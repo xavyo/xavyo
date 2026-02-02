@@ -275,6 +275,58 @@ If a command times out or is interrupted:
 - Re-run the command to completion
 - Do not proceed until you have verified the result
 
+## Documentation Updates (MANDATORY BEFORE COMMIT)
+
+Before committing changes, you MUST update documentation if your changes affect:
+
+### Crate Documentation (`CRATE.md`)
+
+If you modify a crate, update its `crates/<crate-name>/CRATE.md`:
+- **Public API**: Add/update types, traits, functions in the Public API section
+- **Dependencies**: Update if new internal or external dependencies are added
+- **Usage Example**: Update if the API usage pattern changes
+- **Feature Flags**: Document any new feature flags
+- **Anti-Patterns**: Add warnings for common mistakes
+
+### Maturity Level Updates
+
+Update the **Status** section in `CRATE.md` when:
+- A crate moves from alpha to beta (core functionality complete, 20+ tests)
+- A crate moves from beta to stable (comprehensive tests, no critical TODOs)
+- Significant functionality is added or removed
+
+Also update these files to keep maturity indicators in sync:
+- `docs/crates/index.md` - Update the Status column
+- `docs/crates/maturity-matrix.md` - Update the matrix tables
+- `llms.txt` - Update inline maturity badges
+
+### LLM Documentation
+
+If CRATE.md files are modified, regenerate `llms-full.txt`:
+```bash
+cat > llms-full.txt << 'EOF'
+# xavyo - Complete Crate Documentation
+...header...
+EOF
+for f in crates/*/CRATE.md; do cat "$f"; echo -e "\n---\n"; done >> llms-full.txt
+```
+
+### General Documentation
+
+Update `docs/` files when:
+- Architecture changes → `docs/ARCHITECTURE.md`
+- New crate added → `docs/crates/index.md`, `docs/crates/dependency-graph.md`
+- API patterns change → `CLAUDE.md` (this file)
+
+### Documentation Checklist
+
+Before committing, verify:
+- [ ] All modified crates have updated CRATE.md
+- [ ] Maturity levels reflect current state (stable/beta/alpha)
+- [ ] llms-full.txt regenerated if CRATE.md files changed
+- [ ] llms.txt updated if crate maturity changed
+- [ ] docs/crates/index.md and maturity-matrix.md are in sync
+
 ## API-First, No UI (NON-NEGOTIABLE)
 
 This platform is an **API-only backend**. There will NEVER be a UI unless there is absolutely no alternative.
