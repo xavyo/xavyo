@@ -166,10 +166,10 @@ Implement Separation of Duties (SoD) validation service to detect and prevent to
 
 ---
 
-### F-006: xavyo-governance - Implement Risk Assessment Service
+### F-006: xavyo-governance - Implement Risk Assessment Service ✅
 
 **Crate:** `xavyo-governance`
-**Current Status:** Beta
+**Current Status:** Beta ✅ (completed 2026-02-02)
 **Target Status:** Beta
 **Estimated Effort:** 1 week
 **Dependencies:** F-004, F-005
@@ -178,13 +178,13 @@ Implement Separation of Duties (SoD) validation service to detect and prevent to
 Implement risk assessment service for calculating and aggregating risk scores based on entitlements, SoD violations, and user attributes.
 
 **Acceptance Criteria:**
-- [ ] Implement `RiskAssessmentService` with risk level calculation
-- [ ] Add risk factor aggregation (weighted scoring)
-- [ ] Implement risk thresholds (low, medium, high, critical)
-- [ ] Add risk trending over time
-- [ ] Add 20+ unit tests for risk calculations
-- [ ] Integrate with SoD violations as risk factor
-- [ ] Document risk scoring algorithm
+- [x] Implement `RiskAssessmentService` with risk level calculation
+- [x] Add risk factor aggregation (weighted scoring: 0.6 entitlement + 0.4 SoD)
+- [x] Implement risk thresholds (low 0-25, medium 26-50, high 51-75, critical 76-100)
+- [x] Add risk trending over time (RiskHistory, get_risk_trend)
+- [x] Add 20+ unit tests for risk calculations (28 tests, 130 total)
+- [x] Integrate with SoD violations as risk factor (25 points per violation, max 100)
+- [x] Document risk scoring algorithm (CRATE.md, research.md)
 
 **Files to Modify:**
 - `crates/xavyo-governance/src/services/risk.rs` (create)
@@ -1297,6 +1297,9 @@ Update this document as requirements are completed:
 - [x] F-001 - xavyo-nhi foundation ✅ (2026-02-02)
 - [x] F-002 - xavyo-authorization SearchOp ✅ (2026-02-02)
 - [x] F-003 - xavyo-authorization policy admin ✅ (2026-02-02)
+- [x] F-004 - xavyo-governance Entitlement Service ✅ (2026-02-02)
+- [x] F-005 - xavyo-governance SoD Validation ✅ (2026-02-02)
+- [x] F-006 - xavyo-governance Risk Assessment ✅ (2026-02-02)
 - ... (continue for all 48 requirements)
 
 ---
