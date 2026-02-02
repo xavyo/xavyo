@@ -12,9 +12,9 @@ domain
 
 ## Status
 
-🔴 **alpha**
+🟡 **beta**
 
-Experimental with foundation-level implementation (47 tests, 16 public items). Core PDP types defined; full policy evaluation not yet complete.
+Functional implementation with comprehensive test coverage (73 unit tests, 3 doc tests). Core PDP working, SearchOp trait implemented for policy queries.
 
 ## Dependencies
 
@@ -33,90 +33,75 @@ Experimental with foundation-level implementation (47 tests, 16 public items). C
 ### Types
 
 ```rust
-/// Authorization request context
-pub struct AuthzContext {
+/// Authorization request
+pub struct AuthorizationRequest {
+    pub subject_id: Uuid,
     pub tenant_id: Uuid,
-    pub subject_id: Uuid,          // User or agent ID
-    pub subject_type: SubjectType, // User, Agent, Service
-    pub resource_type: String,     // e.g., "user", "report"
-    pub resource_id: Option<Uuid>,
-    pub action: String,            // e.g., "read", "write", "delete"
-    pub environment: Environment,  // Time, IP, risk score
+    pub action: String,
+    pub resource_type: String,
+    pub resource_id: Option<String>,
 }
 
 /// Authorization decision
-pub enum Decision {
-    Allow,
-    Deny,
-    NotApplicable,
-}
-
-/// Authorization response
-pub struct AuthzResponse {
-    pub decision: Decision,
+pub struct AuthorizationDecision {
+    pub allowed: bool,
+    pub reason: String,
+    pub source: DecisionSource,
     pub policy_id: Option<Uuid>,
-    pub reason: Option<String>,
-    pub obligations: Vec<Obligation>,
+    pub decision_id: Uuid,
+    pub latency_ms: f64,
 }
 
-/// Policy condition
-pub struct Condition {
-    pub attribute: String,
-    pub operator: ConditionOperator,
-    pub value: Value,
+/// Policy effect
+pub enum PolicyEffect { Allow, Deny }
+
+/// Decision source
+pub enum DecisionSource { Policy, Entitlement, DefaultDeny }
+
+/// Search filter operator
+pub enum FilterOp { Eq, Ne, Contains, StartsWith, In }
+
+/// Search filter
+pub struct SearchFilter {
+    pub field: String,
+    pub op: FilterOp,
+    pub value: serde_json::Value,
 }
 
-/// Condition operators
-pub enum ConditionOperator {
-    Equals,
-    NotEquals,
-    Contains,
-    GreaterThan,
-    LessThan,
-    InRange,
-    TimeWithin,
+/// Search query
+pub struct SearchQuery {
+    pub filters: Vec<SearchFilter>,
+    pub sort_field: Option<String>,
+    pub sort_dir: SortDir,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
-/// Environment attributes
-pub struct Environment {
-    pub timestamp: DateTime<Utc>,
-    pub ip_address: Option<IpAddr>,
-    pub risk_score: Option<f64>,
-    pub custom: HashMap<String, Value>,
+/// Search result
+pub struct SearchResult<T> {
+    pub items: Vec<T>,
+    pub total: i64,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 ```
 
 ### Traits
 
 ```rust
-/// Policy Decision Point interface
-#[async_trait]
-pub trait PolicyDecisionPoint: Send + Sync {
-    async fn evaluate(&self, ctx: &AuthzContext) -> Result<AuthzResponse, AuthorizationError>;
-    async fn batch_evaluate(&self, contexts: Vec<AuthzContext>) -> Result<Vec<AuthzResponse>, AuthorizationError>;
-}
-```
-
-### Functions
-
-```rust
-/// Create PDP with database pool
+/// Policy Decision Point
 impl PolicyDecisionPoint {
-    pub fn new(pool: PgPool, cache_config: CacheConfig) -> Self;
+    pub fn new(policy_cache: Arc<PolicyCache>, mapping_cache: Arc<MappingCache>) -> Self;
+    pub async fn evaluate(&self, pool: &PgPool, request: AuthorizationRequest, ...) -> AuthorizationDecision;
+    pub async fn invalidate_policies(&self, tenant_id: Uuid);
+    pub async fn invalidate_mappings(&self, tenant_id: Uuid);
 }
 
-/// Entitlement resolver
-impl EntitlementResolver {
-    pub fn new(pool: PgPool) -> Self;
-    pub async fn get_effective_entitlements(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Vec<Entitlement>>;
-    pub async fn has_entitlement(&self, tenant_id: Uuid, user_id: Uuid, entitlement: &str) -> Result<bool>;
-}
-
-/// Policy cache
-impl PolicyCache {
-    pub fn new(max_capacity: u64, ttl_seconds: u64) -> Self;
-    pub async fn get(&self, key: &str) -> Option<Policy>;
-    pub async fn invalidate(&self, tenant_id: Uuid);
+/// SearchOp trait for searchable types
+pub trait SearchOp: Sized {
+    fn table_name() -> &'static str;
+    fn searchable_fields() -> &'static [&'static str];
+    fn default_sort_field() -> &'static str;
 }
 ```
 
@@ -124,43 +109,22 @@ impl PolicyCache {
 
 ```rust
 use xavyo_authorization::{
-    PolicyDecisionPoint, AuthzContext, Decision, Environment,
-    EntitlementResolver,
+    PolicyDecisionPoint, AuthorizationRequest, DecisionSource,
 };
+use xavyo_authorization::search::{SearchQuery, SearchFilter, FilterOp};
 
-// Create PDP
-let pdp = PolicyDecisionPoint::new(pool.clone(), CacheConfig::default());
+// Search for deny policies
+let query = SearchQuery::new()
+    .with_filter(SearchFilter::eq("effect", "deny"))
+    .with_pagination(10, 0);
 
-// Build authorization context
-let ctx = AuthzContext {
+// Build safe SQL
+let (where_clause, params) = query.build_where_clause(
     tenant_id,
-    subject_id: user_id,
-    subject_type: SubjectType::User,
-    resource_type: "report".to_string(),
-    resource_id: Some(report_id),
-    action: "read".to_string(),
-    environment: Environment {
-        timestamp: Utc::now(),
-        ip_address: Some("192.168.1.100".parse().unwrap()),
-        risk_score: Some(0.2),
-        custom: HashMap::new(),
-    },
-};
-
-// Evaluate policy
-let response = pdp.evaluate(&ctx).await?;
-
-match response.decision {
-    Decision::Allow => { /* proceed */ }
-    Decision::Deny => { /* reject with reason */ }
-    Decision::NotApplicable => { /* default deny */ }
-}
-
-// Check specific entitlement
-let resolver = EntitlementResolver::new(pool);
-if resolver.has_entitlement(tenant_id, user_id, "reports:export").await? {
-    // Allow export
-}
+    &["effect", "status", "name"],
+).unwrap();
+// where_clause = "tenant_id = $1 AND effect = $2"
+// params = [tenant_id, "deny"]
 ```
 
 ## Integration Points
@@ -179,8 +143,9 @@ if resolver.has_entitlement(tenant_id, user_id, "reports:export").await? {
 
 - Never bypass PDP for "admin" users - always evaluate
 - Never cache decisions longer than policy TTL
-- Never ignore NotApplicable - default to Deny
+- Never ignore DefaultDeny - it means no policy matched
 - Never leak policy details in error messages to clients
+- Never build SQL without parameterization - use SearchQuery
 
 ## Related Crates
 

@@ -4,6 +4,7 @@ pub mod entitlement_resolver;
 pub mod error;
 pub mod pdp;
 pub mod policy_evaluator;
+pub mod search;
 pub mod types;
 
 pub use cache::{MappingCache, PolicyCache};
