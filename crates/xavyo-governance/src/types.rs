@@ -661,6 +661,221 @@ impl From<BulkOperationId> for Uuid {
     }
 }
 
+// ============================================================================
+// SoD (Separation of Duties) Types (F-005)
+// ============================================================================
+
+/// Unique identifier for an SoD rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SodRuleId(pub Uuid);
+
+impl SodRuleId {
+    /// Create a new random SodRuleId.
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    /// Get the inner UUID.
+    pub fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl Default for SodRuleId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for SodRuleId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<Uuid> for SodRuleId {
+    fn from(id: Uuid) -> Self {
+        Self(id)
+    }
+}
+
+impl From<SodRuleId> for Uuid {
+    fn from(id: SodRuleId) -> Self {
+        id.0
+    }
+}
+
+/// Unique identifier for an SoD violation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SodViolationId(pub Uuid);
+
+impl SodViolationId {
+    /// Create a new random SodViolationId.
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    /// Get the inner UUID.
+    pub fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl Default for SodViolationId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for SodViolationId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<Uuid> for SodViolationId {
+    fn from(id: Uuid) -> Self {
+        Self(id)
+    }
+}
+
+impl From<SodViolationId> for Uuid {
+    fn from(id: SodViolationId) -> Self {
+        id.0
+    }
+}
+
+/// Unique identifier for an SoD exemption.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SodExemptionId(pub Uuid);
+
+impl SodExemptionId {
+    /// Create a new random SodExemptionId.
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    /// Get the inner UUID.
+    pub fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl Default for SodExemptionId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for SodExemptionId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<Uuid> for SodExemptionId {
+    fn from(id: Uuid) -> Self {
+        Self(id)
+    }
+}
+
+impl From<SodExemptionId> for Uuid {
+    fn from(id: SodExemptionId) -> Self {
+        id.0
+    }
+}
+
+/// SoD conflict type - how entitlements conflict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SodConflictType {
+    /// User cannot have both entitlements (mutually exclusive).
+    Exclusive,
+    /// User can have at most N of M entitlements.
+    Cardinality,
+    /// User must have all or none of specified entitlements.
+    Inclusive,
+}
+
+impl fmt::Display for SodConflictType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Exclusive => write!(f, "exclusive"),
+            Self::Cardinality => write!(f, "cardinality"),
+            Self::Inclusive => write!(f, "inclusive"),
+        }
+    }
+}
+
+/// SoD rule severity level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SodSeverity {
+    /// Low severity - informational.
+    Low,
+    /// Medium severity - should be addressed.
+    #[default]
+    Medium,
+    /// High severity - requires attention.
+    High,
+    /// Critical severity - must be resolved immediately.
+    Critical,
+}
+
+impl fmt::Display for SodSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "low"),
+            Self::Medium => write!(f, "medium"),
+            Self::High => write!(f, "high"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
+/// SoD rule status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SodRuleStatus {
+    /// Rule is active and enforced.
+    #[default]
+    Active,
+    /// Rule is inactive (disabled).
+    Inactive,
+}
+
+impl fmt::Display for SodRuleStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Active => write!(f, "active"),
+            Self::Inactive => write!(f, "inactive"),
+        }
+    }
+}
+
+/// SoD violation status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SodViolationStatus {
+    /// Violation is active (not resolved).
+    #[default]
+    Active,
+    /// Violation has been resolved.
+    Resolved,
+}
+
+impl fmt::Display for SodViolationStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Active => write!(f, "active"),
+            Self::Resolved => write!(f, "resolved"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -684,5 +899,46 @@ mod tests {
         let internal = AppType::Internal;
         let json = serde_json::to_string(&internal).unwrap();
         assert_eq!(json, "\"internal\"");
+    }
+
+    #[test]
+    fn test_sod_rule_id() {
+        let id = SodRuleId::new();
+        let uuid: Uuid = id.into();
+        let back: SodRuleId = uuid.into();
+        assert_eq!(id, back);
+    }
+
+    #[test]
+    fn test_sod_conflict_type_display() {
+        assert_eq!(SodConflictType::Exclusive.to_string(), "exclusive");
+        assert_eq!(SodConflictType::Cardinality.to_string(), "cardinality");
+        assert_eq!(SodConflictType::Inclusive.to_string(), "inclusive");
+    }
+
+    #[test]
+    fn test_sod_severity_display() {
+        assert_eq!(SodSeverity::Low.to_string(), "low");
+        assert_eq!(SodSeverity::Medium.to_string(), "medium");
+        assert_eq!(SodSeverity::High.to_string(), "high");
+        assert_eq!(SodSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn test_sod_severity_default() {
+        let severity = SodSeverity::default();
+        assert_eq!(severity, SodSeverity::Medium);
+    }
+
+    #[test]
+    fn test_sod_rule_status_display() {
+        assert_eq!(SodRuleStatus::Active.to_string(), "active");
+        assert_eq!(SodRuleStatus::Inactive.to_string(), "inactive");
+    }
+
+    #[test]
+    fn test_sod_violation_status_display() {
+        assert_eq!(SodViolationStatus::Active.to_string(), "active");
+        assert_eq!(SodViolationStatus::Resolved.to_string(), "resolved");
     }
 }

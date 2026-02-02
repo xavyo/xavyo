@@ -112,11 +112,7 @@ pub trait AssignmentStore: Send + Sync {
     ) -> Result<Vec<EntitlementAssignment>>;
 
     /// List user entitlement IDs (for validation).
-    async fn list_user_entitlement_ids(
-        &self,
-        tenant_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<Vec<Uuid>>;
+    async fn list_user_entitlement_ids(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Vec<Uuid>>;
 }
 
 // ============================================================================
@@ -233,11 +229,7 @@ impl AssignmentStore for InMemoryAssignmentStore {
             .collect())
     }
 
-    async fn list_user_entitlement_ids(
-        &self,
-        tenant_id: Uuid,
-        user_id: Uuid,
-    ) -> Result<Vec<Uuid>> {
+    async fn list_user_entitlement_ids(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Vec<Uuid>> {
         let assignments = self.assignments.read().await;
         Ok(assignments
             .values()
@@ -339,7 +331,10 @@ impl AssignmentService {
             }
         }
 
-        let assignment = self.assignment_store.create(tenant_id, input.clone()).await?;
+        let assignment = self
+            .assignment_store
+            .create(tenant_id, input.clone())
+            .await?;
 
         // Log audit event
         self.audit_store
@@ -359,7 +354,12 @@ impl AssignmentService {
     }
 
     /// Revoke an entitlement assignment.
-    pub async fn revoke(&self, tenant_id: Uuid, assignment_id: Uuid, actor_id: Uuid) -> Result<bool> {
+    pub async fn revoke(
+        &self,
+        tenant_id: Uuid,
+        assignment_id: Uuid,
+        actor_id: Uuid,
+    ) -> Result<bool> {
         // Get current state for audit
         let before: EntitlementAssignment = self
             .assignment_store
@@ -367,7 +367,10 @@ impl AssignmentService {
             .await?
             .ok_or(GovernanceError::AssignmentNotFound(assignment_id))?;
 
-        let deleted = self.assignment_store.delete(tenant_id, assignment_id).await?;
+        let deleted = self
+            .assignment_store
+            .delete(tenant_id, assignment_id)
+            .await?;
 
         if deleted {
             // Log audit event
@@ -435,10 +438,7 @@ mod tests {
         (service, assignment_store, entitlement_store, audit_store)
     }
 
-    async fn create_test_entitlement(
-        store: &InMemoryEntitlementStore,
-        tenant_id: Uuid,
-    ) -> Uuid {
+    async fn create_test_entitlement(store: &InMemoryEntitlementStore, tenant_id: Uuid) -> Uuid {
         let input = CreateEntitlementInput {
             application_id: Uuid::new_v4(),
             name: "Test Entitlement".to_string(),
@@ -544,7 +544,10 @@ mod tests {
                 .unwrap();
         }
 
-        let assignments = service.list_user_entitlements(tenant_id, user_id).await.unwrap();
+        let assignments = service
+            .list_user_entitlements(tenant_id, user_id)
+            .await
+            .unwrap();
         assert_eq!(assignments.len(), 2);
     }
 
@@ -570,7 +573,10 @@ mod tests {
 
         // Second assignment fails
         let result = service.assign(tenant_id, input).await;
-        assert!(matches!(result, Err(GovernanceError::AssignmentAlreadyExists)));
+        assert!(matches!(
+            result,
+            Err(GovernanceError::AssignmentAlreadyExists)
+        ));
     }
 
     #[tokio::test]
@@ -580,7 +586,10 @@ mod tests {
         let actor_id = Uuid::new_v4();
 
         let result = service.revoke(tenant_id, Uuid::new_v4(), actor_id).await;
-        assert!(matches!(result, Err(GovernanceError::AssignmentNotFound(_))));
+        assert!(matches!(
+            result,
+            Err(GovernanceError::AssignmentNotFound(_))
+        ));
     }
 
     #[tokio::test]
@@ -599,7 +608,10 @@ mod tests {
         };
 
         let result = service.assign(tenant_id, input).await;
-        assert!(matches!(result, Err(GovernanceError::EntitlementNotFound(_))));
+        assert!(matches!(
+            result,
+            Err(GovernanceError::EntitlementNotFound(_))
+        ));
     }
 
     #[tokio::test]
@@ -657,7 +669,10 @@ mod tests {
         assert!(retrieved.is_none());
 
         // List in tenant B returns empty
-        let assignments = service.list_user_entitlements(tenant_b, user_id).await.unwrap();
+        let assignments = service
+            .list_user_entitlements(tenant_b, user_id)
+            .await
+            .unwrap();
         assert!(assignments.is_empty());
     }
 
@@ -679,6 +694,9 @@ mod tests {
         };
 
         let result = service.assign(tenant_id, input).await;
-        assert!(matches!(result, Err(GovernanceError::InvalidExpirationDate)));
+        assert!(matches!(
+            result,
+            Err(GovernanceError::InvalidExpirationDate)
+        ));
     }
 }

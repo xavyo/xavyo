@@ -126,6 +126,30 @@ pub enum GovernanceError {
     #[error("SoD exemption requires a non-empty justification")]
     SodExemptionJustificationRequired,
 
+    /// SoD exemption justification too short.
+    #[error("SoD exemption justification must be at least {0} characters")]
+    SodExemptionJustificationTooShort(usize),
+
+    /// SoD exemption expiry date must be in the future.
+    #[error("SoD exemption expiry date must be in the future")]
+    SodExemptionExpiryInPast,
+
+    /// SoD rule requires at least 2 entitlements.
+    #[error("SoD rule requires at least 2 entitlements, got {0}")]
+    SodRuleTooFewEntitlements(usize),
+
+    /// SoD cardinality max_count must be less than entitlement count.
+    #[error("SoD cardinality max_count ({0}) must be less than entitlement count ({1})")]
+    SodRuleInvalidMaxCount(u32, usize),
+
+    /// SoD cardinality max_count is required.
+    #[error("SoD cardinality rule requires max_count to be set")]
+    SodRuleMaxCountRequired,
+
+    /// Multiple SoD violations detected.
+    #[error("Assignment blocked by {0} SoD violation(s)")]
+    SodMultipleViolations(usize),
+
     // =========================================================================
     // Access Request Workflow Errors (F035)
     // =========================================================================

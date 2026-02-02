@@ -11,6 +11,9 @@
 //! - Role-to-entitlement mappings
 //! - Effective access consolidation
 //! - Audit logging for all governance changes
+//! - Separation of Duties (SoD) rule management
+//! - SoD violation detection (preventive and detective)
+//! - SoD exemption handling with time-bound approvals
 //!
 //! # Services
 //!
@@ -18,6 +21,9 @@
 //! - [`services::EntitlementService`] - CRUD operations for entitlements
 //! - [`services::AssignmentService`] - Assign/revoke entitlements for users
 //! - [`services::ValidationService`] - Validate assignments against business rules
+//! - [`services::SodService`] - Manage SoD rules (exclusive, cardinality, inclusive)
+//! - [`services::SodValidationService`] - Validate assignments against SoD rules
+//! - [`services::SodExemptionService`] - Manage SoD exemptions for approved violations
 //!
 //! # Audit
 //!
@@ -34,14 +40,58 @@ pub mod types;
 // Re-export commonly used types
 pub use error::{GovernanceError, Result};
 pub use types::{
-    AppStatus, AppType, ApplicationId, AssignmentId, AssignmentSource, AssignmentStatus,
-    AssignmentTargetType, EntitlementId, EntitlementStatus, RiskLevel,
+    AppStatus,
+    AppType,
+    ApplicationId,
+    AssignmentId,
+    AssignmentSource,
+    AssignmentStatus,
+    AssignmentTargetType,
+    EntitlementId,
+    EntitlementStatus,
+    RiskLevel,
+    // SoD types
+    SodConflictType,
+    SodExemptionId,
+    SodRuleId,
+    SodRuleStatus,
+    SodSeverity,
+    SodViolationId,
+    SodViolationStatus,
 };
 
 // Re-export service types
 pub use services::{
-    AssignEntitlementInput, AssignmentService, CreateEntitlementInput, Entitlement,
-    EntitlementFilter, EntitlementService, ListOptions, UpdateEntitlementInput,
+    AssignEntitlementInput,
+    AssignmentService,
+    CreateEntitlementInput,
+    // SoD service types
+    CreateSodExemptionInput,
+    CreateSodRuleInput,
+    DetectiveScanResult,
+    Entitlement,
+    EntitlementFilter,
+    EntitlementService,
+    InMemorySodExemptionStore,
+    InMemorySodRuleStore,
+    InMemorySodViolationStore,
+    ListOptions,
+    PreventiveValidationResult,
+    RuleScanResult,
+    SodExemption,
+    SodExemptionService,
+    SodExemptionStatus,
+    SodExemptionStore,
+    SodRule,
+    SodRuleStore,
+    SodService,
+    SodValidationService,
+    SodViolation,
+    SodViolationInfo,
+    SodViolationStore,
+    UpdateEntitlementInput,
+    UpdateSodRuleInput,
+    UserViolationReport,
 };
 
 // Re-export audit types
