@@ -28,6 +28,10 @@ pub enum AuthorizationError {
     /// The request is unauthorized (no matching allow policy or entitlement).
     #[error("Unauthorized")]
     Unauthorized,
+
+    /// A generic resource was not found.
+    #[error("Not found: {0}")]
+    NotFound(String),
 }
 
 /// Convenience Result type for the authorization engine.

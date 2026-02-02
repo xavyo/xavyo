@@ -59,7 +59,7 @@ Criteria:
 | xavyo-connector | 🟢 stable | 137 | 79 | Mature framework |
 | xavyo-provisioning | 🟡 beta | 215 | 89 | 11 TODOs in reconciliation |
 | xavyo-governance | 🟡 beta | 3 | 9 | Minimal domain layer |
-| xavyo-authorization | 🟡 beta | 76 | 16 | Foundation only |
+| xavyo-authorization | 🟢 stable | 76 | 16 | Foundation only |
 | xavyo-webhooks | 🟡 beta | 59 | 31 | Needs integration tests |
 | xavyo-siem | 🟡 beta | 115 | 47 | Good coverage, no integration tests |
 | xavyo-secrets | 🟢 stable | 51 | 28 | Multi-provider (Vault, AWS) |
