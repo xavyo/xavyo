@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/xavyo-logo.svg" alt="xavyo" width="400" />
+  <img src="logo-xavyo.png" alt="xavyo" width="400" />
 </p>
 
 <h3 align="center">The Identity Platform for the AI Agent Era</h3>
