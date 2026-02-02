@@ -2023,6 +2023,17 @@ pub enum GovernanceError {
     /// Validation error.
     #[error("Validation error: {0}")]
     Validation(String),
+
+    // =========================================================================
+    // Validation Errors (F-004 Entitlement Service)
+    // =========================================================================
+    /// Validation failed with one or more errors.
+    #[error("Validation failed: {0:?}")]
+    ValidationFailed(Vec<String>),
+
+    /// Prerequisite entitlement not assigned.
+    #[error("Prerequisite entitlement not assigned: {0}")]
+    PrerequisiteNotAssigned(Uuid),
 }
 
 impl GovernanceError {
