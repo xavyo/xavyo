@@ -23,7 +23,7 @@
 - [xavyo-db](crates/xavyo-db/CRATE.md): 🟢 PostgreSQL with RLS
 - [xavyo-tenant](crates/xavyo-tenant/CRATE.md): 🟢 Multi-tenant middleware
 - [xavyo-events](crates/xavyo-events/CRATE.md): 🟢 Kafka event bus
-- [xavyo-nhi](crates/xavyo-nhi/CRATE.md): 🔴 Non-human identity types
+- [xavyo-nhi](crates/xavyo-nhi/CRATE.md): 🟢 Non-human identity types and traits
 
 ### Domain (8 crates)
 - [xavyo-connector](crates/xavyo-connector/CRATE.md): 🟢 Connector framework

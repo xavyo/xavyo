@@ -87,6 +87,8 @@ For detailed crate-level documentation optimized for LLM consumption, see:
 - N/A (stateless plugin; uses Xavyo API for credential retrieval) (125-n8n-get-secret)
 - Rust 1.75+ (per constitution) + Axum + Tower (framework), xavyo-api-agents (existing agent platform), openssl (existing in workspace for x509), rcgen (certificate generation), x509-parser (parsing/validation), xavyo-db (PostgreSQL/SQLx), xavyo-auth (JWT/JwtClaims), xavyo-secrets (CA key storage) (127-agent-pki-certificates)
 - PostgreSQL 15+ with SQLx compile-time checking, 3 new tables (agent_certificates, certificate_authorities, certificate_revocations) with RLS (127-agent-pki-certificates)
+- Rust 1.75+ (per constitution) + serde, uuid, chrono, async-trait, thiserror (already in Cargo.toml) (128-nhi-foundation)
+- N/A (types-only crate, no database) (128-nhi-foundation)
 
 - Rust 1.75+ (per constitution) + Axum + Tower (framework), xavyo-auth (JWT), xavyo-db (PostgreSQL), xavyo-tenant (middleware), chrono (time), lettre (email notifications), serde/serde_json (serialization) (053-deputy-poa)
 - Rust 1.75+ (per constitution) + Axum + Tower (framework), xavyo-auth (JWT), xavyo-db (PostgreSQL/SQLx), xavyo-tenant (middleware), xavyo-governance (existing IGA crate), serde/serde_json, uuid, chrono, lettre (SMTP) (054-workflow-escalation)
@@ -241,9 +243,9 @@ nx affected --target=test        # Test affected projects
 - **Commits**: Use conventional commits (feat:, fix:, docs:, etc.)
 
 ## Recent Changes
+- 128-nhi-foundation: Added Rust 1.75+ (per constitution) + serde, uuid, chrono, async-trait, thiserror (already in Cargo.toml)
 - 127-agent-pki-certificates: Added Rust 1.75+ (per constitution) + Axum + Tower (framework), xavyo-api-agents (existing agent platform), openssl (existing in workspace for x509), rcgen (certificate generation), x509-parser (parsing/validation), xavyo-db (PostgreSQL/SQLx), xavyo-auth (JWT/JwtClaims), xavyo-secrets (CA key storage)
 - 125-n8n-get-secret: Added TypeScript 5.x, Node.js 18+ + n8n-workflow, n8n-core (n8n community node SDK), axios (HTTP client), existing XavyoApiClient from F122/F123
-- 122-n8n-secure-agent-plugin: Added TypeScript 5.x, Node.js 18+ + n8n-workflow, n8n-core (n8n community node SDK), axios (HTTP client)
 
 
 <!-- MANUAL ADDITIONS START -->
