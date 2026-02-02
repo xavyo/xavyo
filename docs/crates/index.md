@@ -15,7 +15,7 @@ Core infrastructure that all other layers depend on.
 | [xavyo-db](../../crates/xavyo-db/CRATE.md) | PostgreSQL models, migrations, RLS | 🟢 stable |
 | [xavyo-tenant](../../crates/xavyo-tenant/CRATE.md) | Multi-tenant middleware extraction | 🟢 stable |
 | [xavyo-events](../../crates/xavyo-events/CRATE.md) | Kafka producer/consumer with idempotence | 🟢 stable |
-| [xavyo-nhi](../../crates/xavyo-nhi/CRATE.md) | Non-human identity types and traits | 🔴 alpha |
+| [xavyo-nhi](../../crates/xavyo-nhi/CRATE.md) | Non-human identity types and traits | 🟢 stable |
 
 ## Domain Layer
 

@@ -50,7 +50,7 @@ Criteria:
 | xavyo-db | 🟢 stable | 958+ | 400+ | 111K LOC, excellent coverage |
 | xavyo-tenant | 🟢 stable | 30 | 13 | Middleware complete |
 | xavyo-events | 🟢 stable | 123+ | 45 | Kafka bus with idempotence |
-| xavyo-nhi | 🔴 alpha | 26 | 11 | Minimal stub implementation |
+| xavyo-nhi | 🟢 stable | 58+ | 30+ | Complete with 37 unit + 21 doc tests |
 
 ### Domain Layer
 
@@ -99,9 +99,9 @@ Criteria:
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 13 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-api-auth, xavyo-api-oauth, xavyo-api-agents, xavyo-api-governance, xavyo-api-tenants |
+| 🟢 Stable | 14 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-api-auth, xavyo-api-oauth, xavyo-api-agents, xavyo-api-governance, xavyo-api-tenants |
 | 🟡 Beta | 13 | xavyo-provisioning, xavyo-governance, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-connector-entra, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi |
-| 🔴 Alpha | 6 | xavyo-nhi, xavyo-authorization, xavyo-connector-rest, xavyo-connector-database, xavyo-api-authorization, xavyo-api-import |
+| 🔴 Alpha | 5 | xavyo-authorization, xavyo-connector-rest, xavyo-connector-database, xavyo-api-authorization, xavyo-api-import |
 
 ---
 
