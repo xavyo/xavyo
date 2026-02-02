@@ -140,10 +140,10 @@ Implement the core `EntitlementService` for managing entitlements (permissions, 
 
 ---
 
-### F-005: xavyo-governance - Implement SoD Validation Service
+### F-005: xavyo-governance - Implement SoD Validation Service ✅
 
 **Crate:** `xavyo-governance`
-**Current Status:** Beta
+**Current Status:** Beta ✅ (completed 2026-02-02)
 **Target Status:** Beta
 **Estimated Effort:** 1.5 weeks
 **Dependencies:** F-004
@@ -152,13 +152,13 @@ Implement the core `EntitlementService` for managing entitlements (permissions, 
 Implement Separation of Duties (SoD) validation service to detect and prevent toxic combinations of entitlements.
 
 **Acceptance Criteria:**
-- [ ] Implement `SodValidationService` with conflict detection
-- [ ] Add rule evaluation engine for SoD policies
-- [ ] Implement conflict types: exclusive, inclusive, cardinality
-- [ ] Add preventive validation (before assignment)
-- [ ] Add detective validation (scan existing assignments)
-- [ ] Add 30+ unit tests for conflict detection scenarios
-- [ ] Add exemption handling for approved violations
+- [x] Implement `SodValidationService` with conflict detection
+- [x] Add rule evaluation engine for SoD policies (SodService)
+- [x] Implement conflict types: exclusive, inclusive, cardinality
+- [x] Add preventive validation (before assignment)
+- [x] Add detective validation (scan existing assignments)
+- [x] Add 30+ unit tests for conflict detection scenarios (91 total tests)
+- [x] Add exemption handling for approved violations (SodExemptionService)
 
 **Files to Modify:**
 - `crates/xavyo-governance/src/services/sod.rs` (create)
