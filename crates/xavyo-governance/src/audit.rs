@@ -215,6 +215,15 @@ impl InMemoryAuditStore {
     pub async fn clear(&self) {
         self.events.write().await.clear();
     }
+
+    /// Get all events (for testing).
+    pub fn get_all(&self) -> Vec<EntitlementAuditEvent> {
+        // Use try_read to avoid blocking
+        self.events
+            .try_read()
+            .map(|guard| guard.values().cloned().collect())
+            .unwrap_or_default()
+    }
 }
 
 #[async_trait::async_trait]

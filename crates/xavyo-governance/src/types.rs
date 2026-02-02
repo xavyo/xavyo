@@ -876,6 +876,269 @@ impl fmt::Display for SodViolationStatus {
     }
 }
 
+// ============================================================================
+// Risk Assessment Types (F-006)
+// ============================================================================
+
+/// Unique identifier for a risk history record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct RiskHistoryId(pub Uuid);
+
+impl RiskHistoryId {
+    /// Create a new random RiskHistoryId.
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    /// Get the inner UUID.
+    pub fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl Default for RiskHistoryId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for RiskHistoryId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<Uuid> for RiskHistoryId {
+    fn from(id: Uuid) -> Self {
+        Self(id)
+    }
+}
+
+impl From<RiskHistoryId> for Uuid {
+    fn from(id: RiskHistoryId) -> Self {
+        id.0
+    }
+}
+
+/// Represents the contribution of a single factor to the risk score.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RiskFactorResult {
+    /// Factor identifier (e.g., "entitlements", "sod_violations").
+    pub name: String,
+    /// Configured weight for this factor (0.0-1.0).
+    pub weight: f64,
+    /// Factor's raw score before weighting (0-100).
+    pub raw_value: f64,
+    /// Weighted contribution to final score.
+    pub contribution: f64,
+    /// Human-readable explanation.
+    pub description: Option<String>,
+}
+
+impl RiskFactorResult {
+    /// Create a new risk factor result.
+    pub fn new(name: impl Into<String>, weight: f64, raw_value: f64) -> Self {
+        let contribution = raw_value * weight;
+        Self {
+            name: name.into(),
+            weight,
+            raw_value,
+            contribution,
+            description: None,
+        }
+    }
+
+    /// Add a description to the factor result.
+    pub fn with_description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+}
+
+/// Represents a calculated risk value for a user at a point in time.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RiskScore {
+    /// User being assessed.
+    pub user_id: Uuid,
+    /// Tenant for isolation.
+    pub tenant_id: Uuid,
+    /// Calculated risk score (0-100).
+    pub score: u8,
+    /// Classified risk level.
+    pub level: RiskLevel,
+    /// Breakdown of contributing factors.
+    pub factors: Vec<RiskFactorResult>,
+    /// When score was calculated.
+    pub calculated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl RiskScore {
+    /// Create a new risk score.
+    pub fn new(
+        tenant_id: Uuid,
+        user_id: Uuid,
+        score: u8,
+        level: RiskLevel,
+        factors: Vec<RiskFactorResult>,
+    ) -> Self {
+        Self {
+            user_id,
+            tenant_id,
+            score,
+            level,
+            factors,
+            calculated_at: chrono::Utc::now(),
+        }
+    }
+}
+
+/// Per-tenant configuration for risk level classification boundaries.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RiskThresholds {
+    /// Tenant identifier.
+    pub tenant_id: Uuid,
+    /// Max score for "Low" level (default: 25).
+    pub low_max: u8,
+    /// Max score for "Medium" level (default: 50).
+    pub medium_max: u8,
+    /// Max score for "High" level (default: 75).
+    pub high_max: u8,
+    /// Last modification timestamp.
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    /// Actor who made the change.
+    pub updated_by: Uuid,
+}
+
+impl RiskThresholds {
+    /// Create new thresholds with custom values.
+    pub fn new(
+        tenant_id: Uuid,
+        low_max: u8,
+        medium_max: u8,
+        high_max: u8,
+        updated_by: Uuid,
+    ) -> Self {
+        Self {
+            tenant_id,
+            low_max,
+            medium_max,
+            high_max,
+            updated_at: chrono::Utc::now(),
+            updated_by,
+        }
+    }
+
+    /// Create default thresholds for a tenant.
+    pub fn default_for_tenant(tenant_id: Uuid, updated_by: Uuid) -> Self {
+        Self {
+            tenant_id,
+            low_max: 25,
+            medium_max: 50,
+            high_max: 75,
+            updated_at: chrono::Utc::now(),
+            updated_by,
+        }
+    }
+
+    /// Validate threshold boundaries.
+    ///
+    /// Returns `Ok(())` if thresholds are valid, or an error message if not.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.low_max == 0 {
+            return Err("low_max must be greater than 0".to_string());
+        }
+        if self.low_max >= self.medium_max {
+            return Err(format!(
+                "low_max ({}) must be less than medium_max ({})",
+                self.low_max, self.medium_max
+            ));
+        }
+        if self.medium_max >= self.high_max {
+            return Err(format!(
+                "medium_max ({}) must be less than high_max ({})",
+                self.medium_max, self.high_max
+            ));
+        }
+        if self.high_max >= 100 {
+            return Err(format!(
+                "high_max ({}) must be less than 100",
+                self.high_max
+            ));
+        }
+        Ok(())
+    }
+
+    /// Get the risk level for a given score.
+    pub fn get_level(&self, score: u8) -> RiskLevel {
+        if score <= self.low_max {
+            RiskLevel::Low
+        } else if score <= self.medium_max {
+            RiskLevel::Medium
+        } else if score <= self.high_max {
+            RiskLevel::High
+        } else {
+            RiskLevel::Critical
+        }
+    }
+}
+
+impl Default for RiskThresholds {
+    fn default() -> Self {
+        Self {
+            tenant_id: Uuid::nil(),
+            low_max: 25,
+            medium_max: 50,
+            high_max: 75,
+            updated_at: chrono::Utc::now(),
+            updated_by: Uuid::nil(),
+        }
+    }
+}
+
+/// Historical record of risk scores for trend analysis.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RiskHistory {
+    /// Unique history record ID.
+    pub id: RiskHistoryId,
+    /// Tenant for isolation.
+    pub tenant_id: Uuid,
+    /// User whose risk was recorded.
+    pub user_id: Uuid,
+    /// Risk score at this point.
+    pub score: u8,
+    /// Risk level at this point.
+    pub level: RiskLevel,
+    /// When this record was created.
+    pub recorded_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl RiskHistory {
+    /// Create a new risk history record.
+    pub fn new(tenant_id: Uuid, user_id: Uuid, score: u8, level: RiskLevel) -> Self {
+        Self {
+            id: RiskHistoryId::new(),
+            tenant_id,
+            user_id,
+            score,
+            level,
+            recorded_at: chrono::Utc::now(),
+        }
+    }
+
+    /// Create from a RiskScore.
+    pub fn from_score(score: &RiskScore) -> Self {
+        Self {
+            id: RiskHistoryId::new(),
+            tenant_id: score.tenant_id,
+            user_id: score.user_id,
+            score: score.score,
+            level: score.level,
+            recorded_at: chrono::Utc::now(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -940,5 +1203,123 @@ mod tests {
     fn test_sod_violation_status_display() {
         assert_eq!(SodViolationStatus::Active.to_string(), "active");
         assert_eq!(SodViolationStatus::Resolved.to_string(), "resolved");
+    }
+
+    // =========================================================================
+    // Risk Assessment Types Tests (F-006)
+    // =========================================================================
+
+    #[test]
+    fn test_risk_history_id() {
+        let id = RiskHistoryId::new();
+        let uuid: Uuid = id.into();
+        let back: RiskHistoryId = uuid.into();
+        assert_eq!(id, back);
+    }
+
+    #[test]
+    fn test_risk_factor_result_new() {
+        let factor = RiskFactorResult::new("test", 0.5, 80.0);
+        assert_eq!(factor.name, "test");
+        assert_eq!(factor.weight, 0.5);
+        assert_eq!(factor.raw_value, 80.0);
+        assert_eq!(factor.contribution, 40.0); // 80 * 0.5
+        assert!(factor.description.is_none());
+    }
+
+    #[test]
+    fn test_risk_factor_result_with_description() {
+        let factor = RiskFactorResult::new("test", 0.5, 80.0).with_description("Test description");
+        assert_eq!(factor.description, Some("Test description".to_string()));
+    }
+
+    #[test]
+    fn test_risk_score_new() {
+        let tenant_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+        let factors = vec![RiskFactorResult::new("test", 1.0, 50.0)];
+
+        let score = RiskScore::new(tenant_id, user_id, 50, RiskLevel::Medium, factors.clone());
+
+        assert_eq!(score.tenant_id, tenant_id);
+        assert_eq!(score.user_id, user_id);
+        assert_eq!(score.score, 50);
+        assert_eq!(score.level, RiskLevel::Medium);
+        assert_eq!(score.factors.len(), 1);
+    }
+
+    #[test]
+    fn test_risk_thresholds_default() {
+        let thresholds = RiskThresholds::default();
+        assert_eq!(thresholds.low_max, 25);
+        assert_eq!(thresholds.medium_max, 50);
+        assert_eq!(thresholds.high_max, 75);
+    }
+
+    #[test]
+    fn test_risk_thresholds_validate_valid() {
+        let tenant_id = Uuid::new_v4();
+        let actor_id = Uuid::new_v4();
+        let thresholds = RiskThresholds::new(tenant_id, 25, 50, 75, actor_id);
+        assert!(thresholds.validate().is_ok());
+    }
+
+    #[test]
+    fn test_risk_thresholds_validate_invalid_ordering() {
+        let tenant_id = Uuid::new_v4();
+        let actor_id = Uuid::new_v4();
+        let thresholds = RiskThresholds::new(tenant_id, 50, 25, 75, actor_id);
+        assert!(thresholds.validate().is_err());
+    }
+
+    #[test]
+    fn test_risk_thresholds_validate_high_max_too_large() {
+        let tenant_id = Uuid::new_v4();
+        let actor_id = Uuid::new_v4();
+        let thresholds = RiskThresholds::new(tenant_id, 25, 50, 100, actor_id);
+        assert!(thresholds.validate().is_err());
+    }
+
+    #[test]
+    fn test_risk_thresholds_get_level() {
+        let tenant_id = Uuid::new_v4();
+        let actor_id = Uuid::new_v4();
+        let thresholds = RiskThresholds::new(tenant_id, 25, 50, 75, actor_id);
+
+        assert_eq!(thresholds.get_level(0), RiskLevel::Low);
+        assert_eq!(thresholds.get_level(25), RiskLevel::Low);
+        assert_eq!(thresholds.get_level(26), RiskLevel::Medium);
+        assert_eq!(thresholds.get_level(50), RiskLevel::Medium);
+        assert_eq!(thresholds.get_level(51), RiskLevel::High);
+        assert_eq!(thresholds.get_level(75), RiskLevel::High);
+        assert_eq!(thresholds.get_level(76), RiskLevel::Critical);
+        assert_eq!(thresholds.get_level(100), RiskLevel::Critical);
+    }
+
+    #[test]
+    fn test_risk_history_new() {
+        let tenant_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+
+        let history = RiskHistory::new(tenant_id, user_id, 50, RiskLevel::Medium);
+
+        assert_eq!(history.tenant_id, tenant_id);
+        assert_eq!(history.user_id, user_id);
+        assert_eq!(history.score, 50);
+        assert_eq!(history.level, RiskLevel::Medium);
+    }
+
+    #[test]
+    fn test_risk_history_from_score() {
+        let tenant_id = Uuid::new_v4();
+        let user_id = Uuid::new_v4();
+
+        let score = RiskScore::new(tenant_id, user_id, 75, RiskLevel::High, vec![]);
+        let history = RiskHistory::from_score(&score);
+
+        assert_eq!(history.tenant_id, tenant_id);
+        assert_eq!(history.user_id, user_id);
+        assert_eq!(history.score, 75);
+        assert_eq!(history.level, RiskLevel::High);
     }
 }

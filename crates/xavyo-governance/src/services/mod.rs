@@ -1,10 +1,11 @@
 //! Service layer for identity governance.
 //!
 //! This module provides business logic services for managing entitlements,
-//! assignments, validation rules, and Separation of Duties (SoD).
+//! assignments, validation rules, Separation of Duties (SoD), and risk assessment.
 
 pub mod assignment;
 pub mod entitlement;
+pub mod risk;
 pub mod sod;
 pub mod sod_exemption;
 pub mod sod_validation;
@@ -35,4 +36,10 @@ pub use sod_exemption::{
 pub use sod_validation::{
     DetectiveScanResult, InMemorySodViolationStore, PreventiveValidationResult, RuleScanResult,
     SodValidationService, SodViolation, SodViolationInfo, SodViolationStore, UserViolationReport,
+};
+
+// Re-export Risk Assessment types
+pub use risk::{
+    InMemoryRiskHistoryStore, InMemoryRiskThresholdStore, RiskAssessmentService, RiskHistoryStore,
+    RiskThresholdStore,
 };

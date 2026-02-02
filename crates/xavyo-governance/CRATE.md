@@ -14,7 +14,7 @@ domain
 
 🟡 **beta**
 
-Feature-complete with 91 tests. Implements EntitlementService, AssignmentService, ValidationService, and full SoD (Separation of Duties) validation with SodService, SodValidationService, and SodExemptionService. Supports preventive validation (block bad assignments), detective validation (scan existing assignments), and time-bound exemptions. Audit logging integrated. Ready for API layer integration.
+Feature-complete with 130 tests. Implements EntitlementService, AssignmentService, ValidationService, full SoD (Separation of Duties) validation with SodService, SodValidationService, and SodExemptionService, and RiskAssessmentService (F-006). Supports preventive validation (block bad assignments), detective validation (scan existing assignments), time-bound exemptions, and risk scoring based on entitlements and SoD violations. Audit logging integrated. Ready for API layer integration.
 
 ## Dependencies
 
@@ -89,6 +89,17 @@ pub struct SodExemptionService {
     async fn revoke_exemption(&self, tenant_id: Uuid, id: SodExemptionId, revoked_by: Uuid) -> Result<SodExemption>;
     async fn is_exempted(&self, tenant_id: Uuid, rule_id: SodRuleId, user_id: Uuid) -> Result<bool>;
     async fn list_user_exemptions(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Vec<SodExemption>>;
+}
+
+/// Service for risk assessment and scoring (F-006)
+pub struct RiskAssessmentService {
+    fn new(threshold_store: Arc<dyn RiskThresholdStore>, history_store: Arc<dyn RiskHistoryStore>, audit_store: Arc<dyn AuditStore>) -> Self;
+    async fn calculate_user_risk(&self, tenant_id: Uuid, user_id: Uuid, entitlements: &[RiskLevel], sod_violation_count: usize) -> Result<RiskScore>;
+    async fn get_risk_level(&self, tenant_id: Uuid, score: u8) -> Result<RiskLevel>;
+    async fn configure_thresholds(&self, tenant_id: Uuid, thresholds: RiskThresholds, actor_id: Uuid) -> Result<RiskThresholds>;
+    async fn get_thresholds(&self, tenant_id: Uuid) -> Result<RiskThresholds>;
+    async fn record_risk_history(&self, tenant_id: Uuid, user_id: Uuid, score: &RiskScore) -> Result<()>;
+    async fn get_risk_trend(&self, tenant_id: Uuid, user_id: Uuid, since: DateTime<Utc>) -> Result<Vec<RiskHistory>>;
 }
 ```
 
@@ -236,6 +247,49 @@ pub struct SodViolationInfo {
 }
 ```
 
+### Risk Assessment Types (F-006)
+
+```rust
+/// A calculated risk score for a user
+pub struct RiskScore {
+    pub user_id: Uuid,
+    pub tenant_id: Uuid,
+    pub score: u8,           // 0-100
+    pub level: RiskLevel,    // Low/Medium/High/Critical
+    pub factors: Vec<RiskFactorResult>,
+    pub calculated_at: DateTime<Utc>,
+}
+
+/// Contribution of a single factor to the risk score
+pub struct RiskFactorResult {
+    pub name: String,        // e.g., "entitlements", "sod_violations"
+    pub weight: f64,         // 0.0-1.0 (0.6 for entitlements, 0.4 for SoD)
+    pub raw_value: f64,      // 0-100 before weighting
+    pub contribution: f64,   // Weighted contribution
+    pub description: Option<String>,
+}
+
+/// Per-tenant risk threshold configuration
+pub struct RiskThresholds {
+    pub tenant_id: Uuid,
+    pub low_max: u8,         // Default: 25
+    pub medium_max: u8,      // Default: 50
+    pub high_max: u8,        // Default: 75
+    pub updated_at: DateTime<Utc>,
+    pub updated_by: Uuid,
+}
+
+/// Historical risk record for trend analysis
+pub struct RiskHistory {
+    pub id: RiskHistoryId,
+    pub tenant_id: Uuid,
+    pub user_id: Uuid,
+    pub score: u8,
+    pub level: RiskLevel,
+    pub recorded_at: DateTime<Utc>,
+}
+```
+
 ### ID Types
 
 ```rust
@@ -245,6 +299,7 @@ pub struct AssignmentId(Uuid);
 pub struct SodRuleId(Uuid);       // F-005
 pub struct SodViolationId(Uuid);  // F-005
 pub struct SodExemptionId(Uuid);  // F-005
+pub struct RiskHistoryId(Uuid);   // F-006
 ```
 
 ### Enums
@@ -293,6 +348,10 @@ pub enum GovernanceError {
     SodExemptionJustificationTooShort(usize),
     SodExemptionExpiryInPast,
     SodMultipleViolations(usize),
+
+    // Risk Assessment Errors (F-006)
+    RiskThresholdInvalid { reason: String },
+    RiskCalculationFailed { reason: String },
 }
 ```
 
@@ -443,6 +502,75 @@ let result = validation_service.validate_preventive(
     &current_entitlements,
 ).await?;
 assert!(result.is_valid); // Passes because of exemption
+```
+
+## Risk Assessment Usage Example (F-006)
+
+```rust
+use xavyo_governance::services::{
+    RiskAssessmentService, InMemoryRiskThresholdStore, InMemoryRiskHistoryStore,
+};
+use xavyo_governance::types::RiskLevel;
+use xavyo_governance::audit::InMemoryAuditStore;
+use std::sync::Arc;
+
+// Create stores
+let threshold_store = Arc::new(InMemoryRiskThresholdStore::new());
+let history_store = Arc::new(InMemoryRiskHistoryStore::new());
+let audit_store = Arc::new(InMemoryAuditStore::new());
+
+// Create service
+let risk_service = RiskAssessmentService::new(
+    threshold_store,
+    history_store,
+    audit_store,
+);
+
+let tenant_id = uuid::Uuid::new_v4();
+let user_id = uuid::Uuid::new_v4();
+
+// User's entitlement risk levels
+let entitlements = vec![RiskLevel::Low, RiskLevel::Medium, RiskLevel::High];
+let sod_violations = 1;
+
+// Calculate risk
+let risk = risk_service.calculate_user_risk(
+    tenant_id,
+    user_id,
+    &entitlements,
+    sod_violations,
+).await?;
+
+// Risk formula:
+// EntitlementFactor = avg(10, 40, 70) = 40, * 0.6 = 24
+// SodFactor = min(100, 1 * 25) = 25, * 0.4 = 10
+// Total = 34 (Medium)
+println!("Score: {}, Level: {:?}", risk.score, risk.level);
+
+// Record for trending
+risk_service.record_risk_history(tenant_id, user_id, &risk).await?;
+
+// Later: Get trend for last 30 days
+let since = chrono::Utc::now() - chrono::Duration::days(30);
+let trend = risk_service.get_risk_trend(tenant_id, user_id, since).await?;
+
+for entry in trend {
+    println!("{}: {} ({:?})", entry.recorded_at, entry.score, entry.level);
+}
+
+// Configure custom thresholds (admin only)
+let admin_id = uuid::Uuid::new_v4();
+use xavyo_governance::types::RiskThresholds;
+
+let thresholds = RiskThresholds {
+    tenant_id,
+    low_max: 30,      // Low: 0-30 (default: 25)
+    medium_max: 60,   // Medium: 31-60 (default: 50)
+    high_max: 85,     // High: 61-85 (default: 75)
+    ..Default::default()
+};
+
+risk_service.configure_thresholds(tenant_id, thresholds, admin_id).await?;
 ```
 
 ## Integration Points
