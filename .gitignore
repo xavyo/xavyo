@@ -162,9 +162,8 @@ data/
 dump.rdb
 
 # --------------------------------------------
-# Documentation (to be updated)
+# Documentation build artifacts (docs/ is tracked)
 # --------------------------------------------
-docs/
 site/
 _site/
 .docusaurus/

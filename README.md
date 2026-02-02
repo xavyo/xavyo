@@ -150,11 +150,16 @@ curl -X POST http://localhost:8080/auth/login \
 
 ## 📚 Documentation
 
-| Resource | Link |
-|----------|------|
-| **API Reference** | [Swagger UI](http://localhost:8080/swagger-ui/) |
-| **OpenAPI Spec** | [`docs/api/openapi.json`](docs/api/openapi.json) |
-| **Architecture** | [Architecture Guide](docs/architecture.md) |
+| Resource | Description |
+|----------|-------------|
+| **[llms.txt](llms.txt)** | LLM-friendly navigation index for all 32 crates |
+| **[llms-full.txt](llms-full.txt)** | Complete documentation (~15,500 words) |
+| **[Architecture](docs/ARCHITECTURE.md)** | System architecture overview |
+| **[Crate Index](docs/crates/index.md)** | All crates organized by layer |
+| **[Dependency Graph](docs/crates/dependency-graph.md)** | Visual dependency relationships |
+| **[API Reference](http://localhost:8080/swagger-ui/)** | Swagger UI (when running) |
+
+Each crate has a standardized `CRATE.md` file at its root (e.g., [`crates/xavyo-core/CRATE.md`](crates/xavyo-core/CRATE.md)).
 
 ---
 

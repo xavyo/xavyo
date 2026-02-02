@@ -1,0 +1,80 @@
+# xavyo
+
+> Unified identity platform for humans, machines, and AI agents. Built in Rust with multi-tenant PostgreSQL.
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md): System overview and design principles
+- [Crate Index](docs/crates/index.md): All 32 crates organized by layer
+- [Dependency Graph](docs/crates/dependency-graph.md): How crates relate
+
+## Crate Layers
+
+### Foundation (6 crates)
+- [xavyo-core](crates/xavyo-core/CRATE.md): Shared types (TenantId, UserId, errors)
+- [xavyo-auth](crates/xavyo-auth/CRATE.md): JWT, password hashing, JWKS
+- [xavyo-db](crates/xavyo-db/CRATE.md): PostgreSQL with RLS
+- [xavyo-tenant](crates/xavyo-tenant/CRATE.md): Multi-tenant middleware
+- [xavyo-events](crates/xavyo-events/CRATE.md): Kafka event bus
+- [xavyo-nhi](crates/xavyo-nhi/CRATE.md): Non-human identity types
+
+### Domain (8 crates)
+- [xavyo-connector](crates/xavyo-connector/CRATE.md): Connector framework
+- [xavyo-provisioning](crates/xavyo-provisioning/CRATE.md): Sync engine
+- [xavyo-governance](crates/xavyo-governance/CRATE.md): IGA logic
+- [xavyo-authorization](crates/xavyo-authorization/CRATE.md): Policy engine
+- [xavyo-webhooks](crates/xavyo-webhooks/CRATE.md): Event delivery
+- [xavyo-siem](crates/xavyo-siem/CRATE.md): Audit export
+- [xavyo-secrets](crates/xavyo-secrets/CRATE.md): Secret providers
+- [xavyo-scim-client](crates/xavyo-scim-client/CRATE.md): Outbound SCIM
+
+### Connectors (4 crates)
+- [xavyo-connector-ldap](crates/xavyo-connector-ldap/CRATE.md): LDAP/AD
+- [xavyo-connector-rest](crates/xavyo-connector-rest/CRATE.md): REST APIs
+- [xavyo-connector-entra](crates/xavyo-connector-entra/CRATE.md): Microsoft Entra
+- [xavyo-connector-database](crates/xavyo-connector-database/CRATE.md): Databases
+
+### API (14 crates)
+- [xavyo-api-auth](crates/xavyo-api-auth/CRATE.md): Auth endpoints
+- [xavyo-api-oauth](crates/xavyo-api-oauth/CRATE.md): OAuth2/OIDC provider
+- [xavyo-api-users](crates/xavyo-api-users/CRATE.md): User management
+- [xavyo-api-scim](crates/xavyo-api-scim/CRATE.md): SCIM provisioning
+- [xavyo-api-saml](crates/xavyo-api-saml/CRATE.md): SAML IdP
+- [xavyo-api-social](crates/xavyo-api-social/CRATE.md): Social login
+- [xavyo-api-agents](crates/xavyo-api-agents/CRATE.md): AI agent security
+- [xavyo-api-governance](crates/xavyo-api-governance/CRATE.md): IGA API
+- [xavyo-api-connectors](crates/xavyo-api-connectors/CRATE.md): Connector API
+- [xavyo-api-tenants](crates/xavyo-api-tenants/CRATE.md): Tenant management
+- [xavyo-api-authorization](crates/xavyo-api-authorization/CRATE.md): Authz API
+- [xavyo-api-import](crates/xavyo-api-import/CRATE.md): Bulk import
+- [xavyo-api-oidc-federation](crates/xavyo-api-oidc-federation/CRATE.md): OIDC federation
+- [xavyo-api-nhi](crates/xavyo-api-nhi/CRATE.md): Non-human identity API
+
+## Quick Reference
+
+### Multi-Tenancy Pattern
+Every handler extracts tenant from JWT claims:
+```rust
+use xavyo_auth::JwtClaims;
+use axum::Extension;
+
+async fn handler(Extension(claims): Extension<JwtClaims>) -> Result<...> {
+    let tenant_id = claims.tenant_id()?.as_uuid();
+    // Use tenant_id in all DB queries
+}
+```
+
+### Error Handling
+All crates use `thiserror` with domain-specific error types.
+
+### Database Queries
+Always include `tenant_id` in WHERE clauses:
+```sql
+SELECT * FROM resources WHERE tenant_id = $1 AND id = $2;
+```
+
+### Feature Flags
+Common flags across crates:
+- `kafka` - Enable Kafka event streaming
+- `openapi` - Generate OpenAPI/utoipa documentation
+- `test-utils` - Include test helpers

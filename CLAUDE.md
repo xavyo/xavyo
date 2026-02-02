@@ -2,6 +2,17 @@
 
 Auto-generated from all feature plans. Last updated: 2026-01-31
 
+## LLM-Friendly Documentation
+
+For detailed crate-level documentation optimized for LLM consumption, see:
+
+- **[llms.txt](llms.txt)** - Navigation index for all 32 crates with quick reference
+- **[llms-full.txt](llms-full.txt)** - Complete documentation (4600+ lines)
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture overview
+- **[docs/crates/index.md](docs/crates/index.md)** - Crate index by layer
+- **[docs/crates/dependency-graph.md](docs/crates/dependency-graph.md)** - Visual dependency graph
+- **Per-crate docs**: Each crate has a `CRATE.md` file at its root (e.g., `crates/xavyo-core/CRATE.md`)
+
 ## Active Technologies
 - Rust 1.75+ (per constitution) + Axum + Tower (framework), xavyo-auth (JWT/JwtClaims), xavyo-db (PostgreSQL), xavyo-tenant (middleware), xavyo-core (TenantId, UserId types), serde/serde_json (serialization), sqlx (compile-time queries), chrono (timestamps), uuid (identifiers), reqwest (HTTP client for ticketing APIs), aes-gcm (credential encryption) (064-semi-manual-resources)
 - Rust 1.75+ (per constitution) + Axum + Tower (framework), xavyo-auth (JWT/JwtClaims), xavyo-db (PostgreSQL), xavyo-tenant (middleware), xavyo-core (TenantId, UserId types), xavyo-connector (OperationType, HookPhase), xavyo-provisioning (HookManager, HookExecutor, HookContext), rhai (scripting engine), serde/serde_json (serialization), sqlx (compile-time queries), chrono (timestamps), uuid (identifiers) (066-provisioning-scripts)

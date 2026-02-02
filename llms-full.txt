@@ -1,0 +1,4642 @@
+# xavyo - Complete Crate Documentation
+
+> This file contains the full documentation for all 32 xavyo crates.
+> Generated from individual CRATE.md files. Use llms.txt for navigation.
+
+---
+
+# xavyo-api-agents
+
+> AI agent security API: registration, tool authorization, audit, MCP/A2A protocol.
+
+## Purpose
+
+Implements OWASP ASI (AI Security Initiative) guidelines for AI agent management. Provides agent registration, tool authorization with JSON Schema validation, real-time authorization decisions (<100ms), comprehensive audit logging, dynamic secrets provisioning, workload identity federation, and MCP/A2A protocol support.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-auth` - JWT validation
+- `xavyo-db` - Agent and tool models
+- `xavyo-tenant` - Multi-tenant middleware
+- `xavyo-nhi` - Non-human identity types
+- `xavyo-events` - Kafka events (optional)
+- `xavyo-secrets` - Dynamic credential provisioning
+
+### External (key)
+- `axum` - Web framework
+- `jsonschema` - Parameter validation
+- `reqwest` - Webhook delivery
+- `rcgen` - Certificate generation
+- `aws-sdk-sts` - AWS federation (optional)
+
+## Public API
+
+### Routers
+
+```rust
+/// Main agent management router
+pub fn agents_router() -> Router<AgentsState>;
+
+/// A2A protocol router
+pub fn a2a_router() -> Router<AgentsState>;
+
+/// MCP (Model Context Protocol) router
+pub fn mcp_router() -> Router<AgentsState>;
+
+/// Discovery router
+pub fn discovery_router() -> Router<AgentsState>;
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/agents` | Register agent |
+| GET | `/agents` | List agents |
+| GET | `/agents/:id` | Get agent |
+| PATCH | `/agents/:id` | Update agent |
+| DELETE | `/agents/:id` | Delete agent |
+| POST | `/agents/:id/suspend` | Suspend agent |
+| POST | `/agents/:id/reactivate` | Reactivate agent |
+| POST | `/tools` | Register tool |
+| GET | `/tools` | List tools |
+| GET | `/tools/:id` | Get tool |
+| PATCH | `/tools/:id` | Update tool |
+| DELETE | `/tools/:id` | Delete tool |
+| POST | `/agents/:id/permissions` | Grant permission |
+| DELETE | `/agents/:id/permissions/:tool_id` | Revoke permission |
+| POST | `/authorize` | Real-time authorization |
+| GET | `/audit` | Query audit trail |
+| GET | `/.well-known/agents/:id.json` | AgentCard discovery |
+| POST | `/mcp/tasks` | Create MCP task |
+| GET | `/mcp/tasks/:id` | Get MCP task status |
+| POST | `/credentials/request` | Request dynamic credential |
+| GET | `/identity/token` | Get workload identity token |
+| POST | `/certificates/issue` | Issue agent certificate |
+
+### Types
+
+```rust
+/// Agents state container
+pub struct AgentsState {
+    pub pool: PgPool,
+    pub secret_provider: Arc<dyn SecretProvider>,
+}
+
+/// Agent registration
+pub struct CreateAgentRequest {
+    pub name: String,
+    pub description: Option<String>,
+    pub agent_type: AgentType,
+    pub owner_id: Uuid,
+    pub allowed_tools: Vec<Uuid>,
+}
+
+/// Tool registration
+pub struct CreateToolRequest {
+    pub name: String,
+    pub description: String,
+    pub endpoint: String,
+    pub parameters_schema: Value,  // JSON Schema
+    pub risk_level: RiskLevel,
+}
+
+/// Authorization request (<100ms SLA)
+pub struct AuthorizeRequest {
+    pub agent_id: Uuid,
+    pub tool_id: Uuid,
+    pub parameters: Value,
+    pub context: AuthorizationContext,
+}
+
+/// Authorization response
+pub struct AuthorizeResponse {
+    pub allowed: bool,
+    pub reason: Option<String>,
+    pub audit_id: Uuid,
+}
+
+/// AgentCard (A2A protocol)
+pub struct AgentCard {
+    pub id: Uuid,
+    pub name: String,
+    pub capabilities: Vec<String>,
+    pub endpoints: AgentEndpoints,
+    pub public_key: Option<String>,
+}
+
+/// Dynamic credential request
+pub struct CredentialRequest {
+    pub agent_id: Uuid,
+    pub secret_type: String,
+    pub scope: String,
+    pub ttl_seconds: u32,
+}
+```
+
+## Usage Example
+
+```rust
+use xavyo_api_agents::{agents_router, discovery_router, AgentsState};
+use axum::Router;
+
+// Create state
+let agents_state = AgentsState::new(pool.clone(), secret_provider);
+
+// Build application
+let app = Router::new()
+    .nest("/api/v1/agents", agents_router())
+    .merge(discovery_router())
+    .with_state(agents_state);
+
+// Agent lifecycle:
+// 1. Register agent: POST /api/v1/agents
+// 2. Register tools: POST /api/v1/agents/tools
+// 3. Grant permissions: POST /api/v1/agents/:id/permissions
+// 4. Agent requests authorization: POST /api/v1/agents/authorize
+// 5. Agent executes tool (if authorized)
+// 6. Audit trail recorded automatically
+
+// Dynamic secrets:
+// 1. Agent requests credential: POST /api/v1/agents/credentials/request
+// 2. System provisions short-lived credential
+// 3. Agent uses credential for external service
+// 4. Credential auto-expires after TTL
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application, AI orchestrators
+- **Provides**: AgentCard at `/.well-known/agents/:id.json`
+- **Integrates with**: HashiCorp Vault, AWS STS, OpenBao
+
+## Feature Flags
+
+| Flag | Description | Dependencies Added |
+|------|-------------|-------------------|
+| `openapi` | OpenAPI documentation | utoipa |
+| `kafka` | Kafka event publishing | xavyo-events |
+| `aws-federation` | AWS STS assume role | aws-sdk-sts |
+
+## Anti-Patterns
+
+- Never skip parameter validation against JSON Schema
+- Never allow agents without assigned owners
+- Never grant broad permissions (least privilege)
+- Never ignore audit trail for compliance
+
+## Related Crates
+
+- `xavyo-nhi` - Non-human identity types
+- `xavyo-governance` - NHI certification campaigns
+- `xavyo-secrets` - Dynamic credential providers
+
+---
+
+# xavyo-api-auth
+
+> Authentication API endpoints: login, MFA, sessions, password reset, WebAuthn, passwordless.
+
+## Purpose
+
+Provides REST endpoints for user authentication including registration, login, password reset, email verification, MFA (TOTP/SMS), WebAuthn/FIDO2, passwordless (magic links), and session management. Also exposes shared services and middleware used by other API crates.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-auth` - JWT, password hashing
+- `xavyo-db` - User and session models
+- `xavyo-tenant` - Multi-tenant middleware
+- `xavyo-webhooks` - Event publishing
+
+### External (key)
+- `axum` - Web framework
+- `webauthn-rs` - WebAuthn/FIDO2 protocol
+- `totp-rs` - TOTP code generation/validation
+- `lettre` - SMTP email delivery
+- `moka` - Async LRU caching
+
+## Public API
+
+### Router
+
+```rust
+/// Main authentication router
+pub fn auth_router() -> Router<AuthState>;
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/auth/register` | User registration |
+| POST | `/auth/login` | Password login |
+| POST | `/auth/refresh` | Token refresh |
+| POST | `/auth/logout` | Session logout |
+| POST | `/auth/forgot-password` | Request password reset |
+| POST | `/auth/reset-password` | Complete password reset |
+| POST | `/auth/verify-email` | Verify email address |
+| POST | `/auth/mfa/setup` | Setup MFA (TOTP) |
+| POST | `/auth/mfa/verify` | Verify MFA code |
+| POST | `/auth/webauthn/register/start` | Start WebAuthn registration |
+| POST | `/auth/webauthn/register/finish` | Complete WebAuthn registration |
+| POST | `/auth/webauthn/login/start` | Start WebAuthn login |
+| POST | `/auth/webauthn/login/finish` | Complete WebAuthn login |
+| POST | `/auth/magic-link/request` | Request passwordless link |
+| POST | `/auth/magic-link/verify` | Verify magic link |
+
+### Services (reusable)
+
+```rust
+pub struct AuthService { ... }        // Core authentication
+pub struct SessionService { ... }     // Session management
+pub struct MfaService { ... }         // MFA operations
+pub struct WebAuthnService { ... }    // WebAuthn/FIDO2
+pub struct TokenService { ... }       // Token generation
+pub struct AuditService { ... }       // Security audit logging
+pub struct LockoutService { ... }     // Account lockout
+pub struct KeyService { ... }         // JWT key rotation
+```
+
+### Middleware (reusable)
+
+```rust
+/// JWT authentication middleware
+pub fn jwt_auth_middleware<S>(state: AuthState) -> impl Layer<S>;
+
+/// API key authentication middleware
+pub fn api_key_auth_middleware<S>(state: AuthState) -> impl Layer<S>;
+
+/// Rate limiter middleware
+pub struct RateLimiter { ... }
+pub struct EmailRateLimiter { ... }
+```
+
+## Usage Example
+
+```rust
+use xavyo_api_auth::{auth_router, AuthState, AuthService};
+use axum::Router;
+
+// Create auth state
+let auth_state = AuthState::new(
+    pool.clone(),
+    jwt_keys,
+    email_config,
+);
+
+// Build application with auth routes
+let app = Router::new()
+    .nest("/auth", auth_router())
+    .with_state(auth_state);
+
+// Use AuthService directly
+let auth_service = AuthService::new(pool.clone(), config);
+let user = auth_service.authenticate_password(
+    tenant_id,
+    "user@example.com",
+    "password123",
+).await?;
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Provides**: Shared auth services to `xavyo-api-oauth`, `xavyo-api-social`
+- **Emits**: Webhook events for `user.login`, `user.registered`, `mfa.enabled`
+
+## Feature Flags
+
+| Flag | Description | Dependencies Added |
+|------|-------------|-------------------|
+| `integration` | Enable integration tests | - |
+
+## Anti-Patterns
+
+- Never expose raw database errors to clients
+- Never log passwords or password hashes
+- Never skip rate limiting on auth endpoints
+- Never return different error messages for valid vs invalid usernames
+
+## Related Crates
+
+- `xavyo-api-oauth` - Uses AuthService for token issuance
+- `xavyo-api-social` - Uses AuthService for social account linking
+- `xavyo-auth` - Core JWT and password primitives
+
+---
+
+# xavyo-api-authorization
+
+> Authorization API: policies, entitlements, access decisions.
+
+## Purpose
+
+Provides REST endpoints for managing authorization policies and evaluating access decisions. Includes policy CRUD, entitlement-to-action mappings, and real-time policy evaluation via the Policy Decision Point (PDP).
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId types
+- `xavyo-db` - Policy models
+- `xavyo-authorization` - PDP engine
+
+### External (key)
+- `axum` - Web framework
+- `sqlx` - Database queries
+
+## Public API
+
+### Routers
+
+```rust
+pub fn policies_router() -> Router<AuthzState>;
+pub fn entitlements_router() -> Router<AuthzState>;
+pub fn decisions_router() -> Router<AuthzState>;
+```
+
+### Key Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/policies` | List policies |
+| POST | `/policies` | Create policy |
+| GET | `/policies/:id` | Get policy |
+| PATCH | `/policies/:id` | Update policy |
+| DELETE | `/policies/:id` | Delete policy |
+| GET | `/policies/:id/conditions` | List conditions |
+| POST | `/policies/:id/conditions` | Add condition |
+| GET | `/entitlement-mappings` | List mappings |
+| POST | `/entitlement-mappings` | Create mapping |
+| POST | `/authorize` | Evaluate access |
+| POST | `/authorize/batch` | Batch evaluation |
+
+## Usage Example
+
+```rust
+use xavyo_api_authorization::{policies_router, decisions_router, AuthzState};
+use axum::Router;
+
+let state = AuthzState::new(pool.clone(), pdp);
+
+let app = Router::new()
+    .nest("/authz/policies", policies_router())
+    .nest("/authz", decisions_router())
+    .with_state(state);
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Uses**: `xavyo-authorization` PDP
+
+## Feature Flags
+
+None
+
+## Anti-Patterns
+
+- Never cache decisions longer than policy TTL
+- Never bypass PDP for "admin" users
+- Never expose policy internals in errors
+
+## Related Crates
+
+- `xavyo-authorization` - PDP engine
+- `xavyo-governance` - Entitlements
+
+---
+
+# xavyo-api-connectors
+
+> Connector management API: configuration, sync operations, reconciliation.
+
+## Purpose
+
+Provides REST endpoints for managing identity connectors to external systems. Includes connector configuration, schema discovery, sync operations, reconciliation runs, and provisioning queue management.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId types
+- `xavyo-db` - Connector models
+- `xavyo-connector` - Connector framework
+- `xavyo-provisioning` - Sync engine
+
+### External (key)
+- `axum` - Web framework
+- `sqlx` - Database queries
+
+## Public API
+
+### Routers
+
+```rust
+pub fn connectors_router() -> Router<ConnectorsState>;
+pub fn provisioning_router() -> Router<ConnectorsState>;
+pub fn reconciliation_router() -> Router<ConnectorsState>;
+```
+
+### Key Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/connectors` | List connectors |
+| POST | `/connectors` | Create connector |
+| GET | `/connectors/:id` | Get connector |
+| PATCH | `/connectors/:id` | Update connector |
+| DELETE | `/connectors/:id` | Delete connector |
+| POST | `/connectors/:id/test` | Test connection |
+| GET | `/connectors/:id/schema` | Get schema |
+| POST | `/connectors/:id/sync` | Trigger sync |
+| GET | `/connectors/:id/sync/status` | Sync status |
+| POST | `/reconciliation/runs` | Start reconciliation |
+| GET | `/reconciliation/runs` | List runs |
+| GET | `/reconciliation/runs/:id` | Run details |
+| GET | `/provisioning/queue` | Queue stats |
+| GET | `/provisioning/dlq` | Dead letter queue |
+
+## Usage Example
+
+```rust
+use xavyo_api_connectors::{connectors_router, ConnectorsState};
+use axum::Router;
+
+let state = ConnectorsState::new(pool.clone(), connector_registry);
+
+let app = Router::new()
+    .nest("/connectors", connectors_router())
+    .with_state(state);
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Uses**: `xavyo-connector` implementations
+- **Uses**: `xavyo-provisioning` sync engine
+
+## Feature Flags
+
+None
+
+## Anti-Patterns
+
+- Never store credentials unencrypted
+- Never skip schema validation for mappings
+- Never ignore reconciliation discrepancies
+
+## Related Crates
+
+- `xavyo-connector` - Framework traits
+- `xavyo-provisioning` - Sync engine
+- `xavyo-connector-*` - Implementations
+
+---
+
+# xavyo-api-governance
+
+> IGA API: access requests, certification campaigns, SoD rules, compliance reporting.
+
+## Purpose
+
+Provides REST endpoints for Identity Governance and Administration (IGA) operations. Includes access request workflows, certification campaigns, Separation of Duties (SoD) rule enforcement, entitlement management, compliance reporting, and orphan account detection.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-db` - Governance models
+- `xavyo-auth` - JWT validation
+- `xavyo-governance` - Domain logic
+- `xavyo-tenant` - Multi-tenant middleware
+
+### External (key)
+- `axum` - Web framework
+- `sqlx` - Database queries
+- `csv` - Report export
+
+## Public API
+
+### Routers
+
+```rust
+pub fn access_requests_router() -> Router<GovState>;
+pub fn certifications_router() -> Router<GovState>;
+pub fn sod_rules_router() -> Router<GovState>;
+pub fn entitlements_router() -> Router<GovState>;
+pub fn applications_router() -> Router<GovState>;
+pub fn compliance_router() -> Router<GovState>;
+pub fn risk_router() -> Router<GovState>;
+```
+
+### Key Endpoints
+
+| Category | Method | Path | Description |
+|----------|--------|------|-------------|
+| Access Requests | POST | `/requests` | Submit access request |
+| Access Requests | GET | `/requests` | List requests |
+| Access Requests | POST | `/requests/:id/approve` | Approve request |
+| Access Requests | POST | `/requests/:id/reject` | Reject request |
+| Certifications | POST | `/campaigns` | Create campaign |
+| Certifications | GET | `/campaigns` | List campaigns |
+| Certifications | POST | `/campaigns/:id/items/:item_id/certify` | Certify item |
+| Certifications | POST | `/campaigns/:id/items/:item_id/revoke` | Revoke item |
+| SoD Rules | POST | `/sod/rules` | Create SoD rule |
+| SoD Rules | GET | `/sod/violations` | List violations |
+| Entitlements | GET | `/entitlements` | List entitlements |
+| Entitlements | GET | `/users/:id/entitlements` | User's entitlements |
+| Compliance | GET | `/reports` | List reports |
+| Compliance | POST | `/reports/:id/generate` | Generate report |
+| Risk | GET | `/risk/scores` | List risk scores |
+| Risk | GET | `/risk/alerts` | List risk alerts |
+
+## Usage Example
+
+```rust
+use xavyo_api_governance::{access_requests_router, certifications_router, GovState};
+use axum::Router;
+
+let gov_state = GovState::new(pool.clone());
+
+let app = Router::new()
+    .nest("/gov/requests", access_requests_router())
+    .nest("/gov/campaigns", certifications_router())
+    .with_state(gov_state);
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Uses**: `xavyo-governance` domain logic
+- **Emits**: Webhooks for workflow events
+
+## Feature Flags
+
+| Flag | Description |
+|------|-------------|
+| `integration` | Enable integration tests |
+
+## Anti-Patterns
+
+- Never bypass approval workflows for privileged access
+- Never skip SoD checks before granting entitlements
+- Never allow campaign decisions without audit trail
+
+## Related Crates
+
+- `xavyo-governance` - Domain logic
+- `xavyo-api-users` - User management
+- `xavyo-authorization` - Policy enforcement
+
+---
+
+# xavyo-api-import
+
+> Bulk import API: CSV user import with validation.
+
+## Purpose
+
+Provides REST endpoints for bulk user import from CSV files. Includes file upload, validation preview, progress tracking, and error reporting for enterprise migration scenarios.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId types
+- `xavyo-db` - User models
+- `xavyo-webhooks` - Event publishing
+
+### External (key)
+- `axum` - Web framework
+- `csv` - CSV parsing
+- `sha2` - File checksums
+
+## Public API
+
+### Routers
+
+```rust
+pub fn import_router() -> Router<ImportState>;
+```
+
+### Key Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/import/users/upload` | Upload CSV |
+| POST | `/import/users/validate` | Validate CSV |
+| POST | `/import/users/execute` | Execute import |
+| GET | `/import/jobs` | List jobs |
+| GET | `/import/jobs/:id` | Job status |
+| GET | `/import/jobs/:id/errors` | Job errors |
+
+## Usage Example
+
+```rust
+use xavyo_api_import::{import_router, ImportState};
+use axum::Router;
+
+let state = ImportState::new(pool.clone());
+
+let app = Router::new()
+    .nest("/import", import_router())
+    .with_state(state);
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Emits**: Webhooks for import completion
+
+## Feature Flags
+
+None
+
+## Anti-Patterns
+
+- Never import without validation preview
+- Never skip duplicate detection
+- Never import passwords in plaintext
+
+## Related Crates
+
+- `xavyo-api-users` - User CRUD
+- `xavyo-api-scim` - Automated provisioning
+
+---
+
+# xavyo-api-nhi
+
+> Non-Human Identity API: unified service account and agent management.
+
+## Purpose
+
+Provides a unified REST API for managing all non-human identities (NHIs) including service accounts and AI agents. Consolidates lifecycle management, certification, risk scoring, and credential rotation for machine identities.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId types
+- `xavyo-db` - NHI models
+- `xavyo-nhi` - NHI types and traits
+- `xavyo-governance` - Certification integration
+
+### External (key)
+- `axum` - Web framework
+- `sqlx` - Database queries
+
+## Public API
+
+### Routers
+
+```rust
+pub fn nhi_router() -> Router<NhiState>;
+pub fn service_accounts_router() -> Router<NhiState>;
+```
+
+### Key Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/nhi` | List all NHIs |
+| GET | `/nhi/:id` | Get NHI by ID |
+| GET | `/nhi/:id/risk` | Get risk score |
+| POST | `/nhi/:id/certify` | Certify NHI |
+| GET | `/service-accounts` | List service accounts |
+| POST | `/service-accounts` | Create service account |
+| PATCH | `/service-accounts/:id` | Update account |
+| DELETE | `/service-accounts/:id` | Delete account |
+| POST | `/service-accounts/:id/rotate` | Rotate credentials |
+| POST | `/service-accounts/:id/suspend` | Suspend account |
+
+## Usage Example
+
+```rust
+use xavyo_api_nhi::{nhi_router, NhiState};
+use axum::Router;
+
+let state = NhiState::new(pool.clone());
+
+let app = Router::new()
+    .nest("/nhi", nhi_router())
+    .with_state(state);
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Integrates**: Service accounts and AI agents under one API
+
+## Feature Flags
+
+None
+
+## Anti-Patterns
+
+- Never create NHIs without owners
+- Never skip risk scoring
+- Never ignore credential rotation policies
+
+## Related Crates
+
+- `xavyo-nhi` - NHI types
+- `xavyo-api-agents` - AI agent specifics
+- `xavyo-governance` - NHI certification
+
+---
+
+# xavyo-api-oauth
+
+> OAuth2/OIDC provider endpoints: authorize, token, userinfo, device code, discovery.
+
+## Purpose
+
+Implements OAuth2 and OpenID Connect provider functionality. Supports authorization code flow with PKCE, client credentials grant, refresh tokens, and RFC 8628 device code flow. Provides OIDC discovery (`.well-known/openid-configuration`) and JWKS endpoints for key distribution.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-auth` - JWT encoding/decoding
+- `xavyo-api-auth` - Shared auth services
+- `xavyo-db` - OAuth client and token models
+- `xavyo-tenant` - Multi-tenant middleware
+- `xavyo-webhooks` - Event publishing
+
+### External (key)
+- `axum` - Web framework
+- `jsonwebtoken` - JWT encoding
+- `rsa` - RSA key handling
+- `subtle` - Constant-time comparison
+
+## Public API
+
+### Routers
+
+```rust
+/// Main OAuth2 router
+pub fn oauth_router() -> Router<OAuthState>;
+
+/// Device code verification router
+pub fn device_router() -> Router<OAuthState>;
+
+/// OIDC discovery router
+pub fn well_known_router() -> Router<OAuthState>;
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/oauth/authorize` | Authorization endpoint |
+| POST | `/oauth/token` | Token endpoint |
+| GET | `/oauth/userinfo` | UserInfo endpoint |
+| POST | `/oauth/revoke` | Token revocation |
+| POST | `/oauth/introspect` | Token introspection |
+| POST | `/oauth/device/code` | Device authorization (RFC 8628) |
+| GET | `/device/verify` | Device verification page |
+| POST | `/device/authorize` | Device authorization decision |
+| GET | `/.well-known/openid-configuration` | OIDC Discovery |
+| GET | `/.well-known/jwks.json` | JSON Web Key Set |
+
+### Types
+
+```rust
+/// OAuth2 state container
+pub struct OAuthState {
+    pub pool: PgPool,
+    pub signing_key: OAuthSigningKey,
+    pub issuer: String,
+}
+
+/// JWT signing key configuration
+pub struct OAuthSigningKey {
+    pub kid: String,
+    pub private_key: RsaPrivateKey,
+    pub public_key: RsaPublicKey,
+}
+```
+
+### Utilities
+
+```rust
+/// Session cookie management
+pub fn create_session_cookie(session_id: &str) -> Cookie;
+pub fn extract_session_cookie(jar: &CookieJar) -> Option<String>;
+pub fn set_session_cookie(jar: &CookieJar, session_id: &str);
+pub fn clear_session_cookie(jar: &CookieJar);
+
+/// Request utilities
+pub fn extract_origin_ip(headers: &HeaderMap) -> Option<IpAddr>;
+pub fn extract_country_code(headers: &HeaderMap) -> Option<String>;
+```
+
+## Usage Example
+
+```rust
+use xavyo_api_oauth::{oauth_router, well_known_router, OAuthState, OAuthSigningKey};
+use axum::Router;
+
+// Generate or load signing key
+let signing_key = OAuthSigningKey::generate()?;
+
+// Create OAuth state
+let oauth_state = OAuthState {
+    pool: pool.clone(),
+    signing_key,
+    issuer: "https://auth.example.com".to_string(),
+};
+
+// Build application
+let app = Router::new()
+    .nest("/oauth", oauth_router())
+    .merge(well_known_router())
+    .with_state(oauth_state);
+
+// OAuth flow:
+// 1. Client redirects to /oauth/authorize?client_id=...&redirect_uri=...&scope=openid
+// 2. User authenticates and consents
+// 3. Redirect back with authorization code
+// 4. Client exchanges code at POST /oauth/token
+// 5. Client receives access_token, id_token, refresh_token
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Uses**: `xavyo-api-auth::AuthService` for user authentication
+- **Provides**: OIDC tokens for federated applications
+
+## Feature Flags
+
+| Flag | Description | Dependencies Added |
+|------|-------------|-------------------|
+| `integration` | Enable integration tests | - |
+
+## Anti-Patterns
+
+- Never expose client secrets in responses
+- Never allow redirect URIs that aren't pre-registered
+- Never skip PKCE validation for public clients
+- Never issue tokens without proper scope validation
+
+## Related Crates
+
+- `xavyo-api-auth` - User authentication services
+- `xavyo-api-oidc-federation` - OIDC as relying party (inbound)
+- `xavyo-auth` - JWT primitives
+
+---
+
+# xavyo-api-oidc-federation
+
+> OIDC federation API: enterprise IdP integration as relying party.
+
+## Purpose
+
+Implements OpenID Connect relying party (RP) functionality for federating with enterprise identity providers. Supports discovery, PKCE, encrypted token storage, and automatic account linking for B2B scenarios.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId types
+- `xavyo-db` - IdP configuration models
+- `xavyo-auth` - JWT handling
+- `xavyo-tenant` - Multi-tenant middleware
+
+### External (key)
+- `axum` - Web framework
+- `reqwest` - HTTP client
+- `aes-gcm` - Token encryption
+
+## Public API
+
+### Routers
+
+```rust
+pub fn oidc_federation_router() -> Router<OidcFedState>;
+pub fn oidc_admin_router() -> Router<OidcFedState>;
+```
+
+### Key Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/federation/:provider_id/authorize` | Start federation |
+| GET | `/federation/:provider_id/callback` | Federation callback |
+| GET | `/admin/federation/providers` | List providers |
+| POST | `/admin/federation/providers` | Create provider |
+| GET | `/admin/federation/providers/:id` | Get provider |
+| PATCH | `/admin/federation/providers/:id` | Update provider |
+| DELETE | `/admin/federation/providers/:id` | Delete provider |
+| POST | `/admin/federation/providers/:id/discover` | Auto-discover config |
+
+## Usage Example
+
+```rust
+use xavyo_api_oidc_federation::{oidc_federation_router, OidcFedState};
+use axum::Router;
+
+let state = OidcFedState::new(pool.clone(), encryption_key);
+
+let app = Router::new()
+    .nest("/federation", oidc_federation_router())
+    .with_state(state);
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Federates with**: Okta, Azure AD, Ping Identity, etc.
+
+## Feature Flags
+
+None
+
+## Anti-Patterns
+
+- Never skip issuer validation
+- Never store tokens unencrypted
+- Never trust claims without verification
+
+## Related Crates
+
+- `xavyo-api-oauth` - xavyo as OIDC provider
+- `xavyo-api-social` - Consumer social login
+
+---
+
+# xavyo-api-saml
+
+> SAML 2.0 Identity Provider endpoints for enterprise SSO.
+
+## Purpose
+
+Implements SAML 2.0 Identity Provider functionality for enterprise single sign-on. Supports SP-initiated SSO (receiving AuthnRequest), IdP-initiated SSO (unsolicited responses), metadata publishing, service provider configuration, and certificate management.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-db` - SP configuration models
+- `xavyo-auth` - User authentication
+- `xavyo-tenant` - Multi-tenant middleware
+
+### External (key)
+- `samael` - SAML 2.0 protocol library
+- `openssl` - Certificate/signature handling
+- `axum` - Web framework
+- `quick-xml` - XML parsing
+- `base64` / `flate2` - Encoding/compression
+
+## Public API
+
+### Routers
+
+```rust
+/// SAML IdP router (SSO endpoints)
+pub fn saml_router() -> Router<SamlState>;
+
+/// Public SAML endpoints (metadata, SSO)
+pub fn saml_public_router() -> Router<SamlState>;
+
+/// Admin SAML endpoints (SP configuration)
+pub fn saml_admin_router() -> Router<SamlState>;
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/saml/metadata` | IdP metadata (XML) |
+| GET | `/saml/sso` | SP-initiated SSO (redirect binding) |
+| POST | `/saml/sso` | SP-initiated SSO (POST binding) |
+| GET | `/saml/idp-init/:sp_id` | IdP-initiated SSO |
+| POST | `/saml/slo` | Single Logout |
+| GET | `/admin/saml/sp` | List service providers |
+| POST | `/admin/saml/sp` | Register service provider |
+| GET | `/admin/saml/sp/:id` | Get SP configuration |
+| PATCH | `/admin/saml/sp/:id` | Update SP configuration |
+| DELETE | `/admin/saml/sp/:id` | Delete SP |
+| POST | `/admin/saml/sp/:id/certificate` | Upload SP certificate |
+
+### Types
+
+```rust
+/// SAML state container
+pub struct SamlState {
+    pub pool: PgPool,
+    pub idp_certificate: X509,
+    pub idp_private_key: PKey,
+    pub entity_id: String,
+}
+
+/// Create SAML state
+pub fn create_saml_state(pool: PgPool, config: SamlConfig) -> Result<SamlState>;
+
+/// Service Provider configuration
+pub struct ServiceProvider {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub entity_id: String,
+    pub name: String,
+    pub acs_url: String,
+    pub slo_url: Option<String>,
+    pub certificate: Option<String>,
+    pub name_id_format: NameIdFormat,
+    pub attribute_mappings: Vec<AttributeMapping>,
+}
+
+/// SAML errors
+pub enum SamlError {
+    InvalidRequest(String),
+    InvalidSignature,
+    UnknownServiceProvider(String),
+    AuthenticationFailed,
+    CertificateError(String),
+}
+```
+
+## Usage Example
+
+```rust
+use xavyo_api_saml::{saml_router, saml_admin_router, create_saml_state, SamlConfig};
+use axum::Router;
+
+// Load IdP certificate and key
+let config = SamlConfig {
+    certificate_pem: std::fs::read_to_string("idp.crt")?,
+    private_key_pem: std::fs::read_to_string("idp.key")?,
+    entity_id: "https://auth.example.com/saml".to_string(),
+};
+
+// Create SAML state
+let saml_state = create_saml_state(pool.clone(), config)?;
+
+// Build application
+let app = Router::new()
+    .nest("/saml", saml_router())
+    .nest("/admin/saml", saml_admin_router())
+    .with_state(saml_state);
+
+// SAML flow:
+// 1. User accesses SP (e.g., Salesforce)
+// 2. SP redirects to /saml/sso?SAMLRequest=...
+// 3. User authenticates at IdP
+// 4. IdP POSTs SAMLResponse to SP's ACS URL
+// 5. SP validates response and creates session
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Integrates with**: Salesforce, ServiceNow, Workday, custom SPs
+- **Uses**: `xavyo-api-auth` for user authentication
+
+## Feature Flags
+
+None - all features are enabled by default.
+
+## Anti-Patterns
+
+- Never accept unsigned AuthnRequests in production
+- Never skip certificate validation for SP responses
+- Never use weak signing algorithms (SHA-1)
+- Never expose private keys in logs or errors
+
+## Related Crates
+
+- `xavyo-api-oauth` - OAuth2/OIDC provider (alternative SSO)
+- `xavyo-api-oidc-federation` - OIDC relying party
+- `xavyo-api-auth` - User authentication services
+
+---
+
+# xavyo-api-scim
+
+> SCIM 2.0 server implementation for automated user and group provisioning.
+
+## Purpose
+
+Implements the SCIM 2.0 protocol (RFC 7643/7644) for inbound provisioning from enterprise identity providers like Okta, Azure AD, and OneLogin. Handles user and group CRUD operations, SCIM filter parsing, bearer token authentication, and audit logging.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-db` - User, Group models
+- `xavyo-tenant` - Multi-tenant middleware
+- `xavyo-auth` - Bearer token validation
+- `xavyo-webhooks` - Event publishing
+
+### External (key)
+- `axum` - Web framework
+- `sqlx` - Database queries
+- `sha2` - Token hashing
+- `rand` - Token generation
+
+## Public API
+
+### Routers
+
+```rust
+/// Main SCIM 2.0 router
+pub fn scim_router() -> Router<ScimState>;
+
+/// Admin router for SCIM configuration
+pub fn scim_admin_router() -> Router<ScimState>;
+
+/// Resource operations router
+pub fn scim_resource_router() -> Router<ScimState>;
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/scim/v2/Users` | List users |
+| POST | `/scim/v2/Users` | Create user |
+| GET | `/scim/v2/Users/:id` | Get user |
+| PUT | `/scim/v2/Users/:id` | Replace user |
+| PATCH | `/scim/v2/Users/:id` | Update user |
+| DELETE | `/scim/v2/Users/:id` | Delete user |
+| GET | `/scim/v2/Groups` | List groups |
+| POST | `/scim/v2/Groups` | Create group |
+| GET | `/scim/v2/Groups/:id` | Get group |
+| PUT | `/scim/v2/Groups/:id` | Replace group |
+| PATCH | `/scim/v2/Groups/:id` | Update group (membership) |
+| DELETE | `/scim/v2/Groups/:id` | Delete group |
+| GET | `/scim/v2/ServiceProviderConfig` | SCIM capabilities |
+| GET | `/scim/v2/Schemas` | Schema definitions |
+| GET | `/scim/v2/ResourceTypes` | Resource type definitions |
+
+### Types
+
+```rust
+/// SCIM configuration
+pub struct ScimConfig {
+    pub tenant_id: Uuid,
+    pub bearer_token_hash: String,
+    pub rate_limit_per_second: u32,
+}
+
+/// SCIM User resource
+pub struct ScimUser {
+    pub schemas: Vec<String>,
+    pub id: Option<String>,
+    pub external_id: Option<String>,
+    pub user_name: String,
+    pub name: Option<ScimName>,
+    pub emails: Vec<ScimEmail>,
+    pub active: Option<bool>,
+    pub meta: Option<ScimMeta>,
+}
+
+/// SCIM Group resource
+pub struct ScimGroup {
+    pub schemas: Vec<String>,
+    pub id: Option<String>,
+    pub external_id: Option<String>,
+    pub display_name: String,
+    pub members: Vec<ScimMember>,
+    pub meta: Option<ScimMeta>,
+}
+
+/// SCIM List response
+pub struct ScimListResponse<T> {
+    pub schemas: Vec<String>,
+    pub total_results: i64,
+    pub items_per_page: i64,
+    pub start_index: i64,
+    pub resources: Vec<T>,
+}
+```
+
+## Usage Example
+
+```rust
+use xavyo_api_scim::{scim_router, ScimConfig};
+use axum::Router;
+
+// SCIM routes are typically mounted under /scim/v2
+let app = Router::new()
+    .nest("/scim/v2", scim_router())
+    .with_state(scim_state);
+
+// SCIM filter examples:
+// GET /scim/v2/Users?filter=userName eq "john@example.com"
+// GET /scim/v2/Users?filter=emails.value co "@example.com"
+// GET /scim/v2/Groups?filter=displayName sw "Engineering"
+
+// SCIM PATCH for group membership:
+// PATCH /scim/v2/Groups/{id}
+// {
+//   "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+//   "Operations": [
+//     {"op": "add", "path": "members", "value": [{"value": "user-id"}]}
+//   ]
+// }
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Receives from**: Okta, Azure AD, OneLogin, other SCIM clients
+- **Emits**: Webhooks for provisioning events
+
+## Feature Flags
+
+None - all features are enabled by default.
+
+## Anti-Patterns
+
+- Never expose bearer tokens in logs or responses
+- Never skip filter validation (SQL injection risk)
+- Never allow unauthenticated SCIM access
+- Never ignore rate limits (DoS protection)
+
+## Related Crates
+
+- `xavyo-scim-client` - Outbound SCIM (to other systems)
+- `xavyo-api-users` - Manual user management
+- `xavyo-provisioning` - Internal provisioning queue
+
+---
+
+# xavyo-api-social
+
+> Social login API for Google, Microsoft, and Apple identity providers.
+
+## Purpose
+
+Implements social authentication flows for consumer identity scenarios. Supports Google, Microsoft (Azure AD), and Apple Sign In via OAuth2/OIDC. Includes account linking, CSRF protection with signed JWT state, PKCE support, and encrypted token storage.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-db` - Social connection models
+- `xavyo-auth` - JWT, session handling
+- `xavyo-tenant` - Multi-tenant middleware
+
+### External (key)
+- `axum` - Web framework
+- `reqwest` - HTTP client for OAuth2 flows
+- `aes-gcm` - Token encryption
+- `jsonwebtoken` - JWT state tokens
+
+## Public API
+
+### Routers
+
+```rust
+/// Social login router
+pub fn social_router() -> Router<SocialState>;
+
+/// Public endpoints (OAuth callbacks)
+pub fn public_social_router() -> Router<SocialState>;
+
+/// Authenticated user operations
+pub fn authenticated_social_router() -> Router<SocialState>;
+
+/// Admin configuration
+pub fn admin_social_router() -> Router<SocialState>;
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/social/providers` | List enabled providers |
+| GET | `/social/:provider/authorize` | Start OAuth flow |
+| GET | `/social/:provider/callback` | OAuth callback |
+| GET | `/social/connections` | List user's connected accounts |
+| POST | `/social/:provider/link` | Link social account |
+| DELETE | `/social/:provider/unlink` | Unlink social account |
+| GET | `/admin/social/providers` | List provider configs |
+| POST | `/admin/social/providers` | Create provider config |
+| PATCH | `/admin/social/providers/:id` | Update provider config |
+| DELETE | `/admin/social/providers/:id` | Delete provider config |
+
+### Types
+
+```rust
+/// Supported social providers
+pub enum ProviderType {
+    Google,
+    Microsoft,
+    Apple,
+}
+
+/// Social state container
+pub struct SocialState {
+    pub pool: PgPool,
+    pub providers: HashMap<ProviderType, ProviderConfig>,
+    pub encryption_key: [u8; 32],
+}
+
+/// Social configuration
+pub struct SocialConfig {
+    pub google: Option<ProviderConfig>,
+    pub microsoft: Option<ProviderConfig>,
+    pub apple: Option<ProviderConfig>,
+}
+
+/// Provider configuration (per tenant)
+pub struct ProviderConfig {
+    pub client_id: String,
+    pub client_secret: SecretString,
+    pub scopes: Vec<String>,
+    pub enabled: bool,
+}
+
+/// Authentication service for social flows
+pub struct AuthService { ... }
+
+/// Social errors
+pub enum SocialError {
+    ProviderNotConfigured(ProviderType),
+    OAuthError(String),
+    AccountAlreadyLinked,
+    InvalidState,
+    TokenExchangeFailed(String),
+}
+```
+
+## Usage Example
+
+```rust
+use xavyo_api_social::{social_router, SocialState, SocialConfig, ProviderType};
+use axum::Router;
+
+// Configure social providers
+let config = SocialConfig {
+    google: Some(ProviderConfig {
+        client_id: "google-client-id".to_string(),
+        client_secret: "google-secret".into(),
+        scopes: vec!["openid", "email", "profile"].into_iter().map(String::from).collect(),
+        enabled: true,
+    }),
+    microsoft: Some(ProviderConfig {
+        client_id: "ms-client-id".to_string(),
+        client_secret: "ms-secret".into(),
+        scopes: vec!["openid", "email", "profile"].into_iter().map(String::from).collect(),
+        enabled: true,
+    }),
+    apple: None, // Not configured
+};
+
+// Create state
+let social_state = SocialState::new(pool.clone(), config, &encryption_key);
+
+// Build application
+let app = Router::new()
+    .nest("/social", social_router())
+    .with_state(social_state);
+
+// Social login flow:
+// 1. Frontend calls GET /social/google/authorize
+// 2. Backend redirects to Google with CSRF state
+// 3. User authenticates at Google
+// 4. Google redirects to GET /social/google/callback?code=...&state=...
+// 5. Backend exchanges code for tokens, creates/links user, returns JWT
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Calls**: Google OAuth, Microsoft Graph, Apple ID APIs
+- **Uses**: `xavyo-api-auth` services for user creation
+
+## Feature Flags
+
+| Flag | Description | Dependencies Added |
+|------|-------------|-------------------|
+| `integration` | Enable integration tests | - |
+
+## Anti-Patterns
+
+- Never store OAuth tokens unencrypted
+- Never skip state parameter validation (CSRF)
+- Never trust provider claims without verification
+- Never allow automatic account linking without consent
+
+## Related Crates
+
+- `xavyo-api-auth` - Core authentication
+- `xavyo-api-oidc-federation` - Enterprise OIDC federation
+- `xavyo-api-oauth` - xavyo as OAuth provider
+
+---
+
+# xavyo-api-tenants
+
+> Tenant management API: provisioning, configuration, API keys.
+
+## Purpose
+
+Provides REST endpoints for tenant lifecycle management. Includes tenant provisioning, configuration settings, policy management, API key generation, and tenant-level branding.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId types
+- `xavyo-db` - Tenant models
+- `xavyo-auth` - JWT validation
+
+### External (key)
+- `axum` - Web framework
+- `sqlx` - Database queries
+- `sha2` - API key hashing
+
+## Public API
+
+### Routers
+
+```rust
+pub fn tenants_router() -> Router<TenantsState>;
+pub fn api_keys_router() -> Router<TenantsState>;
+```
+
+### Key Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/tenants` | List tenants (super admin) |
+| POST | `/tenants` | Create tenant |
+| GET | `/tenants/:id` | Get tenant |
+| PATCH | `/tenants/:id` | Update tenant |
+| DELETE | `/tenants/:id` | Delete tenant |
+| GET | `/tenants/:id/settings` | Get settings |
+| PATCH | `/tenants/:id/settings` | Update settings |
+| GET | `/tenants/:id/api-keys` | List API keys |
+| POST | `/tenants/:id/api-keys` | Create API key |
+| DELETE | `/tenants/:id/api-keys/:key_id` | Revoke key |
+| POST | `/tenants/:id/api-keys/:key_id/rotate` | Rotate key |
+
+## Usage Example
+
+```rust
+use xavyo_api_tenants::{tenants_router, api_keys_router, TenantsState};
+use axum::Router;
+
+let state = TenantsState::new(pool.clone());
+
+let app = Router::new()
+    .nest("/tenants", tenants_router())
+    .with_state(state);
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Provides**: Tenant context for all other APIs
+
+## Feature Flags
+
+None
+
+## Anti-Patterns
+
+- Never expose API key secrets after creation
+- Never allow cross-tenant access
+- Never delete tenants without proper cleanup
+
+## Related Crates
+
+- `xavyo-tenant` - Middleware
+- `xavyo-db` - Tenant models
+
+---
+
+# xavyo-api-users
+
+> User management CRUD API: list, create, update, delete users and groups.
+
+## Purpose
+
+Provides administrative REST endpoints for user lifecycle management. Includes user CRUD operations, group management with hierarchy support, custom attribute definitions, and bulk operations for enterprise-scale identity management.
+
+## Layer
+
+api
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-db` - User, Group models
+- `xavyo-auth` - JWT validation
+- `xavyo-webhooks` - Event publishing
+- `xavyo-events` - Kafka events (optional)
+
+### External (key)
+- `axum` - Web framework
+- `sqlx` - Database queries
+- `uuid` - Identifier generation
+
+## Public API
+
+### Routers
+
+```rust
+/// User management router
+pub fn users_router() -> Router<UsersState>;
+
+/// Group management router
+pub fn groups_router() -> Router<UsersState>;
+
+/// Custom attribute definitions router
+pub fn attribute_definitions_router() -> Router<UsersState>;
+
+/// Bulk operations router
+pub fn bulk_operations_router() -> Router<UsersState>;
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/users` | List users (paginated) |
+| POST | `/users` | Create user |
+| GET | `/users/:id` | Get user by ID |
+| PATCH | `/users/:id` | Update user |
+| DELETE | `/users/:id` | Delete user |
+| POST | `/users/:id/disable` | Disable user |
+| POST | `/users/:id/enable` | Enable user |
+| GET | `/groups` | List groups |
+| POST | `/groups` | Create group |
+| GET | `/groups/:id` | Get group by ID |
+| PATCH | `/groups/:id` | Update group |
+| DELETE | `/groups/:id` | Delete group |
+| GET | `/groups/:id/members` | List group members |
+| POST | `/groups/:id/members` | Add group members |
+| DELETE | `/groups/:id/members/:user_id` | Remove member |
+| GET | `/attribute-definitions` | List attribute definitions |
+| POST | `/attribute-definitions` | Create attribute definition |
+| POST | `/bulk/users` | Bulk create/update users |
+
+### Services
+
+```rust
+pub struct UserService {
+    pub async fn list(&self, tenant_id: Uuid, query: ListUsersQuery) -> Result<UserListResponse>;
+    pub async fn create(&self, tenant_id: Uuid, req: CreateUserRequest) -> Result<UserResponse>;
+    pub async fn get(&self, tenant_id: Uuid, id: Uuid) -> Result<UserResponse>;
+    pub async fn update(&self, tenant_id: Uuid, id: Uuid, req: UpdateUserRequest) -> Result<UserResponse>;
+    pub async fn delete(&self, tenant_id: Uuid, id: Uuid) -> Result<()>;
+}
+
+pub struct GroupHierarchyService { ... }
+pub struct AttributeDefinitionService { ... }
+pub struct AttributeValidationService { ... }
+```
+
+### Request/Response Types
+
+```rust
+pub struct CreateUserRequest {
+    pub email: String,
+    pub username: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub password: Option<String>,
+    pub custom_attributes: Option<HashMap<String, Value>>,
+}
+
+pub struct UserResponse {
+    pub id: Uuid,
+    pub email: String,
+    pub username: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub status: UserStatus,
+    pub created_at: DateTime<Utc>,
+    pub custom_attributes: HashMap<String, Value>,
+}
+
+pub struct ListUsersQuery {
+    pub page: Option<u32>,
+    pub page_size: Option<u32>,
+    pub filter: Option<String>,
+    pub sort_by: Option<String>,
+}
+```
+
+## Usage Example
+
+```rust
+use xavyo_api_users::{users_router, groups_router, UsersState, UserService};
+use axum::Router;
+
+// Create state
+let users_state = UsersState::new(pool.clone());
+
+// Build application with user management routes
+let app = Router::new()
+    .nest("/admin/users", users_router())
+    .nest("/admin/groups", groups_router())
+    .with_state(users_state);
+
+// Direct service usage
+let user_service = UserService::new(pool.clone());
+let users = user_service.list(tenant_id, ListUsersQuery {
+    page: Some(1),
+    page_size: Some(50),
+    filter: Some("status eq 'active'".to_string()),
+    sort_by: Some("created_at desc".to_string()),
+}).await?;
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` main application
+- **Emits**: Kafka events (`user.created`, `user.updated`, `user.deleted`)
+- **Emits**: Webhooks for user lifecycle events
+
+## Feature Flags
+
+| Flag | Description | Dependencies Added |
+|------|-------------|-------------------|
+| `kafka` | Enable Kafka event publishing | xavyo-events |
+
+## Anti-Patterns
+
+- Never delete users without proper audit trail
+- Never expose password hashes in responses
+- Never allow bulk operations without rate limiting
+- Never skip tenant_id validation in queries
+
+## Related Crates
+
+- `xavyo-api-scim` - SCIM provisioning (automated)
+- `xavyo-api-import` - Bulk CSV import
+- `xavyo-governance` - User assignments and certifications
+
+---
+
+# xavyo-auth
+
+> JWT RS256 authentication, JWKS key rotation, and Argon2id password hashing.
+
+## Purpose
+
+Provides authentication primitives for the xavyo platform. This includes JWT token encoding/decoding with RS256, JWKS endpoint fetching for key rotation, and secure password hashing using Argon2id with OWASP-recommended parameters. JWT claims include standard fields plus custom tenant and role claims.
+
+## Layer
+
+foundation
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId for JWT claims
+
+### External (key)
+- `jsonwebtoken` - JWT encoding/decoding
+- `argon2` - Password hashing (Argon2id)
+- `reqwest` - HTTP client for JWKS fetching
+- `chrono` - Timestamp handling
+
+## Public API
+
+### Types
+
+```rust
+/// JWT claims with standard and custom fields
+pub struct JwtClaims {
+    pub sub: String,           // Subject (user ID)
+    pub iss: String,           // Issuer
+    pub aud: Vec<String>,      // Audience
+    pub exp: i64,              // Expiration timestamp
+    pub iat: i64,              // Issued at
+    pub jti: String,           // JWT ID (unique)
+    pub tid: Option<TenantId>, // Tenant ID (custom)
+    pub roles: Vec<String>,    // User roles (custom)
+}
+
+/// Builder for creating JwtClaims
+pub struct JwtClaimsBuilder { ... }
+
+/// JWKS key set for key rotation
+pub struct JwkSet { ... }
+
+/// Client for fetching JWKS from remote endpoints
+pub struct JwksClient { ... }
+
+/// Configuration for token validation
+pub struct ValidationConfig { ... }
+
+/// Password hasher with configurable parameters
+pub struct PasswordHasher { ... }
+
+/// Authentication errors
+pub enum AuthError { ... }
+```
+
+### Traits
+
+None exported.
+
+### Functions
+
+```rust
+/// Encode claims into a signed JWT token
+pub fn encode_token(claims: &JwtClaims, private_key_pem: &str) -> Result<String, AuthError>;
+
+/// Encode with specific key ID for key rotation
+pub fn encode_token_with_kid(claims: &JwtClaims, private_key_pem: &str, kid: &str) -> Result<String, AuthError>;
+
+/// Decode and validate a JWT token
+pub fn decode_token(token: &str, public_key_pem: &str) -> Result<JwtClaims, AuthError>;
+
+/// Decode with custom validation config
+pub fn decode_token_with_config(token: &str, public_key_pem: &str, config: &ValidationConfig) -> Result<JwtClaims, AuthError>;
+
+/// Extract key ID from token header
+pub fn extract_kid(token: &str) -> Result<Option<String>, AuthError>;
+
+/// Hash a password using Argon2id
+pub fn hash_password(password: &str) -> Result<String, AuthError>;
+
+/// Verify a password against its hash
+pub fn verify_password(password: &str, hash: &str) -> Result<bool, AuthError>;
+```
+
+## Usage Example
+
+```rust
+use xavyo_auth::{JwtClaims, encode_token, decode_token, hash_password, verify_password};
+use xavyo_core::TenantId;
+
+// Create JWT claims
+let claims = JwtClaims::builder()
+    .subject("user-123")
+    .issuer("xavyo")
+    .audience(vec!["xavyo-api"])
+    .tenant_id(TenantId::new())
+    .roles(vec!["admin"])
+    .expires_in_secs(3600)
+    .build();
+
+// Encode token
+let token = encode_token(&claims, PRIVATE_KEY_PEM)?;
+
+// Decode and validate token
+let decoded = decode_token(&token, PUBLIC_KEY_PEM)?;
+let tenant_id = decoded.tenant_id().ok_or("missing tenant")?;
+
+// Password hashing
+let hash = hash_password("my-secure-password")?;
+let is_valid = verify_password("my-secure-password", &hash)?;
+```
+
+## Integration Points
+
+- **Consumed by**: `xavyo-api-auth`, `xavyo-api-oauth`, all API crates
+- **Provides**: JWT validation for Axum middleware
+- **Requires**: RSA key pair for RS256 signing
+
+## Feature Flags
+
+None - all features are enabled by default.
+
+## Anti-Patterns
+
+- Never store private keys in code or environment variables in plaintext
+- Never disable token expiration validation in production
+- Never use weak passwords (enforce minimum complexity)
+- Never log JWT tokens or password hashes
+
+## Related Crates
+
+- `xavyo-api-auth` - REST endpoints for authentication
+- `xavyo-api-oauth` - OAuth2/OIDC token issuance
+- `xavyo-secrets` - Secure key storage
+
+---
+
+# xavyo-authorization
+
+> Fine-grained authorization engine (Policy Decision Point) for xavyo.
+
+## Purpose
+
+Provides runtime policy evaluation for access control decisions. Implements a Policy Decision Point (PDP) that evaluates authorization policies against request context. Supports ABAC (Attribute-Based Access Control) with conditions on time, location, risk level, and custom attributes. Includes in-memory caching via Moka for high-performance policy lookups.
+
+## Layer
+
+domain
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-db` - Policy storage models
+
+### External (key)
+- `sqlx` - Policy persistence
+- `moka` - Async LRU cache
+- `chrono` - Time-based conditions
+- `serde` - Policy serialization
+
+## Public API
+
+### Types
+
+```rust
+/// Authorization request context
+pub struct AuthzContext {
+    pub tenant_id: Uuid,
+    pub subject_id: Uuid,          // User or agent ID
+    pub subject_type: SubjectType, // User, Agent, Service
+    pub resource_type: String,     // e.g., "user", "report"
+    pub resource_id: Option<Uuid>,
+    pub action: String,            // e.g., "read", "write", "delete"
+    pub environment: Environment,  // Time, IP, risk score
+}
+
+/// Authorization decision
+pub enum Decision {
+    Allow,
+    Deny,
+    NotApplicable,
+}
+
+/// Authorization response
+pub struct AuthzResponse {
+    pub decision: Decision,
+    pub policy_id: Option<Uuid>,
+    pub reason: Option<String>,
+    pub obligations: Vec<Obligation>,
+}
+
+/// Policy condition
+pub struct Condition {
+    pub attribute: String,
+    pub operator: ConditionOperator,
+    pub value: Value,
+}
+
+/// Condition operators
+pub enum ConditionOperator {
+    Equals,
+    NotEquals,
+    Contains,
+    GreaterThan,
+    LessThan,
+    InRange,
+    TimeWithin,
+}
+
+/// Environment attributes
+pub struct Environment {
+    pub timestamp: DateTime<Utc>,
+    pub ip_address: Option<IpAddr>,
+    pub risk_score: Option<f64>,
+    pub custom: HashMap<String, Value>,
+}
+```
+
+### Traits
+
+```rust
+/// Policy Decision Point interface
+#[async_trait]
+pub trait PolicyDecisionPoint: Send + Sync {
+    async fn evaluate(&self, ctx: &AuthzContext) -> Result<AuthzResponse, AuthorizationError>;
+    async fn batch_evaluate(&self, contexts: Vec<AuthzContext>) -> Result<Vec<AuthzResponse>, AuthorizationError>;
+}
+```
+
+### Functions
+
+```rust
+/// Create PDP with database pool
+impl PolicyDecisionPoint {
+    pub fn new(pool: PgPool, cache_config: CacheConfig) -> Self;
+}
+
+/// Entitlement resolver
+impl EntitlementResolver {
+    pub fn new(pool: PgPool) -> Self;
+    pub async fn get_effective_entitlements(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Vec<Entitlement>>;
+    pub async fn has_entitlement(&self, tenant_id: Uuid, user_id: Uuid, entitlement: &str) -> Result<bool>;
+}
+
+/// Policy cache
+impl PolicyCache {
+    pub fn new(max_capacity: u64, ttl_seconds: u64) -> Self;
+    pub async fn get(&self, key: &str) -> Option<Policy>;
+    pub async fn invalidate(&self, tenant_id: Uuid);
+}
+```
+
+## Usage Example
+
+```rust
+use xavyo_authorization::{
+    PolicyDecisionPoint, AuthzContext, Decision, Environment,
+    EntitlementResolver,
+};
+
+// Create PDP
+let pdp = PolicyDecisionPoint::new(pool.clone(), CacheConfig::default());
+
+// Build authorization context
+let ctx = AuthzContext {
+    tenant_id,
+    subject_id: user_id,
+    subject_type: SubjectType::User,
+    resource_type: "report".to_string(),
+    resource_id: Some(report_id),
+    action: "read".to_string(),
+    environment: Environment {
+        timestamp: Utc::now(),
+        ip_address: Some("192.168.1.100".parse().unwrap()),
+        risk_score: Some(0.2),
+        custom: HashMap::new(),
+    },
+};
+
+// Evaluate policy
+let response = pdp.evaluate(&ctx).await?;
+
+match response.decision {
+    Decision::Allow => { /* proceed */ }
+    Decision::Deny => { /* reject with reason */ }
+    Decision::NotApplicable => { /* default deny */ }
+}
+
+// Check specific entitlement
+let resolver = EntitlementResolver::new(pool);
+if resolver.has_entitlement(tenant_id, user_id, "reports:export").await? {
+    // Allow export
+}
+```
+
+## Integration Points
+
+- **Consumed by**: All API crates for access control
+- **Provides**: Authorization decisions for HTTP handlers
+- **Caches**: Policies and entitlements in Moka
+
+## Feature Flags
+
+| Flag | Description | Dependencies Added |
+|------|-------------|-------------------|
+| `integration` | Enable integration tests | - |
+
+## Anti-Patterns
+
+- Never bypass PDP for "admin" users - always evaluate
+- Never cache decisions longer than policy TTL
+- Never ignore NotApplicable - default to Deny
+- Never leak policy details in error messages to clients
+
+## Related Crates
+
+- `xavyo-api-authorization` - REST API for policy management
+- `xavyo-governance` - Entitlement definitions
+- `xavyo-db` - Policy and entitlement storage
+
+---
+
+# xavyo-connector
+
+> Core abstractions for connecting xavyo to external identity systems (LDAP, REST, etc.).
+
+## Purpose
+
+Provides the foundation for provisioning users, groups, and other identity objects to external systems. Uses a capability-based trait system inspired by ConnId where connectors implement only the operations they support. Includes schema discovery, credential encryption, connection pooling, and retry logic with circuit breakers.
+
+## Layer
+
+domain
+
+## Dependencies
+
+### Internal (xavyo)
+None (standalone domain crate)
+
+### External (key)
+- `tokio` - Async runtime
+- `async-trait` - Async trait support
+- `aes-gcm` - Credential encryption
+- `serde` - Configuration serialization
+
+## Public API
+
+### Types
+
+```rust
+/// Unique connector instance ID
+pub struct ConnectorId(Uuid);
+
+/// Unique operation ID
+pub struct OperationId(Uuid);
+
+/// Connector types supported
+pub enum ConnectorType {
+    Ldap,
+    Database,
+    Rest,
+    Scim,
+    Csv,
+    Custom(String),
+}
+
+/// Connector lifecycle status
+pub enum ConnectorStatus { Active, Disabled, Error }
+
+/// Operation types
+pub enum OperationType { Create, Update, Delete, Enable, Disable }
+
+/// Unique identifier in target system
+pub struct Uid { value: String }
+
+/// Set of attributes for operations
+pub struct AttributeSet { attrs: HashMap<String, AttributeValue> }
+
+/// Search filter
+pub enum Filter { Eq(String, String), And(Vec<Filter>), Or(Vec<Filter>), ... }
+
+/// Schema types
+pub struct Schema { object_classes: Vec<ObjectClass> }
+pub struct ObjectClass { name: String, attributes: Vec<SchemaAttribute> }
+pub struct SchemaAttribute { name: String, data_type: AttributeDataType, required: bool }
+
+/// Connector configuration
+pub struct ConnectorConfig { ... }
+
+/// Credential encryption helper
+pub struct CredentialEncryption { ... }
+
+/// Circuit breaker for resilience
+pub struct CircuitBreaker { ... }
+```
+
+### Traits
+
+```rust
+/// Base trait all connectors implement
+#[async_trait]
+pub trait Connector: Send + Sync {
+    fn connector_type(&self) -> ConnectorType;
+    async fn test_connection(&self) -> ConnectorResult<()>;
+    async fn dispose(&self) -> ConnectorResult<()>;
+}
+
+/// Schema discovery capability
+#[async_trait]
+pub trait SchemaDiscovery: Connector {
+    async fn discover_schema(&self) -> ConnectorResult<Schema>;
+}
+
+/// Create operation capability
+#[async_trait]
+pub trait CreateOp: Connector {
+    async fn create(&self, object_class: &str, attrs: AttributeSet) -> ConnectorResult<Uid>;
+}
+
+/// Update operation capability
+#[async_trait]
+pub trait UpdateOp: Connector {
+    async fn update(&self, object_class: &str, uid: &Uid, changes: Vec<AttributeDelta>) -> ConnectorResult<Uid>;
+}
+
+/// Delete operation capability
+#[async_trait]
+pub trait DeleteOp: Connector {
+    async fn delete(&self, object_class: &str, uid: &Uid) -> ConnectorResult<()>;
+}
+
+/// Search operation capability
+#[async_trait]
+pub trait SearchOp: Connector {
+    async fn search(&self, object_class: &str, filter: Filter, page: PageRequest) -> ConnectorResult<SearchResult>;
+}
+
+/// Combined CRUD trait
+pub trait FullCrud: CreateOp + UpdateOp + DeleteOp + SearchOp {}
+
+/// Incremental sync capability
+#[async_trait]
+pub trait SyncCapable: Connector {
+    async fn sync(&self, object_class: &str, token: Option<String>) -> ConnectorResult<SyncResult>;
+}
+```
+
+### Functions
+
+```rust
+/// Connector factory function type
+pub type ConnectorFactory = Box<dyn Fn(ConnectorConfig) -> BoxedConnector + Send + Sync>;
+
+/// Registry for managing connector instances
+impl ConnectorRegistry {
+    pub fn new() -> Self;
+    pub async fn register_factory(&self, ct: ConnectorType, factory: ConnectorFactory);
+    pub async fn get_or_create(&self, id: ConnectorId, ct: ConnectorType, config: Value) -> ConnectorResult<Arc<dyn Connector>>;
+}
+
+/// Credential encryption
+impl CredentialEncryption {
+    pub fn new(master_key: &[u8]) -> Self;
+    pub fn encrypt(&self, tenant_id: Uuid, plaintext: &[u8]) -> Result<Vec<u8>>;
+    pub fn decrypt(&self, tenant_id: Uuid, ciphertext: &[u8]) -> Result<Vec<u8>>;
+}
+```
+
+## Usage Example
+
+```rust
+use xavyo_connector::prelude::*;
+
+// Register connector factory
+let registry = ConnectorRegistry::new();
+registry.register_factory(ConnectorType::Ldap, ldap_factory).await;
+
+// Get or create connector instance
+let connector = registry.get_or_create(
+    connector_id,
+    ConnectorType::Ldap,
+    serde_json::json!({
+        "host": "ldap.example.com",
+        "port": 636,
+        "base_dn": "dc=example,dc=com"
+    }),
+).await?;
+
+// Test connection
+connector.test_connection().await?;
+
+// Create a user
+let attrs = AttributeSet::new()
+    .with("cn", "John Doe")
+    .with("mail", "john@example.com");
+let uid = connector.create("user", attrs).await?;
+```
+
+## Integration Points
+
+- **Consumed by**: All connector implementations, `xavyo-provisioning`
+- **Provides**: Abstraction layer for identity source operations
+
+## Feature Flags
+
+None - all features are enabled by default.
+
+## Anti-Patterns
+
+- Never store connector credentials in plaintext - use `CredentialEncryption`
+- Never skip `test_connection` before operations
+- Never ignore circuit breaker state
+- Never leak target system errors to clients - wrap in `ConnectorError`
+
+## Related Crates
+
+- `xavyo-connector-ldap` - LDAP/AD implementation
+- `xavyo-connector-entra` - Microsoft Entra ID implementation
+- `xavyo-connector-rest` - Generic REST implementation
+- `xavyo-provisioning` - Uses connectors for provisioning operations
+
+---
+
+# xavyo-connector-database
+
+> Database connector for xavyo provisioning.
+
+## Purpose
+
+Implements the xavyo-connector traits for SQL databases, enabling provisioning to identity tables in PostgreSQL, MySQL, MS SQL Server, and Oracle. Supports schema discovery from INFORMATION_SCHEMA, connection pooling, SSL/TLS, and parameterized queries for security.
+
+## Layer
+
+connector
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-connector` - Connector framework traits
+
+### External (key)
+- `sqlx` - Async database client
+- `tokio` - Async runtime
+
+## Public API
+
+### Types
+
+```rust
+/// Database connector configuration
+pub struct DatabaseConfig {
+    pub driver: DatabaseDriver,
+    pub host: String,
+    pub port: Option<u16>,
+    pub database: String,
+    pub username: String,
+    pub password: Option<String>,
+    pub ssl_mode: SslMode,
+    pub pool_size: u32,
+    pub timeout_secs: u64,
+    pub table_mappings: HashMap<String, TableMapping>,
+}
+
+/// Supported database drivers
+pub enum DatabaseDriver {
+    PostgreSQL,
+    MySQL,
+    MsSql,
+    Oracle,
+}
+
+/// SSL/TLS mode
+pub enum SslMode {
+    Disable,
+    Prefer,
+    Require,
+    VerifyCa,
+    VerifyFull,
+}
+
+/// Table mapping configuration
+pub struct TableMapping {
+    pub table_name: String,
+    pub schema_name: Option<String>,
+    pub uid_column: String,
+    pub column_mappings: HashMap<String, String>,
+}
+
+/// Database connector implementing Connector traits
+pub struct DatabaseConnector { ... }
+```
+
+### Trait Implementations
+
+```rust
+// DatabaseConnector implements:
+impl Connector for DatabaseConnector { ... }
+impl SchemaDiscovery for DatabaseConnector { ... }  // Via INFORMATION_SCHEMA
+impl CreateOp for DatabaseConnector { ... }
+impl UpdateOp for DatabaseConnector { ... }
+impl DeleteOp for DatabaseConnector { ... }
+impl SearchOp for DatabaseConnector { ... }
+```
+
+## Usage Example
+
+```rust
+use xavyo_connector_database::{DatabaseConfig, DatabaseDriver, DatabaseConnector, SslMode};
+use xavyo_connector::prelude::*;
+
+// Configure database connection
+let config = DatabaseConfig::new(
+    DatabaseDriver::PostgreSQL,
+    "db.example.com",
+    "identity_db",
+    "provisioner",
+)
+.with_password("secret")
+.with_ssl_mode(SslMode::Require)
+.with_port(5432)
+.with_table_mapping("user", TableMapping {
+    table_name: "users".to_string(),
+    schema_name: Some("identity".to_string()),
+    uid_column: "id".to_string(),
+    column_mappings: [
+        ("email".to_string(), "email_address".to_string()),
+        ("firstName".to_string(), "first_name".to_string()),
+        ("lastName".to_string(), "last_name".to_string()),
+    ].into_iter().collect(),
+});
+
+// Create connector
+let connector = DatabaseConnector::new(config).await?;
+
+// Test connection
+connector.test_connection().await?;
+
+// Discover schema
+let schema = connector.discover_schema().await?;
+for class in schema.object_classes {
+    println!("Table: {} with {} columns", class.name, class.attributes.len());
+}
+
+// Create user
+let attrs = AttributeSet::new()
+    .with("email", "john@example.com")
+    .with("firstName", "John")
+    .with("lastName", "Doe");
+
+let uid = connector.create("user", attrs).await?;
+// Executes: INSERT INTO identity.users (email_address, first_name, last_name) VALUES ($1, $2, $3) RETURNING id
+
+// Search users
+let filter = Filter::contains("email", "@example.com");
+let results = connector.search("user", filter, PageRequest::default()).await?;
+// Executes: SELECT * FROM identity.users WHERE email_address LIKE $1 LIMIT $2 OFFSET $3
+```
+
+## Integration Points
+
+- **Consumed by**: `xavyo-provisioning`, `xavyo-api-connectors`
+- **Connects to**: PostgreSQL, MySQL, MS SQL Server, Oracle
+- **Standard ports**: 5432 (PostgreSQL), 3306 (MySQL), 1433 (MSSQL), 1521 (Oracle)
+
+## Feature Flags
+
+None - all features are enabled by default.
+
+## Anti-Patterns
+
+- Never store database credentials in plaintext - use `xavyo-connector::CredentialEncryption`
+- Never disable SSL for production connections
+- Never use string concatenation for queries - always use parameterized queries
+- Never grant more permissions than necessary to the provisioner account
+
+## Related Crates
+
+- `xavyo-connector` - Framework traits and types
+- `xavyo-provisioning` - Uses connector for provisioning operations
+- `xavyo-db` - xavyo's own PostgreSQL layer (different purpose)
+
+---
+
+# xavyo-connector-entra
+
+> Microsoft Entra ID (Azure AD) connector for xavyo provisioning.
+
+## Purpose
+
+Implements the xavyo-connector traits for Microsoft Entra ID, enabling bidirectional identity synchronization via the Microsoft Graph API. Supports OAuth2 client credentials, full and delta sync, group membership resolution, outbound provisioning, and multi-cloud environments (Commercial, US Government, China, Germany).
+
+## Layer
+
+connector
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-connector` - Connector framework traits
+- `xavyo-core` - TenantId type
+
+### External (key)
+- `reqwest` - HTTP client for Graph API
+- `tokio` - Async runtime
+- `secrecy` - Secret handling
+
+## Public API
+
+### Types
+
+```rust
+/// Entra connector configuration
+pub struct EntraConfig {
+    pub tenant_id: String,
+    pub cloud_environment: EntraCloudEnvironment,
+    pub user_filter: Option<String>,
+    pub group_filter: Option<String>,
+    pub conflict_strategy: EntraConflictStrategy,
+}
+
+/// Builder for EntraConfig
+pub struct EntraConfigBuilder { ... }
+
+/// OAuth2 credentials
+pub struct EntraCredentials {
+    pub client_id: String,
+    pub client_secret: SecretString,
+}
+
+/// Cloud environment selection
+pub enum EntraCloudEnvironment {
+    Commercial,       // login.microsoftonline.com
+    UsGovernment,    // login.microsoftonline.us
+    China,           // login.chinacloudapi.cn
+    Germany,         // login.microsoftonline.de
+}
+
+/// Conflict resolution strategy
+pub enum EntraConflictStrategy {
+    Skip,
+    Overwrite,
+    Merge,
+}
+
+/// Entra connector implementing Connector traits
+pub struct EntraConnector { ... }
+
+/// Graph API client
+pub struct GraphClient { ... }
+
+/// Token cache for OAuth2
+pub struct TokenCache { ... }
+
+/// Mapped user from Entra
+pub struct MappedEntraUser { ... }
+
+/// Mapped group from Entra
+pub struct MappedEntraGroup { ... }
+```
+
+### Trait Implementations
+
+```rust
+// EntraConnector implements:
+impl Connector for EntraConnector { ... }
+impl SchemaDiscovery for EntraConnector { ... }
+impl CreateOp for EntraConnector { ... }
+impl UpdateOp for EntraConnector { ... }
+impl DeleteOp for EntraConnector { ... }
+impl SearchOp for EntraConnector { ... }
+impl SyncCapable for EntraConnector { ... }  // Delta sync support
+impl DisableOp for EntraConnector { ... }
+impl GroupOp for EntraConnector { ... }
+```
+
+## Usage Example
+
+```rust
+use xavyo_connector_entra::{EntraConnector, EntraConfig, EntraCredentials, EntraCloudEnvironment};
+use xavyo_connector::prelude::*;
+
+// Configure Entra connection
+let config = EntraConfig::builder()
+    .tenant_id("your-tenant-id")
+    .cloud_environment(EntraCloudEnvironment::Commercial)
+    .user_filter("accountEnabled eq true")
+    .build()?;
+
+let credentials = EntraCredentials {
+    client_id: "your-client-id".to_string(),
+    client_secret: "your-client-secret".to_string().into(),
+};
+
+// Create connector
+let connector = EntraConnector::new(config, credentials)?;
+
+// Test connection
+connector.test_connection().await?;
+
+// Full sync
+let sync_result = connector.sync("user", None).await?;
+for user in sync_result.objects {
+    println!("Synced user: {}", user.uid.value());
+}
+
+// Delta sync (incremental)
+let delta_result = connector.sync("user", Some(sync_result.sync_token)).await?;
+for change in delta_result.changes {
+    match change.change_type {
+        SyncChangeType::Created => { /* handle new user */ }
+        SyncChangeType::Updated => { /* handle update */ }
+        SyncChangeType::Deleted => { /* handle deletion */ }
+    }
+}
+
+// Create user in Entra
+let attrs = AttributeSet::new()
+    .with("userPrincipalName", "john.doe@example.com")
+    .with("displayName", "John Doe")
+    .with("mailNickname", "john.doe")
+    .with("accountEnabled", "true");
+
+let uid = connector.create("user", attrs).await?;
+```
+
+## Integration Points
+
+- **Consumed by**: `xavyo-provisioning`, `xavyo-api-connectors`
+- **Connects to**: Microsoft Graph API (graph.microsoft.com)
+- **Required permissions**: User.ReadWrite.All, Group.ReadWrite.All, Directory.ReadWrite.All
+
+## Feature Flags
+
+None - all features are enabled by default.
+
+## Anti-Patterns
+
+- Never store client secrets in plaintext - use `xavyo-connector::CredentialEncryption`
+- Never ignore token expiration - use `TokenCache` for automatic refresh
+- Never use delta sync without persisting sync tokens
+- Never hard-code tenant IDs in multi-tenant deployments
+
+## Related Crates
+
+- `xavyo-connector` - Framework traits and types
+- `xavyo-provisioning` - Uses connector for provisioning operations
+- `xavyo-api-oidc-federation` - Entra as OIDC federation source
+
+---
+
+# xavyo-connector-ldap
+
+> LDAP/Active Directory connector for xavyo provisioning.
+
+## Purpose
+
+Implements the xavyo-connector traits for LDAP directories and Active Directory domains. Enables user and group provisioning to on-premise directory services. Supports LDAP v3 protocol, SSL/TLS, STARTTLS, schema discovery, connection pooling, and paged search results.
+
+## Layer
+
+connector
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-connector` - Connector framework traits
+
+### External (key)
+- `ldap3` - LDAP v3 client library
+- `tokio` - Async runtime
+- `base64` - Binary attribute encoding
+
+## Public API
+
+### Types
+
+```rust
+/// LDAP connector configuration
+pub struct LdapConfig {
+    pub host: String,
+    pub port: u16,
+    pub base_dn: String,
+    pub bind_dn: String,
+    pub password: Option<String>,
+    pub use_ssl: bool,
+    pub use_starttls: bool,
+    pub timeout_secs: u64,
+}
+
+/// Active Directory specific configuration
+pub struct ActiveDirectoryConfig {
+    pub ldap: LdapConfig,
+    pub domain: String,
+    pub user_search_base: Option<String>,
+    pub group_search_base: Option<String>,
+}
+
+/// LDAP connector implementing Connector traits
+pub struct LdapConnector { ... }
+
+/// Active Directory connector with AD-specific features
+pub struct AdConnector { ... }
+```
+
+### Trait Implementations
+
+```rust
+// LdapConnector implements:
+impl Connector for LdapConnector { ... }
+impl SchemaDiscovery for LdapConnector { ... }
+impl CreateOp for LdapConnector { ... }
+impl UpdateOp for LdapConnector { ... }
+impl DeleteOp for LdapConnector { ... }
+impl SearchOp for LdapConnector { ... }
+impl SyncCapable for LdapConnector { ... }
+impl PasswordOp for LdapConnector { ... }
+impl DisableOp for LdapConnector { ... }
+impl GroupOp for LdapConnector { ... }
+```
+
+## Usage Example
+
+```rust
+use xavyo_connector_ldap::{LdapConfig, LdapConnector};
+use xavyo_connector::prelude::*;
+
+// Configure LDAP connection
+let config = LdapConfig::new(
+    "ldap.example.com",
+    "dc=example,dc=com",
+    "cn=admin,dc=example,dc=com",
+)
+.with_password("secret")
+.with_ssl()
+.with_port(636);
+
+// Create connector
+let connector = LdapConnector::new(config)?;
+
+// Test connection
+connector.test_connection().await?;
+
+// Discover schema
+let schema = connector.discover_schema().await?;
+println!("Found {} object classes", schema.object_classes.len());
+
+// Create a user
+let attrs = AttributeSet::new()
+    .with("cn", "John Doe")
+    .with("sn", "Doe")
+    .with("givenName", "John")
+    .with("mail", "john.doe@example.com")
+    .with("userPassword", "initial-password");
+
+let uid = connector.create("inetOrgPerson", attrs).await?;
+println!("Created user with DN: {}", uid.value());
+
+// Search users
+let filter = Filter::and(vec![
+    Filter::eq("objectClass", "inetOrgPerson"),
+    Filter::contains("mail", "@example.com"),
+]);
+let results = connector.search("inetOrgPerson", filter, PageRequest::default()).await?;
+```
+
+## Integration Points
+
+- **Consumed by**: `xavyo-provisioning`, `xavyo-api-connectors`
+- **Connects to**: LDAP v3 directories, Active Directory
+- **Standard ports**: 389 (LDAP), 636 (LDAPS), 3268 (AD Global Catalog)
+
+## Feature Flags
+
+None - all features are enabled by default.
+
+## Anti-Patterns
+
+- Never store bind passwords in plaintext - use `xavyo-connector::CredentialEncryption`
+- Never skip certificate verification in production (use proper CA certs)
+- Never use simple bind over unencrypted connections
+- Never hardcode DNs - use schema discovery for attribute names
+
+## Related Crates
+
+- `xavyo-connector` - Framework traits and types
+- `xavyo-provisioning` - Uses connector for provisioning operations
+- `xavyo-api-connectors` - REST API for connector management
+
+---
+
+# xavyo-connector-rest
+
+> Generic REST API connector for xavyo provisioning.
+
+## Purpose
+
+Implements the xavyo-connector traits for generic REST APIs, enabling provisioning to any system with a REST interface. Supports multiple authentication methods (Basic, Bearer, API Key, OAuth2), flexible endpoint configuration, various pagination styles, and configurable request/response parsing.
+
+## Layer
+
+connector
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-connector` - Connector framework traits
+
+### External (key)
+- `reqwest` - HTTP client
+- `tokio` - Async runtime
+- `url` - URL parsing
+
+## Public API
+
+### Types
+
+```rust
+/// REST connector configuration
+pub struct RestConfig {
+    pub base_url: String,
+    pub auth: AuthConfig,
+    pub endpoints: HashMap<String, EndpointConfig>,
+    pub timeout_secs: u64,
+    pub tls_verify: bool,
+    pub custom_headers: HashMap<String, String>,
+}
+
+/// Authentication configuration
+pub enum AuthConfig {
+    None,
+    Basic { username: String, password: String },
+    Bearer { token: String },
+    ApiKey { header: String, value: String },
+    OAuth2 {
+        client_id: String,
+        client_secret: String,
+        token_url: String,
+        scopes: Vec<String>,
+    },
+}
+
+/// Endpoint configuration
+pub struct EndpointConfig {
+    pub path: String,
+    pub method: HttpMethod,
+    pub pagination: Option<PaginationConfig>,
+    pub response: ResponseConfig,
+}
+
+/// HTTP methods
+pub enum HttpMethod { Get, Post, Put, Patch, Delete }
+
+/// Pagination styles
+pub enum PaginationStyle {
+    Offset,          // ?offset=0&limit=100
+    Page,            // ?page=1&pageSize=100
+    Cursor,          // ?cursor=abc123
+    LinkHeader,      // Link: <url>; rel="next"
+}
+
+/// Pagination configuration
+pub struct PaginationConfig {
+    pub style: PaginationStyle,
+    pub page_size: u32,
+    pub page_param: String,
+    pub size_param: String,
+}
+
+/// Response parsing configuration
+pub struct ResponseConfig {
+    pub data_path: String,        // JSONPath to data array
+    pub uid_field: String,        // Field name for unique ID
+    pub total_path: Option<String>, // JSONPath to total count
+}
+
+/// REST connector implementing Connector traits
+pub struct RestConnector { ... }
+```
+
+### Trait Implementations
+
+```rust
+// RestConnector implements:
+impl Connector for RestConnector { ... }
+impl SchemaDiscovery for RestConnector { ... }  // Via introspection endpoint if available
+impl CreateOp for RestConnector { ... }
+impl UpdateOp for RestConnector { ... }
+impl DeleteOp for RestConnector { ... }
+impl SearchOp for RestConnector { ... }
+```
+
+## Usage Example
+
+```rust
+use xavyo_connector_rest::{RestConfig, RestConnector, AuthConfig, EndpointConfig, HttpMethod};
+use xavyo_connector::prelude::*;
+
+// Configure REST API connection
+let config = RestConfig::new("https://api.example.com/v1")
+    .with_auth(AuthConfig::Bearer {
+        token: "my-api-token".to_string(),
+    })
+    .with_header("X-Custom-Header", "value")
+    .with_endpoint("user", EndpointConfig {
+        path: "/users".to_string(),
+        method: HttpMethod::Get,
+        pagination: Some(PaginationConfig::offset(100)),
+        response: ResponseConfig {
+            data_path: "$.data".to_string(),
+            uid_field: "id".to_string(),
+            total_path: Some("$.meta.total".to_string()),
+        },
+    });
+
+// Create connector
+let connector = RestConnector::new(config)?;
+
+// Test connection
+connector.test_connection().await?;
+
+// Search users
+let filter = Filter::eq("status", "active");
+let results = connector.search("user", filter, PageRequest::default()).await?;
+
+// Create user
+let attrs = AttributeSet::new()
+    .with("email", "john@example.com")
+    .with("firstName", "John")
+    .with("lastName", "Doe");
+
+let uid = connector.create("user", attrs).await?;
+
+// Update user
+let changes = vec![
+    AttributeDelta::replace("lastName", "Smith"),
+];
+connector.update("user", &uid, changes).await?;
+```
+
+## Integration Points
+
+- **Consumed by**: `xavyo-provisioning`, `xavyo-api-connectors`
+- **Connects to**: Any REST API (SaaS apps, custom systems)
+- **Supports**: JSON request/response bodies
+
+## Feature Flags
+
+None - all features are enabled by default.
+
+## Anti-Patterns
+
+- Never store API credentials in plaintext - use `xavyo-connector::CredentialEncryption`
+- Never disable TLS verification in production
+- Never hardcode base URLs - use configuration
+- Never ignore rate limits - implement backoff
+
+## Related Crates
+
+- `xavyo-connector` - Framework traits and types
+- `xavyo-provisioning` - Uses connector for provisioning operations
+- `xavyo-scim-client` - SCIM-specific REST client
+
+---
+
+# xavyo-core
+
+> Shared types and traits for xavyo: TenantId, UserId, XavyoError, TenantAware.
+
+## Purpose
+
+Provides foundational types used across all xavyo crates. This includes strongly-typed identifiers (TenantId, UserId, SessionId) that prevent accidental misuse at compile time, a standardized error type (XavyoError) that maps to HTTP status codes, and the TenantAware trait for multi-tenant entities.
+
+## Layer
+
+foundation
+
+## Dependencies
+
+### Internal (xavyo)
+None (this is the root crate)
+
+### External (key)
+- `serde` - Serialization/deserialization
+- `uuid` - UUID v4 generation
+- `thiserror` - Error derive macros
+
+## Public API
+
+### Types
+
+```rust
+/// Strongly typed identifier for tenants (UUID v4 wrapper)
+pub struct TenantId(Uuid);
+
+/// Strongly typed identifier for users (UUID v4 wrapper)
+pub struct UserId(Uuid);
+
+/// Strongly typed identifier for sessions (UUID v4 wrapper)
+pub struct SessionId(Uuid);
+
+/// Standardized error type with HTTP status code mapping
+pub enum XavyoError {
+    Unauthorized { message: Option<String> },      // HTTP 401
+    NotFound { resource: String, id: Option<String> }, // HTTP 404
+    TenantMismatch { expected: TenantId, actual: TenantId }, // HTTP 403
+    ValidationError { field: String, message: String }, // HTTP 400
+}
+```
+
+### Traits
+
+```rust
+/// Marks an entity as belonging to a specific tenant
+pub trait TenantAware {
+    fn tenant_id(&self) -> TenantId;
+}
+```
+
+### Functions
+
+```rust
+// ID types provide these methods:
+impl TenantId {
+    pub fn new() -> Self;                    // Create random UUID v4
+    pub fn from_uuid(uuid: Uuid) -> Self;    // From existing UUID
+    pub fn as_uuid(&self) -> &Uuid;          // Get underlying UUID
+}
+
+// Result type alias
+pub type Result<T> = std::result::Result<T, XavyoError>;
+```
+
+## Usage Example
+
+```rust
+use xavyo_core::{TenantId, UserId, XavyoError, Result, TenantAware};
+
+// Create strongly typed IDs
+let tenant_id = TenantId::new();
+let user_id = UserId::new();
+
+// Parse from string
+let tenant: TenantId = "550e8400-e29b-41d4-a716-446655440000".parse()?;
+
+// Use in error handling
+fn find_user(id: &str) -> Result<String> {
+    if id.is_empty() {
+        return Err(XavyoError::NotFound {
+            resource: "User".to_string(),
+            id: None,
+        });
+    }
+    Ok(format!("User {}", id))
+}
+
+// Implement TenantAware for your types
+struct Document {
+    tenant_id: TenantId,
+    title: String,
+}
+
+impl TenantAware for Document {
+    fn tenant_id(&self) -> TenantId {
+        self.tenant_id
+    }
+}
+```
+
+## Integration Points
+
+- **Consumed by**: Every other xavyo crate
+- **Provides**: Type safety for tenant isolation throughout the platform
+
+## Feature Flags
+
+None - this crate has no optional features.
+
+## Anti-Patterns
+
+- Never use `Uuid` directly where `TenantId` or `UserId` is expected
+- Never use `Uuid::nil()` as a placeholder for tenant IDs
+- Never serialize XavyoError without the `type` discriminator field
+
+## Related Crates
+
+- `xavyo-db` - Uses these types for database models
+- `xavyo-auth` - Uses TenantId in JWT claims
+- `xavyo-tenant` - Extracts TenantId from HTTP requests
+
+---
+
+# xavyo-db
+
+> PostgreSQL database layer with multi-tenant Row-Level Security (RLS) support.
+
+## Purpose
+
+Provides the data access layer for xavyo with built-in multi-tenant isolation. Uses SQLx for compile-time checked queries and PostgreSQL Row-Level Security to enforce tenant boundaries at the database level. Includes connection pooling, migrations, and all domain models.
+
+## Layer
+
+foundation
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-nhi` - Non-human identity types
+
+### External (key)
+- `sqlx` - Compile-time checked PostgreSQL queries
+- `tokio` - Async runtime
+- `chrono` - Timestamps
+- `serde` - Model serialization
+
+## Public API
+
+### Types
+
+```rust
+/// PostgreSQL connection pool
+pub struct DbPool(PgPool);
+
+/// Pool configuration options
+pub struct DbPoolOptions { ... }
+
+/// Tenant-scoped connection wrapper
+pub struct TenantConnection<'a> { ... }
+
+/// Database errors
+pub enum DbError { ... }
+
+// 700+ domain models exported, including:
+pub struct User { ... }
+pub struct Tenant { ... }
+pub struct OAuth2Client { ... }
+pub struct Session { ... }
+pub struct GovAccessRequest { ... }
+// ... (see lib.rs for full list)
+```
+
+### Functions
+
+```rust
+/// Connect to database and create pool
+impl DbPool {
+    pub async fn connect(url: &str) -> Result<Self, DbError>;
+    pub async fn connect_with_options(url: &str, options: DbPoolOptions) -> Result<Self, DbError>;
+}
+
+/// Run database migrations
+pub async fn run_migrations(pool: &DbPool) -> Result<(), DbError>;
+
+/// Set tenant context for RLS (MUST be called before queries)
+pub async fn set_tenant_context(conn: &mut PgConnection, tenant_id: TenantId) -> Result<(), DbError>;
+
+/// Clear tenant context
+pub async fn clear_tenant_context(conn: &mut PgConnection) -> Result<(), DbError>;
+
+/// Get current tenant from connection
+pub async fn get_current_tenant(conn: &mut PgConnection) -> Result<Option<Uuid>, DbError>;
+
+/// Bootstrap system tenant and CLI client
+pub async fn run_bootstrap(pool: &DbPool) -> BootstrapResult;
+```
+
+## Usage Example
+
+```rust
+use xavyo_db::{DbPool, run_migrations, set_tenant_context};
+use xavyo_core::TenantId;
+
+// Connect to database
+let pool = DbPool::connect(&std::env::var("DATABASE_URL")?).await?;
+
+// Run migrations on startup
+run_migrations(&pool).await?;
+
+// In request handler - set tenant context for RLS
+let tenant_id = TenantId::from_uuid(claims.tid);
+let mut tx = pool.begin().await?;
+set_tenant_context(&mut *tx, tenant_id).await?;
+
+// All queries now automatically filtered by tenant
+let users = sqlx::query_as!(User, "SELECT * FROM users")
+    .fetch_all(&mut *tx)
+    .await?;
+// RLS ensures only this tenant's users are returned
+
+tx.commit().await?;
+```
+
+## Integration Points
+
+- **Consumed by**: All API crates, domain crates
+- **Requires**: PostgreSQL 15+ with RLS enabled
+- **Environment**: `DATABASE_URL` connection string
+
+## Feature Flags
+
+| Flag | Description | Dependencies Added |
+|------|-------------|-------------------|
+| `integration` | Enable integration tests | - |
+| `openapi` | Generate OpenAPI schemas | utoipa |
+| `argon2` | Enable password hashing | argon2 |
+
+## Anti-Patterns
+
+- Never query tenant-scoped tables without calling `set_tenant_context` first
+- Never use `SELECT *` without `WHERE tenant_id = $1` as fallback
+- Never use raw SQL for JOINs without tenant filters on both sides
+- Never commit transactions without proper error handling
+- Never store `TenantConnection` across await points
+
+## Related Crates
+
+- `xavyo-tenant` - Middleware that extracts tenant context
+- `xavyo-core` - TenantId and UserId types
+- `xavyo-governance` - Uses governance models from this crate
+
+---
+
+# xavyo-events
+
+> Kafka event bus library with type-safe producer/consumer and idempotent processing.
+
+## Purpose
+
+Provides event-driven communication infrastructure for xavyo. Enables publishing domain events to Kafka topics with guaranteed exactly-once processing via PostgreSQL-backed idempotence tracking. All events include tenant context for proper isolation.
+
+## Layer
+
+foundation
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+
+### External (key)
+- `rdkafka` - Kafka client (optional, requires `kafka` feature)
+- `sqlx` - Idempotence tracking in PostgreSQL
+- `tokio` - Async runtime
+- `serde` - Event serialization
+
+## Public API
+
+### Types
+
+```rust
+/// Event envelope with metadata
+pub struct EventEnvelope<E> {
+    pub id: Uuid,              // Unique event ID
+    pub event_type: String,    // e.g., "user.created"
+    pub tenant_id: TenantId,   // Tenant context
+    pub actor_id: Option<UserId>, // Who triggered the event
+    pub timestamp: DateTime<Utc>,
+    pub payload: E,            // The actual event
+}
+
+/// Raw envelope for deserialization
+pub struct RawEnvelope { ... }
+
+/// Kafka configuration
+pub struct KafkaConfig {
+    pub brokers: String,
+    pub client_id: String,
+    pub group_id: String,
+}
+
+/// Builder for KafkaConfig
+pub struct KafkaConfigBuilder { ... }
+
+/// Health status for monitoring
+pub enum HealthStatus { Healthy, Degraded, Unhealthy }
+
+/// Event errors
+pub enum EventError { ... }
+
+// Kafka-dependent types (require `kafka` feature)
+#[cfg(feature = "kafka")]
+pub struct EventProducer { ... }
+
+#[cfg(feature = "kafka")]
+pub struct EventConsumer { ... }
+```
+
+### Traits
+
+```rust
+/// Marker trait for events with topic association
+pub trait Event: Serialize + DeserializeOwned {
+    /// Kafka topic for this event type
+    fn topic() -> &'static str;
+
+    /// Event type identifier (e.g., "user.created")
+    fn event_type() -> &'static str;
+}
+
+/// Handler for consuming events
+#[cfg(feature = "kafka")]
+#[async_trait]
+pub trait EventHandler<E: Event> {
+    async fn handle(&self, envelope: EventEnvelope<E>) -> Result<(), EventError>;
+}
+```
+
+### Functions
+
+```rust
+// Producer methods
+#[cfg(feature = "kafka")]
+impl EventProducer {
+    pub fn new(config: KafkaConfig) -> Result<Self, EventError>;
+    pub async fn publish<E: Event>(
+        &self,
+        event: E,
+        tenant_id: TenantId,
+        actor_id: Option<UserId>,
+    ) -> Result<Uuid, EventError>;
+}
+
+// Consumer methods
+#[cfg(feature = "kafka")]
+impl EventConsumer {
+    pub fn new(config: KafkaConfig, pool: PgPool) -> Result<Self, EventError>;
+    pub async fn subscribe<E: Event, H: EventHandler<E>>(
+        &self,
+        handler: H,
+    ) -> Result<(), EventError>;
+}
+```
+
+## Usage Example
+
+```rust
+use xavyo_events::{Event, EventEnvelope, EventProducer, KafkaConfig};
+use xavyo_core::TenantId;
+use serde::{Serialize, Deserialize};
+
+// Define an event
+#[derive(Serialize, Deserialize)]
+pub struct UserCreated {
+    pub user_id: Uuid,
+    pub email: String,
+}
+
+impl Event for UserCreated {
+    fn topic() -> &'static str { "identity.users" }
+    fn event_type() -> &'static str { "user.created" }
+}
+
+// Publish events
+let config = KafkaConfig::from_env()?;
+let producer = EventProducer::new(config)?;
+
+let event = UserCreated {
+    user_id: Uuid::new_v4(),
+    email: "john@example.com".to_string(),
+};
+
+let event_id = producer.publish(event, tenant_id, Some(actor_id)).await?;
+```
+
+## Integration Points
+
+- **Consumed by**: All domain crates that emit events
+- **Requires**: Kafka brokers (when `kafka` feature enabled)
+- **Requires**: PostgreSQL for idempotence (when consuming)
+
+## Feature Flags
+
+| Flag | Description | Dependencies Added |
+|------|-------------|-------------------|
+| `kafka` | Enable Kafka producer/consumer | rdkafka |
+| `kafka-static` | Build librdkafka from source | rdkafka/cmake-build |
+| `integration` | Enable integration tests | kafka |
+
+## Anti-Patterns
+
+- Never publish events without tenant context
+- Never skip idempotence checking when consuming
+- Never process events across tenant boundaries
+- Never block the event loop with synchronous operations
+
+## Related Crates
+
+- `xavyo-webhooks` - Delivers events via HTTP webhooks
+- `xavyo-siem` - Exports audit events to external systems
+- `xavyo-provisioning` - Consumes sync events
+
+---
+
+# xavyo-governance
+
+> Identity Governance and Administration (IGA) domain logic for xavyo.
+
+## Purpose
+
+Provides core domain logic for entitlement management including applications, entitlements, assignments, and effective access queries. Supports role-based access, certification campaigns, access requests, and SoD (Separation of Duties) rule enforcement. This crate contains domain types and logic used by the governance API layer.
+
+## Layer
+
+domain
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-db` - Database models
+
+### External (key)
+- `sqlx` - Database queries
+- `chrono` - Timestamps
+- `serde` - Serialization
+
+## Public API
+
+### Types
+
+```rust
+/// Application identifier
+pub struct ApplicationId(Uuid);
+
+/// Entitlement identifier
+pub struct EntitlementId(Uuid);
+
+/// Assignment identifier
+pub struct AssignmentId(Uuid);
+
+/// Application types
+pub enum AppType {
+    Custom,
+    Saas,
+    OnPremise,
+    Cloud,
+}
+
+/// Application status
+pub enum AppStatus {
+    Active,
+    Inactive,
+    Deprecated,
+}
+
+/// Entitlement status
+pub enum EntitlementStatus {
+    Active,
+    Inactive,
+    PendingApproval,
+}
+
+/// Assignment target type
+pub enum AssignmentTargetType {
+    User,
+    Group,
+    Role,
+}
+
+/// Assignment status
+pub enum AssignmentStatus {
+    Active,
+    PendingApproval,
+    Revoked,
+    Expired,
+}
+
+/// Source of assignment
+pub enum AssignmentSource {
+    Direct,       // Manually assigned
+    Role,         // Inherited from role
+    Birthright,   // Auto-assigned by policy
+}
+
+/// Risk level classification
+pub enum RiskLevel {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+```
+
+### Errors
+
+```rust
+/// Governance operation errors
+pub enum GovernanceError {
+    NotFound { resource: String, id: String },
+    InvalidState { current: String, expected: String },
+    SodViolation { rule_id: Uuid, message: String },
+    ApprovalRequired { workflow_id: Uuid },
+    DatabaseError(String),
+}
+
+/// Result type alias
+pub type Result<T> = std::result::Result<T, GovernanceError>;
+```
+
+## Usage Example
+
+```rust
+use xavyo_governance::{
+    ApplicationId, EntitlementId, AssignmentId,
+    AppType, RiskLevel, AssignmentSource,
+    GovernanceError, Result,
+};
+
+// Create typed identifiers
+let app_id = ApplicationId::new();
+let entitlement_id = EntitlementId::new();
+
+// Use risk levels for entitlements
+fn classify_risk(privilege_level: u32) -> RiskLevel {
+    match privilege_level {
+        0..=25 => RiskLevel::Low,
+        26..=50 => RiskLevel::Medium,
+        51..=75 => RiskLevel::High,
+        _ => RiskLevel::Critical,
+    }
+}
+
+// Handle governance errors
+fn process_assignment() -> Result<()> {
+    Err(GovernanceError::SodViolation {
+        rule_id: uuid::Uuid::new_v4(),
+        message: "Cannot have both AP_APPROVER and AP_PROCESSOR".to_string(),
+    })
+}
+```
+
+## Integration Points
+
+- **Consumed by**: `xavyo-api-governance`, `xavyo-api-users`
+- **Provides**: Domain types and logic for IGA operations
+- **Database**: Uses models from `xavyo-db`
+
+## Feature Flags
+
+| Flag | Description | Dependencies Added |
+|------|-------------|-------------------|
+| `integration` | Enable integration tests | - |
+
+## Anti-Patterns
+
+- Never assign high-risk entitlements without approval workflow
+- Never skip SoD checks before assignment creation
+- Never allow direct database access bypassing service layer
+- Never create assignments without tenant context
+
+## Related Crates
+
+- `xavyo-api-governance` - REST API for governance operations
+- `xavyo-db` - Database models (GovApplication, GovEntitlement, etc.)
+- `xavyo-authorization` - Policy enforcement for entitlements
+
+---
+
+# xavyo-nhi
+
+> Core types and traits for Non-Human Identity (NHI) management.
+
+## Purpose
+
+Provides a unified abstraction for non-human identities including service accounts and AI agents. Both share common governance needs: ownership, lifecycle management, risk scoring, and certification campaigns. This crate defines the common trait and types that enable unified NHI governance.
+
+## Layer
+
+foundation
+
+## Dependencies
+
+### Internal (xavyo)
+None (standalone foundation crate)
+
+### External (key)
+- `serde` - Serialization
+- `uuid` - Identity identifiers
+- `chrono` - Timestamps
+- `async-trait` - Async trait support
+
+## Public API
+
+### Types
+
+```rust
+/// Type of non-human identity
+pub enum NhiType {
+    ServiceAccount,
+    AiAgent,
+}
+
+/// Lifecycle status of an NHI
+pub enum NhiStatus {
+    Active,
+    Suspended,
+    Deprovisioned,
+}
+
+/// Risk level classification
+pub enum NhiRiskLevel {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+/// Factors contributing to risk score
+pub struct RiskFactors {
+    pub privilege_level: u32,      // 0-100 based on entitlements
+    pub credential_age_days: u32,  // Days since credential rotation
+    pub unused_days: u32,          // Days since last activity
+    pub has_owner: bool,           // Whether ownership is assigned
+}
+```
+
+### Traits
+
+```rust
+/// Common interface for all non-human identities
+pub trait NonHumanIdentity: Send + Sync {
+    /// Unique identifier
+    fn id(&self) -> Uuid;
+
+    /// Tenant this NHI belongs to
+    fn tenant_id(&self) -> Uuid;
+
+    /// Type of NHI (ServiceAccount or AiAgent)
+    fn nhi_type(&self) -> NhiType;
+
+    /// Current lifecycle status
+    fn status(&self) -> NhiStatus;
+
+    /// Human owner responsible for this NHI
+    fn owner_id(&self) -> Option<Uuid>;
+
+    /// Display name for UI
+    fn display_name(&self) -> &str;
+
+    /// When this NHI was created
+    fn created_at(&self) -> DateTime<Utc>;
+
+    /// When credentials were last rotated
+    fn last_credential_rotation(&self) -> Option<DateTime<Utc>>;
+
+    /// When this NHI was last used
+    fn last_activity(&self) -> Option<DateTime<Utc>>;
+}
+```
+
+### Functions
+
+```rust
+/// Calculate risk level from risk factors
+pub fn calculate_risk_level(factors: &RiskFactors) -> NhiRiskLevel;
+```
+
+## Usage Example
+
+```rust
+use xavyo_nhi::{NonHumanIdentity, NhiType, NhiStatus, NhiRiskLevel, RiskFactors, calculate_risk_level};
+use uuid::Uuid;
+use chrono::{DateTime, Utc};
+
+// Implement NonHumanIdentity for your types
+struct ServiceAccount {
+    id: Uuid,
+    tenant_id: Uuid,
+    name: String,
+    owner_id: Option<Uuid>,
+    status: NhiStatus,
+    created_at: DateTime<Utc>,
+    last_rotation: Option<DateTime<Utc>>,
+    last_activity: Option<DateTime<Utc>>,
+}
+
+impl NonHumanIdentity for ServiceAccount {
+    fn id(&self) -> Uuid { self.id }
+    fn tenant_id(&self) -> Uuid { self.tenant_id }
+    fn nhi_type(&self) -> NhiType { NhiType::ServiceAccount }
+    fn status(&self) -> NhiStatus { self.status.clone() }
+    fn owner_id(&self) -> Option<Uuid> { self.owner_id }
+    fn display_name(&self) -> &str { &self.name }
+    fn created_at(&self) -> DateTime<Utc> { self.created_at }
+    fn last_credential_rotation(&self) -> Option<DateTime<Utc>> { self.last_rotation }
+    fn last_activity(&self) -> Option<DateTime<Utc>> { self.last_activity }
+}
+
+// Calculate risk
+let factors = RiskFactors {
+    privilege_level: 80,
+    credential_age_days: 180,
+    unused_days: 30,
+    has_owner: false,
+};
+let risk = calculate_risk_level(&factors);
+assert_eq!(risk, NhiRiskLevel::High);
+```
+
+## Integration Points
+
+- **Consumed by**: `xavyo-db` (models), `xavyo-api-agents`, `xavyo-governance`
+- **Provides**: Unified interface for NHI governance operations
+
+## Feature Flags
+
+| Flag | Description | Dependencies Added |
+|------|-------------|-------------------|
+| `sqlx` | Enable SQLx derives for types | sqlx |
+
+## Anti-Patterns
+
+- Never create NHIs without assigning an owner
+- Never skip credential rotation for active NHIs
+- Never ignore high-risk NHIs in certification campaigns
+- Never allow NHIs to exist without tenant context
+
+## Related Crates
+
+- `xavyo-api-agents` - AI agent management API
+- `xavyo-governance` - NHI certification campaigns
+- `xavyo-db` - Persistent NHI models
+
+---
+
+# xavyo-provisioning
+
+> Provisioning engine with queue management, correlation, reconciliation, and Rhai scripting.
+
+## Purpose
+
+Provides the infrastructure for provisioning operations including durable operation queues, retry logic with exponential backoff, dead letter queue handling, correlation engine for matching accounts, reconciliation engine for detecting drift, and Rhai scripting for custom transformation logic. Orchestrates the entire provisioning pipeline from event to target system.
+
+## Layer
+
+domain
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-connector` - Connector abstractions
+- `xavyo-events` - Event consumption
+- `xavyo-db` - Operation persistence
+- `xavyo-core` - TenantId, UserId types
+
+### External (key)
+- `tokio` - Async runtime
+- `sqlx` - Queue persistence
+- `rhai` - Scripting engine
+- `reqwest` - Webhook delivery
+
+## Public API
+
+### Types
+
+```rust
+/// Queued provisioning operation
+pub struct QueuedOperation {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub connector_id: Uuid,
+    pub target_uid: Option<String>,
+    pub operation_type: OperationType,
+    pub object_class: String,
+    pub attributes: Value,
+    pub priority: i32,
+    pub retry_count: i32,
+    pub next_retry_at: Option<DateTime<Utc>>,
+}
+
+/// Queue statistics
+pub struct QueueStats {
+    pub pending: i64,
+    pub in_progress: i64,
+    pub failed: i64,
+    pub dead_letter: i64,
+}
+
+/// Correlation match result
+pub struct CorrelationMatch {
+    pub uid: String,
+    pub confidence: f64,
+    pub match_type: MatchType,
+}
+
+/// Shadow account state
+pub struct Shadow {
+    pub tenant_id: Uuid,
+    pub connector_id: Uuid,
+    pub uid: String,
+    pub state: ShadowState,
+    pub attributes: Value,
+}
+
+/// Hook execution context
+pub struct HookContext {
+    pub tenant_id: Uuid,
+    pub operation_type: OperationType,
+    pub object_class: String,
+    pub attributes: Value,
+}
+
+/// Reconciliation run info
+pub struct ReconciliationRunInfo {
+    pub id: Uuid,
+    pub connector_id: Uuid,
+    pub status: RunStatus,
+    pub statistics: RunStatistics,
+}
+```
+
+### Traits
+
+```rust
+/// Operation processor interface
+#[async_trait]
+pub trait OperationProcessor: Send + Sync {
+    async fn process(&self, operation: QueuedOperation) -> ProcessorResult<()>;
+}
+
+/// Correlation service interface
+#[async_trait]
+pub trait CorrelationService: Send + Sync {
+    async fn correlate(&self, tenant_id: Uuid, connector_id: Uuid, attrs: &Value) -> CorrelationResult<Option<CorrelationMatch>>;
+}
+
+/// Hook executor interface
+#[async_trait]
+pub trait HookExecutor: Send + Sync {
+    async fn execute(&self, hook: &HookDefinition, ctx: &HookContext) -> HookResult<HookExecutionResult>;
+}
+```
+
+### Functions
+
+```rust
+/// Create operation queue
+impl OperationQueue {
+    pub async fn new(pool: PgPool, config: QueueConfig) -> Self;
+    pub async fn enqueue(&self, op: QueuedOperation) -> QueueResult<Uuid>;
+    pub async fn dequeue(&self, limit: i32) -> QueueResult<Vec<QueuedOperation>>;
+    pub async fn stats(&self) -> QueueResult<QueueStats>;
+}
+
+/// Create reconciliation engine
+impl ReconciliationEngine {
+    pub async fn new(pool: PgPool, config: ReconciliationConfig) -> Self;
+    pub async fn run(&self, connector_id: Uuid) -> Result<ReconciliationRunInfo>;
+    pub async fn preview(&self, connector_id: Uuid) -> Result<DiscrepancySummary>;
+}
+
+/// Create Rhai script executor
+impl RhaiScriptExecutor {
+    pub fn new(config: RhaiExecutorConfig) -> Self;
+    pub fn execute(&self, script: &str, ctx: &HookContext) -> Result<Value>;
+    pub fn validate(&self, script: &str) -> Result<(), ScriptValidationError>;
+}
+```
+
+## Usage Example
+
+```rust
+use xavyo_provisioning::{OperationQueue, QueueConfig, QueuedOperation};
+use xavyo_connector::types::OperationType;
+
+// Create queue
+let queue = OperationQueue::new(pool.clone(), QueueConfig::default()).await;
+
+// Enqueue an operation
+let operation = QueuedOperation::new(
+    tenant_id,
+    connector_id,
+    user_id,
+    OperationType::Create,
+    "user".to_string(),
+    serde_json::json!({
+        "firstName": "John",
+        "lastName": "Doe",
+        "email": "john.doe@example.com"
+    }),
+);
+
+let op_id = queue.enqueue(operation).await?;
+
+// Worker processes the queue
+let worker = ProvisioningWorker::new(queue, processor, config);
+worker.start().await?;
+```
+
+## Integration Points
+
+- **Consumed by**: `xavyo-api-connectors`, `idp-api`
+- **Consumes**: Events from `xavyo-events`
+- **Uses**: Connectors via `xavyo-connector`
+
+## Feature Flags
+
+None - all features are enabled by default.
+
+## Anti-Patterns
+
+- Never process operations without idempotency checking
+- Never skip correlation for create operations
+- Never bypass the dead letter queue for permanent failures
+- Never run reconciliation without proper tenant context
+- Never execute untrusted Rhai scripts without validation
+
+## Related Crates
+
+- `xavyo-connector` - Connector abstractions
+- `xavyo-api-connectors` - API layer for provisioning
+- `xavyo-events` - Event-driven triggers
+
+---
+
+# xavyo-scim-client
+
+> SCIM 2.0 outbound provisioning client for xavyo.
+
+## Purpose
+
+Provides outbound SCIM 2.0 provisioning to external identity providers and SaaS applications. Enables xavyo to push user and group changes to downstream systems that support SCIM. Includes automatic retry, reconciliation, and Kafka event consumption for event-driven sync.
+
+## Layer
+
+domain
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-db` - SCIM target configuration
+- `xavyo-connector` - Credential encryption
+- `xavyo-webhooks` - Event publishing
+- `xavyo-events` - Kafka consumption (optional)
+- `xavyo-api-scim` - SCIM types
+
+### External (key)
+- `reqwest` - HTTP client
+- `tokio` - Async runtime
+- `sqlx` - Database access
+
+## Public API
+
+### Types
+
+```rust
+/// SCIM client for a single target
+pub struct ScimClient {
+    base_url: String,
+    auth: ScimAuth,
+    timeout: Duration,
+}
+
+/// SCIM authentication methods
+pub enum ScimCredentials {
+    Bearer { token: String },
+    Basic { username: String, password: String },
+    OAuth2 { client_id: String, client_secret: String, token_url: String },
+}
+
+/// SCIM authentication handler
+pub struct ScimAuth { ... }
+
+/// Provisioner for managing sync operations
+pub struct ScimProvisioner {
+    pool: PgPool,
+    encryption: CredentialEncryption,
+}
+
+/// Reconciler for drift detection
+pub struct ScimReconciler {
+    pool: PgPool,
+    client: ScimClient,
+}
+
+/// Sync result
+pub struct SyncResult {
+    pub created: i32,
+    pub updated: i32,
+    pub deleted: i32,
+    pub failed: i32,
+    pub errors: Vec<SyncError>,
+}
+```
+
+### Errors
+
+```rust
+pub enum ScimClientError {
+    HttpError(reqwest::Error),
+    AuthError(String),
+    NotFound { resource_type: String, id: String },
+    Conflict { message: String },
+    ValidationError { details: Value },
+    EncryptionError(String),
+    InvalidConfig(String),
+}
+
+pub type ScimClientResult<T> = Result<T, ScimClientError>;
+```
+
+### Functions
+
+```rust
+/// Build SCIM client from stored target configuration
+pub fn build_scim_client_from_target(
+    target: &ScimTarget,
+    encryption: &CredentialEncryption,
+    tenant_id: Uuid,
+) -> ScimClientResult<ScimClient>;
+
+/// Publish webhook event for SCIM operations
+pub fn publish_scim_webhook(
+    publisher: Option<&EventPublisher>,
+    event_type: &str,
+    tenant_id: Uuid,
+    actor_id: Option<Uuid>,
+    data: Value,
+);
+
+/// SCIM client operations
+impl ScimClient {
+    pub async fn create_user(&self, user: ScimUser) -> ScimClientResult<ScimUser>;
+    pub async fn get_user(&self, id: &str) -> ScimClientResult<ScimUser>;
+    pub async fn update_user(&self, id: &str, user: ScimUser) -> ScimClientResult<ScimUser>;
+    pub async fn delete_user(&self, id: &str) -> ScimClientResult<()>;
+    pub async fn list_users(&self, filter: Option<&str>) -> ScimClientResult<ListResponse<ScimUser>>;
+}
+```
+
+## Usage Example
+
+```rust
+use xavyo_scim_client::{
+    build_scim_client_from_target,
+    ScimProvisioner,
+};
+use xavyo_connector::crypto::CredentialEncryption;
+
+// Build client from stored target
+let encryption = CredentialEncryption::new(&master_key);
+let client = build_scim_client_from_target(&target, &encryption, tenant_id)?;
+
+// Create user in downstream system
+let scim_user = ScimUser {
+    user_name: "john.doe@example.com".to_string(),
+    name: ScimName {
+        given_name: Some("John".to_string()),
+        family_name: Some("Doe".to_string()),
+        ..Default::default()
+    },
+    emails: vec![ScimEmail {
+        value: "john.doe@example.com".to_string(),
+        primary: true,
+        ..Default::default()
+    }],
+    ..Default::default()
+};
+
+let created = client.create_user(scim_user).await?;
+println!("Created user with ID: {}", created.id.unwrap());
+```
+
+## Integration Points
+
+- **Consumed by**: `xavyo-api-connectors`, provisioning pipelines
+- **Consumes**: Kafka events when `kafka` feature enabled
+- **Pushes to**: SCIM 2.0 compliant endpoints
+
+## Feature Flags
+
+| Flag | Description | Dependencies Added |
+|------|-------------|-------------------|
+| `kafka` | Enable Kafka event consumer | xavyo-events/kafka |
+
+## Anti-Patterns
+
+- Never store SCIM credentials unencrypted
+- Never ignore rate limits from target systems
+- Never skip reconciliation after bulk operations
+- Never provision without proper error handling and retry
+
+## Related Crates
+
+- `xavyo-api-scim` - Inbound SCIM server
+- `xavyo-connector` - Generic connector framework
+- `xavyo-provisioning` - Provisioning queue management
+
+---
+
+# xavyo-secrets
+
+> Pluggable secret provider abstraction for environment, file, Vault, and AWS backends.
+
+## Purpose
+
+Abstracts secret retrieval from multiple backends allowing the platform to load sensitive configuration (JWT keys, database passwords, API tokens) from various sources without code changes. Supports environment variables, files with hot-reload, HashiCorp Vault, and AWS Secrets Manager.
+
+## Layer
+
+foundation
+
+## Dependencies
+
+### Internal (xavyo)
+None (standalone foundation crate)
+
+### External (key)
+- `tokio` - Async runtime
+- `async-trait` - Async trait support
+- `notify` - File watching (optional)
+- `reqwest` - Vault HTTP client (optional)
+- `aws-sdk-secretsmanager` - AWS SDK (optional)
+
+## Public API
+
+### Types
+
+```rust
+/// Secret value returned by providers
+pub struct SecretValue {
+    pub name: String,              // Logical name
+    pub value: Vec<u8>,            // Raw bytes
+    pub version: Option<String>,   // Provider version
+    pub loaded_at: DateTime<Utc>,  // Fetch timestamp
+}
+
+/// Provider configuration
+pub struct SecretProviderConfig {
+    pub provider_type: ProviderType,
+    pub secret_mappings: HashMap<String, String>,
+    pub cache_ttl_seconds: u64,
+}
+
+/// Provider types
+pub enum ProviderType {
+    Env,   // Environment variables
+    File,  // Local filesystem
+    Vault, // HashiCorp Vault
+    Aws,   // AWS Secrets Manager
+}
+
+/// Secret errors
+pub enum SecretError {
+    NotFound { name: String },
+    ProviderUnavailable { provider: String, detail: String },
+    InvalidValue { name: String, detail: String },
+    ConfigError { detail: String },
+    PermissionDenied { detail: String },
+}
+
+/// Caching wrapper for providers
+pub struct CachedSecretProvider { ... }
+
+/// Dynamic credential request (F120)
+pub struct DynamicCredentialRequest { ... }
+
+/// Dynamic credential response
+pub struct DynamicCredential { ... }
+```
+
+### Traits
+
+```rust
+/// All secret providers implement this trait
+#[async_trait]
+pub trait SecretProvider: Send + Sync {
+    /// Retrieve secret by logical name
+    async fn get_secret(&self, name: &str) -> Result<SecretValue, SecretError>;
+
+    /// Check provider health
+    async fn health_check(&self) -> Result<bool, SecretError>;
+
+    /// Provider type for logging
+    fn provider_type(&self) -> &'static str;
+}
+
+/// Dynamic secret provisioning (F120)
+#[async_trait]
+pub trait DynamicSecretProvider: Send + Sync {
+    async fn provision_credential(&self, req: DynamicCredentialRequest) -> Result<DynamicCredential, SecretError>;
+    async fn revoke_credential(&self, credential_id: &str) -> Result<(), SecretError>;
+}
+```
+
+### Functions
+
+```rust
+/// Build provider from configuration
+pub async fn build_provider(config: &SecretProviderConfig) -> Result<Arc<dyn SecretProvider>, SecretError>;
+
+impl SecretValue {
+    /// Interpret as UTF-8 string
+    pub fn as_str(&self) -> Result<&str, SecretError>;
+
+    /// Interpret as hex-encoded bytes
+    pub fn as_hex_bytes(&self) -> Result<Vec<u8>, SecretError>;
+
+    /// Interpret as base64-encoded bytes
+    pub fn as_base64_bytes(&self) -> Result<Vec<u8>, SecretError>;
+}
+```
+
+## Usage Example
+
+```rust
+use xavyo_secrets::{SecretProviderConfig, build_provider, SecretProvider};
+
+// Build provider from environment configuration
+let config = SecretProviderConfig::from_env()?;
+let provider = build_provider(&config).await?;
+
+// Retrieve a secret
+let jwt_keys = provider.get_secret("jwt_signing_keys").await?;
+let pem_str = jwt_keys.as_str()?;
+
+// Check provider health
+if !provider.health_check().await? {
+    tracing::warn!("Secret provider degraded");
+}
+```
+
+## Integration Points
+
+- **Consumed by**: `xavyo-auth` (JWT keys), `xavyo-db` (connection strings), `xavyo-api-agents` (dynamic secrets)
+- **Environment variables**:
+  - `SECRET_PROVIDER` - Provider type (env, file, vault, aws)
+  - `VAULT_ADDR` - Vault server URL
+  - `VAULT_TOKEN` - Vault authentication token
+
+## Feature Flags
+
+| Flag | Description | Dependencies Added |
+|------|-------------|-------------------|
+| `env-provider` | Enable environment variable provider | - |
+| `file-provider` | Enable file provider with hot-reload | notify |
+| `vault-provider` | Enable HashiCorp Vault provider | reqwest |
+| `aws-provider` | Enable AWS Secrets Manager | aws-sdk-secretsmanager |
+
+Default: `env-provider`, `file-provider`
+
+## Anti-Patterns
+
+- Never log secret values (SecretValue::Debug redacts them)
+- Never store secrets in code or config files committed to Git
+- Never skip cache TTL - secrets should be refreshed periodically
+- Never use plaintext secrets when providers are available
+
+## Related Crates
+
+- `xavyo-auth` - Uses secrets for JWT signing keys
+- `xavyo-connector` - Uses secrets for connector credentials
+- `xavyo-api-agents` - Dynamic secret provisioning
+
+---
+
+# xavyo-siem
+
+> SIEM integration and audit log export for compliance and security monitoring.
+
+## Purpose
+
+Exports audit logs to external SIEM systems for compliance, security monitoring, and threat detection. Supports multiple formats (CEF v0, RFC 5424 syslog, JSON, CSV) and delivery methods (syslog TCP/TLS, syslog UDP, webhook, Splunk HEC). Includes circuit breaker patterns, rate limiting, and batch export capabilities.
+
+## Layer
+
+domain
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-db` - Audit log storage
+
+### External (key)
+- `tokio` - Async runtime, TCP/UDP sockets
+- `tokio-native-tls` - TLS for syslog
+- `reqwest` - Webhook/Splunk HEC delivery
+- `governor` - Rate limiting
+- `csv` - CSV export
+
+## Public API
+
+### Types
+
+```rust
+/// Export format types
+pub enum ExportFormat {
+    Cef,      // Common Event Format v0
+    Syslog,   // RFC 5424
+    Json,     // JSON lines
+    Csv,      // CSV with headers
+}
+
+/// Delivery types
+pub enum DeliveryType {
+    SyslogTcp,   // RFC 5424 over TCP
+    SyslogTls,   // RFC 5424 over TLS
+    SyslogUdp,   // RFC 5424 over UDP
+    Webhook,     // HTTP POST
+    SplunkHec,   // Splunk HTTP Event Collector
+}
+
+/// SIEM destination configuration
+pub struct SiemDestination {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub name: String,
+    pub delivery_type: DeliveryType,
+    pub format: ExportFormat,
+    pub endpoint: String,
+    pub auth_config: Option<Vec<u8>>,  // Encrypted
+    pub enabled: bool,
+}
+
+/// Batch export job
+pub struct BatchExportJob {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub destination_id: Uuid,
+    pub start_time: DateTime<Utc>,
+    pub end_time: DateTime<Utc>,
+    pub status: JobStatus,
+}
+
+/// Delivery health metrics
+pub struct DeliveryHealth {
+    pub destination_id: Uuid,
+    pub success_count: i64,
+    pub failure_count: i64,
+    pub last_success: Option<DateTime<Utc>>,
+    pub circuit_state: CircuitState,
+}
+```
+
+### Modules
+
+```rust
+/// Format converters
+pub mod format {
+    pub fn to_cef(event: &AuditEvent) -> String;
+    pub fn to_syslog(event: &AuditEvent) -> String;
+    pub fn to_json(event: &AuditEvent) -> String;
+}
+
+/// Delivery workers
+pub mod delivery {
+    pub struct SyslogTcpWorker { ... }
+    pub struct SyslogUdpWorker { ... }
+    pub struct WebhookWorker { ... }
+    pub struct SplunkHecWorker { ... }
+}
+
+/// Pipeline orchestration
+pub mod pipeline {
+    pub struct ExportPipeline { ... }
+    pub struct CircuitBreaker { ... }
+}
+
+/// Batch export
+pub mod batch {
+    pub struct BatchExporter { ... }
+}
+```
+
+## Usage Example
+
+```rust
+use xavyo_siem::{
+    format::{to_cef, to_syslog},
+    delivery::SyslogTcpWorker,
+    pipeline::ExportPipeline,
+};
+
+// Format an audit event
+let cef_line = to_cef(&audit_event);
+// CEF:0|xavyo|idp|1.0|USER_LOGIN|User Login|5|src=192.168.1.1 ...
+
+let syslog_line = to_syslog(&audit_event);
+// <134>1 2024-01-15T10:30:00Z xavyo idp - - - {...}
+
+// Create export pipeline
+let pipeline = ExportPipeline::new(pool.clone(), config);
+pipeline.start(shutdown_token).await;
+
+// Run batch export
+let batch_exporter = BatchExporter::new(pool.clone());
+batch_exporter.export(BatchExportJob {
+    tenant_id,
+    destination_id,
+    start_time: Utc::now() - Duration::days(1),
+    end_time: Utc::now(),
+    ..Default::default()
+}).await?;
+```
+
+## Integration Points
+
+- **Consumed by**: `xavyo-api-governance` (audit endpoints)
+- **Exports to**: Splunk, QRadar, Sentinel, generic syslog
+- **Reads from**: `xavyo-db` audit tables
+
+## Feature Flags
+
+None - all features are enabled by default.
+
+## Anti-Patterns
+
+- Never export audit logs without tenant context
+- Never skip TLS verification in production
+- Never store auth credentials unencrypted
+- Never bypass rate limiting for "priority" events
+
+## Related Crates
+
+- `xavyo-webhooks` - Real-time event delivery (different purpose)
+- `xavyo-events` - Kafka events (different mechanism)
+- `xavyo-db` - Audit log storage
+
+---
+
+# xavyo-tenant
+
+> Tower/Axum middleware for multi-tenant context extraction and validation.
+
+## Purpose
+
+Extracts tenant identity from HTTP requests and makes it available to route handlers. Supports extraction from `X-Tenant-ID` header or JWT claims. Validates tenant ID format (UUID) and returns structured JSON errors for invalid/missing context. Designed as a composable Tower middleware.
+
+## Layer
+
+foundation
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId type
+
+### External (key)
+- `axum` - Web framework integration
+- `tower` - Middleware composition
+- `http` - HTTP types
+
+## Public API
+
+### Types
+
+```rust
+/// Tower Layer for tenant extraction
+pub struct TenantLayer { ... }
+
+/// Tower Service for tenant extraction
+pub struct TenantService<S> { ... }
+
+/// Configuration for tenant extraction behavior
+pub struct TenantConfig {
+    pub header_name: String,      // Default: "X-Tenant-ID"
+    pub require_tenant: bool,     // Default: true
+}
+
+/// Builder for TenantConfig
+pub struct TenantConfigBuilder { ... }
+
+/// Extracted tenant context
+pub struct TenantContext {
+    pub tenant_id: TenantId,
+    pub source: TenantSource, // Header or JWT
+}
+
+/// Error types for tenant extraction
+pub enum TenantError {
+    MissingTenant,
+    InvalidTenantId { value: String },
+}
+
+/// Structured error response
+pub struct ErrorResponse { ... }
+```
+
+### Functions
+
+```rust
+/// Extract tenant ID from request (for manual extraction)
+pub fn extract_tenant_id(req: &Request) -> Result<TenantContext, TenantError>;
+```
+
+## Usage Example
+
+```rust
+use xavyo_tenant::TenantLayer;
+use axum::{Router, Extension, routing::get};
+use xavyo_core::TenantId;
+
+// Handler receives TenantId via Extension
+async fn list_users(
+    Extension(tenant_id): Extension<TenantId>,
+) -> String {
+    format!("Users for tenant: {}", tenant_id)
+}
+
+// Apply middleware to router
+let app = Router::new()
+    .route("/api/users", get(list_users))
+    .layer(TenantLayer::new());
+
+// With custom configuration
+use xavyo_tenant::TenantConfig;
+
+let config = TenantConfig::builder()
+    .header_name("X-Tenant-ID")
+    .require_tenant(true)
+    .build();
+
+let app = Router::new()
+    .route("/api/users", get(list_users))
+    .layer(TenantLayer::with_config(config));
+```
+
+## Integration Points
+
+- **Consumed by**: `idp-api` application
+- **Provides**: `Extension<TenantId>` to downstream handlers
+- **Works with**: `xavyo-db::set_tenant_context` for RLS
+
+## Feature Flags
+
+None - all features are enabled by default.
+
+## Anti-Patterns
+
+- Never access tenant-scoped data without applying this middleware
+- Never trust client-provided tenant IDs without validation
+- Never skip tenant validation for "internal" endpoints
+- Never use string tenant IDs directly - always use TenantId type
+
+## Related Crates
+
+- `xavyo-core` - Provides TenantId type
+- `xavyo-db` - `set_tenant_context` uses the extracted TenantId
+- `xavyo-auth` - JWT claims can also provide tenant context
+
+---
+
+# xavyo-webhooks
+
+> Webhook delivery system for identity lifecycle event subscriptions.
+
+## Purpose
+
+Provides tenant-scoped webhook subscription management with async delivery, HMAC-SHA256 payload signing, exponential backoff retries, and delivery tracking. Webhooks enable external systems to react to identity events like user creation, role changes, and certification decisions without polling.
+
+## Layer
+
+domain
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` - TenantId, UserId types
+- `xavyo-auth` - JWT validation for API
+- `xavyo-tenant` - Middleware
+- `xavyo-db` - Subscription storage
+
+### External (key)
+- `axum` - HTTP handlers
+- `reqwest` - Webhook delivery
+- `hmac` + `sha2` - Payload signing
+- `aes-gcm` - Secret encryption
+
+## Public API
+
+### Types
+
+```rust
+/// Webhook event types
+pub enum WebhookEventType {
+    UserCreated,
+    UserUpdated,
+    UserDeleted,
+    UserDisabled,
+    RoleAssigned,
+    RoleRevoked,
+    EntitlementGranted,
+    EntitlementRevoked,
+    CertificationDecision,
+    AccessRequestApproved,
+    AccessRequestDenied,
+}
+
+/// Webhook event payload
+pub struct WebhookEvent {
+    pub event_id: Uuid,
+    pub event_type: String,
+    pub tenant_id: Uuid,
+    pub actor_id: Option<Uuid>,
+    pub timestamp: DateTime<Utc>,
+    pub data: Value,
+}
+
+/// Webhook subscription (stored in DB)
+pub struct WebhookSubscription {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub url: String,
+    pub event_types: Vec<WebhookEventType>,
+    pub secret: Vec<u8>,  // Encrypted
+    pub enabled: bool,
+}
+
+/// Delivery attempt record
+pub struct DeliveryAttempt {
+    pub id: Uuid,
+    pub subscription_id: Uuid,
+    pub event_id: Uuid,
+    pub status: DeliveryStatus,
+    pub http_status: Option<u16>,
+    pub attempt_number: i32,
+    pub next_retry_at: Option<DateTime<Utc>>,
+}
+
+/// Webhook errors
+pub enum WebhookError {
+    SubscriptionNotFound(Uuid),
+    DeliveryFailed { url: String, status: u16 },
+    InvalidUrl(String),
+    EncryptionError(String),
+}
+```
+
+### Traits
+
+None - uses concrete implementations.
+
+### Functions
+
+```rust
+/// Event publisher for async delivery
+impl EventPublisher {
+    pub fn new(pool: PgPool, encryption_key: &[u8]) -> Self;
+    pub fn publish(&self, event: WebhookEvent);
+    pub async fn flush(&self);
+}
+
+/// Webhook worker for background delivery
+impl WebhookWorker {
+    pub fn new(pool: PgPool, config: WorkerConfig) -> Self;
+    pub async fn start(&self, shutdown: CancellationToken);
+}
+
+/// Router for webhook management API
+pub fn webhooks_router() -> Router<WebhooksState>;
+```
+
+## Usage Example
+
+```rust
+use xavyo_webhooks::{EventPublisher, WebhookEvent, WebhookWorker};
+
+// Create publisher
+let publisher = EventPublisher::new(pool.clone(), &encryption_key);
+
+// Publish event (non-blocking)
+publisher.publish(WebhookEvent {
+    event_id: Uuid::new_v4(),
+    event_type: "user.created".to_string(),
+    tenant_id,
+    actor_id: Some(admin_id),
+    timestamp: Utc::now(),
+    data: serde_json::json!({
+        "user_id": user_id,
+        "email": "new.user@example.com"
+    }),
+});
+
+// Start background worker
+let worker = WebhookWorker::new(pool, WorkerConfig::default());
+tokio::spawn(async move {
+    worker.start(shutdown_token).await;
+});
+```
+
+## Integration Points
+
+- **Consumed by**: All crates that emit lifecycle events
+- **Provides**: Async event delivery to external systems
+- **HTTP headers**: `X-Webhook-Signature`, `X-Webhook-ID`, `X-Webhook-Timestamp`
+
+## Feature Flags
+
+None - all features are enabled by default.
+
+## Anti-Patterns
+
+- Never deliver webhooks synchronously in request handlers
+- Never log webhook secrets or payload signatures
+- Never skip signature verification documentation for consumers
+- Never retry indefinitely - use dead letter queue
+
+## Related Crates
+
+- `xavyo-events` - Kafka events (different delivery mechanism)
+- `xavyo-siem` - Audit export (different purpose)
+- `xavyo-api-governance` - Triggers governance events
+
+---
+
