@@ -3,6 +3,12 @@
 > This file contains the full documentation for all 32 xavyo crates.
 > Generated from individual CRATE.md files. Use llms.txt for navigation.
 
+## Maturity Legend
+
+- 🟢 **stable** — Production-ready, well-tested
+- 🟡 **beta** — Functional, may have gaps
+- 🔴 **alpha** — Experimental, incomplete
+
 ---
 
 # xavyo-api-agents
@@ -16,6 +22,12 @@ Implements OWASP ASI (AI Security Initiative) guidelines for AI agent management
 ## Layer
 
 api
+
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (335 tests). Complete AI agent security platform with MCP/A2A, HITL, and PKI support.
 
 ## Dependencies
 
@@ -211,6 +223,12 @@ Provides REST endpoints for user authentication including registration, login, p
 
 api
 
+## Status
+
+🟢 **stable**
+
+Production-ready with extensive test coverage (254 tests). Complete authentication stack including MFA, WebAuthn, and passwordless flows.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -349,6 +367,12 @@ Provides REST endpoints for managing authorization policies and evaluating acces
 
 api
 
+## Status
+
+🔴 **alpha**
+
+Experimental with minimal test coverage (8 tests). Basic API structure defined; full policy evaluation not yet implemented.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -433,6 +457,12 @@ Provides REST endpoints for managing identity connectors to external systems. In
 ## Layer
 
 api
+
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (69 tests). Has 6 TODOs; connector management working but some edge cases incomplete.
 
 ## Dependencies
 
@@ -523,6 +553,12 @@ Provides REST endpoints for Identity Governance and Administration (IGA) operati
 ## Layer
 
 api
+
+## Status
+
+🟢 **stable**
+
+Production-ready with extensive test coverage (1058 tests). 135K LOC comprehensive IGA platform with full workflow support.
 
 ## Dependencies
 
@@ -625,6 +661,12 @@ Provides REST endpoints for bulk user import from CSV files. Includes file uploa
 
 api
 
+## Status
+
+🔴 **alpha**
+
+Experimental with limited test coverage (22 tests). Basic import structure defined; not validated with production data.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -702,6 +744,12 @@ Provides a unified REST API for managing all non-human identities (NHIs) includi
 ## Layer
 
 api
+
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (55 tests). Unified NHI API working; lacks integration tests.
 
 ## Dependencies
 
@@ -786,6 +834,12 @@ Implements OAuth2 and OpenID Connect provider functionality. Supports authorizat
 ## Layer
 
 api
+
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (201 tests). Complete OAuth2/OIDC provider with PKCE, device code, and token revocation.
 
 ## Dependencies
 
@@ -934,6 +988,12 @@ Implements OpenID Connect relying party (RP) functionality for federating with e
 
 api
 
+## Status
+
+🟡 **beta**
+
+Functional with limited test coverage (13 tests). Core OIDC RP flows working; needs more IdP interoperability testing.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -1015,6 +1075,12 @@ Implements SAML 2.0 Identity Provider functionality for enterprise single sign-o
 ## Layer
 
 api
+
+## Status
+
+🟡 **beta**
+
+Functional with limited test coverage (13 tests). Has 3 TODOs; needs more comprehensive SP interoperability testing.
 
 ## Dependencies
 
@@ -1165,6 +1231,12 @@ Implements the SCIM 2.0 protocol (RFC 7643/7644) for inbound provisioning from e
 ## Layer
 
 api
+
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (45 tests). SCIM 2.0 compliant; lacks integration tests with real IdPs.
 
 ## Dependencies
 
@@ -1320,6 +1392,12 @@ Implements social authentication flows for consumer identity scenarios. Supports
 ## Layer
 
 api
+
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (27 tests). Core providers (Google, Microsoft, Apple) working; needs validation testing.
 
 ## Dependencies
 
@@ -1491,6 +1569,12 @@ Provides REST endpoints for tenant lifecycle management. Includes tenant provisi
 
 api
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (121 tests). Multi-tenant bootstrap and management complete.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -1574,6 +1658,12 @@ Provides administrative REST endpoints for user lifecycle management. Includes u
 ## Layer
 
 api
+
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (56 tests). Core CRUD operations complete; lacks integration tests.
 
 ## Dependencies
 
@@ -1741,6 +1831,12 @@ Provides authentication primitives for the xavyo platform. This includes JWT tok
 
 foundation
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (44 tests). JWT RS256 and Argon2id implementations complete with clear API.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -1881,6 +1977,12 @@ Provides runtime policy evaluation for access control decisions. Implements a Po
 ## Layer
 
 domain
+
+## Status
+
+🔴 **alpha**
+
+Experimental with foundation-level implementation (47 tests, 16 public items). Core PDP types defined; full policy evaluation not yet complete.
 
 ## Dependencies
 
@@ -2067,6 +2169,12 @@ Provides the foundation for provisioning users, groups, and other identity objec
 ## Layer
 
 domain
+
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (137 tests). Mature connector framework with 79 public items and complete capability-based trait system.
 
 ## Dependencies
 
@@ -2269,6 +2377,12 @@ Implements the xavyo-connector traits for SQL databases, enabling provisioning t
 
 connector
 
+## Status
+
+🔴 **alpha**
+
+Experimental with skeleton implementation (33 tests, 4 public items). Configuration types defined; operations not yet implemented.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -2428,6 +2542,12 @@ Implements the xavyo-connector traits for Microsoft Entra ID, enabling bidirecti
 ## Layer
 
 connector
+
+## Status
+
+🟡 **beta**
+
+Functional with limited test coverage (22 tests). Core Graph API operations complete; needs more comprehensive testing.
 
 ## Dependencies
 
@@ -2596,6 +2716,12 @@ Implements the xavyo-connector traits for LDAP directories and Active Directory 
 
 connector
 
+## Status
+
+🟢 **stable**
+
+Production-ready with extensive test coverage (239 tests). Most mature connector implementation with full LDAP v3 support.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -2735,6 +2861,12 @@ Implements the xavyo-connector traits for generic REST APIs, enabling provisioni
 ## Layer
 
 connector
+
+## Status
+
+🔴 **alpha**
+
+Experimental with minimal implementation (36 tests, 7 public items). Core structure defined; most operations not yet implemented.
 
 ## Dependencies
 
@@ -2910,6 +3042,12 @@ Provides foundational types used across all xavyo crates. This includes strongly
 
 foundation
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (54 tests). Foundational types used across all xavyo crates with complete public API.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -3036,6 +3174,12 @@ Provides the data access layer for xavyo with built-in multi-tenant isolation. U
 ## Layer
 
 foundation
+
+## Status
+
+🟢 **stable**
+
+Production-ready with extensive test coverage (958+ tests). 111K LOC with comprehensive multi-tenant RLS support and 700+ domain models.
 
 ## Dependencies
 
@@ -3167,6 +3311,12 @@ Provides event-driven communication infrastructure for xavyo. Enables publishing
 ## Layer
 
 foundation
+
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (123+ tests). Kafka event bus with idempotent processing fully implemented.
 
 ## Dependencies
 
@@ -3339,6 +3489,12 @@ Provides core domain logic for entitlement management including applications, en
 
 domain
 
+## Status
+
+🟡 **beta**
+
+Functional but minimal domain layer (3 tests, 9 public items). Core types defined; business logic primarily in xavyo-api-governance.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -3503,6 +3659,12 @@ Provides a unified abstraction for non-human identities including service accoun
 ## Layer
 
 foundation
+
+## Status
+
+🔴 **alpha**
+
+Experimental with minimal implementation (11 public items). Core NHI trait and types defined but not fully integrated.
 
 ## Dependencies
 
@@ -3670,6 +3832,12 @@ Provides the infrastructure for provisioning operations including durable operat
 ## Layer
 
 domain
+
+## Status
+
+🟡 **beta**
+
+Functional with good test coverage (215 tests). Has 11 TODOs in reconciliation logic; may have gaps in edge cases.
 
 ## Dependencies
 
@@ -3861,6 +4029,12 @@ Provides outbound SCIM 2.0 provisioning to external identity providers and SaaS 
 
 domain
 
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (37+ tests). Core SCIM client complete; edge case coverage limited.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -4037,6 +4211,12 @@ Abstracts secret retrieval from multiple backends allowing the platform to load 
 
 foundation
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (51 tests). Multi-provider support (Environment, File, Vault, AWS) fully implemented.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -4203,6 +4383,12 @@ Exports audit logs to external SIEM systems for compliance, security monitoring,
 
 domain
 
+## Status
+
+🟡 **beta**
+
+Functional with good test coverage (115 tests). All export formats implemented; lacks integration tests with real SIEM systems.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -4367,6 +4553,12 @@ Extracts tenant identity from HTTP requests and makes it available to route hand
 
 foundation
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (30 tests). Complete multi-tenant middleware implementation.
+
 ## Dependencies
 
 ### Internal (xavyo)
@@ -4488,6 +4680,12 @@ Provides tenant-scoped webhook subscription management with async delivery, HMAC
 ## Layer
 
 domain
+
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (59 tests). Core delivery system complete; lacks comprehensive integration tests.
 
 ## Dependencies
 

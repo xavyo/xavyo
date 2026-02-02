@@ -10,6 +10,12 @@ Provides authentication primitives for the xavyo platform. This includes JWT tok
 
 foundation
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (44 tests). JWT RS256 and Argon2id implementations complete with clear API.
+
 ## Dependencies
 
 ### Internal (xavyo)

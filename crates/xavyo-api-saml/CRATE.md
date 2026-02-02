@@ -10,6 +10,12 @@ Implements SAML 2.0 Identity Provider functionality for enterprise single sign-o
 
 api
 
+## Status
+
+🟡 **beta**
+
+Functional with limited test coverage (13 tests). Has 3 TODOs; needs more comprehensive SP interoperability testing.
+
 ## Dependencies
 
 ### Internal (xavyo)

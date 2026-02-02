@@ -10,6 +10,12 @@ Implements the xavyo-connector traits for LDAP directories and Active Directory 
 
 connector
 
+## Status
+
+🟢 **stable**
+
+Production-ready with extensive test coverage (239 tests). Most mature connector implementation with full LDAP v3 support.
+
 ## Dependencies
 
 ### Internal (xavyo)

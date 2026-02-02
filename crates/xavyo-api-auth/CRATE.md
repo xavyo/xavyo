@@ -10,6 +10,12 @@ Provides REST endpoints for user authentication including registration, login, p
 
 api
 
+## Status
+
+🟢 **stable**
+
+Production-ready with extensive test coverage (254 tests). Complete authentication stack including MFA, WebAuthn, and passwordless flows.
+
 ## Dependencies
 
 ### Internal (xavyo)

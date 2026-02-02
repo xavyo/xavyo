@@ -10,6 +10,12 @@ Provides the foundation for provisioning users, groups, and other identity objec
 
 domain
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (137 tests). Mature connector framework with 79 public items and complete capability-based trait system.
+
 ## Dependencies
 
 ### Internal (xavyo)

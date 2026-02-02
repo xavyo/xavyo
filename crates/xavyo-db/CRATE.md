@@ -10,6 +10,12 @@ Provides the data access layer for xavyo with built-in multi-tenant isolation. U
 
 foundation
 
+## Status
+
+🟢 **stable**
+
+Production-ready with extensive test coverage (958+ tests). 111K LOC with comprehensive multi-tenant RLS support and 700+ domain models.
+
 ## Dependencies
 
 ### Internal (xavyo)

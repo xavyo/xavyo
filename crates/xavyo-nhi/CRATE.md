@@ -10,6 +10,12 @@ Provides a unified abstraction for non-human identities including service accoun
 
 foundation
 
+## Status
+
+🔴 **alpha**
+
+Experimental with minimal implementation (11 public items). Core NHI trait and types defined but not fully integrated.
+
 ## Dependencies
 
 ### Internal (xavyo)

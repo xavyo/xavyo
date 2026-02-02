@@ -10,6 +10,12 @@ Exports audit logs to external SIEM systems for compliance, security monitoring,
 
 domain
 
+## Status
+
+🟡 **beta**
+
+Functional with good test coverage (115 tests). All export formats implemented; lacks integration tests with real SIEM systems.
+
 ## Dependencies
 
 ### Internal (xavyo)

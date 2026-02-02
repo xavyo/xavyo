@@ -10,6 +10,12 @@ Provides REST endpoints for managing authorization policies and evaluating acces
 
 api
 
+## Status
+
+🔴 **alpha**
+
+Experimental with minimal test coverage (8 tests). Basic API structure defined; full policy evaluation not yet implemented.
+
 ## Dependencies
 
 ### Internal (xavyo)

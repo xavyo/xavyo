@@ -10,6 +10,12 @@ Provides the infrastructure for provisioning operations including durable operat
 
 domain
 
+## Status
+
+🟡 **beta**
+
+Functional with good test coverage (215 tests). Has 11 TODOs in reconciliation logic; may have gaps in edge cases.
+
 ## Dependencies
 
 ### Internal (xavyo)

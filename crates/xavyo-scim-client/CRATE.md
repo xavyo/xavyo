@@ -10,6 +10,12 @@ Provides outbound SCIM 2.0 provisioning to external identity providers and SaaS 
 
 domain
 
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (37+ tests). Core SCIM client complete; edge case coverage limited.
+
 ## Dependencies
 
 ### Internal (xavyo)

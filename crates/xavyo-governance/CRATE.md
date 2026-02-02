@@ -10,6 +10,12 @@ Provides core domain logic for entitlement management including applications, en
 
 domain
 
+## Status
+
+🟡 **beta**
+
+Functional but minimal domain layer (3 tests, 9 public items). Core types defined; business logic primarily in xavyo-api-governance.
+
 ## Dependencies
 
 ### Internal (xavyo)

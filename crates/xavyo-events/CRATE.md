@@ -10,6 +10,12 @@ Provides event-driven communication infrastructure for xavyo. Enables publishing
 
 foundation
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (123+ tests). Kafka event bus with idempotent processing fully implemented.
+
 ## Dependencies
 
 ### Internal (xavyo)

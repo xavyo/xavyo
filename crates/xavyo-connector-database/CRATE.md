@@ -10,6 +10,12 @@ Implements the xavyo-connector traits for SQL databases, enabling provisioning t
 
 connector
 
+## Status
+
+🔴 **alpha**
+
+Experimental with skeleton implementation (33 tests, 4 public items). Configuration types defined; operations not yet implemented.
+
 ## Dependencies
 
 ### Internal (xavyo)

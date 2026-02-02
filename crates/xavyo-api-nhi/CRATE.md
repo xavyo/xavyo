@@ -10,6 +10,12 @@ Provides a unified REST API for managing all non-human identities (NHIs) includi
 
 api
 
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (55 tests). Unified NHI API working; lacks integration tests.
+
 ## Dependencies
 
 ### Internal (xavyo)

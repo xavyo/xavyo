@@ -10,6 +10,12 @@ Implements social authentication flows for consumer identity scenarios. Supports
 
 api
 
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (27 tests). Core providers (Google, Microsoft, Apple) working; needs validation testing.
+
 ## Dependencies
 
 ### Internal (xavyo)

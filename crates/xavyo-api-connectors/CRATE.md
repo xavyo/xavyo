@@ -10,6 +10,12 @@ Provides REST endpoints for managing identity connectors to external systems. In
 
 api
 
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (69 tests). Has 6 TODOs; connector management working but some edge cases incomplete.
+
 ## Dependencies
 
 ### Internal (xavyo)

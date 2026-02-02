@@ -10,6 +10,12 @@ Implements the xavyo-connector traits for Microsoft Entra ID, enabling bidirecti
 
 connector
 
+## Status
+
+🟡 **beta**
+
+Functional with limited test coverage (22 tests). Core Graph API operations complete; needs more comprehensive testing.
+
 ## Dependencies
 
 ### Internal (xavyo)

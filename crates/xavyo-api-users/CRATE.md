@@ -10,6 +10,12 @@ Provides administrative REST endpoints for user lifecycle management. Includes u
 
 api
 
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (56 tests). Core CRUD operations complete; lacks integration tests.
+
 ## Dependencies
 
 ### Internal (xavyo)

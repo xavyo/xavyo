@@ -10,6 +10,12 @@ Provides REST endpoints for bulk user import from CSV files. Includes file uploa
 
 api
 
+## Status
+
+🔴 **alpha**
+
+Experimental with limited test coverage (22 tests). Basic import structure defined; not validated with production data.
+
 ## Dependencies
 
 ### Internal (xavyo)

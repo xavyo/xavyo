@@ -10,6 +10,12 @@ Extracts tenant identity from HTTP requests and makes it available to route hand
 
 foundation
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (30 tests). Complete multi-tenant middleware implementation.
+
 ## Dependencies
 
 ### Internal (xavyo)

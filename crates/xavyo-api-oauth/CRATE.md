@@ -10,6 +10,12 @@ Implements OAuth2 and OpenID Connect provider functionality. Supports authorizat
 
 api
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (201 tests). Complete OAuth2/OIDC provider with PKCE, device code, and token revocation.
+
 ## Dependencies
 
 ### Internal (xavyo)

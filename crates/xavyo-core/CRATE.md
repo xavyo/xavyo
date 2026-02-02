@@ -10,6 +10,12 @@ Provides foundational types used across all xavyo crates. This includes strongly
 
 foundation
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (54 tests). Foundational types used across all xavyo crates with complete public API.
+
 ## Dependencies
 
 ### Internal (xavyo)

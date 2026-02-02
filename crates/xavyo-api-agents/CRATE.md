@@ -10,6 +10,12 @@ Implements OWASP ASI (AI Security Initiative) guidelines for AI agent management
 
 api
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (335 tests). Complete AI agent security platform with MCP/A2A, HITL, and PKI support.
+
 ## Dependencies
 
 ### Internal (xavyo)

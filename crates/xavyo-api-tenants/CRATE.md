@@ -10,6 +10,12 @@ Provides REST endpoints for tenant lifecycle management. Includes tenant provisi
 
 api
 
+## Status
+
+🟢 **stable**
+
+Production-ready with comprehensive test coverage (121 tests). Multi-tenant bootstrap and management complete.
+
 ## Dependencies
 
 ### Internal (xavyo)

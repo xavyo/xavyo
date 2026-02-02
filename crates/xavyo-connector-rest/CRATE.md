@@ -10,6 +10,12 @@ Implements the xavyo-connector traits for generic REST APIs, enabling provisioni
 
 connector
 
+## Status
+
+🔴 **alpha**
+
+Experimental with minimal implementation (36 tests, 7 public items). Core structure defined; most operations not yet implemented.
+
 ## Dependencies
 
 ### Internal (xavyo)

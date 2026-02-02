@@ -10,6 +10,12 @@ Provides REST endpoints for Identity Governance and Administration (IGA) operati
 
 api
 
+## Status
+
+🟢 **stable**
+
+Production-ready with extensive test coverage (1058 tests). 135K LOC comprehensive IGA platform with full workflow support.
+
 ## Dependencies
 
 ### Internal (xavyo)

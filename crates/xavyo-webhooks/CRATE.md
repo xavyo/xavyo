@@ -10,6 +10,12 @@ Provides tenant-scoped webhook subscription management with async delivery, HMAC
 
 domain
 
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (59 tests). Core delivery system complete; lacks comprehensive integration tests.
+
 ## Dependencies
 
 ### Internal (xavyo)

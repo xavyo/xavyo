@@ -10,6 +10,12 @@ Provides runtime policy evaluation for access control decisions. Implements a Po
 
 domain
 
+## Status
+
+🔴 **alpha**
+
+Experimental with foundation-level implementation (47 tests, 16 public items). Core PDP types defined; full policy evaluation not yet complete.
+
 ## Dependencies
 
 ### Internal (xavyo)

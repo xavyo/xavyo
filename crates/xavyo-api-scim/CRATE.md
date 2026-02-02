@@ -10,6 +10,12 @@ Implements the SCIM 2.0 protocol (RFC 7643/7644) for inbound provisioning from e
 
 api
 
+## Status
+
+🟡 **beta**
+
+Functional with adequate test coverage (45 tests). SCIM 2.0 compliant; lacks integration tests with real IdPs.
+
 ## Dependencies
 
 ### Internal (xavyo)

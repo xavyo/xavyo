@@ -10,6 +10,12 @@ Implements OpenID Connect relying party (RP) functionality for federating with e
 
 api
 
+## Status
+
+🟡 **beta**
+
+Functional with limited test coverage (13 tests). Core OIDC RP flows working; needs more IdP interoperability testing.
+
 ## Dependencies
 
 ### Internal (xavyo)
