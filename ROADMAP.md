@@ -1291,7 +1291,7 @@ ralph loop --requirements F-001,F-002,F-003
 ### Tracking Progress
 
 Update this document as requirements are completed:
-- [ ] F-001 - xavyo-nhi foundation
+- [x] F-001 - xavyo-nhi foundation ✅ (2026-02-02)
 - [ ] F-002 - xavyo-authorization SearchOp
 - [ ] F-003 - xavyo-authorization policy admin
 - ... (continue for all 48 requirements)
