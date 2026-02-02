@@ -110,10 +110,10 @@ Complete policy administration integration including role resolution from databa
 
 Critical governance crates that form the IGA foundation.
 
-### F-004: xavyo-governance - Implement Entitlement Service
+### F-004: xavyo-governance - Implement Entitlement Service ✅
 
 **Crate:** `xavyo-governance`
-**Current Status:** Beta
+**Current Status:** Beta ✅ (completed 2026-02-02)
 **Target Status:** Beta
 **Estimated Effort:** 2 weeks
 **Dependencies:** None
@@ -122,17 +122,20 @@ Critical governance crates that form the IGA foundation.
 Implement the core `EntitlementService` for managing entitlements (permissions, roles, access rights). Currently the crate contains only types with zero business logic.
 
 **Acceptance Criteria:**
-- [ ] Implement `EntitlementService` with create, get, update, delete, list operations
-- [ ] Implement `assign_entitlement` and `revoke_entitlement` for users
-- [ ] Add entitlement validation (check if user can be assigned)
-- [ ] Add database query builders for complex entitlement queries
-- [ ] Add 50+ unit tests for entitlement operations
-- [ ] Add audit logging for entitlement changes
-- [ ] Verify tenant isolation in all queries
+- [x] Implement `EntitlementService` with create, get, update, delete, list operations
+- [x] Implement `assign_entitlement` and `revoke_entitlement` for users (via `AssignmentService`)
+- [x] Add entitlement validation (check if user can be assigned) (via `ValidationService`)
+- [x] Add database query builders for complex entitlement queries (`EntitlementFilter`, `ListOptions`)
+- [x] Add 50+ unit tests for entitlement operations (52 tests)
+- [x] Add audit logging for entitlement changes (`AuditStore` trait + `InMemoryAuditStore`)
+- [x] Verify tenant isolation in all queries (tests: `test_tenant_isolation`, `test_assignment_tenant_isolation`)
 
 **Files to Modify:**
 - `crates/xavyo-governance/src/services/entitlement.rs` (create)
+- `crates/xavyo-governance/src/services/assignment.rs` (create)
+- `crates/xavyo-governance/src/services/validation.rs` (create)
 - `crates/xavyo-governance/src/services/mod.rs` (create)
+- `crates/xavyo-governance/src/audit.rs` (create)
 - `crates/xavyo-governance/src/lib.rs`
 
 ---
