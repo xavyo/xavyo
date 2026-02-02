@@ -1,0 +1,50 @@
+[package]
+name = "xavyo-secrets"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Pluggable secret provider abstraction for xavyo"
+
+[features]
+default = ["env-provider", "file-provider"]
+env-provider = []
+file-provider = ["notify"]
+vault-provider = ["reqwest"]
+aws-provider = ["aws-config", "aws-sdk-secretsmanager"]
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling & logging
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# UUIDs
+uuid = { workspace = true }
+
+# Base64/hex decoding
+base64 = { workspace = true }
+hex = "0.4"
+
+# File watching (optional, for file provider)
+notify = { version = "6", optional = true }
+
+# HTTP client (optional, for Vault provider)
+reqwest = { version = "0.12", features = ["json"], optional = true }
+
+# AWS SDK (optional, for AWS provider)
+aws-config = { version = "1", optional = true }
+aws-sdk-secretsmanager = { version = "1", optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util"] }

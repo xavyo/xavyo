@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Rust (not handled by Prettier)
+target/
+*.rs
+crates/
+
+# Package manager
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Generated
+coverage/
+.nx/
+
+# Config files that shouldn't be formatted
+*.json
+!.prettierrc
+!package.json
+!tsconfig*.json
+!nx.json
+!project.json
+
+# Documentation (formatted manually)
+docs/
+*.md
+*.html
+
+# Specifications (formatted manually)
+specs/
+.specify/
+
+# n8n plugin (has its own prettier)
+n8n-nodes-xavyo/

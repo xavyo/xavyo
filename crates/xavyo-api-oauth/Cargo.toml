@@ -1,0 +1,96 @@
+[package]
+name = "xavyo-api-oauth"
+version = "0.1.0"
+edition = "2021"
+description = "OAuth2/OIDC Provider API endpoints for xavyo"
+license = "BSL-1.1"
+repository = "https://github.com/xavyo/xavyo"
+
+[dependencies]
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+tower = { version = "0.4", features = ["util", "timeout"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Internal dependencies
+xavyo-core = { path = "../xavyo-core" }
+xavyo-auth = { path = "../xavyo-auth" }
+xavyo-api-auth = { path = "../xavyo-api-auth" }
+xavyo-db = { path = "../xavyo-db" }
+xavyo-tenant = { path = "../xavyo-tenant" }
+xavyo-webhooks = { path = "../xavyo-webhooks" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# OpenAPI documentation
+utoipa = { workspace = true }
+
+# Error handling
+thiserror = "1.0"
+
+# Async runtime
+tokio = { version = "1.35", features = ["rt-multi-thread", "macros", "sync", "time"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Logging
+tracing = "0.1"
+
+# Validation
+validator = { version = "0.18", features = ["derive"] }
+regex = "1.10"
+once_cell = "1.19"
+
+# Random for token/code generation
+rand = "0.8"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono"] }
+
+# Hashing for codes and tokens
+sha2 = "0.10"
+hex = "0.4"
+
+# Base64 for PKCE and token encoding
+base64 = "0.22"
+
+# RSA key parsing for JWKS
+rsa = "0.9"
+pkcs8 = { version = "0.10", features = ["pem"] }
+
+# HTTP types
+http = "1.0"
+
+# Constant-time comparison for security
+subtle = "2.5"
+
+# HMAC/SHA2 for CSRF tokens (F082)
+hmac = "0.12"
+
+# JWT encoding for ID tokens
+jsonwebtoken = "9.3"
+
+# Async trait support
+async-trait = "0.1"
+
+# URL handling
+url = "2.5"
+urlencoding = "2.1"
+
+[dev-dependencies]
+tokio = { version = "1.35", features = ["full", "test-util"] }
+tower = { version = "0.4", features = ["util"] }
+axum-test = "14"
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres"] }
+serde_urlencoded = "0.7"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[features]
+default = []
+integration = []

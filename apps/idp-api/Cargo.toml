@@ -1,0 +1,100 @@
+[package]
+name = "idp-api"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "xavyo API Service - Identity Provider REST API"
+
+[[bin]]
+name = "idp-api"
+path = "src/main.rs"
+
+[features]
+default = []
+kafka = ["xavyo-events", "xavyo-api-governance/kafka", "xavyo-api-users/kafka", "xavyo-scim-client/kafka"]
+
+[dependencies]
+# Web framework
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+hyper = { workspace = true }
+tokio = { workspace = true }
+
+# OpenAPI documentation
+utoipa = { workspace = true }
+utoipa-swagger-ui = { workspace = true }
+
+# Logging and tracing
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# OpenTelemetry
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+opentelemetry-semantic-conventions = { workspace = true }
+
+# Prometheus metrics
+prometheus-client = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Database
+sqlx = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+dotenvy = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }
+async-trait = "0.1"
+hex = "0.4"
+
+# Rate limiting (F082)
+governor = "0.6"
+
+# HMAC/SHA2 for CSRF (F082)
+hmac = "0.12"
+sha2 = "0.10"
+
+# Random for CSRF token generation (F082)
+rand = "0.8"
+
+# Cancellation token for background workers (F085)
+tokio-util = { version = "0.7", features = ["rt"] }
+
+# Internal crates
+xavyo-core = { path = "../../crates/xavyo-core" }
+xavyo-db = { path = "../../crates/xavyo-db", features = ["openapi"] }
+xavyo-auth = { path = "../../crates/xavyo-auth" }
+xavyo-api-auth = { path = "../../crates/xavyo-api-auth" }
+xavyo-api-users = { path = "../../crates/xavyo-api-users" }
+xavyo-api-oauth = { path = "../../crates/xavyo-api-oauth" }
+xavyo-api-social = { path = "../../crates/xavyo-api-social" }
+xavyo-api-saml = { path = "../../crates/xavyo-api-saml" }
+xavyo-api-oidc-federation = { path = "../../crates/xavyo-api-oidc-federation" }
+xavyo-api-scim = { path = "../../crates/xavyo-api-scim" }
+xavyo-api-governance = { path = "../../crates/xavyo-api-governance" }
+xavyo-api-connectors = { path = "../../crates/xavyo-api-connectors" }
+xavyo-connector = { path = "../../crates/xavyo-connector" }
+xavyo-tenant = { path = "../../crates/xavyo-tenant" }
+xavyo-api-authorization = { path = "../../crates/xavyo-api-authorization" }
+xavyo-authorization = { path = "../../crates/xavyo-authorization" }
+xavyo-secrets = { path = "../../crates/xavyo-secrets", features = ["env-provider", "file-provider"] }
+xavyo-webhooks = { path = "../../crates/xavyo-webhooks" }
+xavyo-api-import = { path = "../../crates/xavyo-api-import" }
+xavyo-scim-client = { path = "../../crates/xavyo-scim-client" }
+xavyo-api-agents = { path = "../../crates/xavyo-api-agents", features = ["openapi"] }
+xavyo-api-nhi = { path = "../../crates/xavyo-api-nhi", features = ["openapi"] }
+xavyo-api-tenants = { path = "../../crates/xavyo-api-tenants" }
+xavyo-events = { path = "../../crates/xavyo-events", optional = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+axum-test = { workspace = true }

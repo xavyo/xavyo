@@ -1,0 +1,27 @@
+[package]
+name = "xavyo-tenant"
+version = "0.1.0"
+edition = "2021"
+description = "Tower/Axum middleware for multi-tenant context extraction and validation"
+license = "BSL-1.1"
+
+[dependencies]
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.4"
+tower-layer = "0.3"
+tower-service = "0.3"
+http = "1.0"
+http-body = "1.0"
+http-body-util = "0.1"
+xavyo-core = { path = "../xavyo-core" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+futures-util = "0.3"
+pin-project-lite = "0.2"
+
+[dev-dependencies]
+tokio = { version = "1.35", features = ["full", "test-util"] }
+tower = { version = "0.4", features = ["util"] }
+hyper = "1.0"

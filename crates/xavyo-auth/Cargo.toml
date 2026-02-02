@@ -1,0 +1,52 @@
+[package]
+name = "xavyo-auth"
+version = "0.1.0"
+edition = "2021"
+description = "JWT authentication and password hashing library for xavyo"
+license = "BSL-1.1"
+repository = "https://github.com/xavyo/xavyo"
+
+[dependencies]
+# JWT handling
+jsonwebtoken = "9"
+
+# Password hashing
+argon2 = "0.5"
+
+# HTTP client for JWKS
+reqwest = { workspace = true }
+
+# Internal dependencies
+xavyo-core = { path = "../xavyo-core" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID for jti claims
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Async runtime
+tokio = { version = "1.35", features = ["rt-multi-thread", "macros"] }
+
+# Logging
+tracing = "0.1"
+
+# Random for salt generation
+rand = "0.8"
+
+# Base64 encoding for JWKS
+base64 = "0.22"
+
+[dev-dependencies]
+tokio = { version = "1.35", features = ["full"] }
+wiremock = "0.5"
+
+[features]
+default = []

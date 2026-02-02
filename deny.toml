@@ -1,0 +1,108 @@
+# cargo-deny configuration for xavyo
+# https://embarkstudios.github.io/cargo-deny/
+#
+# Run all checks: cargo deny check
+# Run specific:   cargo deny check advisories|licenses|bans|sources
+
+# ============================================================================
+# [advisories] — Vulnerability scanning against RustSec Advisory Database
+# ============================================================================
+# cargo-deny 0.19+ denies vulnerabilities by default.
+# Unmaintained crates do not fail the build (informational only).
+[advisories]
+# Do not fail the build on unmaintained crate advisories.
+# These are transitive dependencies we cannot immediately control.
+# Values: "all" (default, fail on any), "workspace", "transitive", "none"
+unmaintained = "none"
+
+# Pre-existing advisories that cannot be immediately fixed.
+# Each exemption MUST include: advisory ID, affected crate, reason, and deadline.
+ignore = [
+    # RUSTSEC-2024-0421: idna 0.5.0 — Punycode label acceptance issue
+    # Affected crate: idna (transitive via validator 0.18.1)
+    # Why exempted: Requires validator upgrade to a version using idna >=1.0.0;
+    #               validator 0.18.x pins idna 0.5.x. Low risk for our use case
+    #               (server-side email/URL validation, not browser navigation).
+    # Deadline: 2026-04-01
+    { id = "RUSTSEC-2024-0421", reason = "validator 0.18.x pins idna 0.5.x; low risk for server-side validation" },
+
+    # RUSTSEC-2023-0071: rsa 0.9.10 — Marvin Attack timing sidechannel (CVSS 5.9 MEDIUM)
+    # Affected crate: rsa (transitive via sqlx-mysql, openidconnect)
+    # Why exempted: No fixed version available upstream. We use PostgreSQL (not MySQL),
+    #               so sqlx-mysql RSA usage is compile-time only. The openidconnect path
+    #               uses RSA for JWT verification (not decryption), which is not affected
+    #               by the Marvin Attack.
+    # Deadline: Review when rsa 0.10+ is released
+    { id = "RUSTSEC-2023-0071", reason = "no fix available; PostgreSQL-only project, MySQL RSA path unused" },
+
+    # RUSTSEC-2024-0363: sqlx 0.7.4 — Binary protocol misinterpretation via truncating casts
+    # Affected crate: sqlx (direct dependency)
+    # Why exempted: Upgrading to sqlx 0.8+ is a major migration (breaking API changes
+    #               across all 22+ crates). The vulnerability affects MySQL binary protocol;
+    #               we use PostgreSQL exclusively. Tracked for next major dependency update.
+    # Deadline: 2026-06-01
+    { id = "RUSTSEC-2024-0363", reason = "sqlx 0.8 migration pending; MySQL-only vulnerability, we use PostgreSQL" },
+]
+
+# ============================================================================
+# [licenses] — License compliance enforcement
+# ============================================================================
+# Only approved permissive licenses are allowed. Copyleft (GPL/AGPL/LGPL) is
+# denied unless explicitly exempted. MPL-2.0 is allowed as weak copyleft
+# (file-level only, compatible with proprietary software).
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    # "Unicode-DFS-2016",  # Uncomment when needed by a dependency
+    "Unicode-3.0",
+    "Zlib",
+    "CC0-1.0",
+    # "OpenSSL",  # Uncomment when needed by a dependency
+    "BSL-1.0",
+    "MPL-2.0",
+    "0BSD",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+
+# Per-crate license exceptions for crates with non-standard license identifiers
+exceptions = [
+    # Add exceptions here for crates with licenses not on the allow-list.
+    # Example: { allow = ["LGPL-2.1"], crate = "specific-crate", reason = "dynamically linked" },
+]
+
+# Workspace crates are not published; skip license checks for them
+[licenses.private]
+ignore = true
+
+# ============================================================================
+# [bans] — Banned crate and duplicate detection
+# ============================================================================
+[bans]
+# Warn on duplicate crate versions (informational, does not fail build)
+multiple-versions = "warn"
+# Allow wildcard version requirements
+wildcards = "allow"
+# Highlight all paths to duplicate versions in diagnostics
+highlight = "all"
+
+# Denied crates — add known unmaintained/unsafe crates here
+deny = [
+    # Example: { crate = "some-unsafe-crate", reason = "Use alternative-crate instead" },
+]
+
+# ============================================================================
+# [sources] — Source restrictions (crates.io only)
+# ============================================================================
+# All dependencies must come from crates.io. Git dependencies and unknown
+# registries are denied to prevent supply chain attacks.
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

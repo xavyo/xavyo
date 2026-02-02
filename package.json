@@ -1,0 +1,56 @@
+{
+  "name": "@xavyo/monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "xavyo - AI Agent Security Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "nx run-many --target=build",
+    "test": "nx run-many --target=test",
+    "test:rust": "cargo test --workspace",
+    "lint": "nx run-many --target=lint",
+    "lint:rust": "cargo clippy --workspace -- -D warnings",
+    "format": "nx format:write",
+    "format:check": "nx format:check",
+    "format:rust": "cargo fmt",
+    "format:rust:check": "cargo fmt --check",
+    "check:rust": "cargo check --workspace",
+    "graph": "nx graph",
+    "affected:build": "nx affected --target=build",
+    "affected:test": "nx affected --target=test",
+    "affected:lint": "nx affected --target=lint"
+  },
+  "devDependencies": {
+    "@eslint/compat": "^1.1.1",
+    "@eslint/js": "^9.8.0",
+    "@nx/eslint": "19.8.14",
+    "@nx/eslint-plugin": "19.8.14",
+    "@nx/jest": "19.8.14",
+    "@nx/js": "19.8.14",
+    "@nx/workspace": "^19.8.0",
+    "@swc-node/register": "~1.9.1",
+    "@swc/core": "~1.5.7",
+    "@swc/helpers": "~0.5.11",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^22.0.0",
+    "babel-jest": "^29.7.0",
+    "eslint": "^9.8.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-import": "2.30.0",
+    "jest": "^29.7.0",
+    "nx": "^19.8.0",
+    "prettier": "^3.3.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "10.9.1",
+    "tslib": "^2.3.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "npm@10.0.0"
+}

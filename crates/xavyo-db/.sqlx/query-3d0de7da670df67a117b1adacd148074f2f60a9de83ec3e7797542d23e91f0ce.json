@@ -1,0 +1,97 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id, tenant_id, event_type, agent_id, user_id, provider_type,\n                operation, resource_type, resource_id, details, outcome, created_at\n            FROM identity_audit_events\n            WHERE tenant_id = $1\n                AND ($2::text IS NULL OR event_type = $2)\n                AND ($3::uuid IS NULL OR agent_id = $3)\n                AND ($4::uuid IS NULL OR user_id = $4)\n                AND ($5::text IS NULL OR provider_type = $5)\n                AND ($6::text IS NULL OR outcome = $6)\n                AND ($7::timestamptz IS NULL OR created_at >= $7)\n                AND ($8::timestamptz IS NULL OR created_at <= $8)\n            ORDER BY created_at DESC\n            LIMIT $9 OFFSET $10\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "event_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "provider_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "operation",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "resource_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "resource_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
+        "name": "details",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 10,
+        "name": "outcome",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "3d0de7da670df67a117b1adacd148074f2f60a9de83ec3e7797542d23e91f0ce"
+}

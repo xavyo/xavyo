@@ -1,0 +1,188 @@
+# ============================================
+# xavyo - Open Source .gitignore
+# ============================================
+
+# --------------------------------------------
+# Secrets & Credentials (CRITICAL)
+# --------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.cer
+*.der
+*secret*
+*credential*
+*.token
+service-account*.json
+*-sa.json
+
+# API keys and tokens
+.npmrc
+.yarnrc
+.netrc
+
+# --------------------------------------------
+# Dependencies
+# --------------------------------------------
+node_modules/
+.pnp/
+.pnp.js
+vendor/
+
+# --------------------------------------------
+# Build outputs
+# --------------------------------------------
+dist/
+build/
+.next/
+out/
+*.egg-info/
+
+# Rust
+target/
+debug/
+release/
+*.rs.bk
+*.rlib
+**/*.rs.bk
+
+# --------------------------------------------
+# Testing & Coverage
+# --------------------------------------------
+coverage/
+.nyc_output/
+*.lcov
+htmlcov/
+.tox/
+.pytest_cache/
+
+# --------------------------------------------
+# IDE & Editors
+# --------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.iml
+.project
+.classpath
+.settings/
+*.sublime-*
+
+# --------------------------------------------
+# OS files
+# --------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# --------------------------------------------
+# Logs
+# --------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# --------------------------------------------
+# NX Monorepo
+# --------------------------------------------
+.nx/
+nx-cloud.env
+
+# --------------------------------------------
+# Temporary files
+# --------------------------------------------
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+
+# --------------------------------------------
+# Cache
+# --------------------------------------------
+.cache/
+.eslintcache
+.prettiercache
+.parcel-cache/
+.turbo/
+
+# --------------------------------------------
+# Claude Code / AI tools
+# --------------------------------------------
+.claude/
+.cursor/
+.aider*
+.codeium/
+.copilot/
+.ralph/
+.specify/
+# Note: CLAUDE.md is tracked - it contains project guidelines for AI-assisted development
+
+# --------------------------------------------
+# Docker (local data)
+# --------------------------------------------
+docker/data/
+docker/volumes/
+docker/keys/*
+!docker/keys/README.md
+
+# --------------------------------------------
+# Keys directory
+# --------------------------------------------
+keys/*
+!keys/README.md
+
+# --------------------------------------------
+# Local development data
+# --------------------------------------------
+data/
+*.db
+*.sqlite
+*.sqlite3
+dump.rdb
+
+# --------------------------------------------
+# Documentation (to be updated)
+# --------------------------------------------
+docs/
+site/
+_site/
+.docusaurus/
+
+# --------------------------------------------
+# Speckit (feature specs - generated)
+# --------------------------------------------
+specs/
+
+# --------------------------------------------
+# Misc
+# --------------------------------------------
+*.pid
+*.seed
+*.pid.lock
+.lock-wscript
+
+# Package manager locks (keep Cargo.lock for Rust)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

@@ -1,0 +1,63 @@
+[package]
+name = "xavyo-fuzz"
+version = "0.0.0"
+authors = ["Automated"]
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+# Crates to fuzz
+xavyo-auth = { path = "../crates/xavyo-auth" }
+xavyo-core = { path = "../crates/xavyo-core" }
+
+# Common dependencies for fuzzing
+chrono = "0.4"
+uuid = { version = "1.6", features = ["v4"] }
+serde_json = "1.0"
+sha2 = "0.10"
+hex = "0.4"
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "fuzz_jwt_decode"
+path = "fuzz_targets/fuzz_jwt_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_password_hash"
+path = "fuzz_targets/fuzz_password_hash.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_token_hash"
+path = "fuzz_targets/fuzz_token_hash.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_uuid_parsing"
+path = "fuzz_targets/fuzz_uuid_parsing.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_claims_builder"
+path = "fuzz_targets/fuzz_claims_builder.rs"
+test = false
+doc = false
+bench = false

@@ -1,0 +1,55 @@
+[package]
+name = "xavyo-siem"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "SIEM integration and audit log export for xavyo"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# TLS for syslog TCP
+tokio-native-tls = "0.3"
+native-tls = "0.2"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# HTTP client (webhook + Splunk HEC)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Rate limiting
+governor = "0.6"
+
+# Encryption for auth_config
+aes-gcm = "0.10"
+
+# CSV export
+csv = "1.3"
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+# Random bytes for AES nonce
+rand = "0.8"
+
+# Base64 for encrypted data encoding
+base64 = { workspace = true }
+
+# URL parsing for SSRF validation
+url = "2.5"
+
+# Database (for batch job runner)
+sqlx = { workspace = true }
+xavyo-db = { path = "../xavyo-db" }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+wiremock = "0.6"

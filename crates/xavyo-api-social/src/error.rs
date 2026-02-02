@@ -1,0 +1,185 @@
+//! Social authentication error types.
+
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use serde::Serialize;
+use thiserror::Error;
+use uuid::Uuid;
+
+/// Provider type enumeration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderType {
+    Google,
+    Microsoft,
+    Apple,
+    Github,
+}
+
+impl std::fmt::Display for ProviderType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProviderType::Google => write!(f, "google"),
+            ProviderType::Microsoft => write!(f, "microsoft"),
+            ProviderType::Apple => write!(f, "apple"),
+            ProviderType::Github => write!(f, "github"),
+        }
+    }
+}
+
+impl std::str::FromStr for ProviderType {
+    type Err = SocialError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "google" => Ok(ProviderType::Google),
+            "microsoft" => Ok(ProviderType::Microsoft),
+            "apple" => Ok(ProviderType::Apple),
+            "github" => Ok(ProviderType::Github),
+            _ => Err(SocialError::InvalidProvider {
+                provider: s.to_string(),
+            }),
+        }
+    }
+}
+
+/// Social authentication errors.
+#[derive(Debug, Error)]
+pub enum SocialError {
+    #[error("Provider '{provider}' is not available or disabled for this tenant")]
+    ProviderUnavailable { provider: ProviderType },
+
+    #[error("Invalid provider: {provider}")]
+    InvalidProvider { provider: String },
+
+    #[error("Invalid OAuth callback: {reason}")]
+    InvalidCallback { reason: String },
+
+    #[error("Token exchange failed with provider {provider}: HTTP {status}")]
+    TokenExchangeFailed { provider: ProviderType, status: u16 },
+
+    #[error("Failed to fetch user info from {provider}")]
+    UserInfoFailed { provider: ProviderType },
+
+    #[error("Account linking required: email {email} already exists")]
+    AccountLinkingRequired {
+        existing_user_id: Uuid,
+        email: String,
+    },
+
+    #[error("Social account already linked to another user")]
+    AlreadyLinkedToOther,
+
+    #[error("Cannot unlink: {reason}")]
+    UnlinkForbidden { reason: String },
+
+    #[error("Social connection not found")]
+    ConnectionNotFound,
+
+    #[error("Encryption error: {operation}")]
+    EncryptionError { operation: String },
+
+    #[error("Invalid state parameter: {reason}")]
+    InvalidState { reason: String },
+
+    #[error("PKCE verification failed")]
+    PkceVerificationFailed,
+
+    #[error("Provider configuration error: {message}")]
+    ConfigurationError { message: String },
+
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] sqlx::Error),
+
+    #[error("HTTP client error: {0}")]
+    HttpError(#[from] reqwest::Error),
+
+    #[error("JSON error: {0}")]
+    JsonError(#[from] serde_json::Error),
+
+    #[error("JWT error: {0}")]
+    JwtError(#[from] jsonwebtoken::errors::Error),
+
+    #[error("Internal error: {message}")]
+    InternalError { message: String },
+}
+
+/// Error response structure for API responses.
+#[derive(Debug, Serialize)]
+pub struct ErrorResponse {
+    pub error: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<serde_json::Value>,
+}
+
+impl SocialError {
+    /// Get the error code for API responses.
+    pub fn error_code(&self) -> &'static str {
+        match self {
+            SocialError::ProviderUnavailable { .. } => "provider_unavailable",
+            SocialError::InvalidProvider { .. } => "invalid_provider",
+            SocialError::InvalidCallback { .. } => "invalid_callback",
+            SocialError::TokenExchangeFailed { .. } => "token_exchange_failed",
+            SocialError::UserInfoFailed { .. } => "user_info_failed",
+            SocialError::AccountLinkingRequired { .. } => "account_linking_required",
+            SocialError::AlreadyLinkedToOther => "already_linked",
+            SocialError::UnlinkForbidden { .. } => "unlink_forbidden",
+            SocialError::ConnectionNotFound => "connection_not_found",
+            SocialError::EncryptionError { .. } => "encryption_error",
+            SocialError::InvalidState { .. } => "invalid_state",
+            SocialError::PkceVerificationFailed => "pkce_failed",
+            SocialError::ConfigurationError { .. } => "configuration_error",
+            SocialError::DatabaseError(_) => "database_error",
+            SocialError::HttpError(_) => "http_error",
+            SocialError::JsonError(_) => "json_error",
+            SocialError::JwtError(_) => "jwt_error",
+            SocialError::InternalError { .. } => "internal_error",
+        }
+    }
+
+    /// Get the HTTP status code for this error.
+    pub fn status_code(&self) -> StatusCode {
+        match self {
+            SocialError::ProviderUnavailable { .. } => StatusCode::NOT_FOUND,
+            SocialError::InvalidProvider { .. } => StatusCode::BAD_REQUEST,
+            SocialError::InvalidCallback { .. } => StatusCode::BAD_REQUEST,
+            SocialError::TokenExchangeFailed { .. } => StatusCode::BAD_GATEWAY,
+            SocialError::UserInfoFailed { .. } => StatusCode::BAD_GATEWAY,
+            SocialError::AccountLinkingRequired { .. } => StatusCode::CONFLICT,
+            SocialError::AlreadyLinkedToOther => StatusCode::CONFLICT,
+            SocialError::UnlinkForbidden { .. } => StatusCode::BAD_REQUEST,
+            SocialError::ConnectionNotFound => StatusCode::NOT_FOUND,
+            SocialError::EncryptionError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            SocialError::InvalidState { .. } => StatusCode::BAD_REQUEST,
+            SocialError::PkceVerificationFailed => StatusCode::BAD_REQUEST,
+            SocialError::ConfigurationError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            SocialError::DatabaseError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            SocialError::HttpError(_) => StatusCode::BAD_GATEWAY,
+            SocialError::JsonError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            SocialError::JwtError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            SocialError::InternalError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
+impl IntoResponse for SocialError {
+    fn into_response(self) -> Response {
+        let status = self.status_code();
+        let body = ErrorResponse {
+            error: self.error_code().to_string(),
+            message: self.to_string(),
+            details: match &self {
+                SocialError::AccountLinkingRequired { email, .. } => {
+                    Some(serde_json::json!({ "email": email }))
+                }
+                _ => None,
+            },
+        };
+
+        (status, axum::Json(body)).into_response()
+    }
+}
+
+/// Result type alias for social operations.
+pub type SocialResult<T> = Result<T, SocialError>;

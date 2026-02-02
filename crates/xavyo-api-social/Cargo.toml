@@ -1,0 +1,78 @@
+[package]
+name = "xavyo-api-social"
+version = "0.1.0"
+edition = "2021"
+description = "Social authentication API library for xavyo"
+license = "BSL-1.1"
+
+[dependencies]
+# Workspace dependencies
+xavyo-core = { path = "../xavyo-core" }
+xavyo-db = { path = "../xavyo-db" }
+xavyo-auth = { path = "../xavyo-auth" }
+xavyo-tenant = { path = "../xavyo-tenant" }
+
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP client for OAuth2
+reqwest = { workspace = true }
+
+# Encryption
+aes-gcm = "0.10"
+hkdf = "0.12"
+sha2 = "0.10"
+
+# JWT for Apple client secret and state
+jsonwebtoken = "9"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Base64 encoding
+base64 = "0.21"
+
+# URL handling
+url = "2"
+
+# UUID
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Error handling
+thiserror = "1"
+
+# Async trait
+async-trait = "0.1"
+
+# URL encoding
+urlencoding = "2"
+
+# SQLx for database
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono"] }
+
+# Tracing
+tracing = "0.1"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Random for PKCE
+rand = "0.8"
+
+# OpenAPI documentation
+utoipa = { version = "4", features = ["axum_extras", "uuid", "chrono"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.12"
+wiremock = "0.6"
+
+[features]
+default = []
+integration = []

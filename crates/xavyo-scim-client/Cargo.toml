@@ -1,0 +1,44 @@
+[package]
+name = "xavyo-scim-client"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "SCIM 2.0 outbound provisioning client for xavyo"
+
+[features]
+default = []
+kafka = ["xavyo-events/kafka"]
+
+[dependencies]
+# Core crates
+xavyo-db = { path = "../xavyo-db" }
+xavyo-core = { path = "../xavyo-core" }
+xavyo-connector = { path = "../xavyo-connector" }
+xavyo-api-scim = { path = "../xavyo-api-scim" }
+xavyo-webhooks = { path = "../xavyo-webhooks" }
+xavyo-events = { path = "../xavyo-events", optional = true }
+
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# HTTP client
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+# Database (for PgPool type)
+sqlx = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+wiremock = "0.6"

@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                l.id,\n                l.tenant_id,\n                l.license_pool_id,\n                l.entitlement_id,\n                l.priority,\n                l.enabled,\n                l.created_at,\n                l.created_by\n            FROM gov_license_entitlement_links l\n            JOIN gov_license_pools p ON p.id = l.license_pool_id\n            WHERE l.tenant_id = $1\n              AND l.entitlement_id = $2\n              AND l.enabled = true\n              AND p.status = 'active'\n              AND p.allocated_count < p.total_capacity\n            ORDER BY l.priority ASC, l.created_at ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "license_pool_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "entitlement_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "priority",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "enabled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_by",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f5b6e679af20e6fb904d99beab4074dd360bc9e77f1b56283198237e9a88d55e"
+}

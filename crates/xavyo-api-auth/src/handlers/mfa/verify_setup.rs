@@ -1,0 +1,74 @@
+//! TOTP setup verification handler.
+
+use axum::{extract::State, http::StatusCode, Extension, Json};
+use std::net::IpAddr;
+use tracing::info;
+use uuid::Uuid;
+use validator::Validate;
+use xavyo_core::UserId;
+use xavyo_webhooks::{EventPublisher, WebhookEvent};
+
+use crate::{
+    error::ApiAuthError,
+    models::{TotpVerifySetupRequest, TotpVerifySetupResponse},
+    router::AuthState,
+};
+
+/// POST /auth/mfa/totp/verify-setup
+///
+/// Complete TOTP setup by verifying a code from the authenticator app.
+/// Returns recovery codes on success (displayed only once).
+pub async fn verify_totp_setup(
+    State(state): State<AuthState>,
+    Extension(user_id): Extension<UserId>,
+    Extension(tenant_id): Extension<xavyo_core::TenantId>,
+    Extension(ip_address): Extension<Option<IpAddr>>,
+    Extension(user_agent): Extension<Option<String>>,
+    publisher: Option<Extension<EventPublisher>>,
+    Json(request): Json<TotpVerifySetupRequest>,
+) -> Result<(StatusCode, Json<TotpVerifySetupResponse>), ApiAuthError> {
+    // Validate request
+    request
+        .validate()
+        .map_err(|e| ApiAuthError::Validation(e.to_string()))?;
+
+    // Verify setup
+    let recovery_codes = state
+        .mfa_service
+        .verify_setup(
+            *user_id.as_uuid(),
+            *tenant_id.as_uuid(),
+            &request.code,
+            ip_address,
+            user_agent,
+        )
+        .await?;
+
+    info!(
+        user_id = %user_id.as_uuid(),
+        "TOTP setup completed, MFA enabled"
+    );
+
+    // F085: Publish auth.mfa.enrolled webhook event
+    if let Some(Extension(publisher)) = publisher {
+        publisher.publish(WebhookEvent {
+            event_id: Uuid::new_v4(),
+            event_type: "auth.mfa.enrolled".to_string(),
+            tenant_id: *tenant_id.as_uuid(),
+            actor_id: Some(*user_id.as_uuid()),
+            timestamp: chrono::Utc::now(),
+            data: serde_json::json!({
+                "user_id": user_id.as_uuid(),
+                "factor_type": "totp",
+            }),
+        });
+    }
+
+    Ok((
+        StatusCode::OK,
+        Json(TotpVerifySetupResponse {
+            recovery_codes,
+            message: "MFA has been enabled. Store your recovery codes safely - they will not be shown again.".to_string(),
+        }),
+    ))
+}

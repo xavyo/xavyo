@@ -1,0 +1,51 @@
+[package]
+name = "xavyo-events"
+version = "0.1.0"
+edition = "2021"
+description = "Kafka event bus library for xavyo"
+license = "BSL-1.1"
+
+[dependencies]
+# Kafka client - use dynamic linking by default for easier development
+# Use cmake-build feature in CI/production for static linking
+rdkafka = { version = "0.36", features = ["ssl", "sasl"], optional = true }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Types
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+thiserror = "1"
+
+# Logging
+tracing = "0.1"
+
+# Database (for idempotence)
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono"] }
+
+# Async trait
+async-trait = "0.1"
+
+# Stream utilities
+futures-util = "0.3"
+
+# Internal dependencies
+xavyo-core = { path = "../xavyo-core" }
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[features]
+default = []
+# Enable Kafka integration (requires librdkafka installed or cmake for static build)
+kafka = ["rdkafka"]
+# Use cmake to build librdkafka from source (for CI/production)
+kafka-static = ["rdkafka/cmake-build"]
+integration = ["kafka"]

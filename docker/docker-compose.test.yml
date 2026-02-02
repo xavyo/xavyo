@@ -1,0 +1,39 @@
+version: '3.8'
+
+# =============================================================================
+# Xavyo Suite - Test Environment Overrides
+# =============================================================================
+# Usage: docker compose -f docker-compose.yml -f docker-compose.test.yml up -d
+#
+# This file provides test-specific configuration that extends the base
+# docker-compose.yml. Use this for CI/CD pipelines or isolated test runs.
+
+services:
+  postgres:
+    # Use a separate container name for test isolation
+    container_name: xavyo-postgres-test
+    environment:
+      # Override with test-specific values
+      POSTGRES_DB: xavyo_test
+      POSTGRES_USER: xavyo
+      POSTGRES_PASSWORD: xavyo_test_password
+    # Use ephemeral storage for tests (faster, no persistence)
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./postgres/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      # No named volume - data is ephemeral
+    # Faster health checks for CI
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U xavyo -d xavyo_test']
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 5s
+
+# Override volumes to use tmpfs for faster tests
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs

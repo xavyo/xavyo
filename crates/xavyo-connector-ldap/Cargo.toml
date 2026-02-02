@@ -1,0 +1,32 @@
+[package]
+name = "xavyo-connector-ldap"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "LDAP/Active Directory connector for xavyo"
+
+[dependencies]
+# Core connector
+xavyo-connector = { path = "../xavyo-connector" }
+
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# LDAP client
+ldap3 = "0.11"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+base64 = "0.22"
+
+[dev-dependencies]
+tokio-test = { workspace = true }

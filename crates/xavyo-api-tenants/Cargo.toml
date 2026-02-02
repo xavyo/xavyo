@@ -1,0 +1,70 @@
+[package]
+name = "xavyo-api-tenants"
+version = "0.1.0"
+edition = "2021"
+description = "Tenant Provisioning API for xavyo"
+license = "BSL-1.1"
+repository = "https://github.com/xavyo/xavyo"
+
+[dependencies]
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+tower = { version = "0.4", features = ["util", "timeout"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Internal dependencies
+xavyo-core = { path = "../xavyo-core" }
+xavyo-auth = { path = "../xavyo-auth" }
+xavyo-db = { path = "../xavyo-db" }
+xavyo-tenant = { path = "../xavyo-tenant" }
+xavyo-api-oauth = { path = "../xavyo-api-oauth" }
+xavyo-api-auth = { path = "../xavyo-api-auth" }
+
+# Concurrency
+parking_lot = "0.12"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# OpenAPI documentation
+utoipa = { workspace = true }
+
+# Error handling
+thiserror = "1.0"
+
+# Async runtime
+tokio = { version = "1.35", features = ["rt-multi-thread", "macros", "sync", "time"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Logging
+tracing = "0.1"
+
+# Random for API key generation
+rand = "0.8"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono"] }
+
+# SHA-256 hashing for API keys
+sha2 = "0.10"
+hex = "0.4"
+
+# HTTP types
+http = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1.35", features = ["full", "test-util"] }
+tower = { version = "0.4", features = ["util"] }
+axum-test = "14"
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[features]
+default = []
+integration = []

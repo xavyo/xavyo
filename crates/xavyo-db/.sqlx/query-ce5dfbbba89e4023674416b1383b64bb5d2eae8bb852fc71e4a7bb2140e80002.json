@@ -1,0 +1,109 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                r.id,\n                r.tenant_id,\n                r.license_pool_id,\n                r.trigger_type as \"trigger_type: LicenseReclamationTrigger\",\n                r.threshold_days,\n                r.lifecycle_state,\n                r.notification_days_before,\n                r.enabled,\n                r.created_at,\n                r.updated_at,\n                r.created_by,\n                p.name as pool_name,\n                p.vendor as pool_vendor\n            FROM gov_license_reclamation_rules r\n            LEFT JOIN gov_license_pools p ON p.id = r.license_pool_id\n            WHERE r.tenant_id = $1\n              AND ($2::uuid IS NULL OR r.license_pool_id = $2)\n              AND ($3::text IS NULL OR r.trigger_type::text = $3)\n              AND ($4::boolean IS NULL OR r.enabled = $4)\n            ORDER BY r.created_at DESC\n            LIMIT $5 OFFSET $6\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "license_pool_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "trigger_type: LicenseReclamationTrigger",
+        "type_info": {
+          "Custom": {
+            "name": "license_reclamation_trigger",
+            "kind": {
+              "Enum": [
+                "inactivity",
+                "lifecycle_state"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "threshold_days",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "lifecycle_state",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "notification_days_before",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "enabled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 11,
+        "name": "pool_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "pool_vendor",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Bool",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ce5dfbbba89e4023674416b1383b64bb5d2eae8bb852fc71e4a7bb2140e80002"
+}

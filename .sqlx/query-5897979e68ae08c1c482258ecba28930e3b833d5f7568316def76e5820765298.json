@@ -1,0 +1,101 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id, tenant_id, agent_id, provider_config_id, role_mapping_id,\n                requested_ttl_seconds, granted_ttl_seconds, outcome,\n                error_code, error_message, duration_ms, source_ip::text, created_at\n            FROM identity_credential_requests\n            WHERE tenant_id = $1\n                AND ($2::uuid IS NULL OR agent_id = $2)\n                AND ($3::uuid IS NULL OR provider_config_id = $3)\n                AND ($4::text IS NULL OR outcome = $4)\n                AND ($5::timestamptz IS NULL OR created_at >= $5)\n                AND ($6::timestamptz IS NULL OR created_at <= $6)\n            ORDER BY created_at DESC\n            LIMIT $7 OFFSET $8\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "agent_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "provider_config_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "role_mapping_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "requested_ttl_seconds",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "granted_ttl_seconds",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "outcome",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "error_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "duration_ms",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "source_ip",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      null,
+      false
+    ]
+  },
+  "hash": "5897979e68ae08c1c482258ecba28930e3b833d5f7568316def76e5820765298"
+}

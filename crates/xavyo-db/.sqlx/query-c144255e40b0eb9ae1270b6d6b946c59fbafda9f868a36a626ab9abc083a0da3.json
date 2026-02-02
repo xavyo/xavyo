@@ -1,0 +1,93 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id,\n                tenant_id,\n                license_pool_id,\n                trigger_type as \"trigger_type: LicenseReclamationTrigger\",\n                threshold_days,\n                lifecycle_state,\n                notification_days_before,\n                enabled,\n                created_at,\n                updated_at,\n                created_by\n            FROM gov_license_reclamation_rules\n            WHERE tenant_id = $1 AND id = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "license_pool_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "trigger_type: LicenseReclamationTrigger",
+        "type_info": {
+          "Custom": {
+            "name": "license_reclamation_trigger",
+            "kind": {
+              "Enum": [
+                "inactivity",
+                "lifecycle_state"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "threshold_days",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "lifecycle_state",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "notification_days_before",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "enabled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_by",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c144255e40b0eb9ae1270b6d6b946c59fbafda9f868a36a626ab9abc083a0da3"
+}

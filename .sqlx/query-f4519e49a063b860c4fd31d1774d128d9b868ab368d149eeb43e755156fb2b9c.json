@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM gov_license_entitlement_links\n            WHERE tenant_id = $1 AND entitlement_id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f4519e49a063b860c4fd31d1774d128d9b868ab368d149eeb43e755156fb2b9c"
+}

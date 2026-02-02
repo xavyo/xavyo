@@ -1,0 +1,61 @@
+[package]
+name = "xavyo-api-authorization"
+version = "0.1.0"
+edition = "2021"
+description = "Authorization API endpoints and PEP middleware for xavyo"
+license = "BSL-1.1"
+repository = "https://github.com/xavyo/xavyo"
+
+[dependencies]
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Internal dependencies
+xavyo-core = { path = "../xavyo-core" }
+xavyo-auth = { path = "../xavyo-auth" }
+xavyo-api-auth = { path = "../xavyo-api-auth" }
+xavyo-db = { path = "../xavyo-db" }
+xavyo-tenant = { path = "../xavyo-tenant" }
+xavyo-authorization = { path = "../xavyo-authorization" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# OpenAPI documentation
+utoipa = { workspace = true }
+
+# Error handling
+thiserror = "1.0"
+
+# Async runtime
+tokio = { version = "1.35", features = ["rt-multi-thread", "macros"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Logging
+tracing = "0.1"
+
+# Validation
+validator = { version = "0.18", features = ["derive"] }
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono"] }
+
+# HTTP types
+http = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1.35", features = ["full", "test-util"] }
+tower = { version = "0.4", features = ["util"] }
+axum-test = "14"
+
+[features]
+default = []
+integration = []

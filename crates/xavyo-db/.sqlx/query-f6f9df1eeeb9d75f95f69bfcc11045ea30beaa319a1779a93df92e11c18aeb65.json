@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE identity_provider_configs\n            SET\n                health_status = $3,\n                last_health_check = now(),\n                updated_at = now()\n            WHERE tenant_id = $1 AND id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f6f9df1eeeb9d75f95f69bfcc11045ea30beaa319a1779a93df92e11c18aeb65"
+}

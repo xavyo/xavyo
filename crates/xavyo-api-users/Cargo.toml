@@ -1,0 +1,48 @@
+[package]
+name = "xavyo-api-users"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "User Management CRUD API for xavyo - Admin endpoints"
+
+[dependencies]
+# Web framework
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# OpenAPI documentation
+utoipa = { workspace = true }
+
+# Database
+sqlx = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+regex = { workspace = true }
+
+# Internal crates
+xavyo-core = { path = "../xavyo-core" }
+xavyo-db = { path = "../xavyo-db" }
+xavyo-auth = { path = "../xavyo-auth" }
+xavyo-events = { path = "../xavyo-events", optional = true }
+xavyo-webhooks = { path = "../xavyo-webhooks" }
+
+# Async runtime (for Extension trait)
+tokio = { workspace = true }
+
+[features]
+default = []
+kafka = ["xavyo-events/kafka"]
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+axum-test = { workspace = true }

@@ -1,0 +1,97 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id,\n                tenant_id,\n                license_pool_id,\n                trigger_type as \"trigger_type: LicenseReclamationTrigger\",\n                threshold_days,\n                lifecycle_state,\n                notification_days_before,\n                enabled,\n                created_at,\n                updated_at,\n                created_by\n            FROM gov_license_reclamation_rules\n            WHERE tenant_id = $1\n              AND ($2::uuid IS NULL OR license_pool_id = $2)\n              AND ($3::text IS NULL OR trigger_type::text = $3)\n              AND ($4::boolean IS NULL OR enabled = $4)\n            ORDER BY created_at DESC\n            LIMIT $5 OFFSET $6\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "license_pool_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "trigger_type: LicenseReclamationTrigger",
+        "type_info": {
+          "Custom": {
+            "name": "license_reclamation_trigger",
+            "kind": {
+              "Enum": [
+                "inactivity",
+                "lifecycle_state"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "threshold_days",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "lifecycle_state",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "notification_days_before",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "enabled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "created_by",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Bool",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "7e2cdd7872c82190577f1ede4f6008716debd8b21da7b6587745463cce1ae967"
+}

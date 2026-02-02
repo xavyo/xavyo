@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM gov_license_incompatibilities\n            WHERE tenant_id = $1\n              AND (pool_a_id = $2 OR pool_b_id = $2)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bb4b2d6b914fdb1c2dc1fe106cb3e5ceebaf5e2defc1ddbc03d72ee74b0c259a"
+}

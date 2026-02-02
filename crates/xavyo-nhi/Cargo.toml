@@ -1,0 +1,31 @@
+[package]
+name = "xavyo-nhi"
+description = "Core types and traits for Non-Human Identity (NHI) management"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+
+# Async
+async-trait.workspace = true
+
+# Database (for sqlx derives)
+sqlx = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio-test.workspace = true
+
+[features]
+default = []
+sqlx = ["dep:sqlx"]

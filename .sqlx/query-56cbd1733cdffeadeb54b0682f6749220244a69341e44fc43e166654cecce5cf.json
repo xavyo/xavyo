@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM gov_license_reclamation_rules\n            WHERE tenant_id = $1 AND license_pool_id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "56cbd1733cdffeadeb54b0682f6749220244a69341e44fc43e166654cecce5cf"
+}

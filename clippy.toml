@@ -1,0 +1,8 @@
+# Clippy configuration for xavyo
+# These settings allow patterns that are widespread in the codebase
+
+# Allow functions with many arguments (common in service methods with many dependencies)
+too-many-arguments-threshold = 15
+
+# Allow moderately complex types (SQL query result tuples can be large)
+type-complexity-threshold = 1000

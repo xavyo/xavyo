@@ -1,0 +1,87 @@
+# Xavyo API Gateway Configuration Example
+# Copy to gateway.yaml and customize for your environment
+
+server:
+  host: '0.0.0.0'
+  port: 8080
+  request_timeout_secs: 30
+  max_body_size_bytes: 10485760 # 10MB
+
+backends:
+  - name: idp-api
+    path_prefix: /idp
+    url: http://localhost:8081
+    timeout_secs: 10
+    health_path: /health
+    openapi_path: /docs/openapi.json
+    requires_auth: true
+    strip_prefix: true
+
+  - name: crm-api
+    path_prefix: /crm
+    url: http://localhost:8082
+    timeout_secs: 10
+    health_path: /health
+    openapi_path: /docs/openapi.json
+    requires_auth: true
+    strip_prefix: true
+
+  - name: pim-api
+    path_prefix: /pim
+    url: http://localhost:8083
+    timeout_secs: 10
+    health_path: /health
+    openapi_path: /docs/openapi.json
+    requires_auth: true
+    strip_prefix: true
+
+rate_limits:
+  enabled: true
+  default_requests_per_minute: 100
+  default_burst_size: 10
+  tenant_overrides:
+    # Premium tenants get higher limits
+    # premium-tenant-id:
+    #   requests_per_minute: 1000
+    #   burst_size: 50
+  endpoint_overrides:
+    # Auth endpoints have stricter limits
+    - path_pattern: '^/idp/auth/.*'
+      requests_per_minute: 20
+      burst_size: 5
+
+auth:
+  public_key_path: ./config/jwt-public.pem
+  issuer: https://idp.xavyo.com
+  audience: xavyo-services
+  public_paths:
+    - /health
+    - /metrics
+    - /docs
+    - /docs/*
+
+metrics:
+  enabled: true
+  path: /metrics
+
+cors:
+  allowed_origins:
+    - http://localhost:3000
+    - https://app.xavyo.com
+  allowed_methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - PATCH
+    - OPTIONS
+  allowed_headers:
+    - Authorization
+    - Content-Type
+    - X-Request-ID
+    - X-Tenant-ID
+  max_age_secs: 86400
+
+logging:
+  level: info
+  format: json

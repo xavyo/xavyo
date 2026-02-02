@@ -1,0 +1,60 @@
+[package]
+name = "xavyo-api-connectors"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "API endpoints for connector management in xavyo"
+
+[dependencies]
+# Core crates
+xavyo-connector = { path = "../xavyo-connector" }
+xavyo-connector-ldap = { path = "../xavyo-connector-ldap" }
+xavyo-connector-database = { path = "../xavyo-connector-database" }
+xavyo-connector-rest = { path = "../xavyo-connector-rest" }
+xavyo-connector-entra = { path = "../xavyo-connector-entra" }
+xavyo-provisioning = { path = "../xavyo-provisioning" }
+xavyo-db = { path = "../xavyo-db" }
+xavyo-core = { path = "../xavyo-core" }
+xavyo-auth = { path = "../xavyo-auth" }
+xavyo-tenant = { path = "../xavyo-tenant" }
+xavyo-webhooks = { path = "../xavyo-webhooks" }
+xavyo-scim-client = { path = "../xavyo-scim-client" }
+
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Web framework
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# OpenAPI
+utoipa = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# HTTP client (for SCIM outbound provisioning)
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+# Cron expression parsing (F046 Schema Scheduling)
+cron = "0.12"
+
+# Database (for PgPool type)
+sqlx = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+axum-test = { workspace = true }
+tower = { workspace = true, features = ["util"] }
+sqlx = { workspace = true }
+chrono = { workspace = true }

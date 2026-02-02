@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*) as \"count!\"\n            FROM gov_license_incompatibilities\n            WHERE tenant_id = $1\n              AND ($2::uuid IS NULL OR pool_a_id = $2 OR pool_b_id = $2)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "4ad5951b2c48a9ea9cbe14f2df09c673990484b2d8ddb7f13b1836ed652a8978"
+}

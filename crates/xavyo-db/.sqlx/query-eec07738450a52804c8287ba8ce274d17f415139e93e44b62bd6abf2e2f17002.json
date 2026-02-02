@@ -1,0 +1,87 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                l.id,\n                l.tenant_id,\n                l.license_pool_id,\n                l.entitlement_id,\n                l.priority,\n                l.enabled,\n                l.created_at,\n                l.created_by,\n                p.name as pool_name,\n                p.vendor as pool_vendor,\n                e.name as entitlement_name\n            FROM gov_license_entitlement_links l\n            LEFT JOIN gov_license_pools p ON p.id = l.license_pool_id\n            LEFT JOIN gov_entitlements e ON e.id = l.entitlement_id\n            WHERE l.tenant_id = $1\n              AND ($2::uuid IS NULL OR l.license_pool_id = $2)\n              AND ($3::uuid IS NULL OR l.entitlement_id = $3)\n              AND ($4::boolean IS NULL OR l.enabled = $4)\n            ORDER BY l.priority ASC, l.created_at DESC\n            LIMIT $5 OFFSET $6\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "license_pool_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "entitlement_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "priority",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "enabled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "pool_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "pool_vendor",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "entitlement_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Bool",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "eec07738450a52804c8287ba8ce274d17f415139e93e44b62bd6abf2e2f17002"
+}

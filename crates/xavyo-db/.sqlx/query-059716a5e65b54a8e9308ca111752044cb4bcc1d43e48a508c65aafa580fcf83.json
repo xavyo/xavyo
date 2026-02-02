@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*) as \"count!\"\n            FROM gov_license_reclamation_rules\n            WHERE tenant_id = $1\n              AND ($2::uuid IS NULL OR license_pool_id = $2)\n              AND ($3::text IS NULL OR trigger_type::text = $3)\n              AND ($4::boolean IS NULL OR enabled = $4)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "059716a5e65b54a8e9308ca111752044cb4bcc1d43e48a508c65aafa580fcf83"
+}

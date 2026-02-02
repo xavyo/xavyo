@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*) as \"count!\"\n            FROM identity_audit_events\n            WHERE tenant_id = $1\n                AND ($2::text IS NULL OR event_type = $2)\n                AND ($3::uuid IS NULL OR agent_id = $3)\n                AND ($4::uuid IS NULL OR user_id = $4)\n                AND ($5::text IS NULL OR provider_type = $5)\n                AND ($6::text IS NULL OR outcome = $6)\n                AND ($7::timestamptz IS NULL OR created_at >= $7)\n                AND ($8::timestamptz IS NULL OR created_at <= $8)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "2e4f5c7a44dc15b2aeb1679e775c14a47ce575501eb6d7089a5843d4467f79b6"
+}

@@ -1,0 +1,51 @@
+[package]
+name = "xavyo-connector-entra"
+version = "0.1.0"
+edition = "2021"
+description = "Microsoft Entra ID connector for xavyo"
+license = "BSL-1.1"
+repository = "https://github.com/xavyo/xavyo"
+
+[dependencies]
+# HTTP client for Microsoft Graph API
+reqwest = { workspace = true, features = ["json"] }
+
+# Serialization
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+# Timestamps and duration handling
+chrono = { workspace = true, features = ["serde"] }
+
+# UUID generation and parsing
+uuid = { workspace = true, features = ["v4", "serde"] }
+
+# Async runtime
+tokio = { workspace = true, features = ["time", "sync"] }
+
+# Logging and instrumentation
+tracing = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Async trait support
+async-trait = { workspace = true }
+
+# Secret handling (redacts secrets in Debug output)
+secrecy = { version = "0.8", features = ["serde"] }
+
+# URL building
+url = "2.5"
+urlencoding = "2.1"
+
+# Connector framework traits
+xavyo-connector = { path = "../xavyo-connector" }
+
+# Core types (TenantId, etc.)
+xavyo-core = { path = "../xavyo-core" }
+
+[dev-dependencies]
+# Test utilities
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+wiremock = "0.6"

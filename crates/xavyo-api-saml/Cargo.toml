@@ -1,0 +1,62 @@
+[package]
+name = "xavyo-api-saml"
+version = "0.1.0"
+edition = "2021"
+description = "SAML 2.0 Identity Provider library for xavyo"
+authors = ["xavyo Team"]
+license = "BSL-1.1"
+
+[dependencies]
+# SAML 2.0 library
+samael = "0.0.17"
+
+# Cryptography
+openssl = "0.10"
+
+# Encoding
+base64.workspace = true
+flate2 = "1.0"
+urlencoding = "2.1"
+
+# XML parsing
+quick-xml = "0.37"
+
+# Date/time
+chrono.workspace = true
+
+# UUID
+uuid.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# OpenAPI documentation
+utoipa.workspace = true
+
+# Web framework
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# Database
+sqlx.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# Tracing
+tracing.workspace = true
+
+# Internal dependencies
+xavyo-core = { path = "../xavyo-core" }
+xavyo-db = { path = "../xavyo-db" }
+xavyo-auth = { path = "../xavyo-auth" }
+xavyo-tenant = { path = "../xavyo-tenant" }
+xml-canonicalization = "0.1.0"
+
+[dev-dependencies]
+tokio-test.workspace = true

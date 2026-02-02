@@ -1,0 +1,107 @@
+[package]
+name = "xavyo-api-governance"
+version = "0.1.0"
+edition = "2021"
+description = "Governance API endpoints for xavyo - Entitlement Management"
+license = "BSL-1.1"
+repository = "https://github.com/xavyo/xavyo"
+
+[dependencies]
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+tower = { version = "0.4", features = ["util", "timeout"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Internal dependencies
+xavyo-core = { path = "../xavyo-core" }
+xavyo-auth = { path = "../xavyo-auth" }
+xavyo-api-auth = { path = "../xavyo-api-auth" }
+xavyo-db = { path = "../xavyo-db" }
+xavyo-tenant = { path = "../xavyo-tenant" }
+xavyo-governance = { path = "../xavyo-governance" }
+xavyo-events = { path = "../xavyo-events", optional = true }
+xavyo-webhooks = { path = "../xavyo-webhooks" }
+xavyo-nhi = { path = "../xavyo-nhi" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# OpenAPI documentation
+utoipa = { workspace = true }
+
+# Error handling
+thiserror = "1.0"
+
+# Async runtime
+tokio = { version = "1.35", features = ["rt-multi-thread", "macros", "sync", "time"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Logging
+tracing = "0.1"
+
+# Validation
+validator = { version = "0.18", features = ["derive"] }
+
+# Parametric roles (F057)
+regex = "1.10"
+sha2 = "0.10"
+lazy_static = "1.4"
+hex = "0.4"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono"] }
+
+# HTTP types
+http = "1.0"
+
+# Async trait support
+async-trait = "0.1"
+
+# Credential handling (NHI F061)
+rand = "0.8"
+argon2 = "0.5"
+base64 = { workspace = true }
+
+# Fuzzy matching (Identity Merge F062)
+strsim = "0.11"
+
+# Template rendering (Persona Management F063)
+handlebars = "5.1"
+
+# HTTP client for external ticketing (Semi-manual Resources F064)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Encryption for ticketing credentials (Semi-manual Resources F064)
+aes-gcm = "0.10"
+
+# Decimal handling (License Management F065)
+rust_decimal = { version = "1.33", features = ["serde"] }
+
+# Provisioning Scripts (F066) - Rhai script executor & connector types
+xavyo-provisioning = { path = "../xavyo-provisioning" }
+xavyo-connector = { path = "../xavyo-connector" }
+
+# Unicode normalization (Correlation Engine F067)
+unicode-normalization = "0.1"
+
+# SIEM Integration (F078) - format conversion and delivery
+xavyo-siem = { path = "../xavyo-siem" }
+
+[dev-dependencies]
+tokio = { version = "1.35", features = ["full", "test-util"] }
+tower = { version = "0.4", features = ["util"] }
+axum-test = "14"
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres"] }
+xavyo-events = { path = "../xavyo-events" }
+futures = "0.3"
+
+[features]
+default = []
+integration = []
+kafka = ["xavyo-events/kafka"]

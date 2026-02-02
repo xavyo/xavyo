@@ -1,0 +1,44 @@
+[package]
+name = "xavyo-provisioning"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Provisioning engine with queue management for xavyo"
+
+[dependencies]
+# Core connector
+xavyo-connector = { path = "../xavyo-connector" }
+xavyo-events = { path = "../xavyo-events" }
+xavyo-db = { path = "../xavyo-db" }
+xavyo-core = { path = "../xavyo-core" }
+
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rand = "0.8"
+regex = "1"
+sqlx = { workspace = true }
+
+# Cryptography for idempotency keys
+sha2 = "0.10"
+hex = "0.4"
+
+# HTTP client for webhooks
+reqwest = { version = "0.12", features = ["json"] }
+
+# Scripting engine for provisioning scripts (F066)
+rhai = { version = "1.19", features = ["serde", "sync"] }
+
+[dev-dependencies]
+tokio-test = { workspace = true }

@@ -1,0 +1,60 @@
+[package]
+name = "xavyo-api-nhi"
+description = "Unified Non-Human Identity API for service accounts and AI agents"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+# Internal crates
+xavyo-nhi = { path = "../xavyo-nhi", features = ["sqlx"] }
+xavyo-core = { path = "../xavyo-core" }
+xavyo-db = { path = "../xavyo-db", features = ["argon2"] }
+xavyo-auth = { path = "../xavyo-auth" }
+xavyo-tenant = { path = "../xavyo-tenant" }
+xavyo-governance = { path = "../xavyo-governance" }
+xavyo-api-agents = { path = "../xavyo-api-agents", features = ["openapi"] }
+xavyo-api-governance = { path = "../xavyo-api-governance" }
+
+# Web framework
+axum.workspace = true
+tower.workspace = true
+
+# Async
+tokio.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Database
+sqlx.workspace = true
+
+# Utilities
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+# Credential generation (F110)
+argon2 = "0.5"
+rand = "0.8"
+base64.workspace = true
+
+# OpenAPI documentation
+utoipa.workspace = true
+
+[dev-dependencies]
+axum-test.workspace = true
+tokio-test.workspace = true
+
+[features]
+default = []
+kafka = ["xavyo-events"]
+openapi = []
+
+[dependencies.xavyo-events]
+path = "../xavyo-events"
+optional = true

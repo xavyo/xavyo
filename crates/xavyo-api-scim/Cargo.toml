@@ -1,0 +1,48 @@
+[package]
+name = "xavyo-api-scim"
+version = "0.1.0"
+edition = "2021"
+description = "SCIM 2.0 API for xavyo user and group provisioning"
+authors = ["xavyo Team"]
+license = "BSL-1.1"
+repository = "https://github.com/xavyo/xavyo"
+
+[dependencies]
+# Workspace crates
+xavyo-core = { path = "../xavyo-core" }
+xavyo-db = { path = "../xavyo-db" }
+xavyo-tenant = { path = "../xavyo-tenant" }
+xavyo-auth = { path = "../xavyo-auth" }
+xavyo-webhooks = { path = "../xavyo-webhooks" }
+
+# Web framework
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# OpenAPI documentation
+utoipa = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Database
+sqlx = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+# Token generation and hashing
+rand = "0.8"
+sha2 = "0.10"
+base64 = "0.22"
+
+[dev-dependencies]
+tokio-test = "0.4"

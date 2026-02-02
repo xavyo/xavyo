@@ -1,0 +1,150 @@
+//! HTTP client wrapper for xavyo API
+
+use crate::config::Config;
+use crate::config::ConfigPaths;
+use crate::credentials::{get_credential_store, CredentialStore};
+use crate::error::{CliError, CliResult};
+use crate::models::Credentials;
+use chrono::Utc;
+use reqwest::Client;
+use std::time::Duration;
+
+/// API client for making authenticated requests
+pub struct ApiClient {
+    client: Client,
+    config: Config,
+    paths: ConfigPaths,
+}
+
+impl ApiClient {
+    /// Create a new API client
+    pub fn new(config: Config, paths: ConfigPaths) -> CliResult<Self> {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(config.timeout_secs))
+            .build()
+            .map_err(|e| CliError::Network(format!("Failed to create HTTP client: {}", e)))?;
+
+        Ok(Self {
+            client,
+            config,
+            paths,
+        })
+    }
+
+    /// Get a reference to the config
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    /// Get credentials, refreshing if needed
+    pub async fn get_valid_credentials(&self) -> CliResult<Credentials> {
+        let store = get_credential_store(&self.paths);
+        let credentials = store.load()?.ok_or(CliError::NotAuthenticated)?;
+
+        // Check if token is expired (with 5 minute buffer)
+        let now = Utc::now();
+        let buffer = chrono::Duration::minutes(5);
+
+        if credentials.expires_at <= now + buffer {
+            // Token expired or about to expire, try to refresh
+            self.refresh_token(&credentials, store.as_ref()).await
+        } else {
+            Ok(credentials)
+        }
+    }
+
+    /// Refresh the access token using the refresh token
+    async fn refresh_token(
+        &self,
+        credentials: &Credentials,
+        store: &dyn CredentialStore,
+    ) -> CliResult<Credentials> {
+        let response = self
+            .client
+            .post(self.config.token_url())
+            .form(&[
+                ("grant_type", "refresh_token"),
+                ("client_id", &self.config.client_id),
+                ("refresh_token", &credentials.refresh_token),
+            ])
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(CliError::TokenExpired);
+        }
+
+        let token_response: crate::models::TokenResponse = response.json().await?;
+        let new_credentials = Credentials::from_token_response(token_response);
+
+        // Store the new credentials
+        store.store(&new_credentials)?;
+
+        Ok(new_credentials)
+    }
+
+    /// Make an authenticated POST request with JSON body
+    pub async fn post_json<T: serde::Serialize>(
+        &self,
+        url: &str,
+        body: &T,
+    ) -> CliResult<reqwest::Response> {
+        let credentials = self.get_valid_credentials().await?;
+
+        self.client
+            .post(url)
+            .bearer_auth(&credentials.access_token)
+            .json(body)
+            .send()
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Make an unauthenticated GET request
+    pub async fn get_unauthenticated(&self, url: &str) -> CliResult<reqwest::Response> {
+        self.client.get(url).send().await.map_err(Into::into)
+    }
+
+    /// Make an authenticated GET request
+    pub async fn get_authenticated(&self, url: &str) -> CliResult<reqwest::Response> {
+        let credentials = self.get_valid_credentials().await?;
+
+        self.client
+            .get(url)
+            .bearer_auth(&credentials.access_token)
+            .send()
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Make an authenticated DELETE request
+    pub async fn delete_authenticated(&self, url: &str) -> CliResult<reqwest::Response> {
+        let credentials = self.get_valid_credentials().await?;
+
+        self.client
+            .delete(url)
+            .bearer_auth(&credentials.access_token)
+            .send()
+            .await
+            .map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_api_client_creation() {
+        let config = Config::default();
+        let paths = ConfigPaths {
+            config_dir: std::path::PathBuf::from("/tmp/xavyo-test"),
+            config_file: std::path::PathBuf::from("/tmp/xavyo-test/config.json"),
+            session_file: std::path::PathBuf::from("/tmp/xavyo-test/session.json"),
+            credentials_file: std::path::PathBuf::from("/tmp/xavyo-test/credentials.enc"),
+        };
+
+        let client = ApiClient::new(config, paths).unwrap();
+        assert_eq!(client.config().client_id, "xavyo-cli");
+    }
+}

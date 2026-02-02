@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*) as \"count!\"\n            FROM identity_credential_requests\n            WHERE tenant_id = $1\n                AND ($2::uuid IS NULL OR agent_id = $2)\n                AND ($3::uuid IS NULL OR provider_config_id = $3)\n                AND ($4::text IS NULL OR outcome = $4)\n                AND ($5::timestamptz IS NULL OR created_at >= $5)\n                AND ($6::timestamptz IS NULL OR created_at <= $6)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "bffb3dac4e7e91c56e282a2635fb598c2cf7853145ccfa021a71c96fc1b30446"
+}

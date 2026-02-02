@@ -1,0 +1,48 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                COUNT(*) FILTER (WHERE outcome = 'success') as \"success_count!\",\n                COUNT(*) FILTER (WHERE outcome = 'denied') as \"denied_count!\",\n                COUNT(*) FILTER (WHERE outcome = 'rate_limited') as \"rate_limited_count!\",\n                COUNT(*) FILTER (WHERE outcome = 'error') as \"error_count!\",\n                AVG(duration_ms) FILTER (WHERE outcome = 'success') as \"avg_duration_ms\"\n            FROM identity_credential_requests\n            WHERE tenant_id = $1 AND created_at >= $2 AND created_at <= $3\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "success_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "denied_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "rate_limited_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "error_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "avg_duration_ms",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "172ccad5044c0061dc16de0f1690d44fd4bfd17fde3b52b49d77e9987807e699"
+}

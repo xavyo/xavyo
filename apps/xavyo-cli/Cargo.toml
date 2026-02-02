@@ -1,0 +1,82 @@
+[package]
+name = "xavyo-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Command-line interface for the xavyo platform"
+authors = ["xavyo <dev@xavyo.io>"]
+license = "BSL-1.1"
+repository = "https://github.com/xavyo/xavyo"
+keywords = ["cli", "idp", "oauth", "identity"]
+categories = ["command-line-utilities", "authentication"]
+
+[[bin]]
+name = "xavyo"
+path = "src/main.rs"
+
+[dependencies]
+# CLI framework
+clap = { version = "4", features = ["derive", "env"] }
+clap_complete = "4"
+
+# File watching
+notify = "6"
+notify-debouncer-mini = "0.4"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
+
+# Async streams (for download progress)
+futures-util = "0.3"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+# Secure credential storage
+keyring = "3"
+
+# Browser opening
+open = "5"
+
+# Platform-specific paths
+dirs = "6"
+
+# Encryption for file-based credential storage
+aes-gcm = "0.10"
+rand = "0.8"
+base64 = "0.22"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Upgrade command dependencies
+sha2 = "0.10"
+semver = { version = "1", features = ["serde"] }
+indicatif = "0.17"
+
+# Interactive prompts
+dialoguer = "0.11"
+
+# TTY detection
+atty = "0.2"
+
+# UUID for parsing JWT claims
+uuid = { version = "1", features = ["serde", "v4"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# JWT decoding (for extracting claims without validation - server validates)
+jsonwebtoken = "9"
+
+[dev-dependencies]
+tempfile = "3"
+wiremock = "0.6"
+
+[features]
+default = []
