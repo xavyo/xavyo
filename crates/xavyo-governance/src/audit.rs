@@ -63,6 +63,41 @@ impl std::fmt::Display for EntitlementAuditAction {
     }
 }
 
+/// Action performed on SoD rules, violations, or exemptions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SodAuditAction {
+    /// SoD rule was created.
+    #[default]
+    RuleCreated,
+    /// SoD rule was updated.
+    RuleUpdated,
+    /// SoD rule was deleted.
+    RuleDeleted,
+    /// SoD exemption was granted.
+    ExemptionGranted,
+    /// SoD exemption was revoked.
+    ExemptionRevoked,
+    /// SoD violation was detected.
+    ViolationDetected,
+    /// SoD violation was resolved.
+    ViolationResolved,
+}
+
+impl std::fmt::Display for SodAuditAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RuleCreated => write!(f, "rule_created"),
+            Self::RuleUpdated => write!(f, "rule_updated"),
+            Self::RuleDeleted => write!(f, "rule_deleted"),
+            Self::ExemptionGranted => write!(f, "exemption_granted"),
+            Self::ExemptionRevoked => write!(f, "exemption_revoked"),
+            Self::ViolationDetected => write!(f, "violation_detected"),
+            Self::ViolationResolved => write!(f, "violation_resolved"),
+        }
+    }
+}
+
 /// An audit event for entitlement operations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntitlementAuditEvent {
@@ -212,8 +247,16 @@ impl AuditStore for InMemoryAuditStore {
         let mut results: Vec<_> = events
             .values()
             .filter(|e| e.tenant_id == tenant_id)
-            .filter(|e| filter.entitlement_id.is_none_or(|id| e.entitlement_id == Some(id)))
-            .filter(|e| filter.assignment_id.is_none_or(|id| e.assignment_id == Some(id)))
+            .filter(|e| {
+                filter
+                    .entitlement_id
+                    .is_none_or(|id| e.entitlement_id == Some(id))
+            })
+            .filter(|e| {
+                filter
+                    .assignment_id
+                    .is_none_or(|id| e.assignment_id == Some(id))
+            })
             .filter(|e| filter.user_id.is_none_or(|id| e.user_id == Some(id)))
             .filter(|e| filter.actor_id.is_none_or(|id| e.actor_id == id))
             .filter(|e| filter.action.is_none_or(|a| e.action == a))
@@ -278,7 +321,10 @@ mod tests {
         let entitlement_id = Uuid::new_v4();
 
         // Log two events for the same entitlement
-        for action in [EntitlementAuditAction::Created, EntitlementAuditAction::Updated] {
+        for action in [
+            EntitlementAuditAction::Created,
+            EntitlementAuditAction::Updated,
+        ] {
             store
                 .log_event(EntitlementAuditEventInput {
                     tenant_id,
@@ -450,6 +496,35 @@ mod tests {
         assert_eq!(EntitlementAuditAction::Created.to_string(), "created");
         assert_eq!(EntitlementAuditAction::Assigned.to_string(), "assigned");
         assert_eq!(EntitlementAuditAction::Revoked.to_string(), "revoked");
+    }
+
+    #[test]
+    fn test_sod_audit_action_display() {
+        assert_eq!(SodAuditAction::RuleCreated.to_string(), "rule_created");
+        assert_eq!(SodAuditAction::RuleUpdated.to_string(), "rule_updated");
+        assert_eq!(SodAuditAction::RuleDeleted.to_string(), "rule_deleted");
+        assert_eq!(
+            SodAuditAction::ExemptionGranted.to_string(),
+            "exemption_granted"
+        );
+        assert_eq!(
+            SodAuditAction::ExemptionRevoked.to_string(),
+            "exemption_revoked"
+        );
+        assert_eq!(
+            SodAuditAction::ViolationDetected.to_string(),
+            "violation_detected"
+        );
+        assert_eq!(
+            SodAuditAction::ViolationResolved.to_string(),
+            "violation_resolved"
+        );
+    }
+
+    #[test]
+    fn test_sod_audit_action_default() {
+        let action = SodAuditAction::default();
+        assert_eq!(action, SodAuditAction::RuleCreated);
     }
 
     #[tokio::test]

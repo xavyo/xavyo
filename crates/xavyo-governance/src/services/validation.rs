@@ -374,7 +374,9 @@ mod tests {
         service.add_validator(Box::new(ExpiryDateValidator));
 
         let input = create_input();
-        let result = service.validate_assignment(Uuid::new_v4(), &input, &[]).await;
+        let result = service
+            .validate_assignment(Uuid::new_v4(), &input, &[])
+            .await;
         assert!(result.is_valid);
     }
 
@@ -389,7 +391,9 @@ mod tests {
         let mut input = create_input();
         input.expires_at = Some(Utc::now() - Duration::days(1)); // Invalid
 
-        let result = service.validate_assignment(Uuid::new_v4(), &input, &[]).await;
+        let result = service
+            .validate_assignment(Uuid::new_v4(), &input, &[])
+            .await;
 
         assert!(!result.is_valid);
         // Should have 3 errors: expiry, prerequisite, justification

@@ -85,3 +85,10 @@ apps/idp-api/     # Main API service
 specs/            # Feature specifications
 docs/             # Documentation
 ```
+
+## Active Technologies
+- Rust 1.75+ (per constitution) + xavyo-governance (F-004 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror (132-sod-validation)
+- PostgreSQL 15+ with SQLx compile-time checking, RLS for tenant isolation (132-sod-validation)
+
+## Recent Changes
+- 132-sod-validation: Added Rust 1.75+ (per constitution) + xavyo-governance (F-004 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror

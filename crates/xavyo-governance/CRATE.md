@@ -14,7 +14,7 @@ domain
 
 🟡 **beta**
 
-Feature-complete with 52 tests. Implements EntitlementService, AssignmentService, and ValidationService with full CRUD, assignment, and validation capabilities. Audit logging integrated. Ready for API layer integration.
+Feature-complete with 91 tests. Implements EntitlementService, AssignmentService, ValidationService, and full SoD (Separation of Duties) validation with SodService, SodValidationService, and SodExemptionService. Supports preventive validation (block bad assignments), detective validation (scan existing assignments), and time-bound exemptions. Audit logging integrated. Ready for API layer integration.
 
 ## Dependencies
 
@@ -61,6 +61,34 @@ pub struct ValidationService {
     fn with_defaults() -> Self;  // Includes ExpiryDateValidator
     fn add_validator(&mut self, validator: Box<dyn Validator>);
     async fn validate_assignment(&self, tenant_id: Uuid, input: &AssignEntitlementInput, user_entitlements: &[Uuid]) -> ValidationResult;
+}
+
+/// Service for managing SoD rules (F-005)
+pub struct SodService {
+    fn new(rule_store: Arc<dyn SodRuleStore>, audit_store: Arc<dyn AuditStore>) -> Self;
+    async fn create_rule(&self, tenant_id: Uuid, input: CreateSodRuleInput) -> Result<SodRule>;
+    async fn get_rule(&self, tenant_id: Uuid, id: SodRuleId) -> Result<Option<SodRule>>;
+    async fn list_rules(&self, tenant_id: Uuid) -> Result<Vec<SodRule>>;
+    async fn update_rule(&self, tenant_id: Uuid, id: SodRuleId, input: UpdateSodRuleInput, actor_id: Uuid) -> Result<SodRule>;
+    async fn delete_rule(&self, tenant_id: Uuid, id: SodRuleId, actor_id: Uuid) -> Result<bool>;
+}
+
+/// Service for SoD validation (preventive and detective) (F-005)
+pub struct SodValidationService {
+    fn new(rule_store: Arc<dyn SodRuleStore>, violation_store: Arc<dyn SodViolationStore>, exemption_store: Arc<dyn SodExemptionStore>) -> Self;
+    async fn validate_preventive(&self, tenant_id: Uuid, user_id: Uuid, proposed_entitlement_id: Uuid, current_entitlements: &[Uuid]) -> Result<PreventiveValidationResult>;
+    async fn get_user_violations(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Vec<SodViolationInfo>>;
+    async fn scan_rule(&self, tenant_id: Uuid, rule_id: SodRuleId, ...) -> Result<RuleScanResult>;
+    async fn scan_all(&self, tenant_id: Uuid, ...) -> Result<DetectiveScanResult>;
+}
+
+/// Service for managing SoD exemptions (F-005)
+pub struct SodExemptionService {
+    fn new(exemption_store: Arc<dyn SodExemptionStore>, audit_store: Arc<dyn AuditStore>) -> Self;
+    async fn grant_exemption(&self, tenant_id: Uuid, input: CreateSodExemptionInput) -> Result<SodExemption>;
+    async fn revoke_exemption(&self, tenant_id: Uuid, id: SodExemptionId, revoked_by: Uuid) -> Result<SodExemption>;
+    async fn is_exempted(&self, tenant_id: Uuid, rule_id: SodRuleId, user_id: Uuid) -> Result<bool>;
+    async fn list_user_exemptions(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Vec<SodExemption>>;
 }
 ```
 
@@ -147,12 +175,76 @@ pub struct PrerequisiteValidator;         // Requires prerequisite entitlement
 pub struct JustificationRequiredValidator; // Requires justification field
 ```
 
+### SoD Types (F-005)
+
+```rust
+/// An SoD rule defining prohibited or required entitlement combinations
+pub struct SodRule {
+    pub id: SodRuleId,
+    pub tenant_id: Uuid,
+    pub name: String,
+    pub description: Option<String>,
+    pub conflict_type: SodConflictType,
+    pub entitlement_ids: Vec<Uuid>,
+    pub max_count: Option<u32>,  // For cardinality rules
+    pub severity: SodSeverity,
+    pub status: SodRuleStatus,
+    pub orphaned: bool,
+    pub created_by: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// An SoD violation detected in the system
+pub struct SodViolation {
+    pub id: SodViolationId,
+    pub tenant_id: Uuid,
+    pub rule_id: SodRuleId,
+    pub user_id: Uuid,
+    pub entitlement_ids: Vec<Uuid>,
+    pub detected_at: DateTime<Utc>,
+    pub resolved_at: Option<DateTime<Utc>>,
+    pub status: SodViolationStatus,
+}
+
+/// An SoD exemption allowing a user to bypass a rule
+pub struct SodExemption {
+    pub id: SodExemptionId,
+    pub tenant_id: Uuid,
+    pub rule_id: SodRuleId,
+    pub user_id: Uuid,
+    pub justification: String,  // Min 10 characters
+    pub granted_at: DateTime<Utc>,
+    pub granted_by: Uuid,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub status: SodExemptionStatus,
+}
+
+/// Result of preventive validation
+pub struct PreventiveValidationResult {
+    pub is_valid: bool,
+    pub violations: Vec<SodViolationInfo>,
+}
+
+/// Information about a single SoD violation
+pub struct SodViolationInfo {
+    pub rule_id: SodRuleId,
+    pub rule_name: String,
+    pub conflicting_entitlements: Vec<Uuid>,
+    pub severity: SodSeverity,
+    pub message: String,
+}
+```
+
 ### ID Types
 
 ```rust
 pub struct ApplicationId(Uuid);
 pub struct EntitlementId(Uuid);
 pub struct AssignmentId(Uuid);
+pub struct SodRuleId(Uuid);       // F-005
+pub struct SodViolationId(Uuid);  // F-005
+pub struct SodExemptionId(Uuid);  // F-005
 ```
 
 ### Enums
@@ -164,6 +256,13 @@ pub enum AssignmentStatus { Active, PendingApproval, Revoked, Expired }
 pub enum AssignmentSource { Direct, Role, Birthright }
 pub enum AppType { Custom, Saas, OnPremise, Cloud }
 pub enum AppStatus { Active, Inactive, Deprecated }
+
+// SoD Enums (F-005)
+pub enum SodConflictType { Exclusive, Cardinality, Inclusive }
+pub enum SodSeverity { Low, Medium, High, Critical }
+pub enum SodRuleStatus { Active, Inactive }
+pub enum SodViolationStatus { Active, Resolved }
+pub enum SodExemptionStatus { Active, Revoked, Expired }
 ```
 
 ### Errors
@@ -183,6 +282,17 @@ pub enum GovernanceError {
     ApprovalRequired { workflow_id: Uuid },
     DatabaseError(String),
     Internal(String),
+
+    // SoD Errors (F-005)
+    SodRuleNotFound(Uuid),
+    SodViolationNotFound(Uuid),
+    SodExemptionNotFound(Uuid),
+    SodRuleTooFewEntitlements(usize),
+    SodRuleInvalidMaxCount(u32, usize),
+    SodRuleMaxCountRequired,
+    SodExemptionJustificationTooShort(usize),
+    SodExemptionExpiryInPast,
+    SodMultipleViolations(usize),
 }
 ```
 
@@ -249,6 +359,90 @@ let assignment = assignment_service.assign(
         justification: Some("Required for project Alpha".to_string()),
     },
 ).await?;
+```
+
+## SoD Usage Example (F-005)
+
+```rust
+use xavyo_governance::services::{
+    SodService, SodValidationService, SodExemptionService,
+    CreateSodRuleInput, CreateSodExemptionInput,
+    InMemorySodRuleStore, InMemorySodViolationStore, InMemorySodExemptionStore,
+};
+use xavyo_governance::types::{SodConflictType, SodSeverity};
+use xavyo_governance::audit::InMemoryAuditStore;
+use std::sync::Arc;
+
+// Create stores
+let rule_store = Arc::new(InMemorySodRuleStore::new());
+let violation_store = Arc::new(InMemorySodViolationStore::new());
+let exemption_store = Arc::new(InMemorySodExemptionStore::new());
+let audit_store = Arc::new(InMemoryAuditStore::new());
+
+// Create services
+let sod_service = SodService::new(rule_store.clone(), audit_store.clone());
+let validation_service = SodValidationService::new(
+    rule_store.clone(),
+    violation_store.clone(),
+    exemption_store.clone(),
+);
+let exemption_service = SodExemptionService::new(exemption_store.clone(), audit_store.clone());
+
+let tenant_id = uuid::Uuid::new_v4();
+let admin_id = uuid::Uuid::new_v4();
+let ap_approver_id = uuid::Uuid::new_v4();
+let ap_creator_id = uuid::Uuid::new_v4();
+
+// Create an exclusive SoD rule (AP Segregation)
+let rule = sod_service.create_rule(
+    tenant_id,
+    CreateSodRuleInput {
+        name: "AP Segregation".to_string(),
+        description: Some("Prevent AP fraud".to_string()),
+        conflict_type: SodConflictType::Exclusive,
+        entitlement_ids: vec![ap_approver_id, ap_creator_id],
+        max_count: None,
+        severity: SodSeverity::Critical,
+        created_by: admin_id,
+    },
+).await?;
+
+// Validate before assigning
+let user_id = uuid::Uuid::new_v4();
+let current_entitlements = vec![ap_approver_id]; // User already has this
+let result = validation_service.validate_preventive(
+    tenant_id,
+    user_id,
+    ap_creator_id, // Trying to add this
+    &current_entitlements,
+).await?;
+
+if !result.is_valid {
+    for violation in &result.violations {
+        println!("Violation: {} - {}", violation.rule_name, violation.message);
+    }
+}
+
+// Grant exemption to bypass the rule
+let exemption = exemption_service.grant_exemption(
+    tenant_id,
+    CreateSodExemptionInput {
+        rule_id: rule.id,
+        user_id,
+        justification: "Approved by CFO for Q4 close".to_string(),
+        expires_at: Some(chrono::Utc::now() + chrono::Duration::days(30)),
+        granted_by: admin_id,
+    },
+).await?;
+
+// Now validation passes for exempted user
+let result = validation_service.validate_preventive(
+    tenant_id,
+    user_id,
+    ap_creator_id,
+    &current_entitlements,
+).await?;
+assert!(result.is_valid); // Passes because of exemption
 ```
 
 ## Integration Points

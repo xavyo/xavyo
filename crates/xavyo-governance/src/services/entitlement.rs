@@ -331,7 +331,11 @@ impl EntitlementStore for InMemoryEntitlementStore {
         let mut results: Vec<_> = entitlements
             .values()
             .filter(|e| e.tenant_id == tenant_id)
-            .filter(|e| filter.application_id.is_none_or(|id| e.application_id == id))
+            .filter(|e| {
+                filter
+                    .application_id
+                    .is_none_or(|id| e.application_id == id)
+            })
             .filter(|e| filter.status.is_none_or(|s| e.status == s))
             .filter(|e| filter.risk_level.is_none_or(|r| e.risk_level == r))
             .filter(|e| filter.owner_id.is_none_or(|id| e.owner_id == Some(id)))
@@ -361,7 +365,11 @@ impl EntitlementStore for InMemoryEntitlementStore {
         let count = entitlements
             .values()
             .filter(|e| e.tenant_id == tenant_id)
-            .filter(|e| filter.application_id.is_none_or(|id| e.application_id == id))
+            .filter(|e| {
+                filter
+                    .application_id
+                    .is_none_or(|id| e.application_id == id)
+            })
             .filter(|e| filter.status.is_none_or(|s| e.status == s))
             .filter(|e| filter.risk_level.is_none_or(|r| e.risk_level == r))
             .filter(|e| filter.owner_id.is_none_or(|id| e.owner_id == Some(id)))
@@ -548,7 +556,11 @@ mod tests {
     use super::*;
     use crate::audit::InMemoryAuditStore;
 
-    fn create_test_service() -> (EntitlementService, Arc<InMemoryEntitlementStore>, Arc<InMemoryAuditStore>) {
+    fn create_test_service() -> (
+        EntitlementService,
+        Arc<InMemoryEntitlementStore>,
+        Arc<InMemoryAuditStore>,
+    ) {
         let entitlement_store = Arc::new(InMemoryEntitlementStore::new());
         let audit_store = Arc::new(InMemoryAuditStore::new());
         let service = EntitlementService::new(entitlement_store.clone(), audit_store.clone());
@@ -575,7 +587,10 @@ mod tests {
         let actor_id = Uuid::new_v4();
 
         let input = create_input();
-        let entitlement = service.create(tenant_id, input.clone(), actor_id).await.unwrap();
+        let entitlement = service
+            .create(tenant_id, input.clone(), actor_id)
+            .await
+            .unwrap();
 
         assert_eq!(entitlement.name, "Admin Access");
         assert_eq!(entitlement.tenant_id, tenant_id);
@@ -691,7 +706,10 @@ mod tests {
             is_delegable: true,
         };
 
-        service.create(tenant_id, input1.clone(), actor_id).await.unwrap();
+        service
+            .create(tenant_id, input1.clone(), actor_id)
+            .await
+            .unwrap();
 
         // Try to create with same name
         let result = service.create(tenant_id, input1, actor_id).await;
@@ -1113,7 +1131,11 @@ mod tests {
         let tenant_id = Uuid::new_v4();
 
         let results = service
-            .list(tenant_id, &EntitlementFilter::default(), &ListOptions::default())
+            .list(
+                tenant_id,
+                &EntitlementFilter::default(),
+                &ListOptions::default(),
+            )
             .await
             .unwrap();
         assert!(results.is_empty());
@@ -1156,7 +1178,11 @@ mod tests {
 
         // List with default limit
         let results = service
-            .list(tenant_id, &EntitlementFilter::default(), &ListOptions::default())
+            .list(
+                tenant_id,
+                &EntitlementFilter::default(),
+                &ListOptions::default(),
+            )
             .await
             .unwrap();
         assert_eq!(results.len(), 100); // Default limit is 100
@@ -1265,7 +1291,10 @@ mod tests {
             .await;
 
         assert!(result.is_err());
-        assert!(matches!(result, Err(GovernanceError::EntitlementNameExists(_))));
+        assert!(matches!(
+            result,
+            Err(GovernanceError::EntitlementNameExists(_))
+        ));
     }
 
     #[tokio::test]
@@ -1337,7 +1366,11 @@ mod tests {
 
         // Create 3 high-risk and 2 low-risk entitlements
         for i in 0..5 {
-            let risk = if i < 3 { RiskLevel::High } else { RiskLevel::Low };
+            let risk = if i < 3 {
+                RiskLevel::High
+            } else {
+                RiskLevel::Low
+            };
             service
                 .create(
                     tenant_id,
