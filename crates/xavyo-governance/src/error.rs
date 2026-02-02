@@ -473,6 +473,17 @@ pub enum GovernanceError {
     RiskEventNotFound(Uuid),
 
     // =========================================================================
+    // Risk Assessment Errors (F-006)
+    // =========================================================================
+    /// Invalid risk threshold configuration.
+    #[error("Invalid risk threshold configuration: {reason}")]
+    RiskThresholdInvalid { reason: String },
+
+    /// Risk calculation failed.
+    #[error("Risk calculation failed: {reason}")]
+    RiskCalculationFailed { reason: String },
+
+    // =========================================================================
     // Orphan Account Detection Errors (F040)
     // =========================================================================
     /// Orphan detection not found.

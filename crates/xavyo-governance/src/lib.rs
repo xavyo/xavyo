@@ -14,6 +14,7 @@
 //! - Separation of Duties (SoD) rule management
 //! - SoD violation detection (preventive and detective)
 //! - SoD exemption handling with time-bound approvals
+//! - Risk assessment and scoring based on entitlements and SoD violations
 //!
 //! # Services
 //!
@@ -24,6 +25,7 @@
 //! - [`services::SodService`] - Manage SoD rules (exclusive, cardinality, inclusive)
 //! - [`services::SodValidationService`] - Validate assignments against SoD rules
 //! - [`services::SodExemptionService`] - Manage SoD exemptions for approved violations
+//! - [`services::RiskAssessmentService`] - Calculate user risk scores and manage thresholds
 //!
 //! # Audit
 //!
@@ -49,7 +51,13 @@ pub use types::{
     AssignmentTargetType,
     EntitlementId,
     EntitlementStatus,
+    // Risk Assessment types
+    RiskFactorResult,
+    RiskHistory,
+    RiskHistoryId,
     RiskLevel,
+    RiskScore,
+    RiskThresholds,
     // SoD types
     SodConflictType,
     SodExemptionId,
@@ -72,11 +80,17 @@ pub use services::{
     Entitlement,
     EntitlementFilter,
     EntitlementService,
+    // Risk Assessment service types
+    InMemoryRiskHistoryStore,
+    InMemoryRiskThresholdStore,
     InMemorySodExemptionStore,
     InMemorySodRuleStore,
     InMemorySodViolationStore,
     ListOptions,
     PreventiveValidationResult,
+    RiskAssessmentService,
+    RiskHistoryStore,
+    RiskThresholdStore,
     RuleScanResult,
     SodExemption,
     SodExemptionService,
