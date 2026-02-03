@@ -8234,6 +8234,7 @@ dependencies = [
 name = "xavyo-api-authorization"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "axum",
  "axum-test 14.10.0",
  "chrono",
