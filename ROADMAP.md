@@ -6,8 +6,8 @@ This document defines the functional requirements to bring all crates to product
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 16 | xavyo-core, xavyo-db, xavyo-auth, xavyo-tenant, xavyo-events, xavyo-connector, xavyo-connector-ldap, xavyo-connector-rest, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-agents, xavyo-secrets, xavyo-cli, xavyo-governance, xavyo-provisioning |
-| 🟡 Beta | 11 | xavyo-connector-entra, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi |
+| 🟢 Stable | 17 | xavyo-core, xavyo-db, xavyo-auth, xavyo-tenant, xavyo-events, xavyo-connector, xavyo-connector-ldap, xavyo-connector-rest, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-agents, xavyo-secrets, xavyo-cli, xavyo-governance, xavyo-provisioning, xavyo-webhooks |
+| 🟡 Beta | 10 | xavyo-connector-entra, xavyo-siem, xavyo-scim-client, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi |
 | 🔴 Alpha | 5 | xavyo-nhi, xavyo-authorization, xavyo-connector-database, xavyo-api-authorization, xavyo-api-import |
 
 ## Timeline Overview
@@ -729,11 +729,12 @@ Add comprehensive tests for pagination and large dataset handling, particularly 
 
 ## Phase 5: Beta Domain Crates (Weeks 18-22)
 
-### F-028: xavyo-webhooks - Add Integration Tests
+### F-028: xavyo-webhooks - Add Integration Tests ✅ COMPLETE
 
 **Crate:** `xavyo-webhooks`
-**Current Status:** Beta
-**Target Status:** Beta
+**Current Status:** ✅ Stable
+**Target Status:** Stable
+**Completed:** 2026-02-03
 **Estimated Effort:** 1 week
 **Dependencies:** None
 
@@ -741,15 +742,26 @@ Add comprehensive tests for pagination and large dataset handling, particularly 
 Add comprehensive integration tests for webhook delivery including retry logic and failure scenarios.
 
 **Acceptance Criteria:**
-- [ ] Add 30+ integration tests
-- [ ] Test successful delivery flow
-- [ ] Test retry with exponential backoff
-- [ ] Test signature verification
-- [ ] Test concurrent webhook deliveries
-- [ ] Add mock HTTP server for testing
+- [x] Add 30+ integration tests (38 tests implemented)
+- [x] Test successful delivery flow (5 tests in delivery_tests.rs)
+- [x] Test retry with exponential backoff (6 tests in retry_tests.rs)
+- [x] Test signature verification (7 tests in signature_tests.rs)
+- [x] Test concurrent webhook deliveries (4 tests in concurrent_tests.rs)
+- [x] Add mock HTTP server for testing (wiremock-based infrastructure)
+- [x] Test failure scenarios (8 tests in failure_tests.rs)
+- [x] Test delivery tracking (8 tests in tracking_tests.rs)
+- [x] Update CRATE.md with stable status
 
-**Files to Modify:**
-- `crates/xavyo-webhooks/tests/integration/*.rs` (create)
+**Files Modified:**
+- `crates/xavyo-webhooks/Cargo.toml` (added integration feature)
+- `crates/xavyo-webhooks/tests/common/mod.rs` (test utilities)
+- `crates/xavyo-webhooks/tests/delivery_tests.rs`
+- `crates/xavyo-webhooks/tests/retry_tests.rs`
+- `crates/xavyo-webhooks/tests/signature_tests.rs`
+- `crates/xavyo-webhooks/tests/concurrent_tests.rs`
+- `crates/xavyo-webhooks/tests/failure_tests.rs`
+- `crates/xavyo-webhooks/tests/tracking_tests.rs`
+- `crates/xavyo-webhooks/CRATE.md`
 
 ---
 

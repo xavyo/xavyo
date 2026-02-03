@@ -95,6 +95,12 @@ docs/             # Documentation
 - PostgreSQL 15+ with Row-Level Security (existing infrastructure) (134-governance-integration-tests)
 - Rust 1.75+ (per constitution) + xavyo-connector (CreateOp, UpdateOp, DeleteOp traits), xavyo-db (shadow links), async-trait, tokio (135-remediation-executor)
 - PostgreSQL via SQLx for shadow links and remediation records (135-remediation-executor)
+- Rust 1.75+ (per constitution) + xavyo-api-import, xavyo-db (SQLx), tokio (async runtime), uuid, chrono (143-import-integration-tests)
+- PostgreSQL 15+ with RLS (via xavyo-db test infrastructure) (143-import-integration-tests)
+- Rust 1.75+ (per constitution) + reqwest (existing), tokio (async runtime), rand (jitter) (144-entra-rate-limiting)
+- N/A (in-memory state only) (144-entra-rate-limiting)
+- Rust 1.75+ + wiremock 0.6 (already a dev dependency), tokio, reqwest, hmac/sha2 (146-webhooks-integration-tests)
+- PostgreSQL (via xavyo-db mocks or in-memory stores) (146-webhooks-integration-tests)
 
 ## Recent Changes
 - 132-sod-validation: Added Rust 1.75+ (per constitution) + xavyo-governance (F-004 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror
