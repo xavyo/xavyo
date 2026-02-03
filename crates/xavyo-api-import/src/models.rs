@@ -1,11 +1,150 @@
-//! API request/response models for bulk user import (F086).
+//! API request/response models for bulk user import (F086, F-021).
 //!
 //! All models include serde and utoipa derives for JSON serialization
 //! and OpenAPI documentation.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
+
+// ---------------------------------------------------------------------------
+// CSV Parsing Configuration (F-021)
+// ---------------------------------------------------------------------------
+
+/// Supported CSV delimiters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CsvDelimiter {
+    /// Comma (,) - default delimiter
+    #[default]
+    Comma,
+    /// Semicolon (;) - common in European exports
+    Semicolon,
+    /// Tab character (\t)
+    Tab,
+    /// Pipe character (|)
+    Pipe,
+}
+
+impl CsvDelimiter {
+    /// Convert delimiter to byte for csv crate.
+    pub fn as_byte(&self) -> u8 {
+        match self {
+            CsvDelimiter::Comma => b',',
+            CsvDelimiter::Semicolon => b';',
+            CsvDelimiter::Tab => b'\t',
+            CsvDelimiter::Pipe => b'|',
+        }
+    }
+
+    /// Parse delimiter from string input.
+    pub fn parse(s: &str) -> Result<Self, String> {
+        match s {
+            "," | "comma" => Ok(CsvDelimiter::Comma),
+            ";" | "semicolon" => Ok(CsvDelimiter::Semicolon),
+            "\t" | "tab" | "\\t" => Ok(CsvDelimiter::Tab),
+            "|" | "pipe" => Ok(CsvDelimiter::Pipe),
+            _ => Err(format!(
+                "Invalid delimiter '{}'. Valid values: ',', ';', '\\t', '|'",
+                s
+            )),
+        }
+    }
+}
+
+/// Fields to check for duplicates during CSV parsing.
+#[derive(Debug, Clone, Default)]
+pub struct DuplicateCheckFields {
+    /// Check for duplicate emails (always enabled by default)
+    pub email: bool,
+    /// Check for duplicate usernames
+    pub username: bool,
+    /// Check for duplicate external IDs
+    pub external_id: bool,
+}
+
+impl DuplicateCheckFields {
+    /// Create with only email check (default, backward compatible).
+    pub fn email_only() -> Self {
+        Self {
+            email: true,
+            username: false,
+            external_id: false,
+        }
+    }
+
+    /// Parse from comma-separated string (e.g., "email,username,external_id").
+    pub fn parse(s: &str) -> Self {
+        let mut fields = Self::default();
+        for field in s.split(',').map(|f| f.trim().to_lowercase()) {
+            match field.as_str() {
+                "email" => fields.email = true,
+                "username" => fields.username = true,
+                "external_id" | "externalid" => fields.external_id = true,
+                _ => {} // Ignore unknown fields
+            }
+        }
+        // Default to email if nothing specified
+        if !fields.email && !fields.username && !fields.external_id {
+            fields.email = true;
+        }
+        fields
+    }
+}
+
+/// Configuration for CSV parsing (F-021).
+///
+/// All fields are optional for backward compatibility with existing imports.
+#[derive(Debug, Clone, Default)]
+pub struct CsvParseConfig {
+    /// Field delimiter character. Default: comma
+    pub delimiter: CsvDelimiter,
+    /// Maximum rows to process. Default: 10,000
+    pub max_rows: Option<usize>,
+    /// Column name mapping: source header -> target field name
+    pub column_mapping: Option<HashMap<String, String>>,
+    /// Fields to check for duplicates
+    pub duplicate_check_fields: DuplicateCheckFields,
+    /// Whether to check database for existing duplicates
+    pub check_database_duplicates: bool,
+}
+
+impl CsvParseConfig {
+    /// Create config with defaults (backward compatible).
+    pub fn new() -> Self {
+        Self {
+            delimiter: CsvDelimiter::Comma,
+            max_rows: Some(10_000),
+            column_mapping: None,
+            duplicate_check_fields: DuplicateCheckFields::email_only(),
+            check_database_duplicates: false,
+        }
+    }
+
+    /// Set the delimiter.
+    pub fn with_delimiter(mut self, delimiter: CsvDelimiter) -> Self {
+        self.delimiter = delimiter;
+        self
+    }
+
+    /// Set the maximum rows.
+    pub fn with_max_rows(mut self, max_rows: usize) -> Self {
+        self.max_rows = Some(max_rows);
+        self
+    }
+
+    /// Set column mapping.
+    pub fn with_column_mapping(mut self, mapping: HashMap<String, String>) -> Self {
+        self.column_mapping = Some(mapping);
+        self
+    }
+
+    /// Set duplicate check fields.
+    pub fn with_duplicate_check_fields(mut self, fields: DuplicateCheckFields) -> Self {
+        self.duplicate_check_fields = fields;
+        self
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Import Job responses
