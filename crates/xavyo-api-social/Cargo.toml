@@ -29,7 +29,7 @@ hkdf = "0.12"
 sha2 = "0.10"
 
 # JWT for Apple client secret and state
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

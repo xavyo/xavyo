@@ -86,7 +86,7 @@ aws-config = { version = "1", optional = true }
 aws-sdk-sts = { version = "1", optional = true }
 
 # JWT decoding for K8s token verification (F121)
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 
 # PKI/Certificate generation and parsing (F127)
 rcgen = "0.13"
