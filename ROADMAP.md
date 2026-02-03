@@ -642,28 +642,32 @@ Add comprehensive integration tests for the import API including large file hand
 
 ## Phase 4: Beta Connectors (Weeks 15-17)
 
-### F-025: xavyo-connector-entra - Add Rate Limit Handling
+### F-025: xavyo-connector-entra - Add Rate Limit Handling ✅ COMPLETE
 
 **Crate:** `xavyo-connector-entra`
-**Current Status:** Beta
-**Target Status:** Beta
+**Current Status:** Stable
+**Target Status:** Stable
 **Estimated Effort:** 1 week
 **Dependencies:** None
+**Completed:** 2026-02-03 (PR #19)
 
 **Description:**
 Add robust handling for Microsoft Graph API rate limiting (429 responses) with intelligent throttling and backoff.
 
 **Acceptance Criteria:**
-- [ ] Handle 429 responses with Retry-After header
-- [ ] Implement exponential backoff with jitter
-- [ ] Add request queuing when throttled
-- [ ] Add circuit breaker for sustained throttling
-- [ ] Add 15+ unit tests for rate limit scenarios
-- [ ] Document rate limit behavior
+- [x] Handle 429 responses with Retry-After header
+- [x] Implement exponential backoff with jitter
+- [x] Add request queuing when throttled
+- [x] Add circuit breaker for sustained throttling
+- [x] Add 15+ unit tests for rate limit scenarios (42 rate-limiting tests, 64 total)
+- [x] Document rate limit behavior
 
-**Files to Modify:**
-- `crates/xavyo-connector-entra/src/rate_limit.rs` (create)
-- `crates/xavyo-connector-entra/src/client.rs`
+**Files Modified:**
+- `crates/xavyo-connector-entra/src/rate_limit.rs` (created)
+- `crates/xavyo-connector-entra/src/circuit_breaker.rs` (created)
+- `crates/xavyo-connector-entra/src/metrics.rs` (created)
+- `crates/xavyo-connector-entra/src/request_queue.rs` (created)
+- `crates/xavyo-connector-entra/src/graph_client.rs` (modified)
 
 ---
 
