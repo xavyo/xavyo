@@ -765,10 +765,10 @@ Add comprehensive integration tests for webhook delivery including retry logic a
 
 ---
 
-### F-029: xavyo-webhooks - Implement Circuit Breaker
+### F-029: xavyo-webhooks - Implement Circuit Breaker ✅
 
 **Crate:** `xavyo-webhooks`
-**Current Status:** Beta
+**Current Status:** Stable ✅ (completed 2026-02-03)
 **Target Status:** Stable
 **Estimated Effort:** 1.5 weeks
 **Dependencies:** F-028
@@ -777,17 +777,22 @@ Add comprehensive integration tests for webhook delivery including retry logic a
 Implement circuit breaker pattern for failing webhook destinations and add replay functionality.
 
 **Acceptance Criteria:**
-- [ ] Implement circuit breaker for failing destinations
-- [ ] Add webhook replay functionality
-- [ ] Implement per-destination rate limiting
-- [ ] Add dead letter queue for failed webhooks
-- [ ] Add circuit breaker status endpoint
-- [ ] Add 20+ tests for circuit breaker scenarios
-- [ ] Update CRATE.md with stable status
+- [x] Implement circuit breaker for failing destinations (opens after 5 failures, recovers after 30s)
+- [x] Add webhook replay functionality (single and bulk replay via API)
+- [x] Implement per-destination rate limiting (token bucket: 10 req/s, burst 20)
+- [x] Add dead letter queue for failed webhooks (stores after 6 retries)
+- [x] Add circuit breaker status endpoint (GET /webhooks/circuit-breakers)
+- [x] Add 67 tests for circuit breaker, DLQ, and rate limiter scenarios
+- [x] Update CRATE.md with stable status (157 tests total)
 
-**Files to Modify:**
-- `crates/xavyo-webhooks/src/circuit_breaker.rs` (create)
-- `crates/xavyo-webhooks/src/replay.rs` (create)
+**Files Modified:**
+- `crates/xavyo-webhooks/src/circuit_breaker.rs` (created)
+- `crates/xavyo-webhooks/src/rate_limiter.rs` (created)
+- `crates/xavyo-webhooks/src/services/dlq_service.rs` (created)
+- `crates/xavyo-webhooks/src/handlers/dlq.rs` (created)
+- `crates/xavyo-webhooks/src/handlers/circuit_breakers.rs` (created)
+- `crates/xavyo-db/migrations/1177_webhook_circuit_breaker_state.sql` (created)
+- `crates/xavyo-db/migrations/1178_webhook_dlq.sql` (created)
 - `crates/xavyo-webhooks/CRATE.md`
 
 ---
