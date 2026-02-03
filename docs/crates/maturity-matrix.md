@@ -91,7 +91,7 @@ Criteria:
 | xavyo-api-authorization | 🟡 beta | 36+ | 37 | Integration tests complete |
 | xavyo-api-import | 🟢 stable | 92+ | 45+ | Full integration test coverage |
 | xavyo-api-oidc-federation | 🟡 beta | 13 | 16 | Insufficient coverage |
-| xavyo-api-nhi | 🟡 beta | 55 | 33 | No integration tests |
+| xavyo-api-nhi | 🟢 stable | 77 | 33 | Complete with risk scoring, F-047 & F-048 |
 
 ---
 

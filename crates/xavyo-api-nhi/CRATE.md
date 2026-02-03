@@ -12,9 +12,9 @@ api
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with comprehensive test coverage (55 unit tests + 22 integration tests). Unified NHI API working; integration tests cover all user stories.
+Production-ready with comprehensive test coverage (55 unit tests + 22 integration tests). Unified NHI API with complete risk scoring, staleness detection, certification workflows, and multi-tenant isolation.
 
 ## Dependencies
 
@@ -92,6 +92,31 @@ Run integration tests:
 ```bash
 cargo test -p xavyo-api-nhi --test integration_tests
 ```
+
+## Risk Scoring (F-048)
+
+The crate implements comprehensive risk scoring for NHIs:
+
+### Risk Factors (0-100 scale)
+| Factor | Weight | Low | Medium | High |
+|--------|--------|-----|--------|------|
+| Staleness | 0-40 pts | <30 days | 30-89 days | ≥90 days |
+| Credential Age | 0-30 pts | <30 days | 30-89 days | ≥90 days |
+| Access Scope | 0-30 pts | <20 entitlements | 20-49 | ≥50 |
+
+### Risk Levels
+| Score Range | Level | Action |
+|-------------|-------|--------|
+| 0-25 | Low | No action needed |
+| 26-50 | Medium | Monitor |
+| 51-75 | High | Recommend remediation |
+| 76-100 | Critical | Immediate action |
+
+### Features
+- **Staleness Detection**: Identifies inactive NHIs via `GET /nhi/staleness-report`
+- **Credential Age Tracking**: Flags old credentials for rotation
+- **Risk Summary**: Aggregated statistics via `GET /nhi/risk-summary`
+- **Per-NHI Risk**: Individual scores via `GET /nhi/:id/risk`
 
 ## Anti-Patterns
 
