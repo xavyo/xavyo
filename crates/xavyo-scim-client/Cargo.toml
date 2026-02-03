@@ -9,6 +9,7 @@ description = "SCIM 2.0 outbound provisioning client for xavyo"
 [features]
 default = []
 kafka = ["xavyo-events/kafka"]
+integration = []
 
 [dependencies]
 # Core crates
