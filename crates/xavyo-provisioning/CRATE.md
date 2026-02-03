@@ -14,7 +14,7 @@ domain
 
 🟡 **beta**
 
-Functional with good test coverage (215 tests). Has 11 TODOs in reconciliation logic; may have gaps in edge cases.
+Functional with good test coverage (250+ tests). Remediation executor is fully implemented with transaction support and rollback capabilities. RemediationExecutor supports Create, Update, Delete, Link, Unlink, and InactivateIdentity actions with dry-run mode and state capture.
 
 ## Dependencies
 
@@ -88,6 +88,26 @@ pub struct ReconciliationRunInfo {
     pub status: RunStatus,
     pub statistics: RunStatistics,
 }
+
+/// Remediation result with state capture
+pub struct RemediationResult {
+    pub discrepancy_id: Uuid,
+    pub action: ActionType,
+    pub success: bool,
+    pub dry_run: bool,
+    pub before_state: Option<Value>,
+    pub after_state: Option<Value>,
+    pub error_message: Option<String>,
+}
+
+/// Multi-step remediation transaction with rollback support
+pub struct RemediationTransaction {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub status: TransactionStatus,
+    pub steps: Vec<CompletedStep>,
+    pub rollback_errors: Vec<RollbackError>,
+}
 ```
 
 ### Traits
@@ -135,6 +155,17 @@ impl RhaiScriptExecutor {
     pub fn new(config: RhaiExecutorConfig) -> Self;
     pub fn execute(&self, script: &str, ctx: &HookContext) -> Result<Value>;
     pub fn validate(&self, script: &str) -> Result<(), ScriptValidationError>;
+}
+
+/// Remediation executor for discrepancy resolution
+impl RemediationExecutor {
+    pub fn new(tenant_id: Uuid, connector_provider: Arc<dyn ConnectorProvider>, shadow_repo: Arc<ShadowRepository>, identity_service: Arc<dyn IdentityService>) -> Self;
+    pub async fn execute_create(&self, discrepancy_id: Uuid, identity_id: Uuid, connector_id: Uuid, object_class: &str, dry_run: bool) -> RemediationResult;
+    pub async fn execute_update(&self, discrepancy_id: Uuid, identity_id: Uuid, external_uid: &str, connector_id: Uuid, object_class: &str, direction: RemediationDirection, dry_run: bool) -> RemediationResult;
+    pub async fn execute_delete(&self, discrepancy_id: Uuid, external_uid: &str, connector_id: Uuid, object_class: &str, dry_run: bool) -> RemediationResult;
+    pub async fn execute_link(&self, discrepancy_id: Uuid, identity_id: Uuid, external_uid: &str, connector_id: Uuid, dry_run: bool) -> RemediationResult;
+    pub async fn execute_unlink(&self, discrepancy_id: Uuid, identity_id: Uuid, external_uid: &str, connector_id: Uuid, dry_run: bool) -> RemediationResult;
+    pub async fn execute_inactivate_identity(&self, discrepancy_id: Uuid, identity_id: Uuid, dry_run: bool) -> RemediationResult;
 }
 ```
 

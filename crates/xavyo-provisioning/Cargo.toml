@@ -42,3 +42,4 @@ rhai = { version = "1.19", features = ["serde", "sync"] }
 
 [dev-dependencies]
 tokio-test = { workspace = true }
+mockall = "0.13"
