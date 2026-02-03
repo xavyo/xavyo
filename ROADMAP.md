@@ -559,53 +559,55 @@ Implement robust CSV file upload and parsing with detailed validation and error 
 
 ---
 
-### F-022: xavyo-api-import - Implement Job Processing
+### F-022: xavyo-api-import - Implement Job Processing ✅
 
 **Crate:** `xavyo-api-import`
-**Current Status:** Alpha
+**Current Status:** Beta ✅ (implemented as part of F086)
 **Target Status:** Beta
-**Estimated Effort:** 1.5 weeks
+**Estimated Effort:** Already complete
 **Dependencies:** F-021
 
 **Description:**
 Implement background job processing for import operations with progress tracking and status reporting.
 
 **Acceptance Criteria:**
-- [ ] Implement background job execution
-- [ ] Add progress tracking (records processed, errors, warnings)
-- [ ] Implement GET /imports/{id}/status - job status endpoint
-- [ ] Implement GET /imports/{id}/errors - detailed error report
-- [ ] Add job cancellation support
-- [ ] Add 20+ integration tests for job lifecycle
+- [x] Implement background job execution (job_processor.rs)
+- [x] Add progress tracking (records processed, errors, warnings)
+- [x] Implement GET /imports/{id}/status - job status endpoint (handlers/import.rs)
+- [x] Implement GET /imports/{id}/errors - detailed error report (handlers/errors.rs)
+- [ ] Add job cancellation support (deferred to F-024)
+- [ ] Add 20+ integration tests for job lifecycle (deferred to F-024)
 
-**Files to Modify:**
-- `crates/xavyo-api-import/src/jobs.rs` (create)
-- `crates/xavyo-api-import/src/handlers/status.rs` (create)
+**Already Implemented:**
+- `crates/xavyo-api-import/src/services/job_processor.rs` - Background job execution
+- `crates/xavyo-api-import/src/services/import_service.rs` - Job lifecycle management
+- `crates/xavyo-api-import/src/handlers/import.rs` - Status endpoints
+- `crates/xavyo-api-import/src/handlers/errors.rs` - Error reporting
 
 ---
 
-### F-023: xavyo-api-import - Implement Email Invitations
+### F-023: xavyo-api-import - Implement Email Invitations ✅
 
 **Crate:** `xavyo-api-import`
-**Current Status:** Beta (after F-022)
+**Current Status:** Beta ✅ (implemented as part of F086)
 **Target Status:** Beta
-**Estimated Effort:** 1 week
+**Estimated Effort:** Already complete
 **Dependencies:** F-022
 
 **Description:**
 Implement email invitation workflow for imported users enabling passwordless onboarding.
 
 **Acceptance Criteria:**
-- [ ] Implement invitation email sending
-- [ ] Add invitation token generation and validation
-- [ ] Add invitation expiration handling
-- [ ] Implement resend invitation endpoint
-- [ ] Add 15+ tests for invitation workflow
-- [ ] Document invitation email templates
+- [x] Implement invitation email sending (invitation_service.rs)
+- [x] Add invitation token generation and validation
+- [x] Add invitation expiration handling (24-hour expiry)
+- [x] Implement resend invitation endpoint (handlers/invitations.rs)
+- [ ] Add 15+ tests for invitation workflow (deferred to F-024)
+- [ ] Document invitation email templates (deferred to F-024)
 
-**Files to Modify:**
-- `crates/xavyo-api-import/src/invitation.rs` (create)
-- `crates/xavyo-api-import/src/handlers/invite.rs` (create)
+**Already Implemented:**
+- `crates/xavyo-api-import/src/services/invitation_service.rs` - Invitation creation and emails
+- `crates/xavyo-api-import/src/handlers/invitations.rs` - Token validation, resend, bulk resend
 
 ---
 
