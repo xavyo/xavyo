@@ -12,9 +12,9 @@ connector
 
 ## Status
 
-🔴 **alpha**
+🟡 **beta**
 
-Experimental with skeleton implementation (33 tests, 4 public items). Configuration types defined; operations not yet implemented.
+Functional PostgreSQL connector with transaction support (47 tests). Core operations implemented: create, update, delete, search. Transaction support includes begin/commit/rollback, savepoints, batch operations, and prepared statement caching. Per Constitution Principle XI, only PostgreSQL is supported.
 
 ## Dependencies
 

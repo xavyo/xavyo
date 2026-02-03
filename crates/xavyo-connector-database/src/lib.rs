@@ -34,7 +34,12 @@
 
 pub mod config;
 pub mod connector;
+pub mod transaction;
 
 // Re-exports
 pub use config::{DatabaseConfig, DatabaseDriver, SslMode};
 pub use connector::DatabaseConnector;
+pub use transaction::{
+    BatchOperation, BatchOperationType, BatchResult, DatabaseTransaction, PreparedStatementCache,
+    Savepoint, TransactionState,
+};
