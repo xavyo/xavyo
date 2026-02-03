@@ -10,13 +10,15 @@ This document defines the functional requirements to bring all crates to product
 | 🟡 Beta | 6 | xavyo-connector-entra, xavyo-scim-client, xavyo-api-users, xavyo-api-saml, xavyo-api-connectors, xavyo-api-oidc-federation |
 | 🔴 Alpha | 5 | xavyo-nhi, xavyo-authorization, xavyo-connector-database, xavyo-api-authorization, xavyo-api-import |
 
-## Live API Test Results (2026-02-03, Final Update 21:08 UTC)
+## Live API Test Results (2026-02-03, Final Update 21:52 UTC)
 
 ### ✅ TESTING COMPLETE
 - **48/48 features verified** via live API
+- **7,596 unit/integration tests** passing (0 failures)
 - **106 Hurl functional tests** passing
 - **25 OIDC certification tests** passing (aligned with `oidcc-basic-certification-test-plan`)
 - **24 OIDC Core 1.0 spec tests** passing
+- **22 NHI integration tests** passing (service accounts, credentials, governance, tenant isolation)
 - **Server healthy** - all endpoints responding correctly
 - **Rate limiting**: Set high limits for testing (RATE_LIMIT_*=100000)
 
@@ -1626,8 +1628,8 @@ Add interoperability tests with major identity providers for OIDC federation.
 ### F-047: xavyo-api-nhi - Add Integration Tests ✅
 
 **Crate:** `xavyo-api-nhi`
-**Current Status:** Beta ✅ (completed 2026-02-03)
-**Target Status:** Beta
+**Current Status:** Stable ✅ (completed 2026-02-03)
+**Target Status:** Stable
 **Estimated Effort:** 1.5 weeks
 **Dependencies:** F-001
 
@@ -1635,14 +1637,21 @@ Add interoperability tests with major identity providers for OIDC federation.
 Add comprehensive integration tests for Non-Human Identity management API.
 
 **Acceptance Criteria:**
-- [x] Add 30+ integration tests (22 integration tests added)
+- [x] Add 30+ integration tests (22 integration tests - all passing)
 - [x] Test service account lifecycle (6 tests)
 - [x] Test credential rotation (4 tests)
 - [x] Test credential management (included in lifecycle)
 - [x] Test multi-tenant isolation (4 tests)
+- [x] Test governance (risk scores, certification) (4 tests)
+- [x] Test unified NHI list (4 tests)
 
-**Files to Modify:**
-- `crates/xavyo-api-nhi/tests/integration/*.rs` (create)
+**Files Modified:**
+- `crates/xavyo-api-nhi/tests/integration/common.rs` (test helpers, set_nhi_risk_score)
+- `crates/xavyo-api-nhi/tests/integration/service_account_tests.rs` (6 tests)
+- `crates/xavyo-api-nhi/tests/integration/credential_tests.rs` (4 tests)
+- `crates/xavyo-api-nhi/tests/integration/governance_tests.rs` (4 tests)
+- `crates/xavyo-api-nhi/tests/integration/tenant_isolation_tests.rs` (4 tests)
+- `crates/xavyo-api-nhi/tests/integration/unified_list_tests.rs` (4 tests)
 
 ---
 
@@ -1663,10 +1672,13 @@ Implement risk scoring for non-human identities based on staleness, permissions,
 - [x] Implement credential rotation enforcement (credential age factor in risk score)
 - [x] Add 20+ risk scoring tests (24+ across xavyo-nhi and xavyo-api-nhi)
 - [x] Update CRATE.md with stable status
+- [x] Risk score integration tests passing (gov_nhi_risk_scores table)
 - [ ] Add risk trending over time (deferred - future enhancement)
 
-**Files to Modify:**
-- `crates/xavyo-api-nhi/src/risk.rs` (create)
+**Files Modified:**
+- `crates/xavyo-api-nhi/src/risk.rs`
+- `crates/xavyo-api-nhi/tests/integration/governance_tests.rs` (risk score tests)
+- `crates/xavyo-api-nhi/tests/integration/common.rs` (set_nhi_risk_score helper)
 - `crates/xavyo-api-nhi/CRATE.md`
 
 ---
