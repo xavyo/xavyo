@@ -37,6 +37,27 @@ pub enum WebhookError {
 
     #[error("Internal server error: {0}")]
     Internal(String),
+
+    // Circuit breaker errors
+    #[error("Circuit breaker open for subscription {subscription_id}")]
+    CircuitBreakerOpen { subscription_id: uuid::Uuid },
+
+    #[error("Circuit breaker not found for subscription {subscription_id}")]
+    CircuitBreakerNotFound { subscription_id: uuid::Uuid },
+
+    // Dead letter queue errors
+    #[error("DLQ entry not found")]
+    DlqEntryNotFound,
+
+    #[error("DLQ entry already replayed")]
+    DlqEntryAlreadyReplayed,
+
+    #[error("Invalid DLQ filter: {0}")]
+    InvalidDlqFilter(String),
+
+    // Rate limiting errors
+    #[error("Rate limit exceeded for subscription {subscription_id}")]
+    RateLimitExceeded { subscription_id: uuid::Uuid },
 }
 
 /// JSON error response returned by webhook API endpoints.
@@ -64,6 +85,23 @@ impl IntoResponse for WebhookError {
             WebhookError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
             WebhookError::Validation(_) => (StatusCode::BAD_REQUEST, "validation_error"),
             WebhookError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal_error"),
+            // Circuit breaker errors
+            WebhookError::CircuitBreakerOpen { .. } => {
+                (StatusCode::SERVICE_UNAVAILABLE, "circuit_breaker_open")
+            }
+            WebhookError::CircuitBreakerNotFound { .. } => {
+                (StatusCode::NOT_FOUND, "circuit_breaker_not_found")
+            }
+            // DLQ errors
+            WebhookError::DlqEntryNotFound => (StatusCode::NOT_FOUND, "dlq_entry_not_found"),
+            WebhookError::DlqEntryAlreadyReplayed => {
+                (StatusCode::CONFLICT, "dlq_entry_already_replayed")
+            }
+            WebhookError::InvalidDlqFilter(_) => (StatusCode::BAD_REQUEST, "invalid_dlq_filter"),
+            // Rate limiting errors
+            WebhookError::RateLimitExceeded { .. } => {
+                (StatusCode::TOO_MANY_REQUESTS, "rate_limit_exceeded")
+            }
         };
 
         let body = ErrorResponse {

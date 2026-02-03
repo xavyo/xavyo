@@ -101,6 +101,8 @@ docs/             # Documentation
 - N/A (in-memory state only) (144-entra-rate-limiting)
 - Rust 1.75+ + wiremock 0.6 (already a dev dependency), tokio, reqwest, hmac/sha2 (146-webhooks-integration-tests)
 - PostgreSQL (via xavyo-db mocks or in-memory stores) (146-webhooks-integration-tests)
+- Rust 1.75+ (per constitution) + xavyo-webhooks (existing), tokio (async runtime), chrono (timestamps) (147-webhook-circuit-breaker)
+- PostgreSQL 15+ via xavyo-db (for DLQ and circuit breaker state persistence) (147-webhook-circuit-breaker)
 
 ## Recent Changes
 - 132-sod-validation: Added Rust 1.75+ (per constitution) + xavyo-governance (F-004 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror

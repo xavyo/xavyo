@@ -3,16 +3,25 @@
 //! Responsible for finding matching subscriptions for an event, creating
 //! delivery records, executing HTTP POST with HMAC-SHA256 signatures,
 //! and recording delivery results.
+//!
+//! Integrates with:
+//! - Circuit breaker pattern to protect against failing endpoints
+//! - Dead letter queue for webhooks that exhaust all retries
+//! - Rate limiting to prevent overwhelming endpoints
 
+use std::sync::Arc;
 use std::time::Instant;
 
 use chrono::{Duration, Utc};
 use reqwest::Client;
 use sqlx::PgPool;
 
+use crate::circuit_breaker::{CircuitBreakerRegistry, FailureRecord};
 use crate::crypto;
 use crate::error::WebhookError;
 use crate::models::WebhookPayload;
+use crate::rate_limiter::RateLimiterRegistry;
+use crate::services::dlq_service::{AttemptRecord, DlqService};
 use crate::services::event_publisher::WebhookEvent;
 use xavyo_db::models::{CreateWebhookDelivery, WebhookDelivery, WebhookSubscription};
 
@@ -33,6 +42,12 @@ pub struct DeliveryService {
     encryption_key: Vec<u8>,
     max_attempts: i32,
     disable_threshold: i32,
+    /// Circuit breaker registry for tracking endpoint health.
+    circuit_breaker_registry: Option<Arc<CircuitBreakerRegistry>>,
+    /// DLQ service for storing failed webhooks.
+    dlq_service: Option<Arc<DlqService>>,
+    /// Rate limiter registry for per-destination throttling.
+    rate_limiter_registry: Option<Arc<RateLimiterRegistry>>,
 }
 
 impl DeliveryService {
@@ -55,6 +70,9 @@ impl DeliveryService {
             encryption_key,
             max_attempts: DEFAULT_MAX_ATTEMPTS,
             disable_threshold: DEFAULT_DISABLE_THRESHOLD,
+            circuit_breaker_registry: None,
+            dlq_service: None,
+            rate_limiter_registry: None,
         })
     }
 
@@ -67,6 +85,24 @@ impl DeliveryService {
     /// Set the consecutive failure threshold for auto-disable.
     pub fn with_disable_threshold(mut self, threshold: i32) -> Self {
         self.disable_threshold = threshold;
+        self
+    }
+
+    /// Set the circuit breaker registry for endpoint health tracking.
+    pub fn with_circuit_breaker(mut self, registry: Arc<CircuitBreakerRegistry>) -> Self {
+        self.circuit_breaker_registry = Some(registry);
+        self
+    }
+
+    /// Set the DLQ service for storing failed webhooks.
+    pub fn with_dlq_service(mut self, service: Arc<DlqService>) -> Self {
+        self.dlq_service = Some(service);
+        self
+    }
+
+    /// Set the rate limiter registry for per-destination throttling.
+    pub fn with_rate_limiter(mut self, registry: Arc<RateLimiterRegistry>) -> Self {
+        self.rate_limiter_registry = Some(registry);
         self
     }
 
@@ -186,6 +222,60 @@ impl DeliveryService {
         delivery: &WebhookDelivery,
         subscription: &WebhookSubscription,
     ) {
+        // Check circuit breaker first - if open, reject immediately
+        if let Some(ref cb_registry) = self.circuit_breaker_registry {
+            match cb_registry
+                .can_execute(subscription.tenant_id, subscription.id)
+                .await
+            {
+                Ok(true) => {
+                    // Circuit allows execution
+                }
+                Ok(false) => {
+                    // Circuit is open - reject delivery
+                    tracing::warn!(
+                        target: "webhook_delivery",
+                        delivery_id = %delivery.id,
+                        subscription_id = %subscription.id,
+                        "Delivery rejected - circuit breaker is open"
+                    );
+                    self.handle_delivery_failure(
+                        delivery,
+                        subscription,
+                        "Circuit breaker open - endpoint temporarily unavailable",
+                        None,
+                        None,
+                        None,
+                    )
+                    .await;
+                    return;
+                }
+                Err(e) => {
+                    tracing::error!(
+                        target: "webhook_delivery",
+                        delivery_id = %delivery.id,
+                        error = %e,
+                        "Failed to check circuit breaker status"
+                    );
+                    // Continue with delivery on error - fail open
+                }
+            }
+        }
+
+        // Apply rate limiting - wait if necessary
+        if let Some(ref rl_registry) = self.rate_limiter_registry {
+            let wait_duration = rl_registry.acquire(subscription.id).await;
+            if !wait_duration.is_zero() {
+                tracing::debug!(
+                    target: "webhook_delivery",
+                    delivery_id = %delivery.id,
+                    subscription_id = %subscription.id,
+                    wait_ms = wait_duration.as_millis(),
+                    "Rate limited - waited before delivery"
+                );
+            }
+        }
+
         let payload_bytes = match serde_json::to_vec(&delivery.request_payload) {
             Ok(b) => b,
             Err(e) => {
@@ -352,6 +442,21 @@ impl DeliveryService {
             );
         }
 
+        // Record success to circuit breaker
+        if let Some(ref cb_registry) = self.circuit_breaker_registry {
+            if let Err(e) = cb_registry
+                .record_success(subscription.tenant_id, subscription.id)
+                .await
+            {
+                tracing::error!(
+                    target: "webhook_delivery",
+                    subscription_id = %subscription.id,
+                    error = %e,
+                    "Failed to record success to circuit breaker"
+                );
+            }
+        }
+
         // Reset consecutive failures on success
         if subscription.consecutive_failures > 0 {
             if let Err(e) = WebhookSubscription::reset_consecutive_failures(
@@ -383,6 +488,7 @@ impl DeliveryService {
     ) {
         let next_attempt = delivery.attempt_number + 1;
         let next_attempt_at = calculate_next_attempt_at(next_attempt, self.max_attempts);
+        let retries_exhausted = next_attempt_at.is_none();
 
         tracing::warn!(
             target: "webhook_delivery",
@@ -393,9 +499,26 @@ impl DeliveryService {
             event_type = %delivery.event_type,
             error = %error_message,
             attempt_number = next_attempt,
-            has_next_retry = next_attempt_at.is_some(),
+            has_next_retry = !retries_exhausted,
             "Webhook delivery failed"
         );
+
+        // Record failure to circuit breaker
+        if let Some(ref cb_registry) = self.circuit_breaker_registry {
+            let failure_record =
+                FailureRecord::new(error_message.to_string(), response_code, latency_ms);
+            if let Err(e) = cb_registry
+                .record_failure(subscription.tenant_id, subscription.id, failure_record)
+                .await
+            {
+                tracing::error!(
+                    target: "webhook_delivery",
+                    subscription_id = %subscription.id,
+                    error = %e,
+                    "Failed to record failure to circuit breaker"
+                );
+            }
+        }
 
         // Update delivery record
         if let Err(e) = WebhookDelivery::mark_failed(
@@ -418,6 +541,36 @@ impl DeliveryService {
                 error = %e,
                 "Failed to update delivery status to failed"
             );
+        }
+
+        // If retries exhausted, move to DLQ
+        if retries_exhausted {
+            if let Some(ref dlq_service) = self.dlq_service {
+                // Build attempt history from delivery attempts
+                let attempt_history = self
+                    .build_attempt_history(delivery, error_message, response_code, latency_ms)
+                    .await;
+
+                if let Err(e) = dlq_service
+                    .add_to_dlq(
+                        delivery.tenant_id,
+                        delivery,
+                        subscription,
+                        error_message.to_string(),
+                        response_code,
+                        response_body.map(|s| s.to_string()),
+                        attempt_history,
+                    )
+                    .await
+                {
+                    tracing::error!(
+                        target: "webhook_delivery",
+                        delivery_id = %delivery.id,
+                        error = %e,
+                        "Failed to move delivery to DLQ"
+                    );
+                }
+            }
         }
 
         // Increment consecutive failures and check threshold
@@ -480,6 +633,25 @@ impl DeliveryService {
                 );
             }
         }
+    }
+
+    /// Build attempt history for DLQ entry.
+    async fn build_attempt_history(
+        &self,
+        delivery: &WebhookDelivery,
+        final_error: &str,
+        final_response_code: Option<i16>,
+        final_latency_ms: Option<i32>,
+    ) -> Vec<AttemptRecord> {
+        // Create a simple history with the final attempt
+        // In a more complete implementation, we would track all attempts
+        vec![AttemptRecord {
+            attempt_number: delivery.attempt_number + 1,
+            timestamp: Utc::now(),
+            error: final_error.to_string(),
+            response_code: final_response_code,
+            latency_ms: final_latency_ms,
+        }]
     }
 
     /// Process a pending delivery that is ready for retry.
