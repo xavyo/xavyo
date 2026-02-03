@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Implements SAML 2.0 Identity Provider functionality for enterprise single sign-on. Supports SP-initiated SSO (receiving AuthnRequest), IdP-initiated SSO (unsolicited responses), metadata publishing, service provider configuration, and certificate management.
+Implements SAML 2.0 Identity Provider functionality for enterprise single sign-on. Supports SP-initiated SSO (receiving AuthnRequest), IdP-initiated SSO (unsolicited responses), metadata publishing, service provider configuration, certificate management, and **AuthnRequest session tracking for replay attack prevention**.
 
 ## Layer
 
@@ -14,7 +14,22 @@ api
 
 🟡 **beta**
 
-Functional with limited test coverage (13 tests). Has 3 TODOs; needs more comprehensive SP interoperability testing.
+Functional with comprehensive security test coverage (52 tests). Has 2 remaining TODOs; needs SP interoperability testing.
+
+### Test Coverage
+
+| Test Suite | Count | Description |
+|------------|-------|-------------|
+| Unit tests | 24 | Core service tests |
+| Security tests | 28 | Session storage, expiration, replay attack prevention |
+| **Total** | **52** | Full coverage for session security |
+
+### Security Features (F-038)
+
+- **Replay Attack Prevention**: AuthnRequest IDs tracked with single-use enforcement
+- **TTL Expiration**: 5-minute default with 30-second grace period for clock skew
+- **Tenant Isolation**: Request sessions scoped to tenant via RLS
+- **InResponseTo Validation**: SAML responses validated against stored request IDs
 
 ## Dependencies
 
@@ -30,6 +45,7 @@ Functional with limited test coverage (13 tests). Has 3 TODOs; needs more compre
 - `axum` - Web framework
 - `quick-xml` - XML parsing
 - `base64` / `flate2` - Encoding/compression
+- `async-trait` - Async trait support
 
 ## Public API
 
@@ -44,6 +60,44 @@ pub fn saml_public_router() -> Router<SamlState>;
 
 /// Admin SAML endpoints (SP configuration)
 pub fn saml_admin_router() -> Router<SamlState>;
+```
+
+### Session Management
+
+```rust
+/// Session store trait for AuthnRequest tracking
+pub trait SessionStore: Send + Sync {
+    /// Store a new AuthnRequest session
+    async fn store(&self, session: AuthnRequestSession) -> Result<(), SessionError>;
+
+    /// Validate and consume a session atomically
+    async fn validate_and_consume(
+        &self,
+        tenant_id: Uuid,
+        request_id: &str,
+    ) -> Result<AuthnRequestSession, SessionError>;
+
+    /// Clean up expired sessions
+    async fn cleanup_expired(&self) -> Result<u64, SessionError>;
+}
+
+/// In-memory session store (for testing)
+pub struct InMemorySessionStore;
+
+/// PostgreSQL-backed session store (for production)
+pub struct PostgresSessionStore;
+
+/// AuthnRequest session for replay prevention
+pub struct AuthnRequestSession {
+    pub id: Uuid,
+    pub tenant_id: Uuid,
+    pub request_id: String,
+    pub sp_entity_id: String,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub consumed_at: Option<DateTime<Utc>>,
+    pub relay_state: Option<String>,
+}
 ```
 
 ### Endpoints
@@ -96,6 +150,16 @@ pub enum SamlError {
     UnknownServiceProvider(String),
     AuthenticationFailed,
     CertificateError(String),
+    SessionError(SessionError),  // NEW: Session-related errors
+}
+
+/// Session-related errors
+pub enum SessionError {
+    NotFound(String),
+    Expired { request_id: String, expired_at: DateTime<Utc> },
+    AlreadyConsumed { request_id: String, consumed_at: DateTime<Utc> },
+    DuplicateRequestId(String),
+    StorageError(String),
 }
 ```
 
@@ -124,9 +188,11 @@ let app = Router::new()
 // SAML flow:
 // 1. User accesses SP (e.g., Salesforce)
 // 2. SP redirects to /saml/sso?SAMLRequest=...
-// 3. User authenticates at IdP
-// 4. IdP POSTs SAMLResponse to SP's ACS URL
-// 5. SP validates response and creates session
+// 3. IdP stores AuthnRequest ID for replay prevention
+// 4. User authenticates at IdP
+// 5. IdP validates session, marks as consumed
+// 6. IdP POSTs SAMLResponse to SP's ACS URL with InResponseTo
+// 7. SP validates response and creates session
 ```
 
 ## Integration Points
@@ -145,6 +211,7 @@ None - all features are enabled by default.
 - Never skip certificate validation for SP responses
 - Never use weak signing algorithms (SHA-1)
 - Never expose private keys in logs or errors
+- Never bypass session validation for replay attack prevention
 
 ## Related Crates
 

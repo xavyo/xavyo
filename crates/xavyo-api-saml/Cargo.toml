@@ -41,6 +41,7 @@ tower-http.workspace = true
 
 # Async runtime
 tokio.workspace = true
+async-trait.workspace = true
 
 # Database
 sqlx.workspace = true

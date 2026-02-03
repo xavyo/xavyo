@@ -1,5 +1,6 @@
 //! SAML-specific error types
 
+use crate::session::SessionError;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -17,6 +18,10 @@ pub enum SamlError {
     /// Invalid or malformed AuthnRequest
     #[error("Invalid AuthnRequest: {0}")]
     InvalidAuthnRequest(String),
+
+    /// Session-related errors (replay attack, expired, not found)
+    #[error("Session error: {0}")]
+    SessionError(#[from] SessionError),
 
     /// Unknown or unregistered Service Provider
     #[error("Unknown Service Provider: {0}")]
@@ -106,6 +111,33 @@ pub struct ErrorResponse {
 impl IntoResponse for SamlError {
     fn into_response(self) -> Response {
         let (status, error_code, saml_status) = match &self {
+            SamlError::SessionError(e) => match e {
+                SessionError::NotFound(_) => (
+                    StatusCode::BAD_REQUEST,
+                    "unknown_request",
+                    Some("urn:oasis:names:tc:SAML:2.0:status:Requester"),
+                ),
+                SessionError::Expired { .. } => (
+                    StatusCode::BAD_REQUEST,
+                    "request_expired",
+                    Some("urn:oasis:names:tc:SAML:2.0:status:Requester"),
+                ),
+                SessionError::AlreadyConsumed { .. } => (
+                    StatusCode::BAD_REQUEST,
+                    "replay_attack_detected",
+                    Some("urn:oasis:names:tc:SAML:2.0:status:Requester"),
+                ),
+                SessionError::DuplicateRequestId(_) => (
+                    StatusCode::CONFLICT,
+                    "duplicate_request",
+                    Some("urn:oasis:names:tc:SAML:2.0:status:Requester"),
+                ),
+                SessionError::StorageError(_) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "session_storage_error",
+                    Some("urn:oasis:names:tc:SAML:2.0:status:Responder"),
+                ),
+            },
             SamlError::InvalidAuthnRequest(_) => (
                 StatusCode::BAD_REQUEST,
                 "invalid_request",
