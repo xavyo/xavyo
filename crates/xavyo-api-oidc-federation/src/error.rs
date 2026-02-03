@@ -134,6 +134,22 @@ pub enum FederationError {
 
     #[error("Missing required claim: {0}")]
     MissingRequiredClaim(String),
+
+    // JWT verification errors (F-045)
+    #[error("Token verification failed: {0}")]
+    TokenVerificationFailed(String),
+
+    #[error("Token has expired")]
+    TokenExpired,
+
+    #[error("Invalid issuer: {0}")]
+    InvalidIssuer(String),
+
+    #[error("Failed to fetch JWKS: {0}")]
+    JwksFetchFailed(String),
+
+    #[error("JWKS key not found: {0}")]
+    JwksKeyNotFound(String),
 }
 
 /// Error response body.
@@ -310,6 +326,34 @@ impl IntoResponse for FederationError {
                     "Failed to issue tokens".to_string(),
                 )
             }
+            FederationError::TokenVerificationFailed(msg) => (
+                StatusCode::UNAUTHORIZED,
+                "token_verification_failed",
+                format!("Token verification failed: {}", msg),
+            ),
+            FederationError::TokenExpired => (
+                StatusCode::UNAUTHORIZED,
+                "token_expired",
+                "Token has expired".to_string(),
+            ),
+            FederationError::InvalidIssuer(iss) => (
+                StatusCode::UNAUTHORIZED,
+                "invalid_issuer",
+                format!("Invalid or untrusted issuer: {}", iss),
+            ),
+            FederationError::JwksFetchFailed(msg) => {
+                tracing::error!("JWKS fetch failed: {}", msg);
+                (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "jwks_fetch_failed",
+                    "Failed to fetch identity provider keys".to_string(),
+                )
+            }
+            FederationError::JwksKeyNotFound(kid) => (
+                StatusCode::UNAUTHORIZED,
+                "jwks_key_not_found",
+                format!("Signing key not found: {}", kid),
+            ),
 
             // 500 Internal Server Error
             FederationError::Database(e) => {
