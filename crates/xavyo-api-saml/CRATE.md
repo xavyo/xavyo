@@ -12,9 +12,9 @@ api
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with comprehensive security and group assertion test coverage (70 tests). Needs SP interoperability testing.
+Production-ready with comprehensive security, group assertion, and SP interoperability test coverage (112 tests).
 
 ### Test Coverage
 
@@ -23,7 +23,26 @@ Functional with comprehensive security and group assertion test coverage (70 tes
 | Unit tests | 24 | Core service tests |
 | Security tests | 28 | Session storage, expiration, replay attack prevention |
 | Group assertion tests | 18 | Group loading, filtering, formatting |
-| **Total** | **70** | Full coverage for session security and group assertions |
+| SP interop tests | 42 | Salesforce, ServiceNow, Workday, AWS SSO compatibility |
+| **Total** | **112** | Full coverage for production deployment |
+
+### SP Interoperability Tests (F-040)
+
+| Service Provider | Test Count | Key Validations |
+|------------------|------------|-----------------|
+| Salesforce | 10 | EmailAddress NameID, FederationIdentifier, User.Email, RSA-SHA256 |
+| ServiceNow | 8 | user_name, user_email, multi-value Roles, SessionIndex |
+| Workday | 7 | Unspecified NameID, WorkdayID, mandatory signatures, strict timing |
+| AWS SSO | 9 | Persistent NameID, Role ARN pairs, RoleSessionName, SessionDuration |
+| Common utilities | 8 | XML parsing, SP profiles, test fixtures |
+
+### SP Integration Documentation
+
+Comprehensive integration guides available in `docs/`:
+- `docs/salesforce.md` - Salesforce SAML configuration guide
+- `docs/servicenow.md` - ServiceNow SAML configuration guide
+- `docs/workday.md` - Workday SAML configuration guide (with quirks!)
+- `docs/aws-sso.md` - AWS IAM Identity Center SAML guide
 
 ### Security Features (F-038)
 
@@ -208,8 +227,19 @@ let app = Router::new()
 ## Integration Points
 
 - **Consumed by**: `idp-api` main application
-- **Integrates with**: Salesforce, ServiceNow, Workday, custom SPs
+- **Integrates with**: Salesforce, ServiceNow, Workday, AWS SSO, custom SPs
 - **Uses**: `xavyo-api-auth` for user authentication
+
+### Verified Service Providers
+
+The following SPs have been verified through interoperability testing:
+
+| Provider | NameID Format | Key Attributes | Documentation |
+|----------|---------------|----------------|---------------|
+| Salesforce | emailAddress | FederationIdentifier, User.Email | `docs/salesforce.md` |
+| ServiceNow | emailAddress | user_name, user_email, Roles | `docs/servicenow.md` |
+| Workday | unspecified | WorkdayID (mandatory signature) | `docs/workday.md` |
+| AWS SSO | persistent | Role (ARN pairs), RoleSessionName | `docs/aws-sso.md` |
 
 ## Feature Flags
 
