@@ -70,7 +70,7 @@ Criteria:
 | Crate | Status | Tests | Public Items | Notes |
 |-------|--------|-------|--------------|-------|
 | xavyo-connector-ldap | 🟢 stable | 239 | 31 | Most mature connector |
-| xavyo-connector-entra | 🟡 beta | 22 | 12 | Functional, limited tests |
+| xavyo-connector-entra | 🟢 stable | 64 | 42 | Production-ready with rate limiting |
 | xavyo-connector-rest | 🔴 alpha | 36 | 7 | Stub implementation |
 | xavyo-connector-database | 🔴 alpha | 33 | 4 | Skeleton only |
 
@@ -99,8 +99,8 @@ Criteria:
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 16 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-governance, xavyo-api-auth, xavyo-api-oauth, xavyo-api-agents, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import |
-| 🟡 Beta | 14 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-connector-entra, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi, xavyo-api-authorization |
+| 🟢 Stable | 17 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-governance, xavyo-api-auth, xavyo-api-oauth, xavyo-api-agents, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import |
+| 🟡 Beta | 13 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi, xavyo-api-authorization |
 | 🔴 Alpha | 2 | xavyo-connector-rest, xavyo-connector-database |
 
 ---

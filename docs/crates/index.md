@@ -39,7 +39,7 @@ Identity source implementations.
 | Crate | Description | Status |
 |-------|-------------|--------|
 | [xavyo-connector-ldap](../../crates/xavyo-connector-ldap/CRATE.md) | LDAP/Active Directory connector | 🟢 stable |
-| [xavyo-connector-entra](../../crates/xavyo-connector-entra/CRATE.md) | Microsoft Entra ID connector | 🟡 beta |
+| [xavyo-connector-entra](../../crates/xavyo-connector-entra/CRATE.md) | Microsoft Entra ID connector | 🟢 stable |
 | [xavyo-connector-rest](../../crates/xavyo-connector-rest/CRATE.md) | Generic REST API connector | 🔴 alpha |
 | [xavyo-connector-database](../../crates/xavyo-connector-database/CRATE.md) | SQL database connector | 🔴 alpha |
 

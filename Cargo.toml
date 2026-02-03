@@ -68,6 +68,9 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 # Async utilities
 async-trait = "0.1"
 
+# Random number generation
+rand = "0.8"
+
 # Testing
 tokio-test = "0.4"
 axum-test = "15.3"

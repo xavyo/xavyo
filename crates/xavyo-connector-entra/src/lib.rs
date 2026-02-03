@@ -35,18 +35,23 @@
 //! ```
 
 mod auth;
+mod circuit_breaker;
 mod config;
 mod connector;
 mod error;
 mod graph_client;
 mod groups;
+mod metrics;
 mod provisioning;
+mod rate_limit;
+mod request_queue;
 mod roles;
 mod schema;
 mod sync;
 
 // Re-exports
 pub use auth::TokenCache;
+pub use circuit_breaker::{CircuitBreaker, CircuitBreakerState};
 pub use config::{
     EntraCloudEnvironment, EntraConfig, EntraConfigBuilder, EntraConflictStrategy, EntraCredentials,
 };
@@ -54,4 +59,7 @@ pub use connector::EntraConnector;
 pub use error::{EntraError, EntraResult};
 pub use graph_client::GraphClient;
 pub use groups::MappedEntraGroup;
+pub use metrics::RateLimitMetrics;
+pub use rate_limit::{RateLimitConfig, RateLimitState, RateLimiter};
+pub use request_queue::RequestQueue;
 pub use sync::MappedEntraUser;

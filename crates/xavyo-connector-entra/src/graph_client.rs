@@ -6,6 +6,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, instrument, warn};
 
+use crate::metrics::RateLimitMetrics;
+use crate::rate_limit::{RateLimitConfig, RateLimiter};
 use crate::{EntraCloudEnvironment, EntraError, EntraResult, TokenCache};
 
 /// OData error response from Microsoft Graph.
@@ -41,6 +43,7 @@ pub struct GraphClient {
     cloud_environment: EntraCloudEnvironment,
     api_version: String,
     max_retries: u32,
+    rate_limiter: Arc<RateLimiter>,
 }
 
 impl GraphClient {
@@ -54,10 +57,32 @@ impl GraphClient {
         cloud_environment: EntraCloudEnvironment,
         api_version: String,
     ) -> EntraResult<Self> {
+        Self::with_rate_limit_config(
+            token_cache,
+            cloud_environment,
+            api_version,
+            RateLimitConfig::default(),
+        )
+    }
+
+    /// Creates a new Graph client with custom rate limit configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP client cannot be created or rate limit config is invalid.
+    pub fn with_rate_limit_config(
+        token_cache: Arc<TokenCache>,
+        cloud_environment: EntraCloudEnvironment,
+        api_version: String,
+        rate_limit_config: RateLimitConfig,
+    ) -> EntraResult<Self> {
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(|e| EntraError::Config(format!("Failed to create HTTP client: {}", e)))?;
+
+        let rate_limiter = RateLimiter::new(rate_limit_config)
+            .map_err(|e| EntraError::Config(format!("Invalid rate limit config: {}", e)))?;
 
         Ok(Self {
             http_client,
@@ -65,7 +90,18 @@ impl GraphClient {
             cloud_environment,
             api_version,
             max_retries: 5,
+            rate_limiter: Arc::new(rate_limiter),
         })
+    }
+
+    /// Returns the rate limiter for direct access.
+    pub fn rate_limiter(&self) -> &Arc<RateLimiter> {
+        &self.rate_limiter
+    }
+
+    /// Returns current rate limit metrics.
+    pub async fn rate_limit_metrics(&self) -> RateLimitMetrics {
+        self.rate_limiter.get_metrics().await
     }
 
     /// Returns the base URL for Graph API requests.
@@ -120,7 +156,11 @@ impl GraphClient {
         url: &str,
         body: Option<&B>,
     ) -> EntraResult<T> {
+        // Check circuit breaker before attempting request
+        self.rate_limiter.should_allow_request().await?;
+
         let mut retries = 0;
+        let mut rate_limit_attempts = 0u32;
         let mut delay = Duration::from_secs(1);
 
         loop {
@@ -138,17 +178,19 @@ impl GraphClient {
             let response = request.send().await?;
             let status = response.status();
 
-            // Handle rate limiting (429)
+            // Handle rate limiting (429) using RateLimiter
             if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
                 let retry_after = response
                     .headers()
                     .get("Retry-After")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(60);
+                    .and_then(|v| v.to_str().ok());
 
-                warn!("Rate limited, waiting {} seconds", retry_after);
-                tokio::time::sleep(Duration::from_secs(retry_after)).await;
+                // Use rate limiter to handle with exponential backoff and jitter
+                self.rate_limiter
+                    .handle_rate_limit_response(retry_after, rate_limit_attempts)
+                    .await?;
+
+                rate_limit_attempts += 1;
                 continue;
             }
 
@@ -172,6 +214,7 @@ impl GraphClient {
 
             // Handle success
             if status.is_success() {
+                self.rate_limiter.record_success().await;
                 return response.json().await.map_err(EntraError::from);
             }
 
@@ -199,7 +242,11 @@ impl GraphClient {
         method: reqwest::Method,
         url: &str,
     ) -> EntraResult<()> {
+        // Check circuit breaker before attempting request
+        self.rate_limiter.should_allow_request().await?;
+
         let mut retries = 0;
+        let mut rate_limit_attempts = 0u32;
         let mut delay = Duration::from_secs(1);
 
         loop {
@@ -214,17 +261,19 @@ impl GraphClient {
 
             let status = response.status();
 
-            // Handle rate limiting
+            // Handle rate limiting using RateLimiter
             if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
                 let retry_after = response
                     .headers()
                     .get("Retry-After")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(60);
+                    .and_then(|v| v.to_str().ok());
 
-                warn!("Rate limited, waiting {} seconds", retry_after);
-                tokio::time::sleep(Duration::from_secs(retry_after)).await;
+                // Use rate limiter to handle with exponential backoff and jitter
+                self.rate_limiter
+                    .handle_rate_limit_response(retry_after, rate_limit_attempts)
+                    .await?;
+
+                rate_limit_attempts += 1;
                 continue;
             }
 
@@ -248,6 +297,7 @@ impl GraphClient {
 
             // Success (usually 204 No Content for DELETE)
             if status.is_success() {
+                self.rate_limiter.record_success().await;
                 return Ok(());
             }
 
