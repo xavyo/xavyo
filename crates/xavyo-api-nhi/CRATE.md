@@ -14,7 +14,7 @@ api
 
 🟡 **beta**
 
-Functional with adequate test coverage (55 tests). Unified NHI API working; lacks integration tests.
+Functional with comprehensive test coverage (55 unit tests + 22 integration tests). Unified NHI API working; integration tests cover all user stories.
 
 ## Dependencies
 
@@ -73,6 +73,25 @@ let app = Router::new()
 ## Feature Flags
 
 None
+
+## Testing
+
+### Integration Tests (F-047)
+
+The crate includes 22 integration tests organized by user story:
+
+| Test File | Description | Tests |
+|-----------|-------------|-------|
+| `service_account_tests.rs` | Service account lifecycle (CRUD, suspend, reactivate) | 6 |
+| `credential_tests.rs` | Credential rotation and revocation | 4 |
+| `unified_list_tests.rs` | Unified NHI listing with filters and pagination | 4 |
+| `governance_tests.rs` | Risk scoring and certification | 4 |
+| `tenant_isolation_tests.rs` | Multi-tenant data isolation | 4 |
+
+Run integration tests:
+```bash
+cargo test -p xavyo-api-nhi --test integration_tests
+```
 
 ## Anti-Patterns
 
