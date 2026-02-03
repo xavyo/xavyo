@@ -25,7 +25,7 @@ Business logic independent of HTTP transport.
 |-------|-------------|--------|
 | [xavyo-connector](../../crates/xavyo-connector/CRATE.md) | Abstract connector traits and types | 🟢 stable |
 | [xavyo-provisioning](../../crates/xavyo-provisioning/CRATE.md) | Sync engine, reconciliation, Rhai scripts | 🟡 beta |
-| [xavyo-governance](../../crates/xavyo-governance/CRATE.md) | Access requests, certifications, SoD | 🟡 beta |
+| [xavyo-governance](../../crates/xavyo-governance/CRATE.md) | Access requests, certifications, SoD | 🟢 stable |
 | [xavyo-authorization](../../crates/xavyo-authorization/CRATE.md) | Authorization engine (PDP) | 🟡 beta |
 | [xavyo-webhooks](../../crates/xavyo-webhooks/CRATE.md) | Event subscriptions and delivery | 🟡 beta |
 | [xavyo-siem](../../crates/xavyo-siem/CRATE.md) | Audit log export (syslog, Splunk) | 🟡 beta |
