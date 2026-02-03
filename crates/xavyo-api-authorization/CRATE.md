@@ -12,9 +12,9 @@ api
 
 ## Status
 
-🔴 **alpha**
+🟡 **beta**
 
-Experimental with minimal test coverage (8 tests). Basic API structure defined; full policy evaluation not yet implemented.
+Functional with comprehensive integration test coverage (36 tests). Policy CRUD operations fully tested including validation, authorization checks, tenant isolation, and edge cases. Ready for production use with monitoring.
 
 ## Dependencies
 
@@ -74,7 +74,7 @@ let app = Router::new()
 
 ## Feature Flags
 
-None
+- `integration` - Enable integration tests (requires test database)
 
 ## Anti-Patterns
 

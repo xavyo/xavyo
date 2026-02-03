@@ -88,7 +88,7 @@ Criteria:
 | xavyo-api-governance | 🟢 stable | 1058 | 180+ | 135K LOC, massive coverage |
 | xavyo-api-connectors | 🟡 beta | 69 | 42 | 6 TODOs |
 | xavyo-api-tenants | 🟢 stable | 121 | 38 | Multi-tenant bootstrap complete |
-| xavyo-api-authorization | 🔴 alpha | 8 | 37 | Early-stage |
+| xavyo-api-authorization | 🟡 beta | 36+ | 37 | Integration tests complete |
 | xavyo-api-import | 🔴 alpha | 22 | 21 | Not validated |
 | xavyo-api-oidc-federation | 🟡 beta | 13 | 16 | Insufficient coverage |
 | xavyo-api-nhi | 🟡 beta | 55 | 33 | No integration tests |
@@ -100,8 +100,8 @@ Criteria:
 | Status | Count | Crates |
 |--------|-------|--------|
 | 🟢 Stable | 15 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-governance, xavyo-api-auth, xavyo-api-oauth, xavyo-api-agents, xavyo-api-governance, xavyo-api-tenants |
-| 🟡 Beta | 13 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-connector-entra, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi |
-| 🔴 Alpha | 4 | xavyo-connector-rest, xavyo-connector-database, xavyo-api-authorization, xavyo-api-import |
+| 🟡 Beta | 14 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-connector-entra, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi, xavyo-api-authorization |
+| 🔴 Alpha | 3 | xavyo-connector-rest, xavyo-connector-database, xavyo-api-import |
 
 ---
 
@@ -138,4 +138,4 @@ Maturity was assessed based on:
 
 ---
 
-*Last updated: 2026-02-02*
+*Last updated: 2026-02-03*
