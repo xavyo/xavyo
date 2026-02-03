@@ -51,7 +51,7 @@ REST endpoints exposed to clients.
 |-------|-------------|--------|
 | [xavyo-api-auth](../../crates/xavyo-api-auth/CRATE.md) | Login, MFA, sessions, password reset | 🟢 stable |
 | [xavyo-api-oauth](../../crates/xavyo-api-oauth/CRATE.md) | OAuth2/OIDC provider endpoints | 🟢 stable |
-| [xavyo-api-users](../../crates/xavyo-api-users/CRATE.md) | User CRUD and attributes | 🟡 beta |
+| [xavyo-api-users](../../crates/xavyo-api-users/CRATE.md) | User CRUD and attributes | 🟢 stable |
 | [xavyo-api-scim](../../crates/xavyo-api-scim/CRATE.md) | SCIM 2.0 inbound provisioning | 🟡 beta |
 | [xavyo-api-saml](../../crates/xavyo-api-saml/CRATE.md) | SAML 2.0 IdP endpoints | 🟡 beta |
 | [xavyo-api-social](../../crates/xavyo-api-social/CRATE.md) | Social login providers | 🟡 beta |

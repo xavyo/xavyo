@@ -44,7 +44,7 @@
 ### API (14 crates)
 - [xavyo-api-auth](crates/xavyo-api-auth/CRATE.md): 🟢 Auth endpoints
 - [xavyo-api-oauth](crates/xavyo-api-oauth/CRATE.md): 🟢 OAuth2/OIDC provider
-- [xavyo-api-users](crates/xavyo-api-users/CRATE.md): 🟡 User management
+- [xavyo-api-users](crates/xavyo-api-users/CRATE.md): 🟢 User management
 - [xavyo-api-scim](crates/xavyo-api-scim/CRATE.md): 🟡 SCIM provisioning
 - [xavyo-api-saml](crates/xavyo-api-saml/CRATE.md): 🟡 SAML IdP
 - [xavyo-api-social](crates/xavyo-api-social/CRATE.md): 🟡 Social login
