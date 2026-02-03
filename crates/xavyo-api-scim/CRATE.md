@@ -12,9 +12,18 @@ api
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with comprehensive test coverage (225 tests). SCIM 2.0 compliant with IdP interoperability tests for Okta, Azure AD, and OneLogin. Mock IdP clients available for CI testing.
+Production-ready with comprehensive test coverage (381 tests). RFC 7644 compliant with full protocol compliance test suite and IdP interoperability tests for Okta, Azure AD, and OneLogin.
+
+### Test Coverage
+
+| Test Suite | Count | Description |
+|------------|-------|-------------|
+| Unit tests | 45 | Core service tests |
+| Protocol compliance | 156 | RFC 7644 compliance (filter, PATCH, error, ETag, bulk) |
+| IdP interoperability | 120 | Okta, Azure AD, OneLogin mock clients |
+| Quirks validation | 60 | Mock client accuracy validation |
 
 ### IdP Compatibility
 
