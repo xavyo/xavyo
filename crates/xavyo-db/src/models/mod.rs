@@ -930,11 +930,16 @@ pub use revoked_token::{CreateRevokedToken, RevokedToken};
 pub use signing_key::{CreateSigningKey, SigningKey};
 
 // Webhook models (F085)
+pub mod webhook_circuit_breaker;
 pub mod webhook_delivery;
+pub mod webhook_dlq;
 pub mod webhook_subscription;
 
 // Webhook exports (F085)
+// Note: CircuitState is already exported from connector_health
+pub use webhook_circuit_breaker::{UpsertCircuitBreakerState, WebhookCircuitBreakerState};
 pub use webhook_delivery::{CreateWebhookDelivery, WebhookDelivery};
+pub use webhook_dlq::{CreateWebhookDlqEntry, DlqFilter, WebhookDlqEntry};
 pub use webhook_subscription::{
     CreateWebhookSubscription, UpdateWebhookSubscription, WebhookSubscription,
 };
