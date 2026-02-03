@@ -12,9 +12,9 @@ domain
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with good test coverage (115 tests). All export formats implemented; lacks integration tests with real SIEM systems.
+Comprehensive test coverage (266 tests, including 151 integration tests). All export formats implemented with RFC 5424 and CEF v0 compliance validation. Full integration test suite covering syslog TCP/TLS/UDP, Splunk HEC, webhooks, batch exports, circuit breaker patterns, and SSRF protection.
 
 ## Dependencies
 
@@ -151,7 +151,7 @@ batch_exporter.export(BatchExportJob {
 
 ## Feature Flags
 
-None - all features are enabled by default.
+- `integration` - Enables integration test dependencies (wiremock, rcgen, tokio-util)
 
 ## Anti-Patterns
 
