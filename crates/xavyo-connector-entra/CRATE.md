@@ -14,7 +14,7 @@ connector
 
 🟢 **stable**
 
-Production-ready with comprehensive test coverage (64 tests). Core Graph API operations complete with robust rate limit handling, circuit breaker pattern, and request queuing.
+Production-ready with comprehensive test coverage (116 tests: 64 unit tests + 52 integration tests). Core Graph API operations complete with robust rate limit handling, circuit breaker pattern, and request queuing.
 
 ## Dependencies
 
@@ -200,7 +200,40 @@ println!("Circuit state: {:?}", metrics.current_circuit_state);
 
 ## Feature Flags
 
-None - all features are enabled by default.
+- `integration` - Enables integration tests (disabled by default)
+
+## Integration Tests
+
+The crate includes 52 integration tests covering real-world scenarios with mock Graph API responses:
+
+### Test Suites
+
+| Suite | Tests | Description |
+|-------|-------|-------------|
+| `user_sync_tests` | 8 | Full user sync, pagination, disabled users, special characters |
+| `delta_sync_tests` | 10 | Delta sync tokens, change detection (create/update/delete), token progression |
+| `group_sync_tests` | 9 | Group sync, membership, transitive members, security vs M365 groups |
+| `multi_cloud_tests` | 8 | Commercial, US Government, China, Germany cloud endpoints |
+| `provisioning_tests` | 10 | User create/update/disable/delete, batch operations, error handling |
+| `rate_limit_integration_tests` | 6 | 429 handling, concurrent throttling, recovery scenarios |
+
+### Running Integration Tests
+
+```bash
+# Run all integration tests
+cargo test -p xavyo-connector-entra --features integration
+
+# Run specific test suite
+cargo test -p xavyo-connector-entra --features integration --test user_sync_tests
+```
+
+### Test Infrastructure
+
+Integration tests use [wiremock](https://github.com/LukeMathWalker/wiremock-rs) to mock Microsoft Graph API responses, enabling:
+- Deterministic testing without live API calls
+- Rate limit and error scenario simulation
+- Multi-cloud endpoint validation
+- Pagination and delta sync token testing
 
 ## Rate Limit Handling
 

@@ -48,6 +48,10 @@ xavyo-connector = { path = "../xavyo-connector" }
 # Core types (TenantId, etc.)
 xavyo-core = { path = "../xavyo-core" }
 
+[features]
+default = []
+integration = []
+
 [dev-dependencies]
 # Test utilities
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
