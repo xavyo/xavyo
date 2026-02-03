@@ -20,7 +20,8 @@ use xavyo_db::models::{
 use crate::handlers::reconciliation::{
     ActionSummary, BulkRemediateItem, BulkRemediationResponse, BulkRemediationSummary,
     DiscrepancySummary, PerformanceMetrics, PreviewItem, PreviewResponse, PreviewSummary,
-    ReconciliationStatistics, RemediationResponse, ReportResponse, RunInfo, TrendResponse,
+    ReconciliationStatistics, RemediationResponse, ReportResponse, RunInfo, TrendDataPoint,
+    TrendResponse,
 };
 
 /// Error type for reconciliation service operations.
@@ -680,7 +681,7 @@ impl ReconciliationService {
     #[instrument(skip(self))]
     pub async fn get_trend(
         &self,
-        _tenant_id: Uuid,
+        tenant_id: Uuid,
         connector_id: Option<Uuid>,
         from: Option<DateTime<Utc>>,
         to: Option<DateTime<Utc>>,
@@ -688,10 +689,38 @@ impl ReconciliationService {
         let to_date = to.unwrap_or_else(Utc::now);
         let from_date = from.unwrap_or_else(|| to_date - Duration::days(30));
 
-        // TODO: In production, this would aggregate discrepancy data by date
-        // For now, return empty trend data
+        // Fetch trend data from database
+        let raw_points = ReconciliationDiscrepancy::get_trend_by_date(
+            &self.pool,
+            tenant_id,
+            connector_id,
+            from_date,
+            to_date,
+        )
+        .await?;
+
+        // Aggregate by date - group (date, type, count) into TrendDataPoint per date
+        let mut date_map: HashMap<String, TrendDataPoint> = HashMap::new();
+
+        for point in raw_points {
+            let date_str = point.date.to_string();
+            let entry = date_map
+                .entry(date_str.clone())
+                .or_insert_with(|| TrendDataPoint {
+                    date: date_str,
+                    total: 0,
+                    by_type: HashMap::new(),
+                });
+            entry.total += point.count as u32;
+            *entry.by_type.entry(point.discrepancy_type).or_insert(0) += point.count as u32;
+        }
+
+        // Sort by date and collect
+        let mut data_points: Vec<TrendDataPoint> = date_map.into_values().collect();
+        data_points.sort_by(|a, b| a.date.cmp(&b.date));
+
         Ok(TrendResponse {
-            data_points: vec![],
+            data_points,
             connector_id,
             from: from_date,
             to: to_date,

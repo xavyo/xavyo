@@ -679,17 +679,15 @@ impl ConnectorService {
                 )
             })?;
 
-        // Parse driver (default to PostgreSQL)
+        // Parse driver (only PostgreSQL supported per constitution)
         let driver = config
             .get("driver")
             .and_then(|v| v.as_str())
             .map(|s| match s.to_lowercase().as_str() {
                 "postgresql" | "postgres" => Ok(DatabaseDriver::PostgreSQL),
-                "mysql" | "mariadb" => Ok(DatabaseDriver::MySQL),
-                "mssql" | "sqlserver" => Ok(DatabaseDriver::MsSQL),
-                "oracle" => Ok(DatabaseDriver::Oracle),
+                // MySQL, MSSQL, Oracle skipped per Constitution Principle XI
                 _ => Err(ConnectorApiError::InvalidConfiguration(format!(
-                    "Invalid database driver: {}",
+                    "Unsupported database driver: {}. Only PostgreSQL is supported.",
                     s
                 ))),
             })
