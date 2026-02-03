@@ -68,6 +68,7 @@ pub mod remediation;
 pub mod report;
 pub mod scheduler;
 pub mod statistics;
+pub mod transaction;
 pub mod types;
 
 // Re-export main types
@@ -81,6 +82,7 @@ pub use remediation::{RemediationExecutor, RemediationResult as RemediationOutco
 pub use report::{ReconciliationReport, ReportGenerator};
 pub use scheduler::{ReconciliationScheduler, ScheduleConfig};
 pub use statistics::{RunStatistics, StatisticsTracker};
+pub use transaction::{CompletedStep, RemediationTransaction, RollbackError, TransactionStatus};
 pub use types::{
     ActionType, DiscrepancyType, ReconciliationMode, RemediationDirection, ResolutionStatus,
     RunStatus,

@@ -1,13 +1,22 @@
 //! Remediation action execution for reconciliation.
 //!
 //! Executes actions to resolve discrepancies detected during reconciliation.
+//! Supports create, update, delete operations through connectors, shadow link
+//! management, and identity inactivation.
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use std::sync::Arc;
 use uuid::Uuid;
 
+use super::transaction::{CompletedStep, RemediationTransaction};
 use super::types::{ActionResult, ActionType, RemediationDirection};
+use crate::shadow::{Shadow, ShadowRepository};
+use xavyo_connector::error::{ConnectorError, ConnectorResult};
+use xavyo_connector::operation::{AttributeDelta, AttributeSet, Uid};
+use xavyo_connector::traits::{CreateOp, DeleteOp, SearchOp, UpdateOp};
 
 /// Result of a remediation action.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,16 +216,97 @@ impl BulkRemediationResult {
     }
 }
 
-/// Executor for remediation actions.
-pub struct RemediationExecutor {
-    /// Tenant ID.
-    tenant_id: Uuid,
+/// Trait for providing connector instances at runtime.
+#[async_trait]
+pub trait ConnectorProvider: Send + Sync {
+    /// Get a connector by ID that supports create operations.
+    async fn get_create_connector(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+    ) -> ConnectorResult<Arc<dyn CreateOp>>;
+
+    /// Get a connector by ID that supports update operations.
+    async fn get_update_connector(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+    ) -> ConnectorResult<Arc<dyn UpdateOp>>;
+
+    /// Get a connector by ID that supports delete operations.
+    async fn get_delete_connector(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+    ) -> ConnectorResult<Arc<dyn DeleteOp>>;
+
+    /// Get a connector by ID that supports search operations.
+    async fn get_search_connector(
+        &self,
+        tenant_id: Uuid,
+        connector_id: Uuid,
+    ) -> ConnectorResult<Arc<dyn SearchOp>>;
 }
 
-impl RemediationExecutor {
-    /// Create a new executor.
-    pub fn new(tenant_id: Uuid) -> Self {
-        Self { tenant_id }
+/// Trait for identity service operations.
+#[async_trait]
+pub trait IdentityService: Send + Sync {
+    /// Get identity attributes for provisioning.
+    async fn get_identity_attributes(
+        &self,
+        tenant_id: Uuid,
+        identity_id: Uuid,
+    ) -> Result<AttributeSet, String>;
+
+    /// Update identity with external attributes.
+    async fn update_identity(
+        &self,
+        tenant_id: Uuid,
+        identity_id: Uuid,
+        attributes: AttributeSet,
+    ) -> Result<(), String>;
+
+    /// Inactivate an identity.
+    async fn inactivate_identity(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<(), String>;
+
+    /// Check if identity is active.
+    async fn is_identity_active(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<bool, String>;
+}
+
+/// Executor for remediation actions.
+pub struct RemediationExecutor<C, I>
+where
+    C: ConnectorProvider,
+    I: IdentityService,
+{
+    /// Tenant ID.
+    tenant_id: Uuid,
+    /// Connector provider for runtime connector lookup.
+    connector_provider: Arc<C>,
+    /// Shadow repository for link management.
+    shadow_repository: Arc<ShadowRepository>,
+    /// Identity service for identity operations.
+    identity_service: Arc<I>,
+}
+
+impl<C, I> RemediationExecutor<C, I>
+where
+    C: ConnectorProvider,
+    I: IdentityService,
+{
+    /// Create a new executor with dependencies.
+    pub fn new(
+        tenant_id: Uuid,
+        connector_provider: Arc<C>,
+        shadow_repository: Arc<ShadowRepository>,
+        identity_service: Arc<I>,
+    ) -> Self {
+        Self {
+            tenant_id,
+            connector_provider,
+            shadow_repository,
+            identity_service,
+        }
     }
 
     /// Execute a create action.
@@ -227,23 +317,110 @@ impl RemediationExecutor {
         discrepancy_id: Uuid,
         identity_id: Uuid,
         connector_id: Uuid,
+        object_class: &str,
         dry_run: bool,
     ) -> RemediationResult {
-        if dry_run {
-            return RemediationResult::success(discrepancy_id, ActionType::Create, true);
-        }
-
-        // TODO: Implement actual provisioning via connector
-        // For now, return success placeholder
         tracing::info!(
             tenant_id = %self.tenant_id,
             discrepancy_id = %discrepancy_id,
             identity_id = %identity_id,
             connector_id = %connector_id,
+            object_class = %object_class,
+            dry_run = %dry_run,
             "Executing create action"
         );
 
+        // Get identity attributes for provisioning
+        let attributes = match self
+            .identity_service
+            .get_identity_attributes(self.tenant_id, identity_id)
+            .await
+        {
+            Ok(attrs) => attrs,
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Create,
+                    format!("Failed to get identity attributes: {}", e),
+                    dry_run,
+                );
+            }
+        };
+
+        if dry_run {
+            // Return success with expected after_state
+            return RemediationResult::success(discrepancy_id, ActionType::Create, true)
+                .with_after_state(serde_json::to_value(&attributes).unwrap_or_default());
+        }
+
+        // Get connector with create capability
+        let connector = match self
+            .connector_provider
+            .get_create_connector(self.tenant_id, connector_id)
+            .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Create,
+                    format!("Failed to get connector: {}", e),
+                    false,
+                );
+            }
+        };
+
+        // Execute create operation
+        let uid = match connector.create(object_class, attributes.clone()).await {
+            Ok(uid) => uid,
+            Err(e) => {
+                let error_msg = format!("{} ({})", e, e.error_code());
+                tracing::error!(
+                    tenant_id = %self.tenant_id,
+                    discrepancy_id = %discrepancy_id,
+                    error = %error_msg,
+                    transient = %e.is_transient(),
+                    "Create operation failed"
+                );
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Create,
+                    error_msg,
+                    false,
+                );
+            }
+        };
+
+        // Create shadow link for the new account
+        let shadow = Shadow::new_linked(
+            self.tenant_id,
+            connector_id,
+            identity_id,
+            object_class.to_string(),
+            uid.value().to_string(),
+            serde_json::to_value(&attributes).unwrap_or_default(),
+        );
+
+        if let Err(e) = self.shadow_repository.upsert(&shadow).await {
+            tracing::warn!(
+                tenant_id = %self.tenant_id,
+                discrepancy_id = %discrepancy_id,
+                error = %e,
+                "Failed to create shadow link after account creation"
+            );
+            // Account was created, but shadow link failed - still return success
+            // but log the warning for manual cleanup
+        }
+
+        tracing::info!(
+            tenant_id = %self.tenant_id,
+            discrepancy_id = %discrepancy_id,
+            target_uid = %uid.value(),
+            "Create action completed successfully"
+        );
+
         RemediationResult::success(discrepancy_id, ActionType::Create, false)
+            .with_after_state(serde_json::to_value(&attributes).unwrap_or_default())
     }
 
     /// Execute an update action.
@@ -255,14 +432,10 @@ impl RemediationExecutor {
         identity_id: Uuid,
         external_uid: &str,
         connector_id: Uuid,
+        object_class: &str,
         direction: RemediationDirection,
         dry_run: bool,
     ) -> RemediationResult {
-        if dry_run {
-            return RemediationResult::success(discrepancy_id, ActionType::Update, true);
-        }
-
-        // TODO: Implement actual update via connector or identity service
         tracing::info!(
             tenant_id = %self.tenant_id,
             discrepancy_id = %discrepancy_id,
@@ -270,10 +443,257 @@ impl RemediationExecutor {
             external_uid = %external_uid,
             connector_id = %connector_id,
             direction = %direction,
+            dry_run = %dry_run,
             "Executing update action"
         );
 
+        // Get current shadow state for before_state capture
+        let shadow = match self
+            .shadow_repository
+            .find_by_target_uid(self.tenant_id, connector_id, external_uid)
+            .await
+        {
+            Ok(Some(s)) => s,
+            Ok(None) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Update,
+                    format!("Shadow not found for external UID: {}", external_uid),
+                    dry_run,
+                );
+            }
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Update,
+                    format!("Failed to lookup shadow: {}", e),
+                    dry_run,
+                );
+            }
+        };
+
+        let before_state = shadow.attributes.clone();
+
+        match direction {
+            RemediationDirection::XavyoToTarget => {
+                self.update_to_target(
+                    discrepancy_id,
+                    identity_id,
+                    external_uid,
+                    connector_id,
+                    object_class,
+                    before_state,
+                    dry_run,
+                )
+                .await
+            }
+            RemediationDirection::TargetToXavyo => {
+                self.update_to_source(
+                    discrepancy_id,
+                    identity_id,
+                    external_uid,
+                    connector_id,
+                    object_class,
+                    before_state,
+                    dry_run,
+                )
+                .await
+            }
+        }
+    }
+
+    /// Update target system with xavyo attributes.
+    async fn update_to_target(
+        &self,
+        discrepancy_id: Uuid,
+        identity_id: Uuid,
+        external_uid: &str,
+        connector_id: Uuid,
+        object_class: &str,
+        before_state: JsonValue,
+        dry_run: bool,
+    ) -> RemediationResult {
+        // Get identity attributes
+        let identity_attrs = match self
+            .identity_service
+            .get_identity_attributes(self.tenant_id, identity_id)
+            .await
+        {
+            Ok(attrs) => attrs,
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Update,
+                    format!("Failed to get identity attributes: {}", e),
+                    dry_run,
+                )
+                .with_before_state(before_state);
+            }
+        };
+
+        if dry_run {
+            return RemediationResult::success(discrepancy_id, ActionType::Update, true)
+                .with_before_state(before_state)
+                .with_after_state(serde_json::to_value(&identity_attrs).unwrap_or_default());
+        }
+
+        // Get connector
+        let connector = match self
+            .connector_provider
+            .get_update_connector(self.tenant_id, connector_id)
+            .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Update,
+                    format!("Failed to get connector: {}", e),
+                    false,
+                )
+                .with_before_state(before_state);
+            }
+        };
+
+        // Build attribute delta
+        let mut delta = AttributeDelta::new();
+        for (name, value) in identity_attrs.iter() {
+            delta.replace(name.clone(), value.clone());
+        }
+
+        let uid = Uid::from_value(external_uid);
+
+        // Execute update
+        if let Err(e) = connector.update(object_class, &uid, delta).await {
+            let error_msg = format!("{} ({})", e, e.error_code());
+            tracing::error!(
+                tenant_id = %self.tenant_id,
+                discrepancy_id = %discrepancy_id,
+                error = %error_msg,
+                "Update to target failed"
+            );
+            return RemediationResult::failure(
+                discrepancy_id,
+                ActionType::Update,
+                error_msg,
+                false,
+            )
+            .with_before_state(before_state);
+        }
+
+        // Update shadow with new expected state
+        if let Ok(Some(mut shadow)) = self
+            .shadow_repository
+            .find_by_target_uid(self.tenant_id, connector_id, external_uid)
+            .await
+        {
+            shadow.update_attributes(serde_json::to_value(&identity_attrs).unwrap_or_default());
+            let _ = self.shadow_repository.upsert(&shadow).await;
+        }
+
+        tracing::info!(
+            tenant_id = %self.tenant_id,
+            discrepancy_id = %discrepancy_id,
+            "Update to target completed successfully"
+        );
+
         RemediationResult::success(discrepancy_id, ActionType::Update, false)
+            .with_before_state(before_state)
+            .with_after_state(serde_json::to_value(&identity_attrs).unwrap_or_default())
+    }
+
+    /// Update xavyo with target system attributes.
+    async fn update_to_source(
+        &self,
+        discrepancy_id: Uuid,
+        identity_id: Uuid,
+        external_uid: &str,
+        connector_id: Uuid,
+        object_class: &str,
+        before_state: JsonValue,
+        dry_run: bool,
+    ) -> RemediationResult {
+        // Get current target attributes
+        let connector = match self
+            .connector_provider
+            .get_search_connector(self.tenant_id, connector_id)
+            .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Update,
+                    format!("Failed to get connector: {}", e),
+                    dry_run,
+                )
+                .with_before_state(before_state);
+            }
+        };
+
+        let uid = Uid::from_value(external_uid);
+        let target_attrs = match connector.get(object_class, &uid, None).await {
+            Ok(Some(attrs)) => attrs,
+            Ok(None) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Update,
+                    format!("Object not found in target: {}", external_uid),
+                    dry_run,
+                )
+                .with_before_state(before_state);
+            }
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Update,
+                    format!("Failed to get target attributes: {}", e),
+                    dry_run,
+                )
+                .with_before_state(before_state);
+            }
+        };
+
+        if dry_run {
+            return RemediationResult::success(discrepancy_id, ActionType::Update, true)
+                .with_before_state(before_state)
+                .with_after_state(serde_json::to_value(&target_attrs).unwrap_or_default());
+        }
+
+        // Update identity with target attributes
+        if let Err(e) = self
+            .identity_service
+            .update_identity(self.tenant_id, identity_id, target_attrs.clone())
+            .await
+        {
+            return RemediationResult::failure(
+                discrepancy_id,
+                ActionType::Update,
+                format!("Failed to update identity: {}", e),
+                false,
+            )
+            .with_before_state(before_state);
+        }
+
+        // Update shadow
+        if let Ok(Some(mut shadow)) = self
+            .shadow_repository
+            .find_by_target_uid(self.tenant_id, connector_id, external_uid)
+            .await
+        {
+            shadow.update_attributes(serde_json::to_value(&target_attrs).unwrap_or_default());
+            let _ = self.shadow_repository.upsert(&shadow).await;
+        }
+
+        tracing::info!(
+            tenant_id = %self.tenant_id,
+            discrepancy_id = %discrepancy_id,
+            "Update to source completed successfully"
+        );
+
+        RemediationResult::success(discrepancy_id, ActionType::Update, false)
+            .with_before_state(before_state)
+            .with_after_state(serde_json::to_value(&target_attrs).unwrap_or_default())
     }
 
     /// Execute a delete action.
@@ -284,22 +704,100 @@ impl RemediationExecutor {
         discrepancy_id: Uuid,
         external_uid: &str,
         connector_id: Uuid,
+        object_class: &str,
         dry_run: bool,
     ) -> RemediationResult {
-        if dry_run {
-            return RemediationResult::success(discrepancy_id, ActionType::Delete, true);
-        }
-
-        // TODO: Implement actual deletion via connector
         tracing::info!(
             tenant_id = %self.tenant_id,
             discrepancy_id = %discrepancy_id,
             external_uid = %external_uid,
             connector_id = %connector_id,
+            dry_run = %dry_run,
             "Executing delete action"
         );
 
+        // Get current shadow for before_state
+        let shadow = self
+            .shadow_repository
+            .find_by_target_uid(self.tenant_id, connector_id, external_uid)
+            .await
+            .ok()
+            .flatten();
+
+        let before_state = shadow
+            .as_ref()
+            .map(|s| s.attributes.clone())
+            .unwrap_or_default();
+
+        if dry_run {
+            return RemediationResult::success(discrepancy_id, ActionType::Delete, true)
+                .with_before_state(before_state);
+        }
+
+        // Get connector
+        let connector = match self
+            .connector_provider
+            .get_delete_connector(self.tenant_id, connector_id)
+            .await
+        {
+            Ok(c) => c,
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Delete,
+                    format!("Failed to get connector: {}", e),
+                    false,
+                )
+                .with_before_state(before_state);
+            }
+        };
+
+        let uid = Uid::from_value(external_uid);
+
+        // Execute delete
+        match connector.delete(object_class, &uid).await {
+            Ok(()) => {}
+            Err(ConnectorError::ObjectNotFound { .. }) => {
+                // Object already doesn't exist - treat as success (idempotent)
+                tracing::info!(
+                    tenant_id = %self.tenant_id,
+                    discrepancy_id = %discrepancy_id,
+                    external_uid = %external_uid,
+                    "Object not found during delete - treating as success"
+                );
+            }
+            Err(e) => {
+                let error_msg = format!("{} ({})", e, e.error_code());
+                tracing::error!(
+                    tenant_id = %self.tenant_id,
+                    discrepancy_id = %discrepancy_id,
+                    error = %error_msg,
+                    "Delete operation failed"
+                );
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Delete,
+                    error_msg,
+                    false,
+                )
+                .with_before_state(before_state);
+            }
+        }
+
+        // Mark shadow as deleted
+        if let Some(mut shadow) = shadow {
+            shadow.mark_deleted();
+            let _ = self.shadow_repository.upsert(&shadow).await;
+        }
+
+        tracing::info!(
+            tenant_id = %self.tenant_id,
+            discrepancy_id = %discrepancy_id,
+            "Delete action completed successfully"
+        );
+
         RemediationResult::success(discrepancy_id, ActionType::Delete, false)
+            .with_before_state(before_state)
     }
 
     /// Execute a link action.
@@ -313,21 +811,104 @@ impl RemediationExecutor {
         connector_id: Uuid,
         dry_run: bool,
     ) -> RemediationResult {
-        if dry_run {
-            return RemediationResult::success(discrepancy_id, ActionType::Link, true);
-        }
-
-        // TODO: Implement shadow link creation
         tracing::info!(
             tenant_id = %self.tenant_id,
             discrepancy_id = %discrepancy_id,
             identity_id = %identity_id,
             external_uid = %external_uid,
             connector_id = %connector_id,
+            dry_run = %dry_run,
             "Executing link action"
         );
 
+        // Check for existing shadow
+        let shadow = match self
+            .shadow_repository
+            .find_by_target_uid(self.tenant_id, connector_id, external_uid)
+            .await
+        {
+            Ok(Some(s)) => s,
+            Ok(None) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Link,
+                    format!("Shadow not found for external UID: {}", external_uid),
+                    dry_run,
+                );
+            }
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Link,
+                    format!("Failed to lookup shadow: {}", e),
+                    dry_run,
+                );
+            }
+        };
+
+        let before_state = serde_json::json!({
+            "user_id": shadow.user_id,
+            "sync_situation": shadow.sync_situation.as_str(),
+        });
+
+        // Check if already linked to this identity
+        if shadow.user_id == Some(identity_id) {
+            return RemediationResult::success(discrepancy_id, ActionType::Link, dry_run)
+                .with_before_state(before_state.clone())
+                .with_after_state(before_state);
+        }
+
+        // Check if already linked to a different identity (collision)
+        if let Some(existing_user_id) = shadow.user_id {
+            return RemediationResult::failure(
+                discrepancy_id,
+                ActionType::Link,
+                format!("Shadow already linked to identity: {}", existing_user_id),
+                dry_run,
+            )
+            .with_before_state(before_state);
+        }
+
+        if dry_run {
+            let after_state = serde_json::json!({
+                "user_id": identity_id,
+                "sync_situation": "linked",
+            });
+            return RemediationResult::success(discrepancy_id, ActionType::Link, true)
+                .with_before_state(before_state)
+                .with_after_state(after_state);
+        }
+
+        // Update shadow with link
+        let mut updated_shadow = shadow;
+        updated_shadow.link_to_user(identity_id);
+
+        if let Err(e) = self.shadow_repository.upsert(&updated_shadow).await {
+            return RemediationResult::failure(
+                discrepancy_id,
+                ActionType::Link,
+                format!("Failed to update shadow: {}", e),
+                false,
+            )
+            .with_before_state(before_state);
+        }
+
+        let after_state = serde_json::json!({
+            "user_id": identity_id,
+            "sync_situation": "linked",
+        });
+
+        tracing::info!(
+            tenant_id = %self.tenant_id,
+            discrepancy_id = %discrepancy_id,
+            identity_id = %identity_id,
+            external_uid = %external_uid,
+            "Link action completed successfully"
+        );
+
         RemediationResult::success(discrepancy_id, ActionType::Link, false)
+            .with_before_state(before_state)
+            .with_after_state(after_state)
     }
 
     /// Execute an unlink action.
@@ -341,21 +922,93 @@ impl RemediationExecutor {
         connector_id: Uuid,
         dry_run: bool,
     ) -> RemediationResult {
-        if dry_run {
-            return RemediationResult::success(discrepancy_id, ActionType::Unlink, true);
-        }
-
-        // TODO: Implement shadow link removal
         tracing::info!(
             tenant_id = %self.tenant_id,
             discrepancy_id = %discrepancy_id,
             identity_id = %identity_id,
             external_uid = %external_uid,
             connector_id = %connector_id,
+            dry_run = %dry_run,
             "Executing unlink action"
         );
 
+        // Get existing shadow
+        let shadow = match self
+            .shadow_repository
+            .find_by_target_uid(self.tenant_id, connector_id, external_uid)
+            .await
+        {
+            Ok(Some(s)) => s,
+            Ok(None) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Unlink,
+                    format!("Shadow not found for external UID: {}", external_uid),
+                    dry_run,
+                );
+            }
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::Unlink,
+                    format!("Failed to lookup shadow: {}", e),
+                    dry_run,
+                );
+            }
+        };
+
+        let before_state = serde_json::json!({
+            "user_id": shadow.user_id,
+            "sync_situation": shadow.sync_situation.as_str(),
+        });
+
+        // Check if already unlinked
+        if shadow.user_id.is_none() {
+            return RemediationResult::success(discrepancy_id, ActionType::Unlink, dry_run)
+                .with_before_state(before_state.clone())
+                .with_after_state(before_state);
+        }
+
+        if dry_run {
+            let after_state = serde_json::json!({
+                "user_id": null,
+                "sync_situation": "unlinked",
+            });
+            return RemediationResult::success(discrepancy_id, ActionType::Unlink, true)
+                .with_before_state(before_state)
+                .with_after_state(after_state);
+        }
+
+        // Update shadow to unlink
+        let mut updated_shadow = shadow;
+        updated_shadow.unlink();
+
+        if let Err(e) = self.shadow_repository.upsert(&updated_shadow).await {
+            return RemediationResult::failure(
+                discrepancy_id,
+                ActionType::Unlink,
+                format!("Failed to update shadow: {}", e),
+                false,
+            )
+            .with_before_state(before_state);
+        }
+
+        let after_state = serde_json::json!({
+            "user_id": null,
+            "sync_situation": "unlinked",
+        });
+
+        tracing::info!(
+            tenant_id = %self.tenant_id,
+            discrepancy_id = %discrepancy_id,
+            identity_id = %identity_id,
+            external_uid = %external_uid,
+            "Unlink action completed successfully"
+        );
+
         RemediationResult::success(discrepancy_id, ActionType::Unlink, false)
+            .with_before_state(before_state)
+            .with_after_state(after_state)
     }
 
     /// Execute an inactivate identity action.
@@ -367,23 +1020,285 @@ impl RemediationExecutor {
         identity_id: Uuid,
         dry_run: bool,
     ) -> RemediationResult {
-        if dry_run {
-            return RemediationResult::success(
-                discrepancy_id,
-                ActionType::InactivateIdentity,
-                true,
-            );
-        }
-
-        // TODO: Implement identity inactivation
         tracing::info!(
             tenant_id = %self.tenant_id,
             discrepancy_id = %discrepancy_id,
             identity_id = %identity_id,
+            dry_run = %dry_run,
             "Executing inactivate identity action"
         );
 
+        // Check current identity status
+        let is_active = match self
+            .identity_service
+            .is_identity_active(self.tenant_id, identity_id)
+            .await
+        {
+            Ok(active) => active,
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::InactivateIdentity,
+                    format!("Failed to check identity status: {}", e),
+                    dry_run,
+                );
+            }
+        };
+
+        let before_state = serde_json::json!({
+            "identity_id": identity_id,
+            "is_active": is_active,
+        });
+
+        // Already inactive - idempotent success
+        if !is_active {
+            return RemediationResult::success(
+                discrepancy_id,
+                ActionType::InactivateIdentity,
+                dry_run,
+            )
+            .with_before_state(before_state.clone())
+            .with_after_state(before_state);
+        }
+
+        if dry_run {
+            let after_state = serde_json::json!({
+                "identity_id": identity_id,
+                "is_active": false,
+            });
+            return RemediationResult::success(
+                discrepancy_id,
+                ActionType::InactivateIdentity,
+                true,
+            )
+            .with_before_state(before_state)
+            .with_after_state(after_state);
+        }
+
+        // Inactivate the identity
+        if let Err(e) = self
+            .identity_service
+            .inactivate_identity(self.tenant_id, identity_id)
+            .await
+        {
+            return RemediationResult::failure(
+                discrepancy_id,
+                ActionType::InactivateIdentity,
+                format!("Failed to inactivate identity: {}", e),
+                false,
+            )
+            .with_before_state(before_state);
+        }
+
+        let after_state = serde_json::json!({
+            "identity_id": identity_id,
+            "is_active": false,
+        });
+
+        tracing::info!(
+            tenant_id = %self.tenant_id,
+            discrepancy_id = %discrepancy_id,
+            identity_id = %identity_id,
+            "Inactivate identity action completed successfully"
+        );
+
         RemediationResult::success(discrepancy_id, ActionType::InactivateIdentity, false)
+            .with_before_state(before_state)
+            .with_after_state(after_state)
+    }
+
+    /// Begin a new remediation transaction.
+    pub fn begin_transaction(&self) -> RemediationTransaction {
+        RemediationTransaction::new(self.tenant_id)
+    }
+
+    /// Execute a create action within a transaction.
+    pub async fn execute_create_in_tx(
+        &self,
+        tx: &mut RemediationTransaction,
+        discrepancy_id: Uuid,
+        identity_id: Uuid,
+        connector_id: Uuid,
+        object_class: &str,
+    ) -> RemediationResult {
+        let result = self
+            .execute_create(
+                discrepancy_id,
+                identity_id,
+                connector_id,
+                object_class,
+                false,
+            )
+            .await;
+
+        if result.is_success() {
+            // Record step for potential rollback
+            let step = CompletedStep::new(
+                ActionType::Create,
+                result
+                    .after_state
+                    .as_ref()
+                    .and_then(|s| s.get("uid").and_then(|v| v.as_str()))
+                    .unwrap_or("unknown"),
+            )
+            .with_connector(connector_id)
+            .with_rollback(ActionType::Delete)
+            .with_rollback_context(serde_json::json!({
+                "object_class": object_class,
+            }));
+
+            tx.add_step(step);
+        }
+
+        result
+    }
+
+    /// Execute a link action within a transaction.
+    pub async fn execute_link_in_tx(
+        &self,
+        tx: &mut RemediationTransaction,
+        discrepancy_id: Uuid,
+        identity_id: Uuid,
+        external_uid: &str,
+        connector_id: Uuid,
+    ) -> RemediationResult {
+        let result = self
+            .execute_link(
+                discrepancy_id,
+                identity_id,
+                external_uid,
+                connector_id,
+                false,
+            )
+            .await;
+
+        if result.is_success() {
+            let step = CompletedStep::new(ActionType::Link, external_uid)
+                .with_connector(connector_id)
+                .with_before_state(result.before_state.clone().unwrap_or_default())
+                .with_rollback(ActionType::Unlink)
+                .with_rollback_context(serde_json::json!({
+                    "identity_id": identity_id,
+                }));
+
+            tx.add_step(step);
+        }
+
+        result
+    }
+
+    /// Rollback a transaction by executing inverse operations.
+    pub async fn rollback_transaction(&self, tx: &mut RemediationTransaction) {
+        let tx_id = tx.id;
+
+        // Collect steps info for iteration to avoid borrow issues
+        let steps_info: Vec<_> = tx
+            .steps
+            .iter()
+            .rev()
+            .map(|step| {
+                (
+                    step.action,
+                    step.target_id.clone(),
+                    step.connector_id,
+                    step.rollback_action,
+                    step.rollback_context.clone(),
+                )
+            })
+            .collect();
+
+        let mut rollback_errors = Vec::new();
+
+        for (idx, (action, target_id, connector_id, rollback_action, rollback_context)) in
+            steps_info.into_iter().enumerate()
+        {
+            if let Some(inverse_action) = rollback_action {
+                tracing::info!(
+                    tenant_id = %self.tenant_id,
+                    transaction_id = %tx_id,
+                    step_index = idx,
+                    original_action = %action,
+                    rollback_action = %inverse_action,
+                    target_id = %target_id,
+                    "Rolling back step"
+                );
+
+                let rollback_result = match inverse_action {
+                    ActionType::Delete => {
+                        if let Some(conn_id) = connector_id {
+                            let object_class = rollback_context
+                                .as_ref()
+                                .and_then(|c| c.get("object_class").and_then(|v| v.as_str()))
+                                .unwrap_or("user");
+
+                            self.execute_delete(
+                                Uuid::new_v4(), // Rollback doesn't have a discrepancy
+                                &target_id,
+                                conn_id,
+                                object_class,
+                                false,
+                            )
+                            .await
+                        } else {
+                            RemediationResult::failure(
+                                Uuid::new_v4(),
+                                inverse_action,
+                                "No connector ID for rollback".to_string(),
+                                false,
+                            )
+                        }
+                    }
+                    ActionType::Unlink => {
+                        if let Some(conn_id) = connector_id {
+                            let identity_id = rollback_context
+                                .as_ref()
+                                .and_then(|c| c.get("identity_id").and_then(|v| v.as_str()))
+                                .and_then(|s| Uuid::parse_str(s).ok())
+                                .unwrap_or_default();
+
+                            self.execute_unlink(
+                                Uuid::new_v4(),
+                                identity_id,
+                                &target_id,
+                                conn_id,
+                                false,
+                            )
+                            .await
+                        } else {
+                            RemediationResult::failure(
+                                Uuid::new_v4(),
+                                inverse_action,
+                                "No connector ID for rollback".to_string(),
+                                false,
+                            )
+                        }
+                    }
+                    _ => {
+                        tracing::warn!(
+                            transaction_id = %tx_id,
+                            action = %inverse_action,
+                            "Rollback not implemented for action type"
+                        );
+                        continue;
+                    }
+                };
+
+                if rollback_result.is_failure() {
+                    rollback_errors.push((
+                        idx,
+                        inverse_action,
+                        rollback_result.error_message.unwrap_or_default(),
+                    ));
+                }
+            }
+        }
+
+        // Record errors and mark as rolled back
+        for (idx, action, error) in rollback_errors {
+            tx.record_rollback_error(idx, action, error);
+        }
+
+        tx.mark_rolled_back();
     }
 }
 
