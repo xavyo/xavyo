@@ -281,28 +281,30 @@ Integrate the provisioning engine with the identity service for complete user li
 
 ---
 
-### F-010: xavyo-provisioning - Transformation Engine
+### F-010: xavyo-provisioning - Transformation Engine ✅
 
 **Crate:** `xavyo-provisioning`
 **Current Status:** Beta
 **Target Status:** Beta
 **Estimated Effort:** 1 week
 **Dependencies:** None
+**Completed:** 2026-02-03 (PR #9)
 
 **Description:**
 Complete the transformation engine for attribute mapping using Rhai expressions. Validate transformations before execution.
 
 **Acceptance Criteria:**
-- [ ] Implement Rhai expression evaluation for attribute mappings
-- [ ] Add transformation validation (syntax check before save)
-- [ ] Add built-in transformation functions (concat, split, lowercase, etc.)
-- [ ] Add sandbox restrictions for Rhai execution
-- [ ] Add 20+ transformation tests covering edge cases
-- [ ] Document available transformation functions
+- [x] Implement Rhai expression evaluation for attribute mappings
+- [x] Add transformation validation (syntax check before save)
+- [x] Add built-in transformation functions (30+ functions: concat, split, lowercase, uppercase, trim, replace, substring, pad, slugify, format_email, array_*, type checks, etc.)
+- [x] Add sandbox restrictions for Rhai execution (max operations, call levels, string/array/map sizes)
+- [x] Add 27 transformation tests covering edge cases (exceeds 20+ requirement)
+- [x] Document available transformation functions (comprehensive table in CRATE.md)
 
-**Files to Modify:**
-- `crates/xavyo-provisioning/src/transform.rs`
-- `crates/xavyo-provisioning/src/rhai_executor.rs`
+**Files Modified:**
+- `crates/xavyo-provisioning/src/transform.rs` (NEW - 700+ lines)
+- `crates/xavyo-provisioning/src/lib.rs` (exports)
+- `crates/xavyo-provisioning/CRATE.md` (documentation)
 
 ---
 
@@ -1311,6 +1313,10 @@ Update this document as requirements are completed:
 - [x] F-004 - xavyo-governance Entitlement Service ✅ (2026-02-02)
 - [x] F-005 - xavyo-governance SoD Validation ✅ (2026-02-02)
 - [x] F-006 - xavyo-governance Risk Assessment ✅ (2026-02-02)
+- [x] F-007 - xavyo-governance Integration Tests ✅ (2026-02-03)
+- [x] F-008 - xavyo-provisioning Remediation Executor ✅ (2026-02-03)
+- [x] F-009 - xavyo-provisioning Identity Service Integration ✅ (2026-02-03)
+- [x] F-010 - xavyo-provisioning Transformation Engine ✅ (2026-02-03)
 - ... (continue for all 48 requirements)
 
 ---

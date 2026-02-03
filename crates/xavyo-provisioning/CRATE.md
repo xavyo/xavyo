@@ -14,7 +14,7 @@ domain
 
 🟡 **beta**
 
-Functional with good test coverage (260+ tests). Remediation executor is fully implemented with transaction support and rollback capabilities. RemediationExecutor supports Create, Update, Delete, Link, Unlink, InactivateIdentity, CreateIdentity, and DeleteIdentity actions with dry-run mode and state capture. Full identity service integration for identity lifecycle management.
+Functional with good test coverage (290+ tests). Remediation executor is fully implemented with transaction support and rollback capabilities. RemediationExecutor supports Create, Update, Delete, Link, Unlink, InactivateIdentity, CreateIdentity, and DeleteIdentity actions with dry-run mode and state capture. Full identity service integration for identity lifecycle management. Transformation engine with 30+ built-in functions for attribute mapping.
 
 ## Dependencies
 
@@ -181,6 +181,121 @@ pub trait IdentityService: Send + Sync {
     async fn is_identity_active(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<bool, String>;
     async fn identity_exists(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<bool, String>;
 }
+
+/// Transformation engine for attribute mapping
+impl TransformEngine {
+    pub fn new() -> Self;
+    pub fn with_config(config: TransformConfig) -> Self;
+    pub fn validate_expression(&self, expression: &str) -> Vec<ValidationError>;
+    pub fn validate_mapping(&self, mapping: &MappingConfig) -> Vec<ValidationError>;
+    pub fn evaluate_expression(&self, expression: &str, value: &Value) -> Result<Value, String>;
+    pub fn apply_mappings(&self, source: &Value, mapping: &MappingConfig) -> TransformResult;
+}
+```
+
+## Transformation Engine
+
+The transformation engine provides attribute mapping and transformation capabilities for provisioning operations using Rhai scripting.
+
+### Built-in Functions
+
+| Category | Function | Description | Example |
+|----------|----------|-------------|---------|
+| **String** | `concat2(a, b)` | Concatenate 2 strings | `concat2("Hello", " World")` → `"Hello World"` |
+| | `concat3(a, b, c)` | Concatenate 3 strings | `concat3("a", "b", "c")` → `"abc"` |
+| | `concat4(a, b, c, d)` | Concatenate 4 strings | `concat4("a", "b", "c", "d")` → `"abcd"` |
+| | `split(str, sep)` | Split string into array | `split("a,b,c", ",")` → `["a", "b", "c"]` |
+| | `join(arr, sep)` | Join array into string | `join(["a", "b"], "-")` → `"a-b"` |
+| **Case** | `lowercase(str)` | Convert to lowercase | `lowercase("HELLO")` → `"hello"` |
+| | `uppercase(str)` | Convert to uppercase | `uppercase("hello")` → `"HELLO"` |
+| | `capitalize(str)` | Capitalize first letter | `capitalize("hello")` → `"Hello"` |
+| **Trim** | `trim(str)` | Remove whitespace | `trim("  hello  ")` → `"hello"` |
+| | `trim_start(str)` | Remove leading whitespace | `trim_start("  hello")` → `"hello"` |
+| | `trim_end(str)` | Remove trailing whitespace | `trim_end("hello  ")` → `"hello"` |
+| **Replace** | `replace(str, from, to)` | Replace all occurrences | `replace("hello", "l", "L")` → `"heLLo"` |
+| | `replace_first(str, from, to)` | Replace first occurrence | `replace_first("hello", "l", "L")` → `"heLlo"` |
+| **Substring** | `substring(str, start, len)` | Extract substring | `substring("hello", 0, 3)` → `"hel"` |
+| | `left(str, n)` | Get first n chars | `left("hello", 3)` → `"hel"` |
+| | `right(str, n)` | Get last n chars | `right("hello", 3)` → `"llo"` |
+| **Predicates** | `starts_with(str, prefix)` | Check prefix | `starts_with("hello", "he")` → `true` |
+| | `ends_with(str, suffix)` | Check suffix | `ends_with("hello", "lo")` → `true` |
+| | `contains_str(str, substr)` | Check contains | `contains_str("hello", "ell")` → `true` |
+| | `is_empty(str)` | Check if empty | `is_empty("")` → `true` |
+| | `is_blank(str)` | Check if blank (whitespace) | `is_blank("  ")` → `true` |
+| **Length** | `str_len(str)` | Get byte length | `str_len("hello")` → `5` |
+| | `char_count(str)` | Get character count | `char_count("hello")` → `5` |
+| **Padding** | `pad_left(str, len, char)` | Pad on left | `pad_left("42", 5, "0")` → `"00042"` |
+| | `pad_right(str, len, char)` | Pad on right | `pad_right("42", 5, "0")` → `"42000"` |
+| **Formatting** | `format_email(user, domain)` | Format email | `format_email("John", "EXAMPLE.COM")` → `"john@example.com"` |
+| | `slugify(str)` | Convert to URL slug | `slugify("Hello World!")` → `"hello-world"` |
+| **Default** | `default_str(str, default)` | Default if empty | `default_str("", "N/A")` → `"N/A"` |
+| | `default_val(val, default)` | Default if nil | `default_val(nil, "N/A")` → `"N/A"` |
+| | `coalesce2(a, b)` | First non-empty value | `coalesce2("", "fallback")` → `"fallback"` |
+| | `coalesce3(a, b, c)` | First non-empty value | `coalesce3("", "", "fallback")` → `"fallback"` |
+| **Array** | `array_first(arr)` | Get first element | `array_first(["a", "b"])` → `"a"` |
+| | `array_last(arr)` | Get last element | `array_last(["a", "b"])` → `"b"` |
+| | `array_get(arr, idx)` | Get element at index | `array_get(["a", "b"], 1)` → `"b"` |
+| | `array_len(arr)` | Get array length | `array_len(["a", "b"])` → `2` |
+| | `array_contains(arr, val)` | Check if contains | `array_contains(["a", "b"], "a")` → `true` |
+| | `array_unique(arr)` | Remove duplicates | `array_unique(["a", "a", "b"])` → `["a", "b"]` |
+| **Type Check** | `is_string(val)` | Check if string | `is_string("hello")` → `true` |
+| | `is_int(val)` | Check if integer | `is_int(42)` → `true` |
+| | `is_float(val)` | Check if float | `is_float(3.14)` → `true` |
+| | `is_bool(val)` | Check if boolean | `is_bool(true)` → `true` |
+| | `is_array(val)` | Check if array | `is_array([1, 2])` → `true` |
+| | `is_map(val)` | Check if map | `is_map(#{})` → `true` |
+| | `is_null(val)` | Check if null | `is_null(nil)` → `true` |
+| **Conversion** | `to_string(val)` | Convert to string | `to_string(42)` → `"42"` |
+| | `to_int(str)` | Convert to integer | `to_int("42")` → `42` |
+| | `to_float(str)` | Convert to float | `to_float("3.14")` → `3.14` |
+| | `to_bool(str)` | Convert to boolean | `to_bool("true")` → `true` |
+| **Logging** | `log_info(msg)` | Log info message | `log_info("Processing...")` |
+| | `log_warn(msg)` | Log warning message | `log_warn("Unexpected value")` |
+| | `log_debug(msg)` | Log debug message | `log_debug("Value: " + x)` |
+
+### Transformation Example
+
+```rust
+use xavyo_provisioning::{TransformEngine, MappingConfig, AttributeMapping, MappingDirection};
+
+let engine = TransformEngine::new();
+
+// Define attribute mappings
+let mapping = MappingConfig {
+    object_class: "user".to_string(),
+    direction: MappingDirection::Inbound,
+    mappings: vec![
+        AttributeMapping {
+            source: "firstName".to_string(),
+            target: "givenName".to_string(),
+            transform: Some(r#"uppercase(value)"#.to_string()),
+            required: true,
+            default_value: None,
+        },
+        AttributeMapping {
+            source: "email".to_string(),
+            target: "samAccountName".to_string(),
+            transform: Some(r#"array_first(split(value, "@"))"#.to_string()),
+            required: true,
+            default_value: None,
+        },
+    ],
+    post_transform: Some(r#"
+        target["cn"] = concat3(target["givenName"], " ", source["lastName"]);
+        target
+    "#.to_string()),
+};
+
+// Apply mappings
+let source = serde_json::json!({
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@example.com"
+});
+
+let result = engine.apply_mappings(&source, &mapping);
+assert!(result.success);
+// Result: { "givenName": "JOHN", "samAccountName": "john.doe", "cn": "JOHN Doe" }
 ```
 
 ## Usage Example

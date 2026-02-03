@@ -78,6 +78,7 @@ pub mod reconciliation;
 pub mod rhai_executor;
 pub mod shadow;
 pub mod sync;
+pub mod transform;
 pub mod worker;
 
 // Re-exports for convenience
@@ -113,6 +114,10 @@ pub use rhai_executor::{
     DryRunResult, RhaiExecutorConfig, RhaiScriptExecutor, ScriptValidationError,
 };
 pub use shadow::{Shadow, ShadowError, ShadowRepository, ShadowResult, ShadowState, SyncSituation};
+pub use transform::{
+    AttributeMapping, MappingConfig, MappingDirection, TransformConfig, TransformEngine,
+    TransformError, TransformErrorCode, TransformResult, ValidationError,
+};
 pub use worker::{ProvisioningWorker, WorkerConfig};
 
 // Reconciliation Engine exports (F049)
