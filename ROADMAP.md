@@ -6,8 +6,8 @@ This document defines the functional requirements to bring all crates to product
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 17 | xavyo-core, xavyo-db, xavyo-auth, xavyo-tenant, xavyo-events, xavyo-connector, xavyo-connector-ldap, xavyo-connector-rest, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-agents, xavyo-secrets, xavyo-cli, xavyo-governance, xavyo-provisioning, xavyo-webhooks |
-| 🟡 Beta | 10 | xavyo-connector-entra, xavyo-siem, xavyo-scim-client, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi |
+| 🟢 Stable | 18 | xavyo-core, xavyo-db, xavyo-auth, xavyo-tenant, xavyo-events, xavyo-connector, xavyo-connector-ldap, xavyo-connector-rest, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-agents, xavyo-secrets, xavyo-cli, xavyo-governance, xavyo-provisioning, xavyo-webhooks, xavyo-siem |
+| 🟡 Beta | 9 | xavyo-connector-entra, xavyo-scim-client, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi |
 | 🔴 Alpha | 5 | xavyo-nhi, xavyo-authorization, xavyo-connector-database, xavyo-api-authorization, xavyo-api-import |
 
 ## Timeline Overview
@@ -797,11 +797,11 @@ Implement circuit breaker pattern for failing webhook destinations and add repla
 
 ---
 
-### F-030: xavyo-siem - Add Integration Tests
+### F-030: xavyo-siem - Add Integration Tests ✅
 
 **Crate:** `xavyo-siem`
-**Current Status:** Beta
-**Target Status:** Beta
+**Current Status:** Stable ✅ (completed 2026-02-03)
+**Target Status:** Stable
 **Estimated Effort:** 1.5 weeks
 **Dependencies:** None
 
@@ -809,15 +809,22 @@ Implement circuit breaker pattern for failing webhook destinations and add repla
 Add comprehensive integration tests for SIEM export including real syslog and Splunk HEC integration.
 
 **Acceptance Criteria:**
-- [ ] Add 40+ integration tests
-- [ ] Test syslog format (RFC 5424)
-- [ ] Test Splunk HEC integration
-- [ ] Test CEF format
-- [ ] Test webhook delivery
-- [ ] Test large batch exports
+- [x] Add 40+ integration tests (266 total tests, 151 integration tests)
+- [x] Test syslog format (RFC 5424) - format_tests.rs with validators
+- [x] Test Splunk HEC integration - splunk_hec_tests.rs with wiremock
+- [x] Test CEF format - format_tests.rs with CEF v0 validation
+- [x] Test webhook delivery - webhook_tests.rs including SSRF protection
+- [x] Test large batch exports - batch_tests.rs with 10,000 event test
 
-**Files to Modify:**
-- `crates/xavyo-siem/tests/integration/*.rs` (create)
+**Files Modified:**
+- `crates/xavyo-siem/Cargo.toml` - Added integration feature flag
+- `crates/xavyo-siem/tests/format_tests.rs` (created)
+- `crates/xavyo-siem/tests/syslog_delivery_tests.rs` (created)
+- `crates/xavyo-siem/tests/splunk_hec_tests.rs` (created)
+- `crates/xavyo-siem/tests/webhook_tests.rs` (created)
+- `crates/xavyo-siem/tests/batch_tests.rs` (created)
+- `crates/xavyo-siem/tests/circuit_breaker_tests.rs` (created)
+- `crates/xavyo-siem/tests/helpers/*.rs` (created - mock servers, validators, test data)
 
 ---
 
