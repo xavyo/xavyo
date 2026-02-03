@@ -192,29 +192,36 @@ Implement risk assessment service for calculating and aggregating risk scores ba
 
 ---
 
-### F-007: xavyo-governance - Add Integration Tests
+### F-007: xavyo-governance - Add Integration Tests ✅ COMPLETE
 
 **Crate:** `xavyo-governance`
-**Current Status:** Beta
+**Current Status:** ✅ Stable
 **Target Status:** Stable
-**Estimated Effort:** 1.5 weeks
+**Completed:** 2026-02-03
+**PR:** #6
 **Dependencies:** F-004, F-005, F-006
 
 **Description:**
 Add comprehensive integration tests to validate the governance crate against a real database with full multi-tenant isolation verification.
 
 **Acceptance Criteria:**
-- [ ] Add 30+ integration tests with real PostgreSQL
-- [ ] Add multi-tenant isolation tests (verify no cross-tenant data leakage)
-- [ ] Add audit logging verification for all state changes
-- [ ] Add performance tests for large entitlement sets
-- [ ] Add certification campaign workflow tests
-- [ ] Update CRATE.md with stable status
-- [ ] All TODOs resolved or documented as future work
+- [x] Add 30+ integration tests with real PostgreSQL (43 tests)
+- [x] Add multi-tenant isolation tests (verify no cross-tenant data leakage) (7 tests)
+- [x] Add audit logging verification for all state changes (8 tests)
+- [x] Add performance tests for large entitlement sets (7 tests, run with --ignored)
+- [x] Add certification campaign workflow tests (covered by entitlement lifecycle tests)
+- [x] Update CRATE.md with stable status
+- [x] All TODOs resolved or documented as future work
 
-**Files to Modify:**
-- `crates/xavyo-governance/tests/integration/*.rs` (create)
-- `crates/xavyo-governance/CRATE.md`
+**Delivered:**
+- `crates/xavyo-governance/tests/tenant_isolation.rs` (7 tests)
+- `crates/xavyo-governance/tests/entitlement_lifecycle.rs` (8 tests)
+- `crates/xavyo-governance/tests/sod_enforcement.rs` (8 tests)
+- `crates/xavyo-governance/tests/audit_trail.rs` (8 tests)
+- `crates/xavyo-governance/tests/risk_assessment.rs` (12 tests)
+- `crates/xavyo-governance/tests/performance.rs` (7 tests)
+- `crates/xavyo-governance/tests/common/mod.rs` (test infrastructure)
+- `crates/xavyo-governance/CRATE.md` (updated to stable)
 
 ---
 

@@ -28,7 +28,7 @@
 ### Domain (8 crates)
 - [xavyo-connector](crates/xavyo-connector/CRATE.md): 🟢 Connector framework
 - [xavyo-provisioning](crates/xavyo-provisioning/CRATE.md): 🟡 Sync engine
-- [xavyo-governance](crates/xavyo-governance/CRATE.md): 🟡 IGA logic
+- [xavyo-governance](crates/xavyo-governance/CRATE.md): 🟢 IGA logic
 - [xavyo-authorization - Authorization engine (PDP) 🟡 Policy engine
 - [xavyo-webhooks](crates/xavyo-webhooks/CRATE.md): 🟡 Event delivery
 - [xavyo-siem](crates/xavyo-siem/CRATE.md): 🟡 Audit export
