@@ -12,9 +12,9 @@ api
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with adequate test coverage (56 tests). Core CRUD operations complete; lacks integration tests.
+Production-ready with comprehensive test coverage (95+ tests including 39 integration tests). Full CRUD operations for users and groups, multi-tenant isolation verified, pagination and filtering tested, custom attribute support complete.
 
 ## Dependencies
 

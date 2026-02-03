@@ -42,7 +42,10 @@ tokio = { workspace = true }
 [features]
 default = []
 kafka = ["xavyo-events/kafka"]
+integration = []
 
 [dev-dependencies]
 tokio-test = { workspace = true }
 axum-test = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+serde_json = { workspace = true }

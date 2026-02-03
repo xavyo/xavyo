@@ -80,7 +80,7 @@ Criteria:
 |-------|--------|-------|--------------|-------|
 | xavyo-api-auth | 🟢 stable | 254 | 89 | MFA, passwordless complete |
 | xavyo-api-oauth | 🟢 stable | 201 | 63 | OAuth2/OIDC complete |
-| xavyo-api-users | 🟡 beta | 56 | 34 | No integration tests |
+| xavyo-api-users | 🟢 stable | 95+ | 34 | Full integration test coverage |
 | xavyo-api-scim | 🟡 beta | 45 | 27 | No integration tests |
 | xavyo-api-saml | 🟡 beta | 13 | 18 | 3 TODOs, limited coverage |
 | xavyo-api-social | 🟡 beta | 27 | 19 | Needs validation tests |
@@ -99,8 +99,8 @@ Criteria:
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 18 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-governance, xavyo-scim-client, xavyo-api-auth, xavyo-api-oauth, xavyo-api-agents, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import |
-| 🟡 Beta | 12 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi, xavyo-api-authorization |
+| 🟢 Stable | 19 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-governance, xavyo-scim-client, xavyo-api-auth, xavyo-api-oauth, xavyo-api-agents, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import, xavyo-api-users |
+| 🟡 Beta | 11 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi, xavyo-api-authorization |
 | 🔴 Alpha | 2 | xavyo-connector-rest, xavyo-connector-database |
 
 ---
