@@ -671,28 +671,34 @@ Add robust handling for Microsoft Graph API rate limiting (429 responses) with i
 
 ---
 
-### F-026: xavyo-connector-entra - Add Integration Tests
+### F-026: xavyo-connector-entra - Add Integration Tests ✅ COMPLETE
 
 **Crate:** `xavyo-connector-entra`
-**Current Status:** Beta
+**Current Status:** ✅ Stable
 **Target Status:** Stable
-**Estimated Effort:** 2 weeks
+**Completed:** 2026-02-03 (PR #20)
 **Dependencies:** F-025
 
 **Description:**
 Add comprehensive integration tests against Microsoft Graph API including delta sync and multi-cloud support.
 
 **Acceptance Criteria:**
-- [ ] Add 50+ integration tests (mock + optional live)
-- [ ] Test delta sync token progression
-- [ ] Test delta sync with changes and no changes
-- [ ] Test multi-cloud endpoints (commercial, GCC, GCC-High)
-- [ ] Add Docker-based mock Graph API for CI
-- [ ] Update CRATE.md with stable status
+- [x] Add 50+ integration tests (mock + optional live) - 51 integration tests
+- [x] Test delta sync token progression
+- [x] Test delta sync with changes and no changes
+- [x] Test multi-cloud endpoints (commercial, GCC, GCC-High, China, Germany)
+- [x] Use wiremock for mock Graph API (no Docker needed)
+- [x] Update CRATE.md with stable status (116 total tests documented)
 
-**Files to Modify:**
-- `crates/xavyo-connector-entra/tests/integration/*.rs` (create)
-- `crates/xavyo-connector-entra/CRATE.md`
+**Delivered:**
+- `crates/xavyo-connector-entra/tests/user_sync_tests.rs` (8 tests)
+- `crates/xavyo-connector-entra/tests/delta_sync_tests.rs` (10 tests)
+- `crates/xavyo-connector-entra/tests/group_sync_tests.rs` (9 tests)
+- `crates/xavyo-connector-entra/tests/multi_cloud_tests.rs` (8 tests)
+- `crates/xavyo-connector-entra/tests/provisioning_tests.rs` (10 tests)
+- `crates/xavyo-connector-entra/tests/rate_limit_integration_tests.rs` (6 tests)
+- `crates/xavyo-connector-entra/tests/common/mod.rs` (test infrastructure)
+- `crates/xavyo-connector-entra/CRATE.md` (updated)
 
 ---
 
