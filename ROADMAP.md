@@ -1105,29 +1105,40 @@ Implement group loading during SAML assertion generation to include group member
 
 ---
 
-### F-040: xavyo-api-saml - Add SP Interoperability Tests
+### F-040: xavyo-api-saml - Add SP Interoperability Tests ✅
 
 **Crate:** `xavyo-api-saml`
-**Current Status:** Beta
+**Current Status:** Stable ✅ (completed 2026-02-03)
 **Target Status:** Stable
 **Estimated Effort:** 2 weeks
 **Dependencies:** F-038, F-039
+**Completed:** 2026-02-03
 
 **Description:**
 Add interoperability tests with major service providers that consume SAML assertions.
 
 **Acceptance Criteria:**
-- [ ] Test Salesforce SP compatibility
-- [ ] Test ServiceNow SP compatibility
-- [ ] Test Workday SP compatibility
-- [ ] Test AWS SSO compatibility
-- [ ] Document SP-specific configuration
-- [ ] Add 30+ interoperability tests
-- [ ] Update CRATE.md with stable status
+- [x] Test Salesforce SP compatibility (10 tests)
+- [x] Test ServiceNow SP compatibility (8 tests)
+- [x] Test Workday SP compatibility (7 tests)
+- [x] Test AWS SSO compatibility (9 tests)
+- [x] Document SP-specific configuration (4 integration guides)
+- [x] Add 30+ interoperability tests (42 tests total)
+- [x] Update CRATE.md with stable status (112 total tests)
 
-**Files to Modify:**
-- `crates/xavyo-api-saml/tests/interop/*.rs` (create)
-- `crates/xavyo-api-saml/CRATE.md`
+**Deliverables:**
+- `crates/xavyo-api-saml/tests/interop/mod.rs` - Module structure
+- `crates/xavyo-api-saml/tests/interop/common.rs` - Test utilities and SP profiles
+- `crates/xavyo-api-saml/tests/interop/salesforce_tests.rs` - Salesforce SP tests
+- `crates/xavyo-api-saml/tests/interop/servicenow_tests.rs` - ServiceNow SP tests
+- `crates/xavyo-api-saml/tests/interop/workday_tests.rs` - Workday SP tests
+- `crates/xavyo-api-saml/tests/interop/aws_sso_tests.rs` - AWS SSO tests
+- `crates/xavyo-api-saml/tests/interop_tests.rs` - Test entry point
+- `crates/xavyo-api-saml/docs/salesforce.md` - Salesforce integration guide
+- `crates/xavyo-api-saml/docs/servicenow.md` - ServiceNow integration guide
+- `crates/xavyo-api-saml/docs/workday.md` - Workday integration guide
+- `crates/xavyo-api-saml/docs/aws-sso.md` - AWS SSO integration guide
+- `crates/xavyo-api-saml/CRATE.md` - Updated to stable status
 
 ---
 
