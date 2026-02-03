@@ -463,6 +463,69 @@ impl ReconciliationDiscrepancy {
 
         Ok(result.rows_affected())
     }
+
+    /// Get trend data aggregated by date for a connector or all connectors.
+    /// Returns (date, type, count) tuples for building trend analysis.
+    pub async fn get_trend_by_date(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        connector_id: Option<Uuid>,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    ) -> Result<Vec<DiscrepancyTrendPoint>, sqlx::Error> {
+        if let Some(cid) = connector_id {
+            sqlx::query_as(
+                r#"
+                SELECT
+                    DATE(d.detected_at) as date,
+                    d.discrepancy_type as discrepancy_type,
+                    COUNT(*) as count
+                FROM gov_reconciliation_discrepancies d
+                JOIN gov_reconciliation_runs r ON d.run_id = r.id
+                WHERE d.tenant_id = $1
+                  AND r.connector_id = $2
+                  AND d.detected_at >= $3
+                  AND d.detected_at <= $4
+                GROUP BY DATE(d.detected_at), d.discrepancy_type
+                ORDER BY date ASC, discrepancy_type ASC
+                "#,
+            )
+            .bind(tenant_id)
+            .bind(cid)
+            .bind(from)
+            .bind(to)
+            .fetch_all(pool)
+            .await
+        } else {
+            sqlx::query_as(
+                r#"
+                SELECT
+                    DATE(detected_at) as date,
+                    discrepancy_type,
+                    COUNT(*) as count
+                FROM gov_reconciliation_discrepancies
+                WHERE tenant_id = $1
+                  AND detected_at >= $2
+                  AND detected_at <= $3
+                GROUP BY DATE(detected_at), discrepancy_type
+                ORDER BY date ASC, discrepancy_type ASC
+                "#,
+            )
+            .bind(tenant_id)
+            .bind(from)
+            .bind(to)
+            .fetch_all(pool)
+            .await
+        }
+    }
+}
+
+/// A single data point in the trend analysis.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DiscrepancyTrendPoint {
+    pub date: chrono::NaiveDate,
+    pub discrepancy_type: String,
+    pub count: i64,
 }
 
 /// Input for creating a discrepancy.

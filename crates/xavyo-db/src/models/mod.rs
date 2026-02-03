@@ -454,8 +454,9 @@ pub use reconciliation_action::{
     ReconciliationActionResult,
 };
 pub use reconciliation_discrepancy::{
-    CreateReconciliationDiscrepancy, ReconciliationActionType, ReconciliationDiscrepancy,
-    ReconciliationDiscrepancyFilter, ReconciliationDiscrepancyType, ReconciliationResolutionStatus,
+    CreateReconciliationDiscrepancy, DiscrepancyTrendPoint, ReconciliationActionType,
+    ReconciliationDiscrepancy, ReconciliationDiscrepancyFilter, ReconciliationDiscrepancyType,
+    ReconciliationResolutionStatus,
 };
 pub use reconciliation_schedule::{
     ReconciliationSchedule, ReconciliationScheduleFrequency, UpsertReconciliationSchedule,
