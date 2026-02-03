@@ -14,7 +14,7 @@ api
 
 🟡 **beta**
 
-Functional with comprehensive test coverage (37 tests). Core OIDC RP flows working with JWT integration. Includes JWKS caching and token verification.
+Functional with comprehensive test coverage (65 tests: 37 unit + 28 interop). Core OIDC RP flows working with JWT integration. Includes JWKS caching, token verification, and IdP interoperability tests for Okta, Azure AD, Google Workspace, Ping Identity, and Auth0.
 
 ## Dependencies
 
@@ -125,6 +125,32 @@ None
 - Never store tokens unencrypted
 - Never trust claims without verification
 - Never use default/empty private keys in production
+
+## Testing
+
+### IdP Interoperability Tests (F-046)
+
+Comprehensive interoperability tests verify correct handling of tokens from major identity providers:
+
+```bash
+# Run all interop tests
+cargo test -p xavyo-api-oidc-federation --test idp_interop_tests
+
+# Run specific IdP tests
+cargo test -p xavyo-api-oidc-federation okta
+cargo test -p xavyo-api-oidc-federation azure_ad
+cargo test -p xavyo-api-oidc-federation google
+cargo test -p xavyo-api-oidc-federation ping
+cargo test -p xavyo-api-oidc-federation auth0
+```
+
+Tests cover:
+- Valid token verification with correct JWKS
+- Invalid signature rejection
+- Expired token rejection
+- Issuer validation (including multi-tenant patterns)
+- Key rotation handling
+- IdP-specific claims (groups, hd, tid/oid, namespaced claims)
 
 ## Related Crates
 
