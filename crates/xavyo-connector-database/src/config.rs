@@ -8,17 +8,14 @@ use xavyo_connector::error::{ConnectorError, ConnectorResult};
 use xavyo_connector::types::ConnectorType;
 
 /// Database driver type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// Per Constitution Principle XI (Single Technology Per Layer), only PostgreSQL is supported.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DatabaseDriver {
-    /// PostgreSQL
+    /// PostgreSQL - the only supported database driver
+    #[default]
     PostgreSQL,
-    /// MySQL / MariaDB
-    MySQL,
-    /// Microsoft SQL Server
-    MsSQL,
-    /// Oracle Database
-    Oracle,
 }
 
 impl DatabaseDriver {
@@ -26,9 +23,6 @@ impl DatabaseDriver {
     pub fn default_port(&self) -> u16 {
         match self {
             DatabaseDriver::PostgreSQL => 5432,
-            DatabaseDriver::MySQL => 3306,
-            DatabaseDriver::MsSQL => 1433,
-            DatabaseDriver::Oracle => 1521,
         }
     }
 
@@ -36,9 +30,6 @@ impl DatabaseDriver {
     pub fn as_str(&self) -> &'static str {
         match self {
             DatabaseDriver::PostgreSQL => "postgresql",
-            DatabaseDriver::MySQL => "mysql",
-            DatabaseDriver::MsSQL => "mssql",
-            DatabaseDriver::Oracle => "oracle",
         }
     }
 }
@@ -218,44 +209,20 @@ impl DatabaseConfig {
         self.schema.as_deref().unwrap_or("public")
     }
 
-    /// Build a connection string.
+    /// Build a connection string for PostgreSQL.
     ///
     /// Note: This excludes the password for security. The password
     /// should be passed separately to the connection library.
     pub fn connection_string(&self) -> String {
-        match self.driver {
-            DatabaseDriver::PostgreSQL => {
-                format!(
-                    "host={} port={} dbname={} user={} sslmode={}",
-                    self.host,
-                    self.effective_port(),
-                    self.database,
-                    self.username,
-                    self.ssl_mode.as_str()
-                )
-            }
-            DatabaseDriver::MySQL => {
-                format!(
-                    "mysql://{}@{}:{}/{}",
-                    self.username,
-                    self.host,
-                    self.effective_port(),
-                    self.database
-                )
-            }
-            DatabaseDriver::MsSQL => {
-                format!(
-                    "Server={},{};Database={};User Id={};",
-                    self.host,
-                    self.effective_port(),
-                    self.database,
-                    self.username
-                )
-            }
-            DatabaseDriver::Oracle => {
-                format!("{}:{}/{}", self.host, self.effective_port(), self.database)
-            }
-        }
+        // Only PostgreSQL is supported per Constitution Principle XI
+        format!(
+            "host={} port={} dbname={} user={} sslmode={}",
+            self.host,
+            self.effective_port(),
+            self.database,
+            self.username,
+            self.ssl_mode.as_str()
+        )
     }
 }
 
@@ -330,10 +297,9 @@ mod tests {
 
     #[test]
     fn test_database_driver_defaults() {
+        // Only PostgreSQL is supported per Constitution Principle XI
         assert_eq!(DatabaseDriver::PostgreSQL.default_port(), 5432);
-        assert_eq!(DatabaseDriver::MySQL.default_port(), 3306);
-        assert_eq!(DatabaseDriver::MsSQL.default_port(), 1433);
-        assert_eq!(DatabaseDriver::Oracle.default_port(), 1521);
+        assert_eq!(DatabaseDriver::PostgreSQL.as_str(), "postgresql");
     }
 
     #[test]

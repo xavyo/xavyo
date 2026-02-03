@@ -23,7 +23,7 @@ use xavyo_connector::schema::{
 use xavyo_connector::traits::{Connector, CreateOp, DeleteOp, SchemaDiscovery, SearchOp, UpdateOp};
 use xavyo_connector::types::ConnectorType;
 
-use crate::config::{DatabaseConfig, DatabaseDriver};
+use crate::config::DatabaseConfig;
 
 /// Database Connector for provisioning to relational databases.
 ///
@@ -54,18 +54,10 @@ impl std::fmt::Debug for DatabaseConnector {
 
 impl DatabaseConnector {
     /// Create a new database connector with the given configuration.
+    ///
+    /// Per Constitution Principle XI, only PostgreSQL is supported.
     pub fn new(config: DatabaseConfig) -> ConnectorResult<Self> {
         config.validate()?;
-
-        // Currently only PostgreSQL is fully supported
-        if config.driver != DatabaseDriver::PostgreSQL {
-            return Err(ConnectorError::InvalidConfiguration {
-                message: format!(
-                    "Database driver {:?} is not yet fully supported. Use PostgreSQL.",
-                    config.driver
-                ),
-            });
-        }
 
         let display_name = format!(
             "{}: {}@{}/{}",
@@ -975,21 +967,6 @@ mod tests {
 
         let connector = DatabaseConnector::new(config);
         assert!(connector.is_err());
-    }
-
-    #[test]
-    fn test_database_connector_unsupported_driver() {
-        let config = DatabaseConfig::new(
-            DatabaseDriver::MySQL,
-            "db.example.com",
-            "identity_db",
-            "admin",
-        );
-
-        let connector = DatabaseConnector::new(config);
-        assert!(connector.is_err());
-        let err = connector.unwrap_err();
-        assert!(matches!(err, ConnectorError::InvalidConfiguration { .. }));
     }
 
     #[test]

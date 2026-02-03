@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Implements the xavyo-connector traits for SQL databases, enabling provisioning to identity tables in PostgreSQL, MySQL, MS SQL Server, and Oracle. Supports schema discovery from INFORMATION_SCHEMA, connection pooling, SSL/TLS, and parameterized queries for security.
+Implements the xavyo-connector traits for PostgreSQL databases, enabling provisioning to identity tables. Supports schema discovery from INFORMATION_SCHEMA, connection pooling, SSL/TLS, and parameterized queries for security. Per Constitution Principle XI, only PostgreSQL is supported.
 
 ## Layer
 
@@ -44,12 +44,9 @@ pub struct DatabaseConfig {
     pub table_mappings: HashMap<String, TableMapping>,
 }
 
-/// Supported database drivers
+/// Supported database driver (PostgreSQL only per Constitution Principle XI)
 pub enum DatabaseDriver {
     PostgreSQL,
-    MySQL,
-    MsSql,
-    Oracle,
 }
 
 /// SSL/TLS mode
@@ -142,8 +139,8 @@ let results = connector.search("user", filter, PageRequest::default()).await?;
 ## Integration Points
 
 - **Consumed by**: `xavyo-provisioning`, `xavyo-api-connectors`
-- **Connects to**: PostgreSQL, MySQL, MS SQL Server, Oracle
-- **Standard ports**: 5432 (PostgreSQL), 3306 (MySQL), 1433 (MSSQL), 1521 (Oracle)
+- **Connects to**: PostgreSQL (per Constitution Principle XI - single technology per layer)
+- **Standard port**: 5432 (PostgreSQL)
 
 ## Feature Flags
 
