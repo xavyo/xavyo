@@ -249,8 +249,25 @@ pub trait ConnectorProvider: Send + Sync {
 }
 
 /// Trait for identity service operations.
+///
+/// This trait abstracts identity management operations to allow the provisioning
+/// engine to work with identities without direct database access.
 #[async_trait]
 pub trait IdentityService: Send + Sync {
+    /// Create a new identity with the given attributes.
+    ///
+    /// # Arguments
+    /// * `tenant_id` - The tenant to create the identity in
+    /// * `attributes` - The initial attributes for the identity
+    ///
+    /// # Returns
+    /// The UUID of the newly created identity
+    async fn create_identity(
+        &self,
+        tenant_id: Uuid,
+        attributes: AttributeSet,
+    ) -> Result<Uuid, String>;
+
     /// Get identity attributes for provisioning.
     async fn get_identity_attributes(
         &self,
@@ -266,11 +283,26 @@ pub trait IdentityService: Send + Sync {
         attributes: AttributeSet,
     ) -> Result<(), String>;
 
-    /// Inactivate an identity.
+    /// Delete an identity permanently.
+    ///
+    /// This performs a hard delete of the identity and all associated data.
+    /// For soft delete (keeping the record but marking as inactive), use `inactivate_identity`.
+    ///
+    /// # Arguments
+    /// * `tenant_id` - The tenant containing the identity
+    /// * `identity_id` - The identity to delete
+    async fn delete_identity(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<(), String>;
+
+    /// Inactivate an identity (soft delete).
+    ///
+    /// This marks the identity as inactive but preserves the record for audit purposes.
     async fn inactivate_identity(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<(), String>;
 
     /// Check if identity is active.
     async fn is_identity_active(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<bool, String>;
+
+    /// Check if an identity exists.
+    async fn identity_exists(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<bool, String>;
 }
 
 /// Executor for remediation actions.
@@ -1103,6 +1135,187 @@ where
         );
 
         RemediationResult::success(discrepancy_id, ActionType::InactivateIdentity, false)
+            .with_before_state(before_state)
+            .with_after_state(after_state)
+    }
+
+    /// Execute a create identity action via identity service.
+    ///
+    /// Creates a new identity in xavyo based on attributes from an external source.
+    /// This is used when discovering orphan accounts that should be correlated.
+    pub async fn execute_create_identity(
+        &self,
+        discrepancy_id: Uuid,
+        attributes: AttributeSet,
+        dry_run: bool,
+    ) -> RemediationResult {
+        tracing::info!(
+            tenant_id = %self.tenant_id,
+            discrepancy_id = %discrepancy_id,
+            dry_run = %dry_run,
+            "Executing create identity action"
+        );
+
+        // Build before state (identity doesn't exist yet)
+        let before_state = serde_json::json!({
+            "identity_exists": false,
+        });
+
+        if dry_run {
+            // In dry-run mode, we just preview what would happen
+            let after_state = serde_json::json!({
+                "identity_exists": true,
+                "identity_id": "would-be-generated",
+                "attributes": serde_json::to_value(&attributes).unwrap_or_default(),
+            });
+
+            return RemediationResult::success(discrepancy_id, ActionType::CreateIdentity, true)
+                .with_before_state(before_state)
+                .with_after_state(after_state);
+        }
+
+        // Actually create the identity via identity service
+        let identity_id = match self
+            .identity_service
+            .create_identity(self.tenant_id, attributes.clone())
+            .await
+        {
+            Ok(id) => id,
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::CreateIdentity,
+                    format!("Failed to create identity: {}", e),
+                    false,
+                )
+                .with_before_state(before_state);
+            }
+        };
+
+        let after_state = serde_json::json!({
+            "identity_exists": true,
+            "identity_id": identity_id,
+            "attributes": serde_json::to_value(&attributes).unwrap_or_default(),
+        });
+
+        tracing::info!(
+            tenant_id = %self.tenant_id,
+            discrepancy_id = %discrepancy_id,
+            identity_id = %identity_id,
+            "Create identity action completed successfully"
+        );
+
+        RemediationResult::success(discrepancy_id, ActionType::CreateIdentity, false)
+            .with_before_state(before_state)
+            .with_after_state(after_state)
+    }
+
+    /// Execute a delete identity action.
+    ///
+    /// Permanently deletes an identity from xavyo. This is a hard delete
+    /// and should only be used when the identity needs to be completely removed.
+    /// For soft delete (keeping audit trail), use `execute_inactivate_identity`.
+    pub async fn execute_delete_identity(
+        &self,
+        discrepancy_id: Uuid,
+        identity_id: Uuid,
+        dry_run: bool,
+    ) -> RemediationResult {
+        tracing::info!(
+            tenant_id = %self.tenant_id,
+            discrepancy_id = %discrepancy_id,
+            identity_id = %identity_id,
+            dry_run = %dry_run,
+            "Executing delete identity action"
+        );
+
+        // Check if identity exists
+        let exists = match self
+            .identity_service
+            .identity_exists(self.tenant_id, identity_id)
+            .await
+        {
+            Ok(exists) => exists,
+            Err(e) => {
+                return RemediationResult::failure(
+                    discrepancy_id,
+                    ActionType::DeleteIdentity,
+                    format!("Failed to check identity existence: {}", e),
+                    dry_run,
+                );
+            }
+        };
+
+        // Get current identity state for before_state capture
+        let before_state = if exists {
+            match self
+                .identity_service
+                .get_identity_attributes(self.tenant_id, identity_id)
+                .await
+            {
+                Ok(attrs) => serde_json::json!({
+                    "identity_id": identity_id,
+                    "exists": true,
+                    "attributes": serde_json::to_value(&attrs).unwrap_or_default(),
+                }),
+                Err(_) => serde_json::json!({
+                    "identity_id": identity_id,
+                    "exists": true,
+                }),
+            }
+        } else {
+            serde_json::json!({
+                "identity_id": identity_id,
+                "exists": false,
+            })
+        };
+
+        // Identity doesn't exist - idempotent success
+        if !exists {
+            return RemediationResult::success(discrepancy_id, ActionType::DeleteIdentity, dry_run)
+                .with_before_state(before_state.clone())
+                .with_after_state(before_state);
+        }
+
+        if dry_run {
+            let after_state = serde_json::json!({
+                "identity_id": identity_id,
+                "exists": false,
+            });
+
+            return RemediationResult::success(discrepancy_id, ActionType::DeleteIdentity, true)
+                .with_before_state(before_state)
+                .with_after_state(after_state);
+        }
+
+        // Actually delete the identity
+        if let Err(e) = self
+            .identity_service
+            .delete_identity(self.tenant_id, identity_id)
+            .await
+        {
+            return RemediationResult::failure(
+                discrepancy_id,
+                ActionType::DeleteIdentity,
+                format!("Failed to delete identity: {}", e),
+                false,
+            )
+            .with_before_state(before_state);
+        }
+
+        let after_state = serde_json::json!({
+            "identity_id": identity_id,
+            "exists": false,
+        });
+
+        tracing::info!(
+            tenant_id = %self.tenant_id,
+            discrepancy_id = %discrepancy_id,
+            identity_id = %identity_id,
+            "Delete identity action completed successfully"
+        );
+
+        RemediationResult::success(discrepancy_id, ActionType::DeleteIdentity, false)
             .with_before_state(before_state)
             .with_after_state(after_state)
     }
