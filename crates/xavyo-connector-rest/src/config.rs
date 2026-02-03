@@ -14,6 +14,8 @@ use xavyo_connector::config::{AuthConfig, ConnectionSettings, ConnectorConfig, T
 use xavyo_connector::error::{ConnectorError, ConnectorResult};
 use xavyo_connector::types::ConnectorType;
 
+use crate::rate_limit::{LogVerbosity, RateLimitConfig, RetryConfig};
+
 /// SSRF protection: Validate that a URL does not target internal services.
 ///
 /// This function blocks requests to:
@@ -189,6 +191,18 @@ pub struct RestConfig {
     /// If provided, schema will be discovered from the OpenAPI spec.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub openapi_url: Option<String>,
+
+    /// Rate limiting configuration.
+    #[serde(default)]
+    pub rate_limit: RateLimitConfig,
+
+    /// Retry configuration with exponential backoff.
+    #[serde(default)]
+    pub retry: RetryConfig,
+
+    /// Logging verbosity for request/response logging.
+    #[serde(default)]
+    pub log_verbosity: LogVerbosity,
 }
 
 fn default_content_type() -> String {
@@ -214,6 +228,9 @@ impl RestConfig {
             pagination: PaginationConfig::default(),
             response: ResponseConfig::default(),
             openapi_url: None,
+            rate_limit: RateLimitConfig::default(),
+            retry: RetryConfig::default(),
+            log_verbosity: LogVerbosity::default(),
         }
     }
 
@@ -265,6 +282,36 @@ impl RestConfig {
         let base = self.base_url.trim_end_matches('/');
         let path = path.trim_start_matches('/');
         format!("{}/{}", base, path)
+    }
+
+    /// Set rate limiting configuration.
+    pub fn with_rate_limit(mut self, config: RateLimitConfig) -> Self {
+        self.rate_limit = config;
+        self
+    }
+
+    /// Set retry configuration.
+    pub fn with_retry(mut self, config: RetryConfig) -> Self {
+        self.retry = config;
+        self
+    }
+
+    /// Set logging verbosity.
+    pub fn with_log_verbosity(mut self, verbosity: LogVerbosity) -> Self {
+        self.log_verbosity = verbosity;
+        self
+    }
+
+    /// Disable rate limiting.
+    pub fn without_rate_limit(mut self) -> Self {
+        self.rate_limit = RateLimitConfig::disabled();
+        self
+    }
+
+    /// Disable retries.
+    pub fn without_retry(mut self) -> Self {
+        self.retry = RetryConfig::disabled();
+        self
     }
 }
 

@@ -30,9 +30,13 @@
 
 pub mod config;
 pub mod connector;
+pub mod rate_limit;
 
 // Re-exports
 pub use config::{
     EndpointConfig, HttpMethod, PaginationConfig, PaginationStyle, ResponseConfig, RestConfig,
 };
 pub use connector::RestConnector;
+pub use rate_limit::{
+    EndpointRateLimit, LogVerbosity, RateLimitConfig, RateLimitError, RateLimiter, RetryConfig,
+};

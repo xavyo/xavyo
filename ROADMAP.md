@@ -7,8 +7,8 @@ This document defines the functional requirements to bring all crates to product
 | Status | Count | Crates |
 |--------|-------|--------|
 | 🟢 Stable | 15 | xavyo-core, xavyo-db, xavyo-auth, xavyo-tenant, xavyo-events, xavyo-connector, xavyo-connector-ldap, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-agents, xavyo-secrets, xavyo-cli, xavyo-governance, xavyo-provisioning |
-| 🟡 Beta | 11 | xavyo-connector-entra, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi |
-| 🔴 Alpha | 6 | xavyo-nhi, xavyo-authorization, xavyo-connector-rest, xavyo-connector-database, xavyo-api-authorization, xavyo-api-import |
+| 🟡 Beta | 12 | xavyo-connector-rest, xavyo-connector-entra, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi |
+| 🔴 Alpha | 5 | xavyo-nhi, xavyo-authorization, xavyo-connector-database, xavyo-api-authorization, xavyo-api-import |
 
 ## Timeline Overview
 
@@ -336,28 +336,30 @@ Add comprehensive integration tests for the provisioning crate including end-to-
 
 ## Phase 3: Connectors & Authorization (Weeks 9-14)
 
-### F-012: xavyo-connector-rest - Add Rate Limiting
+### F-012: xavyo-connector-rest - Add Rate Limiting ✅ COMPLETE
 
 **Crate:** `xavyo-connector-rest`
-**Current Status:** Alpha
+**Current Status:** ✅ Beta
 **Target Status:** Beta
-**Estimated Effort:** 1 week
+**Completed:** 2026-02-03
 **Dependencies:** None
 
 **Description:**
 Add robust rate limiting and retry logic to the REST connector for handling API throttling gracefully.
 
 **Acceptance Criteria:**
-- [ ] Implement rate limiting with configurable limits per endpoint
-- [ ] Add exponential backoff retry logic
-- [ ] Implement request queuing when rate limited
-- [ ] Add request/response logging with configurable verbosity
-- [ ] Add 20+ unit tests for rate limiting scenarios
-- [ ] Document rate limiting configuration
+- [x] Implement rate limiting with configurable limits per endpoint (RateLimitConfig, EndpointRateLimit)
+- [x] Add exponential backoff retry logic (RetryConfig with jitter support)
+- [x] Implement request queuing when rate limited (token bucket + semaphore)
+- [x] Add request/response logging with configurable verbosity (LogVerbosity enum)
+- [x] Add 37 unit tests for rate limiting scenarios (exceeds 20+ requirement)
+- [x] Document rate limiting configuration (CRATE.md)
 
-**Files to Modify:**
-- `crates/xavyo-connector-rest/src/rate_limit.rs` (create)
-- `crates/xavyo-connector-rest/src/client.rs`
+**Delivered:**
+- `crates/xavyo-connector-rest/src/rate_limit.rs` (NEW - 700+ lines, rate limiting module)
+- `crates/xavyo-connector-rest/src/config.rs` (updated with RateLimitConfig, RetryConfig, LogVerbosity)
+- `crates/xavyo-connector-rest/src/connector.rs` (integrated rate limiting into all operations)
+- `crates/xavyo-connector-rest/CRATE.md` (updated to beta status with documentation)
 
 ---
 
@@ -1318,6 +1320,7 @@ Update this document as requirements are completed:
 - [x] F-009 - xavyo-provisioning Identity Service Integration ✅ (2026-02-03)
 - [x] F-010 - xavyo-provisioning Transformation Engine ✅ (2026-02-03)
 - [x] F-011 - xavyo-provisioning Integration Tests ✅ (2026-02-03)
+- [x] F-012 - xavyo-connector-rest Rate Limiting ✅ (2026-02-03)
 - ... (continue for all 48 requirements)
 
 ---

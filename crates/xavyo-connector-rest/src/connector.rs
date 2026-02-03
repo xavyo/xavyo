@@ -3,12 +3,12 @@
 //! Implements the Connector trait for generic REST APIs.
 
 use async_trait::async_trait;
-use reqwest::{header, Client, StatusCode};
+use reqwest::{header, Client, Response, StatusCode};
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, info, instrument, trace, warn};
 
 use xavyo_connector::config::{AuthConfig, ConnectorConfig};
 use xavyo_connector::error::{ConnectorError, ConnectorResult};
@@ -20,6 +20,7 @@ use xavyo_connector::traits::{Connector, CreateOp, DeleteOp, SchemaDiscovery, Se
 use xavyo_connector::types::ConnectorType;
 
 use crate::config::{HttpMethod, PaginationStyle, RestConfig};
+use crate::rate_limit::{parse_retry_after, RateLimiter};
 
 /// REST Connector for provisioning to REST APIs.
 pub struct RestConnector {
@@ -37,6 +38,9 @@ pub struct RestConnector {
 
     /// Whether the connector has been disposed.
     disposed: Arc<RwLock<bool>>,
+
+    /// Rate limiter for request throttling.
+    rate_limiter: Arc<RateLimiter>,
 }
 
 impl std::fmt::Debug for RestConnector {
@@ -58,12 +62,16 @@ impl RestConnector {
         // Build HTTP client
         let client = Self::build_client(&config)?;
 
+        // Create rate limiter
+        let rate_limiter = Arc::new(RateLimiter::new(config.rate_limit.clone()));
+
         Ok(Self {
             config,
             display_name,
             client: Arc::new(client),
             oauth_token: Arc::new(RwLock::new(None)),
             disposed: Arc::new(RwLock::new(false)),
+            rate_limiter,
         })
     }
 
@@ -235,6 +243,144 @@ impl RestConnector {
         }
 
         Ok(builder)
+    }
+
+    /// Send a request with rate limiting and retry logic.
+    ///
+    /// This method handles:
+    /// 1. Rate limit acquisition (blocking until allowed)
+    /// 2. Request logging based on verbosity
+    /// 3. Automatic retry with exponential backoff for transient errors
+    /// 4. Retry-After header parsing for 429 responses
+    async fn send_with_retry(
+        &self,
+        method: HttpMethod,
+        url: &str,
+        body: Option<&Value>,
+    ) -> ConnectorResult<Response> {
+        let retry_config = &self.config.retry;
+        let verbosity = &self.config.log_verbosity;
+        let mut attempt = 0;
+
+        loop {
+            attempt += 1;
+
+            // Acquire rate limit permit
+            let _guard = self.rate_limiter.acquire(url).await.map_err(|e| {
+                ConnectorError::TargetUnavailable {
+                    message: format!("Rate limit error: {}", e),
+                }
+            })?;
+
+            // Build the request
+            let mut request = self.build_request(method, url).await?;
+            if let Some(json_body) = body {
+                request = request.json(json_body);
+            }
+
+            // Log request if verbosity allows
+            if verbosity.is_enabled() {
+                debug!(
+                    url = %url,
+                    method = %method.as_str(),
+                    attempt = attempt,
+                    "Sending REST request"
+                );
+            }
+            if verbosity.log_bodies() {
+                if let Some(json_body) = body {
+                    trace!(body = %json_body, "Request body");
+                }
+            }
+
+            // Send the request
+            let response = request.send().await;
+
+            match response {
+                Ok(resp) => {
+                    let status = resp.status();
+
+                    // Log response
+                    if verbosity.is_enabled() {
+                        debug!(
+                            url = %url,
+                            status = %status,
+                            attempt = attempt,
+                            "Received REST response"
+                        );
+                    }
+
+                    // Check if we should retry
+                    if retry_config.should_retry(status.as_u16())
+                        && attempt <= retry_config.max_retries
+                    {
+                        // Handle rate limit response specially
+                        if status == StatusCode::TOO_MANY_REQUESTS {
+                            // Try to parse Retry-After header
+                            let retry_after = resp
+                                .headers()
+                                .get(header::RETRY_AFTER)
+                                .and_then(|v| v.to_str().ok())
+                                .and_then(parse_retry_after);
+
+                            let wait = retry_after
+                                .unwrap_or_else(|| retry_config.calculate_backoff(attempt));
+
+                            warn!(
+                                url = %url,
+                                attempt = attempt,
+                                wait_ms = wait.as_millis(),
+                                "Rate limited (429), waiting before retry"
+                            );
+
+                            tokio::time::sleep(wait).await;
+                            continue;
+                        }
+
+                        // Calculate exponential backoff
+                        let backoff = retry_config.calculate_backoff(attempt);
+                        warn!(
+                            url = %url,
+                            status = %status,
+                            attempt = attempt,
+                            wait_ms = backoff.as_millis(),
+                            "Transient error, retrying with backoff"
+                        );
+
+                        tokio::time::sleep(backoff).await;
+                        continue;
+                    }
+
+                    return Ok(resp);
+                }
+                Err(e) => {
+                    // Network errors - retry if within limits
+                    if attempt <= retry_config.max_retries {
+                        let backoff = retry_config.calculate_backoff(attempt);
+                        warn!(
+                            url = %url,
+                            error = %e,
+                            attempt = attempt,
+                            wait_ms = backoff.as_millis(),
+                            "Request failed, retrying with backoff"
+                        );
+
+                        tokio::time::sleep(backoff).await;
+                        continue;
+                    }
+
+                    return Err(ConnectorError::connection_failed_with_source(
+                        format!("Request failed after {} attempts: {}", attempt, url),
+                        e,
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Get rate limiter statistics.
+    pub async fn rate_limit_stats(&self) -> crate::rate_limit::RateLimitStats {
+        self.rate_limiter.stats().await
     }
 
     /// Handle API response errors.
@@ -953,11 +1099,8 @@ impl CreateOp for RestConnector {
 
         let body = self.attribute_set_to_json(&attrs);
 
-        let request = self.build_request(method, &url).await?.json(&body);
-
-        let response = request.send().await.map_err(|e| {
-            ConnectorError::operation_failed_with_source("Create request failed".to_string(), e)
-        })?;
+        // Use send_with_retry for automatic rate limiting and retry
+        let response = self.send_with_retry(method, &url, Some(&body)).await?;
 
         let status = response.status();
         if status == StatusCode::CONFLICT {
@@ -1013,11 +1156,8 @@ impl UpdateOp for RestConnector {
 
         let body = self.delta_to_json(&changes);
 
-        let request = self.build_request(method, &url).await?.json(&body);
-
-        let response = request.send().await.map_err(|e| {
-            ConnectorError::operation_failed_with_source("Update request failed".to_string(), e)
-        })?;
+        // Use send_with_retry for automatic rate limiting and retry
+        let response = self.send_with_retry(method, &url, Some(&body)).await?;
 
         let status = response.status();
         if status == StatusCode::NOT_FOUND {
@@ -1045,11 +1185,8 @@ impl DeleteOp for RestConnector {
 
         debug!(url = %url, object_class = %object_class, id = %uid.value(), "Deleting REST object");
 
-        let request = self.build_request(method, &url).await?;
-
-        let response = request.send().await.map_err(|e| {
-            ConnectorError::operation_failed_with_source("Delete request failed".to_string(), e)
-        })?;
+        // Use send_with_retry for automatic rate limiting and retry
+        let response = self.send_with_retry(method, &url, None).await?;
 
         let status = response.status();
         if status == StatusCode::NOT_FOUND {
@@ -1085,26 +1222,93 @@ impl SearchOp for RestConnector {
 
         let page_info = page.unwrap_or_default();
         let pagination_params = self.build_pagination_params(&page_info);
+        let filter_params = filter
+            .as_ref()
+            .map(|f| self.filter_to_query_params(f))
+            .unwrap_or_default();
 
-        // Build query with pagination
-        let mut request = self.build_request(method, &url).await?;
-        if !pagination_params.is_empty() {
-            request = request.query(&pagination_params);
-        }
+        let retry_config = &self.config.retry;
+        let verbosity = &self.config.log_verbosity;
+        let mut attempt = 0;
 
-        // Add filter as query params if provided
-        // Note: Filter translation to query params is API-specific
-        // This is a basic implementation
-        if let Some(ref f) = filter {
-            let filter_params = self.filter_to_query_params(f);
+        let response = loop {
+            attempt += 1;
+
+            // Acquire rate limit permit
+            let _guard = self.rate_limiter.acquire(&url).await.map_err(|e| {
+                ConnectorError::TargetUnavailable {
+                    message: format!("Rate limit error: {}", e),
+                }
+            })?;
+
+            // Build query with pagination
+            let mut request = self.build_request(method, &url).await?;
+            if !pagination_params.is_empty() {
+                request = request.query(&pagination_params);
+            }
             if !filter_params.is_empty() {
                 request = request.query(&filter_params);
             }
-        }
 
-        let response = request.send().await.map_err(|e| {
-            ConnectorError::operation_failed_with_source("Search request failed".to_string(), e)
-        })?;
+            // Log request if verbosity allows
+            if verbosity.is_enabled() {
+                debug!(
+                    url = %url,
+                    method = %method.as_str(),
+                    attempt = attempt,
+                    "Sending REST search request"
+                );
+            }
+
+            match request.send().await {
+                Ok(resp) => {
+                    let status = resp.status();
+
+                    if verbosity.is_enabled() {
+                        debug!(url = %url, status = %status, attempt = attempt, "Received search response");
+                    }
+
+                    // Check if we should retry
+                    if retry_config.should_retry(status.as_u16())
+                        && attempt <= retry_config.max_retries
+                    {
+                        if status == StatusCode::TOO_MANY_REQUESTS {
+                            let retry_after = resp
+                                .headers()
+                                .get(header::RETRY_AFTER)
+                                .and_then(|v| v.to_str().ok())
+                                .and_then(parse_retry_after);
+
+                            let wait = retry_after
+                                .unwrap_or_else(|| retry_config.calculate_backoff(attempt));
+                            warn!(url = %url, attempt = attempt, wait_ms = wait.as_millis(), "Rate limited, waiting");
+                            tokio::time::sleep(wait).await;
+                            continue;
+                        }
+
+                        let backoff = retry_config.calculate_backoff(attempt);
+                        warn!(url = %url, status = %status, attempt = attempt, wait_ms = backoff.as_millis(), "Retrying search");
+                        tokio::time::sleep(backoff).await;
+                        continue;
+                    }
+
+                    break resp;
+                }
+                Err(e) => {
+                    if attempt <= retry_config.max_retries {
+                        let backoff = retry_config.calculate_backoff(attempt);
+                        warn!(url = %url, error = %e, attempt = attempt, wait_ms = backoff.as_millis(), "Search failed, retrying");
+                        tokio::time::sleep(backoff).await;
+                        continue;
+                    }
+
+                    return Err(ConnectorError::connection_failed_with_source(
+                        format!("Search failed after {} attempts", attempt),
+                        e,
+                    ));
+                }
+            }
+        };
 
         let status = response.status();
         if !status.is_success() {
