@@ -33,7 +33,7 @@
 - [xavyo-webhooks](crates/xavyo-webhooks/CRATE.md): 🟡 Event delivery
 - [xavyo-siem](crates/xavyo-siem/CRATE.md): 🟡 Audit export
 - [xavyo-secrets](crates/xavyo-secrets/CRATE.md): 🟢 Secret providers
-- [xavyo-scim-client](crates/xavyo-scim-client/CRATE.md): 🟡 Outbound SCIM
+- [xavyo-scim-client](crates/xavyo-scim-client/CRATE.md): 🟢 Outbound SCIM
 
 ### Connectors (4 crates)
 - [xavyo-connector-ldap](crates/xavyo-connector-ldap/CRATE.md): 🟢 LDAP/AD

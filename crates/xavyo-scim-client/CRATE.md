@@ -12,9 +12,9 @@ domain
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with adequate test coverage (37+ tests). Core SCIM client complete; edge case coverage limited.
+Comprehensive test coverage (150+ tests including 70+ integration tests). Core SCIM client, provisioner, reconciler, and sync modules all tested. Full error handling coverage for HTTP status codes, timeouts, and edge cases.
 
 ## Dependencies
 
@@ -164,6 +164,7 @@ println!("Created user with ID: {}", created.id.unwrap());
 | Flag | Description | Dependencies Added |
 |------|-------------|-------------------|
 | `kafka` | Enable Kafka event consumer | xavyo-events/kafka |
+| `integration` | Enable integration tests | wiremock (dev) |
 
 ## Anti-Patterns
 

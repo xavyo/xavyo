@@ -63,7 +63,7 @@ Criteria:
 | xavyo-webhooks | 🟡 beta | 59 | 31 | Needs integration tests |
 | xavyo-siem | 🟡 beta | 115 | 47 | Good coverage, no integration tests |
 | xavyo-secrets | 🟢 stable | 51 | 28 | Multi-provider (Vault, AWS) |
-| xavyo-scim-client | 🟡 beta | 37+ | 24 | Core OK, limited coverage |
+| xavyo-scim-client | 🟢 stable | 150+ | 24 | Full integration test coverage |
 
 ### Connector Layer
 
@@ -99,8 +99,8 @@ Criteria:
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 17 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-governance, xavyo-api-auth, xavyo-api-oauth, xavyo-api-agents, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import |
-| 🟡 Beta | 13 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi, xavyo-api-authorization |
+| 🟢 Stable | 18 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-governance, xavyo-scim-client, xavyo-api-auth, xavyo-api-oauth, xavyo-api-agents, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import |
+| 🟡 Beta | 12 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi, xavyo-api-authorization |
 | 🔴 Alpha | 2 | xavyo-connector-rest, xavyo-connector-database |
 
 ---
