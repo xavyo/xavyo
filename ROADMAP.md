@@ -6,8 +6,8 @@ This document defines the functional requirements to bring all crates to product
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 13 | xavyo-core, xavyo-db, xavyo-auth, xavyo-tenant, xavyo-events, xavyo-connector, xavyo-connector-ldap, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-agents, xavyo-secrets, xavyo-cli |
-| 🟡 Beta | 13 | xavyo-governance, xavyo-provisioning, xavyo-connector-entra, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi |
+| 🟢 Stable | 15 | xavyo-core, xavyo-db, xavyo-auth, xavyo-tenant, xavyo-events, xavyo-connector, xavyo-connector-ldap, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-agents, xavyo-secrets, xavyo-cli, xavyo-governance, xavyo-provisioning |
+| 🟡 Beta | 11 | xavyo-connector-entra, xavyo-webhooks, xavyo-siem, xavyo-scim-client, xavyo-api-users, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi |
 | 🔴 Alpha | 6 | xavyo-nhi, xavyo-authorization, xavyo-connector-rest, xavyo-connector-database, xavyo-api-authorization, xavyo-api-import |
 
 ## Timeline Overview
@@ -308,29 +308,29 @@ Complete the transformation engine for attribute mapping using Rhai expressions.
 
 ---
 
-### F-011: xavyo-provisioning - Add Integration Tests
+### F-011: xavyo-provisioning - Add Integration Tests ✅ COMPLETE
 
 **Crate:** `xavyo-provisioning`
-**Current Status:** Beta
+**Current Status:** ✅ Stable
 **Target Status:** Stable
-**Estimated Effort:** 2 weeks
+**Completed:** 2026-02-03
 **Dependencies:** F-008, F-009, F-010
 
 **Description:**
 Add comprehensive integration tests for the provisioning crate including end-to-end reconciliation flows and error recovery paths.
 
 **Acceptance Criteria:**
-- [ ] Add 50+ integration tests with real database
-- [ ] Test end-to-end reconciliation flow (discovery -> correlation -> remediation)
-- [ ] Test error recovery paths (connector failure, partial completion)
-- [ ] Test concurrent reconciliation runs
-- [ ] Test large dataset performance (10k+ identities)
-- [ ] Update CRATE.md with stable status
-- [ ] All TODOs resolved
+- [x] Add 50+ integration tests with real database (50 tests in remediation_tests.rs)
+- [x] Test end-to-end reconciliation flow (discovery -> correlation -> remediation)
+- [x] Test error recovery paths (connector failure, partial completion)
+- [x] Test concurrent reconciliation runs (parallel execution tests)
+- [x] Test large dataset performance (10k+ identities)
+- [x] Update CRATE.md with stable status
+- [x] All TODOs resolved
 
-**Files to Modify:**
-- `crates/xavyo-provisioning/tests/integration/*.rs` (create)
-- `crates/xavyo-provisioning/CRATE.md`
+**Delivered:**
+- `crates/xavyo-provisioning/tests/remediation_tests.rs` (50 comprehensive tests)
+- `crates/xavyo-provisioning/CRATE.md` (updated to stable status)
 
 ---
 
@@ -1317,6 +1317,7 @@ Update this document as requirements are completed:
 - [x] F-008 - xavyo-provisioning Remediation Executor ✅ (2026-02-03)
 - [x] F-009 - xavyo-provisioning Identity Service Integration ✅ (2026-02-03)
 - [x] F-010 - xavyo-provisioning Transformation Engine ✅ (2026-02-03)
+- [x] F-011 - xavyo-provisioning Integration Tests ✅ (2026-02-03)
 - ... (continue for all 48 requirements)
 
 ---

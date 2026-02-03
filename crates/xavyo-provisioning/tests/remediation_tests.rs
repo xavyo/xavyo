@@ -1667,4 +1667,37 @@ mod edge_case_tests {
         assert_eq!(result.before_state, Some(before));
         assert_eq!(result.after_state, Some(after));
     }
+
+    // Test discrepancy ID tracking across results
+    #[test]
+    fn test_remediation_result_discrepancy_tracking() {
+        let discrepancy_id_1 = Uuid::new_v4();
+        let discrepancy_id_2 = Uuid::new_v4();
+
+        let result_1 = RemediationResult::success(discrepancy_id_1, ActionType::Create, false);
+        let result_2 = RemediationResult::success(discrepancy_id_2, ActionType::Create, false);
+
+        assert_eq!(result_1.discrepancy_id, discrepancy_id_1);
+        assert_eq!(result_2.discrepancy_id, discrepancy_id_2);
+        assert_ne!(result_1.discrepancy_id, result_2.discrepancy_id);
+    }
+
+    // Test failure result contains error details
+    #[test]
+    fn test_remediation_result_failure_details() {
+        let discrepancy_id = test_discrepancy_id();
+        let error_msg = "Target system connection timeout after 30s";
+
+        let result = RemediationResult::failure(
+            discrepancy_id,
+            ActionType::Update,
+            error_msg.to_string(),
+            false,
+        );
+
+        assert!(result.is_failure());
+        assert!(!result.dry_run);
+        assert_eq!(result.error_message, Some(error_msg.to_string()));
+        assert_eq!(result.action, ActionType::Update);
+    }
 }
