@@ -14,7 +14,17 @@ api
 
 🟡 **beta**
 
-Functional with adequate test coverage (45 tests). SCIM 2.0 compliant; lacks integration tests with real IdPs.
+Functional with comprehensive test coverage (225 tests). SCIM 2.0 compliant with IdP interoperability tests for Okta, Azure AD, and OneLogin. Mock IdP clients available for CI testing.
+
+### IdP Compatibility
+
+| IdP | Status | Quirks Documented |
+|-----|--------|-------------------|
+| Okta | ✅ Tested | 5 quirks (OKTA-001 to OKTA-005) |
+| Azure AD | ✅ Tested | 6 quirks (AAD-001 to AAD-006) |
+| OneLogin | ✅ Tested | 5 quirks (OL-001 to OL-005) |
+
+See `docs/scim-idp-quirks.md` for detailed quirk documentation.
 
 ## Dependencies
 

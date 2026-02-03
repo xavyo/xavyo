@@ -971,10 +971,10 @@ Add comprehensive input validation for all user API endpoints.
 
 ---
 
-### F-036: xavyo-api-scim - Add IdP Interoperability Tests
+### F-036: xavyo-api-scim - Add IdP Interoperability Tests ✅
 
 **Crate:** `xavyo-api-scim`
-**Current Status:** Beta
+**Current Status:** Beta ✅ (completed 2026-02-03)
 **Target Status:** Beta
 **Estimated Effort:** 2 weeks
 **Dependencies:** None
@@ -983,14 +983,24 @@ Add comprehensive input validation for all user API endpoints.
 Add interoperability tests with major identity providers that support SCIM.
 
 **Acceptance Criteria:**
-- [ ] Test Okta SCIM client compatibility
-- [ ] Test Azure AD SCIM client compatibility
-- [ ] Test OneLogin SCIM client compatibility
-- [ ] Document IdP-specific quirks and workarounds
-- [ ] Add mock IdP clients for CI testing
+- [x] Test Okta SCIM client compatibility (36 tests)
+- [x] Test Azure AD SCIM client compatibility (31 tests)
+- [x] Test OneLogin SCIM client compatibility (34 tests)
+- [x] Document IdP-specific quirks and workarounds (docs/scim-idp-quirks.md)
+- [x] Add mock IdP clients for CI testing (OktaClient, AzureAdClient, OneLoginClient)
+- [x] Add quirks validation tests (60 tests)
+- [x] Total: 225 tests for xavyo-api-scim
 
-**Files to Modify:**
-- `crates/xavyo-api-scim/tests/interop/*.rs` (create)
+**Files Created:**
+- `crates/xavyo-api-scim/tests/interop/okta_tests.rs`
+- `crates/xavyo-api-scim/tests/interop/azure_ad_tests.rs`
+- `crates/xavyo-api-scim/tests/interop/onelogin_tests.rs`
+- `crates/xavyo-api-scim/tests/mocks/okta_client.rs`
+- `crates/xavyo-api-scim/tests/mocks/azure_ad_client.rs`
+- `crates/xavyo-api-scim/tests/mocks/onelogin_client.rs`
+- `crates/xavyo-api-scim/tests/mocks/quirks.rs`
+- `crates/xavyo-api-scim/tests/quirks_validation.rs`
+- `docs/scim-idp-quirks.md`
 
 ---
 
