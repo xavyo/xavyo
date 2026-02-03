@@ -193,6 +193,12 @@ pub struct ProvisioningOperation {
 
     /// When the operation completed.
     pub completed_at: Option<DateTime<Utc>>,
+
+    /// Who cancelled the operation (user ID).
+    pub cancelled_by: Option<Uuid>,
+
+    /// When the operation was cancelled.
+    pub cancelled_at: Option<DateTime<Utc>>,
 }
 
 /// Request to create a provisioning operation.
@@ -389,6 +395,69 @@ impl ProvisioningOperation {
         q.bind(limit).bind(offset).fetch_all(pool).await
     }
 
+    /// Count operations matching the filter.
+    pub async fn count_with_filter(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        filter: &OperationFilter,
+    ) -> Result<i64, sqlx::Error> {
+        let mut query = String::from(
+            r#"
+            SELECT COUNT(*) FROM provisioning_operations
+            WHERE tenant_id = $1
+            "#,
+        );
+        let mut param_count = 1;
+
+        if filter.connector_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND connector_id = ${}", param_count));
+        }
+        if filter.user_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND user_id = ${}", param_count));
+        }
+        if filter.status.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND status = ${}", param_count));
+        }
+        if filter.operation_type.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND operation_type = ${}", param_count));
+        }
+        if filter.from_date.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND created_at >= ${}", param_count));
+        }
+        if filter.to_date.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND created_at <= ${}", param_count));
+        }
+
+        let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
+
+        if let Some(connector_id) = filter.connector_id {
+            q = q.bind(connector_id);
+        }
+        if let Some(user_id) = filter.user_id {
+            q = q.bind(user_id);
+        }
+        if let Some(status) = filter.status {
+            q = q.bind(status.to_string());
+        }
+        if let Some(operation_type) = filter.operation_type {
+            q = q.bind(operation_type.to_string());
+        }
+        if let Some(from_date) = filter.from_date {
+            q = q.bind(from_date);
+        }
+        if let Some(to_date) = filter.to_date {
+            q = q.bind(to_date);
+        }
+
+        q.fetch_one(pool).await
+    }
+
     /// Get pending operations ready for processing.
     pub async fn get_pending(
         pool: &sqlx::PgPool,
@@ -583,24 +652,40 @@ impl ProvisioningOperation {
     }
 
     /// Cancel an operation.
+    ///
+    /// Sets the status to 'cancelled' and records who cancelled it.
+    /// Only pending or in_progress operations can be cancelled.
     pub async fn cancel(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         id: Uuid,
-    ) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(
+        cancelled_by: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as(
             r#"
-            DELETE FROM provisioning_operations
+            UPDATE provisioning_operations
+            SET status = 'cancelled',
+                cancelled_by = $3,
+                cancelled_at = NOW(),
+                updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-                AND status IN ('pending', 'failed')
+                AND status IN ('pending', 'in_progress')
+            RETURNING *
             "#,
         )
         .bind(id)
         .bind(tenant_id)
-        .execute(pool)
-        .await?;
+        .bind(cancelled_by)
+        .fetch_optional(pool)
+        .await
+    }
 
-        Ok(result.rows_affected() > 0)
+    /// Check if an operation can be cancelled.
+    pub fn can_cancel(&self) -> bool {
+        matches!(
+            self.status,
+            OperationStatus::Pending | OperationStatus::InProgress
+        )
     }
 
     /// Count operations by status for a connector.
@@ -872,6 +957,81 @@ impl ProvisioningOperation {
         .bind(idempotency_key)
         .fetch_optional(pool)
         .await
+    }
+
+    /// Clean up old completed jobs based on retention period.
+    ///
+    /// - Completed jobs older than `completed_days` are deleted
+    /// - Failed jobs older than `failed_days` are deleted
+    ///
+    /// Returns the number of deleted operations.
+    pub async fn cleanup_old_jobs(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        completed_days: i64,
+        failed_days: i64,
+    ) -> Result<u64, sqlx::Error> {
+        // Delete old completed jobs
+        let completed_result = sqlx::query(
+            r#"
+            DELETE FROM provisioning_operations
+            WHERE tenant_id = $1
+                AND status = 'completed'
+                AND completed_at < NOW() - INTERVAL '1 day' * $2
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(completed_days)
+        .execute(pool)
+        .await?;
+
+        // Delete old failed/cancelled jobs (retain longer for audit)
+        let failed_result = sqlx::query(
+            r#"
+            DELETE FROM provisioning_operations
+            WHERE tenant_id = $1
+                AND status IN ('failed', 'cancelled', 'resolved')
+                AND updated_at < NOW() - INTERVAL '1 day' * $2
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(failed_days)
+        .execute(pool)
+        .await?;
+
+        Ok(completed_result.rows_affected() + failed_result.rows_affected())
+    }
+
+    /// Bulk retry multiple dead letter operations.
+    ///
+    /// Returns the IDs that were successfully requeued.
+    pub async fn bulk_retry_dead_letter(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        ids: &[Uuid],
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        let result: Vec<(Uuid,)> = sqlx::query_as(
+            r#"
+            UPDATE provisioning_operations
+            SET status = 'pending',
+                retry_count = 0,
+                next_retry_at = NULL,
+                error_message = NULL,
+                error_code = NULL,
+                is_transient_error = NULL,
+                updated_at = NOW()
+            WHERE tenant_id = $1
+                AND id = ANY($2)
+                AND status = 'dead_letter'
+            RETURNING id
+            "#,
+        )
+        .bind(tenant_id)
+        .bind(ids)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(result.into_iter().map(|(id,)| id).collect())
     }
 }
 

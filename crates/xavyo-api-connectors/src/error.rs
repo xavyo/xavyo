@@ -230,6 +230,29 @@ impl From<crate::services::OperationServiceError> for ConnectorApiError {
     }
 }
 
+impl From<crate::services::JobServiceError> for ConnectorApiError {
+    fn from(err: crate::services::JobServiceError) -> Self {
+        use crate::services::JobServiceError;
+        match err {
+            JobServiceError::Database(e) => ConnectorApiError::Database(e),
+            JobServiceError::NotFound(id) => ConnectorApiError::OperationNotFound(id),
+            JobServiceError::CannotCancel(id, status) => ConnectorApiError::InvalidOperationState {
+                operation_id: id,
+                current_state: status,
+                action: "cancel".to_string(),
+            },
+            JobServiceError::DlqNotFound(id) => ConnectorApiError::NotFound {
+                resource: "DLQ entry".to_string(),
+                id: id.to_string(),
+            },
+            JobServiceError::AlreadyReplayed(id) => ConnectorApiError::Conflict(format!(
+                "DLQ entry {} has already been replayed",
+                id
+            )),
+        }
+    }
+}
+
 /// Result type for connector API operations.
 pub type Result<T> = std::result::Result<T, ConnectorApiError>;
 

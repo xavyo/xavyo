@@ -1,6 +1,7 @@
 //! HTTP handlers for connector API operations.
 
 pub mod connectors;
+pub mod jobs;
 pub mod mappings;
 pub mod operations;
 pub mod reconciliation;
@@ -8,6 +9,7 @@ pub mod schemas;
 pub mod sync;
 
 pub use connectors::*;
+pub use jobs::*;
 pub use mappings::*;
 pub use operations::*;
 pub use reconciliation::*;
