@@ -1,0 +1,53 @@
+# SIEM Docker Test Infrastructure
+# Docker Compose configuration for integration testing
+
+services:
+  splunk-hec-mock:
+    build:
+      context: ./splunk-hec-mock
+      dockerfile: Dockerfile
+    container_name: siem-test-splunk-hec
+    environment:
+      - HEC_TOKEN=${HEC_TOKEN:-test-token-12345}
+      - PORT=8088
+      - MAX_EVENTS=${MAX_EVENTS:-10000}
+    ports:
+      - "${HEC_PORT:-8088}:8088"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - siem-test-network
+    restart: unless-stopped
+
+  syslog-mock:
+    build:
+      context: ./syslog-mock
+      dockerfile: Dockerfile
+    container_name: siem-test-syslog
+    environment:
+      - TCP_PORT=514
+      - UDP_PORT=514
+      - API_PORT=8089
+      - MAX_MESSAGES=${MAX_MESSAGES:-10000}
+    ports:
+      - "${SYSLOG_TCP_PORT:-1514}:514/tcp"
+      - "${SYSLOG_UDP_PORT:-1514}:514/udp"
+      - "${SYSLOG_API_PORT:-8089}:8089"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - siem-test-network
+    restart: unless-stopped
+
+networks:
+  siem-test-network:
+    name: siem-test-network
+    driver: bridge
