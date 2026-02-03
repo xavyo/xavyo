@@ -46,3 +46,4 @@ base64 = "0.22"
 
 [dev-dependencies]
 tokio-test = "0.4"
+uuid = { workspace = true, features = ["v4"] }
