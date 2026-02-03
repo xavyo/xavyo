@@ -530,29 +530,32 @@ Add comprehensive audit logging infrastructure for policy changes with before/af
 
 ---
 
-### F-021: xavyo-api-import - Implement CSV Parsing
+### F-021: xavyo-api-import - Implement CSV Parsing ✅
 
 **Crate:** `xavyo-api-import`
-**Current Status:** Alpha
-**Target Status:** Alpha
+**Current Status:** Beta ✅ (completed 2026-02-03)
+**Target Status:** Beta
 **Estimated Effort:** 1.5 weeks
 **Dependencies:** None
+**Completed:** 2026-02-03 (PR #17)
 
 **Description:**
 Implement robust CSV file upload and parsing with detailed validation and error reporting.
 
 **Acceptance Criteria:**
-- [ ] Implement CSV file upload handler (multipart)
-- [ ] Add CSV parsing with configurable delimiter
-- [ ] Implement row-level validation with detailed errors
-- [ ] Add duplicate detection (by email, username, external ID)
-- [ ] Add column mapping configuration
-- [ ] Support large files (streaming parser)
-- [ ] Add 25+ unit tests for parsing scenarios
+- [x] Implement CSV file upload handler (multipart) - existing handler extended
+- [x] Add CSV parsing with configurable delimiter (comma, semicolon, tab, pipe)
+- [x] Implement row-level validation with detailed errors
+- [x] Add duplicate detection (by email, username, external ID)
+- [x] Add column mapping configuration (JSON mapping)
+- [x] Support large files (streaming parser with max_rows limit)
+- [x] Add 32 new unit tests for parsing scenarios (47 total in crate)
 
-**Files to Modify:**
-- `crates/xavyo-api-import/src/csv.rs` (create)
-- `crates/xavyo-api-import/src/handlers/upload.rs` (create)
+**Deliverables:**
+- `crates/xavyo-api-import/src/models.rs` - CsvParseConfig, CsvDelimiter, DuplicateCheckFields
+- `crates/xavyo-api-import/src/services/csv_parser.rs` - parse_csv_with_config, UTF-8 BOM handling
+- `crates/xavyo-api-import/src/validation.rs` - column mapping, username/external_id columns
+- `crates/xavyo-api-import/CRATE.md` - updated to beta status
 
 ---
 
