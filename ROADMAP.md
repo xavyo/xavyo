@@ -611,28 +611,32 @@ Implement email invitation workflow for imported users enabling passwordless onb
 
 ---
 
-### F-024: xavyo-api-import - Add Integration Tests
+### F-024: xavyo-api-import - Add Integration Tests ✅
 
 **Crate:** `xavyo-api-import`
-**Current Status:** Beta
+**Current Status:** ~~Beta~~ Stable
 **Target Status:** Stable
 **Estimated Effort:** 1.5 weeks
 **Dependencies:** F-021, F-022, F-023
+**Completed:** PR #18
 
 **Description:**
 Add comprehensive integration tests for the import API including large file handling and error scenarios.
 
 **Acceptance Criteria:**
-- [ ] Add 40+ integration tests
-- [ ] Test large file performance (10k+ rows)
-- [ ] Test all error scenarios (invalid data, duplicates, etc.)
-- [ ] Test concurrent import jobs
-- [ ] Test multi-tenant isolation
-- [ ] Update CRATE.md with stable status
+- [x] Add 40+ integration tests (45+ tests implemented)
+- [x] Test large file performance (10k+ rows in <30 seconds)
+- [x] Test all error scenarios (invalid data, duplicates, etc.)
+- [x] Test concurrent import jobs (5+ simultaneous)
+- [x] Test multi-tenant isolation (strict RLS enforcement)
+- [x] Update CRATE.md with stable status
 
-**Files to Modify:**
-- `crates/xavyo-api-import/tests/integration/*.rs` (create)
+**Files Modified:**
+- `crates/xavyo-api-import/tests/common/mod.rs` (created)
+- `crates/xavyo-api-import/tests/integration_tests.rs` (created)
 - `crates/xavyo-api-import/CRATE.md`
+- `docs/crates/index.md`
+- `docs/crates/maturity-matrix.md`
 
 ---
 
