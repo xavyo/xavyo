@@ -53,7 +53,7 @@
 - [xavyo-api-connectors](crates/xavyo-api-connectors/CRATE.md): 🟡 Connector API
 - [xavyo-api-tenants](crates/xavyo-api-tenants/CRATE.md): 🟢 Tenant management
 - [xavyo-api-authorization](crates/xavyo-api-authorization/CRATE.md): 🔴 Authz API
-- [xavyo-api-import](crates/xavyo-api-import/CRATE.md): 🔴 Bulk import
+- [xavyo-api-import](crates/xavyo-api-import/CRATE.md): 🟢 Bulk import
 - [xavyo-api-oidc-federation](crates/xavyo-api-oidc-federation/CRATE.md): 🟡 OIDC federation
 - [xavyo-api-nhi](crates/xavyo-api-nhi/CRATE.md): 🟡 Non-human identity API
 

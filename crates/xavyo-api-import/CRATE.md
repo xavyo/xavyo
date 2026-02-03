@@ -12,9 +12,17 @@ api
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with comprehensive CSV parsing test coverage (47 tests). F-021 enhancements include configurable delimiters, extended duplicate detection, column mapping, and streaming parser support. Ready for integration testing.
+Production-ready with comprehensive test coverage (45+ integration tests, 47+ unit tests). Covers:
+- Job lifecycle (pending/processing/completed/failed state transitions)
+- Multi-tenant isolation (strict RLS enforcement)
+- Error scenarios (invalid email, duplicates, missing fields, wrong delimiter)
+- Large file performance (10k rows in <30 seconds)
+- Concurrent import jobs (5+ simultaneous)
+- Invitation workflow (create, validate, accept, expire)
+
+F-021 enhancements include configurable delimiters, extended duplicate detection, column mapping, and streaming parser support.
 
 ## Dependencies
 
@@ -98,7 +106,10 @@ let app = Router::new()
 
 ## Feature Flags
 
-None
+| Flag | Description |
+|------|-------------|
+| `openapi` | Enable OpenAPI documentation generation |
+| `integration` | Enable integration tests requiring PostgreSQL |
 
 ## Anti-Patterns
 

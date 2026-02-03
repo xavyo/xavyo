@@ -71,6 +71,9 @@ xavyo-webhooks = { path = "../xavyo-webhooks" }
 [features]
 default = []
 openapi = ["utoipa/default"]
+integration = []  # Feature flag for integration tests requiring real PostgreSQL
 
 [dev-dependencies]
 tokio-test = "0.4"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+futures = "0.3"
