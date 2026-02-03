@@ -354,6 +354,37 @@ pub fn connector_routes_full(
         .merge(reconciliation_routes(reconciliation_state))
 }
 
+// --- Job Tracking routes (F044) ---
+
+use crate::handlers::jobs::{self, JobState};
+
+/// Create the job tracking API router.
+///
+/// All routes are relative to the nest point (e.g. `/api/v1/connectors`).
+///
+/// # Example
+///
+/// ```ignore
+/// use xavyo_api_connectors::router::{job_routes, JobState};
+///
+/// let state = JobState::new(Arc::new(job_service));
+/// let app = Router::new()
+///     .nest("/api/v1/connectors", job_routes(state));
+/// ```
+pub fn job_routes(state: JobState) -> Router {
+    Router::new()
+        // Job listing and details (US1)
+        .route("/jobs", get(jobs::list_jobs))
+        .route("/jobs/:id", get(jobs::get_job))
+        // Job cancellation (US2)
+        .route("/jobs/:id/cancel", post(jobs::cancel_job))
+        // DLQ management (US3)
+        .route("/dlq", get(jobs::list_dlq))
+        .route("/dlq/:id/replay", post(jobs::replay_dlq_entry))
+        .route("/dlq/replay", post(jobs::bulk_replay_dlq))
+        .with_state(state)
+}
+
 // --- SCIM Outbound Provisioning Target routes (F087) ---
 
 use crate::handlers::scim_log;

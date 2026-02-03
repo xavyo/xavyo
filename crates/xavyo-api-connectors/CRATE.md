@@ -1,10 +1,10 @@
 # xavyo-api-connectors
 
-> Connector management API: configuration, sync operations, reconciliation.
+> Connector management API: configuration, sync operations, reconciliation, job tracking.
 
 ## Purpose
 
-Provides REST endpoints for managing identity connectors to external systems. Includes connector configuration, schema discovery, sync operations, reconciliation runs, and provisioning queue management.
+Provides REST endpoints for managing identity connectors to external systems. Includes connector configuration, schema discovery, sync operations, reconciliation runs, provisioning queue management, and background job tracking with DLQ management.
 
 ## Layer
 
@@ -12,9 +12,9 @@ api
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with adequate test coverage (69 tests). Has 6 TODOs; connector management working but some edge cases incomplete.
+Production-ready with comprehensive test coverage (157+ tests). Full connector management, reconciliation, and background job tracking (F-044).
 
 ## Dependencies
 
@@ -56,6 +56,12 @@ pub fn reconciliation_router() -> Router<ConnectorsState>;
 | GET | `/reconciliation/runs/:id` | Run details |
 | GET | `/provisioning/queue` | Queue stats |
 | GET | `/provisioning/dlq` | Dead letter queue |
+| GET | `/jobs` | List background jobs (F-044) |
+| GET | `/jobs/:id` | Get job details with attempts |
+| POST | `/jobs/:id/cancel` | Cancel pending/running job |
+| GET | `/dlq` | List dead letter queue entries |
+| POST | `/dlq/:id/replay` | Replay single DLQ entry |
+| POST | `/dlq/replay` | Bulk replay DLQ entries |
 
 ## Usage Example
 

@@ -2,6 +2,7 @@
 
 pub mod connector_service;
 pub mod discovery_state;
+pub mod job_service;
 pub mod mapping_service;
 pub mod notification_service;
 pub mod operation_service;
@@ -32,6 +33,9 @@ pub use schedule_service::{
 };
 pub use schema_service::{AttributeResponse, ObjectClassResponse, SchemaResponse, SchemaService};
 pub use sync_service::{SyncService, SyncServiceError, SyncServiceResult};
+
+// Job tracking service (F044)
+pub use job_service::{JobService, JobServiceError, JobServiceResult};
 
 // SCIM Outbound Provisioning Client services (F087)
 pub mod scim_target_service;
