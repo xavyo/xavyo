@@ -56,7 +56,7 @@ impl FederationState {
             config.callback_base_url.clone(),
         );
         let provisioning = ProvisioningService::new(config.pool.clone());
-        let token_issuer = TokenIssuerService::new();
+        let token_issuer = TokenIssuerService::new_default();
 
         Self {
             idp_config,

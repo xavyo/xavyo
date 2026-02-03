@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Implements OpenID Connect relying party (RP) functionality for federating with enterprise identity providers. Supports discovery, PKCE, encrypted token storage, and automatic account linking for B2B scenarios.
+Implements OpenID Connect relying party (RP) functionality for federating with enterprise identity providers. Supports discovery, PKCE, encrypted token storage, automatic account linking for B2B scenarios, and proper JWT issuance with RS256 signatures.
 
 ## Layer
 
@@ -14,22 +14,40 @@ api
 
 🟡 **beta**
 
-Functional with limited test coverage (13 tests). Core OIDC RP flows working; needs more IdP interoperability testing.
+Functional with comprehensive test coverage (37 tests). Core OIDC RP flows working with JWT integration. Includes JWKS caching and token verification.
 
 ## Dependencies
 
 ### Internal (xavyo)
 - `xavyo-core` - TenantId types
 - `xavyo-db` - IdP configuration models
-- `xavyo-auth` - JWT handling
+- `xavyo-auth` - JWT encoding/decoding with RS256
 - `xavyo-tenant` - Multi-tenant middleware
 
 ### External (key)
 - `axum` - Web framework
-- `reqwest` - HTTP client
+- `reqwest` - HTTP client for JWKS fetching
 - `aes-gcm` - Token encryption
+- `jsonwebtoken` - JWT parsing (via xavyo-auth)
 
 ## Public API
+
+### Services (F-045)
+
+```rust
+// Token issuance with RS256 signing
+pub struct TokenIssuerService { ... }
+pub struct TokenIssuerConfig { ... }
+pub struct IssuedTokens { access_token, expires_in, refresh_token, token_type }
+
+// Token verification with JWKS
+pub struct TokenVerifierService { ... }
+pub struct VerificationConfig { ... }
+pub struct VerifiedToken { claims, kid, issuer }
+
+// JWKS caching
+pub struct JwksCache { ... }
+```
 
 ### Routers
 
@@ -54,20 +72,48 @@ pub fn oidc_admin_router() -> Router<OidcFedState>;
 ## Usage Example
 
 ```rust
-use xavyo_api_oidc_federation::{oidc_federation_router, OidcFedState};
-use axum::Router;
+use xavyo_api_oidc_federation::{
+    TokenIssuerService, TokenIssuerConfig,
+    TokenVerifierService, VerificationConfig,
+    JwksCache,
+};
+use uuid::Uuid;
 
-let state = OidcFedState::new(pool.clone(), encryption_key);
+// Configure token issuer with private key
+let config = TokenIssuerConfig {
+    private_key_pem: include_bytes!("keys/private_key.pem").to_vec(),
+    access_token_ttl: 900,  // 15 minutes
+    refresh_token_ttl: 604800,  // 7 days
+    issuer: "https://auth.example.com".to_string(),
+    audience: vec!["https://api.example.com".to_string()],
+};
 
-let app = Router::new()
-    .nest("/federation", oidc_federation_router())
-    .with_state(state);
+let issuer = TokenIssuerService::new(config);
+
+// Issue tokens after successful federation
+let tokens = issuer.issue_tokens(
+    user_id,
+    tenant_id,
+    vec!["user".to_string()],
+    None,  // Optional federation claims
+).await?;
+
+// Verify tokens from federated IdPs
+let verifier = TokenVerifierService::new(
+    VerificationConfig::default().issuer("https://idp.example.com")
+);
+
+let verified = verifier.verify_token(
+    &idp_token,
+    "https://idp.example.com/.well-known/jwks.json"
+).await?;
 ```
 
 ## Integration Points
 
 - **Consumed by**: `idp-api` main application
-- **Federates with**: Okta, Azure AD, Ping Identity, etc.
+- **Federates with**: Okta, Azure AD, Ping Identity, Google Workspace, etc.
+- **Uses**: `xavyo-auth` for JWT encoding/decoding
 
 ## Feature Flags
 
@@ -78,8 +124,10 @@ None
 - Never skip issuer validation
 - Never store tokens unencrypted
 - Never trust claims without verification
+- Never use default/empty private keys in production
 
 ## Related Crates
 
 - `xavyo-api-oauth` - xavyo as OIDC provider
 - `xavyo-api-social` - Consumer social login
+- `xavyo-auth` - JWT infrastructure

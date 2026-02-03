@@ -117,6 +117,10 @@ docs/             # Documentation
 - N/A (tests only, using in-memory test fixtures) (156-saml-sp-interop-tests)
 - Rust 1.75+ (per constitution) + xavyo-api-social (existing), wiremock (mock HTTP server), tokio (async runtime), serde_json (JSON handling), jsonwebtoken (JWT generation for Apple mocks) (157-social-provider-tests)
 - N/A (tests only, no persistent storage) (157-social-provider-tests)
+- Rust 1.75+ (per constitution) + xavyo-api-connectors (existing), xavyo-db (existing models), xavyo-provisioning (queue) (160-job-tracking)
+- PostgreSQL 15+ with existing operation tables (160-job-tracking)
+- Rust 1.75+ + xavyo-auth (JWT encoding/decoding), jsonwebtoken, reqwest (JWKS fetching) (161-oidc-jwt-integration)
+- PostgreSQL 15+ (via xavyo-db for tenant keys) (161-oidc-jwt-integration)
 
 ## Recent Changes
 - 132-sod-validation: Added Rust 1.75+ (per constitution) + xavyo-governance (F-004 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror

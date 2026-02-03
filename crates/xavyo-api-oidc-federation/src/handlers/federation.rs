@@ -146,9 +146,11 @@ pub async fn callback(
         .await?;
 
     // Generate Xavyo JWT for the user
+    // TODO: Load user roles from database
+    let roles = vec!["user".to_string()];
     let xavyo_tokens = state
         .token_issuer
-        .issue_tokens(user.id, token_result.session.tenant_id)
+        .issue_tokens(user.id, token_result.session.tenant_id, roles, None)
         .await?;
 
     // Audit log
