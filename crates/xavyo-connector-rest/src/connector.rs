@@ -664,14 +664,8 @@ impl Connector for RestConnector {
 
         debug!(url = %url, "Testing REST connection");
 
-        let request = self.build_request(method, &url).await?;
-
-        let response = request.send().await.map_err(|e| {
-            ConnectorError::connection_failed_with_source(
-                format!("Failed to connect to {}", self.config.base_url),
-                e,
-            )
-        })?;
+        // Use send_with_retry for automatic rate limiting and retry
+        let response = self.send_with_retry(method, &url, None).await?;
 
         let status = response.status();
         if status.is_client_error() || status.is_server_error() {
