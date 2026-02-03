@@ -67,4 +67,16 @@ pub enum EntraError {
     /// Permission denied.
     #[error("Permission denied: {0}")]
     PermissionDenied(String),
+
+    /// Circuit breaker is open, requests are being rejected.
+    #[error("Circuit breaker open, failing fast")]
+    CircuitOpen,
+
+    /// Request queue is full.
+    #[error("Request queue full ({queue_depth} requests pending)")]
+    QueueFull { queue_depth: usize },
+
+    /// Maximum retry attempts exceeded.
+    #[error("Maximum retries ({attempts}) exceeded for rate limit")]
+    MaxRetriesExceeded { attempts: u32 },
 }

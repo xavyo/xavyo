@@ -37,7 +37,7 @@
 
 ### Connectors (4 crates)
 - [xavyo-connector-ldap](crates/xavyo-connector-ldap/CRATE.md): 🟢 LDAP/AD
-- [xavyo-connector-entra](crates/xavyo-connector-entra/CRATE.md): 🟡 Microsoft Entra
+- [xavyo-connector-entra](crates/xavyo-connector-entra/CRATE.md): 🟢 Microsoft Entra
 - [xavyo-connector-rest](crates/xavyo-connector-rest/CRATE.md): 🔴 REST APIs
 - [xavyo-connector-database](crates/xavyo-connector-database/CRATE.md): 🔴 Databases
 

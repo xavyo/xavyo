@@ -39,6 +39,9 @@ secrecy = { version = "0.8", features = ["serde"] }
 url = "2.5"
 urlencoding = "2.1"
 
+# Random number generation for jitter
+rand = { workspace = true }
+
 # Connector framework traits
 xavyo-connector = { path = "../xavyo-connector" }
 

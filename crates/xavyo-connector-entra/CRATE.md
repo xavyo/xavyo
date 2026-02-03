@@ -12,9 +12,9 @@ connector
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with limited test coverage (22 tests). Core Graph API operations complete; needs more comprehensive testing.
+Production-ready with comprehensive test coverage (64 tests). Core Graph API operations complete with robust rate limit handling, circuit breaker pattern, and request queuing.
 
 ## Dependencies
 
@@ -26,6 +26,7 @@ Functional with limited test coverage (22 tests). Core Graph API operations comp
 - `reqwest` - HTTP client for Graph API
 - `tokio` - Async runtime
 - `secrecy` - Secret handling
+- `rand` - Random jitter for rate limiting
 
 ## Public API
 
@@ -79,6 +80,37 @@ pub struct MappedEntraUser { ... }
 
 /// Mapped group from Entra
 pub struct MappedEntraGroup { ... }
+
+/// Rate limit configuration
+pub struct RateLimitConfig {
+    pub base_delay_ms: u64,      // Default: 1000
+    pub max_delay_ms: u64,       // Default: 300000 (5 min)
+    pub jitter_factor: f64,      // Default: 0.25 (25%)
+    pub max_retries: u32,        // Default: 10
+    pub circuit_failure_threshold: u32, // Default: 10
+    pub circuit_failure_window_secs: u64, // Default: 300 (5 min)
+    pub circuit_open_duration_secs: u64,  // Default: 30
+    pub queue_max_depth: usize,  // Default: 100
+}
+
+/// Rate limiter for Graph API requests
+pub struct RateLimiter { ... }
+
+/// Circuit breaker states
+pub enum CircuitBreakerState {
+    Closed,   // Normal operation
+    Open,     // Failing fast
+    HalfOpen, // Testing recovery
+}
+
+/// Rate limit metrics
+pub struct RateLimitMetrics {
+    pub total_requests: u64,
+    pub rate_limited_count: u64,
+    pub retry_count: u64,
+    pub circuit_opens: u64,
+    pub current_circuit_state: CircuitBreakerState,
+}
 ```
 
 ### Trait Implementations
@@ -114,8 +146,16 @@ let credentials = EntraCredentials {
     client_secret: "your-client-secret".to_string().into(),
 };
 
-// Create connector
+// Create connector (uses default rate limit config)
 let connector = EntraConnector::new(config, credentials)?;
+
+// Or with custom rate limit configuration
+let rate_config = RateLimitConfig {
+    max_retries: 5,
+    circuit_failure_threshold: 5,
+    ..Default::default()
+};
+// let connector = EntraConnector::with_rate_limit_config(config, credentials, rate_config)?;
 
 // Test connection
 connector.test_connection().await?;
@@ -144,6 +184,12 @@ let attrs = AttributeSet::new()
     .with("accountEnabled", "true");
 
 let uid = connector.create("user", attrs).await?;
+
+// Access rate limit metrics
+let graph_client = connector.graph_client();
+let metrics = graph_client.rate_limit_metrics().await;
+println!("Rate limited {} times", metrics.rate_limited_count);
+println!("Circuit state: {:?}", metrics.current_circuit_state);
 ```
 
 ## Integration Points
@@ -156,12 +202,24 @@ let uid = connector.create("user", attrs).await?;
 
 None - all features are enabled by default.
 
+## Rate Limit Handling
+
+The connector implements robust rate limit handling for Microsoft Graph API:
+
+- **Retry-After Header**: Honors `Retry-After` header from 429 responses
+- **Exponential Backoff**: Uses `base * 2^attempt` with configurable base (default 1s) and cap (default 5 min)
+- **Jitter**: Adds 0-25% random variance to prevent thundering herd
+- **Circuit Breaker**: Opens after 10 failures in 5 minutes, fails fast for 30 seconds
+- **Request Queuing**: Queues up to 100 requests during throttle (FIFO processing)
+- **Metrics**: Exposes rate limit count, retry count, circuit state for observability
+
 ## Anti-Patterns
 
 - Never store client secrets in plaintext - use `xavyo-connector::CredentialEncryption`
 - Never ignore token expiration - use `TokenCache` for automatic refresh
 - Never use delta sync without persisting sync tokens
 - Never hard-code tenant IDs in multi-tenant deployments
+- Never disable rate limiting in production - use conservative config instead
 
 ## Related Crates
 
