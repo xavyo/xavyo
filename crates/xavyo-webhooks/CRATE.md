@@ -12,9 +12,9 @@ domain
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with adequate test coverage (59 tests). Core delivery system complete; lacks comprehensive integration tests.
+Production-ready with comprehensive test coverage (97 tests: 59 unit tests + 38 integration tests). Core delivery system complete with full integration test coverage for delivery, retry logic, signature verification, concurrent delivery, failure scenarios, and tracking.
 
 ## Dependencies
 
@@ -150,7 +150,44 @@ tokio::spawn(async move {
 
 ## Feature Flags
 
-None - all features are enabled by default.
+- `integration` - Enables integration tests (disabled by default)
+
+## Integration Tests
+
+The crate includes 38 integration tests covering real-world webhook delivery scenarios:
+
+### Test Suites
+
+| Suite | Tests | Description |
+|-------|-------|-------------|
+| `delivery_tests` | 5 | Successful delivery, multiple subscriptions, 2xx handling, payload structure |
+| `retry_tests` | 6 | 5xx retry, exponential backoff, eventual success, max retries, abandonment |
+| `signature_tests` | 7 | HMAC-SHA256 presence, format, verification, different payloads, no secret |
+| `concurrent_tests` | 4 | Concurrent delivery, independent completion, no blocking, same endpoint |
+| `failure_tests` | 8 | Timeout, 4xx/5xx errors, network errors, consecutive failures, redirect blocking |
+| `tracking_tests` | 8 | Delivery records, attempt tracking, response codes, latency, timestamps |
+
+### Running Integration Tests
+
+```bash
+# Run all integration tests
+cargo test -p xavyo-webhooks --features integration
+
+# Run specific test suite
+cargo test -p xavyo-webhooks --features integration --test delivery_tests
+
+# Run single test
+cargo test -p xavyo-webhooks --features integration --test signature_tests test_hmac_signature_header_present
+```
+
+### Test Infrastructure
+
+Integration tests use [wiremock](https://github.com/LukeMathWalker/wiremock-rs) to mock HTTP endpoints:
+
+- **CaptureResponder**: Captures request body and headers for verification
+- **CountingResponder**: Counts requests for concurrency testing
+- **FailingResponder**: Fails N times then succeeds for retry testing
+- **DelayedResponder**: Adds response delay for timeout testing
 
 ## Anti-Patterns
 

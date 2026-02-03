@@ -60,6 +60,9 @@ xavyo-tenant = { path = "../xavyo-tenant" }
 # Graceful shutdown
 tokio-util = { version = "0.7", features = ["rt"] }
 
+[features]
+integration = []
+
 [dev-dependencies]
 tokio = { workspace = true }
 tokio-test = { workspace = true }
