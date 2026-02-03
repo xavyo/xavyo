@@ -1173,29 +1173,31 @@ Add integration tests for all supported social login providers.
 
 ---
 
-### F-042: xavyo-api-social - Add Error Scenario Tests
+### F-042: xavyo-api-social - Add Error Scenario Tests ✅
 
 **Crate:** `xavyo-api-social`
-**Current Status:** Beta
+**Current Status:** Stable ✅ (completed 2026-02-03)
 **Target Status:** Stable
 **Estimated Effort:** 1 week
 **Dependencies:** F-041
+**Completed:** 2026-02-03
 
 **Description:**
 Add comprehensive error scenario tests for graceful degradation when providers fail.
 
 **Acceptance Criteria:**
-- [ ] Test provider downtime handling
-- [ ] Test state token expiration
-- [ ] Test PKCE mismatch handling
-- [ ] Test invalid authorization code
-- [ ] Test user cancellation flow
-- [ ] Add 20+ error scenario tests
-- [ ] Update CRATE.md with stable status
+- [x] Test provider downtime handling (4 tests: 500, 502, 503, 504)
+- [x] Test state token expiration (3 tests: missing, invalid, expired)
+- [x] Test PKCE mismatch handling (1 test)
+- [x] Test OAuth2 protocol errors per RFC 6749 (5 tests)
+- [x] Test network errors (3 tests: timeout, connection refused, malformed JSON)
+- [x] Test provider-specific errors (4 tests: GitHub abuse, Microsoft interaction_required, Google revoked, Apple invalid_client)
+- [x] Add 20+ error scenario tests (20 tests total)
+- [x] Update CRATE.md with stable status
 
-**Files to Modify:**
-- `crates/xavyo-api-social/tests/errors.rs` (create)
-- `crates/xavyo-api-social/CRATE.md`
+**Files Created:**
+- `crates/xavyo-api-social/tests/providers/error_tests.rs` (20 tests)
+- Extended `crates/xavyo-api-social/tests/providers/mock_server.rs` with error helpers
 
 ---
 

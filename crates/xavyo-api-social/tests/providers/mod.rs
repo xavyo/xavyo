@@ -12,6 +12,7 @@ pub mod common;
 pub mod mock_server;
 
 pub mod apple_tests;
+pub mod error_tests;
 pub mod github_tests;
 pub mod google_tests;
 pub mod microsoft_tests;
