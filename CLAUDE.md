@@ -89,6 +89,12 @@ docs/             # Documentation
 ## Active Technologies
 - Rust 1.75+ (per constitution) + xavyo-governance (F-004 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror (132-sod-validation)
 - PostgreSQL 15+ with SQLx compile-time checking, RLS for tenant isolation (132-sod-validation)
+- Rust 1.75+ (per constitution) + xavyo-governance (F-004, F-005 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror (133-risk-assessment)
+- PostgreSQL (via existing xavyo-db patterns) with in-memory stores for testing (133-risk-assessment)
+- Rust 1.75+ (per constitution) + xavyo-governance (existing services), xavyo-db (SQLx + PostgreSQL), tokio (async runtime) (134-governance-integration-tests)
+- PostgreSQL 15+ with Row-Level Security (existing infrastructure) (134-governance-integration-tests)
+- Rust 1.75+ (per constitution) + xavyo-connector (CreateOp, UpdateOp, DeleteOp traits), xavyo-db (shadow links), async-trait, tokio (135-remediation-executor)
+- PostgreSQL via SQLx for shadow links and remediation records (135-remediation-executor)
 
 ## Recent Changes
 - 132-sod-validation: Added Rust 1.75+ (per constitution) + xavyo-governance (F-004 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror
