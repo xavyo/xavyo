@@ -74,7 +74,7 @@ subtle = "2.5"
 hmac = "0.12"
 
 # JWT encoding for ID tokens
-jsonwebtoken = "10"
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 
 # Async trait support
 async-trait = "0.1"

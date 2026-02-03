@@ -8,7 +8,7 @@ repository = "https://github.com/xavyo/xavyo"
 
 [dependencies]
 # JWT handling
-jsonwebtoken = "10"
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 
 # Password hashing
 argon2 = "0.5"
