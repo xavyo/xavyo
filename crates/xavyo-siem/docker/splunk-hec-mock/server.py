@@ -57,8 +57,8 @@ def collector_event():
     # Parse event data
     try:
         data = request.get_json(force=True)
-    except Exception as e:
-        return jsonify({"text": f"Invalid JSON: {str(e)}", "code": 6}), 400
+    except Exception:
+        return jsonify({"text": "Invalid JSON format", "code": 6}), 400
 
     # Store event with metadata
     event_record = {
