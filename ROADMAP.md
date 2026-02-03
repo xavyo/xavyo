@@ -1067,7 +1067,7 @@ Fix the AuthnRequest session binding to prevent replay attacks by validating res
 
 ---
 
-### F-039: xavyo-api-saml - Implement Group Loading
+### F-039: xavyo-api-saml - Implement Group Loading ✅
 
 **Crate:** `xavyo-api-saml`
 **Current Status:** Beta
@@ -1079,15 +1079,29 @@ Fix the AuthnRequest session binding to prevent replay attacks by validating res
 Implement group loading during SAML assertion generation to include group membership claims.
 
 **Acceptance Criteria:**
-- [ ] Load user groups during assertion generation
-- [ ] Implement group attribute mapping configuration
-- [ ] Support multi-group membership in assertions
-- [ ] Add configurable group attribute name
-- [ ] Add 15+ tests for group assertions
+- [X] Load user groups during assertion generation
+- [X] Implement group attribute mapping configuration
+- [X] Support multi-group membership in assertions
+- [X] Add configurable group attribute name
+- [X] Add 15+ tests for group assertions (18 tests added)
 
-**Files to Modify:**
-- `crates/xavyo-api-saml/src/assertion.rs`
-- `crates/xavyo-api-saml/src/groups.rs` (create)
+**Implementation Summary:**
+- Created `GroupService` for loading and formatting user groups
+- Added `GroupAttributeConfig` with per-SP configuration (attribute name, value format, filtering)
+- Implemented value formats: Name, ID (UUID), DN (Distinguished Name)
+- Implemented pattern (glob) and allowlist filters
+- Modified SSO and IdP-initiated handlers to load groups
+- Added database migration for SP group configuration fields
+- 18 group assertion tests + 41 unit tests covering all scenarios
+
+**Files Modified:**
+- `crates/xavyo-api-saml/src/services/group_service.rs` (new)
+- `crates/xavyo-api-saml/src/models/group_config.rs` (new)
+- `crates/xavyo-api-saml/src/handlers/sso.rs`
+- `crates/xavyo-api-saml/src/handlers/initiate.rs`
+- `crates/xavyo-db/src/models/saml_service_provider.rs`
+- `crates/xavyo-db/migrations/996_saml_sp_group_config.sql`
+- `crates/xavyo-api-saml/tests/group_assertion_tests.rs` (new)
 
 ---
 

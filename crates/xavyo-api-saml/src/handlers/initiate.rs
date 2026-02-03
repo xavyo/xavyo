@@ -2,9 +2,10 @@
 
 use crate::error::{SamlError, SamlResult};
 use crate::handlers::metadata::SamlState;
+use crate::models::group_config::GroupAttributeConfig;
 use crate::models::{generate_auto_submit_form, InitiateSsoRequest};
 use crate::saml::UserAttributes;
-use crate::services::{AssertionBuilder, SpService};
+use crate::services::{AssertionBuilder, GroupService, SpService};
 use axum::{
     extract::{Path, State},
     response::{Html, IntoResponse, Response},
@@ -84,11 +85,52 @@ async fn initiate_sso_inner(
     // Build user attributes
     // Note: User model doesn't have display_name, derive from email
     let display_name = user.email.split('@').next().map(String::from);
+
+    // Load user groups with SP-specific configuration
+    let sp_group_config = sp.get_group_config();
+    let group_config = GroupAttributeConfig {
+        attribute_name: sp_group_config.attribute_name,
+        value_format: crate::models::group_config::GroupValueFormat::parse(
+            &sp_group_config.value_format,
+        ),
+        filter: sp_group_config.filter.map(|f| {
+            crate::models::group_config::GroupFilter {
+                filter_type: match f.filter_type.as_str() {
+                    "pattern" => crate::models::group_config::GroupFilterType::Pattern,
+                    "allowlist" => crate::models::group_config::GroupFilterType::Allowlist,
+                    _ => crate::models::group_config::GroupFilterType::None,
+                },
+                patterns: f.patterns,
+                allowlist: f.allowlist,
+            }
+        }),
+        include_groups: sp_group_config.include_groups,
+        omit_empty_groups: sp_group_config.omit_empty_groups,
+        dn_base: sp_group_config.dn_base,
+    };
+
+    let groups = GroupService::load_groups_for_assertion(
+        &state.pool,
+        tenant_id,
+        user.id,
+        &group_config,
+    )
+    .await
+    .unwrap_or_else(|e| {
+        tracing::warn!(
+            tenant_id = %tenant_id,
+            user_id = %user.id,
+            error = %e,
+            "Failed to load user groups, continuing without groups"
+        );
+        vec![]
+    });
+
     let user_attrs = UserAttributes {
         user_id: user.id.to_string(),
         email: user.email.clone(),
         display_name,
-        groups: vec![], // TODO: Load user groups
+        groups,
         tenant_id: tenant_id.to_string(),
     };
 
