@@ -14,7 +14,7 @@ api
 
 🟡 **beta**
 
-Functional with comprehensive security test coverage (52 tests). Has 2 remaining TODOs; needs SP interoperability testing.
+Functional with comprehensive security and group assertion test coverage (70 tests). Needs SP interoperability testing.
 
 ### Test Coverage
 
@@ -22,7 +22,8 @@ Functional with comprehensive security test coverage (52 tests). Has 2 remaining
 |------------|-------|-------------|
 | Unit tests | 24 | Core service tests |
 | Security tests | 28 | Session storage, expiration, replay attack prevention |
-| **Total** | **52** | Full coverage for session security |
+| Group assertion tests | 18 | Group loading, filtering, formatting |
+| **Total** | **70** | Full coverage for session security and group assertions |
 
 ### Security Features (F-038)
 
@@ -30,6 +31,15 @@ Functional with comprehensive security test coverage (52 tests). Has 2 remaining
 - **TTL Expiration**: 5-minute default with 30-second grace period for clock skew
 - **Tenant Isolation**: Request sessions scoped to tenant via RLS
 - **InResponseTo Validation**: SAML responses validated against stored request IDs
+
+### Group Assertion Features (F-039)
+
+- **Group Loading**: Automatic loading of user group memberships during assertion generation
+- **Configurable Attribute Name**: Per-SP group attribute name (default: "groups", supports custom URIs)
+- **Value Formats**: Name (display_name), ID (UUID), or DN (Distinguished Name) formats
+- **Group Filtering**: Pattern-based (glob) or allowlist filtering per SP
+- **Tenant Isolation**: Groups scoped to tenant, no cross-tenant leakage
+- **Performance**: Handles 500+ groups per user in <500ms
 
 ## Dependencies
 

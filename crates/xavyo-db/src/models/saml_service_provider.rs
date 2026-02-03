@@ -23,6 +23,25 @@ pub struct SamlServiceProvider {
     pub metadata_url: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    // Group configuration fields (F-039)
+    /// Custom SAML attribute name for groups (default: "groups")
+    #[serde(default)]
+    pub group_attribute_name: Option<String>,
+    /// How to format group values: "name", "id", or "dn"
+    #[serde(default = "default_group_value_format")]
+    pub group_value_format: String,
+    /// JSON filter config for which groups to include
+    #[serde(default)]
+    pub group_filter: Option<serde_json::Value>,
+    /// Whether to include groups in assertions
+    #[serde(default = "default_true")]
+    pub include_groups: bool,
+    /// Whether to omit groups attribute when user has no groups
+    #[serde(default = "default_true")]
+    pub omit_empty_groups: bool,
+    /// Base DN for DN format
+    #[serde(default)]
+    pub group_dn_base: Option<String>,
 }
 
 /// Request to create a new Service Provider
@@ -90,6 +109,10 @@ fn default_name_id_format() -> String {
     "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress".to_string()
 }
 
+fn default_group_value_format() -> String {
+    "name".to_string()
+}
+
 fn default_true() -> bool {
     true
 }
@@ -129,9 +152,71 @@ impl Default for AttributeMapping {
     }
 }
 
+/// Group filter configuration (matches xavyo-api-saml::models::GroupFilter)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SpGroupFilter {
+    /// Type of filter: "none", "pattern", or "allowlist"
+    #[serde(default)]
+    pub filter_type: String,
+    /// Patterns for pattern-based filtering
+    #[serde(default)]
+    pub patterns: Vec<String>,
+    /// Explicit list of allowed group names
+    #[serde(default)]
+    pub allowlist: Vec<String>,
+}
+
+/// Group attribute configuration for SP
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpGroupConfig {
+    /// SAML attribute name for groups
+    pub attribute_name: String,
+    /// Format: "name", "id", or "dn"
+    pub value_format: String,
+    /// Filter configuration
+    pub filter: Option<SpGroupFilter>,
+    /// Whether to include groups
+    pub include_groups: bool,
+    /// Whether to omit empty groups attribute
+    pub omit_empty_groups: bool,
+    /// Base DN for DN format
+    pub dn_base: Option<String>,
+}
+
+impl Default for SpGroupConfig {
+    fn default() -> Self {
+        Self {
+            attribute_name: "groups".to_string(),
+            value_format: "name".to_string(),
+            filter: None,
+            include_groups: true,
+            omit_empty_groups: true,
+            dn_base: None,
+        }
+    }
+}
+
 impl SamlServiceProvider {
     /// Parse attribute mapping from JSONB value
     pub fn get_attribute_mapping(&self) -> AttributeMapping {
         serde_json::from_value(self.attribute_mapping.clone()).unwrap_or_default()
+    }
+
+    /// Get group configuration for this SP
+    pub fn get_group_config(&self) -> SpGroupConfig {
+        SpGroupConfig {
+            attribute_name: self
+                .group_attribute_name
+                .clone()
+                .unwrap_or_else(|| "groups".to_string()),
+            value_format: self.group_value_format.clone(),
+            filter: self
+                .group_filter
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok()),
+            include_groups: self.include_groups,
+            omit_empty_groups: self.omit_empty_groups,
+            dn_base: self.group_dn_base.clone(),
+        }
     }
 }
