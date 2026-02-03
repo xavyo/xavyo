@@ -184,6 +184,80 @@ pub async fn setup_github_rate_limit(server: &MockServer) {
         .await;
 }
 
+// ============================================================================
+// Error Scenario Helpers (F-042)
+// ============================================================================
+
+/// Setup server error response for token endpoint (HTTP 5xx)
+pub async fn setup_server_error(server: &MockServer, status_code: u16, message: &str) {
+    let error_code = match status_code {
+        503 => "temporarily_unavailable",
+        _ => "server_error",
+    };
+
+    Mock::given(method("POST"))
+        .and(path("/token"))
+        .respond_with(
+            ResponseTemplate::new(status_code).set_body_json(json!({
+                "error": error_code,
+                "error_description": message
+            })),
+        )
+        .mount(server)
+        .await;
+}
+
+/// Setup GitHub abuse detection error (403 with Retry-After header)
+pub async fn setup_github_abuse_error(server: &MockServer) {
+    let response = json!({
+        "message": "You have exceeded a secondary rate limit. Please wait a few minutes before you try again.",
+        "documentation_url": "https://docs.github.com/rest/overview/rate-limits-for-the-rest-api"
+    });
+
+    Mock::given(method("GET"))
+        .and(path("/user"))
+        .respond_with(
+            ResponseTemplate::new(403)
+                .set_body_json(response)
+                .insert_header("Retry-After", "60"),
+        )
+        .mount(server)
+        .await;
+}
+
+/// Setup Microsoft interaction_required error (AADSTS codes)
+pub async fn setup_microsoft_interaction_required(server: &MockServer) {
+    let response = json!({
+        "error": "interaction_required",
+        "error_description": "AADSTS50076: Due to a configuration change made by your administrator, or because you moved to a new location, you must use multi-factor authentication to access the resource.",
+        "error_codes": [50076],
+        "timestamp": "2026-02-03T12:00:00Z",
+        "trace_id": "abc123-trace-id",
+        "correlation_id": "def456-correlation-id",
+        "suberror": "basic_action"
+    });
+
+    Mock::given(method("POST"))
+        .and(path("/token"))
+        .respond_with(ResponseTemplate::new(400).set_body_json(response))
+        .mount(server)
+        .await;
+}
+
+/// Setup Google token revoked error
+pub async fn setup_google_token_revoked(server: &MockServer) {
+    let response = json!({
+        "error": "invalid_grant",
+        "error_description": "Token has been expired or revoked."
+    });
+
+    Mock::given(method("POST"))
+        .and(path("/token"))
+        .respond_with(ResponseTemplate::new(400).set_body_json(response))
+        .mount(server)
+        .await;
+}
+
 /// Generate a mock Apple identity token (JWT)
 /// Uses a simple structure for testing purposes
 pub fn generate_apple_id_token(user: &MockUser, client_id: &str, nonce: Option<&str>) -> String {
@@ -319,7 +393,7 @@ mod tests {
         assert!(uri.starts_with("http://"));
         assert!(uri.contains("127.0.0.1"));
         // Port should be dynamic, not a fixed number
-        let port: u16 = uri.split(':').last().unwrap().parse().unwrap();
+        let port: u16 = uri.split(':').next_back().unwrap().parse().unwrap();
         assert!(port > 0);
     }
 
@@ -397,7 +471,8 @@ mod tests {
         let challenge = validate_pkce(verifier, "KVy9qVZBPvZQMdNGhtW4V8FQ8kXe4_YfMIYvwGxl8gE");
         // Note: This may not match exactly without proper calculation
         // The important thing is the function runs without error
-        assert!(challenge || !challenge); // Placeholder - real test would verify actual challenge
+        // Just verify the function runs without panic - real test would use known test vectors
+        let _ = challenge;
     }
 
     #[test]
