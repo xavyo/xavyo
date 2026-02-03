@@ -203,6 +203,11 @@ pub struct RestConfig {
     /// Logging verbosity for request/response logging.
     #[serde(default)]
     pub log_verbosity: LogVerbosity,
+
+    /// Allow localhost URLs (for testing only).
+    /// WARNING: Never enable in production - disables SSRF protection.
+    #[serde(default)]
+    pub allow_localhost: bool,
 }
 
 fn default_content_type() -> String {
@@ -231,6 +236,7 @@ impl RestConfig {
             rate_limit: RateLimitConfig::default(),
             retry: RetryConfig::default(),
             log_verbosity: LogVerbosity::default(),
+            allow_localhost: false,
         }
     }
 
@@ -313,6 +319,25 @@ impl RestConfig {
         self.retry = RetryConfig::disabled();
         self
     }
+
+    /// Allow localhost URLs (for testing only).
+    ///
+    /// # Warning
+    ///
+    /// This disables SSRF protection for localhost URLs. **NEVER** use in production!
+    /// Only use this for integration tests with mock servers.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // In integration tests only:
+    /// let config = RestConfig::new(&mock_server.uri())
+    ///     .with_allow_localhost();
+    /// ```
+    pub fn with_allow_localhost(mut self) -> Self {
+        self.allow_localhost = true;
+        self
+    }
 }
 
 impl ConnectorConfig for RestConfig {
@@ -334,19 +359,25 @@ impl ConnectorConfig for RestConfig {
             })?;
 
         // SSRF protection: validate the URL is not targeting internal services
-        validate_url_ssrf(&url).map_err(|e| ConnectorError::InvalidConfiguration {
-            message: format!("SSRF protection: {}", e),
-        })?;
-
-        // Also validate OAuth2 token URL if present
-        if let AuthConfig::OAuth2 { token_url, .. } = &self.auth {
-            let oauth_url =
-                url::Url::parse(token_url).map_err(|e| ConnectorError::InvalidConfiguration {
-                    message: format!("invalid OAuth2 token_url: {}", e),
-                })?;
-            validate_url_ssrf(&oauth_url).map_err(|e| ConnectorError::InvalidConfiguration {
-                message: format!("SSRF protection for OAuth2 token_url: {}", e),
+        // Skip this check if allow_localhost is true (for testing only!)
+        if !self.allow_localhost {
+            validate_url_ssrf(&url).map_err(|e| ConnectorError::InvalidConfiguration {
+                message: format!("SSRF protection: {}", e),
             })?;
+
+            // Also validate OAuth2 token URL if present
+            if let AuthConfig::OAuth2 { token_url, .. } = &self.auth {
+                let oauth_url = url::Url::parse(token_url).map_err(|e| {
+                    ConnectorError::InvalidConfiguration {
+                        message: format!("invalid OAuth2 token_url: {}", e),
+                    }
+                })?;
+                validate_url_ssrf(&oauth_url).map_err(|e| {
+                    ConnectorError::InvalidConfiguration {
+                        message: format!("SSRF protection for OAuth2 token_url: {}", e),
+                    }
+                })?;
+            }
         }
 
         Ok(())

@@ -12,9 +12,9 @@ connector
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with comprehensive rate limiting and retry implementation (73 tests). Core operations implemented: create, update, delete, search. Rate limiting uses token bucket algorithm with per-endpoint configuration. Retry logic supports exponential backoff with jitter and Retry-After header parsing. Needs integration tests against real APIs for stable status.
+Production-ready REST connector with comprehensive test coverage (114 tests: 73 unit + 41 integration). Core operations implemented: create, update, delete, search. Rate limiting uses token bucket algorithm with per-endpoint configuration. Retry logic supports exponential backoff with jitter and Retry-After header parsing. SSRF protection blocks internal/private IP addresses by default. Integration tests cover CRUD operations, authentication methods, pagination styles, retry/rate-limit behavior, and security validations.
 
 ## Dependencies
 
