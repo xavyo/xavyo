@@ -9,8 +9,10 @@ mod common;
 
 use std::time::Instant;
 use uuid::Uuid;
-use xavyo_governance::services::entitlement::{CreateEntitlementInput, EntitlementFilter, ListOptions};
 use xavyo_governance::services::assignment::{AssignEntitlementInput, AssignmentStore};
+use xavyo_governance::services::entitlement::{
+    CreateEntitlementInput, EntitlementFilter, ListOptions,
+};
 use xavyo_governance::services::sod::CreateSodRuleInput;
 use xavyo_governance::types::{RiskLevel, SodConflictType, SodSeverity};
 use xavyo_governance::AuditStore;
@@ -322,7 +324,9 @@ async fn test_pf_003_sod_validation_under_500ms() {
 #[ignore] // Performance test - run with --ignored
 async fn test_pf_004_audit_query_under_1_second() {
     use chrono::{Duration, Utc};
-    use xavyo_governance::audit::{AuditEventFilter, EntitlementAuditAction, EntitlementAuditEventInput};
+    use xavyo_governance::audit::{
+        AuditEventFilter, EntitlementAuditAction, EntitlementAuditEventInput,
+    };
 
     let ctx = TestContext::new();
 
@@ -482,7 +486,10 @@ async fn test_concurrent_reads() {
                 .list(
                     tenant,
                     &EntitlementFilter::default(),
-                    &ListOptions { limit: 10, offset: 0 },
+                    &ListOptions {
+                        limit: 10,
+                        offset: 0,
+                    },
                 )
                 .await
         });

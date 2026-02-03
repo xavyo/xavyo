@@ -69,24 +69,21 @@ impl CaService {
             };
 
             // Load from secret provider
-            let secret_value = provider
-                .get_secret(secret_name)
-                .await
-                .map_err(|e| ApiAgentsError::CaCreationFailed(
-                    format!("Failed to load secret '{}': {}", secret_name, e)
-                ))?;
-
-            secret_value
-                .as_str()
-                .map(|s| s.to_string())
-                .map_err(|e| ApiAgentsError::CaCreationFailed(
-                    format!("Invalid secret value: {}", e)
+            let secret_value = provider.get_secret(secret_name).await.map_err(|e| {
+                ApiAgentsError::CaCreationFailed(format!(
+                    "Failed to load secret '{}': {}",
+                    secret_name, e
                 ))
+            })?;
+
+            secret_value.as_str().map(|s| s.to_string()).map_err(|e| {
+                ApiAgentsError::CaCreationFailed(format!("Invalid secret value: {}", e))
+            })
         } else {
             // No secret provider configured - return as-is (development mode)
             if secret_ref.starts_with("secret://") {
                 Err(ApiAgentsError::CaCreationFailed(
-                    "Secret provider not configured. Cannot load secrets.".to_string()
+                    "Secret provider not configured. Cannot load secrets.".to_string(),
                 ))
             } else {
                 Ok(secret_ref.to_string())
@@ -137,16 +134,21 @@ impl CaService {
         let encrypted_private_key = encrypted_private_key_base64.into_bytes();
 
         // Parse certificate to get not_before/not_after
-        let cert_der = ::pem::parse(&ca_cert_pem)
-            .map_err(|e| ApiAgentsError::CaCreationFailed(format!("Failed to parse CA cert: {}", e)))?;
+        let cert_der = ::pem::parse(&ca_cert_pem).map_err(|e| {
+            ApiAgentsError::CaCreationFailed(format!("Failed to parse CA cert: {}", e))
+        })?;
 
         let (_, cert) = x509_parser::certificate::X509Certificate::from_der(cert_der.contents())
-            .map_err(|e| ApiAgentsError::CaCreationFailed(format!("Failed to parse X.509: {:?}", e)))?;
+            .map_err(|e| {
+                ApiAgentsError::CaCreationFailed(format!("Failed to parse X.509: {:?}", e))
+            })?;
 
-        let not_before: DateTime<Utc> = DateTime::from_timestamp(cert.validity().not_before.timestamp(), 0)
-            .unwrap_or_else(Utc::now);
-        let not_after: DateTime<Utc> = DateTime::from_timestamp(cert.validity().not_after.timestamp(), 0)
-            .unwrap_or_else(|| Utc::now() + chrono::Duration::days(validity_days as i64));
+        let not_before: DateTime<Utc> =
+            DateTime::from_timestamp(cert.validity().not_before.timestamp(), 0)
+                .unwrap_or_else(Utc::now);
+        let not_after: DateTime<Utc> =
+            DateTime::from_timestamp(cert.validity().not_after.timestamp(), 0)
+                .unwrap_or_else(|| Utc::now() + chrono::Duration::days(validity_days as i64));
 
         // Create DB record
         let ca = CertificateAuthority::create_internal(
@@ -192,18 +194,23 @@ impl CaService {
         };
 
         // Parse the CA chain certificate
-        let cert_der = ::pem::parse(&request.ca_chain_pem)
-            .map_err(|e| ApiAgentsError::CaCreationFailed(format!("Failed to parse CA chain: {}", e)))?;
+        let cert_der = ::pem::parse(&request.ca_chain_pem).map_err(|e| {
+            ApiAgentsError::CaCreationFailed(format!("Failed to parse CA chain: {}", e))
+        })?;
 
         let (_, cert) = x509_parser::certificate::X509Certificate::from_der(cert_der.contents())
-            .map_err(|e| ApiAgentsError::CaCreationFailed(format!("Failed to parse X.509: {:?}", e)))?;
+            .map_err(|e| {
+                ApiAgentsError::CaCreationFailed(format!("Failed to parse X.509: {:?}", e))
+            })?;
 
         let subject_dn = format_subject_dn(cert.subject());
 
-        let not_before: DateTime<Utc> = DateTime::from_timestamp(cert.validity().not_before.timestamp(), 0)
-            .unwrap_or_else(Utc::now);
-        let not_after: DateTime<Utc> = DateTime::from_timestamp(cert.validity().not_after.timestamp(), 0)
-            .unwrap_or_else(|| Utc::now() + chrono::Duration::days(3650));
+        let not_before: DateTime<Utc> =
+            DateTime::from_timestamp(cert.validity().not_before.timestamp(), 0)
+                .unwrap_or_else(Utc::now);
+        let not_after: DateTime<Utc> =
+            DateTime::from_timestamp(cert.validity().not_after.timestamp(), 0)
+                .unwrap_or_else(|| Utc::now() + chrono::Duration::days(3650));
 
         let db_input = CreateExternalCa {
             name: request.name,
@@ -232,11 +239,7 @@ impl CaService {
     }
 
     /// Get a CA by ID.
-    pub async fn get_ca(
-        &self,
-        tenant_id: Uuid,
-        ca_id: Uuid,
-    ) -> Result<CaResponse, ApiAgentsError> {
+    pub async fn get_ca(&self, tenant_id: Uuid, ca_id: Uuid) -> Result<CaResponse, ApiAgentsError> {
         let ca = CertificateAuthority::find_by_id(&self.pool, tenant_id, ca_id)
             .await
             .map_err(ApiAgentsError::Database)?
@@ -246,10 +249,7 @@ impl CaService {
     }
 
     /// Get the default CA for a tenant.
-    pub async fn get_default_ca(
-        &self,
-        tenant_id: Uuid,
-    ) -> Result<CaResponse, ApiAgentsError> {
+    pub async fn get_default_ca(&self, tenant_id: Uuid) -> Result<CaResponse, ApiAgentsError> {
         let ca = CertificateAuthority::find_default(&self.pool, tenant_id)
             .await
             .map_err(ApiAgentsError::Database)?
@@ -266,9 +266,10 @@ impl CaService {
         limit: i64,
         offset: i64,
     ) -> Result<CaListResponse, ApiAgentsError> {
-        let cas = CertificateAuthority::list_by_tenant(&self.pool, tenant_id, &filter, limit, offset)
-            .await
-            .map_err(ApiAgentsError::Database)?;
+        let cas =
+            CertificateAuthority::list_by_tenant(&self.pool, tenant_id, &filter, limit, offset)
+                .await
+                .map_err(ApiAgentsError::Database)?;
 
         let total = CertificateAuthority::count_by_tenant(&self.pool, tenant_id, &filter)
             .await
@@ -364,11 +365,7 @@ impl CaService {
     /// - The CA doesn't exist
     /// - The CA is set as the default
     /// - There are active certificates signed by this CA
-    pub async fn delete_ca(
-        &self,
-        tenant_id: Uuid,
-        ca_id: Uuid,
-    ) -> Result<(), ApiAgentsError> {
+    pub async fn delete_ca(&self, tenant_id: Uuid, ca_id: Uuid) -> Result<(), ApiAgentsError> {
         // Check if CA exists
         let ca = CertificateAuthority::find_by_id(&self.pool, tenant_id, ca_id)
             .await
@@ -431,19 +428,24 @@ impl CaService {
         &self,
         ca: &CertificateAuthority,
     ) -> Result<Box<dyn CaProvider + Send + Sync>, ApiAgentsError> {
-        let ca_type = ca.ca_type_enum()
-            .map_err(ApiAgentsError::InvalidCaType)?;
+        let ca_type = ca.ca_type_enum().map_err(ApiAgentsError::InvalidCaType)?;
 
         match ca_type {
             CaType::Internal => {
                 // Decrypt the private key
                 // The encrypted key is stored as Vec<u8> (base64-encoded bytes), convert to String for decrypt()
                 let key_pem = if let Some(ref encrypted) = ca.private_key_encrypted {
-                    let encrypted_str = String::from_utf8(encrypted.clone())
-                        .map_err(|e| ApiAgentsError::CaCreationFailed(format!("Invalid encrypted key encoding: {}", e)))?;
+                    let encrypted_str = String::from_utf8(encrypted.clone()).map_err(|e| {
+                        ApiAgentsError::CaCreationFailed(format!(
+                            "Invalid encrypted key encoding: {}",
+                            e
+                        ))
+                    })?;
                     self.encryption.decrypt(&encrypted_str)?
                 } else {
-                    return Err(ApiAgentsError::CaCreationFailed("No private key for internal CA".to_string()));
+                    return Err(ApiAgentsError::CaCreationFailed(
+                        "No private key for internal CA".to_string(),
+                    ));
                 };
 
                 let config = InternalCaConfig {
@@ -464,13 +466,16 @@ impl CaService {
             CaType::StepCa => {
                 // Parse external_config into StepCaConfig
                 let external_config = ca.external_config.clone().ok_or_else(|| {
-                    ApiAgentsError::CaCreationFailed("No external configuration for step-ca".to_string())
+                    ApiAgentsError::CaCreationFailed(
+                        "No external configuration for step-ca".to_string(),
+                    )
                 })?;
 
                 let base_config: serde_json::Value = external_config;
-                let mut config: StepCaConfig = serde_json::from_value(base_config).map_err(|e| {
-                    ApiAgentsError::CaCreationFailed(format!("Invalid step-ca config: {}", e))
-                })?;
+                let mut config: StepCaConfig =
+                    serde_json::from_value(base_config).map_err(|e| {
+                        ApiAgentsError::CaCreationFailed(format!("Invalid step-ca config: {}", e))
+                    })?;
 
                 // Fill in fields from the CA record
                 config.ca_id = ca.id;
@@ -486,13 +491,16 @@ impl CaService {
             CaType::VaultPki => {
                 // Parse external_config into VaultPkiConfig
                 let external_config = ca.external_config.clone().ok_or_else(|| {
-                    ApiAgentsError::CaCreationFailed("No external configuration for Vault PKI".to_string())
+                    ApiAgentsError::CaCreationFailed(
+                        "No external configuration for Vault PKI".to_string(),
+                    )
                 })?;
 
                 let base_config: serde_json::Value = external_config;
-                let mut config: VaultPkiConfig = serde_json::from_value(base_config).map_err(|e| {
-                    ApiAgentsError::CaCreationFailed(format!("Invalid Vault PKI config: {}", e))
-                })?;
+                let mut config: VaultPkiConfig =
+                    serde_json::from_value(base_config).map_err(|e| {
+                        ApiAgentsError::CaCreationFailed(format!("Invalid Vault PKI config: {}", e))
+                    })?;
 
                 // Fill in fields from the CA record
                 config.ca_id = ca.id;
@@ -524,9 +532,7 @@ fn format_subject_dn(subject: &x509_parser::x509::X509Name) -> String {
                 "2.5.4.11" => Some("OU"),
                 _ => None,
             };
-            oid_str.map(|oid| {
-                format!("{}={}", oid, attr.as_str().unwrap_or(""))
-            })
+            oid_str.map(|oid| format!("{}={}", oid, attr.as_str().unwrap_or("")))
         })
         .collect::<Vec<_>>()
         .join(",")
@@ -684,7 +690,9 @@ mod tests {
             self.secrets
                 .get(name)
                 .map(|v| SecretValue::new(name, v.as_bytes().to_vec()))
-                .ok_or_else(|| SecretError::NotFound { name: name.to_string() })
+                .ok_or_else(|| SecretError::NotFound {
+                    name: name.to_string(),
+                })
         }
 
         async fn health_check(&self) -> Result<bool, SecretError> {
@@ -715,7 +723,8 @@ mod tests {
             tenant_id: Uuid::new_v4(),
             ca_type: "internal".to_string(),
             name: "Test CA".to_string(),
-            certificate_pem: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----".to_string(),
+            certificate_pem: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"
+                .to_string(),
             chain_pem: None,
             private_key_encrypted: Some(vec![1, 2, 3]),
             private_key_ref: None,

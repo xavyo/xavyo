@@ -351,10 +351,7 @@ pub async fn get_job(
 ) -> Result<Json<JobDetailResponse>, ApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
 
-    let response = state
-        .job_service
-        .get_job_detail(tenant_id, job_id)
-        .await?;
+    let response = state.job_service.get_job_detail(tenant_id, job_id).await?;
 
     Ok(Json(response))
 }

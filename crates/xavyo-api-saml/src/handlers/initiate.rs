@@ -93,8 +93,9 @@ async fn initiate_sso_inner(
         value_format: crate::models::group_config::GroupValueFormat::parse(
             &sp_group_config.value_format,
         ),
-        filter: sp_group_config.filter.map(|f| {
-            crate::models::group_config::GroupFilter {
+        filter: sp_group_config
+            .filter
+            .map(|f| crate::models::group_config::GroupFilter {
                 filter_type: match f.filter_type.as_str() {
                     "pattern" => crate::models::group_config::GroupFilterType::Pattern,
                     "allowlist" => crate::models::group_config::GroupFilterType::Allowlist,
@@ -102,29 +103,24 @@ async fn initiate_sso_inner(
                 },
                 patterns: f.patterns,
                 allowlist: f.allowlist,
-            }
-        }),
+            }),
         include_groups: sp_group_config.include_groups,
         omit_empty_groups: sp_group_config.omit_empty_groups,
         dn_base: sp_group_config.dn_base,
     };
 
-    let groups = GroupService::load_groups_for_assertion(
-        &state.pool,
-        tenant_id,
-        user.id,
-        &group_config,
-    )
-    .await
-    .unwrap_or_else(|e| {
-        tracing::warn!(
-            tenant_id = %tenant_id,
-            user_id = %user.id,
-            error = %e,
-            "Failed to load user groups, continuing without groups"
-        );
-        vec![]
-    });
+    let groups =
+        GroupService::load_groups_for_assertion(&state.pool, tenant_id, user.id, &group_config)
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!(
+                    tenant_id = %tenant_id,
+                    user_id = %user.id,
+                    error = %e,
+                    "Failed to load user groups, continuing without groups"
+                );
+                vec![]
+            });
 
     let user_attrs = UserAttributes {
         user_id: user.id.to_string(),

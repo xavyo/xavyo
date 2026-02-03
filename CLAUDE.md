@@ -121,6 +121,8 @@ docs/             # Documentation
 - PostgreSQL 15+ with existing operation tables (160-job-tracking)
 - Rust 1.75+ + xavyo-auth (JWT encoding/decoding), jsonwebtoken, reqwest (JWKS fetching) (161-oidc-jwt-integration)
 - PostgreSQL 15+ (via xavyo-db for tenant keys) (161-oidc-jwt-integration)
+- Docker Compose 2.x, Rust 1.75+ (tests) + Docker Compose, wiremock (existing), tokio-test (existing) (165-siem-docker-tests)
+- N/A (containers only persist during test run) (165-siem-docker-tests)
 
 ## Recent Changes
 - 132-sod-validation: Added Rust 1.75+ (per constitution) + xavyo-governance (F-004 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror

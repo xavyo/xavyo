@@ -21,7 +21,9 @@ use uuid::Uuid;
 
 use crate::error::ApiAgentsError;
 use crate::router::AgentsState;
-use crate::services::ca_service::{CreateExternalCaRequest, CreateInternalCaRequest, UpdateCaRequest};
+use crate::services::ca_service::{
+    CreateExternalCaRequest, CreateInternalCaRequest, UpdateCaRequest,
+};
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::certificate_authority::CertificateAuthorityFilter;
 
@@ -79,7 +81,10 @@ pub async fn create_internal_ca(
 ) -> Result<impl IntoResponse, ApiAgentsError> {
     let tenant_id = extract_tenant_id(&claims)?;
 
-    let ca = state.ca_service.create_internal_ca(tenant_id, request).await?;
+    let ca = state
+        .ca_service
+        .create_internal_ca(tenant_id, request)
+        .await?;
 
     Ok((StatusCode::CREATED, Json(ca)))
 }
@@ -108,7 +113,10 @@ pub async fn create_external_ca(
 ) -> Result<impl IntoResponse, ApiAgentsError> {
     let tenant_id = extract_tenant_id(&claims)?;
 
-    let ca = state.ca_service.create_external_ca(tenant_id, request).await?;
+    let ca = state
+        .ca_service
+        .create_external_ca(tenant_id, request)
+        .await?;
 
     Ok((StatusCode::CREATED, Json(ca)))
 }
@@ -205,7 +213,10 @@ pub async fn update_ca(
 ) -> Result<impl IntoResponse, ApiAgentsError> {
     let tenant_id = extract_tenant_id(&claims)?;
 
-    let ca = state.ca_service.update_ca(tenant_id, ca_id, request).await?;
+    let ca = state
+        .ca_service
+        .update_ca(tenant_id, ca_id, request)
+        .await?;
 
     Ok(Json(ca))
 }
@@ -309,7 +320,8 @@ pub async fn get_ca_chain(
 
     // Use chain_pem if available, otherwise fall back to certificate_pem
     // (for internal CAs, the CA certificate itself is the trust anchor)
-    let chain_pem = ca_record.chain_pem
+    let chain_pem = ca_record
+        .chain_pem
         .unwrap_or_else(|| ca_record.certificate_pem.clone());
 
     Ok(Json(CaChainResponse {

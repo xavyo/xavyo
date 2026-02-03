@@ -105,3 +105,4 @@ futures = "0.3"
 default = []
 integration = []
 kafka = ["xavyo-events/kafka"]
+openapi = []

@@ -118,9 +118,7 @@ impl CertificateRevocation {
 
     /// Get a human-readable reason description.
     pub fn reason_description(&self) -> &'static str {
-        self.reason()
-            .map(|r| r.description())
-            .unwrap_or("Unknown")
+        self.reason().map(|r| r.description()).unwrap_or("Unknown")
     }
 }
 
@@ -425,8 +423,14 @@ mod tests {
 
     #[test]
     fn test_revocation_reason_code_display() {
-        assert_eq!(format!("{}", RevocationReasonCode::Unspecified), "Unspecified");
-        assert_eq!(format!("{}", RevocationReasonCode::KeyCompromise), "Key Compromise");
+        assert_eq!(
+            format!("{}", RevocationReasonCode::Unspecified),
+            "Unspecified"
+        );
+        assert_eq!(
+            format!("{}", RevocationReasonCode::KeyCompromise),
+            "Key Compromise"
+        );
     }
 
     #[test]
@@ -450,7 +454,10 @@ mod tests {
             created_at: Utc::now(),
         };
 
-        assert_eq!(revocation.reason(), Some(RevocationReasonCode::KeyCompromise));
+        assert_eq!(
+            revocation.reason(),
+            Some(RevocationReasonCode::KeyCompromise)
+        );
         assert_eq!(revocation.reason_description(), "Key Compromise");
     }
 

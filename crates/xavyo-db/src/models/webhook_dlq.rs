@@ -241,11 +241,7 @@ impl WebhookDlqEntry {
     }
 
     /// Delete a DLQ entry.
-    pub async fn delete(
-        pool: &PgPool,
-        tenant_id: Uuid,
-        id: Uuid,
-    ) -> Result<bool, sqlx::Error> {
+    pub async fn delete(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r#"
             DELETE FROM webhook_dlq

@@ -230,15 +230,12 @@ pub struct ExemptionFactory;
 
 impl ExemptionFactory {
     /// Create an exemption input.
-    pub fn create(
-        rule_id: SodRuleId,
-        user_id: Uuid,
-        granted_by: Uuid,
-    ) -> CreateSodExemptionInput {
+    pub fn create(rule_id: SodRuleId, user_id: Uuid, granted_by: Uuid) -> CreateSodExemptionInput {
         CreateSodExemptionInput {
             rule_id,
             user_id,
-            justification: "Test exemption with sufficient justification for validation".to_string(),
+            justification: "Test exemption with sufficient justification for validation"
+                .to_string(),
             expires_at: Some(Utc::now() + Duration::days(30)),
             granted_by,
         }

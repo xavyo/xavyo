@@ -12,7 +12,10 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
-use rcgen::{CertificateParams, DnType, KeyPair, PKCS_ECDSA_P256_SHA256, PKCS_ECDSA_P384_SHA384, PKCS_RSA_SHA256};
+use rcgen::{
+    CertificateParams, DnType, KeyPair, PKCS_ECDSA_P256_SHA256, PKCS_ECDSA_P384_SHA384,
+    PKCS_RSA_SHA256,
+};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -190,10 +193,7 @@ impl StepCaProvider {
     }
 
     /// Generate a CSR for the given request.
-    fn generate_csr(
-        request: &CertificateIssueRequest,
-        key_pair: &KeyPair,
-    ) -> CaResult<String> {
+    fn generate_csr(request: &CertificateIssueRequest, key_pair: &KeyPair) -> CaResult<String> {
         let mut params = CertificateParams::default();
 
         // Set subject DN
@@ -218,11 +218,11 @@ impl StepCaProvider {
         // Create SAN entries
         let dns_san = rcgen::SanType::DnsName(
             rcgen::Ia5String::try_from(request.agent_name.as_str())
-                .map_err(|e| CaProviderError::InvalidCsr(format!("Invalid DNS name: {}", e)))?
+                .map_err(|e| CaProviderError::InvalidCsr(format!("Invalid DNS name: {}", e)))?,
         );
         let uri_san = rcgen::SanType::URI(
             rcgen::Ia5String::try_from(agent_uri.as_str())
-                .map_err(|e| CaProviderError::InvalidCsr(format!("Invalid URI: {}", e)))?
+                .map_err(|e| CaProviderError::InvalidCsr(format!("Invalid URI: {}", e)))?,
         );
 
         params.subject_alt_names.push(dns_san);
@@ -232,13 +232,15 @@ impl StepCaProvider {
         for san in &request.additional_sans {
             if let Some(dns_name) = san.strip_prefix("dns:") {
                 params.subject_alt_names.push(rcgen::SanType::DnsName(
-                    rcgen::Ia5String::try_from(dns_name)
-                        .map_err(|e| CaProviderError::InvalidCsr(format!("Invalid DNS SAN: {}", e)))?
+                    rcgen::Ia5String::try_from(dns_name).map_err(|e| {
+                        CaProviderError::InvalidCsr(format!("Invalid DNS SAN: {}", e))
+                    })?,
                 ));
             } else if let Some(uri) = san.strip_prefix("uri:") {
                 params.subject_alt_names.push(rcgen::SanType::URI(
-                    rcgen::Ia5String::try_from(uri)
-                        .map_err(|e| CaProviderError::InvalidCsr(format!("Invalid URI SAN: {}", e)))?
+                    rcgen::Ia5String::try_from(uri).map_err(|e| {
+                        CaProviderError::InvalidCsr(format!("Invalid URI SAN: {}", e))
+                    })?,
                 ));
             }
         }
@@ -248,8 +250,9 @@ impl StepCaProvider {
             .serialize_request(key_pair)
             .map_err(|e| CaProviderError::InvalidCsr(format!("Failed to create CSR: {}", e)))?;
 
-        csr.pem()
-            .map_err(|e| CaProviderError::InvalidCsr(format!("Failed to serialize CSR to PEM: {}", e)))
+        csr.pem().map_err(|e| {
+            CaProviderError::InvalidCsr(format!("Failed to serialize CSR to PEM: {}", e))
+        })
     }
 
     /// Generate a one-time token (OTT) for step-ca authentication.
@@ -310,8 +313,9 @@ impl StepCaProvider {
     /// Extract serial number from a PEM certificate.
     fn extract_serial_number(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = X509Certificate::from_der(&der)
-            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e)))?;
+        let (_, cert) = X509Certificate::from_der(&der).map_err(|e| {
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+        })?;
 
         Ok(cert
             .serial
@@ -324,8 +328,9 @@ impl StepCaProvider {
     /// Extract subject DN from a PEM certificate.
     fn extract_subject_dn(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = X509Certificate::from_der(&der)
-            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e)))?;
+        let (_, cert) = X509Certificate::from_der(&der).map_err(|e| {
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+        })?;
 
         Ok(cert.subject().to_string())
     }
@@ -333,8 +338,9 @@ impl StepCaProvider {
     /// Extract issuer DN from a PEM certificate.
     fn extract_issuer_dn(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = X509Certificate::from_der(&der)
-            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e)))?;
+        let (_, cert) = X509Certificate::from_der(&der).map_err(|e| {
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+        })?;
 
         Ok(cert.issuer().to_string())
     }
@@ -342,8 +348,9 @@ impl StepCaProvider {
     /// Extract validity timestamps from a PEM certificate.
     fn extract_validity(cert_pem: &str) -> CaResult<(i64, i64)> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = X509Certificate::from_der(&der)
-            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e)))?;
+        let (_, cert) = X509Certificate::from_der(&der).map_err(|e| {
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+        })?;
 
         let not_before = cert.validity().not_before.timestamp();
         let not_after = cert.validity().not_after.timestamp();
@@ -361,12 +368,10 @@ impl CaProvider for StepCaProvider {
     async fn health_check(&self) -> CaResult<()> {
         let url = format!("{}/health", self.config.base_url);
 
-        let response = self
-            .http_client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| CaProviderError::NetworkError(format!("Health check failed: {}", e)))?;
+        let response =
+            self.http_client.get(&url).send().await.map_err(|e| {
+                CaProviderError::NetworkError(format!("Health check failed: {}", e))
+            })?;
 
         if !response.status().is_success() {
             return Err(CaProviderError::NotAvailable(format!(
@@ -375,10 +380,9 @@ impl CaProvider for StepCaProvider {
             )));
         }
 
-        let health: StepCaHealthResponse = response
-            .json()
-            .await
-            .map_err(|e| CaProviderError::ExternalCaError(format!("Invalid health response: {}", e)))?;
+        let health: StepCaHealthResponse = response.json().await.map_err(|e| {
+            CaProviderError::ExternalCaError(format!("Invalid health response: {}", e))
+        })?;
 
         if health.status != "ok" {
             return Err(CaProviderError::NotAvailable(format!(
@@ -454,10 +458,9 @@ impl CaProvider for StepCaProvider {
             )));
         }
 
-        let sign_response: StepCaSignResponse = response
-            .json()
-            .await
-            .map_err(|e| CaProviderError::ExternalCaError(format!("Invalid sign response: {}", e)))?;
+        let sign_response: StepCaSignResponse = response.json().await.map_err(|e| {
+            CaProviderError::ExternalCaError(format!("Invalid sign response: {}", e))
+        })?;
 
         // Parse the issued certificate
         let cert_der = Self::parse_pem_to_der(&sign_response.crt)?;
@@ -534,10 +537,9 @@ impl CaProvider for StepCaProvider {
             )));
         }
 
-        let _revoke_response: StepCaRevokeResponse = response
-            .json()
-            .await
-            .map_err(|e| CaProviderError::ExternalCaError(format!("Invalid revoke response: {}", e)))?;
+        let _revoke_response: StepCaRevokeResponse = response.json().await.map_err(|e| {
+            CaProviderError::ExternalCaError(format!("Invalid revoke response: {}", e))
+        })?;
 
         Ok(RevocationResult {
             certificate_id: Uuid::nil(), // We don't have the cert ID from step-ca
@@ -674,7 +676,8 @@ mod tests {
             provisioner_name: "xavyo-agents".to_string(),
             provisioner_key_id: "test-key-id".to_string(),
             provisioner_password_ref: "secret://step-ca-password".to_string(),
-            ca_certificate_pem: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----".to_string(),
+            ca_certificate_pem: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"
+                .to_string(),
             max_validity_days: 30,
             timeout_ms: 30_000,
         }
@@ -713,7 +716,10 @@ mod tests {
         let result = provider.issue_certificate(&request).await;
         assert!(matches!(
             result,
-            Err(CaProviderError::ValidityExceedsMax { requested: 90, max: 30 })
+            Err(CaProviderError::ValidityExceedsMax {
+                requested: 90,
+                max: 30
+            })
         ));
     }
 
@@ -736,7 +742,13 @@ mod tests {
         let config = test_config();
         let provider = StepCaProvider::with_password(config, "test-password".to_string());
 
-        let ott = provider.generate_ott("test-agent", &["test-agent".to_string(), "xavyo:tenant:xxx:agent:yyy".to_string()]);
+        let ott = provider.generate_ott(
+            "test-agent",
+            &[
+                "test-agent".to_string(),
+                "xavyo:tenant:xxx:agent:yyy".to_string(),
+            ],
+        );
         assert!(ott.is_ok());
 
         let token = ott.unwrap();
@@ -745,10 +757,8 @@ mod tests {
         assert_eq!(parts.len(), 3, "JWT should have 3 parts");
 
         // Verify we can decode the header (base64)
-        let header_json = base64::Engine::decode(
-            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-            parts[0]
-        );
+        let header_json =
+            base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, parts[0]);
         assert!(header_json.is_ok(), "Header should be valid base64");
     }
 
@@ -778,7 +788,13 @@ mod tests {
 
         assert!(csr_pem.is_ok(), "CSR generation should succeed");
         let pem_str = csr_pem.unwrap();
-        assert!(pem_str.starts_with("-----BEGIN CERTIFICATE REQUEST-----"), "CSR should be in PEM format");
-        assert!(pem_str.contains("-----END CERTIFICATE REQUEST-----"), "CSR should have proper ending");
+        assert!(
+            pem_str.starts_with("-----BEGIN CERTIFICATE REQUEST-----"),
+            "CSR should be in PEM format"
+        );
+        assert!(
+            pem_str.contains("-----END CERTIFICATE REQUEST-----"),
+            "CSR should have proper ending"
+        );
     }
 }

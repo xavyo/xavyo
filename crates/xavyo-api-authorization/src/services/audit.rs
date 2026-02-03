@@ -343,6 +343,7 @@ impl PolicyAuditStore for FailingPolicyAuditStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::PolicyAuditAction;
 
     #[test]
     fn test_emit_decision_all_verbosity() {

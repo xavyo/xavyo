@@ -22,7 +22,10 @@ fn test_salesforce_sp_profile_configuration() {
     assert_eq!(sp.entity_id, "https://company.my.salesforce.com");
     assert_eq!(sp.acs_url, "https://company.my.salesforce.com/saml/acs");
     assert!(sp.sign_assertions, "Salesforce requires signed assertions");
-    assert_eq!(sp.assertion_validity_seconds, 300, "5-minute validity window");
+    assert_eq!(
+        sp.assertion_validity_seconds, 300,
+        "5-minute validity window"
+    );
 }
 
 // ============================================================================
@@ -94,7 +97,11 @@ fn test_salesforce_federation_identifier_attribute() {
     );
 
     let values = fed_id.unwrap();
-    assert_eq!(values.len(), 1, "FederationIdentifier should have one value");
+    assert_eq!(
+        values.len(),
+        1,
+        "FederationIdentifier should have one value"
+    );
     assert_eq!(
         values[0], user.federation_id,
         "FederationIdentifier should match user's federation_id"
@@ -152,7 +159,10 @@ fn test_salesforce_signature_algorithm_rsa_sha256() {
     let parsed = parse_saml_xml(&xml).expect("Should parse SAML XML");
 
     // Salesforce requires signed assertions
-    assert!(parsed.has_signature, "Salesforce requires signed assertions");
+    assert!(
+        parsed.has_signature,
+        "Salesforce requires signed assertions"
+    );
 
     // Signature algorithm should be RSA-SHA256
     assert!(

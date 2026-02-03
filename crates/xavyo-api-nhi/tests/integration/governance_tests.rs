@@ -34,12 +34,24 @@ async fn test_get_risk_summary() {
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
 
     // Create NHIs with different risk scores
-    let _low_risk =
-        create_test_nhi(&pool, tenant_id, owner_id, "low-risk-nhi", "service_account").await;
+    let _low_risk = create_test_nhi(
+        &pool,
+        tenant_id,
+        owner_id,
+        "low-risk-nhi",
+        "service_account",
+    )
+    .await;
 
     let high_risk_name = format!("high-risk-nhi-{}", Uuid::new_v4());
-    let high_risk_id =
-        create_test_nhi(&pool, tenant_id, owner_id, &high_risk_name, "service_account").await;
+    let high_risk_id = create_test_nhi(
+        &pool,
+        tenant_id,
+        owner_id,
+        &high_risk_name,
+        "service_account",
+    )
+    .await;
 
     // Update risk score for high risk NHI
     sqlx::query(

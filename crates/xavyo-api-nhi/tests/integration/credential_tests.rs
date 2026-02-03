@@ -137,7 +137,9 @@ async fn test_rotate_credentials() {
     .await
     .expect("Deactivate should succeed");
 
-    let new_cred_id = create_test_credential(&pool, tenant_id, sa_id, true).await.unwrap();
+    let new_cred_id = create_test_credential(&pool, tenant_id, sa_id, true)
+        .await
+        .unwrap();
 
     // Verify new credential is different
     assert_ne!(old_cred_id, new_cred_id);
@@ -285,7 +287,10 @@ async fn test_old_credential_invalid_after_rotation() {
     .expect("Old credential should exist");
 
     let is_active: bool = row.get("is_active");
-    assert!(!is_active, "Old credential should be invalid after rotation");
+    assert!(
+        !is_active,
+        "Old credential should be invalid after rotation"
+    );
 
     // Verify only one active credential exists
     let count_row: (i64,) = sqlx::query_as(
@@ -301,5 +306,8 @@ async fn test_old_credential_invalid_after_rotation() {
     .await
     .expect("Count should work");
 
-    assert_eq!(count_row.0, 1, "Only one credential should be active after rotation");
+    assert_eq!(
+        count_row.0, 1,
+        "Only one credential should be active after rotation"
+    );
 }

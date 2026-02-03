@@ -73,7 +73,10 @@ impl StoreAssertions for StoreCounts {
             self.audit_events, expected.audit_events,
             "Audit event count mismatch"
         );
-        assert_eq!(self.sod_rules, expected.sod_rules, "SoD rule count mismatch");
+        assert_eq!(
+            self.sod_rules, expected.sod_rules,
+            "SoD rule count mismatch"
+        );
         assert_eq!(
             self.sod_violations, expected.sod_violations,
             "SoD violation count mismatch"

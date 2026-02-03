@@ -33,7 +33,11 @@ pub struct CertificateService {
 impl CertificateService {
     /// Create a new CertificateService.
     pub fn new(pool: PgPool, ca_service: Arc<CaService>, audit_service: Arc<AuditService>) -> Self {
-        Self { pool, ca_service, audit_service }
+        Self {
+            pool,
+            ca_service,
+            audit_service,
+        }
     }
 
     /// Issue a new certificate for an agent.
@@ -110,15 +114,22 @@ impl CertificateService {
         };
 
         // Issue certificate using the CA provider
-        let cert_result = provider.issue_certificate(&issue_request).await
+        let cert_result = provider
+            .issue_certificate(&issue_request)
+            .await
             .map_err(|e| ApiAgentsError::CertificateIssueFailed(e.to_string()))?;
 
         // Parse the issued certificate to extract metadata
-        let cert_der = ::pem::parse(&cert_result.certificate_pem)
-            .map_err(|e| ApiAgentsError::CertificateIssueFailed(format!("Failed to parse certificate: {}", e)))?;
+        let cert_der = ::pem::parse(&cert_result.certificate_pem).map_err(|e| {
+            ApiAgentsError::CertificateIssueFailed(format!("Failed to parse certificate: {}", e))
+        })?;
 
-        let (_, x509_cert) = x509_parser::certificate::X509Certificate::from_der(cert_der.contents())
-            .map_err(|e| ApiAgentsError::CertificateIssueFailed(format!("Failed to parse X.509: {:?}", e)))?;
+        let (_, x509_cert) = x509_parser::certificate::X509Certificate::from_der(
+            cert_der.contents(),
+        )
+        .map_err(|e| {
+            ApiAgentsError::CertificateIssueFailed(format!("Failed to parse X.509: {:?}", e))
+        })?;
 
         // Calculate SHA-256 fingerprint
         let fingerprint = calculate_fingerprint(cert_der.contents());
@@ -133,10 +144,12 @@ impl CertificateService {
         let issuer_dn = format_subject_dn(x509_cert.issuer());
 
         // Extract validity dates
-        let not_before: DateTime<Utc> = DateTime::from_timestamp(x509_cert.validity().not_before.timestamp(), 0)
-            .unwrap_or_else(Utc::now);
-        let not_after: DateTime<Utc> = DateTime::from_timestamp(x509_cert.validity().not_after.timestamp(), 0)
-            .unwrap_or_else(|| Utc::now() + chrono::Duration::days(validity_days as i64));
+        let not_before: DateTime<Utc> =
+            DateTime::from_timestamp(x509_cert.validity().not_before.timestamp(), 0)
+                .unwrap_or_else(Utc::now);
+        let not_after: DateTime<Utc> =
+            DateTime::from_timestamp(x509_cert.validity().not_after.timestamp(), 0)
+                .unwrap_or_else(|| Utc::now() + chrono::Duration::days(validity_days as i64));
 
         // Store the certificate in the database
         let certificate = AgentCertificate::create(
@@ -157,24 +170,27 @@ impl CertificateService {
         .map_err(ApiAgentsError::Database)?;
 
         // Log audit event for certificate issuance
-        let _ = self.audit_service.log_certificate_event(
-            tenant_id,
-            agent_id,
-            "certificate_issued",
-            Some(certificate.id),
-            Some(&serial_number),
-            "success",
-            Some(serde_json::json!({
-                "ca_id": ca.id,
-                "ca_name": ca.name,
-                "validity_days": validity_days,
-                "key_algorithm": request.key_algorithm,
-                "fingerprint": fingerprint,
-                "not_before": not_before.to_rfc3339(),
-                "not_after": not_after.to_rfc3339(),
-            })),
-            created_by,
-        ).await;
+        let _ = self
+            .audit_service
+            .log_certificate_event(
+                tenant_id,
+                agent_id,
+                "certificate_issued",
+                Some(certificate.id),
+                Some(&serial_number),
+                "success",
+                Some(serde_json::json!({
+                    "ca_id": ca.id,
+                    "ca_name": ca.name,
+                    "validity_days": validity_days,
+                    "key_algorithm": request.key_algorithm,
+                    "fingerprint": fingerprint,
+                    "not_before": not_before.to_rfc3339(),
+                    "not_after": not_after.to_rfc3339(),
+                })),
+                created_by,
+            )
+            .await;
 
         Ok(IssueCertificateResponse {
             certificate,
@@ -234,9 +250,10 @@ impl CertificateService {
         limit: i64,
         offset: i64,
     ) -> Result<CertificateListResponse, ApiAgentsError> {
-        let certificates = AgentCertificate::list_by_tenant(&self.pool, tenant_id, &filter, limit, offset)
-            .await
-            .map_err(ApiAgentsError::Database)?;
+        let certificates =
+            AgentCertificate::list_by_tenant(&self.pool, tenant_id, &filter, limit, offset)
+                .await
+                .map_err(ApiAgentsError::Database)?;
 
         // Count total (we'd need a count query, for now use len as approximation if < limit)
         let total = if certificates.len() < limit as usize && offset == 0 {
@@ -273,7 +290,8 @@ impl CertificateService {
             ..Default::default()
         };
 
-        self.list_certificates(tenant_id, filter, limit, offset).await
+        self.list_certificates(tenant_id, filter, limit, offset)
+            .await
     }
 
     /// List certificates expiring within the specified number of days.
@@ -353,7 +371,9 @@ impl CertificateService {
         renewed_by: Option<Uuid>,
     ) -> Result<IssueCertificateResponse, ApiAgentsError> {
         // Get the existing certificate
-        let existing_cert = self.get_certificate_for_agent(tenant_id, agent_id, certificate_id).await?;
+        let existing_cert = self
+            .get_certificate_for_agent(tenant_id, agent_id, certificate_id)
+            .await?;
 
         // Validate the certificate is not revoked
         if existing_cert.is_revoked() {
@@ -381,14 +401,13 @@ impl CertificateService {
         }
 
         // Determine validity period (use requested or default to CA max)
-        let validity_days = request.validity_days
+        let validity_days = request
+            .validity_days
             .map(|d| d.min(ca.max_validity_days))
             .unwrap_or(ca.max_validity_days);
 
         // Determine key algorithm (use requested or same as original)
-        let key_algorithm = request.key_algorithm
-            .as_deref()
-            .unwrap_or("ecdsa_p256");
+        let key_algorithm = request.key_algorithm.as_deref().unwrap_or("ecdsa_p256");
 
         // Build issue request for renewal
         let issue_request = IssueCertificateRequest {
@@ -399,27 +418,32 @@ impl CertificateService {
         };
 
         // Issue the new certificate
-        let result = self.issue_certificate(tenant_id, agent_id, issue_request, renewed_by).await?;
+        let result = self
+            .issue_certificate(tenant_id, agent_id, issue_request, renewed_by)
+            .await?;
 
         // Log audit event for certificate renewal
-        let _ = self.audit_service.log_certificate_event(
-            tenant_id,
-            agent_id,
-            "certificate_renewed",
-            Some(result.certificate.id),
-            Some(&result.certificate.serial_number),
-            "success",
-            Some(serde_json::json!({
-                "old_certificate_id": certificate_id,
-                "old_serial_number": existing_cert.serial_number,
-                "old_expires_at": existing_cert.not_after.to_rfc3339(),
-                "new_certificate_id": result.certificate.id,
-                "new_serial_number": result.certificate.serial_number,
-                "new_expires_at": result.certificate.not_after.to_rfc3339(),
-                "validity_days": validity_days,
-            })),
-            renewed_by,
-        ).await;
+        let _ = self
+            .audit_service
+            .log_certificate_event(
+                tenant_id,
+                agent_id,
+                "certificate_renewed",
+                Some(result.certificate.id),
+                Some(&result.certificate.serial_number),
+                "success",
+                Some(serde_json::json!({
+                    "old_certificate_id": certificate_id,
+                    "old_serial_number": existing_cert.serial_number,
+                    "old_expires_at": existing_cert.not_after.to_rfc3339(),
+                    "new_certificate_id": result.certificate.id,
+                    "new_serial_number": result.certificate.serial_number,
+                    "new_expires_at": result.certificate.not_after.to_rfc3339(),
+                    "validity_days": validity_days,
+                })),
+                renewed_by,
+            )
+            .await;
 
         Ok(result)
     }
@@ -444,7 +468,9 @@ impl CertificateService {
         revoked_by: Option<Uuid>,
     ) -> Result<AgentCertificate, ApiAgentsError> {
         // Get the certificate
-        let cert = self.get_certificate_for_agent(tenant_id, agent_id, certificate_id).await?;
+        let cert = self
+            .get_certificate_for_agent(tenant_id, agent_id, certificate_id)
+            .await?;
 
         // Check if already revoked
         if cert.is_revoked() {
@@ -455,27 +481,31 @@ impl CertificateService {
         let reason_code = parse_revocation_reason(reason)?;
 
         // Revoke the certificate
-        let revoked_cert = AgentCertificate::revoke(&self.pool, tenant_id, certificate_id, reason_code)
-            .await
-            .map_err(ApiAgentsError::Database)?
-            .ok_or_else(|| ApiAgentsError::CertificateNotFoundId(certificate_id))?;
+        let revoked_cert =
+            AgentCertificate::revoke(&self.pool, tenant_id, certificate_id, reason_code)
+                .await
+                .map_err(ApiAgentsError::Database)?
+                .ok_or_else(|| ApiAgentsError::CertificateNotFoundId(certificate_id))?;
 
         // Log audit event
-        let _ = self.audit_service.log_certificate_event(
-            tenant_id,
-            agent_id,
-            "certificate_revoked",
-            Some(certificate_id),
-            Some(&revoked_cert.serial_number),
-            "success",
-            Some(serde_json::json!({
-                "reason": reason,
-                "reason_code": reason_code,
-                "fingerprint": revoked_cert.fingerprint_sha256,
-                "revoked_at": revoked_cert.revoked_at,
-            })),
-            revoked_by,
-        ).await;
+        let _ = self
+            .audit_service
+            .log_certificate_event(
+                tenant_id,
+                agent_id,
+                "certificate_revoked",
+                Some(certificate_id),
+                Some(&revoked_cert.serial_number),
+                "success",
+                Some(serde_json::json!({
+                    "reason": reason,
+                    "reason_code": reason_code,
+                    "fingerprint": revoked_cert.fingerprint_sha256,
+                    "revoked_at": revoked_cert.revoked_at,
+                })),
+                revoked_by,
+            )
+            .await;
 
         Ok(revoked_cert)
     }
@@ -573,7 +603,11 @@ fn calculate_fingerprint(der_bytes: &[u8]) -> String {
 
 /// Format serial number bytes as hex string.
 fn format_serial_number(bytes: Vec<u8>) -> String {
-    bytes.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join("")
+    bytes
+        .iter()
+        .map(|b| format!("{:02X}", b))
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 /// Format an X.500 Distinguished Name.
@@ -603,12 +637,30 @@ mod tests {
 
     #[test]
     fn test_parse_key_algorithm() {
-        assert!(matches!(parse_key_algorithm("ecdsa_p256").unwrap(), KeyAlgorithm::EcdsaP256));
-        assert!(matches!(parse_key_algorithm("ecdsa-p256").unwrap(), KeyAlgorithm::EcdsaP256));
-        assert!(matches!(parse_key_algorithm("p256").unwrap(), KeyAlgorithm::EcdsaP256));
-        assert!(matches!(parse_key_algorithm("ECDSA_P384").unwrap(), KeyAlgorithm::EcdsaP384));
-        assert!(matches!(parse_key_algorithm("rsa2048").unwrap(), KeyAlgorithm::Rsa2048));
-        assert!(matches!(parse_key_algorithm("RSA-4096").unwrap(), KeyAlgorithm::Rsa4096));
+        assert!(matches!(
+            parse_key_algorithm("ecdsa_p256").unwrap(),
+            KeyAlgorithm::EcdsaP256
+        ));
+        assert!(matches!(
+            parse_key_algorithm("ecdsa-p256").unwrap(),
+            KeyAlgorithm::EcdsaP256
+        ));
+        assert!(matches!(
+            parse_key_algorithm("p256").unwrap(),
+            KeyAlgorithm::EcdsaP256
+        ));
+        assert!(matches!(
+            parse_key_algorithm("ECDSA_P384").unwrap(),
+            KeyAlgorithm::EcdsaP384
+        ));
+        assert!(matches!(
+            parse_key_algorithm("rsa2048").unwrap(),
+            KeyAlgorithm::Rsa2048
+        ));
+        assert!(matches!(
+            parse_key_algorithm("RSA-4096").unwrap(),
+            KeyAlgorithm::Rsa4096
+        ));
         assert!(parse_key_algorithm("invalid").is_err());
     }
 

@@ -328,6 +328,7 @@ pub struct EntitlementComparison {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use xavyo_db::PersonaStatus;
 
     // T057: Unit test for persona entitlement precedence
     #[test]

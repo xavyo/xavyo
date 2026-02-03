@@ -8,8 +8,8 @@
 //! - Cross-tenant mutations are rejected
 
 use super::common::{
-    create_test_nhi, create_test_pool, create_test_tenant,
-    create_test_user, unique_email, unique_service_account_name, NhiRow,
+    create_test_nhi, create_test_pool, create_test_tenant, create_test_user, unique_email,
+    unique_service_account_name, NhiRow,
 };
 use sqlx::{PgPool, Row};
 use uuid::Uuid;

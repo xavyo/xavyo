@@ -188,8 +188,10 @@ impl RevocationService {
                     cert.revoked_at.map(|revoked_at| RevokedCertEntry {
                         serial_number: cert.serial_number.clone(),
                         revocation_time: revoked_at.timestamp(),
-                        reason_code: RevocationReason::from_i16(cert.revocation_reason.unwrap_or(0))
-                            .unwrap_or(RevocationReason::Unspecified),
+                        reason_code: RevocationReason::from_i16(
+                            cert.revocation_reason.unwrap_or(0),
+                        )
+                        .unwrap_or(RevocationReason::Unspecified),
                     })
                 })
                 .collect();

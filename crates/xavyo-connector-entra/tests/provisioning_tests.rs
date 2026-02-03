@@ -116,12 +116,10 @@ async fn test_user_creation_conflict() {
 
     Mock::given(method("POST"))
         .and(path("/v1.0/users"))
-        .respond_with(
-            ResponseTemplate::new(409).set_body_json(create_odata_error(
-                "Request_MultipleObjectsWithSameKeyValue",
-                "Another object with the same value for property userPrincipalName already exists.",
-            )),
-        )
+        .respond_with(ResponseTemplate::new(409).set_body_json(create_odata_error(
+            "Request_MultipleObjectsWithSameKeyValue",
+            "Another object with the same value for property userPrincipalName already exists.",
+        )))
         .mount(&mock.server)
         .await;
 
@@ -154,12 +152,10 @@ async fn test_user_update_not_found() {
 
     Mock::given(method("PATCH"))
         .and(path("/v1.0/users/non-existent"))
-        .respond_with(
-            ResponseTemplate::new(404).set_body_json(create_odata_error(
-                "Request_ResourceNotFound",
-                "Resource 'non-existent' does not exist.",
-            )),
-        )
+        .respond_with(ResponseTemplate::new(404).set_body_json(create_odata_error(
+            "Request_ResourceNotFound",
+            "Resource 'non-existent' does not exist.",
+        )))
         .mount(&mock.server)
         .await;
 
@@ -185,12 +181,10 @@ async fn test_user_deletion_not_found() {
 
     Mock::given(method("DELETE"))
         .and(path("/v1.0/users/non-existent"))
-        .respond_with(
-            ResponseTemplate::new(404).set_body_json(create_odata_error(
-                "Request_ResourceNotFound",
-                "Resource 'non-existent' does not exist.",
-            )),
-        )
+        .respond_with(ResponseTemplate::new(404).set_body_json(create_odata_error(
+            "Request_ResourceNotFound",
+            "Resource 'non-existent' does not exist.",
+        )))
         .mount(&mock.server)
         .await;
 
@@ -211,7 +205,8 @@ async fn test_batch_user_creation() {
 
     // Set up multiple user creation responses
     for i in 0..3 {
-        let created_user = create_test_user(&format!("batch-user-{}", i), &format!("batchuser{}", i));
+        let created_user =
+            create_test_user(&format!("batch-user-{}", i), &format!("batchuser{}", i));
         Mock::given(method("POST"))
             .and(path("/v1.0/users"))
             .and(body_json(json!({

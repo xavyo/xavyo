@@ -812,7 +812,10 @@ pub trait CaProvider: Send + Sync {
     ///
     /// # Returns
     /// An issued certificate with private key on success.
-    async fn issue_certificate(&self, request: &CertificateIssueRequest) -> CaResult<IssuedCertificate>;
+    async fn issue_certificate(
+        &self,
+        request: &CertificateIssueRequest,
+    ) -> CaResult<IssuedCertificate>;
 
     /// Renew an existing certificate.
     ///
@@ -821,7 +824,10 @@ pub trait CaProvider: Send + Sync {
     ///
     /// # Returns
     /// A new issued certificate on success.
-    async fn renew_certificate(&self, request: &CertificateRenewRequest) -> CaResult<IssuedCertificate>;
+    async fn renew_certificate(
+        &self,
+        request: &CertificateRenewRequest,
+    ) -> CaResult<IssuedCertificate>;
 
     /// Revoke a certificate.
     ///
@@ -830,7 +836,10 @@ pub trait CaProvider: Send + Sync {
     ///
     /// # Returns
     /// Revocation result on success.
-    async fn revoke_certificate(&self, request: &CertificateRevokeRequest) -> CaResult<RevocationResult>;
+    async fn revoke_certificate(
+        &self,
+        request: &CertificateRevokeRequest,
+    ) -> CaResult<RevocationResult>;
 
     /// Validate a certificate.
     ///
@@ -927,9 +936,18 @@ mod tests {
     // F127: PKI tests
     #[test]
     fn test_key_algorithm_parsing() {
-        assert_eq!("ecdsa_p256".parse::<KeyAlgorithm>().unwrap(), KeyAlgorithm::EcdsaP256);
-        assert_eq!("rsa2048".parse::<KeyAlgorithm>().unwrap(), KeyAlgorithm::Rsa2048);
-        assert_eq!("p384".parse::<KeyAlgorithm>().unwrap(), KeyAlgorithm::EcdsaP384);
+        assert_eq!(
+            "ecdsa_p256".parse::<KeyAlgorithm>().unwrap(),
+            KeyAlgorithm::EcdsaP256
+        );
+        assert_eq!(
+            "rsa2048".parse::<KeyAlgorithm>().unwrap(),
+            KeyAlgorithm::Rsa2048
+        );
+        assert_eq!(
+            "p384".parse::<KeyAlgorithm>().unwrap(),
+            KeyAlgorithm::EcdsaP384
+        );
         assert!("invalid".parse::<KeyAlgorithm>().is_err());
     }
 
@@ -942,14 +960,23 @@ mod tests {
     #[test]
     fn test_revocation_reason_conversion() {
         assert_eq!(RevocationReason::KeyCompromise.as_i16(), 1);
-        assert_eq!(RevocationReason::from_i16(5), Some(RevocationReason::CessationOfOperation));
+        assert_eq!(
+            RevocationReason::from_i16(5),
+            Some(RevocationReason::CessationOfOperation)
+        );
         assert_eq!(RevocationReason::from_i16(99), None);
     }
 
     #[test]
     fn test_revocation_reason_parsing() {
-        assert_eq!("key_compromise".parse::<RevocationReason>().unwrap(), RevocationReason::KeyCompromise);
-        assert_eq!("superseded".parse::<RevocationReason>().unwrap(), RevocationReason::Superseded);
+        assert_eq!(
+            "key_compromise".parse::<RevocationReason>().unwrap(),
+            RevocationReason::KeyCompromise
+        );
+        assert_eq!(
+            "superseded".parse::<RevocationReason>().unwrap(),
+            RevocationReason::Superseded
+        );
         assert!("invalid_reason".parse::<RevocationReason>().is_err());
     }
 
@@ -959,12 +986,8 @@ mod tests {
         let tenant_id = Uuid::new_v4();
         let expires_at = chrono::Utc::now().timestamp() + 86400;
 
-        let validation = CertificateValidation::valid(
-            agent_id,
-            tenant_id,
-            "01ABCDEF".to_string(),
-            expires_at,
-        );
+        let validation =
+            CertificateValidation::valid(agent_id, tenant_id, "01ABCDEF".to_string(), expires_at);
 
         assert!(validation.valid);
         assert_eq!(validation.status, CertificateStatus::Active);

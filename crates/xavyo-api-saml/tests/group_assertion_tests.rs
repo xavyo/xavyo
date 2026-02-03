@@ -4,9 +4,7 @@
 
 use std::time::Instant;
 use uuid::Uuid;
-use xavyo_api_saml::models::group_config::{
-    GroupAttributeConfig, GroupFilter, GroupValueFormat,
-};
+use xavyo_api_saml::models::group_config::{GroupAttributeConfig, GroupFilter, GroupValueFormat};
 use xavyo_api_saml::services::group_service::{GroupInfo, GroupService};
 
 // ============================================================================
@@ -92,7 +90,11 @@ fn test_large_group_count_performance() {
     let duration = start.elapsed();
 
     assert_eq!(formatted.len(), 500);
-    assert!(duration.as_millis() < 500, "Formatting took {}ms, expected <500ms", duration.as_millis());
+    assert!(
+        duration.as_millis() < 500,
+        "Formatting took {}ms, expected <500ms",
+        duration.as_millis()
+    );
 }
 
 #[test]
@@ -326,12 +328,10 @@ fn test_include_groups_false_disables_groups() {
 #[test]
 fn test_multi_sp_different_configs() {
     // T036: Test multi-SP with different configs
-    let groups = vec![
-        GroupInfo {
-            id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
-            display_name: "Engineering".to_string(),
-        },
-    ];
+    let groups = vec![GroupInfo {
+        id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+        display_name: "Engineering".to_string(),
+    }];
 
     // SP-A config: default attribute name, name format
     let config_a = GroupAttributeConfig::default();

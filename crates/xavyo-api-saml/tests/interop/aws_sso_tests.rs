@@ -67,10 +67,7 @@ fn test_aws_sso_nameid_persistent_format() {
     );
 
     // NameID should be unique and immutable (using UUID)
-    assert!(
-        parsed.name_id.is_some(),
-        "NameID value should be present"
-    );
+    assert!(parsed.name_id.is_some(), "NameID value should be present");
 }
 
 #[test]

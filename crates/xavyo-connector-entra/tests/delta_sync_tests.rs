@@ -42,7 +42,10 @@ async fn test_delta_sync_with_no_changes() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/v1.0/users/delta?$deltatoken=token-1", mock.url()))
+        .get(format!(
+            "{}/v1.0/users/delta?$deltatoken=token-1",
+            mock.url()
+        ))
         .send()
         .await
         .unwrap();
@@ -60,11 +63,15 @@ async fn test_delta_sync_detects_created_user() {
     let new_user = create_test_user("new-user-123", "newuser");
 
     mock.mock_token_endpoint("test-tenant").await;
-    mock.mock_delta_endpoint(vec![new_user.clone()], "token-2").await;
+    mock.mock_delta_endpoint(vec![new_user.clone()], "token-2")
+        .await;
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/v1.0/users/delta?$deltatoken=token-1", mock.url()))
+        .get(format!(
+            "{}/v1.0/users/delta?$deltatoken=token-1",
+            mock.url()
+        ))
         .send()
         .await
         .unwrap();
@@ -86,11 +93,15 @@ async fn test_delta_sync_detects_updated_user() {
     updated_user["displayName"] = json!("Updated Display Name");
 
     mock.mock_token_endpoint("test-tenant").await;
-    mock.mock_delta_endpoint(vec![updated_user.clone()], "token-2").await;
+    mock.mock_delta_endpoint(vec![updated_user.clone()], "token-2")
+        .await;
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/v1.0/users/delta?$deltatoken=token-1", mock.url()))
+        .get(format!(
+            "{}/v1.0/users/delta?$deltatoken=token-1",
+            mock.url()
+        ))
         .send()
         .await
         .unwrap();
@@ -109,11 +120,15 @@ async fn test_delta_sync_detects_deleted_user() {
     let deleted_item = create_deleted_item("deleted-user-123");
 
     mock.mock_token_endpoint("test-tenant").await;
-    mock.mock_delta_endpoint(vec![deleted_item], "token-2").await;
+    mock.mock_delta_endpoint(vec![deleted_item], "token-2")
+        .await;
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/v1.0/users/delta?$deltatoken=token-1", mock.url()))
+        .get(format!(
+            "{}/v1.0/users/delta?$deltatoken=token-1",
+            mock.url()
+        ))
         .send()
         .await
         .unwrap();
@@ -144,7 +159,10 @@ async fn test_delta_sync_handles_mixed_changes() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/v1.0/users/delta?$deltatoken=token-1", mock.url()))
+        .get(format!(
+            "{}/v1.0/users/delta?$deltatoken=token-1",
+            mock.url()
+        ))
         .send()
         .await
         .unwrap();
@@ -170,16 +188,19 @@ async fn test_invalid_delta_token_returns_error() {
     // Set up mock to return 410 Gone for invalid token
     Mock::given(method("GET"))
         .and(path_regex(r"/v1\.0/users/delta.*"))
-        .respond_with(
-            ResponseTemplate::new(410)
-                .set_body_json(create_odata_error("InvalidDeltaToken", "The delta token is expired or invalid"))
-        )
+        .respond_with(ResponseTemplate::new(410).set_body_json(create_odata_error(
+            "InvalidDeltaToken",
+            "The delta token is expired or invalid",
+        )))
         .mount(&mock.server)
         .await;
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/v1.0/users/delta?$deltatoken=invalid", mock.url()))
+        .get(format!(
+            "{}/v1.0/users/delta?$deltatoken=invalid",
+            mock.url()
+        ))
         .send()
         .await
         .unwrap();
@@ -197,7 +218,10 @@ async fn test_delta_sync_returns_new_token() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/v1.0/users/delta?$deltatoken=old-token", mock.url()))
+        .get(format!(
+            "{}/v1.0/users/delta?$deltatoken=old-token",
+            mock.url()
+        ))
         .send()
         .await
         .unwrap();
@@ -228,7 +252,10 @@ async fn test_delta_sync_handles_pagination() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(format!("{}/v1.0/users/delta?$deltatoken=token-1", mock.url()))
+        .get(format!(
+            "{}/v1.0/users/delta?$deltatoken=token-1",
+            mock.url()
+        ))
         .send()
         .await
         .unwrap();

@@ -83,18 +83,19 @@ pub fn scim_resource_router(config: ScimConfig) -> Router {
                 .patch(groups::update_group)
                 .delete(groups::delete_group),
         )
-        // Add services as extensions
-        .layer(Extension(token_service.clone()))
-        .layer(Extension(user_service))
-        .layer(Extension(group_service))
-        .layer(Extension(audit_service))
-        .layer(Extension(pool))
-        // Apply SCIM auth and rate limiting
+        // Apply SCIM auth and rate limiting (innermost layers)
+        // Note: Layers are applied in reverse order - last layer is outermost (runs first)
+        .layer(ScimAuthLayer::new())
         .layer(RateLimitLayer::new(
             config.rate_limit_per_sec,
             config.rate_limit_burst,
         ))
-        .layer(ScimAuthLayer::new())
+        // Add services as extensions (outermost layers - run before auth)
+        .layer(Extension(pool))
+        .layer(Extension(audit_service))
+        .layer(Extension(group_service))
+        .layer(Extension(user_service))
+        .layer(Extension(token_service.clone()))
 }
 
 /// Create the SCIM admin router (for /admin/scim endpoints)

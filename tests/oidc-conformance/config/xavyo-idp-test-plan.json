@@ -1,0 +1,40 @@
+{
+  "$schema": "https://openid.net/certification/conformance-suite/test-plan-schema.json",
+  "alias": "xavyo-idp",
+  "description": "Xavyo IDP OpenID Connect Conformance Tests",
+
+  "server": {
+    "discoveryUrl": "http://host.docker.internal:8080/.well-known/openid-configuration",
+    "issuer": "http://localhost:8080"
+  },
+
+  "client": {
+    "client_id": "${OIDC_TEST_CLIENT_ID}",
+    "client_secret": "${OIDC_TEST_CLIENT_SECRET}"
+  },
+
+  "client2": {
+    "client_id": "${OIDC_TEST_CLIENT2_ID}",
+    "client_secret": "${OIDC_TEST_CLIENT2_SECRET}"
+  },
+
+  "resource": {
+    "resourceUrl": "http://host.docker.internal:8080/oauth/userinfo"
+  },
+
+  "testPlan": {
+    "planName": "oidcc-basic-certification-test-plan",
+    "variant": {
+      "client_auth_type": "client_secret_basic",
+      "response_type": "code",
+      "response_mode": "default",
+      "client_registration": "static_client"
+    }
+  },
+
+  "notes": [
+    "This configuration tests xavyo-idp against OpenID Connect Core 1.0 Basic profile",
+    "Ensure the xavyo-idp server is running on localhost:8080 before starting tests",
+    "Create test clients in the database before running conformance tests"
+  ]
+}

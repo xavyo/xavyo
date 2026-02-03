@@ -134,11 +134,15 @@ async fn test_sod_001_exclusive_rule_violation_detection() {
     assert_eq!(violation.rule_id, rule.id);
     assert_eq!(violation.severity, SodSeverity::High);
     assert!(
-        violation.conflicting_entitlements.contains(&edit.id.into_inner()),
+        violation
+            .conflicting_entitlements
+            .contains(&edit.id.into_inner()),
         "Conflicting entitlements should include Edit"
     );
     assert!(
-        violation.conflicting_entitlements.contains(&delete.id.into_inner()),
+        violation
+            .conflicting_entitlements
+            .contains(&delete.id.into_inner()),
         "Conflicting entitlements should include Delete"
     );
 }
@@ -434,8 +438,9 @@ async fn test_sod_004_exemption_honored_during_validation() {
             CreateSodExemptionInput {
                 rule_id: rule.id,
                 user_id,
-                justification: "Emergency access approved by security team for critical incident response"
-                    .to_string(),
+                justification:
+                    "Emergency access approved by security team for critical incident response"
+                        .to_string(),
                 expires_at: Some(Utc::now() + Duration::days(30)),
                 granted_by: ctx.actor_id,
             },
@@ -828,10 +833,7 @@ async fn test_non_violating_assignment_passes() {
         .await
         .expect("Validation failed");
 
-    assert!(
-        result.is_valid,
-        "Should pass when no SoD conflict exists"
-    );
+    assert!(result.is_valid, "Should pass when no SoD conflict exists");
 }
 
 /// Test multiple rules violation.

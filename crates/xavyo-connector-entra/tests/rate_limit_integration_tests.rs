@@ -161,10 +161,8 @@ async fn test_rate_limit_without_retry_after() {
     Mock::given(method("GET"))
         .and(path("/v1.0/users"))
         .respond_with(
-            ResponseTemplate::new(429).set_body_json(create_odata_error(
-                "TooManyRequests",
-                "Too many requests.",
-            )),
+            ResponseTemplate::new(429)
+                .set_body_json(create_odata_error("TooManyRequests", "Too many requests.")),
         )
         .expect(1)
         .mount(&server)

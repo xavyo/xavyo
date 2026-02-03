@@ -144,10 +144,7 @@ async fn test_el_002_update_entitlement_with_audit() {
         .expect("Failed to update entitlement");
 
     // Verify changes persisted
-    assert_eq!(
-        updated.description,
-        Some("Updated description".to_string())
-    );
+    assert_eq!(updated.description, Some("Updated description".to_string()));
     assert_eq!(updated.risk_level, RiskLevel::High);
     assert_eq!(updated.name, "Test Permission"); // Unchanged
 
@@ -247,7 +244,10 @@ async fn test_el_003_assign_and_revoke_entitlement() {
         .expect("Failed to list assignments");
 
     assert_eq!(user_assignments.len(), 1);
-    assert_eq!(user_assignments[0].entitlement_id, entitlement.id.into_inner());
+    assert_eq!(
+        user_assignments[0].entitlement_id,
+        entitlement.id.into_inner()
+    );
 
     // Revoke assignment
     let revoked = ctx

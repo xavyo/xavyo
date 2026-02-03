@@ -17,9 +17,7 @@ use xavyo_governance::services::risk::{
 };
 use xavyo_governance::services::sod::{InMemorySodRuleStore, SodService};
 use xavyo_governance::services::sod_exemption::{InMemorySodExemptionStore, SodExemptionService};
-use xavyo_governance::services::sod_validation::{
-    InMemorySodViolationStore, SodValidationService,
-};
+use xavyo_governance::services::sod_validation::{InMemorySodViolationStore, SodValidationService};
 
 /// Stores all the in-memory stores for test isolation.
 #[derive(Clone)]

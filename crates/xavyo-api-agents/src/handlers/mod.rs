@@ -92,8 +92,8 @@ pub use role_mappings::{
 
 // F127 handler exports
 pub use ca::{
-    create_external_ca, create_internal_ca, delete_ca, get_ca, get_ca_chain, list_cas, set_default_ca,
-    update_ca,
+    create_external_ca, create_internal_ca, delete_ca, get_ca, get_ca_chain, list_cas,
+    set_default_ca, update_ca,
 };
 pub use certificates::{
     get_agent_certificate, get_certificate, issue_certificate, list_agent_certificates,

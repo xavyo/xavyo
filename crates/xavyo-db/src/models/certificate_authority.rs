@@ -735,7 +735,8 @@ mod tests {
             tenant_id: Uuid::new_v4(),
             name: "test-ca".to_string(),
             ca_type: "internal".to_string(),
-            certificate_pem: "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----".to_string(),
+            certificate_pem: "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+                .to_string(),
             chain_pem: None,
             private_key_encrypted: Some(vec![1, 2, 3]),
             private_key_ref: None,
@@ -768,7 +769,8 @@ mod tests {
             tenant_id: Uuid::new_v4(),
             name: "expired-ca".to_string(),
             ca_type: "internal".to_string(),
-            certificate_pem: "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----".to_string(),
+            certificate_pem: "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+                .to_string(),
             chain_pem: None,
             private_key_encrypted: Some(vec![1, 2, 3]),
             private_key_ref: None,

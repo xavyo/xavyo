@@ -38,18 +38,24 @@ async fn test_ra_001_entitlement_factor_calculation() {
 
     // Final score should be based on entitlement factor (no SoD violations)
     // avg(10, 40, 70) = 40, weighted at 0.6 = 24
-    assert!(risk_score.score > 0, "Score should be positive with entitlements");
+    assert!(
+        risk_score.score > 0,
+        "Score should be positive with entitlements"
+    );
     assert!(risk_score.score <= 100, "Score should be <= 100");
 
     // Check factors breakdown
-    let entitlement_factor = risk_score
-        .factors
-        .iter()
-        .find(|f| f.name == "entitlements");
-    assert!(entitlement_factor.is_some(), "Should have entitlement factor");
+    let entitlement_factor = risk_score.factors.iter().find(|f| f.name == "entitlements");
+    assert!(
+        entitlement_factor.is_some(),
+        "Should have entitlement factor"
+    );
 
     let factor = entitlement_factor.unwrap();
-    assert!(factor.raw_value > 0.0, "Raw entitlement value should be positive");
+    assert!(
+        factor.raw_value > 0.0,
+        "Raw entitlement value should be positive"
+    );
 }
 
 // ============================================================================
@@ -78,7 +84,10 @@ async fn test_ra_002_sod_violation_factor_included() {
         .expect("Failed to calculate risk");
 
     // Score should reflect SoD violations
-    assert!(risk_score.score > 0, "Score should be positive with violations");
+    assert!(
+        risk_score.score > 0,
+        "Score should be positive with violations"
+    );
 
     // Check factors breakdown
     let sod_factor = risk_score
@@ -88,7 +97,10 @@ async fn test_ra_002_sod_violation_factor_included() {
     assert!(sod_factor.is_some(), "Should have SoD violation factor");
 
     let factor = sod_factor.unwrap();
-    assert!(factor.raw_value > 0.0, "Raw SoD value should be positive with violations");
+    assert!(
+        factor.raw_value > 0.0,
+        "Raw SoD value should be positive with violations"
+    );
 }
 
 /// Test combined entitlement and SoD factor.
@@ -109,7 +121,10 @@ async fn test_combined_risk_factors() {
         .expect("Failed to calculate risk");
 
     // Score should be higher with both factors
-    assert!(risk_score.score > 50, "Combined factors should yield high score");
+    assert!(
+        risk_score.score > 50,
+        "Combined factors should yield high score"
+    );
     assert_eq!(risk_score.factors.len(), 2, "Should have 2 factors");
 }
 
@@ -176,12 +191,7 @@ async fn test_multiple_risk_history_entries() {
         let risk_score = ctx
             .services
             .risk
-            .calculate_user_risk(
-                ctx.tenant_a,
-                user_id,
-                &[RiskLevel::Medium],
-                violations,
-            )
+            .calculate_user_risk(ctx.tenant_a, user_id, &[RiskLevel::Medium], violations)
             .await
             .expect("Failed to calculate risk");
 
@@ -308,7 +318,10 @@ async fn test_zero_entitlements_risk_calculation() {
         .expect("Failed to calculate risk");
 
     // With no entitlements and no violations, score should be 0
-    assert_eq!(risk_score.score, 0, "Score should be 0 with no risk factors");
+    assert_eq!(
+        risk_score.score, 0,
+        "Score should be 0 with no risk factors"
+    );
 }
 
 /// Test risk with only SoD violations, no entitlements.
@@ -326,7 +339,10 @@ async fn test_risk_with_only_violations() {
         .expect("Failed to calculate risk");
 
     // Should have a score based on SoD violations only
-    assert!(risk_score.score > 0, "Score should be positive with violations");
+    assert!(
+        risk_score.score > 0,
+        "Score should be positive with violations"
+    );
 }
 
 // ============================================================================

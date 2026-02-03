@@ -143,7 +143,11 @@ mod tests {
 
     #[test]
     fn test_circuit_state_round_trip() {
-        for state in [CircuitState::Closed, CircuitState::Open, CircuitState::HalfOpen] {
+        for state in [
+            CircuitState::Closed,
+            CircuitState::Open,
+            CircuitState::HalfOpen,
+        ] {
             let s = state.to_string();
             let parsed: CircuitState = s.parse().unwrap();
             assert_eq!(parsed, state);

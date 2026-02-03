@@ -225,8 +225,7 @@ mod tests {
             test_group("00000000-0000-0000-0000-000000000002", "Finance"),
             test_group("00000000-0000-0000-0000-000000000003", "HR"),
         ];
-        let filter =
-            GroupFilter::with_allowlist(vec!["Engineering".to_string(), "HR".to_string()]);
+        let filter = GroupFilter::with_allowlist(vec!["Engineering".to_string(), "HR".to_string()]);
         let result = GroupService::apply_filter(&groups, Some(&filter));
         assert_eq!(result.len(), 2);
         let names: Vec<_> = result.iter().map(|g| g.display_name.as_str()).collect();

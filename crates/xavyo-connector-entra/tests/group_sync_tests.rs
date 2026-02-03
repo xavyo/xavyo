@@ -68,7 +68,8 @@ async fn test_group_membership_retrieval() {
     let members = generate_test_users(3);
 
     mock.mock_token_endpoint("test-tenant").await;
-    mock.mock_group_members_endpoint("group-123", members.clone()).await;
+    mock.mock_group_members_endpoint("group-123", members.clone())
+        .await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -122,11 +123,8 @@ async fn test_transitive_membership_resolution() {
     let indirect_member = create_test_user("user-1", "directuser"); // Same user from nested group
 
     mock.mock_token_endpoint("test-tenant").await;
-    mock.mock_transitive_members_endpoint(
-        "group-parent",
-        vec![direct_member, indirect_member],
-    )
-    .await;
+    mock.mock_transitive_members_endpoint("group-parent", vec![direct_member, indirect_member])
+        .await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -151,7 +149,8 @@ async fn test_security_vs_m365_groups() {
     let m365_group = create_m365_group("group-m365", "M365 Group");
 
     mock.mock_token_endpoint("test-tenant").await;
-    mock.mock_groups_endpoint(vec![security_group, m365_group]).await;
+    mock.mock_groups_endpoint(vec![security_group, m365_group])
+        .await;
 
     let client = reqwest::Client::new();
     let response = client
@@ -186,7 +185,10 @@ async fn test_group_delta_sync() {
     let new_group = create_test_group("new-group", "Newly Created Group");
     let delta_response = create_delta_response(
         vec![new_group],
-        &format!("{}/v1.0/groups/delta?$deltatoken=groups-token-2", mock.url()),
+        &format!(
+            "{}/v1.0/groups/delta?$deltatoken=groups-token-2",
+            mock.url()
+        ),
     );
 
     Mock::given(method("GET"))
@@ -216,7 +218,8 @@ async fn test_empty_group_handling() {
     let mock = MockGraphServer::new().await;
 
     mock.mock_token_endpoint("test-tenant").await;
-    mock.mock_group_members_endpoint("empty-group", vec![]).await;
+    mock.mock_group_members_endpoint("empty-group", vec![])
+        .await;
 
     let client = reqwest::Client::new();
     let response = client

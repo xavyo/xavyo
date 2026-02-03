@@ -95,12 +95,10 @@ async fn test_server_error_504_gateway_timeout() {
     // Setup 504 Gateway Timeout
     Mock::given(method("POST"))
         .and(path("/token"))
-        .respond_with(
-            ResponseTemplate::new(504).set_body_json(json!({
-                "error": "server_error",
-                "error_description": "Gateway timeout - upstream server did not respond"
-            })),
-        )
+        .respond_with(ResponseTemplate::new(504).set_body_json(json!({
+            "error": "server_error",
+            "error_description": "Gateway timeout - upstream server did not respond"
+        })))
         .mount(&server)
         .await;
 
@@ -128,7 +126,10 @@ async fn test_oauth2_protocol_access_denied() {
     let client = reqwest::Client::new();
     let response = client
         .post(format!("{}/token", server.uri()))
-        .form(&[("grant_type", "authorization_code"), ("code", "user_denied")])
+        .form(&[
+            ("grant_type", "authorization_code"),
+            ("code", "user_denied"),
+        ])
         .send()
         .await
         .unwrap();
@@ -281,7 +282,10 @@ async fn test_validation_expired_state_token() {
     let max_age = chrono::Duration::minutes(10);
 
     let is_expired = chrono::Utc::now() - created_at > max_age;
-    assert!(is_expired, "State token older than 10 minutes should be expired");
+    assert!(
+        is_expired,
+        "State token older than 10 minutes should be expired"
+    );
 }
 
 #[tokio::test]
@@ -462,11 +466,9 @@ async fn test_provider_specific_apple_invalid_client() {
     // Apple returns minimal error response
     Mock::given(method("POST"))
         .and(path("/token"))
-        .respond_with(
-            ResponseTemplate::new(400).set_body_json(json!({
-                "error": "invalid_client"
-            })),
-        )
+        .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+            "error": "invalid_client"
+        })))
         .mount(&server)
         .await;
 

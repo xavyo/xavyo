@@ -64,7 +64,11 @@ pub fn create_m365_group(id: &str, name: &str) -> Value {
 }
 
 /// Wraps items in an OData response format.
-pub fn create_odata_response(items: Vec<Value>, next_link: Option<&str>, delta_link: Option<&str>) -> Value {
+pub fn create_odata_response(
+    items: Vec<Value>,
+    next_link: Option<&str>,
+    delta_link: Option<&str>,
+) -> Value {
     let mut response = json!({ "value": items });
     if let Some(link) = next_link {
         response["@odata.nextLink"] = json!(link);
@@ -148,7 +152,11 @@ impl MockGraphServer {
 
         for (i, page) in pages.into_iter().enumerate() {
             let next_link = if i < total_pages - 1 {
-                Some(format!("{}/v1.0/users?$skiptoken=page{}", self.url(), i + 1))
+                Some(format!(
+                    "{}/v1.0/users?$skiptoken=page{}",
+                    self.url(),
+                    i + 1
+                ))
             } else {
                 None
             };
@@ -260,8 +268,7 @@ impl MockGraphServer {
         Mock::given(method("GET"))
             .and(path(path_pattern))
             .respond_with(
-                ResponseTemplate::new(429)
-                    .insert_header("Retry-After", retry_after.to_string()),
+                ResponseTemplate::new(429).insert_header("Retry-After", retry_after.to_string()),
             )
             .expect(1)
             .mount(&self.server)

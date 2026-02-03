@@ -259,19 +259,13 @@ mod tests {
     #[test]
     fn test_group_value_format_from_str() {
         assert_eq!(GroupValueFormat::parse("name"), GroupValueFormat::Name);
-        assert_eq!(
-            GroupValueFormat::parse("id"),
-            GroupValueFormat::Identifier
-        );
+        assert_eq!(GroupValueFormat::parse("id"), GroupValueFormat::Identifier);
         assert_eq!(
             GroupValueFormat::parse("identifier"),
             GroupValueFormat::Identifier
         );
         assert_eq!(GroupValueFormat::parse("dn"), GroupValueFormat::Dn);
-        assert_eq!(
-            GroupValueFormat::parse("unknown"),
-            GroupValueFormat::Name
-        );
+        assert_eq!(GroupValueFormat::parse("unknown"), GroupValueFormat::Name);
     }
 
     #[test]

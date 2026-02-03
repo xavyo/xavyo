@@ -90,7 +90,8 @@ impl JobService {
         let operations =
             ProvisioningOperation::list_with_filter(&self.pool, tenant_id, &filter, limit, offset)
                 .await?;
-        let total = ProvisioningOperation::count_with_filter(&self.pool, tenant_id, &filter).await?;
+        let total =
+            ProvisioningOperation::count_with_filter(&self.pool, tenant_id, &filter).await?;
 
         // Fetch connector names for display
         let connector_names = self.get_connector_names(tenant_id, &operations).await?;
@@ -131,8 +132,9 @@ impl JobService {
             .ok_or(JobServiceError::NotFound(job_id))?;
 
         // Fetch connector name
-        let connector_name =
-            self.get_connector_name(tenant_id, operation.connector_id).await?;
+        let connector_name = self
+            .get_connector_name(tenant_id, operation.connector_id)
+            .await?;
 
         // Fetch execution attempts from operation logs
         let attempts = self.get_job_attempts(tenant_id, job_id).await?;
@@ -188,10 +190,7 @@ impl JobService {
                     message: Some("Job cancellation requested".to_string()),
                 })
             }
-            None => Err(JobServiceError::CannotCancel(
-                job_id,
-                "unknown".to_string(),
-            )),
+            None => Err(JobServiceError::CannotCancel(job_id, "unknown".to_string())),
         }
     }
 
@@ -206,9 +205,14 @@ impl JobService {
         limit: i64,
         offset: i64,
     ) -> JobServiceResult<DlqListResponse> {
-        let entries =
-            ProvisioningOperation::list_dead_letter(&self.pool, tenant_id, connector_id, limit, offset)
-                .await?;
+        let entries = ProvisioningOperation::list_dead_letter(
+            &self.pool,
+            tenant_id,
+            connector_id,
+            limit,
+            offset,
+        )
+        .await?;
         let total =
             ProvisioningOperation::count_dead_letter(&self.pool, tenant_id, connector_id).await?;
 
@@ -438,7 +442,9 @@ impl JobService {
 
         // If no attempts found but operation has been processed, create a synthetic attempt
         if attempts.is_empty() {
-            if let Ok(Some(op)) = ProvisioningOperation::find_by_id(&self.pool, tenant_id, job_id).await {
+            if let Ok(Some(op)) =
+                ProvisioningOperation::find_by_id(&self.pool, tenant_id, job_id).await
+            {
                 if op.started_at.is_some() {
                     attempts.push(JobAttempt {
                         attempt_number: 1,
@@ -447,9 +453,9 @@ impl JobService {
                         success: op.status == OperationStatus::Completed,
                         error_code: op.error_code.clone(),
                         error_message: op.error_message.clone(),
-                        duration_ms: op.completed_at.and_then(|c| {
-                            op.started_at.map(|s| (c - s).num_milliseconds())
-                        }),
+                        duration_ms: op
+                            .completed_at
+                            .and_then(|c| op.started_at.map(|s| (c - s).num_milliseconds())),
                     });
                 }
             }
@@ -515,7 +521,9 @@ impl JobService {
             connector_id: op.connector_id,
             connector_name: connector_names.get(&op.connector_id).cloned(),
             operation_type: op.operation_type.to_string(),
-            error_message: op.error_message.unwrap_or_else(|| "Unknown error".to_string()),
+            error_message: op
+                .error_message
+                .unwrap_or_else(|| "Unknown error".to_string()),
             created_at: op.created_at,
             retry_count: op.retry_count,
             last_attempt_at: op.updated_at.into(),

@@ -1,0 +1,56 @@
+# OpenID Conformance Suite for xavyo-idp Testing
+#
+# NOTE: For quick local OIDC validation, use Hurl tests instead:
+#   hurl --test --variables-file ../hurl/vars.env ../hurl/oidc-core-spec.hurl
+#
+# For official OpenID certification:
+#   1. Use the public server at https://www.certification.openid.net
+#   2. Or build the conformance suite from source (requires Java/Maven):
+#      https://gitlab.com/openid/conformance-suite
+#
+# Based on: https://gitlab.com/openid/conformance-suite
+
+services:
+  # MongoDB for storing test results
+  mongodb:
+    image: mongo:6.0
+    container_name: oidc-conformance-mongo
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - conformance
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # OpenID Conformance Suite Server
+  conformance-suite:
+    image: authelia/openid-connect-conformance-suite:v5.1.30
+    container_name: oidc-conformance-server
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    ports:
+      - "8443:8443"
+    environment:
+      - MONGODB_HOST=mongodb
+      - MONGODB_PORT=27017
+      - MONGODB_DATABASE=conformance
+      - BASE_URL=https://localhost:8443
+      - FINTECHLABS_BASE_URL=https://localhost:8443
+      # For local testing without SSL verification
+      - DISABLE_SSL_VERIFY=true
+    networks:
+      - conformance
+    extra_hosts:
+      # Allow conformance suite to reach host machine
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  mongodb_data:
+
+networks:
+  conformance:
+    driver: bridge

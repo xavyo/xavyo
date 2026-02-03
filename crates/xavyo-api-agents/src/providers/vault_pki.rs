@@ -196,9 +196,9 @@ impl VaultPkiProvider {
 
     /// Get the Vault token, returning an error if not configured.
     fn get_token(&self) -> CaResult<&str> {
-        self.vault_token.as_deref().ok_or_else(|| {
-            CaProviderError::NotAvailable("Vault token not configured".to_string())
-        })
+        self.vault_token
+            .as_deref()
+            .ok_or_else(|| CaProviderError::NotAvailable("Vault token not configured".to_string()))
     }
 
     /// Map key algorithm to Vault key_type and key_bits.
@@ -235,8 +235,9 @@ impl VaultPkiProvider {
     /// Extract subject DN from a PEM certificate.
     fn extract_subject_dn(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der)
-            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e)))?;
+        let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der).map_err(|e| {
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+        })?;
 
         Ok(cert.subject().to_string())
     }
@@ -244,8 +245,9 @@ impl VaultPkiProvider {
     /// Extract issuer DN from a PEM certificate.
     fn extract_issuer_dn(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der)
-            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e)))?;
+        let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der).map_err(|e| {
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+        })?;
 
         Ok(cert.issuer().to_string())
     }
@@ -253,8 +255,9 @@ impl VaultPkiProvider {
     /// Extract validity timestamps from a PEM certificate.
     fn extract_validity(cert_pem: &str) -> CaResult<(i64, i64)> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der)
-            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e)))?;
+        let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der).map_err(|e| {
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+        })?;
 
         let not_before = cert.validity().not_before.timestamp();
         let not_after = cert.validity().not_after.timestamp();
@@ -280,12 +283,10 @@ impl CaProvider for VaultPkiProvider {
         // First check Vault health
         let url = format!("{}/v1/sys/health", self.config.vault_url);
 
-        let response = self
-            .http_client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| CaProviderError::NetworkError(format!("Health check failed: {}", e)))?;
+        let response =
+            self.http_client.get(&url).send().await.map_err(|e| {
+                CaProviderError::NetworkError(format!("Health check failed: {}", e))
+            })?;
 
         // Vault health endpoint returns different status codes based on state
         // 200 = initialized, unsealed, active
@@ -302,9 +303,7 @@ impl CaProvider for VaultPkiProvider {
             ));
         }
         if status.as_u16() == 503 {
-            return Err(CaProviderError::NotAvailable(
-                "Vault is sealed".to_string(),
-            ));
+            return Err(CaProviderError::NotAvailable("Vault is sealed".to_string()));
         }
 
         // Check if PKI mount is accessible
@@ -415,10 +414,9 @@ impl CaProvider for VaultPkiProvider {
             )));
         }
 
-        let issue_response: VaultIssueResponse = response
-            .json()
-            .await
-            .map_err(|e| CaProviderError::ExternalCaError(format!("Invalid issue response: {}", e)))?;
+        let issue_response: VaultIssueResponse = response.json().await.map_err(|e| {
+            CaProviderError::ExternalCaError(format!("Invalid issue response: {}", e))
+        })?;
 
         // Parse the issued certificate
         let cert_der = Self::parse_pem_to_der(&issue_response.data.certificate)?;
@@ -509,10 +507,9 @@ impl CaProvider for VaultPkiProvider {
             )));
         }
 
-        let revoke_response: VaultRevokeResponse = response
-            .json()
-            .await
-            .map_err(|e| CaProviderError::ExternalCaError(format!("Invalid revoke response: {}", e)))?;
+        let revoke_response: VaultRevokeResponse = response.json().await.map_err(|e| {
+            CaProviderError::ExternalCaError(format!("Invalid revoke response: {}", e))
+        })?;
 
         Ok(RevocationResult {
             certificate_id: Uuid::nil(), // We don't have the cert ID from Vault
@@ -679,7 +676,8 @@ mod tests {
             mount_path: "pki".to_string(),
             role_name: "agent-certs".to_string(),
             auth_token_ref: "secret://vault-token".to_string(),
-            ca_certificate_pem: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----".to_string(),
+            ca_certificate_pem: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"
+                .to_string(),
             max_validity_days: 90,
             timeout_ms: 30_000,
         }
@@ -718,7 +716,10 @@ mod tests {
         let result = provider.issue_certificate(&request).await;
         assert!(matches!(
             result,
-            Err(CaProviderError::ValidityExceedsMax { requested: 365, max: 90 })
+            Err(CaProviderError::ValidityExceedsMax {
+                requested: 365,
+                max: 90
+            })
         ));
     }
 

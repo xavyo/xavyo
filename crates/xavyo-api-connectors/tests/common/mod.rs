@@ -36,8 +36,5 @@ impl Default for TestContext {
 
 /// Generate a test JWT token for the given tenant and user.
 fn generate_test_jwt(tenant_id: Uuid, user_id: Uuid) -> String {
-    format!(
-        "test_token_{}_{}",
-        tenant_id, user_id
-    )
+    format!("test_token_{}_{}", tenant_id, user_id)
 }

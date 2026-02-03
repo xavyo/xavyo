@@ -197,12 +197,10 @@ pub async fn setup_server_error(server: &MockServer, status_code: u16, message: 
 
     Mock::given(method("POST"))
         .and(path("/token"))
-        .respond_with(
-            ResponseTemplate::new(status_code).set_body_json(json!({
-                "error": error_code,
-                "error_description": message
-            })),
-        )
+        .respond_with(ResponseTemplate::new(status_code).set_body_json(json!({
+            "error": error_code,
+            "error_description": message
+        })))
         .mount(server)
         .await;
 }

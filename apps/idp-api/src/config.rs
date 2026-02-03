@@ -215,8 +215,7 @@ impl OtelConfig {
             .ok()
             .filter(|s| !s.is_empty());
 
-        let service_name =
-            env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "xavyo".to_string());
+        let service_name = env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "xavyo".to_string());
 
         let sampling_rate = env::var("OTEL_TRACES_SAMPLER_ARG")
             .ok()
@@ -609,8 +608,7 @@ impl Config {
 
         // WebAuthn configuration
         let webauthn_rp_id = env::var("WEBAUTHN_RP_ID").unwrap_or_else(|_| "localhost".to_string());
-        let webauthn_rp_name =
-            env::var("WEBAUTHN_RP_NAME").unwrap_or_else(|_| "xavyo".to_string());
+        let webauthn_rp_name = env::var("WEBAUTHN_RP_NAME").unwrap_or_else(|_| "xavyo".to_string());
         let webauthn_origin =
             env::var("WEBAUTHN_ORIGIN").unwrap_or_else(|_| "http://localhost:8080".to_string());
 

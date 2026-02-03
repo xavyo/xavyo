@@ -19,7 +19,9 @@ use std::{
 use tower::{Layer, Service};
 use uuid::Uuid;
 
-use crate::services::{CertificateService, MtlsService as MtlsValidationService, MtlsValidationResult};
+use crate::services::{
+    CertificateService, MtlsService as MtlsValidationService, MtlsValidationResult,
+};
 
 /// Configuration for mTLS middleware.
 #[derive(Debug, Clone)]
@@ -90,10 +92,7 @@ impl From<&MtlsValidationResult> for MtlsIdentity {
             agent_id: result.agent_id.unwrap_or_default(),
             serial_number: result.serial_number.clone().unwrap_or_default(),
             fingerprint: result.fingerprint.clone().unwrap_or_default(),
-            expires_at: result
-                .expires_at
-                .map(|t| t.timestamp())
-                .unwrap_or(0),
+            expires_at: result.expires_at.map(|t| t.timestamp()).unwrap_or(0),
         }
     }
 }
@@ -120,7 +119,10 @@ impl MtlsLayer {
     }
 
     /// Create a new mTLS layer with an existing validation service.
-    pub fn with_service(config: MtlsConfig, validation_service: Arc<MtlsValidationService>) -> Self {
+    pub fn with_service(
+        config: MtlsConfig,
+        validation_service: Arc<MtlsValidationService>,
+    ) -> Self {
         Self {
             config: Arc::new(config),
             validation_service,
@@ -208,7 +210,10 @@ where
 
             // Check validation result
             if !validation_result.is_valid {
-                let error = validation_result.error.as_deref().unwrap_or("Unknown error");
+                let error = validation_result
+                    .error
+                    .as_deref()
+                    .unwrap_or("Unknown error");
                 tracing::warn!("mTLS certificate validation failed: {}", error);
 
                 // Map specific error types
@@ -251,7 +256,11 @@ where
 /// - `X-Forwarded-Client-Cert`: Envoy
 fn extract_client_certificate(req: &Request) -> Option<String> {
     // Try different header names in order of preference
-    let headers = ["X-Client-Cert", "X-Amzn-Mtls-Clientcert", "X-SSL-Client-Cert"];
+    let headers = [
+        "X-Client-Cert",
+        "X-Amzn-Mtls-Clientcert",
+        "X-SSL-Client-Cert",
+    ];
 
     for header_name in headers {
         if let Some(value) = req.headers().get(header_name) {

@@ -138,7 +138,9 @@ impl MtlsService {
             .unwrap_or_else(Utc::now);
 
         if now < not_before {
-            return Ok(MtlsValidationResult::failure("Certificate is not yet valid"));
+            return Ok(MtlsValidationResult::failure(
+                "Certificate is not yet valid",
+            ));
         }
 
         if now > not_after {
@@ -188,7 +190,9 @@ impl MtlsService {
 
         // Check if certificate is revoked
         if certificate.is_revoked() {
-            return Ok(MtlsValidationResult::failure("Certificate has been revoked"));
+            return Ok(MtlsValidationResult::failure(
+                "Certificate has been revoked",
+            ));
         }
 
         // Check certificate status
@@ -233,7 +237,9 @@ impl MtlsService {
             .find(|ext| ext.oid == oid_registry::OID_X509_EXT_SUBJECT_ALT_NAME);
 
         let san_ext = san_ext.ok_or_else(|| {
-            ApiAgentsError::MtlsValidationFailed("No Subject Alternative Name extension".to_string())
+            ApiAgentsError::MtlsValidationFailed(
+                "No Subject Alternative Name extension".to_string(),
+            )
         })?;
 
         // Parse SAN extension
@@ -355,7 +361,9 @@ impl MtlsService {
         &self,
         fingerprint: &str,
     ) -> Result<Option<AgentCertificate>, ApiAgentsError> {
-        self.certificate_service.find_by_fingerprint_any_tenant(fingerprint).await
+        self.certificate_service
+            .find_by_fingerprint_any_tenant(fingerprint)
+            .await
     }
 }
 
@@ -433,7 +441,8 @@ mod tests {
             tenant_id,
             agent_id,
             serial_number: "ABC123".to_string(),
-            certificate_pem: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----".to_string(),
+            certificate_pem: "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"
+                .to_string(),
             fingerprint_sha256: "AA:BB:CC".to_string(),
             subject_dn: "CN=test".to_string(),
             issuer_dn: "CN=CA".to_string(),
@@ -447,12 +456,8 @@ mod tests {
             created_by: None,
         };
 
-        let result = MtlsValidationResult::success(
-            tenant_id,
-            agent_id,
-            cert,
-            "AA:BB:CC".to_string(),
-        );
+        let result =
+            MtlsValidationResult::success(tenant_id, agent_id, cert, "AA:BB:CC".to_string());
 
         assert!(result.is_valid);
         assert_eq!(result.tenant_id, Some(tenant_id));

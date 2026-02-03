@@ -12,7 +12,7 @@
 
 pub mod common;
 
+pub mod aws_sso_tests;
 pub mod salesforce_tests;
 pub mod servicenow_tests;
 pub mod workday_tests;
-pub mod aws_sso_tests;

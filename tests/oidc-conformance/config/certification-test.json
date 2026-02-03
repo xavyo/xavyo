@@ -1,0 +1,29 @@
+{
+  "alias": "xavyo-idp-certification",
+  "description": "Xavyo IDP OpenID Connect Certification Test",
+
+  "server": {
+    "discoveryUrl": "https://xavyo-idp-test.loca.lt/.well-known/openid-configuration"
+  },
+
+  "client": {
+    "client_id": "conformance-test-client-1",
+    "client_secret": "conformance-test-secret-1"
+  },
+
+  "client2": {
+    "client_id": "conformance-test-client-2",
+    "client_secret": "conformance-test-secret-2"
+  },
+
+  "resource": {
+    "resourceUrl": "https://xavyo-idp-test.loca.lt/oauth/userinfo"
+  },
+
+  "variant": {
+    "client_auth_type": "client_secret_basic",
+    "response_type": "code",
+    "response_mode": "default",
+    "client_registration": "static_client"
+  }
+}

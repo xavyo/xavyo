@@ -7,12 +7,14 @@
 
 mod common;
 
+use chrono::{Duration, Utc};
 use uuid::Uuid;
-use xavyo_governance::services::entitlement::{CreateEntitlementInput, EntitlementFilter, ListOptions};
 use xavyo_governance::services::assignment::{AssignEntitlementInput, AssignmentStore};
+use xavyo_governance::services::entitlement::{
+    CreateEntitlementInput, EntitlementFilter, ListOptions,
+};
 use xavyo_governance::services::sod::CreateSodRuleInput;
 use xavyo_governance::types::{RiskLevel, SodConflictType, SodSeverity};
-use chrono::{Duration, Utc};
 
 use common::TestContext;
 
@@ -78,7 +80,11 @@ async fn test_ti_001_entitlement_isolation_between_tenants() {
     let tenant_a_list = ctx
         .services
         .entitlement
-        .list(ctx.tenant_a, &EntitlementFilter::default(), &ListOptions::default())
+        .list(
+            ctx.tenant_a,
+            &EntitlementFilter::default(),
+            &ListOptions::default(),
+        )
         .await
         .expect("Failed to list tenant A entitlements");
 
@@ -86,16 +92,28 @@ async fn test_ti_001_entitlement_isolation_between_tenants() {
     let tenant_b_list = ctx
         .services
         .entitlement
-        .list(ctx.tenant_b, &EntitlementFilter::default(), &ListOptions::default())
+        .list(
+            ctx.tenant_b,
+            &EntitlementFilter::default(),
+            &ListOptions::default(),
+        )
         .await
         .expect("Failed to list tenant B entitlements");
 
     // Verify isolation
-    assert_eq!(tenant_a_list.len(), 1, "Tenant A should have exactly 1 entitlement");
+    assert_eq!(
+        tenant_a_list.len(),
+        1,
+        "Tenant A should have exactly 1 entitlement"
+    );
     assert_eq!(tenant_a_list[0].name, "Admin Access");
     assert_eq!(tenant_a_list[0].tenant_id, ctx.tenant_a);
 
-    assert_eq!(tenant_b_list.len(), 1, "Tenant B should have exactly 1 entitlement");
+    assert_eq!(
+        tenant_b_list.len(),
+        1,
+        "Tenant B should have exactly 1 entitlement"
+    );
     assert_eq!(tenant_b_list[0].name, "User Access");
     assert_eq!(tenant_b_list[0].tenant_id, ctx.tenant_b);
 

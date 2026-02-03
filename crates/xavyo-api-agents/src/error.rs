@@ -1226,9 +1226,9 @@ impl ApiAgentsError {
             ApiAgentsError::ProviderTimeout(_) => StatusCode::GATEWAY_TIMEOUT,
 
             // F127: PKI errors - Not Found
-            ApiAgentsError::CaNotFound | ApiAgentsError::CertificateNotFound | ApiAgentsError::NoDefaultCa => {
-                StatusCode::NOT_FOUND
-            }
+            ApiAgentsError::CaNotFound
+            | ApiAgentsError::CertificateNotFound
+            | ApiAgentsError::NoDefaultCa => StatusCode::NOT_FOUND,
 
             // F127: PKI errors - Conflict
             ApiAgentsError::CaNameExists
@@ -1236,7 +1236,9 @@ impl ApiAgentsError {
             | ApiAgentsError::CannotRenewRevokedCertificate => StatusCode::CONFLICT,
 
             // F127: PKI errors - Forbidden
-            ApiAgentsError::CaNotActive | ApiAgentsError::CertificateNotYetValid => StatusCode::FORBIDDEN,
+            ApiAgentsError::CaNotActive | ApiAgentsError::CertificateNotYetValid => {
+                StatusCode::FORBIDDEN
+            }
 
             // F127: PKI errors - Bad Request
             ApiAgentsError::ValidityExceedsMax { .. }
@@ -1253,12 +1255,13 @@ impl ApiAgentsError {
             ApiAgentsError::CaPrivateKeyUnavailable => StatusCode::SERVICE_UNAVAILABLE,
 
             // F127: PKI errors - Internal Server Error
-            ApiAgentsError::CertificateSigningFailed(_) | ApiAgentsError::CrlGenerationFailed(_) => {
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
+            ApiAgentsError::CertificateSigningFailed(_)
+            | ApiAgentsError::CrlGenerationFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
 
             // F127: PKI errors - Bad Gateway
-            ApiAgentsError::ExternalCaError(_) | ApiAgentsError::OcspError(_) => StatusCode::BAD_GATEWAY,
+            ApiAgentsError::ExternalCaError(_) | ApiAgentsError::OcspError(_) => {
+                StatusCode::BAD_GATEWAY
+            }
 
             // F127: PKI errors - Gone (expired certificate)
             ApiAgentsError::CertificateExpired => StatusCode::GONE,

@@ -199,10 +199,7 @@ fn test_servicenow_signature_present() {
 
     let parsed = parse_saml_xml(&xml).expect("Should parse SAML XML");
 
-    assert!(
-        parsed.has_signature,
-        "ServiceNow prefers signed assertions"
-    );
+    assert!(parsed.has_signature, "ServiceNow prefers signed assertions");
     assert!(
         validate_signature_algorithm(&parsed),
         "ServiceNow requires RSA-SHA256"

@@ -17,8 +17,8 @@ use crate::services::{
     A2aService, AgentService, AnomalyService, ApprovalService, AssessmentService, AuditService,
     AuthorizationService, BaselineService, CaService, CertificateService, DynamicCredentialService,
     IdentityAuditService, IdentityFederationService, IdentityProviderService, McpService,
-    PermissionService, RevocationService, RoleMappingService, SecretPermissionService, SecretProviderService,
-    SecretTypeService, ToolService, WebhookService,
+    PermissionService, RevocationService, RoleMappingService, SecretPermissionService,
+    SecretProviderService, SecretTypeService, ToolService, WebhookService,
 };
 
 /// Shared state for the agents API.
@@ -152,7 +152,10 @@ impl AgentsState {
         ));
 
         // F127: Agent PKI & Certificate Issuance services
-        let ca_service = Arc::new(CaService::new(pool.clone(), Arc::clone(&encryption_service)));
+        let ca_service = Arc::new(CaService::new(
+            pool.clone(),
+            Arc::clone(&encryption_service),
+        ));
         let certificate_service = Arc::new(CertificateService::new(
             pool.clone(),
             Arc::clone(&ca_service),
@@ -411,7 +414,10 @@ pub fn agents_router(state: AgentsState) -> Router {
             post(handlers::revoke_certificate),
         )
         .route("/certificates", get(handlers::list_certificates))
-        .route("/certificates/expiring", get(handlers::list_expiring_certificates))
+        .route(
+            "/certificates/expiring",
+            get(handlers::list_expiring_certificates),
+        )
         .route("/certificates/:cert_id", get(handlers::get_certificate))
         // PKI endpoints (F127)
         .route("/pki/crl/:ca_id", get(handlers::get_crl))
@@ -496,10 +502,7 @@ pub fn a2a_router(state: AgentsState) -> Router {
 /// # Arguments
 /// * `state` - The agents state containing service references
 /// * `mtls_config` - Configuration for mTLS validation (required vs optional)
-pub fn mtls_a2a_router(
-    state: AgentsState,
-    mtls_config: crate::middleware::MtlsConfig,
-) -> Router {
+pub fn mtls_a2a_router(state: AgentsState, mtls_config: crate::middleware::MtlsConfig) -> Router {
     use crate::middleware::MtlsLayer;
 
     let mtls_layer = MtlsLayer::new(

@@ -247,7 +247,9 @@ pub async fn jwt_auth_middleware(
     request.extensions_mut().insert(user_id);
     request.extensions_mut().insert(tenant_id);
     request.extensions_mut().insert(user_uuid); // Raw UUID for handlers expecting uuid::Uuid
-    request.extensions_mut().insert(ServiceAccountMarker(is_service_account)); // Mark if this is a service account token
+    request
+        .extensions_mut()
+        .insert(ServiceAccountMarker(is_service_account)); // Mark if this is a service account token
     request.extensions_mut().insert(device_fingerprint); // Device fingerprint for F026
     request.extensions_mut().insert(ip_address); // IP address for audit
     request.extensions_mut().insert(user_agent); // User agent for audit

@@ -30,7 +30,10 @@ fn test_workday_sp_profile_configuration() {
         sp.name_id_format.contains("unspecified"),
         "Workday typically uses unspecified NameID format"
     );
-    assert_eq!(sp.assertion_validity_seconds, 300, "5-minute validity window");
+    assert_eq!(
+        sp.assertion_validity_seconds, 300,
+        "5-minute validity window"
+    );
 }
 
 // ============================================================================
@@ -88,10 +91,7 @@ fn test_workday_workdayid_attribute_present() {
 
     // Workday requires WorkdayID attribute
     let workday_id = get_attribute_values(&parsed, "WorkdayID");
-    assert!(
-        workday_id.is_some(),
-        "Workday REQUIRES WorkdayID attribute"
-    );
+    assert!(workday_id.is_some(), "Workday REQUIRES WorkdayID attribute");
 
     let values = workday_id.unwrap();
     assert_eq!(values.len(), 1, "WorkdayID should have exactly one value");

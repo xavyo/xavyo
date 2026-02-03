@@ -30,7 +30,10 @@ fn test_china_cloud_endpoints() {
     let env = EntraCloudEnvironment::China;
 
     assert_eq!(env.login_endpoint(), "https://login.chinacloudapi.cn");
-    assert_eq!(env.graph_endpoint(), "https://microsoftgraph.chinacloudapi.cn");
+    assert_eq!(
+        env.graph_endpoint(),
+        "https://microsoftgraph.chinacloudapi.cn"
+    );
 }
 
 /// Tests that Germany cloud uses correct endpoints.
@@ -65,7 +68,11 @@ fn test_token_endpoint_per_cloud() {
 
     // Commercial
     let commercial = EntraCloudEnvironment::Commercial;
-    let token_url = format!("{}/{}/oauth2/v2.0/token", commercial.login_endpoint(), tenant_id);
+    let token_url = format!(
+        "{}/{}/oauth2/v2.0/token",
+        commercial.login_endpoint(),
+        tenant_id
+    );
     assert_eq!(
         token_url,
         "https://login.microsoftonline.com/test-tenant-id/oauth2/v2.0/token"
@@ -73,7 +80,11 @@ fn test_token_endpoint_per_cloud() {
 
     // US Government
     let us_gov = EntraCloudEnvironment::UsGovernment;
-    let token_url = format!("{}/{}/oauth2/v2.0/token", us_gov.login_endpoint(), tenant_id);
+    let token_url = format!(
+        "{}/{}/oauth2/v2.0/token",
+        us_gov.login_endpoint(),
+        tenant_id
+    );
     assert_eq!(
         token_url,
         "https://login.microsoftonline.us/test-tenant-id/oauth2/v2.0/token"
@@ -114,6 +125,12 @@ fn test_all_environments_distinct() {
 #[test]
 fn test_default_environment_is_commercial() {
     let default_env = EntraCloudEnvironment::default();
-    assert_eq!(default_env.login_endpoint(), EntraCloudEnvironment::Commercial.login_endpoint());
-    assert_eq!(default_env.graph_endpoint(), EntraCloudEnvironment::Commercial.graph_endpoint());
+    assert_eq!(
+        default_env.login_endpoint(),
+        EntraCloudEnvironment::Commercial.login_endpoint()
+    );
+    assert_eq!(
+        default_env.graph_endpoint(),
+        EntraCloudEnvironment::Commercial.graph_endpoint()
+    );
 }

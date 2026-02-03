@@ -110,13 +110,17 @@ impl SpProfile {
                 AttributeMapping {
                     source: "federation_id".to_string(),
                     target_name: "User.FederationIdentifier".to_string(),
-                    format: Some("urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified".to_string()),
+                    format: Some(
+                        "urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified".to_string(),
+                    ),
                     multi_value: false,
                 },
                 AttributeMapping {
                     source: "email".to_string(),
                     target_name: "User.Email".to_string(),
-                    format: Some("urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified".to_string()),
+                    format: Some(
+                        "urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified".to_string(),
+                    ),
                     multi_value: false,
                 },
             ],
@@ -200,13 +204,15 @@ impl SpProfile {
                 },
                 AttributeMapping {
                     source: "username".to_string(),
-                    target_name: "https://aws.amazon.com/SAML/Attributes/RoleSessionName".to_string(),
+                    target_name: "https://aws.amazon.com/SAML/Attributes/RoleSessionName"
+                        .to_string(),
                     format: Some("urn:oasis:names:tc:SAML:2.0:attrname-format:uri".to_string()),
                     multi_value: false,
                 },
                 AttributeMapping {
                     source: "session_duration".to_string(),
-                    target_name: "https://aws.amazon.com/SAML/Attributes/SessionDuration".to_string(),
+                    target_name: "https://aws.amazon.com/SAML/Attributes/SessionDuration"
+                        .to_string(),
                     format: Some("urn:oasis:names:tc:SAML:2.0:attrname-format:uri".to_string()),
                     multi_value: false,
                 },
@@ -463,10 +469,7 @@ pub fn parse_saml_xml(xml: &str) -> Result<ParsedAssertion, String> {
 }
 
 /// Validate that an assertion has all required elements for a given SP
-pub fn validate_assertion_structure(
-    assertion: &ParsedAssertion,
-    sp: &SpProfile,
-) -> Vec<String> {
+pub fn validate_assertion_structure(assertion: &ParsedAssertion, sp: &SpProfile) -> Vec<String> {
     let mut errors = Vec::new();
 
     // Required elements
