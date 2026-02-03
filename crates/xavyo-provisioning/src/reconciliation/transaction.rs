@@ -198,6 +198,8 @@ impl RemediationTransaction {
             ActionType::Link => Some(ActionType::Unlink),
             ActionType::Unlink => Some(ActionType::Link),
             ActionType::InactivateIdentity => None, // Typically no auto-restore
+            ActionType::CreateIdentity => Some(ActionType::DeleteIdentity),
+            ActionType::DeleteIdentity => None, // Cannot undo hard delete
         }
     }
 

@@ -14,7 +14,7 @@ domain
 
 🟡 **beta**
 
-Functional with good test coverage (250+ tests). Remediation executor is fully implemented with transaction support and rollback capabilities. RemediationExecutor supports Create, Update, Delete, Link, Unlink, and InactivateIdentity actions with dry-run mode and state capture.
+Functional with good test coverage (260+ tests). Remediation executor is fully implemented with transaction support and rollback capabilities. RemediationExecutor supports Create, Update, Delete, Link, Unlink, InactivateIdentity, CreateIdentity, and DeleteIdentity actions with dry-run mode and state capture. Full identity service integration for identity lifecycle management.
 
 ## Dependencies
 
@@ -166,6 +166,20 @@ impl RemediationExecutor {
     pub async fn execute_link(&self, discrepancy_id: Uuid, identity_id: Uuid, external_uid: &str, connector_id: Uuid, dry_run: bool) -> RemediationResult;
     pub async fn execute_unlink(&self, discrepancy_id: Uuid, identity_id: Uuid, external_uid: &str, connector_id: Uuid, dry_run: bool) -> RemediationResult;
     pub async fn execute_inactivate_identity(&self, discrepancy_id: Uuid, identity_id: Uuid, dry_run: bool) -> RemediationResult;
+    pub async fn execute_create_identity(&self, discrepancy_id: Uuid, attributes: AttributeSet, dry_run: bool) -> RemediationResult;
+    pub async fn execute_delete_identity(&self, discrepancy_id: Uuid, identity_id: Uuid, dry_run: bool) -> RemediationResult;
+}
+
+/// Identity service trait for identity lifecycle management
+#[async_trait]
+pub trait IdentityService: Send + Sync {
+    async fn create_identity(&self, tenant_id: Uuid, attributes: AttributeSet) -> Result<Uuid, String>;
+    async fn get_identity_attributes(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<AttributeSet, String>;
+    async fn update_identity(&self, tenant_id: Uuid, identity_id: Uuid, attributes: AttributeSet) -> Result<(), String>;
+    async fn delete_identity(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<(), String>;
+    async fn inactivate_identity(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<(), String>;
+    async fn is_identity_active(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<bool, String>;
+    async fn identity_exists(&self, tenant_id: Uuid, identity_id: Uuid) -> Result<bool, String>;
 }
 ```
 

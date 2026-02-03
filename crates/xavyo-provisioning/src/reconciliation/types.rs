@@ -215,8 +215,12 @@ pub enum ActionType {
     Link,
     /// Remove shadow link.
     Unlink,
-    /// Disable identity in xavyo.
+    /// Disable identity in xavyo (soft delete).
     InactivateIdentity,
+    /// Create a new identity in xavyo.
+    CreateIdentity,
+    /// Delete identity from xavyo (hard delete).
+    DeleteIdentity,
 }
 
 impl fmt::Display for ActionType {
@@ -228,6 +232,8 @@ impl fmt::Display for ActionType {
             Self::Link => write!(f, "link"),
             Self::Unlink => write!(f, "unlink"),
             Self::InactivateIdentity => write!(f, "inactivate_identity"),
+            Self::CreateIdentity => write!(f, "create_identity"),
+            Self::DeleteIdentity => write!(f, "delete_identity"),
         }
     }
 }
@@ -243,6 +249,8 @@ impl std::str::FromStr for ActionType {
             "link" => Ok(Self::Link),
             "unlink" => Ok(Self::Unlink),
             "inactivate_identity" => Ok(Self::InactivateIdentity),
+            "create_identity" => Ok(Self::CreateIdentity),
+            "delete_identity" => Ok(Self::DeleteIdentity),
             _ => Err(format!("Invalid action type: {}", s)),
         }
     }

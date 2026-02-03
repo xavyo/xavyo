@@ -272,9 +272,15 @@ impl ConnectorProvider for MockConnectorProvider {
 pub struct MockIdentityService {
     attributes: Option<AttributeSet>,
     is_active: AtomicBool,
+    identity_exists: AtomicBool,
     get_error: Option<String>,
     inactivate_error: Option<String>,
+    create_error: Option<String>,
+    delete_error: Option<String>,
     inactivate_called: AtomicBool,
+    create_called: AtomicBool,
+    delete_called: AtomicBool,
+    created_identity_id: std::sync::Mutex<Option<Uuid>>,
 }
 
 impl MockIdentityService {
@@ -282,9 +288,15 @@ impl MockIdentityService {
         Self {
             attributes: Some(AttributeSet::new()),
             is_active: AtomicBool::new(true),
+            identity_exists: AtomicBool::new(true),
             get_error: None,
             inactivate_error: None,
+            create_error: None,
+            delete_error: None,
             inactivate_called: AtomicBool::new(false),
+            create_called: AtomicBool::new(false),
+            delete_called: AtomicBool::new(false),
+            created_identity_id: std::sync::Mutex::new(None),
         }
     }
 
@@ -298,6 +310,11 @@ impl MockIdentityService {
         self
     }
 
+    pub fn with_exists(self, exists: bool) -> Self {
+        self.identity_exists.store(exists, Ordering::SeqCst);
+        self
+    }
+
     pub fn with_get_error(mut self, error: String) -> Self {
         self.get_error = Some(error);
         self
@@ -308,13 +325,49 @@ impl MockIdentityService {
         self
     }
 
+    pub fn with_create_error(mut self, error: String) -> Self {
+        self.create_error = Some(error);
+        self
+    }
+
+    pub fn with_delete_error(mut self, error: String) -> Self {
+        self.delete_error = Some(error);
+        self
+    }
+
     pub fn was_inactivate_called(&self) -> bool {
         self.inactivate_called.load(Ordering::SeqCst)
+    }
+
+    pub fn was_create_called(&self) -> bool {
+        self.create_called.load(Ordering::SeqCst)
+    }
+
+    pub fn was_delete_called(&self) -> bool {
+        self.delete_called.load(Ordering::SeqCst)
+    }
+
+    pub fn created_identity_id(&self) -> Option<Uuid> {
+        *self.created_identity_id.lock().unwrap()
     }
 }
 
 #[async_trait]
 impl IdentityService for MockIdentityService {
+    async fn create_identity(
+        &self,
+        _tenant_id: Uuid,
+        _attributes: AttributeSet,
+    ) -> Result<Uuid, String> {
+        self.create_called.store(true, Ordering::SeqCst);
+        if let Some(err) = &self.create_error {
+            return Err(err.clone());
+        }
+        let id = Uuid::new_v4();
+        *self.created_identity_id.lock().unwrap() = Some(id);
+        Ok(id)
+    }
+
     async fn get_identity_attributes(
         &self,
         _tenant_id: Uuid,
@@ -337,6 +390,14 @@ impl IdentityService for MockIdentityService {
         Ok(())
     }
 
+    async fn delete_identity(&self, _tenant_id: Uuid, _identity_id: Uuid) -> Result<(), String> {
+        self.delete_called.store(true, Ordering::SeqCst);
+        if let Some(err) = &self.delete_error {
+            return Err(err.clone());
+        }
+        Ok(())
+    }
+
     async fn inactivate_identity(
         &self,
         _tenant_id: Uuid,
@@ -355,6 +416,10 @@ impl IdentityService for MockIdentityService {
         _identity_id: Uuid,
     ) -> Result<bool, String> {
         Ok(self.is_active.load(Ordering::SeqCst))
+    }
+
+    async fn identity_exists(&self, _tenant_id: Uuid, _identity_id: Uuid) -> Result<bool, String> {
+        Ok(self.identity_exists.load(Ordering::SeqCst))
     }
 }
 
@@ -1219,6 +1284,256 @@ mod us6_inactivate_tests {
 
         assert!(result.is_success());
         assert!(identity_service.was_inactivate_called());
+    }
+}
+
+// =============================================================================
+// User Story 7: Identity Service Integration Tests (F-009)
+// =============================================================================
+
+mod us7_identity_service_tests {
+    use super::*;
+
+    // Test execute_create_identity success
+    #[tokio::test]
+    async fn test_execute_create_identity_success() {
+        let tenant_id = test_tenant_id();
+        let discrepancy_id = test_discrepancy_id();
+
+        let connector_provider = MockConnectorProvider::new();
+        let identity_service = Arc::new(MockIdentityService::new());
+
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
+        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+
+        let executor = RemediationExecutor::new(
+            tenant_id,
+            Arc::new(connector_provider),
+            shadow_repo,
+            identity_service.clone(),
+        );
+
+        let mut attrs = AttributeSet::new();
+        attrs.set("email", "new@example.com");
+        attrs.set("displayName", "New User");
+
+        let result = executor
+            .execute_create_identity(discrepancy_id, attrs, false)
+            .await;
+
+        assert!(result.is_success());
+        assert_eq!(result.action, ActionType::CreateIdentity);
+        assert!(identity_service.was_create_called());
+        assert!(identity_service.created_identity_id().is_some());
+        assert!(result.after_state.is_some());
+    }
+
+    // Test execute_create_identity dry-run mode
+    #[tokio::test]
+    async fn test_execute_create_identity_dry_run() {
+        let tenant_id = test_tenant_id();
+        let discrepancy_id = test_discrepancy_id();
+
+        let connector_provider = MockConnectorProvider::new();
+        let identity_service = Arc::new(MockIdentityService::new());
+
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
+        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+
+        let executor = RemediationExecutor::new(
+            tenant_id,
+            Arc::new(connector_provider),
+            shadow_repo,
+            identity_service.clone(),
+        );
+
+        let mut attrs = AttributeSet::new();
+        attrs.set("email", "dry-run@example.com");
+
+        let result = executor
+            .execute_create_identity(discrepancy_id, attrs, true)
+            .await;
+
+        assert!(result.is_success());
+        assert!(result.dry_run);
+        // Service should NOT be called in dry-run mode
+        assert!(!identity_service.was_create_called());
+        assert!(result.after_state.is_some());
+    }
+
+    // Test execute_create_identity failure
+    #[tokio::test]
+    async fn test_execute_create_identity_failure() {
+        let tenant_id = test_tenant_id();
+        let discrepancy_id = test_discrepancy_id();
+
+        let connector_provider = MockConnectorProvider::new();
+        let identity_service = MockIdentityService::new()
+            .with_create_error("Database constraint violation".to_string());
+
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
+        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+
+        let executor = RemediationExecutor::new(
+            tenant_id,
+            Arc::new(connector_provider),
+            shadow_repo,
+            Arc::new(identity_service),
+        );
+
+        let attrs = AttributeSet::new();
+
+        let result = executor
+            .execute_create_identity(discrepancy_id, attrs, false)
+            .await;
+
+        assert!(result.is_failure());
+        assert!(result
+            .error_message
+            .unwrap()
+            .contains("Database constraint"));
+    }
+
+    // Test execute_delete_identity success
+    #[tokio::test]
+    async fn test_execute_delete_identity_success() {
+        let tenant_id = test_tenant_id();
+        let identity_id = test_identity_id();
+        let discrepancy_id = test_discrepancy_id();
+
+        let connector_provider = MockConnectorProvider::new();
+        let identity_service = Arc::new(MockIdentityService::new().with_exists(true));
+
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
+        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+
+        let executor = RemediationExecutor::new(
+            tenant_id,
+            Arc::new(connector_provider),
+            shadow_repo,
+            identity_service.clone(),
+        );
+
+        let result = executor
+            .execute_delete_identity(discrepancy_id, identity_id, false)
+            .await;
+
+        assert!(result.is_success());
+        assert_eq!(result.action, ActionType::DeleteIdentity);
+        assert!(identity_service.was_delete_called());
+        assert!(result.before_state.is_some());
+    }
+
+    // Test execute_delete_identity dry-run mode
+    #[tokio::test]
+    async fn test_execute_delete_identity_dry_run() {
+        let tenant_id = test_tenant_id();
+        let identity_id = test_identity_id();
+        let discrepancy_id = test_discrepancy_id();
+
+        let connector_provider = MockConnectorProvider::new();
+        let identity_service = Arc::new(MockIdentityService::new().with_exists(true));
+
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
+        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+
+        let executor = RemediationExecutor::new(
+            tenant_id,
+            Arc::new(connector_provider),
+            shadow_repo,
+            identity_service.clone(),
+        );
+
+        let result = executor
+            .execute_delete_identity(discrepancy_id, identity_id, true)
+            .await;
+
+        assert!(result.is_success());
+        assert!(result.dry_run);
+        // Service should NOT be called in dry-run mode
+        assert!(!identity_service.was_delete_called());
+    }
+
+    // Test execute_delete_identity already deleted (idempotent)
+    #[tokio::test]
+    async fn test_execute_delete_identity_not_found_is_success() {
+        let tenant_id = test_tenant_id();
+        let identity_id = test_identity_id();
+        let discrepancy_id = test_discrepancy_id();
+
+        let connector_provider = MockConnectorProvider::new();
+        let identity_service = Arc::new(MockIdentityService::new().with_exists(false));
+
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
+        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+
+        let executor = RemediationExecutor::new(
+            tenant_id,
+            Arc::new(connector_provider),
+            shadow_repo,
+            identity_service.clone(),
+        );
+
+        let result = executor
+            .execute_delete_identity(discrepancy_id, identity_id, false)
+            .await;
+
+        // Identity not found should be treated as success (idempotent delete)
+        assert!(result.is_success());
+        // Service should NOT call delete if identity doesn't exist
+        assert!(!identity_service.was_delete_called());
+    }
+
+    // Test execute_delete_identity failure
+    #[tokio::test]
+    async fn test_execute_delete_identity_failure() {
+        let tenant_id = test_tenant_id();
+        let identity_id = test_identity_id();
+        let discrepancy_id = test_discrepancy_id();
+
+        let connector_provider = MockConnectorProvider::new();
+        let identity_service = MockIdentityService::new()
+            .with_exists(true)
+            .with_delete_error("Foreign key constraint".to_string());
+
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
+        let shadow_repo = Arc::new(ShadowRepository::new(pool));
+
+        let executor = RemediationExecutor::new(
+            tenant_id,
+            Arc::new(connector_provider),
+            shadow_repo,
+            Arc::new(identity_service),
+        );
+
+        let result = executor
+            .execute_delete_identity(discrepancy_id, identity_id, false)
+            .await;
+
+        assert!(result.is_failure());
+        assert!(result.error_message.unwrap().contains("Foreign key"));
+    }
+
+    // Test new ActionType display values
+    #[test]
+    fn test_new_action_type_display() {
+        assert_eq!(ActionType::CreateIdentity.to_string(), "create_identity");
+        assert_eq!(ActionType::DeleteIdentity.to_string(), "delete_identity");
+    }
+
+    // Test inverse action mapping for new types
+    #[tokio::test]
+    async fn test_new_inverse_action_mapping() {
+        use xavyo_provisioning::reconciliation::transaction::RemediationTransaction;
+
+        assert_eq!(
+            RemediationTransaction::get_inverse_action(ActionType::CreateIdentity),
+            Some(ActionType::DeleteIdentity)
+        );
+        assert_eq!(
+            RemediationTransaction::get_inverse_action(ActionType::DeleteIdentity),
+            None
+        );
     }
 }
 
