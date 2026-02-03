@@ -14,7 +14,7 @@ api
 
 🟡 **beta**
 
-Functional with comprehensive integration test coverage (36 tests). Policy CRUD operations fully tested including validation, authorization checks, tenant isolation, and edge cases. Ready for production use with monitoring.
+Functional with comprehensive integration test coverage (60 tests). Policy CRUD operations fully tested (36 tests) including validation, authorization checks, tenant isolation, and edge cases. Authorization decision endpoints fully tested (24 tests) including single/batch decisions, caching, and tenant isolation. Ready for production use with monitoring.
 
 ## Dependencies
 
@@ -50,8 +50,9 @@ pub fn decisions_router() -> Router<AuthzState>;
 | POST | `/policies/:id/conditions` | Add condition |
 | GET | `/entitlement-mappings` | List mappings |
 | POST | `/entitlement-mappings` | Create mapping |
-| POST | `/authorize` | Evaluate access |
-| POST | `/authorize/batch` | Batch evaluation |
+| GET | `/authorization/can-i` | Single authorization decision |
+| GET | `/admin/authorization/check` | Admin check on behalf of user |
+| POST | `/admin/authorization/bulk-check` | Batch authorization (max 100) |
 
 ## Usage Example
 
