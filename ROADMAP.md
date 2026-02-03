@@ -1034,28 +1034,36 @@ Add comprehensive RFC 7644 compliance tests for SCIM protocol.
 
 ---
 
-### F-038: xavyo-api-saml - Fix AuthnRequest Session Storage
+### F-038: xavyo-api-saml - Fix AuthnRequest Session Storage ✅
 
 **Crate:** `xavyo-api-saml`
-**Current Status:** Beta
+**Current Status:** Beta ✅ (completed 2026-02-03)
 **Target Status:** Beta
 **Estimated Effort:** 1.5 weeks
 **Dependencies:** None
+**Completed:** 2026-02-03
 
 **Description:**
 Fix the AuthnRequest session binding to prevent replay attacks by validating response references the original request.
 
 **Acceptance Criteria:**
-- [ ] Implement AuthnRequest session binding (store request ID)
-- [ ] Validate SAML response InResponseTo matches stored request
-- [ ] Add request expiration (5 minute TTL)
-- [ ] Prevent replay attacks
-- [ ] Add 15+ security tests
-- [ ] Document security measures
+- [x] Implement AuthnRequest session binding (store request ID) - AuthnRequestSession type
+- [x] Validate SAML response InResponseTo matches stored request - SessionStore trait
+- [x] Add request expiration (5 minute TTL with 30s grace period)
+- [x] Prevent replay attacks - consumed_at tracking with single-use enforcement
+- [x] Add 15+ security tests - 28 security tests (session, expiration, replay)
+- [x] Document security measures - CRATE.md updated
 
-**Files to Modify:**
-- `crates/xavyo-api-saml/src/session.rs` (create)
-- `crates/xavyo-api-saml/src/handlers/sso.rs`
+**Files Created:**
+- `crates/xavyo-db/migrations/995_saml_authn_request_sessions.sql` (migration)
+- `crates/xavyo-api-saml/src/session/mod.rs` (module entry)
+- `crates/xavyo-api-saml/src/session/types.rs` (AuthnRequestSession, SessionError)
+- `crates/xavyo-api-saml/src/session/store.rs` (SessionStore trait, implementations)
+- `crates/xavyo-api-saml/tests/security/mod.rs`
+- `crates/xavyo-api-saml/tests/security/session_tests.rs`
+- `crates/xavyo-api-saml/tests/security/expiration_tests.rs`
+- `crates/xavyo-api-saml/tests/security/replay_tests.rs`
+- `crates/xavyo-api-saml/tests/security_tests.rs`
 
 ---
 
