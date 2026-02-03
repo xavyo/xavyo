@@ -937,6 +937,7 @@ impl SearchOp for DatabaseConnector {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::DatabaseDriver;
 
     #[test]
     fn test_database_connector_new() {
