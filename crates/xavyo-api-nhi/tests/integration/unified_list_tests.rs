@@ -47,7 +47,7 @@ async fn test_list_all_nhis() {
     let nhis: Vec<NhiRow> = sqlx::query_as(
         r#"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE tenant_id = $1
         ORDER BY created_at DESC
         "#,
@@ -90,7 +90,7 @@ async fn test_filter_by_type() {
     let sa_nhis: Vec<NhiRow> = sqlx::query_as(
         r#"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE tenant_id = $1 AND nhi_type = 'service_account'
         "#,
     )
@@ -107,7 +107,7 @@ async fn test_filter_by_type() {
     let agent_nhis: Vec<NhiRow> = sqlx::query_as(
         r#"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE tenant_id = $1 AND nhi_type = 'ai_agent'
         "#,
     )
@@ -146,7 +146,7 @@ async fn test_pagination() {
     let count_row: (i64,) = sqlx::query_as(
         r#"
         SELECT COUNT(*) as count
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE tenant_id = $1
         "#,
     )
@@ -161,7 +161,7 @@ async fn test_pagination() {
     let page1: Vec<NhiRow> = sqlx::query_as(
         r#"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE tenant_id = $1
         ORDER BY created_at DESC
         LIMIT 2 OFFSET 0
@@ -178,7 +178,7 @@ async fn test_pagination() {
     let page2: Vec<NhiRow> = sqlx::query_as(
         r#"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE tenant_id = $1
         ORDER BY created_at DESC
         LIMIT 2 OFFSET 2
@@ -209,7 +209,7 @@ async fn test_get_nhi_by_id() {
     let row: NhiRow = sqlx::query_as(
         r#"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE id = $1 AND tenant_id = $2
         "#,
     )

@@ -43,7 +43,7 @@ async fn test_tenant_cannot_list_others_nhis() {
     let nhis_b: Vec<NhiRow> = sqlx::query_as(
         r#"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE tenant_id = $1
         "#,
     )
@@ -63,7 +63,7 @@ async fn test_tenant_cannot_list_others_nhis() {
     let nhis_a: Vec<NhiRow> = sqlx::query_as(
         r#"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE tenant_id = $1
         "#,
     )
@@ -94,7 +94,7 @@ async fn test_tenant_cannot_access_others_by_id() {
     let result: Option<NhiRow> = sqlx::query_as(
         r#"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE id = $1 AND tenant_id = $2
         "#,
     )
@@ -150,7 +150,7 @@ async fn test_tenant_cannot_update_others() {
     let row = sqlx::query(
         r#"
         SELECT description
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE id = $1 AND tenant_id = $2
         "#,
     )
@@ -185,7 +185,7 @@ async fn test_tenant_cannot_delete_others() {
     // Try to delete from tenant B's perspective
     let result = sqlx::query(
         r#"
-        DELETE FROM non_human_identities
+        DELETE FROM v_non_human_identities
         WHERE id = $1 AND tenant_id = $2
         "#,
     )
@@ -205,7 +205,7 @@ async fn test_tenant_cannot_delete_others() {
     let count_row: (i64,) = sqlx::query_as(
         r#"
         SELECT COUNT(*) as count
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE id = $1 AND tenant_id = $2
         "#,
     )

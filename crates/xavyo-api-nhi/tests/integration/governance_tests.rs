@@ -75,7 +75,7 @@ async fn test_get_risk_summary() {
             COUNT(*) FILTER (WHERE risk_score < 40) as low_risk,
             COUNT(*) FILTER (WHERE risk_score >= 40 AND risk_score < 70) as medium_risk,
             COUNT(*) FILTER (WHERE risk_score >= 70) as high_risk
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE tenant_id = $1
         "#,
     )
@@ -242,7 +242,7 @@ async fn test_risk_score_endpoint() {
     let row = sqlx::query(
         r#"
         SELECT id, name, risk_score
-        FROM non_human_identities
+        FROM v_non_human_identities
         WHERE id = $1 AND tenant_id = $2
         "#,
     )

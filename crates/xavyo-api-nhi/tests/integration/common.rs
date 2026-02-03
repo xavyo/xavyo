@@ -94,7 +94,9 @@ pub async fn create_test_service_account(
     sa_id
 }
 
-/// Create a test NHI record in the non_human_identities table.
+/// Create a test NHI record in the appropriate table based on nhi_type.
+/// For 'service_account' -> gov_service_accounts table
+/// For 'ai_agent' -> ai_agents table
 pub async fn create_test_nhi(
     pool: &PgPool,
     tenant_id: Uuid,
@@ -104,25 +106,50 @@ pub async fn create_test_nhi(
 ) -> Uuid {
     let nhi_id = Uuid::new_v4();
 
-    sqlx::query(
-        r#"
-        INSERT INTO non_human_identities (
-            id, tenant_id, name, description, nhi_type, owner_id, status,
-            risk_score, created_at, updated_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, 'active', 25, NOW(), NOW())
-        ON CONFLICT (id) DO NOTHING
-        "#,
-    )
-    .bind(nhi_id)
-    .bind(tenant_id)
-    .bind(name)
-    .bind(format!("Test NHI: {}", name))
-    .bind(nhi_type)
-    .bind(owner_id)
-    .execute(pool)
-    .await
-    .expect("Failed to create test NHI");
+    match nhi_type {
+        "service_account" => {
+            // Use nhi_id as user_id to ensure uniqueness
+            sqlx::query(
+                r#"
+                INSERT INTO gov_service_accounts (
+                    id, tenant_id, user_id, name, purpose, owner_id, status,
+                    created_at, updated_at
+                )
+                VALUES ($1, $2, $1, $3, $4, $5, 'active', NOW(), NOW())
+                ON CONFLICT (id) DO NOTHING
+                "#,
+            )
+            .bind(nhi_id)
+            .bind(tenant_id)
+            .bind(name)
+            .bind(format!("Test NHI: {}", name))
+            .bind(owner_id)
+            .execute(pool)
+            .await
+            .expect("Failed to create test service account");
+        }
+        "ai_agent" => {
+            sqlx::query(
+                r#"
+                INSERT INTO ai_agents (
+                    id, tenant_id, name, description, agent_type, owner_id, status,
+                    risk_level, created_at, updated_at
+                )
+                VALUES ($1, $2, $3, $4, 'custom', $5, 'active', 'low', NOW(), NOW())
+                ON CONFLICT (id) DO NOTHING
+                "#,
+            )
+            .bind(nhi_id)
+            .bind(tenant_id)
+            .bind(name)
+            .bind(format!("Test NHI: {}", name))
+            .bind(owner_id)
+            .execute(pool)
+            .await
+            .expect("Failed to create test AI agent");
+        }
+        _ => panic!("Unknown nhi_type: {}", nhi_type),
+    }
 
     nhi_id
 }
@@ -245,7 +272,7 @@ pub async fn cleanup_test_tenant(pool: &PgPool, tenant_id: Uuid) {
         .await;
 
     // Non-human identities
-    let _ = sqlx::query("DELETE FROM non_human_identities WHERE tenant_id = $1")
+    let _ = sqlx::query("DELETE FROM v_non_human_identities WHERE tenant_id = $1")
         .bind(tenant_id)
         .execute(pool)
         .await;
