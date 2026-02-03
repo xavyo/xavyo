@@ -50,6 +50,13 @@ url = "2.5"
 sqlx = { workspace = true }
 xavyo-db = { path = "../xavyo-db" }
 
+[features]
+default = []
+integration = []
+
 [dev-dependencies]
 tokio-test = { workspace = true }
 wiremock = "0.6"
+rcgen = "0.13"
+regex = "1.10"
+tokio-util = { version = "0.7", features = ["rt"] }

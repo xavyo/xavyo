@@ -11,6 +11,12 @@ pub mod csv;
 pub mod json;
 pub mod syslog;
 
+// Re-export formatters for convenience
+pub use cef::CefFormatter;
+pub use csv::CsvFormatter;
+pub use json::JsonFormatter;
+pub use syslog::SyslogFormatter;
+
 use crate::models::{ExportFormat, SiemEvent};
 use thiserror::Error;
 

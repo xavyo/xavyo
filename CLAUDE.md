@@ -103,6 +103,8 @@ docs/             # Documentation
 - PostgreSQL (via xavyo-db mocks or in-memory stores) (146-webhooks-integration-tests)
 - Rust 1.75+ (per constitution) + xavyo-webhooks (existing), tokio (async runtime), chrono (timestamps) (147-webhook-circuit-breaker)
 - PostgreSQL 15+ via xavyo-db (for DLQ and circuit breaker state persistence) (147-webhook-circuit-breaker)
+- Rust 1.75+ (per constitution) + xavyo-siem (existing), tokio (async runtime), wiremock (HTTP mocking), tokio-test (async test utilities) (148-siem-integration-tests)
+- N/A (testing crate only - uses in-memory mock servers) (148-siem-integration-tests)
 
 ## Recent Changes
 - 132-sod-validation: Added Rust 1.75+ (per constitution) + xavyo-governance (F-004 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror
