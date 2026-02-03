@@ -2,10 +2,10 @@
 //!
 //! Provides email validation, display name sanitization, and CSV header checks.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Known optional CSV column names (case-insensitive matching).
-const KNOWN_COLUMNS: &[&str] = &[
+pub const KNOWN_COLUMNS: &[&str] = &[
     "email",
     "first_name",
     "last_name",
@@ -14,6 +14,8 @@ const KNOWN_COLUMNS: &[&str] = &[
     "groups",
     "department",
     "is_active",
+    "username",    // F-021: Added for extended duplicate detection
+    "external_id", // F-021: Added for HR system integration
 ];
 
 /// Maximum email length per RFC 5321.
@@ -142,6 +144,67 @@ pub fn validate_csv_headers(headers: &[String]) -> HeaderValidation {
         custom_columns,
         error: None,
     }
+}
+
+/// Apply column mapping to headers, renaming source columns to target field names.
+///
+/// Returns the mapped headers and any errors for invalid mappings.
+pub fn apply_column_mapping(
+    headers: &[String],
+    mapping: &HashMap<String, String>,
+) -> Result<Vec<String>, String> {
+    let known_set: HashSet<&str> = KNOWN_COLUMNS.iter().copied().collect();
+
+    // Validate all mapping targets are known columns
+    for (source, target) in mapping {
+        let target_lower = target.to_lowercase();
+        if !known_set.contains(target_lower.as_str()) {
+            return Err(format!(
+                "Invalid column mapping: '{}' -> '{}'. Target '{}' is not a known column. Valid targets: {}",
+                source, target, target, KNOWN_COLUMNS.join(", ")
+            ));
+        }
+    }
+
+    // Create a case-insensitive lookup for source columns
+    let mapping_lower: HashMap<String, String> = mapping
+        .iter()
+        .map(|(k, v)| (k.to_lowercase(), v.to_lowercase()))
+        .collect();
+
+    // Apply mapping
+    let mapped: Vec<String> = headers
+        .iter()
+        .map(|h| {
+            let h_lower = h.to_lowercase();
+            mapping_lower
+                .get(&h_lower)
+                .cloned()
+                .unwrap_or_else(|| h.clone())
+        })
+        .collect();
+
+    Ok(mapped)
+}
+
+/// Validate that all mapped source columns exist in the headers.
+pub fn validate_mapping_sources(
+    headers: &[String],
+    mapping: &HashMap<String, String>,
+) -> Result<(), String> {
+    let header_set: HashSet<String> = headers.iter().map(|h| h.to_lowercase()).collect();
+
+    for source in mapping.keys() {
+        if !header_set.contains(&source.to_lowercase()) {
+            return Err(format!(
+                "Column mapping error: source column '{}' not found in CSV headers. Available columns: {}",
+                source,
+                headers.join(", ")
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

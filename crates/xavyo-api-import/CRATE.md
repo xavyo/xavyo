@@ -12,9 +12,9 @@ api
 
 ## Status
 
-🔴 **alpha**
+🟡 **beta**
 
-Experimental with limited test coverage (22 tests). Basic import structure defined; not validated with production data.
+Functional with comprehensive CSV parsing test coverage (47 tests). F-021 enhancements include configurable delimiters, extended duplicate detection, column mapping, and streaming parser support. Ready for integration testing.
 
 ## Dependencies
 
@@ -47,6 +47,37 @@ pub fn import_router() -> Router<ImportState>;
 | GET | `/import/jobs/:id` | Job status |
 | GET | `/import/jobs/:id/errors` | Job errors |
 
+### CSV Parsing Configuration (F-021)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| delimiter | string | `,` | Field delimiter: `,`, `;`, `\t`, `|` |
+| column_mapping | JSON | null | Map source headers to target fields |
+| duplicate_check_fields | string | `email` | Comma-separated: email, username, external_id |
+| check_database_duplicates | bool | false | Check DB for existing records |
+
+### Supported Delimiters
+
+- **Comma** (`,`) - Default, standard CSV
+- **Semicolon** (`;`) - Common in European exports
+- **Tab** (`\t`) - TSV files
+- **Pipe** (`|`) - Pipe-delimited files
+
+### Column Mapping Example
+
+```json
+{
+  "E-mail": "email",
+  "Given Name": "first_name",
+  "Surname": "last_name",
+  "Employee ID": "external_id"
+}
+```
+
+### Known Columns
+
+email, first_name, last_name, display_name, roles, groups, department, is_active, username, external_id
+
 ## Usage Example
 
 ```rust
@@ -74,6 +105,7 @@ None
 - Never import without validation preview
 - Never skip duplicate detection
 - Never import passwords in plaintext
+- Never use wrong delimiter without detecting errors
 
 ## Related Crates
 
