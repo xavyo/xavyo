@@ -6,8 +6,8 @@ This document defines the functional requirements to bring all crates to product
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 19 | xavyo-core, xavyo-db, xavyo-auth, xavyo-tenant, xavyo-events, xavyo-connector, xavyo-connector-ldap, xavyo-connector-rest, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-agents, xavyo-secrets, xavyo-cli, xavyo-governance, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-api-scim |
-| 🟡 Beta | 8 | xavyo-connector-entra, xavyo-scim-client, xavyo-api-users, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi |
+| 🟢 Stable | 20 | xavyo-core, xavyo-db, xavyo-auth, xavyo-tenant, xavyo-events, xavyo-connector, xavyo-connector-ldap, xavyo-connector-rest, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-agents, xavyo-secrets, xavyo-cli, xavyo-governance, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-api-scim, xavyo-api-social |
+| 🟡 Beta | 7 | xavyo-connector-entra, xavyo-scim-client, xavyo-api-users, xavyo-api-saml, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi |
 | 🔴 Alpha | 5 | xavyo-nhi, xavyo-authorization, xavyo-connector-database, xavyo-api-authorization, xavyo-api-import |
 
 ## Timeline Overview
@@ -1142,10 +1142,10 @@ Add interoperability tests with major service providers that consume SAML assert
 
 ---
 
-### F-041: xavyo-api-social - Add Provider Integration Tests
+### F-041: xavyo-api-social - Add Provider Integration Tests ✅
 
 **Crate:** `xavyo-api-social`
-**Current Status:** Beta
+**Current Status:** Stable ✅ (completed 2026-02-03)
 **Target Status:** Beta
 **Estimated Effort:** 1.5 weeks
 **Dependencies:** None
@@ -1154,15 +1154,22 @@ Add interoperability tests with major service providers that consume SAML assert
 Add integration tests for all supported social login providers.
 
 **Acceptance Criteria:**
-- [ ] Test Google OAuth2 flow
-- [ ] Test Microsoft OAuth2 flow
-- [ ] Test Apple Sign In flow
-- [ ] Test GitHub OAuth2 flow
-- [ ] Add mock provider servers for CI
-- [ ] Add 25+ provider integration tests
+- [x] Test Google OAuth2 flow (8 tests)
+- [x] Test Microsoft OAuth2 flow (8 tests)
+- [x] Test Apple Sign In flow (8 tests)
+- [x] Test GitHub OAuth2 flow (8 tests)
+- [x] Add mock provider servers for CI (wiremock infrastructure)
+- [x] Add 25+ provider integration tests (46 tests total)
 
-**Files to Modify:**
-- `crates/xavyo-api-social/tests/providers/*.rs` (create)
+**Files Created:**
+- `crates/xavyo-api-social/tests/provider_tests.rs`
+- `crates/xavyo-api-social/tests/providers/mod.rs`
+- `crates/xavyo-api-social/tests/providers/common.rs`
+- `crates/xavyo-api-social/tests/providers/mock_server.rs`
+- `crates/xavyo-api-social/tests/providers/google_tests.rs`
+- `crates/xavyo-api-social/tests/providers/microsoft_tests.rs`
+- `crates/xavyo-api-social/tests/providers/apple_tests.rs`
+- `crates/xavyo-api-social/tests/providers/github_tests.rs`
 
 ---
 

@@ -1,10 +1,10 @@
 # xavyo-api-social
 
-> Social login API for Google, Microsoft, and Apple identity providers.
+> Social login API for Google, Microsoft, Apple, and GitHub identity providers.
 
 ## Purpose
 
-Implements social authentication flows for consumer identity scenarios. Supports Google, Microsoft (Azure AD), and Apple Sign In via OAuth2/OIDC. Includes account linking, CSRF protection with signed JWT state, PKCE support, and encrypted token storage.
+Implements social authentication flows for consumer identity scenarios. Supports Google, Microsoft (Azure AD), Apple Sign In, and GitHub via OAuth2/OIDC. Includes account linking, CSRF protection with signed JWT state, PKCE support, and encrypted token storage.
 
 ## Layer
 
@@ -12,9 +12,9 @@ api
 
 ## Status
 
-🟡 **beta**
+🟢 **stable**
 
-Functional with adequate test coverage (27 tests). Core providers (Google, Microsoft, Apple) working; needs validation testing.
+Production-ready with comprehensive test coverage (73 tests total, including 46 provider integration tests). All four major providers (Google, Microsoft, Apple, GitHub) fully tested with mock OAuth2 infrastructure for CI reliability.
 
 ## Dependencies
 
@@ -71,6 +71,7 @@ pub enum ProviderType {
     Google,
     Microsoft,
     Apple,
+    GitHub,
 }
 
 /// Social state container
@@ -150,8 +151,23 @@ let app = Router::new()
 ## Integration Points
 
 - **Consumed by**: `idp-api` main application
-- **Calls**: Google OAuth, Microsoft Graph, Apple ID APIs
+- **Calls**: Google OAuth, Microsoft Graph, Apple ID, GitHub OAuth APIs
 - **Uses**: `xavyo-api-auth` services for user creation
+
+## Test Coverage
+
+### Provider Integration Tests (46 tests)
+
+| Provider | Tests | Coverage |
+|----------|-------|----------|
+| Google | 8 | Auth URL, token exchange, userinfo, CSRF, PKCE, errors |
+| Microsoft | 8 | v2.0 endpoint, Graph API, PKCE, consent errors |
+| Apple | 8 | Form-post, JWT validation, private relay, name capture |
+| GitHub | 8 | User API, emails API, rate limits, private email |
+| Common | 6 | Fixtures, private email handling |
+| Mock Server | 8 | Server lifecycle, token/error responses, PKCE |
+
+All tests use wiremock for CI reliability - no external network calls.
 
 ## Feature Flags
 

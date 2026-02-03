@@ -105,6 +105,18 @@ docs/             # Documentation
 - PostgreSQL 15+ via xavyo-db (for DLQ and circuit breaker state persistence) (147-webhook-circuit-breaker)
 - Rust 1.75+ (per constitution) + xavyo-siem (existing), tokio (async runtime), wiremock (HTTP mocking), tokio-test (async test utilities) (148-siem-integration-tests)
 - N/A (testing crate only - uses in-memory mock servers) (148-siem-integration-tests)
+- Rust 1.75+ (per constitution) + xavyo-scim-client (existing), tokio (async runtime), wiremock (HTTP mocking), tokio-test (async test utilities) (149-scim-client-tests)
+- Rust 1.75+ (per constitution) + xavyo-api-users, xavyo-db (User/Group models), xavyo-auth (JwtClaims), sqlx, tokio (150-api-users-tests)
+- PostgreSQL 15+ with RLS for tenant isolation (150-api-users-tests)
+- Rust 1.75+ (per constitution) + xavyo-api-users (existing), validator crate (for email RFC 5322), regex (existing) (151-api-users-validation)
+- PostgreSQL (existing, no changes needed) (151-api-users-validation)
+- Rust 1.75+ (per constitution) + xavyo-api-scim, axum-test, tokio-test, serde_json (152-scim-idp-interop-tests)
+- N/A (tests use in-memory or mocked database) (152-scim-idp-interop-tests)
+- Rust 1.75+ (per constitution) + xavyo-api-saml (existing), xavyo-db (Group/GroupMembership models), async-trait, chrono, uuid, serde/serde_json (155-saml-group-assertions)
+- Rust 1.75+ (per constitution) + xavyo-api-saml (existing), xavyo-db (SP models), tokio (async testing) (156-saml-sp-interop-tests)
+- N/A (tests only, using in-memory test fixtures) (156-saml-sp-interop-tests)
+- Rust 1.75+ (per constitution) + xavyo-api-social (existing), wiremock (mock HTTP server), tokio (async runtime), serde_json (JSON handling), jsonwebtoken (JWT generation for Apple mocks) (157-social-provider-tests)
+- N/A (tests only, no persistent storage) (157-social-provider-tests)
 
 ## Recent Changes
 - 132-sod-validation: Added Rust 1.75+ (per constitution) + xavyo-governance (F-004 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror
