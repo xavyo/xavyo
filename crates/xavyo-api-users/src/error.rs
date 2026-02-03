@@ -17,6 +17,31 @@ pub struct AttributeFieldError {
     pub error: String,
 }
 
+/// A single field validation error with detailed information.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct FieldValidationError {
+    /// The field name that failed validation.
+    pub field: String,
+    /// Error code for programmatic handling.
+    pub code: String,
+    /// Human-readable error message.
+    pub message: String,
+    /// Optional constraint details (e.g., max_length, pattern).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub constraints: Option<serde_json::Value>,
+}
+
+impl From<crate::validation::ValidationError> for FieldValidationError {
+    fn from(err: crate::validation::ValidationError) -> Self {
+        Self {
+            field: err.field,
+            code: err.code,
+            message: err.message,
+            constraints: err.constraints,
+        }
+    }
+}
+
 /// Error type for the User Management API.
 #[derive(Debug, thiserror::Error)]
 pub enum ApiUsersError {
@@ -100,6 +125,13 @@ pub enum ApiUsersError {
     /// Parent group not found.
     #[error("Parent group not found")]
     ParentNotFound,
+
+    /// Field-level validation errors with detailed information.
+    #[error("Validation failed")]
+    ValidationErrors {
+        /// Individual field validation errors.
+        errors: Vec<FieldValidationError>,
+    },
 }
 
 /// RFC 7807 Problem Details response format.
@@ -334,6 +366,29 @@ impl IntoResponse for ApiUsersError {
                     errors: None,
                 },
             ),
+            ApiUsersError::ValidationErrors { errors } => {
+                // Convert FieldValidationError to AttributeFieldError for response
+                let attr_errors: Vec<AttributeFieldError> = errors
+                    .iter()
+                    .map(|e| AttributeFieldError {
+                        attribute: e.field.clone(),
+                        error: e.message.clone(),
+                    })
+                    .collect();
+                (
+                    StatusCode::BAD_REQUEST,
+                    ProblemDetails {
+                        problem_type: "https://xavyo.net/problems/validation-error".to_string(),
+                        title: "Validation Error".to_string(),
+                        status: 400,
+                        detail: Some(format!(
+                            "{} validation error(s)",
+                            errors.len()
+                        )),
+                        errors: Some(attr_errors),
+                    },
+                )
+            }
         };
 
         (status, Json(problem)).into_response()

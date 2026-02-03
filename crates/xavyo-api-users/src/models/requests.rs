@@ -14,6 +14,10 @@ pub struct CreateUserRequest {
 
     /// Roles to assign to the user.
     pub roles: Vec<String>,
+
+    /// Optional username (3-64 chars, alphanumeric + underscore + hyphen, starts with letter).
+    #[serde(default)]
+    pub username: Option<String>,
 }
 
 /// Request to update an existing user.
@@ -30,6 +34,10 @@ pub struct UpdateUserRequest {
     /// New active status (optional).
     #[serde(default)]
     pub is_active: Option<bool>,
+
+    /// New username (optional, 3-64 chars, alphanumeric + underscore + hyphen, starts with letter).
+    #[serde(default)]
+    pub username: Option<String>,
 }
 
 /// Query parameters for listing users.
@@ -55,6 +63,9 @@ impl ListUsersQuery {
     /// Maximum allowed page size.
     pub const MAX_LIMIT: i64 = 100;
 
+    /// Minimum allowed page size.
+    pub const MIN_LIMIT: i64 = 1;
+
     /// Get the offset, defaulting to 0.
     #[must_use]
     pub fn offset(&self) -> i64 {
@@ -67,6 +78,16 @@ impl ListUsersQuery {
         self.limit
             .unwrap_or(Self::DEFAULT_LIMIT)
             .clamp(1, Self::MAX_LIMIT)
+    }
+
+    /// Validate pagination parameters with rejection (not clamping).
+    ///
+    /// # Returns
+    ///
+    /// * `Ok((offset, limit))` with validated values
+    /// * `Err(Vec<ValidationError>)` if any parameter is invalid
+    pub fn validate(&self) -> Result<(i64, i64), Vec<crate::validation::ValidationError>> {
+        crate::validation::validate_pagination(self.offset, self.limit)
     }
 }
 

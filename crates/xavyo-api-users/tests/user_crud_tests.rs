@@ -29,6 +29,7 @@ async fn test_create_user_success() {
         email: unique_email(),
         password: "SecurePassword123!".to_string(),
         roles: vec![],
+        username: None,
     };
 
     let result = service
@@ -56,6 +57,7 @@ async fn test_create_user_with_roles() {
         email: unique_email(),
         password: "SecurePassword123!".to_string(),
         roles: vec!["admin".to_string(), "viewer".to_string()],
+        username: None,
     };
 
     let result = service
@@ -85,6 +87,7 @@ async fn test_create_user_duplicate_email_fails() {
         email: email.clone(),
         password: "SecurePassword123!".to_string(),
         roles: vec![],
+        username: None,
     };
     let _ = service
         .create_user(TenantId::from_uuid(tenant_id), &request1)
@@ -96,6 +99,7 @@ async fn test_create_user_duplicate_email_fails() {
         email,
         password: "DifferentPassword456!".to_string(),
         roles: vec![],
+        username: None,
     };
     let result = service
         .create_user(TenantId::from_uuid(tenant_id), &request2)
@@ -119,6 +123,7 @@ async fn test_create_user_validation_errors() {
         email: "".to_string(),
         password: "SecurePassword123!".to_string(),
         roles: vec![],
+        username: None,
     };
 
     let result = service
@@ -199,6 +204,7 @@ async fn test_update_user_email() {
         email: Some(new_email.clone()),
         roles: None,
         is_active: None,
+        username: None,
     };
 
     let result = service
@@ -230,6 +236,7 @@ async fn test_update_user_roles() {
         email: None,
         roles: Some(vec!["editor".to_string(), "reviewer".to_string()]),
         is_active: None,
+        username: None,
     };
 
     let result = service
@@ -264,6 +271,7 @@ async fn test_update_user_active_status() {
         email: None,
         roles: None,
         is_active: Some(false),
+        username: None,
     };
 
     let result = service
@@ -283,6 +291,7 @@ async fn test_update_user_active_status() {
         email: None,
         roles: None,
         is_active: Some(true),
+        username: None,
     };
 
     let result = service

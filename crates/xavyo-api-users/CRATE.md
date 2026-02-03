@@ -14,7 +14,7 @@ api
 
 🟢 **stable**
 
-Production-ready with comprehensive test coverage (95+ tests including 39 integration tests). Full CRUD operations for users and groups, multi-tenant isolation verified, pagination and filtering tested, custom attribute support complete.
+Production-ready with comprehensive test coverage (106+ tests including 39 integration tests). Full CRUD operations for users and groups, multi-tenant isolation verified, pagination and filtering tested, custom attribute support complete, comprehensive input validation (RFC 5322 email validation, username format validation, pagination bounds validation).
 
 ## Dependencies
 
@@ -85,6 +85,33 @@ pub struct UserService {
 pub struct GroupHierarchyService { ... }
 pub struct AttributeDefinitionService { ... }
 pub struct AttributeValidationService { ... }
+```
+
+### Validation Functions
+
+```rust
+// RFC 5322 compliant email validation
+pub fn validate_email(email: &str) -> Result<(), ValidationError>;
+
+// Username validation (3-64 chars, alphanumeric + underscore + hyphen, starts with letter)
+pub fn validate_username(username: &str) -> Result<(), ValidationError>;
+
+// Pagination bounds validation (rejects invalid values instead of clamping)
+pub fn validate_pagination(offset: Option<i64>, limit: Option<i64>)
+    -> Result<(i64, i64), Vec<ValidationError>>;
+```
+
+### Validation Error Types
+
+```rust
+pub struct ValidationError {
+    pub field: String,      // Field name that failed validation
+    pub code: String,       // Machine-readable error code
+    pub message: String,    // Human-readable error message
+    pub constraints: Option<serde_json::Value>,  // Optional constraint details
+}
+
+// All validation errors are returned at once using RFC 7807 Problem Details format
 ```
 
 ### Request/Response Types
