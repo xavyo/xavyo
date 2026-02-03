@@ -25,6 +25,7 @@ pub mod middleware;
 pub mod models;
 pub mod router;
 pub mod services;
+pub mod validation;
 
 // Re-export public API
 pub use error::{ApiUsersError, AttributeFieldError, ProblemDetails};

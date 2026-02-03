@@ -2,11 +2,12 @@
 //!
 //! Handles CRUD operations for users within a tenant context.
 
-use crate::error::ApiUsersError;
+use crate::error::{ApiUsersError, FieldValidationError};
 use crate::models::{
     CreateUserRequest, CustomAttributeFilter, FilterOperator, LifecycleStateInfo, ListUsersQuery,
     PaginationMeta, UpdateUserRequest, UserListResponse, UserResponse,
 };
+use crate::validation::{validate_email, validate_username};
 use sqlx::PgPool;
 use xavyo_auth::PasswordHasher;
 use xavyo_core::{TenantId, UserId};
@@ -264,36 +265,66 @@ impl UserService {
         tenant_id: TenantId,
         request: &CreateUserRequest,
     ) -> Result<UserResponse, ApiUsersError> {
-        // Validate email
+        // Collect all validation errors
+        let mut validation_errors = Vec::new();
+
+        // Validate email using RFC 5322 compliant validator
         let email = request.email.trim().to_lowercase();
-        if email.is_empty() {
-            return Err(ApiUsersError::Validation("Email is required".to_string()));
+        if let Err(err) = validate_email(&email) {
+            validation_errors.push(FieldValidationError::from(err));
         }
-        if !email.contains('@') {
-            return Err(ApiUsersError::Validation(
-                "Invalid email format".to_string(),
-            ));
+
+        // Validate username if provided
+        if let Some(ref username) = request.username {
+            if let Err(err) = validate_username(username) {
+                validation_errors.push(FieldValidationError::from(err));
+            }
         }
 
         // Validate password
         if request.password.len() < 8 {
-            return Err(ApiUsersError::Validation(
-                "Password must be at least 8 characters".to_string(),
-            ));
+            validation_errors.push(FieldValidationError {
+                field: "password".to_string(),
+                code: "too_short".to_string(),
+                message: "Password must be at least 8 characters".to_string(),
+                constraints: Some(
+                    serde_json::json!({"min_length": 8, "actual": request.password.len()}),
+                ),
+            });
         }
 
         // Validate roles
         if request.roles.is_empty() {
-            return Err(ApiUsersError::Validation(
-                "At least one role is required".to_string(),
-            ));
+            validation_errors.push(FieldValidationError {
+                field: "roles".to_string(),
+                code: "required".to_string(),
+                message: "At least one role is required".to_string(),
+                constraints: None,
+            });
         }
-        for role in &request.roles {
-            if role.is_empty() || role.len() > 50 {
-                return Err(ApiUsersError::Validation(
-                    "Role names must be 1-50 characters".to_string(),
-                ));
+        for (i, role) in request.roles.iter().enumerate() {
+            if role.is_empty() {
+                validation_errors.push(FieldValidationError {
+                    field: format!("roles[{}]", i),
+                    code: "empty".to_string(),
+                    message: "Role name cannot be empty".to_string(),
+                    constraints: None,
+                });
+            } else if role.len() > 50 {
+                validation_errors.push(FieldValidationError {
+                    field: format!("roles[{}]", i),
+                    code: "too_long".to_string(),
+                    message: "Role name must not exceed 50 characters".to_string(),
+                    constraints: Some(serde_json::json!({"max_length": 50, "actual": role.len()})),
+                });
             }
+        }
+
+        // Return all validation errors at once
+        if !validation_errors.is_empty() {
+            return Err(ApiUsersError::ValidationErrors {
+                errors: validation_errors,
+            });
         }
 
         // Check if email already exists in tenant
@@ -507,19 +538,65 @@ impl UserService {
         let now = chrono::Utc::now();
         let mut updated = false;
 
+        // Validate all provided fields first
+        let mut validation_errors = Vec::new();
+
+        // Validate email if provided
+        if let Some(ref new_email) = request.email {
+            let email_trimmed = new_email.trim().to_lowercase();
+            if let Err(err) = validate_email(&email_trimmed) {
+                validation_errors.push(FieldValidationError::from(err));
+            }
+        }
+
+        // Validate username if provided
+        if let Some(ref username) = request.username {
+            if let Err(err) = validate_username(username) {
+                validation_errors.push(FieldValidationError::from(err));
+            }
+        }
+
+        // Validate roles if provided
+        if let Some(ref new_roles) = request.roles {
+            if new_roles.is_empty() {
+                validation_errors.push(FieldValidationError {
+                    field: "roles".to_string(),
+                    code: "required".to_string(),
+                    message: "At least one role is required".to_string(),
+                    constraints: None,
+                });
+            }
+            for (i, role) in new_roles.iter().enumerate() {
+                if role.is_empty() {
+                    validation_errors.push(FieldValidationError {
+                        field: format!("roles[{}]", i),
+                        code: "empty".to_string(),
+                        message: "Role name cannot be empty".to_string(),
+                        constraints: None,
+                    });
+                } else if role.len() > 50 {
+                    validation_errors.push(FieldValidationError {
+                        field: format!("roles[{}]", i),
+                        code: "too_long".to_string(),
+                        message: "Role name must not exceed 50 characters".to_string(),
+                        constraints: Some(
+                            serde_json::json!({"max_length": 50, "actual": role.len()}),
+                        ),
+                    });
+                }
+            }
+        }
+
+        // Return all validation errors at once
+        if !validation_errors.is_empty() {
+            return Err(ApiUsersError::ValidationErrors {
+                errors: validation_errors,
+            });
+        }
+
         // Update email if provided
         if let Some(ref new_email) = request.email {
             let email = new_email.trim().to_lowercase();
-            if email.is_empty() {
-                return Err(ApiUsersError::Validation(
-                    "Email cannot be empty".to_string(),
-                ));
-            }
-            if !email.contains('@') {
-                return Err(ApiUsersError::Validation(
-                    "Invalid email format".to_string(),
-                ));
-            }
 
             // Check if email is different and not already taken
             if email != user.email {
@@ -567,21 +644,8 @@ impl UserService {
             }
         }
 
-        // Update roles if provided
+        // Update roles if provided (validation done upfront)
         let roles = if let Some(ref new_roles) = request.roles {
-            if new_roles.is_empty() {
-                return Err(ApiUsersError::Validation(
-                    "At least one role is required".to_string(),
-                ));
-            }
-            for role in new_roles {
-                if role.is_empty() || role.len() > 50 {
-                    return Err(ApiUsersError::Validation(
-                        "Role names must be 1-50 characters".to_string(),
-                    ));
-                }
-            }
-
             // Delete existing roles and insert new ones
             sqlx::query("DELETE FROM user_roles WHERE user_id = $1")
                 .bind(user_id.as_uuid())

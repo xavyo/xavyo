@@ -129,6 +129,7 @@ async fn test_update_user_from_other_tenant_returns_not_found() {
         email: Some(unique_email()),
         roles: None,
         is_active: None,
+        username: None,
     };
 
     let result = service
@@ -203,6 +204,7 @@ async fn test_user_created_in_tenant_a_not_visible_to_tenant_b() {
         email: unique_email(),
         password: "SecurePassword123!".to_string(),
         roles: vec![],
+        username: None,
     };
 
     let create_result = service

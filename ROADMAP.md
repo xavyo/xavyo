@@ -938,28 +938,35 @@ Add comprehensive integration tests for user management API including full CRUD 
 
 ---
 
-### F-035: xavyo-api-users - Add Validation
+### F-035: xavyo-api-users - Add Validation ✅
 
 **Crate:** `xavyo-api-users`
-**Current Status:** Beta
+**Current Status:** ~~Beta~~ Stable
 **Target Status:** Stable
 **Estimated Effort:** 1 week
 **Dependencies:** F-034
+**Completed:** 2026-02-03
 
 **Description:**
 Add comprehensive input validation for all user API endpoints.
 
 **Acceptance Criteria:**
-- [ ] Add email format validation
-- [ ] Add custom attribute schema enforcement
-- [ ] Add pagination bounds validation
-- [ ] Add username format validation
-- [ ] Add 20+ validation tests
-- [ ] Document validation rules
-- [ ] Update CRATE.md with stable status
+- [x] Add email format validation (RFC 5322 compliant)
+- [x] Add custom attribute schema enforcement (existing AttributeValidationService)
+- [x] Add pagination bounds validation (rejects invalid values with detailed errors)
+- [x] Add username format validation (3-64 chars, alphanumeric + underscore + hyphen)
+- [x] Add 20+ validation tests (48 validation tests added)
+- [x] Document validation rules
+- [x] Update CRATE.md with stable status
 
-**Files to Modify:**
-- `crates/xavyo-api-users/src/validation.rs` (create)
+**Files Modified:**
+- `crates/xavyo-api-users/src/validation/mod.rs` (created)
+- `crates/xavyo-api-users/src/validation/error.rs` (created)
+- `crates/xavyo-api-users/src/validation/email.rs` (created)
+- `crates/xavyo-api-users/src/validation/username.rs` (created)
+- `crates/xavyo-api-users/src/validation/pagination.rs` (created)
+- `crates/xavyo-api-users/src/services/user_service.rs` (integrated validation)
+- `crates/xavyo-api-users/src/error.rs` (added ValidationErrors variant)
 - `crates/xavyo-api-users/CRATE.md`
 
 ---
