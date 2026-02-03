@@ -391,78 +391,29 @@ Add comprehensive integration tests including real API endpoint tests and securi
 
 ---
 
-### F-014: xavyo-connector-database - Add MySQL Driver
+### F-014: xavyo-connector-database - Add MySQL Driver ⏭️ SKIPPED
 
-**Crate:** `xavyo-connector-database`
-**Current Status:** Alpha
-**Target Status:** Alpha
-**Estimated Effort:** 1.5 weeks
-**Dependencies:** None
+**Status:** SKIPPED per Constitution Principle XI (Single Technology Per Layer)
 
-**Description:**
-Implement MySQL database connector support including connection pooling, type mappings, and schema discovery.
-
-**Acceptance Criteria:**
-- [ ] Implement MySQL connection with TLS support
-- [ ] Add connection pooling configuration
-- [ ] Implement MySQL-specific type mappings
-- [ ] Add MySQL schema discovery (tables, columns, types)
-- [ ] Add 20+ unit tests for MySQL operations
-- [ ] Document MySQL-specific configuration
-
-**Files to Modify:**
-- `crates/xavyo-connector-database/src/mysql.rs` (create)
-- `crates/xavyo-connector-database/src/lib.rs`
+**Rationale:** The constitution mandates PostgreSQL as the ONLY supported database for internal use.
+The database connector exists to provision TO external systems, not to add alternative database engines.
+MySQL/MSSQL/Oracle support would violate the single-technology-per-layer principle.
 
 ---
 
-### F-015: xavyo-connector-database - Add MSSQL Driver
+### F-015: xavyo-connector-database - Add MSSQL Driver ⏭️ SKIPPED
 
-**Crate:** `xavyo-connector-database`
-**Current Status:** Alpha
-**Target Status:** Alpha
-**Estimated Effort:** 1.5 weeks
-**Dependencies:** None
+**Status:** SKIPPED per Constitution Principle XI (Single Technology Per Layer)
 
-**Description:**
-Implement Microsoft SQL Server database connector support including connection pooling, type mappings, and schema discovery.
-
-**Acceptance Criteria:**
-- [ ] Implement MSSQL connection with TLS support
-- [ ] Add connection pooling configuration
-- [ ] Implement MSSQL-specific type mappings
-- [ ] Add MSSQL schema discovery
-- [ ] Add 20+ unit tests for MSSQL operations
-- [ ] Document MSSQL-specific configuration
-
-**Files to Modify:**
-- `crates/xavyo-connector-database/src/mssql.rs` (create)
-- `crates/xavyo-connector-database/src/lib.rs`
+**Rationale:** See F-014.
 
 ---
 
-### F-016: xavyo-connector-database - Add Oracle Driver
+### F-016: xavyo-connector-database - Add Oracle Driver ⏭️ SKIPPED
 
-**Crate:** `xavyo-connector-database`
-**Current Status:** Alpha
-**Target Status:** Alpha
-**Estimated Effort:** 1.5 weeks
-**Dependencies:** None
+**Status:** SKIPPED per Constitution Principle XI (Single Technology Per Layer)
 
-**Description:**
-Implement Oracle database connector support including connection pooling, type mappings, and schema discovery.
-
-**Acceptance Criteria:**
-- [ ] Implement Oracle connection with TLS support
-- [ ] Add connection pooling configuration
-- [ ] Implement Oracle-specific type mappings (NUMBER, VARCHAR2, etc.)
-- [ ] Add Oracle schema discovery
-- [ ] Add 20+ unit tests for Oracle operations
-- [ ] Document Oracle-specific configuration
-
-**Files to Modify:**
-- `crates/xavyo-connector-database/src/oracle.rs` (create)
-- `crates/xavyo-connector-database/src/lib.rs`
+**Rationale:** See F-014.
 
 ---
 
@@ -471,17 +422,17 @@ Implement Oracle database connector support including connection pooling, type m
 **Crate:** `xavyo-connector-database`
 **Current Status:** Alpha
 **Target Status:** Stable
-**Estimated Effort:** 1.5 weeks
-**Dependencies:** F-014, F-015, F-016
+**Estimated Effort:** 1 week
+**Dependencies:** None
 
 **Description:**
-Add comprehensive transaction support including begin/commit/rollback, batch operations, and prepared statement caching.
+Add comprehensive PostgreSQL transaction support including begin/commit/rollback, batch operations, and prepared statement caching.
 
 **Acceptance Criteria:**
-- [ ] Implement transaction begin/commit/rollback across all drivers
+- [ ] Implement transaction begin/commit/rollback for PostgreSQL
 - [ ] Add batch operation support (bulk insert, update, delete)
 - [ ] Implement prepared statement caching
-- [ ] Add savepoint support where available
+- [ ] Add savepoint support
 - [ ] Add 30+ integration tests for transaction scenarios
 - [ ] Update CRATE.md with stable status
 
