@@ -135,7 +135,7 @@ pub async fn create_test_nhi(
                     id, tenant_id, name, description, agent_type, owner_id, status,
                     risk_level, created_at, updated_at
                 )
-                VALUES ($1, $2, $3, $4, 'custom', $5, 'active', 'low', NOW(), NOW())
+                VALUES ($1, $2, $3, $4, 'autonomous', $5, 'active', 'low', NOW(), NOW())
                 ON CONFLICT (id) DO NOTHING
                 "#,
             )
@@ -247,6 +247,31 @@ impl TestContext {
     pub async fn create_nhi_b(&self, name: &str, nhi_type: &str) -> Uuid {
         create_test_nhi(&self.pool, self.tenant_b, self.owner_b, name, nhi_type).await
     }
+}
+
+/// Set risk score for an NHI via the gov_nhi_risk_scores table.
+pub async fn set_nhi_risk_score(pool: &PgPool, tenant_id: Uuid, nhi_id: Uuid, score: i32) {
+    let risk_level = match score {
+        0..=39 => "low",
+        40..=69 => "medium",
+        70..=89 => "high",
+        _ => "critical",
+    };
+
+    sqlx::query(
+        r#"
+        INSERT INTO gov_nhi_risk_scores (id, tenant_id, nhi_id, total_score, risk_level, factor_breakdown, calculated_at)
+        VALUES (gen_random_uuid(), $1, $2, $3, $4::gov_risk_level, '{}', NOW())
+        ON CONFLICT (tenant_id, nhi_id) DO UPDATE SET total_score = $3, risk_level = $4::gov_risk_level, calculated_at = NOW()
+        "#,
+    )
+    .bind(tenant_id)
+    .bind(nhi_id)
+    .bind(score)
+    .bind(risk_level)
+    .execute(pool)
+    .await
+    .expect("Failed to set NHI risk score");
 }
 
 /// Clean up test data for a tenant.

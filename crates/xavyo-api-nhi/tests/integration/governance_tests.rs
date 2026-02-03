@@ -10,7 +10,7 @@
 
 use super::common::{
     create_test_nhi, create_test_pool, create_test_service_account, create_test_tenant,
-    create_test_user, unique_email, unique_service_account_name,
+    create_test_user, set_nhi_risk_score, unique_email, unique_service_account_name,
 };
 use chrono::Utc;
 use sqlx::{PgPool, Row};
@@ -34,14 +34,18 @@ async fn test_get_risk_summary() {
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
 
     // Create NHIs with different risk scores
-    let _low_risk = create_test_nhi(
+    let low_risk_name = format!("low-risk-nhi-{}", Uuid::new_v4());
+    let low_risk_id = create_test_nhi(
         &pool,
         tenant_id,
         owner_id,
-        "low-risk-nhi",
+        &low_risk_name,
         "service_account",
     )
     .await;
+
+    // Set low risk score
+    set_nhi_risk_score(&pool, tenant_id, low_risk_id, 20).await;
 
     let high_risk_name = format!("high-risk-nhi-{}", Uuid::new_v4());
     let high_risk_id = create_test_nhi(
@@ -53,19 +57,8 @@ async fn test_get_risk_summary() {
     )
     .await;
 
-    // Update risk score for high risk NHI
-    sqlx::query(
-        r#"
-        UPDATE non_human_identities
-        SET risk_score = 80
-        WHERE id = $1 AND tenant_id = $2
-        "#,
-    )
-    .bind(high_risk_id)
-    .bind(tenant_id)
-    .execute(&pool)
-    .await
-    .expect("Update risk score should succeed");
+    // Set high risk score
+    set_nhi_risk_score(&pool, tenant_id, high_risk_id, 80).await;
 
     // Query risk distribution
     let row = sqlx::query(
@@ -224,21 +217,10 @@ async fn test_risk_score_endpoint() {
     let nhi_name = unique_service_account_name();
     let nhi_id = create_test_nhi(&pool, tenant_id, owner_id, &nhi_name, "service_account").await;
 
-    // Update with a specific risk score
-    sqlx::query(
-        r#"
-        UPDATE non_human_identities
-        SET risk_score = 45
-        WHERE id = $1 AND tenant_id = $2
-        "#,
-    )
-    .bind(nhi_id)
-    .bind(tenant_id)
-    .execute(&pool)
-    .await
-    .expect("Update should succeed");
+    // Set a specific risk score via gov_nhi_risk_scores
+    set_nhi_risk_score(&pool, tenant_id, nhi_id, 45).await;
 
-    // Fetch risk score
+    // Fetch risk score from view
     let row = sqlx::query(
         r#"
         SELECT id, name, risk_score

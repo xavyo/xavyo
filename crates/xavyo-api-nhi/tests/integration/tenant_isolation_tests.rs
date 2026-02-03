@@ -126,11 +126,11 @@ async fn test_tenant_cannot_update_others() {
 
     let original_desc = format!("Test NHI: {}", sa_name);
 
-    // Try to update from tenant B's perspective
+    // Try to update from tenant B's perspective (using underlying table)
     let result = sqlx::query(
         r#"
-        UPDATE non_human_identities
-        SET description = 'Hacked by tenant B'
+        UPDATE gov_service_accounts
+        SET purpose = 'Hacked by tenant B'
         WHERE id = $1 AND tenant_id = $2
         "#,
     )
@@ -146,11 +146,11 @@ async fn test_tenant_cannot_update_others() {
         "Cross-tenant update should affect 0 rows"
     );
 
-    // Verify the original description is unchanged
+    // Verify the original purpose is unchanged
     let row = sqlx::query(
         r#"
-        SELECT description
-        FROM v_non_human_identities
+        SELECT purpose
+        FROM gov_service_accounts
         WHERE id = $1 AND tenant_id = $2
         "#,
     )
@@ -160,11 +160,10 @@ async fn test_tenant_cannot_update_others() {
     .await
     .expect("NHI should exist");
 
-    let description: Option<String> = row.get("description");
+    let purpose: String = row.get("purpose");
     assert_eq!(
-        description,
-        Some(original_desc),
-        "Original description should be unchanged"
+        purpose, original_desc,
+        "Original purpose should be unchanged"
     );
 }
 
@@ -182,10 +181,10 @@ async fn test_tenant_cannot_delete_others() {
     let sa_name = unique_service_account_name();
     let sa_id_a = create_test_nhi(&pool, tenant_a, owner_a, &sa_name, "service_account").await;
 
-    // Try to delete from tenant B's perspective
+    // Try to delete from tenant B's perspective (using underlying table)
     let result = sqlx::query(
         r#"
-        DELETE FROM v_non_human_identities
+        DELETE FROM gov_service_accounts
         WHERE id = $1 AND tenant_id = $2
         "#,
     )
