@@ -152,6 +152,52 @@ batch_exporter.export(BatchExportJob {
 ## Feature Flags
 
 - `integration` - Enables integration test dependencies (wiremock, rcgen, tokio-util)
+- `docker-tests` - Enables Docker-based integration tests with real network endpoints
+
+## Docker Test Infrastructure
+
+For integration testing with real network endpoints, the crate includes Docker-based mock servers.
+
+### Quick Start
+
+```bash
+# Start test containers
+cd crates/xavyo-siem/scripts
+./start-test-infra.sh --wait
+
+# Run Docker integration tests
+cargo test -p xavyo-siem --features docker-tests -- --ignored
+
+# Stop containers
+./stop-test-infra.sh
+```
+
+### Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| Splunk HEC Mock | 8088 | Mock HTTP Event Collector |
+| Syslog Mock (TCP) | 1514 | RFC 5424 syslog over TCP |
+| Syslog Mock (UDP) | 1514 | RFC 5424 syslog over UDP |
+| Syslog API | 8089 | HTTP API for message retrieval |
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HEC_PORT` | 8088 | Splunk HEC port |
+| `HEC_TOKEN` | test-token-12345 | HEC authentication token |
+| `SYSLOG_TCP_PORT` | 1514 | Syslog TCP port |
+| `SYSLOG_UDP_PORT` | 1514 | Syslog UDP port |
+| `SYSLOG_API_PORT` | 8089 | Syslog HTTP API port |
+
+### Test Coverage
+
+Docker tests provide:
+- Real TCP/UDP socket testing (vs in-memory mocks)
+- HEC token authentication validation
+- High-volume throughput testing (100+ events/sec)
+- Concurrent protocol testing
 
 ## Anti-Patterns
 

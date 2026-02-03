@@ -53,6 +53,7 @@ xavyo-db = { path = "../xavyo-db" }
 [features]
 default = []
 integration = []
+docker-tests = []
 
 [dev-dependencies]
 tokio-test = { workspace = true }
