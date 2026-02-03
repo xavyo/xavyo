@@ -14,7 +14,7 @@ connector
 
 🟢 **stable**
 
-Production-ready with comprehensive test coverage (116 tests: 64 unit tests + 52 integration tests). Core Graph API operations complete with robust rate limit handling, circuit breaker pattern, and request queuing.
+Production-ready with comprehensive test coverage (125 tests: 64 unit tests + 61 integration tests). Core Graph API operations complete with robust rate limit handling, circuit breaker pattern, and request queuing.
 
 ## Dependencies
 
@@ -204,7 +204,7 @@ println!("Circuit state: {:?}", metrics.current_circuit_state);
 
 ## Integration Tests
 
-The crate includes 52 integration tests covering real-world scenarios with mock Graph API responses:
+The crate includes 61 integration tests covering real-world scenarios with mock Graph API responses:
 
 ### Test Suites
 
@@ -216,6 +216,7 @@ The crate includes 52 integration tests covering real-world scenarios with mock 
 | `multi_cloud_tests` | 8 | Commercial, US Government, China, Germany cloud endpoints |
 | `provisioning_tests` | 10 | User create/update/disable/delete, batch operations, error handling |
 | `rate_limit_integration_tests` | 6 | 429 handling, concurrent throttling, recovery scenarios |
+| `pagination_tests` | 9 | Large datasets (1000+ members), edge cases, concurrent fetches |
 
 ### Running Integration Tests
 
