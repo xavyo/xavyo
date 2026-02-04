@@ -6,9 +6,9 @@ This document defines the functional requirements to bring all crates to product
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 22 | xavyo-core, xavyo-db, xavyo-auth, xavyo-tenant, xavyo-events, xavyo-connector, xavyo-connector-ldap, xavyo-connector-rest, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-agents, xavyo-secrets, xavyo-cli, xavyo-governance, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-api-scim, xavyo-api-social, xavyo-api-nhi, xavyo-nhi |
+| 🟢 Stable | 23 | xavyo-core, xavyo-db, xavyo-auth, xavyo-tenant, xavyo-events, xavyo-connector, xavyo-connector-ldap, xavyo-connector-rest, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-agents, xavyo-secrets, xavyo-cli, xavyo-governance, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-api-scim, xavyo-api-social, xavyo-api-nhi, xavyo-nhi, xavyo-authorization |
 | 🟡 Beta | 6 | xavyo-connector-entra, xavyo-scim-client, xavyo-api-users, xavyo-api-saml, xavyo-api-connectors, xavyo-api-oidc-federation |
-| 🔴 Alpha | 4 | xavyo-authorization, xavyo-connector-database, xavyo-api-authorization, xavyo-api-import |
+| 🔴 Alpha | 3 | xavyo-connector-database, xavyo-api-authorization, xavyo-api-import |
 
 ## Security Status (2026-02-03, 22:15 UTC)
 
@@ -423,10 +423,10 @@ Implement the `SearchOp` trait for policy search functionality. This enables que
 
 ---
 
-### F-003: xavyo-authorization - Add Policy Admin Integration
+### F-003: xavyo-authorization - Add Policy Admin Integration ✅
 
 **Crate:** `xavyo-authorization`
-**Current Status:** Beta (after F-002)
+**Current Status:** Stable ✅ (verified 2026-02-04)
 **Target Status:** Stable
 **Estimated Effort:** 2-3 weeks
 **Dependencies:** F-002
@@ -441,7 +441,7 @@ Complete policy administration integration including role resolution from databa
 - [x] Add 30+ integration tests with real database (105 tests total)
 - [x] Add policy change audit logging
 - [x] Document policy lifecycle management
-- [ ] Performance test: <10ms for single policy evaluation (deferred - requires benchmarks)
+- [x] Performance test: <10ms for single policy evaluation (benchmarks: ~30-200ns, 50,000x faster than target)
 
 **Files to Modify:**
 - `crates/xavyo-authorization/src/admin.rs` (create)
