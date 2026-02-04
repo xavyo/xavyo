@@ -53,7 +53,7 @@ pub struct DeviceAuthorizationResponse {
     /// URL with code pre-filled (optional convenience).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verification_uri_complete: Option<String>,
-    /// Seconds until device_code expires.
+    /// Seconds until `device_code` expires.
     pub expires_in: i64,
     /// Minimum seconds between polling requests.
     pub interval: i32,
@@ -62,7 +62,7 @@ pub struct DeviceAuthorizationResponse {
 /// Query params for GET /device.
 #[derive(Debug, Clone, Deserialize)]
 pub struct DeviceVerificationQuery {
-    /// Pre-filled user code (from verification_uri_complete).
+    /// Pre-filled user code (from `verification_uri_complete`).
     #[serde(default)]
     pub code: Option<String>,
 }
@@ -109,7 +109,7 @@ pub struct ApprovalContext {
     pub user_code: String,
     /// OAuth client ID (fallback if name is unknown).
     pub client_id: String,
-    /// Human-readable client name from oauth_clients table.
+    /// Human-readable client name from `oauth_clients` table.
     pub client_name: Option<String>,
     /// Requested OAuth scopes.
     pub scopes: Vec<String>,
@@ -142,7 +142,7 @@ impl ApprovalContext {
         }
     }
 
-    /// Check if the application is unknown (no client_name).
+    /// Check if the application is unknown (no `client_name`).
     #[must_use]
     pub fn is_unknown_app(&self) -> bool {
         self.client_name.is_none()
@@ -162,7 +162,7 @@ impl ApprovalContext {
     }
 }
 
-/// Extract tenant_id from X-Tenant-ID header.
+/// Extract `tenant_id` from X-Tenant-ID header.
 fn extract_tenant_id(headers: &HeaderMap) -> Result<Uuid, OAuthError> {
     let tenant_header = headers
         .get("X-Tenant-ID")
@@ -181,8 +181,8 @@ fn extract_tenant_id(headers: &HeaderMap) -> Result<Uuid, OAuthError> {
 /// POST /oauth/device/code
 ///
 /// This is the first step in the device code flow. The client sends its
-/// client_id and requested scopes, and receives a device_code (for polling)
-/// and user_code (to display to the user).
+/// `client_id` and requested scopes, and receives a `device_code` (for polling)
+/// and `user_code` (to display to the user).
 #[utoipa::path(
     post,
     path = "/oauth/device/code",
@@ -231,8 +231,7 @@ pub async fn device_authorization_handler(
     for scope in &scopes {
         if !client.scopes.contains(scope) {
             return Err(OAuthError::InvalidScope(format!(
-                "Scope '{}' is not allowed for this client",
-                scope
+                "Scope '{scope}' is not allowed for this client"
             )));
         }
     }
@@ -247,7 +246,7 @@ pub async fn device_authorization_handler(
     let origin_user_agent = headers
         .get("User-Agent")
         .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
+        .map(std::string::ToString::to_string);
 
     // Create device code service and generate authorization
     let device_service = DeviceCodeService::new(state.pool.clone());
@@ -278,7 +277,7 @@ pub async fn device_authorization_handler(
 /// GET /device
 ///
 /// Renders an HTML page where the user can enter their user code.
-/// If `code` query parameter is provided (from verification_uri_complete),
+/// If `code` query parameter is provided (from `verification_uri_complete`),
 /// the code is pre-filled in the form.
 /// Sets a CSRF token cookie for form protection.
 pub async fn device_verification_page_handler(
@@ -725,7 +724,7 @@ pub async fn device_authorize_handler(
 
 /// Check device authorization status (for token polling).
 ///
-/// This is called by the token endpoint when grant_type is device_code.
+/// This is called by the token endpoint when `grant_type` is `device_code`.
 pub async fn check_device_authorization(
     state: &OAuthState,
     tenant_id: Uuid,
@@ -921,10 +920,9 @@ fn render_approval_page_with_context(context: &ApprovalContext) -> String {
                 <span class="warning-icon">⏰</span>
                 <div>
                     <strong>This code is older than 5 minutes</strong>
-                    <p>Created {} minutes ago. Legitimate device codes are usually approved quickly. If you didn't just initiate this request, click Deny.</p>
+                    <p>Created {age} minutes ago. Legitimate device codes are usually approved quickly. If you didn't just initiate this request, click Deny.</p>
                 </div>
-            </div>"#,
-            age
+            </div>"#
         ));
     }
 

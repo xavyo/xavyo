@@ -49,7 +49,7 @@ tracing = "0.1"
 rand = "0.8"
 
 # Database
-sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono"] }
+sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "macros", "uuid", "chrono"] }
 
 # SHA-256 hashing for API keys
 sha2 = "0.10"
@@ -62,7 +62,7 @@ http = "1.0"
 tokio = { version = "1.35", features = ["full", "test-util"] }
 tower = { version = "0.4", features = ["util"] }
 axum-test = "14"
-sqlx = { version = "0.7", features = ["runtime-tokio", "postgres"] }
+sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "macros"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [features]

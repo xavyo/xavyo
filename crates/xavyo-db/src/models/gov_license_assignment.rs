@@ -62,6 +62,7 @@ pub struct GovLicenseAssignment {
 
 impl GovLicenseAssignment {
     /// Check if the assignment is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self.status, LicenseAssignmentStatus::Active)
     }
@@ -73,10 +74,10 @@ impl GovLicenseAssignment {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_assignments
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -92,10 +93,10 @@ impl GovLicenseAssignment {
         license_pool_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_assignments
             WHERE tenant_id = $1 AND user_id = $2 AND license_pool_id = $3 AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -111,11 +112,11 @@ impl GovLicenseAssignment {
         user_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_assignments
             WHERE tenant_id = $1 AND user_id = $2 AND status = 'active'
             ORDER BY assigned_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -130,11 +131,11 @@ impl GovLicenseAssignment {
         license_pool_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_assignments
             WHERE tenant_id = $1 AND license_pool_id = $2 AND status = 'active'
             ORDER BY assigned_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(license_pool_id)
@@ -151,28 +152,28 @@ impl GovLicenseAssignment {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_license_assignments
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.license_pool_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND license_pool_id = ${}", param_count));
+            query.push_str(&format!(" AND license_pool_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.source.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND source = ${}", param_count));
+            query.push_str(&format!(" AND source = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -206,28 +207,28 @@ impl GovLicenseAssignment {
         filter: &LicenseAssignmentFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_license_assignments
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.license_pool_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND license_pool_id = ${}", param_count));
+            query.push_str(&format!(" AND license_pool_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.source.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND source = ${}", param_count));
+            query.push_str(&format!(" AND source = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -255,14 +256,14 @@ impl GovLicenseAssignment {
         input: CreateGovLicenseAssignment,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_license_assignments (
                 tenant_id, license_pool_id, user_id, assigned_by, source,
                 entitlement_link_id, session_id, notes
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.license_pool_id)
@@ -283,12 +284,12 @@ impl GovLicenseAssignment {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_license_assignments
             SET status = 'released', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -304,12 +305,12 @@ impl GovLicenseAssignment {
         reason: LicenseReclaimReason,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_license_assignments
             SET status = 'reclaimed', reclaimed_at = NOW(), reclaim_reason = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -325,12 +326,12 @@ impl GovLicenseAssignment {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_license_assignments
             SET status = 'expired', reclaim_reason = 'expiration', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -345,11 +346,11 @@ impl GovLicenseAssignment {
         license_pool_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_license_assignments
             SET status = 'expired', reclaim_reason = 'expiration', updated_at = NOW()
             WHERE tenant_id = $1 AND license_pool_id = $2 AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(license_pool_id)
@@ -366,11 +367,11 @@ impl GovLicenseAssignment {
         entitlement_link_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_assignments
             WHERE tenant_id = $1 AND entitlement_link_id = $2
             ORDER BY assigned_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_link_id)
@@ -385,12 +386,12 @@ impl GovLicenseAssignment {
         user_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_assignments
             WHERE tenant_id = $1 AND user_id = $2
               AND source = 'entitlement' AND status = 'active'
             ORDER BY assigned_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -405,10 +406,10 @@ impl GovLicenseAssignment {
         user_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT license_pool_id FROM gov_license_assignments
             WHERE tenant_id = $1 AND user_id = $2 AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -423,10 +424,10 @@ impl GovLicenseAssignment {
         license_pool_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_license_assignments
             WHERE tenant_id = $1 AND license_pool_id = $2 AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(license_pool_id)
@@ -485,7 +486,7 @@ impl LicenseAssignmentWithDetails {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT
                 a.id, a.tenant_id, a.license_pool_id, p.name as license_pool_name,
                 a.user_id, u.display_name as user_display_name, u.email as user_email,
@@ -495,25 +496,25 @@ impl LicenseAssignmentWithDetails {
             JOIN gov_license_pools p ON a.license_pool_id = p.id
             JOIN users u ON a.user_id = u.id
             WHERE a.tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.license_pool_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND a.license_pool_id = ${}", param_count));
+            query.push_str(&format!(" AND a.license_pool_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND a.user_id = ${}", param_count));
+            query.push_str(&format!(" AND a.user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND a.status = ${}", param_count));
+            query.push_str(&format!(" AND a.status = ${param_count}"));
         }
         if filter.source.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND a.source = ${}", param_count));
+            query.push_str(&format!(" AND a.source = ${param_count}"));
         }
 
         query.push_str(&format!(

@@ -19,7 +19,8 @@ pub struct AuditService {
 }
 
 impl AuditService {
-    /// Create a new AuditService.
+    /// Create a new `AuditService`.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -141,7 +142,7 @@ impl AuditService {
             tool_name: serial_number.map(String::from), // Re-use tool_name for serial_number
             parameters: details,
             decision: Some(outcome.to_string()),
-            decision_reason: created_by.map(|u| format!("Requested by user {}", u)),
+            decision_reason: created_by.map(|u| format!("Requested by user {u}")),
             policy_id: None,
             outcome: Some(outcome.to_string()),
             error_message: None,
@@ -178,8 +179,8 @@ impl AuditService {
             end_time: filter.end_time,
         };
 
-        let limit = filter.limit.min(1000) as i64;
-        let offset = filter.offset.max(0) as i64;
+        let limit = i64::from(filter.limit.min(1000));
+        let offset = i64::from(filter.offset.max(0));
 
         let events =
             AiAgentAuditEvent::list_by_tenant(&self.pool, tenant_id, &db_filter, limit, offset)

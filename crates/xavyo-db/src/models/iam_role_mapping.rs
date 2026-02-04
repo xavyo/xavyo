@@ -205,7 +205,7 @@ impl IamRoleMapping {
             tenant_id,
             id,
             request.role_identifier.as_ref(),
-            request.allowed_scopes.as_ref().map(|s| s.as_slice()),
+            request.allowed_scopes.as_ref().map(std::vec::Vec::as_slice),
             ttl,
             request.constraints.clone(),
         )
@@ -232,7 +232,7 @@ impl IamRoleMapping {
     /// Find the best matching role mapping for an agent type.
     ///
     /// Returns the specific mapping if one exists for the agent type,
-    /// otherwise returns the default mapping (agent_type = NULL).
+    /// otherwise returns the default mapping (`agent_type` = NULL).
     pub async fn find_for_agent(
         pool: &PgPool,
         tenant_id: Uuid,

@@ -9,7 +9,7 @@ use xavyo_core::UserId;
 /// A role assignment for a user.
 ///
 /// Roles are simple strings (e.g., "admin", "user") and are stored
-/// in a normalized table with a composite primary key (user_id, role_name).
+/// in a normalized table with a composite primary key (`user_id`, `role_name`).
 #[derive(Debug, Clone, FromRow)]
 pub struct UserRole {
     /// The user this role is assigned to.
@@ -31,13 +31,13 @@ impl UserRole {
 
     /// Fetch all role names for a user.
     ///
-    /// Returns a list of role strings (e.g., ["admin", "user", "super_admin"]).
+    /// Returns a list of role strings (e.g., ["admin", "user", "`super_admin`"]).
     pub async fn get_user_roles(
         pool: &sqlx::PgPool,
         user_id: uuid::Uuid,
     ) -> Result<Vec<String>, sqlx::Error> {
         let roles: Vec<UserRole> = sqlx::query_as(
-            r#"SELECT user_id, role_name, created_at FROM user_roles WHERE user_id = $1"#,
+            r"SELECT user_id, role_name, created_at FROM user_roles WHERE user_id = $1",
         )
         .bind(user_id)
         .fetch_all(pool)

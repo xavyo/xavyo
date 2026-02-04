@@ -1,10 +1,10 @@
 //! Structured JSON logging setup using tracing.
 //!
 //! This module initializes the tracing subscriber with JSON output format
-//! suitable for log aggregation systems like ELK, Datadog, or CloudWatch.
+//! suitable for log aggregation systems like ELK, Datadog, or `CloudWatch`.
 //!
 //! When OpenTelemetry is enabled (F072), an additional layer bridges tracing
-//! spans to OTel spans for distributed trace export. Existing JSON log output
+//! spans to `OTel` spans for distributed trace export. Existing JSON log output
 //! is preserved unchanged (FR-015).
 
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};

@@ -37,7 +37,7 @@ impl std::str::FromStr for SyncMode {
             "polling" => Ok(SyncMode::Polling),
             "event" => Ok(SyncMode::Event),
             "hybrid" => Ok(SyncMode::Hybrid),
-            _ => Err(format!("Unknown sync mode: {}", s)),
+            _ => Err(format!("Unknown sync mode: {s}")),
         }
     }
 }
@@ -77,7 +77,7 @@ impl std::str::FromStr for SyncConflictResolution {
             "outbound_wins" => Ok(SyncConflictResolution::OutboundWins),
             "merge" => Ok(SyncConflictResolution::Merge),
             "manual" => Ok(SyncConflictResolution::Manual),
-            _ => Err(format!("Unknown conflict resolution: {}", s)),
+            _ => Err(format!("Unknown conflict resolution: {s}")),
         }
     }
 }
@@ -101,11 +101,13 @@ pub struct SyncConfiguration {
 
 impl SyncConfiguration {
     /// Get the sync mode enum.
+    #[must_use] 
     pub fn sync_mode(&self) -> SyncMode {
         self.sync_mode.parse().unwrap_or(SyncMode::Polling)
     }
 
     /// Get the conflict resolution enum.
+    #[must_use] 
     pub fn conflict_resolution(&self) -> SyncConflictResolution {
         self.conflict_resolution
             .parse()
@@ -120,7 +122,7 @@ impl SyncConfiguration {
         input: &CreateSyncConfiguration,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_sync_configurations (
                 tenant_id, connector_id, enabled, sync_mode,
                 polling_interval_secs, rate_limit_per_minute, batch_size,
@@ -128,7 +130,7 @@ impl SyncConfiguration {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -150,10 +152,10 @@ impl SyncConfiguration {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sync_configurations
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -168,10 +170,10 @@ impl SyncConfiguration {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sync_configurations
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -182,11 +184,11 @@ impl SyncConfiguration {
     /// List all enabled sync configurations for a tenant.
     pub async fn list_enabled(pool: &PgPool, tenant_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sync_configurations
             WHERE tenant_id = $1 AND enabled = true
             ORDER BY created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -196,11 +198,11 @@ impl SyncConfiguration {
     /// List all sync configurations for a tenant.
     pub async fn list_by_tenant(pool: &PgPool, tenant_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sync_configurations
             WHERE tenant_id = $1
             ORDER BY created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -219,31 +221,31 @@ impl SyncConfiguration {
 
         if input.enabled.is_some() {
             param_count += 1;
-            query.push_str(&format!(", enabled = ${}", param_count));
+            query.push_str(&format!(", enabled = ${param_count}"));
         }
         if input.sync_mode.is_some() {
             param_count += 1;
-            query.push_str(&format!(", sync_mode = ${}", param_count));
+            query.push_str(&format!(", sync_mode = ${param_count}"));
         }
         if input.polling_interval_secs.is_some() {
             param_count += 1;
-            query.push_str(&format!(", polling_interval_secs = ${}", param_count));
+            query.push_str(&format!(", polling_interval_secs = ${param_count}"));
         }
         if input.rate_limit_per_minute.is_some() {
             param_count += 1;
-            query.push_str(&format!(", rate_limit_per_minute = ${}", param_count));
+            query.push_str(&format!(", rate_limit_per_minute = ${param_count}"));
         }
         if input.batch_size.is_some() {
             param_count += 1;
-            query.push_str(&format!(", batch_size = ${}", param_count));
+            query.push_str(&format!(", batch_size = ${param_count}"));
         }
         if input.conflict_resolution.is_some() {
             param_count += 1;
-            query.push_str(&format!(", conflict_resolution = ${}", param_count));
+            query.push_str(&format!(", conflict_resolution = ${param_count}"));
         }
         if input.auto_create_identity.is_some() {
             param_count += 1;
-            query.push_str(&format!(", auto_create_identity = ${}", param_count));
+            query.push_str(&format!(", auto_create_identity = ${param_count}"));
         }
 
         query.push_str(" WHERE tenant_id = $1 AND connector_id = $2 RETURNING *");
@@ -284,12 +286,12 @@ impl SyncConfiguration {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sync_configurations
             SET enabled = true, updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -304,12 +306,12 @@ impl SyncConfiguration {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sync_configurations
             SET enabled = false, updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -324,10 +326,10 @@ impl SyncConfiguration {
         connector_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_sync_configurations
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -345,7 +347,7 @@ impl SyncConfiguration {
         input: &CreateSyncConfiguration,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_sync_configurations (
                 tenant_id, connector_id, enabled, sync_mode,
                 polling_interval_secs, rate_limit_per_minute, batch_size,
@@ -362,7 +364,7 @@ impl SyncConfiguration {
                 auto_create_identity = EXCLUDED.auto_create_identity,
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)

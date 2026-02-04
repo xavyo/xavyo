@@ -4,7 +4,7 @@
 //! - Field-based correlation (name, email, employee ID, etc.)
 //! - Weighted confidence scoring
 //! - Batch detection scans
-//! - Integration with FuzzyMatchingService
+//! - Integration with `FuzzyMatchingService`
 
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
@@ -57,7 +57,7 @@ pub struct CorrelationRuleConfig {
     pub id: Uuid,
     /// Rule name/identifier.
     pub name: String,
-    /// Source field to compare (e.g., "email", "first_name").
+    /// Source field to compare (e.g., "email", "`first_name`").
     pub source_field: String,
     /// Target field to compare against.
     pub target_field: String,
@@ -77,6 +77,7 @@ pub struct DuplicateDetectionService {
 
 impl DuplicateDetectionService {
     /// Create a new duplicate detection service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -85,6 +86,7 @@ impl DuplicateDetectionService {
     }
 
     /// Create with custom fuzzy matching configuration.
+    #[must_use] 
     pub fn with_fuzzy_config(pool: PgPool, fuzzy_config: FuzzyMatchConfig) -> Self {
         Self {
             pool,
@@ -312,8 +314,9 @@ impl DuplicateDetectionService {
     /// Get default correlation rules.
     ///
     /// These rules compare standard user fields. Additional custom fields
-    /// can be compared by providing custom CorrelationRuleConfig entries
-    /// that reference custom_attributes keys.
+    /// can be compared by providing custom `CorrelationRuleConfig` entries
+    /// that reference `custom_attributes` keys.
+    #[must_use] 
     pub fn default_rules() -> Vec<CorrelationRuleConfig> {
         vec![
             CorrelationRuleConfig {

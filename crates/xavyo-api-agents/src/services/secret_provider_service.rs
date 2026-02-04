@@ -1,6 +1,6 @@
 //! Secret Provider Service for managing external secret provider configurations (F120).
 //!
-//! This service handles CRUD operations for secret providers (OpenBao, Infisical, AWS)
+//! This service handles CRUD operations for secret providers (`OpenBao`, Infisical, AWS)
 //! with encrypted connection settings and health check management.
 
 use sqlx::PgPool;
@@ -23,7 +23,8 @@ pub struct SecretProviderService {
 }
 
 impl SecretProviderService {
-    /// Create a new SecretProviderService.
+    /// Create a new `SecretProviderService`.
+    #[must_use] 
     pub fn new(pool: PgPool, encryption: Arc<EncryptionService>) -> Self {
         Self { pool, encryption }
     }
@@ -214,8 +215,7 @@ impl SecretProviderService {
             "infisical" => self.check_infisical_health(&settings_json).await,
             "internal" => Ok(true), // Internal provider is always healthy
             other => Err(ApiAgentsError::BadRequest(format!(
-                "Unknown provider type: {}",
-                other
+                "Unknown provider type: {other}"
             ))),
         };
 
@@ -282,21 +282,21 @@ impl SecretProviderService {
         Ok(providers.into_iter().next())
     }
 
-    /// Check OpenBao health.
+    /// Check `OpenBao` health.
     async fn check_openbao_health(&self, settings_json: &str) -> Result<bool, ApiAgentsError> {
         let settings: OpenBaoSettings = serde_json::from_str(settings_json)
-            .map_err(|e| ApiAgentsError::BadRequest(format!("Invalid OpenBao settings: {}", e)))?;
+            .map_err(|e| ApiAgentsError::BadRequest(format!("Invalid OpenBao settings: {e}")))?;
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
             .map_err(|e| {
-                ApiAgentsError::Internal(format!("Failed to create HTTP client: {}", e))
+                ApiAgentsError::Internal(format!("Failed to create HTTP client: {e}"))
             })?;
 
         let url = format!("{}/v1/sys/health", settings.addr.trim_end_matches('/'));
         let resp = client.get(&url).send().await.map_err(|e| {
-            ApiAgentsError::SecretProviderUnavailable(format!("OpenBao connection failed: {}", e))
+            ApiAgentsError::SecretProviderUnavailable(format!("OpenBao connection failed: {e}"))
         })?;
 
         let status = resp.status().as_u16();
@@ -307,14 +307,14 @@ impl SecretProviderService {
     /// Check Infisical health.
     async fn check_infisical_health(&self, settings_json: &str) -> Result<bool, ApiAgentsError> {
         let settings: InfisicalSettings = serde_json::from_str(settings_json).map_err(|e| {
-            ApiAgentsError::BadRequest(format!("Invalid Infisical settings: {}", e))
+            ApiAgentsError::BadRequest(format!("Invalid Infisical settings: {e}"))
         })?;
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
             .map_err(|e| {
-                ApiAgentsError::Internal(format!("Failed to create HTTP client: {}", e))
+                ApiAgentsError::Internal(format!("Failed to create HTTP client: {e}"))
             })?;
 
         // Try to get workspace info
@@ -334,8 +334,7 @@ impl SecretProviderService {
             .await
             .map_err(|e| {
                 ApiAgentsError::SecretProviderUnavailable(format!(
-                    "Infisical connection failed: {}",
-                    e
+                    "Infisical connection failed: {e}"
                 ))
             })?;
 
@@ -347,8 +346,7 @@ impl SecretProviderService {
         match provider_type {
             "openbao" | "infisical" | "internal" | "aws" => Ok(()),
             other => Err(ApiAgentsError::BadRequest(format!(
-                "Invalid provider type: {}. Supported types: openbao, infisical, internal, aws",
-                other
+                "Invalid provider type: {other}. Supported types: openbao, infisical, internal, aws"
             ))),
         }
     }

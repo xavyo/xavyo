@@ -76,13 +76,10 @@ pub async fn ip_filter_middleware(
     next: Next,
 ) -> Response {
     // Extract client IP
-    let ip_address = match extract_client_ip(&req) {
-        Some(ip) => ip,
-        None => {
-            // If we can't determine the IP, log and continue (fail-open for IP detection)
-            warn!("Could not determine client IP, skipping IP filter");
-            return next.run(req).await;
-        }
+    let ip_address = if let Some(ip) = extract_client_ip(&req) { ip } else {
+        // If we can't determine the IP, log and continue (fail-open for IP detection)
+        warn!("Could not determine client IP, skipping IP filter");
+        return next.run(req).await;
     };
 
     // Get user info from claims

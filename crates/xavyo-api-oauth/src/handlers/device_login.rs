@@ -49,7 +49,7 @@ pub struct DeviceMfaQuery {
     pub user_code: String,
 }
 
-/// Extract tenant_id from X-Tenant-ID header.
+/// Extract `tenant_id` from X-Tenant-ID header.
 fn extract_tenant_id(headers: &HeaderMap) -> Result<Uuid, DeviceLoginErrorResponse> {
     let tenant_header = headers.get("X-Tenant-ID").ok_or_else(|| {
         DeviceLoginErrorResponse::validation_error("X-Tenant-ID header is required")
@@ -311,7 +311,7 @@ pub async fn device_login_handler(
             .flat_map(|errors| {
                 errors
                     .iter()
-                    .filter_map(|e| e.message.as_ref().map(|m| m.to_string()))
+                    .filter_map(|e| e.message.as_ref().map(std::string::ToString::to_string))
             })
             .collect();
         return render_login_error_with_csrf(
@@ -621,7 +621,7 @@ async fn store_mfa_session(
     let expires_at = chrono::Utc::now() + chrono::Duration::minutes(5);
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO device_mfa_sessions (id, user_id, tenant_id, user_code, expires_at, created_at)
         VALUES ($1, $2, $3, $4, $5, NOW())
         ON CONFLICT (id) DO UPDATE SET
@@ -629,7 +629,7 @@ async fn store_mfa_session(
             tenant_id = EXCLUDED.tenant_id,
             user_code = EXCLUDED.user_code,
             expires_at = EXCLUDED.expires_at
-        "#,
+        ",
     )
     .bind(session_id)
     .bind(user_id)
@@ -648,11 +648,11 @@ async fn lookup_mfa_session(
     session_id: Uuid,
 ) -> Result<Option<(Uuid, Uuid, String)>, sqlx::Error> {
     let result = sqlx::query_as::<_, (Uuid, Uuid, String, chrono::DateTime<chrono::Utc>)>(
-        r#"
+        r"
         SELECT user_id, tenant_id, user_code, expires_at
         FROM device_mfa_sessions
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(session_id)
     .fetch_optional(pool)
@@ -855,7 +855,7 @@ pub async fn device_mfa_handler(
             .flat_map(|errors| {
                 errors
                     .iter()
-                    .filter_map(|e| e.message.as_ref().map(|m| m.to_string()))
+                    .filter_map(|e| e.message.as_ref().map(std::string::ToString::to_string))
             })
             .collect();
         return render_mfa_error_with_csrf(
@@ -990,7 +990,7 @@ pub async fn device_mfa_handler(
     let is_secure = state.is_production();
     let cookie_value = create_session_cookie(session.id, is_secure);
 
-    let redirect_url = format!("/device/authorize?user_code={}", user_code);
+    let redirect_url = format!("/device/authorize?user_code={user_code}");
     let mut response = Redirect::to(&redirect_url).into_response();
 
     if let Ok(value) = HeaderValue::from_str(&cookie_value) {
@@ -1099,7 +1099,7 @@ fn render_session_expired_page(user_code: &str) -> String {
 /// Get the current user from session cookie.
 ///
 /// Utility function to extract user from session for the device authorize handler.
-/// Returns (user_id, tenant_id) if session is valid and active.
+/// Returns (`user_id`, `tenant_id`) if session is valid and active.
 pub async fn get_user_from_session(
     headers: &HeaderMap,
     session_service: &SessionService,

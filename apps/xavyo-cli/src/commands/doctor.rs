@@ -40,7 +40,7 @@ fn check_configuration(paths: &ConfigPaths) -> DiagnosticCheck {
         Err(e) => DiagnosticCheck::fail(
             "configuration",
             "Configuration",
-            &format!("Config file invalid: {}", e),
+            &format!("Config file invalid: {e}"),
             "Delete the config file or fix its format",
         ),
     }
@@ -68,7 +68,7 @@ fn check_credentials(paths: &ConfigPaths) -> DiagnosticCheck {
         Err(e) => DiagnosticCheck::fail(
             "credentials",
             "Credentials",
-            &format!("Failed to load credentials: {}", e),
+            &format!("Failed to load credentials: {e}"),
             "Run `xavyo login` to re-authenticate",
         ),
     }
@@ -81,7 +81,7 @@ async fn check_api_connectivity(client: &ApiClient, config: &Config) -> Diagnost
 
     match status {
         crate::models::HealthStatus::Healthy => {
-            let version_info = version.map(|v| format!(" (v{})", v)).unwrap_or_default();
+            let version_info = version.map(|v| format!(" (v{v})")).unwrap_or_default();
             DiagnosticCheck::pass(
                 "api_connectivity",
                 "API Connectivity",
@@ -110,7 +110,7 @@ async fn check_auth_service(client: &ApiClient, config: &Config) -> DiagnosticCh
 
     match status {
         crate::models::HealthStatus::Healthy => {
-            let version_info = version.map(|v| format!(" (v{})", v)).unwrap_or_default();
+            let version_info = version.map(|v| format!(" (v{v})")).unwrap_or_default();
             DiagnosticCheck::pass(
                 "auth_service",
                 "Auth Service",
@@ -166,14 +166,14 @@ fn check_token_validity(paths: &ConfigPaths) -> DiagnosticCheck {
                 DiagnosticCheck::warn(
                     "token_validity",
                     "Token Validity",
-                    &format!("Token expires in {}m", minutes),
+                    &format!("Token expires in {minutes}m"),
                     Some("Consider running `xavyo login` soon to refresh"),
                 )
             } else {
                 DiagnosticCheck::pass(
                     "token_validity",
                     "Token Validity",
-                    &format!("Token valid, expires in {}h {}m", hours, minutes),
+                    &format!("Token valid, expires in {hours}h {minutes}m"),
                 )
             }
         }
@@ -199,7 +199,7 @@ fn check_tenant_health(paths: &ConfigPaths) -> DiagnosticCheck {
                 DiagnosticCheck::pass(
                     "tenant_health",
                     "Tenant Health",
-                    &format!("Tenant active ({})", name),
+                    &format!("Tenant active ({name})"),
                 )
             } else {
                 DiagnosticCheck::warn(
@@ -334,11 +334,10 @@ fn print_report(report: &DiagnosticReport) {
         if let Some(ref suggestion) = check.suggestion {
             if use_color {
                 println!(
-                    "                              └─ \x1b[90m{}{}",
-                    suggestion, RESET
+                    "                              └─ \x1b[90m{suggestion}{RESET}"
                 );
             } else {
-                println!("                              └─ {}", suggestion);
+                println!("                              └─ {suggestion}");
             }
         }
     }
@@ -380,7 +379,7 @@ fn print_report(report: &DiagnosticReport) {
         )
     };
 
-    println!("  Overall Status: {}", overall_display);
+    println!("  Overall Status: {overall_display}");
     println!();
     println!("  CLI Version: {}", report.cli_version);
     println!("  Checked at: {}", report.timestamp);

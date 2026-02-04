@@ -1,7 +1,7 @@
-//! OAuth2 client admin endpoint handlers.
+//! `OAuth2` client admin endpoint handlers.
 //!
 //! These handlers require admin authentication and provide CRUD operations
-//! for managing OAuth2 clients within a tenant.
+//! for managing `OAuth2` clients within a tenant.
 
 use crate::error::OAuthError;
 use crate::models::{
@@ -16,7 +16,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-/// Extract tenant_id from X-Tenant-ID header.
+/// Extract `tenant_id` from X-Tenant-ID header.
 fn extract_tenant_id(headers: &HeaderMap) -> Result<Uuid, OAuthError> {
     let tenant_header = headers
         .get("X-Tenant-ID")
@@ -30,7 +30,7 @@ fn extract_tenant_id(headers: &HeaderMap) -> Result<Uuid, OAuthError> {
         .map_err(|_| OAuthError::InvalidRequest("X-Tenant-ID must be a valid UUID".to_string()))
 }
 
-/// Lists all OAuth2 clients for the current tenant.
+/// Lists all `OAuth2` clients for the current tenant.
 #[utoipa::path(
     get,
     path = "/admin/oauth/clients",
@@ -54,7 +54,7 @@ pub async fn list_clients_handler(
     Ok(Json(ClientListResponse { clients, total }))
 }
 
-/// Gets a single OAuth2 client by ID.
+/// Gets a single `OAuth2` client by ID.
 #[utoipa::path(
     get,
     path = "/admin/oauth/clients/{id}",
@@ -82,7 +82,7 @@ pub async fn get_client_handler(
     Ok(Json(client))
 }
 
-/// Creates a new OAuth2 client.
+/// Creates a new `OAuth2` client.
 #[utoipa::path(
     post,
     path = "/admin/oauth/clients",
@@ -131,8 +131,7 @@ pub async fn create_client_handler(
     for grant_type in &request.grant_types {
         if !valid_grant_types.contains(&grant_type.as_str()) {
             return Err(OAuthError::InvalidRequest(format!(
-                "Invalid grant_type: {}",
-                grant_type
+                "Invalid grant_type: {grant_type}"
             )));
         }
     }
@@ -148,7 +147,7 @@ pub async fn create_client_handler(
     }))
 }
 
-/// Updates an existing OAuth2 client.
+/// Updates an existing `OAuth2` client.
 #[utoipa::path(
     put,
     path = "/admin/oauth/clients/{id}",
@@ -180,8 +179,7 @@ pub async fn update_client_handler(
         for grant_type in grant_types {
             if !valid_grant_types.contains(&grant_type.as_str()) {
                 return Err(OAuthError::InvalidRequest(format!(
-                    "Invalid grant_type: {}",
-                    grant_type
+                    "Invalid grant_type: {grant_type}"
                 )));
             }
         }
@@ -195,7 +193,7 @@ pub async fn update_client_handler(
     Ok(Json(client))
 }
 
-/// Deactivates an OAuth2 client (soft delete).
+/// Deactivates an `OAuth2` client (soft delete).
 #[utoipa::path(
     delete,
     path = "/admin/oauth/clients/{id}",

@@ -41,7 +41,7 @@ pub struct AttributeDefinitionUpdated {
     pub definition_id: Uuid,
     /// Attribute name (slug).
     pub name: String,
-    /// Map of field_name to new_value for changed fields.
+    /// Map of `field_name` to `new_value` for changed fields.
     pub changes: HashMap<String, serde_json::Value>,
     /// Admin who updated the definition.
     pub updated_by: Option<Uuid>,

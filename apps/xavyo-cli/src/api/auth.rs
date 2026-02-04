@@ -25,13 +25,12 @@ pub async fn request_device_code(
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         return Err(CliError::AuthenticationFailed(format!(
-            "Failed to request device code: {} - {}",
-            status, body
+            "Failed to request device code: {status} - {body}"
         )));
     }
 
     let device_code: DeviceCodeResponse = response.json().await.map_err(|e| {
-        CliError::AuthenticationFailed(format!("Invalid device code response: {}", e))
+        CliError::AuthenticationFailed(format!("Invalid device code response: {e}"))
     })?;
 
     Ok(device_code)
@@ -58,7 +57,7 @@ pub async fn poll_device_token(
 
     if response.status().is_success() {
         let token: TokenResponse = response.json().await.map_err(|e| {
-            CliError::AuthenticationFailed(format!("Invalid token response: {}", e))
+            CliError::AuthenticationFailed(format!("Invalid token response: {e}"))
         })?;
         return Ok(Some(token));
     }
@@ -67,7 +66,7 @@ pub async fn poll_device_token(
     let error: OAuthError = response
         .json()
         .await
-        .map_err(|e| CliError::AuthenticationFailed(format!("Invalid error response: {}", e)))?;
+        .map_err(|e| CliError::AuthenticationFailed(format!("Invalid error response: {e}")))?;
 
     if error.is_authorization_pending() || error.is_slow_down() {
         // Still waiting for user to authenticate
@@ -121,7 +120,7 @@ pub async fn signup(
 
     if response.status().is_success() {
         let signup_response: SignupResponse = response.json().await.map_err(|e| {
-            CliError::AuthenticationFailed(format!("Invalid signup response: {}", e))
+            CliError::AuthenticationFailed(format!("Invalid signup response: {e}"))
         })?;
         return Ok(signup_response);
     }
@@ -142,8 +141,7 @@ pub async fn signup(
     }
 
     Err(CliError::AuthenticationFailed(format!(
-        "Signup failed: {} - {}",
-        status, body
+        "Signup failed: {status} - {body}"
     )))
 }
 

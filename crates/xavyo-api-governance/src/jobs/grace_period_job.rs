@@ -20,8 +20,8 @@ pub const DEFAULT_BATCH_SIZE: i32 = 100;
 
 /// Job for expiring grace periods on state transitions.
 ///
-/// This job polls the gov_state_transition_requests table for transitions
-/// with expired grace periods (grace_period_ends_at < now AND rollback_available = true)
+/// This job polls the `gov_state_transition_requests` table for transitions
+/// with expired grace periods (`grace_period_ends_at` < now AND `rollback_available` = true)
 /// and marks them as no longer rollbackable.
 pub struct GracePeriodExpirationJob {
     state_transition_service: Arc<StateTransitionService>,
@@ -30,6 +30,7 @@ pub struct GracePeriodExpirationJob {
 
 impl GracePeriodExpirationJob {
     /// Create a new grace period expiration job.
+    #[must_use] 
     pub fn new(state_transition_service: StateTransitionService) -> Self {
         Self {
             state_transition_service: Arc::new(state_transition_service),
@@ -38,6 +39,7 @@ impl GracePeriodExpirationJob {
     }
 
     /// Create from an Arc-wrapped service.
+    #[must_use] 
     pub fn from_arc(state_transition_service: Arc<StateTransitionService>) -> Self {
         Self {
             state_transition_service,

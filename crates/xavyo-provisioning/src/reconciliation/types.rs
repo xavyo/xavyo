@@ -31,7 +31,7 @@ impl std::str::FromStr for ReconciliationMode {
         match s.to_lowercase().as_str() {
             "full" => Ok(Self::Full),
             "delta" => Ok(Self::Delta),
-            _ => Err(format!("Invalid reconciliation mode: {}", s)),
+            _ => Err(format!("Invalid reconciliation mode: {s}")),
         }
     }
 }
@@ -54,16 +54,19 @@ pub enum RunStatus {
 
 impl RunStatus {
     /// Check if the run is in a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
     }
 
     /// Check if the run can be cancelled.
+    #[must_use] 
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Pending | Self::Running)
     }
 
     /// Check if the run can be resumed.
+    #[must_use] 
     pub fn can_resume(&self) -> bool {
         matches!(self, Self::Failed)
     }
@@ -91,7 +94,7 @@ impl std::str::FromStr for RunStatus {
             "completed" => Ok(Self::Completed),
             "failed" => Ok(Self::Failed),
             "cancelled" => Ok(Self::Cancelled),
-            _ => Err(format!("Invalid run status: {}", s)),
+            _ => Err(format!("Invalid run status: {s}")),
         }
     }
 }
@@ -116,6 +119,7 @@ pub enum DiscrepancyType {
 
 impl DiscrepancyType {
     /// Get the suggested remediation actions for this discrepancy type.
+    #[must_use] 
     pub fn suggested_actions(&self) -> Vec<ActionType> {
         match self {
             Self::Missing => vec![ActionType::Create],
@@ -132,6 +136,7 @@ impl DiscrepancyType {
     }
 
     /// Check if this discrepancy type requires an identity reference.
+    #[must_use] 
     pub fn requires_identity(&self) -> bool {
         matches!(self, Self::Missing | Self::Mismatch | Self::Unlinked)
     }
@@ -161,7 +166,7 @@ impl std::str::FromStr for DiscrepancyType {
             "collision" => Ok(Self::Collision),
             "unlinked" => Ok(Self::Unlinked),
             "deleted" => Ok(Self::Deleted),
-            _ => Err(format!("Invalid discrepancy type: {}", s)),
+            _ => Err(format!("Invalid discrepancy type: {s}")),
         }
     }
 }
@@ -196,7 +201,7 @@ impl std::str::FromStr for ResolutionStatus {
             "pending" => Ok(Self::Pending),
             "resolved" => Ok(Self::Resolved),
             "ignored" => Ok(Self::Ignored),
-            _ => Err(format!("Invalid resolution status: {}", s)),
+            _ => Err(format!("Invalid resolution status: {s}")),
         }
     }
 }
@@ -251,7 +256,7 @@ impl std::str::FromStr for ActionType {
             "inactivate_identity" => Ok(Self::InactivateIdentity),
             "create_identity" => Ok(Self::CreateIdentity),
             "delete_identity" => Ok(Self::DeleteIdentity),
-            _ => Err(format!("Invalid action type: {}", s)),
+            _ => Err(format!("Invalid action type: {s}")),
         }
     }
 }

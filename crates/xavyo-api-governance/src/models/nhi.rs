@@ -970,10 +970,10 @@ pub struct RecordUsageRequest {
     pub metadata: Option<serde_json::Value>,
 }
 
-/// Query parameters for listing usage events (alias for ListNhiUsageQuery).
+/// Query parameters for listing usage events (alias for `ListNhiUsageQuery`).
 pub type NhiUsageListQuery = ListNhiUsageQuery;
 
-/// Paginated list of usage events (alias for NhiUsageEventListResponse).
+/// Paginated list of usage events (alias for `NhiUsageEventListResponse`).
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct NhiUsageListResponse {
     pub items: Vec<NhiUsageEventResponse>,
@@ -1081,7 +1081,7 @@ pub struct StalenessReportResponse {
     /// NHIs stale 90-180 days (warning).
     pub warning_count: i64,
 
-    /// List of stale NHIs (sorted by days_inactive desc).
+    /// List of stale NHIs (sorted by `days_inactive` desc).
     pub stale_nhis: Vec<StaleNhiInfo>,
 }
 
@@ -1137,11 +1137,13 @@ pub enum NhiCertificationStatus {
 
 impl NhiCertificationStatus {
     /// Check if this status represents a final decision.
+    #[must_use] 
     pub fn is_decided(&self) -> bool {
         !matches!(self, Self::Pending)
     }
 
     /// Check if this status represents a certified (approved) NHI.
+    #[must_use] 
     pub fn is_certified(&self) -> bool {
         matches!(self, Self::Certified)
     }
@@ -1161,6 +1163,7 @@ pub enum NhiCertificationDecision {
 
 impl NhiCertificationDecision {
     /// Check if this decision is an approval.
+    #[must_use] 
     pub fn is_approval(&self) -> bool {
         matches!(self, Self::Certify)
     }
@@ -1241,6 +1244,7 @@ pub struct NhiCertificationSummary {
 
 impl NhiCertificationSummary {
     /// Calculate completion rate as percentage.
+    #[must_use] 
     pub fn completion_rate(&self) -> f64 {
         if self.total == 0 {
             0.0
@@ -1273,7 +1277,7 @@ pub struct CreateNhiCertificationCampaignRequest {
     #[serde(default)]
     pub reviewer_type: NhiCertReviewerType,
 
-    /// Specific reviewer IDs (if reviewer_type is SpecificUsers).
+    /// Specific reviewer IDs (if `reviewer_type` is `SpecificUsers`).
     #[serde(default)]
     pub specific_reviewers: Option<Vec<Uuid>>,
 
@@ -1472,6 +1476,7 @@ pub enum NhiCertCampaignStatus {
 
 impl NhiCertCampaignStatus {
     /// Check if this campaign can be cancelled.
+    #[must_use] 
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Draft | Self::Active | Self::Overdue)
     }

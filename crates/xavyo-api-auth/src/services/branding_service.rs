@@ -35,6 +35,7 @@ pub struct BrandingService {
 
 impl BrandingService {
     /// Create a new branding service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -44,6 +45,7 @@ impl BrandingService {
     }
 
     /// Create a new branding service with custom cache TTL.
+    #[must_use] 
     pub fn with_cache_ttl(pool: PgPool, ttl_secs: u64) -> Self {
         Self {
             pool,
@@ -93,8 +95,7 @@ impl BrandingService {
             if let Some(ref color) = color_opt {
                 if !validators::validate_hex_color(color) {
                     return Err(ApiAuthError::Validation(format!(
-                        "Invalid {} format: {}. Use #RGB or #RRGGBB",
-                        field_name, color
+                        "Invalid {field_name} format: {color}. Use #RGB or #RRGGBB"
                     )));
                 }
             }
@@ -118,8 +119,7 @@ impl BrandingService {
             if let Some(ref url) = url_opt {
                 if !validators::validate_url(url) {
                     return Err(ApiAuthError::Validation(format!(
-                        "Invalid {} format. Use absolute URL or /relative/path",
-                        field_name
+                        "Invalid {field_name} format. Use absolute URL or /relative/path"
                     )));
                 }
             }
@@ -215,20 +215,17 @@ impl BrandingService {
             .await
             .map_err(ApiAuthError::Database)?;
 
-        let response = match branding {
-            Some(b) => {
-                let public: PublicBranding = b.into();
-                PublicBrandingResponse::from(public)
+        let response = if let Some(b) = branding {
+            let public: PublicBranding = b.into();
+            PublicBrandingResponse::from(public)
+        } else {
+            // Check if tenant exists
+            let tenant_exists = self.check_tenant_exists_by_slug(tenant_slug).await?;
+            if !tenant_exists {
+                return Err(ApiAuthError::TenantSlugNotFound);
             }
-            None => {
-                // Check if tenant exists
-                let tenant_exists = self.check_tenant_exists_by_slug(tenant_slug).await?;
-                if !tenant_exists {
-                    return Err(ApiAuthError::TenantSlugNotFound);
-                }
-                // Tenant exists but no branding - return defaults
-                PublicBrandingResponse::default()
-            }
+            // Tenant exists but no branding - return defaults
+            PublicBrandingResponse::default()
         };
 
         // Store in cache

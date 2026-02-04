@@ -63,24 +63,24 @@ impl std::fmt::Display for EntitlementAuditAction {
     }
 }
 
-/// Action performed on SoD rules, violations, or exemptions.
+/// Action performed on `SoD` rules, violations, or exemptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SodAuditAction {
-    /// SoD rule was created.
+    /// `SoD` rule was created.
     #[default]
     RuleCreated,
-    /// SoD rule was updated.
+    /// `SoD` rule was updated.
     RuleUpdated,
-    /// SoD rule was deleted.
+    /// `SoD` rule was deleted.
     RuleDeleted,
-    /// SoD exemption was granted.
+    /// `SoD` exemption was granted.
     ExemptionGranted,
-    /// SoD exemption was revoked.
+    /// `SoD` exemption was revoked.
     ExemptionRevoked,
-    /// SoD violation was detected.
+    /// `SoD` violation was detected.
     ViolationDetected,
-    /// SoD violation was resolved.
+    /// `SoD` violation was resolved.
     ViolationResolved,
 }
 
@@ -200,6 +200,7 @@ pub struct InMemoryAuditStore {
 
 impl InMemoryAuditStore {
     /// Create a new in-memory audit store.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             events: Arc::new(RwLock::new(HashMap::new())),
@@ -217,6 +218,7 @@ impl InMemoryAuditStore {
     }
 
     /// Get all events (for testing).
+    #[must_use] 
     pub fn get_all(&self) -> Vec<EntitlementAuditEvent> {
         // Use try_read to avoid blocking
         self.events

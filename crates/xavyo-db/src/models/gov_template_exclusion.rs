@@ -40,10 +40,10 @@ impl GovTemplateExclusion {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_exclusions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -59,10 +59,10 @@ impl GovTemplateExclusion {
         excluded_rule_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_exclusions
             WHERE tenant_id = $1 AND template_id = $2 AND excluded_rule_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -78,11 +78,11 @@ impl GovTemplateExclusion {
         template_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_exclusions
             WHERE tenant_id = $1 AND template_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -97,10 +97,10 @@ impl GovTemplateExclusion {
         template_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT excluded_rule_id FROM gov_template_exclusions
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -116,10 +116,10 @@ impl GovTemplateExclusion {
         rule_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_template_exclusions
             WHERE tenant_id = $1 AND template_id = $2 AND excluded_rule_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -138,13 +138,13 @@ impl GovTemplateExclusion {
         input: CreateGovTemplateExclusion,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_template_exclusions (
                 tenant_id, template_id, excluded_rule_id
             )
             VALUES ($1, $2, $3)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -160,10 +160,10 @@ impl GovTemplateExclusion {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_template_exclusions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -181,10 +181,10 @@ impl GovTemplateExclusion {
         excluded_rule_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_template_exclusions
             WHERE tenant_id = $1 AND template_id = $2 AND excluded_rule_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -202,10 +202,10 @@ impl GovTemplateExclusion {
         template_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_template_exclusions
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -222,10 +222,10 @@ impl GovTemplateExclusion {
         template_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_template_exclusions
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)

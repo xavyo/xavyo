@@ -23,6 +23,7 @@ pub struct TemplateRuleService {
 
 impl TemplateRuleService {
     /// Create a new template rule service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -110,7 +111,7 @@ impl TemplateRuleService {
             if let Err(e) = self.expression_service.validate(condition) {
                 return Err(GovernanceError::TemplateRuleExpressionError {
                     rule_id: Uuid::nil(),
-                    message: format!("Invalid condition: {}", e),
+                    message: format!("Invalid condition: {e}"),
                 });
             }
         }
@@ -200,7 +201,7 @@ impl TemplateRuleService {
             if let Err(e) = self.expression_service.validate(condition) {
                 return Err(GovernanceError::TemplateRuleExpressionError {
                     rule_id,
-                    message: format!("Invalid condition: {}", e),
+                    message: format!("Invalid condition: {e}"),
                 });
             }
         }
@@ -340,7 +341,7 @@ impl TemplateRuleService {
         } else {
             Err(GovernanceError::TemplateRuleInvalidAttribute {
                 attribute: attribute.to_string(),
-                object_type: format!("{:?}", object_type),
+                object_type: format!("{object_type:?}"),
             })
         }
     }

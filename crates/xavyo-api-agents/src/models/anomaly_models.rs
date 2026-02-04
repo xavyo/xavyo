@@ -26,6 +26,7 @@ pub enum AnomalyType {
 
 impl AnomalyType {
     /// Get the string representation for database storage.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             AnomalyType::HighVolume => "high_volume",
@@ -37,6 +38,7 @@ impl AnomalyType {
     }
 
     /// Get default threshold for this anomaly type.
+    #[must_use] 
     pub fn default_threshold(&self) -> f64 {
         match self {
             AnomalyType::HighVolume => 3.0,  // 3 sigma
@@ -64,7 +66,7 @@ impl std::str::FromStr for AnomalyType {
             "unusual_tool" => Ok(AnomalyType::UnusualTool),
             "off_hours" => Ok(AnomalyType::OffHours),
             "rapid_burst" => Ok(AnomalyType::RapidBurst),
-            _ => Err(format!("Unknown anomaly type: {}", s)),
+            _ => Err(format!("Unknown anomaly type: {s}")),
         }
     }
 }
@@ -84,6 +86,7 @@ pub enum BaselineType {
 
 impl BaselineType {
     /// Get the string representation for database storage.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             BaselineType::HourlyVolume => "hourly_volume",
@@ -119,6 +122,7 @@ pub enum Severity {
 
 impl Severity {
     /// Get the string representation.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Severity::Low => "low",

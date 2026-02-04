@@ -70,13 +70,13 @@ impl ScimProvisioningState {
     ) -> Result<Self, sqlx::Error> {
         // Try INSERT ... ON CONFLICT DO NOTHING RETURNING *
         let maybe = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO scim_provisioning_states
                 (tenant_id, target_id, resource_type, internal_resource_id, external_id)
             VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (target_id, resource_type, internal_resource_id) DO NOTHING
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(data.target_id)
@@ -92,13 +92,13 @@ impl ScimProvisioningState {
 
         // Conflict occurred — fetch the existing row
         let existing = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM scim_provisioning_states
             WHERE tenant_id = $1
               AND target_id = $2
               AND resource_type = $3
               AND internal_resource_id = $4
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(data.target_id)
@@ -119,13 +119,13 @@ impl ScimProvisioningState {
         internal_resource_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_provisioning_states
             WHERE tenant_id = $1
               AND target_id = $2
               AND resource_type = $3
               AND internal_resource_id = $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(target_id)
@@ -137,7 +137,7 @@ impl ScimProvisioningState {
 
     /// List provisioning states for a target with optional filters and pagination.
     ///
-    /// Returns a tuple of (items, total_count).
+    /// Returns a tuple of (items, `total_count`).
     pub async fn list_by_target(
         pool: &PgPool,
         tenant_id: Uuid,
@@ -150,12 +150,12 @@ impl ScimProvisioningState {
         let (items, count) = match (resource_type, status) {
             (None, None) => {
                 let items = sqlx::query_as::<_, Self>(
-                    r#"
+                    r"
                     SELECT * FROM scim_provisioning_states
                     WHERE tenant_id = $1 AND target_id = $2
                     ORDER BY created_at DESC
                     LIMIT $3 OFFSET $4
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -165,10 +165,10 @@ impl ScimProvisioningState {
                 .await?;
 
                 let count: (i64,) = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM scim_provisioning_states
                     WHERE tenant_id = $1 AND target_id = $2
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -179,12 +179,12 @@ impl ScimProvisioningState {
             }
             (Some(rt), None) => {
                 let items = sqlx::query_as::<_, Self>(
-                    r#"
+                    r"
                     SELECT * FROM scim_provisioning_states
                     WHERE tenant_id = $1 AND target_id = $2 AND resource_type = $3
                     ORDER BY created_at DESC
                     LIMIT $4 OFFSET $5
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -195,10 +195,10 @@ impl ScimProvisioningState {
                 .await?;
 
                 let count: (i64,) = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM scim_provisioning_states
                     WHERE tenant_id = $1 AND target_id = $2 AND resource_type = $3
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -210,12 +210,12 @@ impl ScimProvisioningState {
             }
             (None, Some(st)) => {
                 let items = sqlx::query_as::<_, Self>(
-                    r#"
+                    r"
                     SELECT * FROM scim_provisioning_states
                     WHERE tenant_id = $1 AND target_id = $2 AND status = $3
                     ORDER BY created_at DESC
                     LIMIT $4 OFFSET $5
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -226,10 +226,10 @@ impl ScimProvisioningState {
                 .await?;
 
                 let count: (i64,) = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM scim_provisioning_states
                     WHERE tenant_id = $1 AND target_id = $2 AND status = $3
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -241,12 +241,12 @@ impl ScimProvisioningState {
             }
             (Some(rt), Some(st)) => {
                 let items = sqlx::query_as::<_, Self>(
-                    r#"
+                    r"
                     SELECT * FROM scim_provisioning_states
                     WHERE tenant_id = $1 AND target_id = $2 AND resource_type = $3 AND status = $4
                     ORDER BY created_at DESC
                     LIMIT $5 OFFSET $6
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -258,10 +258,10 @@ impl ScimProvisioningState {
                 .await?;
 
                 let count: (i64,) = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM scim_provisioning_states
                     WHERE tenant_id = $1 AND target_id = $2 AND resource_type = $3 AND status = $4
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -285,7 +285,7 @@ impl ScimProvisioningState {
         external_resource_id: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE scim_provisioning_states
             SET status = 'synced',
                 external_resource_id = $3,
@@ -296,7 +296,7 @@ impl ScimProvisioningState {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -315,7 +315,7 @@ impl ScimProvisioningState {
         next_retry_at: Option<DateTime<Utc>>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE scim_provisioning_states
             SET status = 'error',
                 last_error = $3,
@@ -324,7 +324,7 @@ impl ScimProvisioningState {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -343,13 +343,13 @@ impl ScimProvisioningState {
         status: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE scim_provisioning_states
             SET status = $3,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -365,7 +365,7 @@ impl ScimProvisioningState {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE scim_provisioning_states
             SET status = 'pending',
                 retry_count = 0,
@@ -374,7 +374,7 @@ impl ScimProvisioningState {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'error'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -389,13 +389,13 @@ impl ScimProvisioningState {
         target_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_provisioning_states
             WHERE tenant_id = $1
               AND target_id = $2
               AND status IN ('pending', 'pending_update', 'pending_deprovision', 'error')
             ORDER BY created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(target_id)
@@ -410,10 +410,10 @@ impl ScimProvisioningState {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_provisioning_states
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -424,19 +424,19 @@ impl ScimProvisioningState {
     /// Find provisioning states by internal resource ID across all targets.
     ///
     /// Used by event handlers when the source record has been deleted and
-    /// tenant_id is not available from the event payload.  Returns all
+    /// `tenant_id` is not available from the event payload.  Returns all
     /// provisioning states for the given resource, which implicitly carries
-    /// the tenant_id on each row.
+    /// the `tenant_id` on each row.
     pub async fn find_by_internal_resource_id(
         pool: &PgPool,
         resource_type: &str,
         internal_resource_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_provisioning_states
             WHERE resource_type = $1 AND internal_resource_id = $2
-            "#,
+            ",
         )
         .bind(resource_type)
         .bind(internal_resource_id)

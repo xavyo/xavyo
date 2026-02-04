@@ -13,7 +13,7 @@ use uuid::Uuid;
 pub enum AuthMethod {
     /// Standard email/password authentication.
     Password,
-    /// OAuth2 social login (Google, GitHub, etc.).
+    /// `OAuth2` social login (Google, GitHub, etc.).
     Social,
     /// Enterprise SSO/SAML.
     Sso,
@@ -132,7 +132,7 @@ impl LoginAttempt {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO login_attempts (
                 tenant_id, user_id, email, success, failure_reason, auth_method,
                 ip_address, user_agent, device_fingerprint, geo_country, geo_city,
@@ -140,7 +140,7 @@ impl LoginAttempt {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(input.user_id)
@@ -179,12 +179,12 @@ impl LoginAttempt {
         match cursor {
             Some(cursor_time) => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM login_attempts
                     WHERE tenant_id = $1 AND user_id = $2 AND created_at < $3
                     ORDER BY created_at DESC
                     LIMIT $4
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(user_id)
@@ -195,12 +195,12 @@ impl LoginAttempt {
             }
             None => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM login_attempts
                     WHERE tenant_id = $1 AND user_id = $2
                     ORDER BY created_at DESC
                     LIMIT $3
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(user_id)
@@ -227,7 +227,7 @@ impl LoginAttempt {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM login_attempts
             WHERE tenant_id = $1
               AND user_id = $2
@@ -237,7 +237,7 @@ impl LoginAttempt {
               AND ($6::timestamptz IS NULL OR created_at < $6)
             ORDER BY created_at DESC
             LIMIT $7
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -260,10 +260,10 @@ impl LoginAttempt {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM login_attempts
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -291,7 +291,7 @@ impl LoginAttempt {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM login_attempts
             WHERE tenant_id = $1
               AND ($2::uuid IS NULL OR user_id = $2)
@@ -303,7 +303,7 @@ impl LoginAttempt {
               AND ($8::timestamptz IS NULL OR created_at < $8)
             ORDER BY created_at DESC
             LIMIT $9
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -327,10 +327,10 @@ impl LoginAttempt {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM login_attempts
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(executor)

@@ -27,16 +27,19 @@ pub enum MiningJobStatus {
 
 impl MiningJobStatus {
     /// Check if job can be started.
+    #[must_use] 
     pub fn can_start(&self) -> bool {
         matches!(self, Self::Pending)
     }
 
     /// Check if job can be cancelled.
+    #[must_use] 
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Running)
     }
 
     /// Check if job is terminal (completed, failed, or cancelled).
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
     }
@@ -176,10 +179,10 @@ impl GovRoleMiningJob {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_mining_jobs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -193,10 +196,10 @@ impl GovRoleMiningJob {
         tenant_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_mining_jobs
             WHERE tenant_id = $1 AND status = 'running'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -214,20 +217,20 @@ impl GovRoleMiningJob {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_role_mining_jobs
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -255,20 +258,20 @@ impl GovRoleMiningJob {
         filter: &MiningJobFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_mining_jobs
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -293,11 +296,11 @@ impl GovRoleMiningJob {
             serde_json::to_value(&input.parameters).unwrap_or_else(|_| serde_json::json!({}));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_role_mining_jobs (tenant_id, name, parameters, created_by)
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -314,12 +317,12 @@ impl GovRoleMiningJob {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_role_mining_jobs
             SET status = 'running', started_at = NOW(), updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -341,15 +344,15 @@ impl GovRoleMiningJob {
         let mut param_idx = 4;
 
         if input.candidate_count.is_some() {
-            updates.push(format!("candidate_count = ${}", param_idx));
+            updates.push(format!("candidate_count = ${param_idx}"));
             param_idx += 1;
         }
         if input.excessive_privilege_count.is_some() {
-            updates.push(format!("excessive_privilege_count = ${}", param_idx));
+            updates.push(format!("excessive_privilege_count = ${param_idx}"));
             param_idx += 1;
         }
         if input.consolidation_suggestion_count.is_some() {
-            updates.push(format!("consolidation_suggestion_count = ${}", param_idx));
+            updates.push(format!("consolidation_suggestion_count = ${param_idx}"));
             let _ = param_idx;
         }
 
@@ -386,14 +389,14 @@ impl GovRoleMiningJob {
         consolidation_suggestion_count: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_role_mining_jobs
             SET status = 'completed', completed_at = NOW(), progress_percent = 100,
                 candidate_count = $3, excessive_privilege_count = $4,
                 consolidation_suggestion_count = $5, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'running'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -412,12 +415,12 @@ impl GovRoleMiningJob {
         error_message: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_role_mining_jobs
             SET status = 'failed', completed_at = NOW(), error_message = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'running'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -433,12 +436,12 @@ impl GovRoleMiningJob {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_role_mining_jobs
             SET status = 'cancelled', completed_at = NOW(), updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status IN ('pending', 'running')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -453,10 +456,10 @@ impl GovRoleMiningJob {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_mining_jobs
             WHERE id = $1 AND tenant_id = $2 AND status IN ('pending', 'cancelled')
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -467,6 +470,7 @@ impl GovRoleMiningJob {
     }
 
     /// Parse the job parameters.
+    #[must_use] 
     pub fn parse_parameters(&self) -> MiningJobParameters {
         serde_json::from_value(self.parameters.clone()).unwrap_or_default()
     }

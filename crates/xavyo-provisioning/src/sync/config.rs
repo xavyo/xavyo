@@ -23,6 +23,7 @@ pub enum SyncMode {
 
 impl SyncMode {
     /// Convert to string representation.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             SyncMode::Polling => "polling",
@@ -46,7 +47,7 @@ impl std::str::FromStr for SyncMode {
             "polling" => Ok(SyncMode::Polling),
             "event" => Ok(SyncMode::Event),
             "hybrid" => Ok(SyncMode::Hybrid),
-            _ => Err(format!("Unknown sync mode: {}", s)),
+            _ => Err(format!("Unknown sync mode: {s}")),
         }
     }
 }
@@ -67,6 +68,7 @@ pub enum ConflictResolution {
 
 impl ConflictResolution {
     /// Convert to resolution strategy.
+    #[must_use] 
     pub fn to_strategy(&self) -> ResolutionStrategy {
         match self {
             ConflictResolution::InboundWins => ResolutionStrategy::InboundWins,
@@ -77,6 +79,7 @@ impl ConflictResolution {
     }
 
     /// Convert to string representation.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             ConflictResolution::InboundWins => "inbound_wins",
@@ -102,7 +105,7 @@ impl std::str::FromStr for ConflictResolution {
             "outbound_wins" => Ok(ConflictResolution::OutboundWins),
             "merge" => Ok(ConflictResolution::Merge),
             "manual" => Ok(ConflictResolution::Manual),
-            _ => Err(format!("Unknown conflict resolution: {}", s)),
+            _ => Err(format!("Unknown conflict resolution: {s}")),
         }
     }
 }
@@ -134,6 +137,7 @@ pub struct SyncConfig {
 
 impl SyncConfig {
     /// Get polling interval as Duration.
+    #[must_use] 
     pub fn polling_interval(&self) -> Duration {
         Duration::from_secs(self.polling_interval_secs as u64)
     }
@@ -189,6 +193,7 @@ pub struct SyncConfigService {
 
 impl SyncConfigService {
     /// Create a new sync config service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -197,20 +202,20 @@ impl SyncConfigService {
     #[instrument(skip(self))]
     pub async fn get(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncResult<Option<SyncConfig>> {
         let result = sqlx::query_as::<_, SyncConfigRow>(
-            r#"
+            r"
             SELECT id, tenant_id, connector_id, enabled, sync_mode,
                    polling_interval_secs, rate_limit_per_minute, batch_size,
                    conflict_resolution, auto_create_identity
             FROM gov_sync_configurations
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(|row| row.into_config()))
+        Ok(result.map(SyncConfigRow::into_config))
     }
 
     /// Create or update sync configuration.
@@ -219,7 +224,7 @@ impl SyncConfigService {
         config.validate()?;
 
         let result = sqlx::query_as::<_, SyncConfigRow>(
-            r#"
+            r"
             INSERT INTO gov_sync_configurations (
                 tenant_id, connector_id, enabled, sync_mode,
                 polling_interval_secs, rate_limit_per_minute, batch_size,
@@ -238,7 +243,7 @@ impl SyncConfigService {
             RETURNING id, tenant_id, connector_id, enabled, sync_mode,
                       polling_interval_secs, rate_limit_per_minute, batch_size,
                       conflict_resolution, auto_create_identity
-            "#,
+            ",
         )
         .bind(config.tenant_id)
         .bind(config.connector_id)
@@ -259,11 +264,11 @@ impl SyncConfigService {
     #[instrument(skip(self))]
     pub async fn enable(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncResult<bool> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_sync_configurations
             SET enabled = true, updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -277,11 +282,11 @@ impl SyncConfigService {
     #[instrument(skip(self))]
     pub async fn disable(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncResult<bool> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_sync_configurations
             SET enabled = false, updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -295,30 +300,30 @@ impl SyncConfigService {
     #[instrument(skip(self))]
     pub async fn list_enabled(&self, tenant_id: Uuid) -> SyncResult<Vec<SyncConfig>> {
         let rows = sqlx::query_as::<_, SyncConfigRow>(
-            r#"
+            r"
             SELECT id, tenant_id, connector_id, enabled, sync_mode,
                    polling_interval_secs, rate_limit_per_minute, batch_size,
                    conflict_resolution, auto_create_identity
             FROM gov_sync_configurations
             WHERE tenant_id = $1 AND enabled = true
             ORDER BY connector_id
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|row| row.into_config()).collect())
+        Ok(rows.into_iter().map(SyncConfigRow::into_config).collect())
     }
 
     /// Delete sync configuration.
     #[instrument(skip(self))]
     pub async fn delete(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncResult<bool> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_sync_configurations
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)

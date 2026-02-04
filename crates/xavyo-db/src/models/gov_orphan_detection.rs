@@ -59,6 +59,7 @@ pub enum RemediationAction {
 
 impl OrphanStatus {
     /// Check if this status allows remediation actions.
+    #[must_use] 
     pub fn can_remediate(&self) -> bool {
         matches!(self, Self::Pending | Self::UnderReview)
     }
@@ -154,10 +155,10 @@ impl GovOrphanDetection {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_orphan_detections
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -165,19 +166,19 @@ impl GovOrphanDetection {
         .await
     }
 
-    /// Find detection for a specific user that is still active (pending/under_review).
+    /// Find detection for a specific user that is still active (`pending/under_review`).
     pub async fn find_active_for_user(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_orphan_detections
             WHERE tenant_id = $1 AND user_id = $2 AND status IN ('pending', 'under_review')
             ORDER BY detected_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -194,41 +195,41 @@ impl GovOrphanDetection {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_orphan_detections
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_idx));
+            query.push_str(&format!(" AND status = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.detection_reason.is_some() {
-            query.push_str(&format!(" AND detection_reason = ${}", param_idx));
+            query.push_str(&format!(" AND detection_reason = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.run_id.is_some() {
-            query.push_str(&format!(" AND run_id = ${}", param_idx));
+            query.push_str(&format!(" AND run_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.user_id.is_some() {
-            query.push_str(&format!(" AND user_id = ${}", param_idx));
+            query.push_str(&format!(" AND user_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.since.is_some() {
-            query.push_str(&format!(" AND detected_at >= ${}", param_idx));
+            query.push_str(&format!(" AND detected_at >= ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.until.is_some() {
-            query.push_str(&format!(" AND detected_at <= ${}", param_idx));
+            query.push_str(&format!(" AND detected_at <= ${param_idx}"));
             param_idx += 1;
         }
 
@@ -276,41 +277,41 @@ impl GovOrphanDetection {
         filter: &OrphanDetectionFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_orphan_detections
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_idx));
+            query.push_str(&format!(" AND status = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.detection_reason.is_some() {
-            query.push_str(&format!(" AND detection_reason = ${}", param_idx));
+            query.push_str(&format!(" AND detection_reason = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.run_id.is_some() {
-            query.push_str(&format!(" AND run_id = ${}", param_idx));
+            query.push_str(&format!(" AND run_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.user_id.is_some() {
-            query.push_str(&format!(" AND user_id = ${}", param_idx));
+            query.push_str(&format!(" AND user_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.since.is_some() {
-            query.push_str(&format!(" AND detected_at >= ${}", param_idx));
+            query.push_str(&format!(" AND detected_at >= ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.until.is_some() {
-            query.push_str(&format!(" AND detected_at <= ${}", param_idx));
+            query.push_str(&format!(" AND detected_at <= ${param_idx}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -348,12 +349,12 @@ impl GovOrphanDetection {
         tenant_id: Uuid,
     ) -> Result<Vec<(OrphanStatus, i64)>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT status, COUNT(*) as count
             FROM gov_orphan_detections
             WHERE tenant_id = $1
             GROUP BY status
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -366,12 +367,12 @@ impl GovOrphanDetection {
         tenant_id: Uuid,
     ) -> Result<Vec<(DetectionReason, i64)>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT detection_reason, COUNT(*) as count
             FROM gov_orphan_detections
             WHERE tenant_id = $1 AND status IN ('pending', 'under_review')
             GROUP BY detection_reason
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -385,13 +386,13 @@ impl GovOrphanDetection {
         data: CreateGovOrphanDetection,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_orphan_detections (
                 tenant_id, user_id, run_id, detection_reason, last_activity_at, days_inactive
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.user_id)
@@ -411,12 +412,12 @@ impl GovOrphanDetection {
         status: OrphanStatus,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_orphan_detections
             SET status = $3
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -448,7 +449,7 @@ impl GovOrphanDetection {
         };
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_orphan_detections
             SET
                 status = $3,
@@ -459,7 +460,7 @@ impl GovOrphanDetection {
                 new_owner_id = $7
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -480,7 +481,7 @@ impl GovOrphanDetection {
         current_run_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_orphan_detections
             SET
                 status = 'remediated',
@@ -490,7 +491,7 @@ impl GovOrphanDetection {
             WHERE tenant_id = $1 AND user_id = $2
                 AND run_id != $3
                 AND status IN ('pending', 'under_review')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -508,10 +509,10 @@ impl GovOrphanDetection {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_orphan_detections
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -527,11 +528,11 @@ impl GovOrphanDetection {
         tenant_id: Uuid,
     ) -> Result<Option<f64>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT AVG(EXTRACT(EPOCH FROM (NOW() - detected_at)) / 86400)::float8
             FROM gov_orphan_detections
             WHERE tenant_id = $1 AND status IN ('pending', 'under_review')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)

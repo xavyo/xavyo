@@ -50,6 +50,7 @@ pub struct PatternAnalyzer {
 
 impl PatternAnalyzer {
     /// Create a new pattern analyzer with the given parameters.
+    #[must_use] 
     pub fn new(params: MiningJobParameters) -> Self {
         Self { params }
     }
@@ -150,6 +151,7 @@ impl PatternAnalyzer {
     }
 
     /// Convert analyzed patterns to database creation requests.
+    #[must_use] 
     pub fn patterns_to_create_requests(
         &self,
         job_id: Uuid,
@@ -168,6 +170,7 @@ impl PatternAnalyzer {
     }
 
     /// Convert discovered candidates to database creation requests.
+    #[must_use] 
     pub fn candidates_to_create_requests(
         &self,
         job_id: Uuid,
@@ -190,7 +193,7 @@ impl PatternAnalyzer {
 /// Calculate confidence score for a pattern.
 fn calculate_confidence(user_count: i32, entitlement_count: usize, min_users: i32) -> f64 {
     // Base confidence from user count (normalized)
-    let user_factor = (user_count as f64 / min_users as f64).min(2.0) / 2.0;
+    let user_factor = (f64::from(user_count) / f64::from(min_users)).min(2.0) / 2.0;
 
     // Entitlement coverage factor (2-10 entitlements is ideal)
     let entitlement_factor = if (2..=10).contains(&entitlement_count) {
@@ -217,11 +220,11 @@ fn generate_role_name(
     // Try to find a common prefix in entitlement names
     let names: Vec<&str> = entitlement_ids
         .iter()
-        .filter_map(|id| entitlement_names.get(id).map(|s| s.as_str()))
+        .filter_map(|id| entitlement_names.get(id).map(std::string::String::as_str))
         .collect();
 
     if names.is_empty() {
-        return format!("Role_Candidate_{}", index);
+        return format!("Role_Candidate_{index}");
     }
 
     // Find common prefix
@@ -230,7 +233,7 @@ fn generate_role_name(
     if common_prefix.len() >= 3 {
         format!("{}_Access_{}", common_prefix.trim_end_matches('_'), index)
     } else {
-        format!("Role_Candidate_{}", index)
+        format!("Role_Candidate_{index}")
     }
 }
 

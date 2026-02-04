@@ -35,6 +35,7 @@ pub struct SyncService {
 
 impl SyncService {
     /// Create a new sync service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             status_manager: SyncStatusManager::new(pool.clone()),
@@ -251,8 +252,7 @@ impl SyncService {
         match row {
             Some((tenant_id,)) => Ok(tenant_id),
             None => Err(SyncServiceError::NotFound(format!(
-                "Connector {} not found",
-                connector_id
+                "Connector {connector_id} not found"
             ))),
         }
     }

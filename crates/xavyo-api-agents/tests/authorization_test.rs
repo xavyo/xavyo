@@ -1,6 +1,6 @@
 //! Authorization integration tests for F123 - Three-Layer Authorization.
 //!
-//! Tests for the can_operate_agent endpoint and user context in authorization.
+//! Tests for the `can_operate_agent` endpoint and user context in authorization.
 
 mod common;
 
@@ -169,7 +169,7 @@ mod three_layer_auth_tests {
         assert_eq!(user_context.roles.as_ref().unwrap().len(), 3);
     }
 
-    /// Test that user_id is a valid UUID
+    /// Test that `user_id` is a valid UUID
     #[test]
     fn test_user_context_uuid_validation() {
         // Valid UUID

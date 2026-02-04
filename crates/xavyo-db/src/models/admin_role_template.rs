@@ -50,11 +50,11 @@ impl AdminRoleTemplate {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO admin_role_templates (tenant_id, name, description, is_system)
             VALUES ($1, $2, $3, false)
             RETURNING id, tenant_id, name, description, is_system, created_at, updated_at
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(&input.name)
@@ -74,11 +74,11 @@ impl AdminRoleTemplate {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, is_system, created_at, updated_at
             FROM admin_role_templates
             WHERE id = $1 AND (tenant_id IS NULL OR tenant_id = $2)
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -92,11 +92,11 @@ impl AdminRoleTemplate {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, is_system, created_at, updated_at
             FROM admin_role_templates
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .fetch_optional(executor)
@@ -114,24 +114,24 @@ impl AdminRoleTemplate {
     {
         if include_system {
             sqlx::query_as::<_, Self>(
-                r#"
+                r"
                 SELECT id, tenant_id, name, description, is_system, created_at, updated_at
                 FROM admin_role_templates
                 WHERE tenant_id IS NULL OR tenant_id = $1
                 ORDER BY is_system DESC, name
-                "#,
+                ",
             )
             .bind(tenant_id)
             .fetch_all(executor)
             .await
         } else {
             sqlx::query_as::<_, Self>(
-                r#"
+                r"
                 SELECT id, tenant_id, name, description, is_system, created_at, updated_at
                 FROM admin_role_templates
                 WHERE tenant_id = $1
                 ORDER BY name
-                "#,
+                ",
             )
             .bind(tenant_id)
             .fetch_all(executor)
@@ -150,14 +150,14 @@ impl AdminRoleTemplate {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE admin_role_templates
             SET name = COALESCE($3, name),
                 description = COALESCE($4, description),
                 updated_at = now()
             WHERE id = $1 AND tenant_id = $2 AND is_system = false
             RETURNING id, tenant_id, name, description, is_system, created_at, updated_at
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -174,10 +174,10 @@ impl AdminRoleTemplate {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM admin_role_templates
             WHERE id = $1 AND tenant_id = $2 AND is_system = false
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -199,13 +199,13 @@ impl AdminRoleTemplate {
     {
         let row: (bool,) = if let Some(id) = exclude_id {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT EXISTS(
                     SELECT 1 FROM admin_role_templates
                     WHERE (tenant_id IS NULL OR tenant_id = $1)
                     AND name = $2 AND id != $3
                 )
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(name)
@@ -214,12 +214,12 @@ impl AdminRoleTemplate {
             .await?
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT EXISTS(
                     SELECT 1 FROM admin_role_templates
                     WHERE (tenant_id IS NULL OR tenant_id = $1) AND name = $2
                 )
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(name)
@@ -239,13 +239,13 @@ impl AdminRoleTemplate {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, AdminPermission>(
-            r#"
+            r"
             SELECT p.id, p.code, p.name, p.description, p.category, p.created_at
             FROM admin_permissions p
             JOIN admin_role_template_permissions tp ON tp.permission_id = p.id
             WHERE tp.template_id = $1
             ORDER BY p.category, p.code
-            "#,
+            ",
         )
         .bind(template_id)
         .fetch_all(executor)
@@ -261,10 +261,10 @@ impl AdminRoleTemplate {
     ) -> Result<(), sqlx::Error> {
         // Delete existing permissions
         sqlx::query(
-            r#"
+            r"
             DELETE FROM admin_role_template_permissions
             WHERE template_id = $1
-            "#,
+            ",
         )
         .bind(template_id)
         .execute(pool)
@@ -273,11 +273,11 @@ impl AdminRoleTemplate {
         // Insert new permissions
         for permission_id in permission_ids {
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO admin_role_template_permissions (template_id, permission_id)
                 VALUES ($1, $2)
                 ON CONFLICT DO NOTHING
-                "#,
+                ",
             )
             .bind(template_id)
             .bind(permission_id)
@@ -297,11 +297,11 @@ impl AdminRoleTemplate {
     ) -> Result<(), sqlx::Error> {
         for permission_id in permission_ids {
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO admin_role_template_permissions (template_id, permission_id)
                 VALUES ($1, $2)
                 ON CONFLICT DO NOTHING
-                "#,
+                ",
             )
             .bind(template_id)
             .bind(permission_id)
@@ -318,10 +318,10 @@ impl AdminRoleTemplate {
         E: PgExecutor<'e>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM admin_role_templates
             WHERE tenant_id IS NULL OR tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(executor)

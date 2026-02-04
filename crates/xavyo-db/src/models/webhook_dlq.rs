@@ -55,7 +55,7 @@ impl WebhookDlqEntry {
     /// Create a new DLQ entry.
     pub async fn create(pool: &PgPool, input: CreateWebhookDlqEntry) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO webhook_dlq (
                 tenant_id, subscription_id, subscription_url, event_id,
                 event_type, request_payload, failure_reason,
@@ -63,7 +63,7 @@ impl WebhookDlqEntry {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(input.subscription_id)
@@ -86,10 +86,10 @@ impl WebhookDlqEntry {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM webhook_dlq
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -107,10 +107,10 @@ impl WebhookDlqEntry {
     ) -> Result<Vec<Self>, sqlx::Error> {
         // Build dynamic query based on filters
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM webhook_dlq
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_count = 1;
@@ -174,22 +174,22 @@ impl WebhookDlqEntry {
         // Simplified count query
         let include_replayed = filter.include_replayed;
 
-        let row: (i64,) = if !include_replayed {
+        let row: (i64,) = if include_replayed {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT COUNT(*) FROM webhook_dlq
-                WHERE tenant_id = $1 AND replayed_at IS NULL
-                "#,
+                WHERE tenant_id = $1
+                ",
             )
             .bind(tenant_id)
             .fetch_one(pool)
             .await?
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT COUNT(*) FROM webhook_dlq
-                WHERE tenant_id = $1
-                "#,
+                WHERE tenant_id = $1 AND replayed_at IS NULL
+                ",
             )
             .bind(tenant_id)
             .fetch_one(pool)
@@ -206,12 +206,12 @@ impl WebhookDlqEntry {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE webhook_dlq
             SET replayed_at = NOW()
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -226,11 +226,11 @@ impl WebhookDlqEntry {
         ids: &[Uuid],
     ) -> Result<i64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE webhook_dlq
             SET replayed_at = NOW()
             WHERE tenant_id = $1 AND id = ANY($2) AND replayed_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(ids)
@@ -243,10 +243,10 @@ impl WebhookDlqEntry {
     /// Delete a DLQ entry.
     pub async fn delete(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM webhook_dlq
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -264,14 +264,14 @@ impl WebhookDlqEntry {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM webhook_dlq
             WHERE tenant_id = $1
               AND subscription_id = $2
               AND replayed_at IS NULL
             ORDER BY created_at ASC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(subscription_id)

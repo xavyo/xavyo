@@ -80,6 +80,7 @@ pub struct LicenseAuditEntry {
 
 impl LicenseAuditService {
     /// Create a new license audit service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -250,10 +251,10 @@ impl LicenseAuditService {
         pool_ids: &[Uuid],
     ) -> Result<HashMap<Uuid, String>> {
         let rows: Vec<(Uuid, String)> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, name FROM gov_license_pools
             WHERE id = ANY($1) AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(pool_ids)
         .bind(tenant_id)
@@ -317,6 +318,7 @@ impl LicenseAuditService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

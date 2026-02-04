@@ -129,10 +129,10 @@ impl SiemDestination {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM siem_destinations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -147,10 +147,10 @@ impl SiemDestination {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM siem_destinations
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -167,16 +167,16 @@ impl SiemDestination {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM siem_destinations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if enabled_only.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND enabled = ${}", param_count));
+            query.push_str(&format!(" AND enabled = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -200,11 +200,11 @@ impl SiemDestination {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM siem_destinations
             WHERE tenant_id = $1 AND enabled = true
             ORDER BY name
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -218,16 +218,16 @@ impl SiemDestination {
         enabled_only: Option<bool>,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM siem_destinations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if enabled_only.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND enabled = ${}", param_count));
+            query.push_str(&format!(" AND enabled = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -247,7 +247,7 @@ impl SiemDestination {
         input: CreateSiemDestination,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO siem_destinations (
                 tenant_id, name, destination_type, endpoint_host, endpoint_port,
                 export_format, auth_config, event_type_filter,
@@ -258,7 +258,7 @@ impl SiemDestination {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -295,71 +295,71 @@ impl SiemDestination {
         let mut param_idx = 3; // $1=id, $2=tenant_id
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.endpoint_host.is_some() {
-            updates.push(format!("endpoint_host = ${}", param_idx));
+            updates.push(format!("endpoint_host = ${param_idx}"));
             param_idx += 1;
         }
         if input.endpoint_port.is_some() {
-            updates.push(format!("endpoint_port = ${}", param_idx));
+            updates.push(format!("endpoint_port = ${param_idx}"));
             param_idx += 1;
         }
         if input.export_format.is_some() {
-            updates.push(format!("export_format = ${}", param_idx));
+            updates.push(format!("export_format = ${param_idx}"));
             param_idx += 1;
         }
         if input.auth_config.is_some() {
-            updates.push(format!("auth_config = ${}", param_idx));
+            updates.push(format!("auth_config = ${param_idx}"));
             param_idx += 1;
         }
         if input.event_type_filter.is_some() {
-            updates.push(format!("event_type_filter = ${}", param_idx));
+            updates.push(format!("event_type_filter = ${param_idx}"));
             param_idx += 1;
         }
         if input.rate_limit_per_second.is_some() {
-            updates.push(format!("rate_limit_per_second = ${}", param_idx));
+            updates.push(format!("rate_limit_per_second = ${param_idx}"));
             param_idx += 1;
         }
         if input.queue_buffer_size.is_some() {
-            updates.push(format!("queue_buffer_size = ${}", param_idx));
+            updates.push(format!("queue_buffer_size = ${param_idx}"));
             param_idx += 1;
         }
         if input.circuit_breaker_threshold.is_some() {
-            updates.push(format!("circuit_breaker_threshold = ${}", param_idx));
+            updates.push(format!("circuit_breaker_threshold = ${param_idx}"));
             param_idx += 1;
         }
         if input.circuit_breaker_cooldown_secs.is_some() {
-            updates.push(format!("circuit_breaker_cooldown_secs = ${}", param_idx));
+            updates.push(format!("circuit_breaker_cooldown_secs = ${param_idx}"));
             param_idx += 1;
         }
         if input.enabled.is_some() {
-            updates.push(format!("enabled = ${}", param_idx));
+            updates.push(format!("enabled = ${param_idx}"));
             param_idx += 1;
         }
         if input.splunk_source.is_some() {
-            updates.push(format!("splunk_source = ${}", param_idx));
+            updates.push(format!("splunk_source = ${param_idx}"));
             param_idx += 1;
         }
         if input.splunk_sourcetype.is_some() {
-            updates.push(format!("splunk_sourcetype = ${}", param_idx));
+            updates.push(format!("splunk_sourcetype = ${param_idx}"));
             param_idx += 1;
         }
         if input.splunk_index.is_some() {
-            updates.push(format!("splunk_index = ${}", param_idx));
+            updates.push(format!("splunk_index = ${param_idx}"));
             param_idx += 1;
         }
         if input.splunk_ack_enabled.is_some() {
-            updates.push(format!("splunk_ack_enabled = ${}", param_idx));
+            updates.push(format!("splunk_ack_enabled = ${param_idx}"));
             param_idx += 1;
         }
         if input.syslog_facility.is_some() {
-            updates.push(format!("syslog_facility = ${}", param_idx));
+            updates.push(format!("syslog_facility = ${param_idx}"));
             param_idx += 1;
         }
         if input.tls_verify_cert.is_some() {
-            updates.push(format!("tls_verify_cert = ${}", param_idx));
+            updates.push(format!("tls_verify_cert = ${param_idx}"));
             let _ = param_idx;
         }
 
@@ -436,11 +436,11 @@ impl SiemDestination {
         last_failure_at: Option<DateTime<Utc>>,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE siem_destinations
             SET circuit_state = $3, circuit_last_failure_at = $4, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -459,10 +459,10 @@ impl SiemDestination {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM siem_destinations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

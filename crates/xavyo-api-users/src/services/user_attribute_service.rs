@@ -25,6 +25,7 @@ pub struct UserAttributeService {
 
 impl UserAttributeService {
     /// Create a new user attribute service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -55,10 +56,10 @@ impl UserAttributeService {
         user_id: Uuid,
     ) -> Result<UserCustomAttributesResponse, ApiUsersError> {
         let row: Option<(Value,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT custom_attributes FROM users
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -85,10 +86,10 @@ impl UserAttributeService {
         // Capture old values for audit event (F081)
         let _old_attrs: Option<Value> = {
             let row: Option<(Value,)> = sqlx::query_as(
-                r#"
+                r"
                 SELECT custom_attributes FROM users
                 WHERE id = $1 AND tenant_id = $2
-                "#,
+                ",
             )
             .bind(user_id)
             .bind(tenant_id)
@@ -131,13 +132,13 @@ impl UserAttributeService {
 
         // Update the user's custom attributes
         let row: Option<(Value,)> = sqlx::query_as(
-            r#"
+            r"
             UPDATE users
             SET custom_attributes = $3,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING custom_attributes
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -177,10 +178,10 @@ impl UserAttributeService {
     ) -> Result<UserCustomAttributesResponse, ApiUsersError> {
         // Load current attributes
         let current_row: Option<(Value,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT custom_attributes FROM users
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -232,13 +233,13 @@ impl UserAttributeService {
 
         // Update the user's custom attributes
         let row: Option<(Value,)> = sqlx::query_as(
-            r#"
+            r"
             UPDATE users
             SET custom_attributes = $3,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING custom_attributes
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -270,7 +271,7 @@ impl UserAttributeService {
 
     /// Bulk update a custom attribute across multiple users.
     ///
-    /// Supports filtering by current_value (JSONB containment) or explicit user_ids.
+    /// Supports filtering by `current_value` (JSONB containment) or explicit `user_ids`.
     /// Processes in batches of 500 to avoid long-running transactions.
     pub async fn bulk_update(
         &self,
@@ -319,10 +320,10 @@ impl UserAttributeService {
         let matching_user_ids: Vec<Uuid> = if let Some(ref user_ids) = request.filter.user_ids {
             // Filter by explicit user IDs
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT id FROM users
                 WHERE tenant_id = $1 AND id = ANY($2)
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(user_ids)
@@ -332,10 +333,10 @@ impl UserAttributeService {
             // Filter by current attribute value using JSONB containment
             let containment = serde_json::json!({ attr_name: current_value });
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT id FROM users
                 WHERE tenant_id = $1 AND custom_attributes @> $2::jsonb
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(&containment)
@@ -344,10 +345,10 @@ impl UserAttributeService {
         } else {
             // No filter means all users in tenant
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT id FROM users
                 WHERE tenant_id = $1
-                "#,
+                ",
             )
             .bind(tenant_id)
             .fetch_all(&self.pool)
@@ -366,7 +367,7 @@ impl UserAttributeService {
 
             // Use jsonb_set to update the specific attribute key
             let result = sqlx::query(
-                r#"
+                r"
                 UPDATE users
                 SET custom_attributes = jsonb_set(
                     COALESCE(custom_attributes, '{}'::jsonb),
@@ -375,7 +376,7 @@ impl UserAttributeService {
                 ),
                 updated_at = NOW()
                 WHERE tenant_id = $1 AND id = ANY($2)
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(&batch_vec)

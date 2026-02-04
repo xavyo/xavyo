@@ -83,10 +83,10 @@ impl GovMetaRoleConflict {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_conflicts
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -110,11 +110,11 @@ impl GovMetaRoleConflict {
         };
 
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_conflicts
             WHERE tenant_id = $1 AND meta_role_a_id = $2 AND meta_role_b_id = $3
                   AND affected_role_id = $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(a)
@@ -132,12 +132,12 @@ impl GovMetaRoleConflict {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_conflicts
             WHERE tenant_id = $1 AND resolution_status = 'unresolved'
             ORDER BY detected_at DESC
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -153,11 +153,11 @@ impl GovMetaRoleConflict {
         affected_role_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_conflicts
             WHERE tenant_id = $1 AND affected_role_id = $2
             ORDER BY detected_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(affected_role_id)
@@ -172,11 +172,11 @@ impl GovMetaRoleConflict {
         meta_role_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_conflicts
             WHERE tenant_id = $1 AND (meta_role_a_id = $2 OR meta_role_b_id = $2)
             ORDER BY detected_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -197,22 +197,21 @@ impl GovMetaRoleConflict {
 
         if filter.affected_role_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND affected_role_id = ${}", param_count));
+            query.push_str(&format!(" AND affected_role_id = ${param_count}"));
         }
         if filter.meta_role_id.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND (meta_role_a_id = ${0} OR meta_role_b_id = ${0})",
-                param_count
+                " AND (meta_role_a_id = ${param_count} OR meta_role_b_id = ${param_count})"
             ));
         }
         if filter.conflict_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND conflict_type = ${}", param_count));
+            query.push_str(&format!(" AND conflict_type = ${param_count}"));
         }
         if filter.resolution_status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND resolution_status = ${}", param_count));
+            query.push_str(&format!(" AND resolution_status = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -245,10 +244,10 @@ impl GovMetaRoleConflict {
         tenant_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_meta_role_conflicts
             WHERE tenant_id = $1 AND resolution_status = 'unresolved'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -265,12 +264,12 @@ impl GovMetaRoleConflict {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if let Some(status) = status {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_meta_role_conflicts
                 WHERE tenant_id = $1 AND resolution_status = $2
                 ORDER BY detected_at DESC
                 LIMIT $3 OFFSET $4
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(status)
@@ -280,12 +279,12 @@ impl GovMetaRoleConflict {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_meta_role_conflicts
                 WHERE tenant_id = $1
                 ORDER BY detected_at DESC
                 LIMIT $2 OFFSET $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(limit)
@@ -303,10 +302,10 @@ impl GovMetaRoleConflict {
     ) -> Result<i64, sqlx::Error> {
         if let Some(status) = status {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM gov_meta_role_conflicts
                 WHERE tenant_id = $1 AND resolution_status = $2
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(status)
@@ -314,10 +313,10 @@ impl GovMetaRoleConflict {
             .await
         } else {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM gov_meta_role_conflicts
                 WHERE tenant_id = $1
-                "#,
+                ",
             )
             .bind(tenant_id)
             .fetch_one(pool)
@@ -334,10 +333,10 @@ impl GovMetaRoleConflict {
     ) -> Result<i64, sqlx::Error> {
         if let Some(status) = status {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM gov_meta_role_conflicts
                 WHERE tenant_id = $1 AND affected_role_id = $2 AND resolution_status = $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(role_id)
@@ -346,10 +345,10 @@ impl GovMetaRoleConflict {
             .await
         } else {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM gov_meta_role_conflicts
                 WHERE tenant_id = $1 AND affected_role_id = $2
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(role_id)
@@ -372,14 +371,14 @@ impl GovMetaRoleConflict {
         };
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_meta_role_conflicts (
                 tenant_id, meta_role_a_id, meta_role_b_id, affected_role_id,
                 conflict_type, conflicting_items
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(a)
@@ -400,7 +399,7 @@ impl GovMetaRoleConflict {
         input: ResolveGovMetaRoleConflict,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_meta_role_conflicts
             SET resolution_status = $3,
                 resolved_by = $4,
@@ -408,7 +407,7 @@ impl GovMetaRoleConflict {
                 resolved_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND resolution_status = 'unresolved'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -426,10 +425,10 @@ impl GovMetaRoleConflict {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_meta_role_conflicts
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -440,6 +439,7 @@ impl GovMetaRoleConflict {
     }
 
     /// Check if conflict is unresolved.
+    #[must_use] 
     pub fn is_unresolved(&self) -> bool {
         self.resolution_status == ResolutionStatus::Unresolved
     }

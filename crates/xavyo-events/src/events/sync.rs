@@ -93,7 +93,7 @@ pub struct SyncConflictDetected {
     pub inbound_change_id: Uuid,
     /// The outbound operation involved (if any).
     pub outbound_operation_id: Option<Uuid>,
-    /// Type of conflict (concurrent_update, delete_update, etc.).
+    /// Type of conflict (`concurrent_update`, `delete_update`, etc.).
     pub conflict_type: String,
     /// Attributes that are in conflict.
     pub affected_attributes: Vec<String>,

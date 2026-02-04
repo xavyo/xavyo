@@ -15,7 +15,7 @@ use uuid::Uuid;
 pub enum ConnectorType {
     /// LDAP/Active Directory connector.
     Ldap,
-    /// Database connector (PostgreSQL, MySQL, etc.).
+    /// Database connector (`PostgreSQL`, `MySQL`, etc.).
     Database,
     /// REST API connector.
     Rest,
@@ -39,7 +39,7 @@ impl std::str::FromStr for ConnectorType {
             "ldap" => Ok(ConnectorType::Ldap),
             "database" => Ok(ConnectorType::Database),
             "rest" => Ok(ConnectorType::Rest),
-            _ => Err(format!("Unknown connector type: {}", s)),
+            _ => Err(format!("Unknown connector type: {s}")),
         }
     }
 }
@@ -76,7 +76,7 @@ impl std::str::FromStr for ConnectorStatus {
             "active" => Ok(ConnectorStatus::Active),
             "inactive" => Ok(ConnectorStatus::Inactive),
             "error" => Ok(ConnectorStatus::Error),
-            _ => Err(format!("Unknown connector status: {}", s)),
+            _ => Err(format!("Unknown connector status: {s}")),
         }
     }
 }
@@ -176,10 +176,10 @@ impl ConnectorConfiguration {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM connector_configurations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -194,10 +194,10 @@ impl ConnectorConfiguration {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM connector_configurations
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -214,24 +214,24 @@ impl ConnectorConfiguration {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM connector_configurations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.connector_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND connector_type = ${}", param_count));
+            query.push_str(&format!(" AND connector_type = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.name_contains.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE '%' || ${} || '%'", param_count));
+            query.push_str(&format!(" AND name ILIKE '%' || ${param_count} || '%'"));
         }
 
         query.push_str(&format!(
@@ -262,24 +262,24 @@ impl ConnectorConfiguration {
         filter: &ConnectorFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM connector_configurations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.connector_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND connector_type = ${}", param_count));
+            query.push_str(&format!(" AND connector_type = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.name_contains.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE '%' || ${} || '%'", param_count));
+            query.push_str(&format!(" AND name ILIKE '%' || ${param_count} || '%'"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -312,14 +312,14 @@ impl ConnectorConfiguration {
         credentials_key_version: i32,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO connector_configurations (
                 tenant_id, name, connector_type, description, config,
                 credentials_encrypted, credentials_key_version
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -345,27 +345,27 @@ impl ConnectorConfiguration {
         let mut param_idx = 3; // $1 = id, $2 = tenant_id
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.config.is_some() {
-            updates.push(format!("config = ${}", param_idx));
+            updates.push(format!("config = ${param_idx}"));
             param_idx += 1;
         }
         if credentials_encrypted.is_some() {
-            updates.push(format!("credentials_encrypted = ${}", param_idx));
+            updates.push(format!("credentials_encrypted = ${param_idx}"));
             param_idx += 1;
         }
         if credentials_key_version.is_some() {
-            updates.push(format!("credentials_key_version = ${}", param_idx));
+            updates.push(format!("credentials_key_version = ${param_idx}"));
             param_idx += 1;
         }
         if input.status.is_some() {
-            updates.push(format!("status = ${}", param_idx));
+            updates.push(format!("status = ${param_idx}"));
             // param_idx += 1; // Last parameter
         }
 
@@ -409,11 +409,11 @@ impl ConnectorConfiguration {
         error: Option<&str>,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE connector_configurations
             SET status = $3, last_error = $4, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -440,11 +440,11 @@ impl ConnectorConfiguration {
         };
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE connector_configurations
             SET status = $3, last_connection_test = NOW(), last_error = $4, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -463,10 +463,10 @@ impl ConnectorConfiguration {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM connector_configurations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -477,16 +477,19 @@ impl ConnectorConfiguration {
     }
 
     /// Check if connector is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self.status, ConnectorStatus::Active)
     }
 
     /// Check if connector has an error.
+    #[must_use] 
     pub fn has_error(&self) -> bool {
         matches!(self.status, ConnectorStatus::Error)
     }
 
     /// Get summary view of this connector.
+    #[must_use] 
     pub fn to_summary(&self) -> ConnectorSummary {
         ConnectorSummary {
             id: self.id,

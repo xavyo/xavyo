@@ -155,6 +155,7 @@ pub struct CorrelationEngineService {
 
 impl CorrelationEngineService {
     /// Create a new correlation engine service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -175,6 +176,7 @@ impl CorrelationEngineService {
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -229,7 +231,7 @@ impl CorrelationEngineService {
 
         let auto_confirm = decimal_to_f64(thresholds.auto_confirm_threshold);
         let manual_review = decimal_to_f64(thresholds.manual_review_threshold);
-        let batch_size = thresholds.batch_size as i64;
+        let batch_size = i64::from(thresholds.batch_size);
 
         // 3. Iterate over identities (users) in batches.
         //    We query the `users` table and construct an attributes JSON object
@@ -241,7 +243,7 @@ impl CorrelationEngineService {
 
         loop {
             let identity_rows: Vec<(Uuid, serde_json::Value)> = sqlx::query_as(
-                r#"
+                r"
                 SELECT id, jsonb_build_object(
                     'email', email,
                     'display_name', display_name,
@@ -250,7 +252,7 @@ impl CorrelationEngineService {
                 FROM users
                 WHERE tenant_id = $1
                 LIMIT $2 OFFSET $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(batch_size)
@@ -463,7 +465,7 @@ impl CorrelationEngineService {
             if let Some(identity_id) = best_identity_id {
                 // Update the shadow account to link it to the matched identity.
                 sqlx::query(
-                    r#"
+                    r"
                     UPDATE gov_shadows
                     SET user_id = $1,
                         sync_situation = 'linked',
@@ -471,7 +473,7 @@ impl CorrelationEngineService {
                     WHERE id = $2
                       AND tenant_id = $3
                       AND connector_id = $4
-                    "#,
+                    ",
                 )
                 .bind(identity_id)
                 .bind(account_id)
@@ -646,26 +648,23 @@ impl CorrelationEngineService {
         trigger: GovCorrelationTrigger,
     ) -> Result<Uuid> {
         let job_id = Uuid::new_v4();
-        let total_accounts = match &account_ids {
-            Some(ids) => ids.len() as i64,
-            None => {
-                // Count uncorrelated shadow accounts for the connector.
-                let count: i64 = sqlx::query_scalar(
-                    r#"
-                    SELECT COUNT(*)::bigint FROM gov_shadows
-                    WHERE tenant_id = $1
-                      AND connector_id = $2
-                      AND user_id IS NULL
-                      AND sync_situation IN ('unlinked', 'unmatched')
-                      AND state != 'dead'
-                    "#,
-                )
-                .bind(tenant_id)
-                .bind(connector_id)
-                .fetch_one(&self.pool)
-                .await?;
-                count
-            }
+        let total_accounts = if let Some(ids) = &account_ids { ids.len() as i64 } else {
+            // Count uncorrelated shadow accounts for the connector.
+            let count: i64 = sqlx::query_scalar(
+                r"
+                SELECT COUNT(*)::bigint FROM gov_shadows
+                WHERE tenant_id = $1
+                  AND connector_id = $2
+                  AND user_id IS NULL
+                  AND sync_situation IN ('unlinked', 'unmatched')
+                  AND state != 'dead'
+                ",
+            )
+            .bind(tenant_id)
+            .bind(connector_id)
+            .fetch_one(&self.pool)
+            .await?;
+            count
         };
 
         let status = CorrelationJobStatus {
@@ -739,6 +738,7 @@ impl CorrelationEngineService {
     }
 
     /// Convert job status to the API response DTO.
+    #[must_use] 
     pub fn job_status_to_response(status: &CorrelationJobStatus) -> CorrelationJobStatusResponse {
         CorrelationJobStatusResponse {
             job_id: status.job_id,
@@ -951,10 +951,10 @@ async fn run_batch_evaluation(
             let mut result = Vec::with_capacity(ids.len());
             for id in ids {
                 match sqlx::query_as::<_, (Uuid, serde_json::Value)>(
-                    r#"
+                    r"
                     SELECT id, attributes FROM gov_shadows
                     WHERE tenant_id = $1 AND connector_id = $2 AND id = $3
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(connector_id)
@@ -974,7 +974,7 @@ async fn run_batch_evaluation(
             result
         }
         None => sqlx::query_as::<_, (Uuid, serde_json::Value)>(
-            r#"
+            r"
                 SELECT id, attributes FROM gov_shadows
                 WHERE tenant_id = $1
                   AND connector_id = $2
@@ -982,7 +982,7 @@ async fn run_batch_evaluation(
                   AND sync_situation IN ('unlinked', 'unmatched')
                   AND state != 'dead'
                 ORDER BY created_at ASC
-                "#,
+                ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -1315,11 +1315,7 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
     for i in 1..=a_len {
         curr_row[0] = i;
         for j in 1..=b_len {
-            let cost = if a_chars[i - 1] == b_chars[j - 1] {
-                0
-            } else {
-                1
-            };
+            let cost = usize::from(a_chars[i - 1] != b_chars[j - 1]);
             curr_row[j] = (prev_row[j] + 1)
                 .min(curr_row[j - 1] + 1)
                 .min(prev_row[j - 1] + cost);
@@ -1334,7 +1330,7 @@ fn levenshtein_distance(a: &str, b: &str) -> usize {
 ///
 /// Returns a 4-character code representing the phonetic sound of the input.
 fn soundex(s: &str) -> String {
-    let chars: Vec<char> = s.chars().filter(|c| c.is_ascii_alphabetic()).collect();
+    let chars: Vec<char> = s.chars().filter(char::is_ascii_alphabetic).collect();
 
     if chars.is_empty() {
         return "0000".to_string();
@@ -1398,7 +1394,7 @@ fn soundex(s: &str) -> String {
 ///
 /// When the Rhai scripting engine from `xavyo-provisioning` is integrated,
 /// this function should delegate to `RhaiScriptExecutor::execute()` with
-/// sandboxed configuration (max_operations=10000) to evaluate arbitrary
+/// sandboxed configuration (`max_operations=10000`) to evaluate arbitrary
 /// expressions safely.
 fn evaluate_expression(expression: &str, source: &str, target: &str) -> f64 {
     let expr_lower = expression.to_lowercase();
@@ -1465,6 +1461,7 @@ fn evaluate_expression(expression: &str, source: &str, target: &str) -> f64 {
 /// Note: `unicode_normalization` crate is required in Cargo.toml.
 /// If not available, we fall back to basic lowercasing which handles
 /// ASCII correctly.
+#[must_use] 
 pub fn normalize_attribute(value: &str) -> String {
     // Basic normalization: trim whitespace, lowercase.
     // Full Unicode NFC requires the `unicode-normalization` crate.
@@ -1481,6 +1478,7 @@ pub fn normalize_attribute(value: &str) -> String {
 /// When some rules are skipped (e.g., due to missing attributes), their weight
 /// is proportionally redistributed among the remaining rules so that the total
 /// weight sums to 1.0 (or the original total, whichever is appropriate).
+#[must_use] 
 pub fn redistribute_weights(
     all_rules: &[GovCorrelationRule],
     available_rule_ids: &[Uuid],
@@ -1531,6 +1529,7 @@ pub fn redistribute_weights(
 // =============================================================================
 
 /// Apply confidence thresholds to determine the evaluation outcome.
+#[must_use] 
 pub fn apply_thresholds(
     confidence: f64,
     auto_confirm_threshold: f64,

@@ -29,6 +29,7 @@ pub struct LifecycleEventService {
 
 impl LifecycleEventService {
     /// Create a new lifecycle event service.
+    #[must_use] 
     pub fn new(
         pool: PgPool,
         birthright_policy_service: Arc<BirthrightPolicyService>,
@@ -42,6 +43,7 @@ impl LifecycleEventService {
     }
 
     /// Get a reference to the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -311,7 +313,7 @@ impl LifecycleEventService {
             let revoke_result = self.revoke_assignment(tenant_id, assignment.id).await;
 
             match revoke_result {
-                Ok(_) => {
+                Ok(()) => {
                     // Mark as executed
                     let executed_action =
                         GovLifecycleAction::mark_executed(&self.pool, tenant_id, action.id)
@@ -501,11 +503,11 @@ impl LifecycleEventService {
                     .iter()
                     .find(|p| p.entitlement_ids.contains(&entitlement_id));
 
-                let grace_period_days = policy.map(|p| p.grace_period_days).unwrap_or(0);
+                let grace_period_days = policy.map_or(0, |p| p.grace_period_days);
 
                 if grace_period_days > 0 {
                     // Schedule revocation
-                    let scheduled_at = Utc::now() + Duration::days(grace_period_days as i64);
+                    let scheduled_at = Utc::now() + Duration::days(i64::from(grace_period_days));
 
                     let action = self
                         .create_action(
@@ -526,7 +528,7 @@ impl LifecycleEventService {
                     let revoke_result = self.revoke_assignment(tenant_id, assignment.id).await;
 
                     match revoke_result {
-                        Ok(_) => {
+                        Ok(()) => {
                             let action = self
                                 .create_action(
                                     tenant_id,
@@ -632,7 +634,7 @@ impl LifecycleEventService {
                 let revoke_result = self.revoke_assignment(tenant_id, assignment_id).await;
 
                 match revoke_result {
-                    Ok(_) => {
+                    Ok(()) => {
                         if let Some(executed_action) =
                             GovLifecycleAction::mark_executed(&self.pool, tenant_id, action.id)
                                 .await?

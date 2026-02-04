@@ -27,11 +27,11 @@ use crate::services::{ApiKeyService, SlugService};
 /// and not hardcoded to avoid exposing incorrect endpoints to tenants.
 #[derive(Clone, Debug)]
 pub struct EndpointConfig {
-    /// Base URL for API access (e.g., "https://api.xavyo.net").
+    /// Base URL for API access (e.g., "<https://api.xavyo.net>").
     pub api_url: String,
-    /// Base URL for authentication (e.g., "https://auth.xavyo.net").
+    /// Base URL for authentication (e.g., "<https://auth.xavyo.net>").
     pub auth_url: String,
-    /// Base URL for documentation (e.g., "https://docs.xavyo.net").
+    /// Base URL for documentation (e.g., "<https://docs.xavyo.net>").
     pub docs_url: String,
 }
 
@@ -39,9 +39,10 @@ impl EndpointConfig {
     /// Create endpoint configuration from environment variables.
     ///
     /// Environment variables:
-    /// - `API_BASE_URL`: Base URL for API (default: "https://api.xavyo.net")
-    /// - `AUTH_BASE_URL`: Base URL for auth (default: "https://auth.xavyo.net")
-    /// - `DOCS_BASE_URL`: Base URL for docs (default: "https://docs.xavyo.net")
+    /// - `API_BASE_URL`: Base URL for API (default: "<https://api.xavyo.net>")
+    /// - `AUTH_BASE_URL`: Base URL for auth (default: "<https://auth.xavyo.net>")
+    /// - `DOCS_BASE_URL`: Base URL for docs (default: "<https://docs.xavyo.net>")
+    #[must_use] 
     pub fn from_env() -> Self {
         Self {
             api_url: std::env::var("API_BASE_URL")
@@ -76,6 +77,7 @@ pub struct ProvisioningService {
 
 impl ProvisioningService {
     /// Create a new provisioning service.
+    #[must_use] 
     pub fn new(
         pool: PgPool,
         slug_service: Arc<SlugService>,
@@ -90,6 +92,7 @@ impl ProvisioningService {
     }
 
     /// Create a new provisioning service with custom endpoint configuration.
+    #[must_use] 
     pub fn with_endpoint_config(
         pool: PgPool,
         slug_service: Arc<SlugService>,
@@ -349,7 +352,7 @@ impl ProvisioningService {
 
     /// Create a default OAuth client within a transaction.
     ///
-    /// Returns (client_id, client_secret_plaintext, oauth_client_uuid).
+    /// Returns (`client_id`, `client_secret_plaintext`, `oauth_client_uuid`).
     async fn create_oauth_client_in_tx<'e>(
         &self,
         tx: &mut sqlx::Transaction<'e, sqlx::Postgres>,
@@ -366,16 +369,16 @@ impl ProvisioningService {
 
         let id = Uuid::new_v4();
         let now = chrono::Utc::now();
-        let name = format!("{} - Default Client", org_name);
+        let name = format!("{org_name} - Default Client");
 
         // Insert the client
         sqlx::query(
-            r#"
+            r"
             INSERT INTO oauth_clients (
                 id, tenant_id, client_id, client_secret_hash, name, client_type,
                 redirect_uris, grant_types, scopes, is_active, created_at, updated_at
             ) VALUES ($1, $2, $3, $4, $5, 'confidential', $6, $7, $8, true, $9, $9)
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -406,7 +409,7 @@ impl ProvisioningService {
 
     /// Generate a cryptographically secure client ID.
     ///
-    /// SECURITY: Uses OsRng (CSPRNG) for cryptographic randomness.
+    /// SECURITY: Uses `OsRng` (CSPRNG) for cryptographic randomness.
     fn generate_client_id(&self) -> String {
         let mut bytes = vec![0u8; CLIENT_ID_LENGTH];
         OsRng.fill_bytes(&mut bytes);
@@ -415,7 +418,7 @@ impl ProvisioningService {
 
     /// Generate a cryptographically secure client secret.
     ///
-    /// SECURITY: Uses OsRng (CSPRNG) for cryptographic randomness.
+    /// SECURITY: Uses `OsRng` (CSPRNG) for cryptographic randomness.
     fn generate_client_secret(&self) -> String {
         let mut bytes = vec![0u8; CLIENT_SECRET_LENGTH];
         OsRng.fill_bytes(&mut bytes);

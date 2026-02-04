@@ -19,7 +19,7 @@ use crate::services::{
     UpdateMappingRequest,
 };
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid> {
     claims
         .tenant_id()
@@ -38,7 +38,7 @@ pub struct ListMappingsQuery {
 
 /// Create a new attribute mapping.
 ///
-/// POST /connectors/{connector_id}/mappings
+/// POST /`connectors/{connector_id}/mappings`
 #[utoipa::path(
     post,
     path = "/connectors/{connector_id}/mappings",
@@ -77,7 +77,7 @@ pub async fn create_mapping(
 
 /// List mappings for a connector.
 ///
-/// GET /connectors/{connector_id}/mappings
+/// GET /`connectors/{connector_id}/mappings`
 #[utoipa::path(
     get,
     path = "/connectors/{connector_id}/mappings",
@@ -109,7 +109,7 @@ pub async fn list_mappings(
 
 /// Get a specific mapping.
 ///
-/// GET /connectors/{connector_id}/mappings/{mapping_id}
+/// GET /`connectors/{connector_id}/mappings/{mapping_id`}
 #[utoipa::path(
     get,
     path = "/connectors/{connector_id}/mappings/{mapping_id}",
@@ -140,7 +140,7 @@ pub async fn get_mapping(
 
 /// Update a mapping.
 ///
-/// PUT /connectors/{connector_id}/mappings/{mapping_id}
+/// PUT /`connectors/{connector_id}/mappings/{mapping_id`}
 #[utoipa::path(
     put,
     path = "/connectors/{connector_id}/mappings/{mapping_id}",
@@ -174,7 +174,7 @@ pub async fn update_mapping(
 
 /// Delete a mapping.
 ///
-/// DELETE /connectors/{connector_id}/mappings/{mapping_id}
+/// DELETE /`connectors/{connector_id}/mappings/{mapping_id`}
 #[utoipa::path(
     delete,
     path = "/connectors/{connector_id}/mappings/{mapping_id}",
@@ -205,7 +205,7 @@ pub async fn delete_mapping(
 
 /// Preview a mapping transformation.
 ///
-/// POST /connectors/{connector_id}/mappings/{mapping_id}/preview
+/// POST /`connectors/{connector_id}/mappings/{mapping_id}/preview`
 #[utoipa::path(
     post,
     path = "/connectors/{connector_id}/mappings/{mapping_id}/preview",
@@ -246,7 +246,7 @@ mod tests {
         let query: ListMappingsQuery = serde_json::from_str(r#"{"object_class": "user"}"#).unwrap();
         assert_eq!(query.object_class, Some("user".to_string()));
 
-        let empty_query: ListMappingsQuery = serde_json::from_str(r#"{}"#).unwrap();
+        let empty_query: ListMappingsQuery = serde_json::from_str(r"{}").unwrap();
         assert!(empty_query.object_class.is_none());
     }
 }

@@ -1,8 +1,8 @@
 //! Workday SP Interoperability Tests
 //!
 //! Tests SAML assertion compatibility with Workday requirements:
-//! - NameID in unspecified format (typically employee ID)
-//! - WorkdayID attribute required
+//! - `NameID` in unspecified format (typically employee ID)
+//! - `WorkdayID` attribute required
 //! - Assertions MUST be signed (unsigned not accepted)
 //! - 5-minute assertion validity window
 //! - Clock skew tolerance
@@ -51,8 +51,7 @@ fn test_workday_basic_assertion_structure() {
 
     assert!(
         errors.is_empty(),
-        "Workday assertion structure validation failed: {:?}",
-        errors
+        "Workday assertion structure validation failed: {errors:?}"
     );
 }
 

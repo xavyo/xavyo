@@ -1,8 +1,8 @@
 //! Unit tests for SCIM HTTP client — discovery, auth, and error handling.
 //!
 //! Tests cover:
-//! - T016: ServiceProviderConfig discovery, health check, connection failures
-//! - T017: Bearer token auth, OAuth2 client credentials, token caching
+//! - T016: `ServiceProviderConfig` discovery, health check, connection failures
+//! - T017: Bearer token auth, `OAuth2` client credentials, token caching
 
 use serde_json::json;
 use wiremock::matchers::{basic_auth, body_string_contains, header, method, path};
@@ -11,7 +11,7 @@ use xavyo_scim_client::auth::{ScimAuth, ScimCredentials};
 use xavyo_scim_client::client::ScimClient;
 use xavyo_scim_client::error::ScimClientError;
 
-/// Helper: create a ScimClient pointing at a wiremock server with Bearer auth.
+/// Helper: create a `ScimClient` pointing at a wiremock server with Bearer auth.
 fn bearer_client(server: &MockServer) -> ScimClient {
     let auth = ScimAuth::new(
         ScimCredentials::Bearer {
@@ -22,7 +22,7 @@ fn bearer_client(server: &MockServer) -> ScimClient {
     ScimClient::with_http_client(server.uri(), auth, reqwest::Client::new())
 }
 
-/// Helper: standard ServiceProviderConfig JSON response.
+/// Helper: standard `ServiceProviderConfig` JSON response.
 fn service_provider_config_json() -> serde_json::Value {
     json!({
         "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
@@ -264,7 +264,7 @@ async fn test_429_returns_rate_limited_with_retry_after() {
         Err(ScimClientError::RateLimited { retry_after_secs }) => {
             assert_eq!(retry_after_secs, Some(30));
         }
-        other => panic!("Expected RateLimited, got {:?}", other),
+        other => panic!("Expected RateLimited, got {other:?}"),
     }
 }
 
@@ -285,7 +285,7 @@ async fn test_500_returns_scim_error() {
         Err(ScimClientError::ScimError { status, .. }) => {
             assert_eq!(status, 500);
         }
-        other => panic!("Expected ScimError with status 500, got {:?}", other),
+        other => panic!("Expected ScimError with status 500, got {other:?}"),
     }
 }
 

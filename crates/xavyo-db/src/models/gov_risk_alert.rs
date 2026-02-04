@@ -90,10 +90,10 @@ impl GovRiskAlert {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_alerts
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -109,12 +109,12 @@ impl GovRiskAlert {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_alerts
             WHERE tenant_id = $1 AND acknowledged = false
             ORDER BY severity DESC, created_at DESC
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -132,12 +132,12 @@ impl GovRiskAlert {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_alerts
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -156,13 +156,13 @@ impl GovRiskAlert {
         cooldown_hours: i32,
     ) -> Result<bool, sqlx::Error> {
         let exists: bool = sqlx::query_scalar(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM gov_risk_alerts
                 WHERE tenant_id = $1 AND user_id = $2 AND threshold_id = $3
                 AND created_at > NOW() - INTERVAL '1 hour' * $4
             )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -184,28 +184,28 @@ impl GovRiskAlert {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_risk_alerts
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.threshold_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND threshold_id = ${}", param_count));
+            query.push_str(&format!(" AND threshold_id = ${param_count}"));
         }
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ${}", param_count));
+            query.push_str(&format!(" AND severity = ${param_count}"));
         }
         if filter.acknowledged.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND acknowledged = ${}", param_count));
+            query.push_str(&format!(" AND acknowledged = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -240,28 +240,28 @@ impl GovRiskAlert {
         filter: &RiskAlertFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_risk_alerts
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.threshold_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND threshold_id = ${}", param_count));
+            query.push_str(&format!(" AND threshold_id = ${param_count}"));
         }
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ${}", param_count));
+            query.push_str(&format!(" AND severity = ${param_count}"));
         }
         if filter.acknowledged.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND acknowledged = ${}", param_count));
+            query.push_str(&format!(" AND acknowledged = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -288,13 +288,13 @@ impl GovRiskAlert {
         tenant_id: Uuid,
     ) -> Result<Vec<(AlertSeverity, i64)>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT severity, COUNT(*) as count
             FROM gov_risk_alerts
             WHERE tenant_id = $1 AND acknowledged = false
             GROUP BY severity
             ORDER BY severity DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -308,13 +308,13 @@ impl GovRiskAlert {
         input: CreateGovRiskAlert,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_risk_alerts (
                 tenant_id, user_id, threshold_id, score_at_alert, severity
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.user_id)
@@ -333,12 +333,12 @@ impl GovRiskAlert {
         acknowledged_by: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_risk_alerts
             SET acknowledged = true, acknowledged_by = $3, acknowledged_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND acknowledged = false
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -355,11 +355,11 @@ impl GovRiskAlert {
         acknowledged_by: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_risk_alerts
             SET acknowledged = true, acknowledged_by = $3, acknowledged_at = NOW()
             WHERE tenant_id = $1 AND user_id = $2 AND acknowledged = false
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -377,10 +377,10 @@ impl GovRiskAlert {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_risk_alerts
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -397,10 +397,10 @@ impl GovRiskAlert {
         before: DateTime<Utc>,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_risk_alerts
             WHERE tenant_id = $1 AND created_at < $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(before)
@@ -417,12 +417,12 @@ impl GovRiskAlert {
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_alerts
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

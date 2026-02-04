@@ -39,7 +39,7 @@ impl std::str::FromStr for OperationType {
             "create" => Ok(OperationType::Create),
             "update" => Ok(OperationType::Update),
             "delete" => Ok(OperationType::Delete),
-            _ => Err(format!("Unknown operation type: {}", s)),
+            _ => Err(format!("Unknown operation type: {s}")),
         }
     }
 }
@@ -96,13 +96,14 @@ impl std::str::FromStr for OperationStatus {
             "awaiting_system" => Ok(OperationStatus::AwaitingSystem),
             "resolved" => Ok(OperationStatus::Resolved),
             "cancelled" => Ok(OperationStatus::Cancelled),
-            _ => Err(format!("Unknown operation status: {}", s)),
+            _ => Err(format!("Unknown operation status: {s}")),
         }
     }
 }
 
 impl OperationStatus {
     /// Check if the operation is in a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
@@ -114,6 +115,7 @@ impl OperationStatus {
     }
 
     /// Check if the operation is waiting for external system.
+    #[must_use] 
     pub fn is_waiting(&self) -> bool {
         matches!(self, OperationStatus::AwaitingSystem)
     }
@@ -241,10 +243,10 @@ impl ProvisioningOperation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM provisioning_operations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -263,12 +265,12 @@ impl ProvisioningOperation {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if let (Some(cid), Some(s)) = (connector_id, status) {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM provisioning_operations
                 WHERE tenant_id = $1 AND connector_id = $2 AND status = $3
                 ORDER BY priority DESC, created_at ASC
                 LIMIT $4 OFFSET $5
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(cid)
@@ -279,12 +281,12 @@ impl ProvisioningOperation {
             .await
         } else if let Some(cid) = connector_id {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM provisioning_operations
                 WHERE tenant_id = $1 AND connector_id = $2
                 ORDER BY priority DESC, created_at ASC
                 LIMIT $3 OFFSET $4
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(cid)
@@ -294,12 +296,12 @@ impl ProvisioningOperation {
             .await
         } else if let Some(s) = status {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM provisioning_operations
                 WHERE tenant_id = $1 AND status = $2
                 ORDER BY priority DESC, created_at ASC
                 LIMIT $3 OFFSET $4
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(s)
@@ -309,12 +311,12 @@ impl ProvisioningOperation {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM provisioning_operations
                 WHERE tenant_id = $1
                 ORDER BY priority DESC, created_at ASC
                 LIMIT $2 OFFSET $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(limit)
@@ -324,7 +326,7 @@ impl ProvisioningOperation {
         }
     }
 
-    /// List operations with OperationFilter.
+    /// List operations with `OperationFilter`.
     pub async fn list_with_filter(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -333,36 +335,36 @@ impl ProvisioningOperation {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM provisioning_operations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.connector_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND connector_id = ${}", param_count));
+            query.push_str(&format!(" AND connector_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.operation_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND operation_type = ${}", param_count));
+            query.push_str(&format!(" AND operation_type = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -402,36 +404,36 @@ impl ProvisioningOperation {
         filter: &OperationFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM provisioning_operations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.connector_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND connector_id = ${}", param_count));
+            query.push_str(&format!(" AND connector_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.operation_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND operation_type = ${}", param_count));
+            query.push_str(&format!(" AND operation_type = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -467,14 +469,14 @@ impl ProvisioningOperation {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if let Some(cid) = connector_id {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM provisioning_operations
                 WHERE tenant_id = $1 AND connector_id = $2
                     AND status = 'pending'
                     AND (next_retry_at IS NULL OR next_retry_at <= NOW())
                 ORDER BY priority DESC, created_at ASC
                 LIMIT $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(cid)
@@ -483,13 +485,13 @@ impl ProvisioningOperation {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM provisioning_operations
                 WHERE tenant_id = $1 AND status = 'pending'
                     AND (next_retry_at IS NULL OR next_retry_at <= NOW())
                 ORDER BY priority DESC, created_at ASC
                 LIMIT $2
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(limit)
@@ -509,14 +511,14 @@ impl ProvisioningOperation {
         let max_retries = input.max_retries.unwrap_or(DEFAULT_MAX_RETRIES);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO provisioning_operations (
                 id, tenant_id, connector_id, user_id, object_class,
                 operation_type, target_uid, payload, priority, max_retries
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -539,11 +541,11 @@ impl ProvisioningOperation {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'in_progress', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -561,13 +563,13 @@ impl ProvisioningOperation {
         target_uid: Option<&str>,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'completed', target_uid = COALESCE($3, target_uid),
                 completed_at = NOW(), updated_at = NOW(),
                 error_message = NULL, error_code = NULL
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -607,14 +609,14 @@ impl ProvisioningOperation {
         };
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = $3, retry_count = $4, next_retry_at = $5,
                 error_message = $6, error_code = $7, is_transient_error = $8,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -635,13 +637,13 @@ impl ProvisioningOperation {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'pending', retry_count = 0, next_retry_at = NULL,
                 error_message = NULL, error_code = NULL, is_transient_error = NULL,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'dead_letter'
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -654,7 +656,7 @@ impl ProvisioningOperation {
     /// Cancel an operation.
     ///
     /// Sets the status to 'cancelled' and records who cancelled it.
-    /// Only pending or in_progress operations can be cancelled.
+    /// Only pending or `in_progress` operations can be cancelled.
     pub async fn cancel(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -662,7 +664,7 @@ impl ProvisioningOperation {
         cancelled_by: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'cancelled',
                 cancelled_by = $3,
@@ -671,7 +673,7 @@ impl ProvisioningOperation {
             WHERE id = $1 AND tenant_id = $2
                 AND status IN ('pending', 'in_progress')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -681,6 +683,7 @@ impl ProvisioningOperation {
     }
 
     /// Check if an operation can be cancelled.
+    #[must_use] 
     pub fn can_cancel(&self) -> bool {
         matches!(
             self.status,
@@ -696,10 +699,10 @@ impl ProvisioningOperation {
         status: OperationStatus,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM provisioning_operations
             WHERE tenant_id = $1 AND connector_id = $2 AND status = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -717,10 +720,10 @@ impl ProvisioningOperation {
     ) -> Result<i64, sqlx::Error> {
         if let (Some(cid), Some(s)) = (connector_id, status) {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM provisioning_operations
                 WHERE tenant_id = $1 AND connector_id = $2 AND status = $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(cid)
@@ -729,10 +732,10 @@ impl ProvisioningOperation {
             .await
         } else if let Some(cid) = connector_id {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM provisioning_operations
                 WHERE tenant_id = $1 AND connector_id = $2
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(cid)
@@ -740,10 +743,10 @@ impl ProvisioningOperation {
             .await
         } else if let Some(s) = status {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM provisioning_operations
                 WHERE tenant_id = $1 AND status = $2
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(s)
@@ -751,10 +754,10 @@ impl ProvisioningOperation {
             .await
         } else {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM provisioning_operations
                 WHERE tenant_id = $1
-                "#,
+                ",
             )
             .bind(tenant_id)
             .fetch_one(pool)
@@ -763,6 +766,7 @@ impl ProvisioningOperation {
     }
 
     /// Check if this operation can be retried.
+    #[must_use] 
     pub fn can_retry(&self) -> bool {
         matches!(
             self.status,
@@ -771,11 +775,13 @@ impl ProvisioningOperation {
     }
 
     /// Check if this operation is in dead letter.
+    #[must_use] 
     pub fn is_dead_letter(&self) -> bool {
         matches!(self.status, OperationStatus::DeadLetter)
     }
 
     /// Check if this operation is awaiting system.
+    #[must_use] 
     pub fn is_awaiting_system(&self) -> bool {
         matches!(self.status, OperationStatus::AwaitingSystem)
     }
@@ -787,12 +793,12 @@ impl ProvisioningOperation {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'awaiting_system', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
                 AND status IN ('pending', 'failed')
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -809,12 +815,12 @@ impl ProvisioningOperation {
         connector_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'pending', updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
                 AND status = 'awaiting_system'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -833,7 +839,7 @@ impl ProvisioningOperation {
         resolution_notes: Option<&str>,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'resolved',
                 resolved_by = $3,
@@ -841,7 +847,7 @@ impl ProvisioningOperation {
                 resolution_notes = $4,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'dead_letter'
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -863,12 +869,12 @@ impl ProvisioningOperation {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if let Some(cid) = connector_id {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM provisioning_operations
                 WHERE tenant_id = $1 AND connector_id = $2 AND status = 'dead_letter'
                 ORDER BY created_at DESC
                 LIMIT $3 OFFSET $4
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(cid)
@@ -878,12 +884,12 @@ impl ProvisioningOperation {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM provisioning_operations
                 WHERE tenant_id = $1 AND status = 'dead_letter'
                 ORDER BY created_at DESC
                 LIMIT $2 OFFSET $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(limit)
@@ -901,10 +907,10 @@ impl ProvisioningOperation {
     ) -> Result<i64, sqlx::Error> {
         if let Some(cid) = connector_id {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM provisioning_operations
                 WHERE tenant_id = $1 AND connector_id = $2 AND status = 'dead_letter'
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(cid)
@@ -912,10 +918,10 @@ impl ProvisioningOperation {
             .await
         } else {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM provisioning_operations
                 WHERE tenant_id = $1 AND status = 'dead_letter'
-                "#,
+                ",
             )
             .bind(tenant_id)
             .fetch_one(pool)
@@ -930,10 +936,10 @@ impl ProvisioningOperation {
         connector_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM provisioning_operations
             WHERE tenant_id = $1 AND connector_id = $2 AND status = 'awaiting_system'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -948,10 +954,10 @@ impl ProvisioningOperation {
         idempotency_key: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM provisioning_operations
             WHERE tenant_id = $1 AND idempotency_key = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(idempotency_key)
@@ -973,12 +979,12 @@ impl ProvisioningOperation {
     ) -> Result<u64, sqlx::Error> {
         // Delete old completed jobs
         let completed_result = sqlx::query(
-            r#"
+            r"
             DELETE FROM provisioning_operations
             WHERE tenant_id = $1
                 AND status = 'completed'
                 AND completed_at < NOW() - INTERVAL '1 day' * $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(completed_days)
@@ -987,12 +993,12 @@ impl ProvisioningOperation {
 
         // Delete old failed/cancelled jobs (retain longer for audit)
         let failed_result = sqlx::query(
-            r#"
+            r"
             DELETE FROM provisioning_operations
             WHERE tenant_id = $1
                 AND status IN ('failed', 'cancelled', 'resolved')
                 AND updated_at < NOW() - INTERVAL '1 day' * $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(failed_days)
@@ -1011,7 +1017,7 @@ impl ProvisioningOperation {
         ids: &[Uuid],
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         let result: Vec<(Uuid,)> = sqlx::query_as(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'pending',
                 retry_count = 0,
@@ -1024,7 +1030,7 @@ impl ProvisioningOperation {
                 AND id = ANY($2)
                 AND status = 'dead_letter'
             RETURNING id
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(ids)

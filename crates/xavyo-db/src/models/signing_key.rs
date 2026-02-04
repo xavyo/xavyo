@@ -42,11 +42,11 @@ impl SigningKey {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO signing_keys (tenant_id, kid, algorithm, private_key_pem, public_key_pem, created_by)
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(&input.kid)
@@ -64,9 +64,9 @@ impl SigningKey {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM signing_keys WHERE kid = $1
-            "#,
+            ",
         )
         .bind(kid)
         .fetch_optional(executor)
@@ -82,11 +82,11 @@ impl SigningKey {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM signing_keys
             WHERE tenant_id = $1 AND state = 'active'
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(executor)
@@ -102,11 +102,11 @@ impl SigningKey {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM signing_keys
             WHERE tenant_id = $1 AND state IN ('active', 'retiring')
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(executor)
@@ -122,11 +122,11 @@ impl SigningKey {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM signing_keys
             WHERE tenant_id = $1
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(executor)
@@ -153,12 +153,12 @@ impl SigningKey {
         // Build update dynamically based on new state
         if new_state == "retiring" {
             sqlx::query_as(
-                r#"
+                r"
                 UPDATE signing_keys
                 SET state = $1, rotated_at = $2
                 WHERE kid = $3 AND tenant_id = $4
                 RETURNING *
-                "#,
+                ",
             )
             .bind(new_state)
             .bind(rotated_at)
@@ -168,12 +168,12 @@ impl SigningKey {
             .await
         } else if new_state == "revoked" {
             sqlx::query_as(
-                r#"
+                r"
                 UPDATE signing_keys
                 SET state = $1, revoked_at = $2
                 WHERE kid = $3 AND tenant_id = $4
                 RETURNING *
-                "#,
+                ",
             )
             .bind(new_state)
             .bind(revoked_at)
@@ -183,12 +183,12 @@ impl SigningKey {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 UPDATE signing_keys
                 SET state = $1
                 WHERE kid = $2 AND tenant_id = $3
                 RETURNING *
-                "#,
+                ",
             )
             .bind(new_state)
             .bind(kid)

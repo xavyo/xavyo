@@ -152,9 +152,7 @@ mod archetype_deletion_prevention {
         // Should prevent deletion when active personas exist
         assert!(
             active_persona_count > 0,
-            "Cannot delete archetype {} with {} active personas",
-            archetype_id,
-            active_persona_count
+            "Cannot delete archetype {archetype_id} with {active_persona_count} active personas"
         );
     }
 
@@ -166,8 +164,7 @@ mod archetype_deletion_prevention {
         // Can delete when no active personas
         assert_eq!(
             active_persona_count, 0,
-            "Can delete archetype {} with no active personas",
-            archetype_id
+            "Can delete archetype {archetype_id} with no active personas"
         );
     }
 
@@ -194,8 +191,7 @@ mod archetype_deletion_prevention {
         let can_deactivate = true;
         assert!(
             can_deactivate,
-            "Can deactivate archetype {} even with {} active personas",
-            archetype_id, active_persona_count
+            "Can deactivate archetype {archetype_id} even with {active_persona_count} active personas"
         );
     }
 }
@@ -216,7 +212,7 @@ mod persona_validity_from_archetype {
         };
 
         let now = Utc::now();
-        let valid_until = now + Duration::days(policy.default_validity_days as i64);
+        let valid_until = now + Duration::days(i64::from(policy.default_validity_days));
 
         // Persona should use archetype's default validity
         assert!(valid_until > now);
@@ -252,13 +248,13 @@ mod persona_validity_from_archetype {
         };
 
         let now = Utc::now();
-        let valid_until = now + Duration::days(policy.default_validity_days as i64);
-        let notify_at = valid_until - Duration::days(policy.notification_before_expiry_days as i64);
+        let valid_until = now + Duration::days(i64::from(policy.default_validity_days));
+        let notify_at = valid_until - Duration::days(i64::from(policy.notification_before_expiry_days));
 
         // Notification should be 7 days before expiration
         assert_eq!(
             (valid_until - notify_at).num_days(),
-            policy.notification_before_expiry_days as i64
+            i64::from(policy.notification_before_expiry_days)
         );
     }
 }
@@ -281,8 +277,7 @@ mod archetype_compatibility_check {
         for attr in required_attributes {
             assert!(
                 user_attributes.get(attr).is_some(),
-                "User missing required attribute: {}",
-                attr
+                "User missing required attribute: {attr}"
             );
         }
     }

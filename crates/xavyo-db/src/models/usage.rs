@@ -64,11 +64,13 @@ pub struct TenantActiveUser {
 
 impl TenantUsageMetrics {
     /// Calculate the period start for a given date (first day of month).
+    #[must_use] 
     pub fn period_start_for(date: NaiveDate) -> NaiveDate {
         NaiveDate::from_ymd_opt(date.year(), date.month(), 1).unwrap()
     }
 
     /// Calculate the period end for a given date (last day of month).
+    #[must_use] 
     pub fn period_end_for(date: NaiveDate) -> NaiveDate {
         let next_month = if date.month() == 12 {
             NaiveDate::from_ymd_opt(date.year() + 1, 1, 1).unwrap()
@@ -86,12 +88,12 @@ impl TenantUsageMetrics {
 
         // Try to insert, on conflict return existing
         let result = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO tenant_usage_metrics (tenant_id, period_start, period_end)
             VALUES ($1, $2, $3)
             ON CONFLICT (tenant_id, period_start) DO UPDATE SET updated_at = NOW()
             RETURNING id, tenant_id, period_start, period_end, mau_count, api_calls, auth_events, agent_invocations, created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(period_start)
@@ -109,11 +111,11 @@ impl TenantUsageMetrics {
         let period_start = Self::period_start_for(today);
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, period_start, period_end, mau_count, api_calls, auth_events, agent_invocations, created_at, updated_at
             FROM tenant_usage_metrics
             WHERE tenant_id = $1 AND period_start = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(period_start)
@@ -129,13 +131,13 @@ impl TenantUsageMetrics {
         periods: usize,
     ) -> Result<Vec<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, period_start, period_end, mau_count, api_calls, auth_events, agent_invocations, created_at, updated_at
             FROM tenant_usage_metrics
             WHERE tenant_id = $1
             ORDER BY period_start DESC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(periods as i64)
@@ -155,13 +157,13 @@ impl TenantUsageMetrics {
         let period_end = Self::period_end_for(today);
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO tenant_usage_metrics (tenant_id, period_start, period_end, api_calls)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (tenant_id, period_start) DO UPDATE
             SET api_calls = tenant_usage_metrics.api_calls + $4,
                 updated_at = NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(period_start)
@@ -185,13 +187,13 @@ impl TenantUsageMetrics {
         let period_end = Self::period_end_for(today);
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO tenant_usage_metrics (tenant_id, period_start, period_end, auth_events)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (tenant_id, period_start) DO UPDATE
             SET auth_events = tenant_usage_metrics.auth_events + $4,
                 updated_at = NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(period_start)
@@ -215,13 +217,13 @@ impl TenantUsageMetrics {
         let period_end = Self::period_end_for(today);
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO tenant_usage_metrics (tenant_id, period_start, period_end, agent_invocations)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (tenant_id, period_start) DO UPDATE
             SET agent_invocations = tenant_usage_metrics.agent_invocations + $4,
                 updated_at = NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(period_start)
@@ -242,7 +244,7 @@ impl TenantUsageMetrics {
 
         // Count unique users and update the metrics
         let result = sqlx::query_scalar::<_, i64>(
-            r#"
+            r"
             WITH mau AS (
                 SELECT COUNT(DISTINCT user_id)::INTEGER as count
                 FROM tenant_active_users
@@ -254,7 +256,7 @@ impl TenantUsageMetrics {
             SET mau_count = COALESCE((SELECT count FROM mau), 0),
                 updated_at = NOW()
             RETURNING mau_count::BIGINT
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(period_start)
@@ -278,12 +280,12 @@ impl TenantActiveUser {
         let period_start = TenantUsageMetrics::period_start_for(today);
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO tenant_active_users (tenant_id, user_id, period_start, last_active_at)
             VALUES ($1, $2, $3, NOW())
             ON CONFLICT (tenant_id, user_id, period_start) DO UPDATE
             SET last_active_at = NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -301,11 +303,11 @@ impl TenantActiveUser {
         let period_start = TenantUsageMetrics::period_start_for(today);
 
         sqlx::query_scalar::<_, i64>(
-            r#"
+            r"
             SELECT COUNT(DISTINCT user_id)
             FROM tenant_active_users
             WHERE tenant_id = $1 AND period_start = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(period_start)

@@ -161,7 +161,7 @@ pub trait NonHumanIdentity: Send + Sync {
     /// Higher scores indicate higher risk. Scores are normalized
     /// from type-specific algorithms:
     /// - **Service accounts**: staleness (40) + credential age (30) + scope (30)
-    /// - **AI agents**: mapped from risk_level enum or computed score
+    /// - **AI agents**: mapped from `risk_level` enum or computed score
     ///
     /// See [`crate::risk::calculate_risk_score`] for the algorithm.
     fn risk_score(&self) -> u32;
@@ -343,7 +343,7 @@ impl NonHumanIdentity for Box<dyn NonHumanIdentity> {
 mod tests {
     use super::*;
 
-    /// Test implementation of NonHumanIdentity for unit tests.
+    /// Test implementation of `NonHumanIdentity` for unit tests.
     struct MockNhi {
         id: Uuid,
         tenant_id: Uuid,

@@ -13,7 +13,7 @@ use uuid::Uuid;
 #[sqlx(type_name = "risk_factor_category", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum RiskFactorCategory {
-    /// Based on current access state (entitlements, SoD violations).
+    /// Based on current access state (entitlements, `SoD` violations).
     Static,
     /// Based on behavioral events (login anomalies, patterns).
     Dynamic,
@@ -21,11 +21,13 @@ pub enum RiskFactorCategory {
 
 impl RiskFactorCategory {
     /// Check if this is a static factor.
+    #[must_use] 
     pub fn is_static(&self) -> bool {
         matches!(self, Self::Static)
     }
 
     /// Check if this is a dynamic factor.
+    #[must_use] 
     pub fn is_dynamic(&self) -> bool {
         matches!(self, Self::Dynamic)
     }
@@ -103,10 +105,10 @@ impl GovRiskFactor {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_factors
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -121,10 +123,10 @@ impl GovRiskFactor {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_factors
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -139,10 +141,10 @@ impl GovRiskFactor {
         factor_type: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_factors
             WHERE tenant_id = $1 AND factor_type = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(factor_type)
@@ -156,11 +158,11 @@ impl GovRiskFactor {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_factors
             WHERE tenant_id = $1 AND is_enabled = true
             ORDER BY category, name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -174,11 +176,11 @@ impl GovRiskFactor {
         category: RiskFactorCategory,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_factors
             WHERE tenant_id = $1 AND category = $2 AND is_enabled = true
             ORDER BY name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(category)
@@ -195,24 +197,24 @@ impl GovRiskFactor {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_risk_factors
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.category.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND category = ${}", param_count));
+            query.push_str(&format!(" AND category = ${param_count}"));
         }
         if filter.is_enabled.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_enabled = ${}", param_count));
+            query.push_str(&format!(" AND is_enabled = ${param_count}"));
         }
         if filter.factor_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND factor_type = ${}", param_count));
+            query.push_str(&format!(" AND factor_type = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -243,24 +245,24 @@ impl GovRiskFactor {
         filter: &RiskFactorFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_risk_factors
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.category.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND category = ${}", param_count));
+            query.push_str(&format!(" AND category = ${param_count}"));
         }
         if filter.is_enabled.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_enabled = ${}", param_count));
+            query.push_str(&format!(" AND is_enabled = ${param_count}"));
         }
         if filter.factor_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND factor_type = ${}", param_count));
+            query.push_str(&format!(" AND factor_type = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -285,13 +287,13 @@ impl GovRiskFactor {
         input: CreateGovRiskFactor,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_risk_factors (
                 tenant_id, name, category, factor_type, weight, description, is_enabled
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -315,27 +317,27 @@ impl GovRiskFactor {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.category.is_some() {
-            updates.push(format!("category = ${}", param_idx));
+            updates.push(format!("category = ${param_idx}"));
             param_idx += 1;
         }
         if input.factor_type.is_some() {
-            updates.push(format!("factor_type = ${}", param_idx));
+            updates.push(format!("factor_type = ${param_idx}"));
             param_idx += 1;
         }
         if input.weight.is_some() {
-            updates.push(format!("weight = ${}", param_idx));
+            updates.push(format!("weight = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_enabled.is_some() {
-            updates.push(format!("is_enabled = ${}", param_idx));
+            updates.push(format!("is_enabled = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -377,10 +379,10 @@ impl GovRiskFactor {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_risk_factors
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -397,12 +399,12 @@ impl GovRiskFactor {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_risk_factors
             SET is_enabled = true, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND is_enabled = false
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -417,12 +419,12 @@ impl GovRiskFactor {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_risk_factors
             SET is_enabled = false, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND is_enabled = true
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

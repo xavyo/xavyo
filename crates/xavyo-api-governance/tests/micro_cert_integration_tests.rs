@@ -1,6 +1,6 @@
 //! Integration tests for F055 Micro-certification.
 //!
-//! These tests require a running PostgreSQL database with the test schema.
+//! These tests require a running `PostgreSQL` database with the test schema.
 //! Run with: `cargo test -p xavyo-api-governance --features integration`
 
 mod common;

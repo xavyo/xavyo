@@ -138,10 +138,10 @@ impl GovStateTransitionAudit {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_state_transition_audit
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -156,11 +156,11 @@ impl GovStateTransitionAudit {
         request_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_state_transition_audit
             WHERE request_id = $1 AND tenant_id = $2
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(request_id)
         .bind(tenant_id)
@@ -177,12 +177,12 @@ impl GovStateTransitionAudit {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_state_transition_audit
             WHERE object_id = $1 AND tenant_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(object_id)
         .bind(tenant_id)
@@ -201,41 +201,41 @@ impl GovStateTransitionAudit {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_state_transition_audit
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_num = 2;
 
         if filter.object_id.is_some() {
-            query.push_str(&format!(" AND object_id = ${}", param_num));
+            query.push_str(&format!(" AND object_id = ${param_num}"));
             param_num += 1;
         }
 
         if filter.object_type.is_some() {
-            query.push_str(&format!(" AND object_type = ${}", param_num));
+            query.push_str(&format!(" AND object_type = ${param_num}"));
             param_num += 1;
         }
 
         if filter.actor_id.is_some() {
-            query.push_str(&format!(" AND actor_id = ${}", param_num));
+            query.push_str(&format!(" AND actor_id = ${param_num}"));
             param_num += 1;
         }
 
         if filter.action_type.is_some() {
-            query.push_str(&format!(" AND action_type = ${}", param_num));
+            query.push_str(&format!(" AND action_type = ${param_num}"));
             param_num += 1;
         }
 
         if filter.from_date.is_some() {
-            query.push_str(&format!(" AND created_at >= ${}", param_num));
+            query.push_str(&format!(" AND created_at >= ${param_num}"));
             param_num += 1;
         }
 
         if filter.to_date.is_some() {
-            query.push_str(&format!(" AND created_at <= ${}", param_num));
+            query.push_str(&format!(" AND created_at <= ${param_num}"));
             param_num += 1;
         }
 
@@ -281,41 +281,41 @@ impl GovStateTransitionAudit {
         filter: &TransitionAuditFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_state_transition_audit
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_num = 2;
 
         if filter.object_id.is_some() {
-            query.push_str(&format!(" AND object_id = ${}", param_num));
+            query.push_str(&format!(" AND object_id = ${param_num}"));
             param_num += 1;
         }
 
         if filter.object_type.is_some() {
-            query.push_str(&format!(" AND object_type = ${}", param_num));
+            query.push_str(&format!(" AND object_type = ${param_num}"));
             param_num += 1;
         }
 
         if filter.actor_id.is_some() {
-            query.push_str(&format!(" AND actor_id = ${}", param_num));
+            query.push_str(&format!(" AND actor_id = ${param_num}"));
             param_num += 1;
         }
 
         if filter.action_type.is_some() {
-            query.push_str(&format!(" AND action_type = ${}", param_num));
+            query.push_str(&format!(" AND action_type = ${param_num}"));
             param_num += 1;
         }
 
         if filter.from_date.is_some() {
-            query.push_str(&format!(" AND created_at >= ${}", param_num));
+            query.push_str(&format!(" AND created_at >= ${param_num}"));
             param_num += 1;
         }
 
         if filter.to_date.is_some() {
-            query.push_str(&format!(" AND created_at <= ${}", param_num));
+            query.push_str(&format!(" AND created_at <= ${param_num}"));
         }
 
         let mut db_query = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -354,10 +354,10 @@ impl GovStateTransitionAudit {
         object_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_state_transition_audit
             WHERE object_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(object_id)
         .bind(tenant_id)
@@ -372,12 +372,12 @@ impl GovStateTransitionAudit {
         object_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_state_transition_audit
             WHERE object_id = $1 AND tenant_id = $2
             ORDER BY created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(object_id)
         .bind(tenant_id)
@@ -392,7 +392,7 @@ impl GovStateTransitionAudit {
         input: &CreateGovStateTransitionAudit,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_state_transition_audit (
                 tenant_id, request_id, object_id, object_type,
                 from_state, to_state, transition_name, actor_id,
@@ -401,7 +401,7 @@ impl GovStateTransitionAudit {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.request_id)
@@ -432,14 +432,14 @@ impl GovStateTransitionAudit {
         input: &UpdateGovStateTransitionAudit,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_state_transition_audit
             SET
                 entitlements_before = COALESCE($3, entitlements_before),
                 entitlements_after = COALESCE($4, entitlements_after)
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

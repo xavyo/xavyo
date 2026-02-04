@@ -1,11 +1,11 @@
-//! IdP Metadata generator
+//! `IdP` Metadata generator
 
 use crate::error::SamlResult;
 use crate::saml::{
     SigningCredentials, NAMEID_FORMAT_EMAIL, NAMEID_FORMAT_PERSISTENT, NAMEID_FORMAT_TRANSIENT,
 };
 
-/// Service for generating IdP SAML 2.0 metadata
+/// Service for generating `IdP` SAML 2.0 metadata
 pub struct MetadataGenerator {
     entity_id: String,
     sso_url: String,
@@ -14,6 +14,7 @@ pub struct MetadataGenerator {
 
 impl MetadataGenerator {
     /// Create a new metadata generator
+    #[must_use] 
     pub fn new(
         entity_id: String,
         sso_url: String,
@@ -26,7 +27,7 @@ impl MetadataGenerator {
         }
     }
 
-    /// Generate IdP metadata XML
+    /// Generate `IdP` metadata XML
     pub fn generate(&self) -> SamlResult<String> {
         let certificate_element = if let Some(ref creds) = self.credentials {
             let cert_base64 = creds.certificate_base64_der()?;
@@ -35,11 +36,10 @@ impl MetadataGenerator {
         <md:KeyDescriptor use="signing">
             <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
                 <ds:X509Data>
-                    <ds:X509Certificate>{}</ds:X509Certificate>
+                    <ds:X509Certificate>{cert_base64}</ds:X509Certificate>
                 </ds:X509Data>
             </ds:KeyInfo>
-        </md:KeyDescriptor>"#,
-                cert_base64
+        </md:KeyDescriptor>"#
             )
         } else {
             String::new()

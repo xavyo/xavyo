@@ -4,7 +4,7 @@ use serde_json::json;
 use xavyo_api_connectors::{ConnectorResponse, CreateConnectorRequest, UpdateConnectorRequest};
 use xavyo_db::models::{ConnectorStatus, ConnectorType};
 
-/// Test: CreateConnectorRequest deserializes correctly for LDAP
+/// Test: `CreateConnectorRequest` deserializes correctly for LDAP
 #[test]
 fn test_create_ldap_connector_request_deserialization() {
     let json = json!({
@@ -35,7 +35,7 @@ fn test_create_ldap_connector_request_deserialization() {
     assert_eq!(request.credentials["password"], "secret123");
 }
 
-/// Test: CreateConnectorRequest deserializes correctly for Database
+/// Test: `CreateConnectorRequest` deserializes correctly for Database
 #[test]
 fn test_create_database_connector_request_deserialization() {
     let json = json!({
@@ -60,7 +60,7 @@ fn test_create_database_connector_request_deserialization() {
     assert_eq!(request.config["driver"], "postgresql");
 }
 
-/// Test: CreateConnectorRequest deserializes correctly for REST
+/// Test: `CreateConnectorRequest` deserializes correctly for REST
 #[test]
 fn test_create_rest_connector_request_deserialization() {
     let json = json!({
@@ -83,7 +83,7 @@ fn test_create_rest_connector_request_deserialization() {
     assert_eq!(request.config["base_url"], "https://api.example.com/v1");
 }
 
-/// Test: CreateConnectorRequest fails without name
+/// Test: `CreateConnectorRequest` fails without name
 #[test]
 fn test_create_connector_request_missing_name() {
     let json = json!({
@@ -96,7 +96,7 @@ fn test_create_connector_request_missing_name() {
     assert!(result.is_err());
 }
 
-/// Test: CreateConnectorRequest fails with invalid connector type
+/// Test: `CreateConnectorRequest` fails with invalid connector type
 #[test]
 fn test_create_connector_request_invalid_type() {
     let json = json!({
@@ -110,7 +110,7 @@ fn test_create_connector_request_invalid_type() {
     assert!(result.is_err());
 }
 
-/// Test: UpdateConnectorRequest deserializes with partial fields
+/// Test: `UpdateConnectorRequest` deserializes with partial fields
 #[test]
 fn test_update_connector_request_partial() {
     let json = json!({
@@ -125,7 +125,7 @@ fn test_update_connector_request_partial() {
     assert!(request.credentials.is_none());
 }
 
-/// Test: UpdateConnectorRequest deserializes all fields
+/// Test: `UpdateConnectorRequest` deserializes all fields
 #[test]
 fn test_update_connector_request_full() {
     let json = json!({
@@ -147,7 +147,7 @@ fn test_update_connector_request_full() {
     assert!(request.credentials.is_some());
 }
 
-/// Test: ConnectorResponse serializes correctly
+/// Test: `ConnectorResponse` serializes correctly
 #[test]
 fn test_connector_response_serialization() {
     use chrono::Utc;
@@ -177,7 +177,7 @@ fn test_connector_response_serialization() {
     assert!(json.get("credentials").is_none());
 }
 
-/// Test: ConnectorResponse without optional fields
+/// Test: `ConnectorResponse` without optional fields
 #[test]
 fn test_connector_response_minimal() {
     use chrono::Utc;

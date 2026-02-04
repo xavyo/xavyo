@@ -20,16 +20,19 @@ pub enum OutlierAnalysisStatus {
 
 impl OutlierAnalysisStatus {
     /// Check if the analysis can be started.
+    #[must_use] 
     pub fn can_start(&self) -> bool {
         matches!(self, Self::Pending)
     }
 
     /// Check if the analysis can be cancelled.
+    #[must_use] 
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Running)
     }
 
     /// Check if the analysis is in a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Failed)
     }
@@ -83,21 +86,19 @@ pub enum OutlierDispositionStatus {
 
 impl OutlierDispositionStatus {
     /// Check if a transition from this status to another is valid.
+    #[must_use] 
     pub fn can_transition_to(&self, target: &Self) -> bool {
         match (self, target) {
             // From New, can go to any review state
-            (Self::New, Self::Legitimate)
-            | (Self::New, Self::RequiresRemediation)
-            | (Self::New, Self::UnderInvestigation) => true,
+            (Self::New,
+Self::Legitimate | Self::RequiresRemediation | Self::UnderInvestigation) => true,
 
             // From Investigation, can conclude in any direction
-            (Self::UnderInvestigation, Self::Legitimate)
-            | (Self::UnderInvestigation, Self::RequiresRemediation)
-            | (Self::UnderInvestigation, Self::Remediated) => true,
+            (Self::UnderInvestigation,
+Self::Legitimate | Self::RequiresRemediation | Self::Remediated) => true,
 
             // From RequiresRemediation, can investigate or remediate
-            (Self::RequiresRemediation, Self::UnderInvestigation)
-            | (Self::RequiresRemediation, Self::Remediated) => true,
+            (Self::RequiresRemediation, Self::UnderInvestigation | Self::Remediated) => true,
 
             // Legitimate can be re-flagged (system sets back to New)
             (Self::Legitimate, Self::New) => true,
@@ -110,11 +111,13 @@ impl OutlierDispositionStatus {
     }
 
     /// Check if this is a terminal state (no further action needed).
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Legitimate | Self::Remediated)
     }
 
     /// Check if this status requires analyst attention.
+    #[must_use] 
     pub fn requires_attention(&self) -> bool {
         matches!(
             self,
@@ -155,6 +158,7 @@ pub enum OutlierAlertSeverity {
 
 impl OutlierAlertSeverity {
     /// Determine severity based on outlier score.
+    #[must_use] 
     pub fn from_score(score: f64) -> Self {
         if score >= 80.0 {
             Self::Critical
@@ -207,7 +211,7 @@ impl ScoringWeights {
             + self.historical_deviation;
 
         if (sum - 1.0).abs() > 0.01 {
-            return Err(format!("Scoring weights must sum to 1.0, got {}", sum));
+            return Err(format!("Scoring weights must sum to 1.0, got {sum}"));
         }
 
         // Validate individual weights are non-negative
@@ -265,7 +269,7 @@ pub struct FactorScore {
     pub raw_value: f64,
     /// Weight applied to this factor.
     pub weight: f64,
-    /// Contribution to overall score (raw_value * weight, normalized).
+    /// Contribution to overall score (`raw_value` * weight, normalized).
     pub contribution: f64,
     /// Human-readable explanation.
     pub details: String,

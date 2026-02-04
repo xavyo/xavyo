@@ -8,7 +8,7 @@
 //! - Full reconciliation mode comparing all accounts in target system with all identities
 //! - Delta reconciliation mode processing only changes since last reconciliation
 //! - Discrepancy detection (missing, orphan, mismatch, collision, unlinked, deleted)
-//! - Remediation actions (create, update, delete, link, unlink, inactivate_identity)
+//! - Remediation actions (create, update, delete, link, unlink, `inactivate_identity`)
 //! - Scheduling with configurable intervals
 //! - Dry-run mode for previewing changes
 //! - Detailed reports with statistics

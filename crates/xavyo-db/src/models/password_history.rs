@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 /// A record of a user's previous password hash.
 ///
-/// Used to prevent password reuse when history_count > 0 in the tenant policy.
+/// Used to prevent password reuse when `history_count` > 0 in the tenant policy.
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct PasswordHistory {
     /// Unique identifier for this history entry.
@@ -40,11 +40,11 @@ impl PasswordHistory {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO password_history (user_id, tenant_id, password_hash)
             VALUES ($1, $2, $3)
             RETURNING *
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -64,12 +64,12 @@ impl PasswordHistory {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM password_history
             WHERE user_id = $1 AND tenant_id = $2
             ORDER BY created_at DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -91,7 +91,7 @@ impl PasswordHistory {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM password_history
             WHERE user_id = $1 AND tenant_id = $2
             AND id NOT IN (
@@ -100,7 +100,7 @@ impl PasswordHistory {
                 ORDER BY created_at DESC
                 LIMIT $3
             )
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -121,10 +121,10 @@ impl PasswordHistory {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM password_history
             WHERE user_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -144,10 +144,10 @@ impl PasswordHistory {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM password_history
             WHERE user_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)

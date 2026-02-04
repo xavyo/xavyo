@@ -42,7 +42,7 @@ pub struct CreateDelegationScopeRequest {
     pub role_ids: Vec<Uuid>,
 
     /// Workflow types in scope. Empty = no type restriction.
-    /// Valid values: "access_request", "certification", "state_transition"
+    /// Valid values: "`access_request`", "certification", "`state_transition`"
     #[serde(default)]
     pub workflow_types: Vec<String>,
 }
@@ -274,7 +274,7 @@ pub struct ListDelegatedWorkItemsQuery {
     /// Filter by delegator ID.
     pub delegator_id: Option<Uuid>,
 
-    /// Filter by work item type (access_request, certification, state_transition).
+    /// Filter by work item type (`access_request`, certification, `state_transition`).
     pub work_item_type: Option<String>,
 
     /// Filter by application ID.
@@ -378,10 +378,10 @@ pub struct ListDelegationAuditQuery {
     /// Filter by delegator ID.
     pub delegator_id: Option<Uuid>,
 
-    /// Filter by action type (approve_request, reject_request, certify_access, etc.).
+    /// Filter by action type (`approve_request`, `reject_request`, `certify_access`, etc.).
     pub action_type: Option<String>,
 
-    /// Filter by work item type (access_request, certification, state_transition).
+    /// Filter by work item type (`access_request`, certification, `state_transition`).
     pub work_item_type: Option<String>,
 
     /// Filter by date range start.

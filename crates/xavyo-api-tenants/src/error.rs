@@ -129,7 +129,7 @@ impl IntoResponse for TenantError {
             TenantError::TenantNotFound(id) => (
                 StatusCode::NOT_FOUND,
                 "not_found",
-                format!("Tenant {} not found", id),
+                format!("Tenant {id} not found"),
                 None,
             ),
             TenantError::NotFoundWithMessage(msg) => {
@@ -138,7 +138,7 @@ impl IntoResponse for TenantError {
             TenantError::SlugConflict(slug) => (
                 StatusCode::CONFLICT,
                 "conflict",
-                format!("Slug already exists: {}", slug),
+                format!("Slug already exists: {slug}"),
                 None,
             ),
             TenantError::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg.clone(), None),

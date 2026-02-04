@@ -77,6 +77,7 @@ pub struct ExportPipeline {
 
 impl ExportPipeline {
     /// Create a new export pipeline for a destination.
+    #[must_use] 
     pub fn new(worker: Box<dyn DeliveryWorker>, config: PipelineConfig) -> Self {
         let circuit_breaker = CircuitBreaker::new(
             config.circuit_breaker_threshold,
@@ -97,7 +98,7 @@ impl ExportPipeline {
     /// Process a single event through the pipeline.
     ///
     /// Returns a `PipelineResult` indicating the outcome. The caller is responsible
-    /// for recording the result in the database (siem_export_events, siem_delivery_health).
+    /// for recording the result in the database (`siem_export_events`, `siem_delivery_health`).
     pub async fn process_event(&self, event: &SiemEvent) -> PipelineResult {
         // Step 1: Filter — check if event type is accepted
         if !self.matches_filter(event) {
@@ -120,7 +121,7 @@ impl ExportPipeline {
                     latency_ms: None,
                     retry_count: 0,
                     dead_lettered: true,
-                    error: Some(format!("Format error: {}", e)),
+                    error: Some(format!("Format error: {e}")),
                 };
             }
         };

@@ -1,6 +1,6 @@
 //! File-based secret provider for Kubernetes volume mounts.
 //!
-//! Reads secrets from filesystem paths configured via SECRET_MAP_* env vars.
+//! Reads secrets from filesystem paths configured via `SECRET_MAP`_* env vars.
 //! Supports file watching via the `notify` crate for live rotation detection.
 
 use async_trait::async_trait;
@@ -29,7 +29,7 @@ impl std::fmt::Debug for FileSecretProvider {
 }
 
 impl FileSecretProvider {
-    /// Create a new FileSecretProvider from configuration.
+    /// Create a new `FileSecretProvider` from configuration.
     pub fn new(config: &SecretProviderConfig) -> Result<Self, SecretError> {
         let path_mappings: HashMap<String, PathBuf> = config
             .secret_mappings
@@ -42,7 +42,7 @@ impl FileSecretProvider {
         }
 
         let file_config = config.file.as_ref();
-        let watch_enabled = file_config.map(|c| c.watch_enabled).unwrap_or(true);
+        let watch_enabled = file_config.is_none_or(|c| c.watch_enabled);
 
         let (watcher, change_tx) = if watch_enabled {
             Self::setup_file_watcher(&path_mappings, file_config)?
@@ -58,8 +58,9 @@ impl FileSecretProvider {
     }
 
     /// Get a receiver for file change notifications.
+    #[must_use] 
     pub fn change_receiver(&self) -> Option<tokio::sync::broadcast::Receiver<String>> {
-        self.change_tx.as_ref().map(|tx| tx.subscribe())
+        self.change_tx.as_ref().map(tokio::sync::broadcast::Sender::subscribe)
     }
 
     /// Setup file watcher for rotation detection.
@@ -88,7 +89,7 @@ impl FileSecretProvider {
             })
             .collect();
 
-        let debounce_ms = file_config.map(|c| c.watch_debounce_ms).unwrap_or(2000);
+        let debounce_ms = file_config.map_or(2000, |c| c.watch_debounce_ms);
 
         let mut watcher =
             notify::recommended_watcher(move |event: Result<notify::Event, notify::Error>| {

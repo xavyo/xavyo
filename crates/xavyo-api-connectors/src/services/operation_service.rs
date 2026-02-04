@@ -141,7 +141,7 @@ pub struct OperationResponse {
     /// When the operation was resolved.
     pub resolved_at: Option<chrono::DateTime<chrono::Utc>>,
 
-    /// Execution attempt history (populated when include_attempts=true).
+    /// Execution attempt history (populated when `include_attempts=true`).
     /// Each attempt records a single execution of the operation (F047).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attempts: Option<Vec<AttemptResponse>>,
@@ -301,18 +301,21 @@ pub struct OperationService {
 
 impl OperationService {
     /// Create a new operation service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         let queue = Arc::new(OperationQueue::new(pool.clone()));
         Self { pool, queue }
     }
 
     /// Create with custom queue configuration.
+    #[must_use] 
     pub fn with_queue_config(pool: PgPool, config: QueueConfig) -> Self {
         let queue = Arc::new(OperationQueue::with_config(pool.clone(), config));
         Self { pool, queue }
     }
 
     /// Get the underlying queue for the processor.
+    #[must_use] 
     pub fn queue(&self) -> Arc<OperationQueue> {
         self.queue.clone()
     }
@@ -600,7 +603,7 @@ impl OperationService {
         })
     }
 
-    /// Release stale operations (operations stuck in in_progress).
+    /// Release stale operations (operations stuck in `in_progress`).
     #[instrument(skip(self))]
     pub async fn release_stale_operations(&self) -> OperationServiceResult<u64> {
         let count = self.queue.release_stale_operations().await?;
@@ -723,7 +726,7 @@ pub struct QueueStatsResponse {
     /// Average processing time in seconds.
     pub avg_processing_time_secs: Option<f64>,
 
-    /// Success rate as percentage (completed / (completed + dead_letter) * 100).
+    /// Success rate as percentage (completed / (completed + `dead_letter`) * 100).
     pub success_rate: f64,
 }
 
@@ -854,7 +857,7 @@ impl From<&xavyo_db::models::ConflictRecord> for ConflictResponse {
             .map(|arr| {
                 arr.iter()
                     .filter_map(|v| v.as_str())
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect()
             })
             .unwrap_or_default();

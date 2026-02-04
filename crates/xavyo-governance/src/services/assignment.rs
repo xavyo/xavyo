@@ -32,7 +32,7 @@ pub struct EntitlementAssignment {
     pub entitlement_id: Uuid,
     /// The type of target (user or group).
     pub target_type: AssignmentTargetType,
-    /// The target ID (user_id or group_id).
+    /// The target ID (`user_id` or `group_id`).
     pub target_id: Uuid,
     /// Who made the assignment.
     pub assigned_by: Uuid,
@@ -127,6 +127,7 @@ pub struct InMemoryAssignmentStore {
 
 impl InMemoryAssignmentStore {
     /// Create a new in-memory store.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             assignments: Arc::new(RwLock::new(HashMap::new())),

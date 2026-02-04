@@ -7,7 +7,7 @@ use serde::Deserialize;
 use super::{SocialProvider, SocialUserInfo, TokenResponse};
 use crate::error::{ProviderType, SocialError, SocialResult};
 
-/// Google OAuth2 endpoints.
+/// Google `OAuth2` endpoints.
 const AUTHORIZATION_ENDPOINT: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT: &str = "https://oauth2.googleapis.com/token";
 const USERINFO_ENDPOINT: &str = "https://openidconnect.googleapis.com/v1/userinfo";
@@ -35,7 +35,7 @@ struct GoogleUserInfo {
     picture: Option<String>,
 }
 
-/// Google OAuth2 provider.
+/// Google `OAuth2` provider.
 #[derive(Clone)]
 pub struct GoogleProvider {
     client_id: String,
@@ -45,6 +45,7 @@ pub struct GoogleProvider {
 
 impl GoogleProvider {
     /// Create a new Google provider.
+    #[must_use] 
     pub fn new(client_id: String, client_secret: String) -> Self {
         Self {
             client_id,

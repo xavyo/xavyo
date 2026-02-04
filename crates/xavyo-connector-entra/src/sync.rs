@@ -88,7 +88,7 @@ impl MappedEntraUser {
                 .map(String::from),
             account_enabled: value
                 .get("accountEnabled")
-                .and_then(|v| v.as_bool())
+                .and_then(serde_json::Value::as_bool)
                 .unwrap_or(true),
             created_at: value
                 .get("createdDateTime")
@@ -172,12 +172,9 @@ impl EntraConnector {
     /// Performs a delta (incremental) user sync.
     #[instrument(skip(self))]
     pub async fn delta_user_sync(&self) -> EntraResult<UserSyncResult> {
-        let delta_link = match &self.config().delta_link_user {
-            Some(link) => link.clone(),
-            None => {
-                info!("No delta link available, performing full sync");
-                return self.full_user_sync().await;
-            }
+        let delta_link = if let Some(link) = &self.config().delta_link_user { link.clone() } else {
+            info!("No delta link available, performing full sync");
+            return self.full_user_sync().await;
         };
 
         info!("Starting delta user sync");

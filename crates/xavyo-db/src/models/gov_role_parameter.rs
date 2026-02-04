@@ -1,6 +1,6 @@
 //! Role Parameter model (F057).
 //!
-//! Represents a parameter definition on a role (entitlement with is_role=true).
+//! Represents a parameter definition on a role (entitlement with `is_role=true`).
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ pub struct GovRoleParameter {
     /// The role (entitlement) this parameter is defined on.
     pub role_id: Uuid,
 
-    /// Parameter name (alphanumeric with underscores, e.g., "database_name").
+    /// Parameter name (alphanumeric with underscores, e.g., "`database_name`").
     pub name: String,
 
     /// Human-readable display name.
@@ -92,10 +92,10 @@ impl GovRoleParameter {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_parameters
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -111,10 +111,10 @@ impl GovRoleParameter {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_parameters
             WHERE tenant_id = $1 AND role_id = $2 AND name = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -130,11 +130,11 @@ impl GovRoleParameter {
         role_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_parameters
             WHERE tenant_id = $1 AND role_id = $2
             ORDER BY display_order ASC, name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -149,11 +149,11 @@ impl GovRoleParameter {
         role_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_parameters
             WHERE tenant_id = $1 AND role_id = $2 AND is_required = true
             ORDER BY display_order ASC, name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -174,15 +174,15 @@ impl GovRoleParameter {
 
         if filter.parameter_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND parameter_type = ${}", param_count));
+            query.push_str(&format!(" AND parameter_type = ${param_count}"));
         }
         if filter.is_required.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_required = ${}", param_count));
+            query.push_str(&format!(" AND is_required = ${param_count}"));
         }
         if filter.name_contains.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${}", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count}"));
         }
 
         query.push_str(" ORDER BY display_order ASC, name ASC");
@@ -198,7 +198,7 @@ impl GovRoleParameter {
             q = q.bind(is_required);
         }
         if let Some(ref name_contains) = filter.name_contains {
-            q = q.bind(format!("%{}%", name_contains));
+            q = q.bind(format!("%{name_contains}%"));
         }
 
         q.fetch_all(pool).await
@@ -211,10 +211,10 @@ impl GovRoleParameter {
         role_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_parameters
             WHERE tenant_id = $1 AND role_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -234,14 +234,14 @@ impl GovRoleParameter {
         let constraints_json = input.constraints.and_then(|c| serde_json::to_value(c).ok());
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_role_parameters (
                 tenant_id, role_id, name, display_name, description,
                 parameter_type, is_required, default_value, constraints, display_order
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -269,27 +269,27 @@ impl GovRoleParameter {
 
         if input.display_name.is_some() {
             param_count += 1;
-            updates.push(format!("display_name = ${}", param_count));
+            updates.push(format!("display_name = ${param_count}"));
         }
         if input.description.is_some() {
             param_count += 1;
-            updates.push(format!("description = ${}", param_count));
+            updates.push(format!("description = ${param_count}"));
         }
         if input.is_required.is_some() {
             param_count += 1;
-            updates.push(format!("is_required = ${}", param_count));
+            updates.push(format!("is_required = ${param_count}"));
         }
         if input.default_value.is_some() {
             param_count += 1;
-            updates.push(format!("default_value = ${}", param_count));
+            updates.push(format!("default_value = ${param_count}"));
         }
         if input.constraints.is_some() {
             param_count += 1;
-            updates.push(format!("constraints = ${}", param_count));
+            updates.push(format!("constraints = ${param_count}"));
         }
         if input.display_order.is_some() {
             param_count += 1;
-            updates.push(format!("display_order = ${}", param_count));
+            updates.push(format!("display_order = ${param_count}"));
         }
 
         if updates.is_empty() {
@@ -334,10 +334,10 @@ impl GovRoleParameter {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_parameters
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -354,10 +354,10 @@ impl GovRoleParameter {
         role_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_parameters
             WHERE tenant_id = $1 AND role_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -368,6 +368,7 @@ impl GovRoleParameter {
     }
 
     /// Get the parsed constraints.
+    #[must_use] 
     pub fn get_constraints(&self) -> Option<ParameterConstraints> {
         self.constraints
             .as_ref()

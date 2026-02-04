@@ -33,7 +33,7 @@ impl EncryptionService {
             BASE64
                 .decode(master_key_base64)
                 .map_err(|e| SocialError::EncryptionError {
-                    operation: format!("decode master key: {}", e),
+                    operation: format!("decode master key: {e}"),
                 })?;
 
         if master_key_bytes.len() != KEY_SIZE {
@@ -55,7 +55,7 @@ impl EncryptionService {
     /// Derive a per-tenant encryption key using HKDF.
     fn derive_tenant_key(&self, tenant_id: Uuid) -> [u8; KEY_SIZE] {
         let hkdf = Hkdf::<Sha256>::new(None, &self.master_key);
-        let info = format!("xavyo-social-{}", tenant_id);
+        let info = format!("xavyo-social-{tenant_id}");
 
         let mut tenant_key = [0u8; KEY_SIZE];
         hkdf.expand(info.as_bytes(), &mut tenant_key)
@@ -71,7 +71,7 @@ impl EncryptionService {
         let tenant_key = self.derive_tenant_key(tenant_id);
         let cipher =
             Aes256Gcm::new_from_slice(&tenant_key).map_err(|e| SocialError::EncryptionError {
-                operation: format!("create cipher: {}", e),
+                operation: format!("create cipher: {e}"),
             })?;
 
         // Generate a random nonce
@@ -84,7 +84,7 @@ impl EncryptionService {
             cipher
                 .encrypt(nonce, plaintext)
                 .map_err(|e| SocialError::EncryptionError {
-                    operation: format!("encrypt: {}", e),
+                    operation: format!("encrypt: {e}"),
                 })?;
 
         // Prepend nonce to ciphertext
@@ -108,7 +108,7 @@ impl EncryptionService {
         let tenant_key = self.derive_tenant_key(tenant_id);
         let cipher =
             Aes256Gcm::new_from_slice(&tenant_key).map_err(|e| SocialError::EncryptionError {
-                operation: format!("create cipher: {}", e),
+                operation: format!("create cipher: {e}"),
             })?;
 
         // Extract nonce and ciphertext
@@ -119,7 +119,7 @@ impl EncryptionService {
         cipher
             .decrypt(nonce, encrypted_data)
             .map_err(|e| SocialError::EncryptionError {
-                operation: format!("decrypt: {}", e),
+                operation: format!("decrypt: {e}"),
             })
     }
 
@@ -132,12 +132,13 @@ impl EncryptionService {
     pub fn decrypt_string(&self, tenant_id: Uuid, ciphertext: &[u8]) -> SocialResult<String> {
         let plaintext = self.decrypt(tenant_id, ciphertext)?;
         String::from_utf8(plaintext).map_err(|e| SocialError::EncryptionError {
-            operation: format!("invalid UTF-8: {}", e),
+            operation: format!("invalid UTF-8: {e}"),
         })
     }
 }
 
 /// Generate a new random master key and return it base64-encoded.
+#[must_use] 
 pub fn generate_master_key() -> String {
     let mut key = [0u8; KEY_SIZE];
     OsRng.fill_bytes(&mut key);

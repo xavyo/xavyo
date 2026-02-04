@@ -169,7 +169,7 @@ pub async fn list_execution_logs(
         .as_uuid();
 
     let limit = params.page_size.unwrap_or(50).min(100);
-    let offset = params.page.map(|p| (p.max(1) - 1) * limit).unwrap_or(0);
+    let offset = params.page.map_or(0, |p| (p.max(1) - 1) * limit);
 
     // Parse date strings into DateTime<Utc> if provided.
     let from_date = params
@@ -239,7 +239,7 @@ pub async fn get_execution_log(
         .script_analytics_service
         .get_execution_log(tenant_id, id)
         .await?
-        .ok_or_else(|| ApiGovernanceError::NotFound(format!("Execution log not found: {}", id)))?;
+        .ok_or_else(|| ApiGovernanceError::NotFound(format!("Execution log not found: {id}")))?;
 
     Ok(Json(map_execution_log(log)))
 }

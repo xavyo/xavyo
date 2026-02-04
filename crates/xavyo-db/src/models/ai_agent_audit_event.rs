@@ -43,7 +43,7 @@ impl std::str::FromStr for AiAuditEventType {
             "approval_request" => Ok(AiAuditEventType::ApprovalRequest),
             "approval_decision" => Ok(AiAuditEventType::ApprovalDecision),
             "agent_lifecycle" => Ok(AiAuditEventType::AgentLifecycle),
-            _ => Err(format!("Invalid audit event type: {}", s)),
+            _ => Err(format!("Invalid audit event type: {s}")),
         }
     }
 }
@@ -81,7 +81,7 @@ impl std::str::FromStr for AiAuditDecision {
             "approved" => Ok(AiAuditDecision::Approved),
             "rejected" => Ok(AiAuditDecision::Rejected),
             "require_approval" => Ok(AiAuditDecision::RequireApproval),
-            _ => Err(format!("Invalid audit decision: {}", s)),
+            _ => Err(format!("Invalid audit decision: {s}")),
         }
     }
 }
@@ -119,7 +119,7 @@ impl std::str::FromStr for AiAuditOutcome {
             "error" => Ok(AiAuditOutcome::Error),
             "timeout" => Ok(AiAuditOutcome::Timeout),
             "cancelled" => Ok(AiAuditOutcome::Cancelled),
-            _ => Err(format!("Invalid audit outcome: {}", s)),
+            _ => Err(format!("Invalid audit outcome: {s}")),
         }
     }
 }
@@ -156,16 +156,19 @@ impl AiAgentAuditEvent {
     }
 
     /// Returns the decision as an enum, if present.
+    #[must_use] 
     pub fn decision_enum(&self) -> Option<Result<AiAuditDecision, String>> {
         self.decision.as_ref().map(|d| d.parse())
     }
 
     /// Returns the outcome as an enum, if present.
+    #[must_use] 
     pub fn outcome_enum(&self) -> Option<Result<AiAuditOutcome, String>> {
         self.outcome.as_ref().map(|o| o.parse())
     }
 
-    /// Get the source IP as parsed IpAddr (if present and valid).
+    /// Get the source IP as parsed `IpAddr` (if present and valid).
+    #[must_use] 
     pub fn source_ip_addr(&self) -> Option<IpAddr> {
         self.source_ip.as_ref().and_then(|s| s.parse().ok())
     }
@@ -214,7 +217,7 @@ impl AiAgentAuditEvent {
         input: LogAuditEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO ai_agent_audit_events (
                 tenant_id, agent_id, event_type, conversation_id, session_id,
                 user_instruction, agent_reasoning, tool_id, tool_name, parameters,
@@ -226,7 +229,7 @@ impl AiAgentAuditEvent {
                       user_instruction, agent_reasoning, tool_id, tool_name, parameters,
                       decision, decision_reason, policy_id, outcome, error_message,
                       source_ip::text, user_agent, duration_ms, timestamp
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.agent_id)
@@ -257,14 +260,14 @@ impl AiAgentAuditEvent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, event_type, conversation_id, session_id,
                    user_instruction, agent_reasoning, tool_id, tool_name, parameters,
                    decision, decision_reason, policy_id, outcome, error_message,
                    source_ip::text, user_agent, duration_ms, timestamp
             FROM ai_agent_audit_events
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -285,7 +288,7 @@ impl AiAgentAuditEvent {
         let end = end.unwrap_or_else(Utc::now);
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, event_type, conversation_id, session_id,
                    user_instruction, agent_reasoning, tool_id, tool_name, parameters,
                    decision, decision_reason, policy_id, outcome, error_message,
@@ -295,7 +298,7 @@ impl AiAgentAuditEvent {
               AND timestamp >= $3 AND timestamp <= $4
             ORDER BY timestamp DESC
             LIMIT $5
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -315,49 +318,49 @@ impl AiAgentAuditEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, event_type, conversation_id, session_id,
                    user_instruction, agent_reasoning, tool_id, tool_name, parameters,
                    decision, decision_reason, policy_id, outcome, error_message,
                    source_ip::text, user_agent, duration_ms, timestamp
             FROM ai_agent_audit_events
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
         let mut conditions = Vec::new();
 
         if filter.agent_id.is_some() {
-            conditions.push(format!("agent_id = ${}", param_idx));
+            conditions.push(format!("agent_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.event_type.is_some() {
-            conditions.push(format!("event_type = ${}", param_idx));
+            conditions.push(format!("event_type = ${param_idx}"));
             param_idx += 1;
         }
         if filter.decision.is_some() {
-            conditions.push(format!("decision = ${}", param_idx));
+            conditions.push(format!("decision = ${param_idx}"));
             param_idx += 1;
         }
         if filter.outcome.is_some() {
-            conditions.push(format!("outcome = ${}", param_idx));
+            conditions.push(format!("outcome = ${param_idx}"));
             param_idx += 1;
         }
         if filter.conversation_id.is_some() {
-            conditions.push(format!("conversation_id = ${}", param_idx));
+            conditions.push(format!("conversation_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.tool_id.is_some() {
-            conditions.push(format!("tool_id = ${}", param_idx));
+            conditions.push(format!("tool_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.start_time.is_some() {
-            conditions.push(format!("timestamp >= ${}", param_idx));
+            conditions.push(format!("timestamp >= ${param_idx}"));
             param_idx += 1;
         }
         if filter.end_time.is_some() {
-            conditions.push(format!("timestamp <= ${}", param_idx));
+            conditions.push(format!("timestamp <= ${param_idx}"));
             param_idx += 1;
         }
 
@@ -411,46 +414,46 @@ impl AiAgentAuditEvent {
         filter: &AiAgentAuditEventFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) as count
             FROM ai_agent_audit_events
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
         let mut conditions = Vec::new();
 
         if filter.agent_id.is_some() {
-            conditions.push(format!("agent_id = ${}", param_idx));
+            conditions.push(format!("agent_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.event_type.is_some() {
-            conditions.push(format!("event_type = ${}", param_idx));
+            conditions.push(format!("event_type = ${param_idx}"));
             param_idx += 1;
         }
         if filter.decision.is_some() {
-            conditions.push(format!("decision = ${}", param_idx));
+            conditions.push(format!("decision = ${param_idx}"));
             param_idx += 1;
         }
         if filter.outcome.is_some() {
-            conditions.push(format!("outcome = ${}", param_idx));
+            conditions.push(format!("outcome = ${param_idx}"));
             param_idx += 1;
         }
         if filter.conversation_id.is_some() {
-            conditions.push(format!("conversation_id = ${}", param_idx));
+            conditions.push(format!("conversation_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.tool_id.is_some() {
-            conditions.push(format!("tool_id = ${}", param_idx));
+            conditions.push(format!("tool_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.start_time.is_some() {
-            conditions.push(format!("timestamp >= ${}", param_idx));
+            conditions.push(format!("timestamp >= ${param_idx}"));
             param_idx += 1;
         }
         if filter.end_time.is_some() {
-            conditions.push(format!("timestamp <= ${}", param_idx));
+            conditions.push(format!("timestamp <= ${param_idx}"));
         }
 
         for condition in conditions {
@@ -497,11 +500,11 @@ impl AiAgentAuditEvent {
     ) -> Result<i64, sqlx::Error> {
         if let Some(since) = since {
             sqlx::query_scalar::<_, i64>(
-                r#"
+                r"
                 SELECT COUNT(*) as count
                 FROM ai_agent_audit_events
                 WHERE tenant_id = $1 AND agent_id = $2 AND timestamp >= $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(agent_id)
@@ -510,11 +513,11 @@ impl AiAgentAuditEvent {
             .await
         } else {
             sqlx::query_scalar::<_, i64>(
-                r#"
+                r"
                 SELECT COUNT(*) as count
                 FROM ai_agent_audit_events
                 WHERE tenant_id = $1 AND agent_id = $2
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(agent_id)
@@ -532,11 +535,11 @@ impl AiAgentAuditEvent {
     ) -> Result<i64, sqlx::Error> {
         if let Some(since) = since {
             sqlx::query_scalar::<_, i64>(
-                r#"
+                r"
                 SELECT COUNT(DISTINCT session_id) as count
                 FROM ai_agent_audit_events
                 WHERE tenant_id = $1 AND agent_id = $2 AND timestamp >= $3 AND session_id IS NOT NULL
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(agent_id)
@@ -545,11 +548,11 @@ impl AiAgentAuditEvent {
             .await
         } else {
             sqlx::query_scalar::<_, i64>(
-                r#"
+                r"
                 SELECT COUNT(DISTINCT session_id) as count
                 FROM ai_agent_audit_events
                 WHERE tenant_id = $1 AND agent_id = $2 AND session_id IS NOT NULL
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(agent_id)
@@ -566,7 +569,7 @@ impl AiAgentAuditEvent {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, event_type, conversation_id, session_id,
                    user_instruction, agent_reasoning, tool_id, tool_name, parameters,
                    decision, decision_reason, policy_id, outcome, error_message,
@@ -575,7 +578,7 @@ impl AiAgentAuditEvent {
             WHERE tenant_id = $1 AND conversation_id = $2
             ORDER BY timestamp ASC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(conversation_id)
@@ -594,7 +597,7 @@ impl AiAgentAuditEvent {
         let since = Utc::now() - chrono::Duration::hours(hours);
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, event_type, conversation_id, session_id,
                    user_instruction, agent_reasoning, tool_id, tool_name, parameters,
                    decision, decision_reason, policy_id, outcome, error_message,
@@ -605,7 +608,7 @@ impl AiAgentAuditEvent {
               AND decision IN ('denied', 'rejected')
             ORDER BY timestamp DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(since)
@@ -624,7 +627,7 @@ impl AiAgentAuditEvent {
         let since = Utc::now() - chrono::Duration::hours(hours);
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, event_type, conversation_id, session_id,
                    user_instruction, agent_reasoning, tool_id, tool_name, parameters,
                    decision, decision_reason, policy_id, outcome, error_message,
@@ -635,7 +638,7 @@ impl AiAgentAuditEvent {
               AND outcome IN ('failure', 'error', 'timeout')
             ORDER BY timestamp DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(since)

@@ -139,7 +139,7 @@ pub struct OrphanedAgentResponse {
     /// Last activity timestamp.
     pub last_activity_at: Option<DateTime<Utc>>,
 
-    /// Whether this agent can be auto-promoted (has valid backup_owner).
+    /// Whether this agent can be auto-promoted (has valid `backup_owner`).
     pub can_auto_promote: bool,
 }
 
@@ -310,7 +310,7 @@ pub struct PermissionListResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AuthorizeResponse {
-    /// Authorization decision: allow, deny, require_approval.
+    /// Authorization decision: allow, deny, `require_approval`.
     pub decision: String,
 
     /// Decision ID for audit trail correlation.
@@ -322,7 +322,7 @@ pub struct AuthorizeResponse {
     /// Decision latency in milliseconds.
     pub latency_ms: f64,
 
-    /// Approval request ID (if decision is require_approval).
+    /// Approval request ID (if decision is `require_approval`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approval_request_id: Option<Uuid>,
 
@@ -363,7 +363,7 @@ pub struct AuditEventResponse {
     /// Agent ID.
     pub agent_id: Uuid,
 
-    /// Event type: tool_invocation, authorization, status_change.
+    /// Event type: `tool_invocation`, authorization, `status_change`.
     pub event_type: String,
 
     /// Conversation ID.
@@ -415,7 +415,7 @@ pub struct AuditListResponse {
 // AgentCard (A2A Protocol)
 // ============================================================================
 
-/// A2A Protocol AgentCard for agent discovery.
+/// A2A Protocol `AgentCard` for agent discovery.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AgentCard {

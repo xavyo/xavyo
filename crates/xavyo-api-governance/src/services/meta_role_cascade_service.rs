@@ -43,6 +43,7 @@ pub struct CascadeStatus {
 
 impl CascadeStatus {
     /// Create a new cascade status.
+    #[must_use] 
     pub fn new(meta_role_id: Uuid, total_affected: i64) -> Self {
         Self {
             meta_role_id,
@@ -66,6 +67,7 @@ pub struct MetaRoleCascadeService {
 
 impl MetaRoleCascadeService {
     /// Create a new cascade service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -76,6 +78,7 @@ impl MetaRoleCascadeService {
     }
 
     /// Create a cascade service with custom batch size.
+    #[must_use] 
     pub fn with_batch_size(pool: PgPool, batch_size: i64) -> Self {
         Self {
             pool,
@@ -222,7 +225,7 @@ impl MetaRoleCascadeService {
                 .apply_cascade_to_role(tenant_id, meta_role_id, inheritance.child_role_id)
                 .await
             {
-                Ok(_) => succeeded += 1,
+                Ok(()) => succeeded += 1,
                 Err(e) => {
                     warn!(
                         tenant_id = %tenant_id,

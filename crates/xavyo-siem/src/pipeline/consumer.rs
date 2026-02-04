@@ -122,7 +122,7 @@ impl SiemEventConsumer {
 
     /// Dispatch a single event to all configured destination pipelines.
     ///
-    /// Returns a map of destination_id → PipelineResult for each pipeline that
+    /// Returns a map of `destination_id` → `PipelineResult` for each pipeline that
     /// processed the event. Pipelines that filter out the event will return a
     /// result with `delivered: false, dead_lettered: false`.
     pub async fn dispatch(&self, event: &SiemEvent) -> HashMap<Uuid, PipelineResult> {
@@ -158,7 +158,7 @@ impl SiemEventConsumer {
                             latency_ms: None,
                             retry_count: 0,
                             dead_lettered: true,
-                            error: Some(format!("Pipeline task panicked: {}", e)),
+                            error: Some(format!("Pipeline task panicked: {e}")),
                         },
                     );
                 }
@@ -169,11 +169,13 @@ impl SiemEventConsumer {
     }
 
     /// Get the number of active destination pipelines.
+    #[must_use] 
     pub fn destination_count(&self) -> usize {
         self.pipelines.len()
     }
 
     /// Check if a specific destination pipeline exists.
+    #[must_use] 
     pub fn has_destination(&self, id: &Uuid) -> bool {
         self.pipelines.contains_key(id)
     }

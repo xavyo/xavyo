@@ -82,7 +82,7 @@ where
                         .headers()
                         .get(TENANT_ID_HEADER)
                         .and_then(|v| v.to_str().ok())
-                        .map(|s| s.to_string())
+                        .map(std::string::ToString::to_string)
                 });
 
             if let Some(tenant_id) = tenant_id {

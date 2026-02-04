@@ -114,10 +114,9 @@ async fn test_create_meta_role_duplicate_name_fails() {
 
     let err = result.unwrap_err();
     assert!(
-        format!("{:?}", err).contains("MetaRoleNameExists")
-            || format!("{:?}", err).contains("Unique Name"),
-        "Expected MetaRoleNameExists error, got: {:?}",
-        err
+        format!("{err:?}").contains("MetaRoleNameExists")
+            || format!("{err:?}").contains("Unique Name"),
+        "Expected MetaRoleNameExists error, got: {err:?}"
     );
 
     cleanup_meta_role_data(&pool, tenant_id).await;
@@ -549,9 +548,8 @@ async fn test_delete_meta_role_with_active_inheritances_fails() {
 
     let err = result.unwrap_err();
     assert!(
-        format!("{:?}", err).contains("MetaRoleHasActiveInheritances"),
-        "Expected MetaRoleHasActiveInheritances error, got: {:?}",
-        err
+        format!("{err:?}").contains("MetaRoleHasActiveInheritances"),
+        "Expected MetaRoleHasActiveInheritances error, got: {err:?}"
     );
 
     cleanup_meta_role_data(&pool, tenant_id).await;

@@ -4,7 +4,7 @@ use chrono::Utc;
 use serde_json::json;
 use xavyo_api_connectors::ConnectionTestResponse;
 
-/// Test: ConnectionTestResponse success serializes correctly
+/// Test: `ConnectionTestResponse` success serializes correctly
 #[test]
 fn test_connection_test_response_success() {
     let response = ConnectionTestResponse {
@@ -20,7 +20,7 @@ fn test_connection_test_response_success() {
     assert!(json["tested_at"].is_string());
 }
 
-/// Test: ConnectionTestResponse failure serializes correctly
+/// Test: `ConnectionTestResponse` failure serializes correctly
 #[test]
 fn test_connection_test_response_failure() {
     let response = ConnectionTestResponse {
@@ -36,7 +36,7 @@ fn test_connection_test_response_failure() {
     assert!(json["tested_at"].is_string());
 }
 
-/// Test: ConnectionTestResponse deserializes correctly
+/// Test: `ConnectionTestResponse` deserializes correctly
 #[test]
 fn test_connection_test_response_deserialization() {
     let json = json!({
@@ -50,7 +50,7 @@ fn test_connection_test_response_deserialization() {
     assert!(response.error.is_none());
 }
 
-/// Test: ConnectionTestResponse with error deserializes correctly
+/// Test: `ConnectionTestResponse` with error deserializes correctly
 #[test]
 fn test_connection_test_response_with_error_deserialization() {
     let json = json!({
@@ -65,7 +65,7 @@ fn test_connection_test_response_with_error_deserialization() {
     assert_eq!(response.error, Some("Authentication failed".to_string()));
 }
 
-/// Test: Various error messages in ConnectionTestResponse
+/// Test: Various error messages in `ConnectionTestResponse`
 #[test]
 fn test_connection_test_various_errors() {
     let error_messages = vec![

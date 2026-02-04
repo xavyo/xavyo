@@ -1,4 +1,4 @@
-//! Unit tests for ObjectTemplateService (F058).
+//! Unit tests for `ObjectTemplateService` (F058).
 //!
 //! Tests CRUD operations, validation, activation/deactivation,
 //! versioning, and inheritance for object templates.
@@ -148,7 +148,7 @@ fn test_create_template_all_object_types() {
 
     for object_type in types {
         let request = CreateGovObjectTemplate {
-            name: format!("{:?} Template", object_type),
+            name: format!("{object_type:?} Template"),
             description: None,
             object_type,
             priority: None,
@@ -324,7 +324,7 @@ fn test_priority_validation_bounds() {
     // Valid priorities
     let valid = vec![MIN_TEMPLATE_PRIORITY, 50, 100, 500, MAX_TEMPLATE_PRIORITY];
     for p in valid {
-        assert!(p >= MIN_TEMPLATE_PRIORITY && p <= MAX_TEMPLATE_PRIORITY);
+        assert!((MIN_TEMPLATE_PRIORITY..=MAX_TEMPLATE_PRIORITY).contains(&p));
     }
 
     // Invalid: below minimum

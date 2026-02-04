@@ -1,6 +1,6 @@
-//! SoD enforcement service for governance API.
+//! `SoD` enforcement service for governance API.
 //!
-//! Provides preventive enforcement by checking assignments against SoD rules.
+//! Provides preventive enforcement by checking assignments against `SoD` rules.
 
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -12,7 +12,7 @@ use crate::models::{EntitlementSourceInfo, SodCheckResponse, SodCheckViolation};
 use crate::services::effective_access_service::EntitlementSource;
 use crate::services::EffectiveAccessService;
 
-/// Result of an SoD check for a potential assignment.
+/// Result of an `SoD` check for a potential assignment.
 #[derive(Debug, Clone)]
 pub struct SodCheckResult {
     /// Whether the assignment is allowed.
@@ -21,7 +21,7 @@ pub struct SodCheckResult {
     pub violations: Vec<SodViolationInfo>,
 }
 
-/// Information about a potential SoD violation.
+/// Information about a potential `SoD` violation.
 #[derive(Debug, Clone)]
 pub struct SodViolationInfo {
     /// Rule that would be violated.
@@ -38,14 +38,15 @@ pub struct SodViolationInfo {
     pub source: Option<EntitlementSourceInfo>,
 }
 
-/// Service for SoD enforcement operations.
+/// Service for `SoD` enforcement operations.
 pub struct SodEnforcementService {
     pool: PgPool,
     effective_access_service: EffectiveAccessService,
 }
 
 impl SodEnforcementService {
-    /// Create a new SoD enforcement service.
+    /// Create a new `SoD` enforcement service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             effective_access_service: EffectiveAccessService::new(pool.clone()),
@@ -53,7 +54,7 @@ impl SodEnforcementService {
         }
     }
 
-    /// Check if an assignment would create SoD violations.
+    /// Check if an assignment would create `SoD` violations.
     ///
     /// Returns a result indicating whether the assignment is allowed and
     /// details of any violations found.
@@ -172,7 +173,7 @@ impl SodEnforcementService {
 
     /// Check multiple assignments at once (for bulk operations).
     ///
-    /// Returns a list of (user_id, entitlement_id) pairs that would violate SoD rules.
+    /// Returns a list of (`user_id`, `entitlement_id`) pairs that would violate `SoD` rules.
     pub async fn check_bulk_assignments(
         &self,
         tenant_id: Uuid,
@@ -237,6 +238,7 @@ impl SodEnforcementService {
     }
 
     /// Convert internal check result to API response format.
+    #[must_use] 
     pub fn to_api_response(result: &SodCheckResult) -> SodCheckResponse {
         SodCheckResponse {
             allowed: result.allowed,
@@ -286,6 +288,7 @@ impl SodEnforcementService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

@@ -16,6 +16,7 @@ pub struct SimulationService {
 
 impl SimulationService {
     /// Create a new simulation service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -181,11 +182,11 @@ impl SimulationService {
 
         // Get users who are members of this group/role
         let affected_users: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT user_id
             FROM user_groups
             WHERE tenant_id = $1 AND group_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -227,7 +228,7 @@ impl SimulationService {
 
         // Get users who have this entitlement through the role
         let affected_users: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT ug.user_id
             FROM user_groups ug
             INNER JOIN gov_entitlement_assignments ea ON ea.target_id = ug.group_id
@@ -235,7 +236,7 @@ impl SimulationService {
                 AND ea.entitlement_id = $3
                 AND ea.status = 'active'
             WHERE ug.tenant_id = $1 AND ug.group_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -298,11 +299,11 @@ impl SimulationService {
 
         // Get all users in this role
         let affected_users: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT user_id
             FROM user_groups
             WHERE tenant_id = $1 AND group_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -312,11 +313,11 @@ impl SimulationService {
 
         // Get all entitlements assigned to this role
         let entitlement_ids: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT entitlement_id
             FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND target_type = 'group' AND target_id = $2 AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -353,11 +354,11 @@ impl SimulationService {
 
         // Get all users in this role
         let affected_users: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT user_id
             FROM user_groups
             WHERE tenant_id = $1 AND group_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -577,7 +578,7 @@ impl SimulationService {
 
         // Check if group with this name already exists
         let existing: Option<Uuid> =
-            sqlx::query_scalar(r#"SELECT id FROM groups WHERE tenant_id = $1 AND name = $2"#)
+            sqlx::query_scalar(r"SELECT id FROM groups WHERE tenant_id = $1 AND name = $2")
                 .bind(tenant_id)
                 .bind(role_name)
                 .fetch_optional(&self.pool)
@@ -585,8 +586,7 @@ impl SimulationService {
 
         if existing.is_some() {
             return Err(GovernanceError::Validation(format!(
-                "A group with name '{}' already exists",
-                role_name
+                "A group with name '{role_name}' already exists"
             )));
         }
 
@@ -597,11 +597,11 @@ impl SimulationService {
             .unwrap_or_else(|| "Role created from simulation".to_string());
 
         let group_id: Uuid = sqlx::query_scalar(
-            r#"
+            r"
             INSERT INTO groups (tenant_id, name, description, created_at, updated_at)
             VALUES ($1, $2, $3, NOW(), NOW())
             RETURNING id
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_name)
@@ -641,7 +641,7 @@ impl SimulationService {
 
         // Verify the group exists
         let exists: Option<Uuid> =
-            sqlx::query_scalar(r#"SELECT id FROM groups WHERE tenant_id = $1 AND id = $2"#)
+            sqlx::query_scalar(r"SELECT id FROM groups WHERE tenant_id = $1 AND id = $2")
                 .bind(tenant_id)
                 .bind(role_id)
                 .fetch_optional(&self.pool)
@@ -649,17 +649,16 @@ impl SimulationService {
 
         if exists.is_none() {
             return Err(GovernanceError::Validation(format!(
-                "Group {} not found",
-                role_id
+                "Group {role_id} not found"
             )));
         }
 
         // Remove all entitlement assignments for this group
         sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND target_type = 'group' AND target_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -668,10 +667,10 @@ impl SimulationService {
 
         // Remove all user memberships from this group
         sqlx::query(
-            r#"
+            r"
             DELETE FROM user_groups
             WHERE tenant_id = $1 AND group_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -680,10 +679,10 @@ impl SimulationService {
 
         // Delete the group itself
         sqlx::query(
-            r#"
+            r"
             DELETE FROM groups
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)

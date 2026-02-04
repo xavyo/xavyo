@@ -141,11 +141,13 @@ impl std::fmt::Display for RevokeReason {
 
 impl Session {
     /// Check if the session is active (not revoked and not expired).
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         self.revoked_at.is_none() && self.expires_at > Utc::now()
     }
 
     /// Check if the session has exceeded idle timeout.
+    #[must_use] 
     pub fn is_idle(&self, idle_timeout_minutes: i64) -> bool {
         if idle_timeout_minutes == 0 {
             return false; // Idle timeout disabled
@@ -160,7 +162,7 @@ impl Session {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO sessions (
                 user_id, tenant_id, refresh_token_id, device_id, device_name,
                 device_type, browser, browser_version, os, os_version,
@@ -168,7 +170,7 @@ impl Session {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.user_id)
         .bind(data.tenant_id)
@@ -221,11 +223,11 @@ impl Session {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM sessions
             WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
             ORDER BY last_activity_at DESC
-            "#,
+            ",
         )
         .bind(user_id)
         .fetch_all(executor)
@@ -238,10 +240,10 @@ impl Session {
         E: PgExecutor<'e>,
     {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM sessions
             WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
-            "#,
+            ",
         )
         .bind(user_id)
         .fetch_one(executor)
@@ -259,11 +261,11 @@ impl Session {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE sessions
             SET revoked_at = NOW(), revoked_reason = $2
             WHERE id = $1 AND revoked_at IS NULL
-            "#,
+            ",
         )
         .bind(id)
         .bind(reason.to_string())
@@ -283,11 +285,11 @@ impl Session {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE sessions
             SET revoked_at = NOW(), revoked_reason = $3
             WHERE user_id = $1 AND id != $2 AND revoked_at IS NULL
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(except_session_id)
@@ -307,11 +309,11 @@ impl Session {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE sessions
             SET revoked_at = NOW(), revoked_reason = $2
             WHERE user_id = $1 AND revoked_at IS NULL
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(reason.to_string())
@@ -329,12 +331,12 @@ impl Session {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM sessions
             WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
             ORDER BY created_at ASC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(user_id)
         .fetch_optional(executor)
@@ -347,11 +349,11 @@ impl Session {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE sessions
             SET last_activity_at = NOW()
             WHERE id = $1 AND revoked_at IS NULL
-            "#,
+            ",
         )
         .bind(id)
         .execute(executor)
@@ -365,11 +367,11 @@ impl Session {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM sessions
             WHERE (revoked_at IS NOT NULL OR expires_at < NOW())
               AND created_at < NOW() - ($1 || ' days')::INTERVAL
-            "#,
+            ",
         )
         .bind(older_than_days.to_string())
         .execute(executor)

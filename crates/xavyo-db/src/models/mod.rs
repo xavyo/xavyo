@@ -1,7 +1,7 @@
 //! Database entity models for xavyo-db.
 //!
 //! These models represent the database tables and provide
-//! type-safe interactions with PostgreSQL.
+//! type-safe interactions with `PostgreSQL`.
 
 pub mod admin_audit_log;
 

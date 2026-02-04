@@ -25,10 +25,10 @@ use crate::{
 // User Story 4: Admin Device Management
 // ============================================================================
 
-/// GET /admin/users/:user_id/devices
+/// GET /`admin/users/:user_id/devices`
 ///
 /// List all devices for a specific user (admin view).
-/// Query params: include_revoked=true to include revoked devices.
+/// Query params: `include_revoked=true` to include revoked devices.
 pub async fn admin_list_user_devices(
     Extension(device_service): Extension<Arc<DeviceService>>,
     Extension(tenant_id): Extension<TenantId>,
@@ -55,7 +55,7 @@ pub async fn admin_list_user_devices(
     ))
 }
 
-/// DELETE /admin/users/:user_id/devices/:device_id
+/// DELETE /`admin/users/:user_id/devices/:device_id`
 ///
 /// Revoke a device for a specific user (admin action).
 pub async fn admin_revoke_device(

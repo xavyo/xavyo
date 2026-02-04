@@ -4,7 +4,7 @@ use serde_json::json;
 use xavyo_api_connectors::{ConnectorListResponse, ConnectorSummaryResponse, ListConnectorsQuery};
 use xavyo_db::models::{ConnectorStatus, ConnectorType};
 
-/// Test: ListConnectorsQuery deserializes with defaults
+/// Test: `ListConnectorsQuery` deserializes with defaults
 #[test]
 fn test_list_connectors_query_defaults() {
     let json = json!({});
@@ -17,7 +17,7 @@ fn test_list_connectors_query_defaults() {
     assert_eq!(query.offset, 0); // default
 }
 
-/// Test: ListConnectorsQuery deserializes with all filters
+/// Test: `ListConnectorsQuery` deserializes with all filters
 #[test]
 fn test_list_connectors_query_with_filters() {
     let json = json!({
@@ -37,7 +37,7 @@ fn test_list_connectors_query_with_filters() {
     assert_eq!(query.offset, 10);
 }
 
-/// Test: ConnectorSummaryResponse serializes correctly
+/// Test: `ConnectorSummaryResponse` serializes correctly
 #[test]
 fn test_connector_summary_response() {
     use chrono::Utc;
@@ -63,7 +63,7 @@ fn test_connector_summary_response() {
     assert!(json.get("description").is_none());
 }
 
-/// Test: ConnectorListResponse serializes correctly
+/// Test: `ConnectorListResponse` serializes correctly
 #[test]
 fn test_connector_list_response() {
     use chrono::Utc;
@@ -103,7 +103,7 @@ fn test_connector_list_response() {
     assert_eq!(json["items"][1]["name"], "Connector 2");
 }
 
-/// Test: Empty ConnectorListResponse
+/// Test: Empty `ConnectorListResponse`
 #[test]
 fn test_connector_list_response_empty() {
     let response = ConnectorListResponse {
@@ -119,7 +119,7 @@ fn test_connector_list_response_empty() {
     assert_eq!(json["total"], 0);
 }
 
-/// Test: ListConnectorsQuery with database filter
+/// Test: `ListConnectorsQuery` with database filter
 #[test]
 fn test_list_connectors_query_database_filter() {
     let json = json!({
@@ -130,7 +130,7 @@ fn test_list_connectors_query_database_filter() {
     assert_eq!(query.connector_type, Some(ConnectorType::Database));
 }
 
-/// Test: ListConnectorsQuery with REST filter
+/// Test: `ListConnectorsQuery` with REST filter
 #[test]
 fn test_list_connectors_query_rest_filter() {
     let json = json!({
@@ -141,7 +141,7 @@ fn test_list_connectors_query_rest_filter() {
     assert_eq!(query.connector_type, Some(ConnectorType::Rest));
 }
 
-/// Test: ListConnectorsQuery with error status filter
+/// Test: `ListConnectorsQuery` with error status filter
 #[test]
 fn test_list_connectors_query_error_status() {
     let json = json!({

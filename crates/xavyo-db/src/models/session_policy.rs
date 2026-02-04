@@ -80,6 +80,7 @@ pub struct UpsertSessionPolicy {
 
 impl TenantSessionPolicy {
     /// Get default policy for a tenant (doesn't persist).
+    #[must_use] 
     pub fn default_for_tenant(tenant_id: Uuid) -> Self {
         Self {
             tenant_id,
@@ -122,7 +123,7 @@ impl TenantSessionPolicy {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_session_policies (
                 tenant_id,
                 access_token_ttl_minutes,
@@ -144,7 +145,7 @@ impl TenantSessionPolicy {
                 remember_me_ttl_days = COALESCE($8, tenant_session_policies.remember_me_ttl_days),
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.access_token_ttl_minutes.unwrap_or(DEFAULT_ACCESS_TOKEN_TTL_MINUTES))
@@ -178,7 +179,7 @@ impl TenantSessionPolicy {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_session_policies (
                 tenant_id,
                 access_token_ttl_minutes,
@@ -191,7 +192,7 @@ impl TenantSessionPolicy {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(DEFAULT_ACCESS_TOKEN_TTL_MINUTES)

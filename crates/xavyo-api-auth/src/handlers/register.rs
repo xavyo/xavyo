@@ -50,7 +50,7 @@ pub async fn register_handler(
             .flat_map(|errors| {
                 errors
                     .iter()
-                    .filter_map(|e| e.message.as_ref().map(|m| m.to_string()))
+                    .filter_map(|e| e.message.as_ref().map(std::string::ToString::to_string))
             })
             .collect();
         if errors.iter().any(|e| e.contains("email")) {
@@ -67,7 +67,7 @@ pub async fn register_handler(
 
     let validation = PasswordPolicyService::validate_password(&request.password, &policy);
     if !validation.is_valid {
-        let errors: Vec<String> = validation.errors.iter().map(|e| e.to_string()).collect();
+        let errors: Vec<String> = validation.errors.iter().map(std::string::ToString::to_string).collect();
         return Err(ApiAuthError::WeakPassword(errors));
     }
 
@@ -119,10 +119,10 @@ async fn send_verification_email(
 
     // Store token hash in database
     sqlx::query(
-        r#"
+        r"
         INSERT INTO email_verification_tokens (tenant_id, user_id, token_hash, expires_at, ip_address)
         VALUES ($1, $2, $3, $4, $5)
-        "#,
+        ",
     )
     .bind(tenant_id.as_uuid())
     .bind(user_id)

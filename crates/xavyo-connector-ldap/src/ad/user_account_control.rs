@@ -71,16 +71,19 @@ pub struct UserAccountControl {
 
 impl UserAccountControl {
     /// Parse a UAC value from the raw integer.
+    #[must_use] 
     pub fn from_value(value: u32) -> Self {
         Self { value }
     }
 
     /// Build a new UAC value starting from zero.
+    #[must_use] 
     pub fn new() -> Self {
         Self { value: 0 }
     }
 
     /// Build a default UAC for a new normal user account.
+    #[must_use] 
     pub fn normal_account() -> Self {
         Self {
             value: NORMAL_ACCOUNT,
@@ -88,53 +91,63 @@ impl UserAccountControl {
     }
 
     /// Check if a specific flag is set.
+    #[must_use] 
     pub fn has_flag(&self, flag: u32) -> bool {
         self.value & flag != 0
     }
 
     /// Set a flag.
+    #[must_use] 
     pub fn set_flag(mut self, flag: u32) -> Self {
         self.value |= flag;
         self
     }
 
     /// Clear a flag.
+    #[must_use] 
     pub fn clear_flag(mut self, flag: u32) -> Self {
         self.value &= !flag;
         self
     }
 
     /// Returns `true` if the account is disabled (ACCOUNTDISABLE bit is set).
+    #[must_use] 
     pub fn is_disabled(&self) -> bool {
         self.has_flag(ACCOUNTDISABLE)
     }
 
     /// Returns `true` if the account is locked out (LOCKOUT bit is set).
+    #[must_use] 
     pub fn is_locked(&self) -> bool {
         self.has_flag(LOCKOUT)
     }
 
     /// Returns `true` if this is a normal user account.
+    #[must_use] 
     pub fn is_normal_account(&self) -> bool {
         self.has_flag(NORMAL_ACCOUNT)
     }
 
     /// Returns `true` if the password never expires.
+    #[must_use] 
     pub fn password_never_expires(&self) -> bool {
         self.has_flag(DONT_EXPIRE_PASSWORD)
     }
 
     /// Returns `true` if a password is not required.
+    #[must_use] 
     pub fn password_not_required(&self) -> bool {
         self.has_flag(PASSWD_NOTREQD)
     }
 
     /// Returns `true` if the password has expired.
+    #[must_use] 
     pub fn password_expired(&self) -> bool {
         self.has_flag(PASSWORD_EXPIRED)
     }
 
     /// Returns `true` if smart card is required for logon.
+    #[must_use] 
     pub fn smartcard_required(&self) -> bool {
         self.has_flag(SMARTCARD_REQUIRED)
     }
@@ -142,16 +155,19 @@ impl UserAccountControl {
     /// Determine the `is_active` status for the platform.
     ///
     /// An account is active if it is NOT disabled.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         !self.is_disabled()
     }
 
     /// Disable the account by setting the ACCOUNTDISABLE flag.
+    #[must_use] 
     pub fn disable(self) -> Self {
         self.set_flag(ACCOUNTDISABLE)
     }
 
     /// Enable the account by clearing the ACCOUNTDISABLE flag.
+    #[must_use] 
     pub fn enable(self) -> Self {
         self.clear_flag(ACCOUNTDISABLE)
     }
@@ -356,7 +372,7 @@ mod tests {
     #[test]
     fn test_display() {
         let uac = UserAccountControl::from_value(NORMAL_ACCOUNT | ACCOUNTDISABLE);
-        let display = format!("{}", uac);
+        let display = format!("{uac}");
         assert!(display.contains("DISABLED"));
         assert!(display.contains("NORMAL"));
         assert!(display.contains("0x202"));

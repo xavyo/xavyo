@@ -24,7 +24,7 @@ pub const DEFAULT_WARNING_THRESHOLD_SECS: i64 = 14400;
 
 /// Job for processing escalation timeouts and warnings.
 ///
-/// This job polls the gov_access_requests table for:
+/// This job polls the `gov_access_requests` table for:
 /// 1. Requests with expired deadlines (need escalation)
 /// 2. Requests approaching deadline (need warning notification)
 pub struct EscalationJob {
@@ -62,6 +62,7 @@ impl EscalationStats {
 
 impl EscalationJob {
     /// Create a new escalation job.
+    #[must_use] 
     pub fn new(
         escalation_service: EscalationService,
         escalation_policy_service: EscalationPolicyService,
@@ -201,8 +202,7 @@ impl EscalationJob {
         .map_err(|e| EscalationJobError::Database(e.to_string()))?
         .ok_or_else(|| {
             EscalationJobError::Processing(format!(
-                "Step {} not found for workflow {}",
-                step_order, workflow_id
+                "Step {step_order} not found for workflow {workflow_id}"
             ))
         })?;
 

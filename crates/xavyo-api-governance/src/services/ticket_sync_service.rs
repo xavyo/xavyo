@@ -23,6 +23,7 @@ pub struct TicketSyncService {
 
 impl TicketSyncService {
     /// Create a new ticket sync service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         let ticketing_config_service = TicketingConfigService::new(pool.clone());
         Self {
@@ -32,6 +33,7 @@ impl TicketSyncService {
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -45,7 +47,7 @@ impl TicketSyncService {
         offset: i64,
     ) -> Result<Vec<GovManualProvisioningTask>> {
         let tasks = sqlx::query_as::<_, GovManualProvisioningTask>(
-            r#"
+            r"
             SELECT t.* FROM gov_manual_provisioning_tasks t
             INNER JOIN gov_external_tickets et ON t.external_ticket_id = et.id
             WHERE t.status IN ('ticket_created', 'in_progress', 'partially_completed')
@@ -53,7 +55,7 @@ impl TicketSyncService {
             ORDER BY t.created_at ASC
             LIMIT $1 OFFSET $2
             FOR UPDATE OF t SKIP LOCKED
-            "#,
+            ",
         )
         .bind(limit)
         .bind(offset)
@@ -180,14 +182,14 @@ impl TicketSyncService {
         if !task.status.is_terminal() {
             // Clear the external ticket reference and set status back to pending
             sqlx::query(
-                r#"
+                r"
                 UPDATE gov_manual_provisioning_tasks
                 SET status = 'pending',
                     external_ticket_id = NULL,
                     error_message = $3,
                     updated_at = NOW()
                 WHERE id = $1 AND tenant_id = $2
-                "#,
+                ",
             )
             .bind(task_id)
             .bind(tenant_id)
@@ -217,11 +219,11 @@ impl TicketSyncService {
 
         // Get all external tickets that need syncing (not in terminal state)
         let tickets = sqlx::query_as::<_, GovExternalTicket>(
-            r#"
+            r"
             SELECT * FROM gov_external_tickets
             WHERE tenant_id = $1
             AND status_category NOT IN ('resolved', 'closed', 'rejected')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -256,7 +258,7 @@ impl TicketSyncService {
                         );
                         result.errors.push(TicketSyncError {
                             ticket_id,
-                            error: format!("Missing ticket handling failed: {}", e),
+                            error: format!("Missing ticket handling failed: {e}"),
                         });
                     } else {
                         result.synced_count += 1; // Count as synced since we handled it
@@ -337,7 +339,7 @@ impl TicketSyncService {
             .get_ticket_status(&ticket.external_reference)
             .await
             .map_err(|e| {
-                GovernanceError::Validation(format!("Failed to get ticket status: {}", e))
+                GovernanceError::Validation(format!("Failed to get ticket status: {e}"))
             })?;
 
         // Map external status to our status category
@@ -348,11 +350,11 @@ impl TicketSyncService {
         if new_category == old_category {
             // Update last_synced_at even if no status change
             sqlx::query(
-                r#"
+                r"
                 UPDATE gov_external_tickets
                 SET last_synced_at = NOW(), updated_at = NOW()
                 WHERE id = $1 AND tenant_id = $2
-                "#,
+                ",
             )
             .bind(ticket.id)
             .bind(tenant_id)
@@ -537,19 +539,16 @@ impl TicketSyncService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        let ticket = match ticket {
-            Some(t) => t,
-            None => {
-                tracing::warn!(
-                    tenant_id = %tenant_id,
-                    external_reference = %payload.ticket_id,
-                    "Webhook received for unknown ticket"
-                );
-                return Ok(WebhookCallbackResult {
-                    processed: false,
-                    message: "Unknown ticket".to_string(),
-                });
-            }
+        let ticket = if let Some(t) = ticket { t } else {
+            tracing::warn!(
+                tenant_id = %tenant_id,
+                external_reference = %payload.ticket_id,
+                "Webhook received for unknown ticket"
+            );
+            return Ok(WebhookCallbackResult {
+                processed: false,
+                message: "Unknown ticket".to_string(),
+            });
         };
 
         // Map the webhook status to our status category
@@ -634,7 +633,7 @@ impl TicketSyncService {
     }
 }
 
-/// Map our TicketStatus to TicketStatusCategory for storage.
+/// Map our `TicketStatus` to `TicketStatusCategory` for storage.
 fn map_ticket_status_to_category(status: &TicketStatus) -> TicketStatusCategory {
     match status {
         TicketStatus::Open => TicketStatusCategory::Open,

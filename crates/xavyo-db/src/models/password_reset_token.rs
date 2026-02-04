@@ -73,7 +73,7 @@ impl PasswordResetToken {
         TenantId::from_uuid(self.tenant_id)
     }
 
-    /// Get the IP address as parsed IpAddr (if present and valid).
+    /// Get the IP address as parsed `IpAddr` (if present and valid).
     #[must_use]
     pub fn ip_addr(&self) -> Option<IpAddr> {
         self.ip_address.as_ref().and_then(|s| s.parse().ok())

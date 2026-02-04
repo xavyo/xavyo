@@ -1,12 +1,12 @@
 //! AWS SSO (IAM Identity Center) Interoperability Tests
 //!
 //! Tests SAML assertion compatibility with AWS IAM Identity Center requirements:
-//! - NameID in persistent format
+//! - `NameID` in persistent format
 //! - Role attribute with AWS namespace URI
-//! - Role ARN pair format (role_arn,provider_arn)
-//! - Multi-role support with separate AttributeValue elements
-//! - RoleSessionName attribute
-//! - SessionDuration attribute (900-43200 seconds)
+//! - Role ARN pair format (`role_arn,provider_arn`)
+//! - Multi-role support with separate `AttributeValue` elements
+//! - `RoleSessionName` attribute
+//! - `SessionDuration` attribute (900-43200 seconds)
 //! - Audience urn:amazon:webservices
 
 use super::common::*;
@@ -44,8 +44,7 @@ fn test_aws_sso_basic_assertion_structure() {
 
     assert!(
         errors.is_empty(),
-        "AWS SSO assertion structure validation failed: {:?}",
-        errors
+        "AWS SSO assertion structure validation failed: {errors:?}"
     );
 }
 
@@ -84,8 +83,7 @@ fn test_aws_sso_role_attribute_namespace_uri() {
 
     assert!(
         roles.is_some(),
-        "AWS SSO requires Role attribute with exact namespace URI: {}",
-        role_attr
+        "AWS SSO requires Role attribute with exact namespace URI: {role_attr}"
     );
 }
 
@@ -104,8 +102,7 @@ fn test_aws_sso_role_arn_pair_format() {
     for role_value in &roles {
         assert!(
             role_value.contains(','),
-            "Role value must contain comma separator: {}",
-            role_value
+            "Role value must contain comma separator: {role_value}"
         );
 
         let parts: Vec<&str> = role_value.split(',').collect();
@@ -163,8 +160,7 @@ fn test_aws_sso_multi_role_separate_attribute_values() {
     for expected_role in &user.aws_roles {
         assert!(
             roles.contains(expected_role),
-            "Missing role: {}",
-            expected_role
+            "Missing role: {expected_role}"
         );
     }
 }
@@ -228,8 +224,7 @@ fn test_aws_sso_session_duration_attribute() {
 
     assert!(
         (900..=43200).contains(&duration_seconds),
-        "SessionDuration must be between 900 and 43200 seconds, got: {}",
-        duration_seconds
+        "SessionDuration must be between 900 and 43200 seconds, got: {duration_seconds}"
     );
 }
 

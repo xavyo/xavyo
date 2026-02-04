@@ -112,7 +112,7 @@ pub struct NhiAuditEventFilter {
 }
 
 impl GovNhiAuditEvent {
-    /// Get the source IP as parsed IpAddr (if present and valid).
+    /// Get the source IP as parsed `IpAddr` (if present and valid).
     #[must_use]
     pub fn source_ip_addr(&self) -> Option<IpAddr> {
         self.source_ip.as_ref().and_then(|s| s.parse().ok())
@@ -125,14 +125,14 @@ impl GovNhiAuditEvent {
         data: CreateGovNhiAuditEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_nhi_audit_events (
                 tenant_id, nhi_id, event_type, actor_id,
                 changes, metadata, source_ip
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.nhi_id)
@@ -154,36 +154,36 @@ impl GovNhiAuditEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_nhi_audit_events
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.nhi_id.is_some() {
-            query.push_str(&format!(" AND nhi_id = ${}", param_idx));
+            query.push_str(&format!(" AND nhi_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.event_type.is_some() {
-            query.push_str(&format!(" AND event_type = ${}", param_idx));
+            query.push_str(&format!(" AND event_type = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.actor_id.is_some() {
-            query.push_str(&format!(" AND actor_id = ${}", param_idx));
+            query.push_str(&format!(" AND actor_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.start_date.is_some() {
-            query.push_str(&format!(" AND timestamp >= ${}", param_idx));
+            query.push_str(&format!(" AND timestamp >= ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.end_date.is_some() {
-            query.push_str(&format!(" AND timestamp <= ${}", param_idx));
+            query.push_str(&format!(" AND timestamp <= ${param_idx}"));
             param_idx += 1;
         }
 
@@ -227,36 +227,36 @@ impl GovNhiAuditEvent {
         filter: &NhiAuditEventFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_nhi_audit_events
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.nhi_id.is_some() {
-            query.push_str(&format!(" AND nhi_id = ${}", param_idx));
+            query.push_str(&format!(" AND nhi_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.event_type.is_some() {
-            query.push_str(&format!(" AND event_type = ${}", param_idx));
+            query.push_str(&format!(" AND event_type = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.actor_id.is_some() {
-            query.push_str(&format!(" AND actor_id = ${}", param_idx));
+            query.push_str(&format!(" AND actor_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.start_date.is_some() {
-            query.push_str(&format!(" AND timestamp >= ${}", param_idx));
+            query.push_str(&format!(" AND timestamp >= ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.end_date.is_some() {
-            query.push_str(&format!(" AND timestamp <= ${}", param_idx));
+            query.push_str(&format!(" AND timestamp <= ${param_idx}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -292,12 +292,12 @@ impl GovNhiAuditEvent {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_nhi_audit_events
             WHERE tenant_id = $1 AND nhi_id = $2
             ORDER BY timestamp DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(nhi_id)

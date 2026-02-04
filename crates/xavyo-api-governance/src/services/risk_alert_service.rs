@@ -20,6 +20,7 @@ pub struct RiskAlertService {
 
 impl RiskAlertService {
     /// Create a new risk alert service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -29,8 +30,7 @@ impl RiskAlertService {
         let alert = GovRiskAlert::find_by_id(&self.pool, tenant_id, alert_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk alert not found: {}",
-                alert_id
+                "Risk alert not found: {alert_id}"
             )))?;
 
         Ok(RiskAlertResponse::from(alert))
@@ -82,8 +82,7 @@ impl RiskAlertService {
         let alert = GovRiskAlert::acknowledge(&self.pool, tenant_id, alert_id, acknowledged_by)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk alert not found or already acknowledged: {}",
-                alert_id
+                "Risk alert not found or already acknowledged: {alert_id}"
             )))?;
 
         Ok(AcknowledgeAlertResponse {
@@ -203,8 +202,7 @@ impl RiskAlertService {
 
         if !deleted {
             return Err(ApiGovernanceError::NotFound(format!(
-                "Risk alert not found: {}",
-                alert_id
+                "Risk alert not found: {alert_id}"
             )));
         }
 

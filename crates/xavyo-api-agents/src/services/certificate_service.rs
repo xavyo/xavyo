@@ -3,7 +3,7 @@
 //! This service handles the complete lifecycle of X.509 certificates for AI agents:
 //! - Certificate issuance with configurable validity and key algorithm
 //! - Certificate retrieval and listing
-//! - Integration with CaService for CA management
+//! - Integration with `CaService` for CA management
 
 use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
@@ -31,7 +31,8 @@ pub struct CertificateService {
 }
 
 impl CertificateService {
-    /// Create a new CertificateService.
+    /// Create a new `CertificateService`.
+    #[must_use] 
     pub fn new(pool: PgPool, ca_service: Arc<CaService>, audit_service: Arc<AuditService>) -> Self {
         Self {
             pool,
@@ -121,14 +122,14 @@ impl CertificateService {
 
         // Parse the issued certificate to extract metadata
         let cert_der = ::pem::parse(&cert_result.certificate_pem).map_err(|e| {
-            ApiAgentsError::CertificateIssueFailed(format!("Failed to parse certificate: {}", e))
+            ApiAgentsError::CertificateIssueFailed(format!("Failed to parse certificate: {e}"))
         })?;
 
         let (_, x509_cert) = x509_parser::certificate::X509Certificate::from_der(
             cert_der.contents(),
         )
         .map_err(|e| {
-            ApiAgentsError::CertificateIssueFailed(format!("Failed to parse X.509: {:?}", e))
+            ApiAgentsError::CertificateIssueFailed(format!("Failed to parse X.509: {e:?}"))
         })?;
 
         // Calculate SHA-256 fingerprint
@@ -149,7 +150,7 @@ impl CertificateService {
                 .unwrap_or_else(Utc::now);
         let not_after: DateTime<Utc> =
             DateTime::from_timestamp(x509_cert.validity().not_after.timestamp(), 0)
-                .unwrap_or_else(|| Utc::now() + chrono::Duration::days(validity_days as i64));
+                .unwrap_or_else(|| Utc::now() + chrono::Duration::days(i64::from(validity_days)));
 
         // Store the certificate in the database
         let certificate = AgentCertificate::create(
@@ -320,7 +321,7 @@ impl CertificateService {
     /// Find a certificate by fingerprint without tenant filter.
     ///
     /// **Security Warning**: Only use for mTLS validation where tenant is
-    /// extracted from the certificate itself. Always verify tenant_id after lookup.
+    /// extracted from the certificate itself. Always verify `tenant_id` after lookup.
     pub async fn find_by_fingerprint_any_tenant(
         &self,
         fingerprint: &str,
@@ -403,8 +404,7 @@ impl CertificateService {
         // Determine validity period (use requested or default to CA max)
         let validity_days = request
             .validity_days
-            .map(|d| d.min(ca.max_validity_days))
-            .unwrap_or(ca.max_validity_days);
+            .map_or(ca.max_validity_days, |d| d.min(ca.max_validity_days));
 
         // Determine key algorithm (use requested or same as original)
         let key_algorithm = request.key_algorithm.as_deref().unwrap_or("ecdsa_p256");
@@ -457,7 +457,7 @@ impl CertificateService {
     /// * `tenant_id` - The tenant ID
     /// * `agent_id` - The agent ID
     /// * `certificate_id` - The certificate to revoke
-    /// * `reason` - Revocation reason (key_compromise, ca_compromise, etc.)
+    /// * `reason` - Revocation reason (`key_compromise`, `ca_compromise`, etc.)
     /// * `revoked_by` - Optional user ID who requested revocation
     pub async fn revoke_certificate(
         &self,
@@ -532,12 +532,12 @@ impl CertificateService {
 ///
 /// Supported reasons:
 /// - unspecified (0)
-/// - key_compromise (1)
-/// - ca_compromise (2)
-/// - affiliation_changed (3)
+/// - `key_compromise` (1)
+/// - `ca_compromise` (2)
+/// - `affiliation_changed` (3)
 /// - superseded (4)
-/// - cessation_of_operation (5)
-/// - certificate_hold (6)
+/// - `cessation_of_operation` (5)
+/// - `certificate_hold` (6)
 fn parse_revocation_reason(reason: &str) -> Result<i16, ApiAgentsError> {
     match reason.to_lowercase().as_str() {
         "unspecified" | "" => Ok(0),
@@ -596,7 +596,7 @@ fn calculate_fingerprint(der_bytes: &[u8]) -> String {
     // Format as colon-separated hex (e.g., "AB:CD:EF:...")
     result
         .iter()
-        .map(|b| format!("{:02X}", b))
+        .map(|b| format!("{b:02X}"))
         .collect::<Vec<_>>()
         .join(":")
 }
@@ -605,16 +605,15 @@ fn calculate_fingerprint(der_bytes: &[u8]) -> String {
 fn format_serial_number(bytes: Vec<u8>) -> String {
     bytes
         .iter()
-        .map(|b| format!("{:02X}", b))
-        .collect::<Vec<_>>()
-        .join("")
+        .map(|b| format!("{b:02X}"))
+        .collect::<String>()
 }
 
 /// Format an X.500 Distinguished Name.
 fn format_subject_dn(subject: &x509_parser::x509::X509Name) -> String {
     subject
         .iter()
-        .flat_map(|rdn| rdn.iter())
+        .flat_map(x509_parser::prelude::RelativeDistinguishedName::iter)
         .filter_map(|attr| {
             let oid_str = match attr.attr_type().to_string().as_str() {
                 "2.5.4.3" => Some("CN"),

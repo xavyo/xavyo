@@ -16,7 +16,7 @@ use xavyo_db::models::{
     CreateIamRoleMapping, IamRoleMapping, IamRoleMappingFilter, UpdateIamRoleMapping,
 };
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()
@@ -24,7 +24,7 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
         .ok_or(ApiAgentsError::MissingTenant)
 }
 
-/// Extract user_id from JWT claims (uses sub field).
+/// Extract `user_id` from JWT claims (uses sub field).
 fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     Uuid::parse_str(&claims.sub).map_err(|_| ApiAgentsError::MissingUser)
 }
@@ -172,7 +172,7 @@ pub async fn create_role_mapping(
         .create_mapping(
             tenant_id,
             user_id,
-            &provider.provider_type.to_string(),
+            &provider.provider_type.clone(),
             &create_request,
         )
         .await?;
@@ -301,7 +301,7 @@ pub async fn update_role_mapping(
             tenant_id,
             user_id,
             id,
-            &provider.provider_type.to_string(),
+            &provider.provider_type.clone(),
             &update_request,
         )
         .await?;
@@ -347,7 +347,7 @@ pub async fn delete_role_mapping(
 
     state
         .role_mapping_service
-        .delete_mapping(tenant_id, user_id, id, &provider.provider_type.to_string())
+        .delete_mapping(tenant_id, user_id, id, &provider.provider_type.clone())
         .await?;
 
     Ok(StatusCode::NO_CONTENT)

@@ -22,6 +22,7 @@ pub struct PersonaAuditService {
 
 impl PersonaAuditService {
     /// Create a new audit service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -381,9 +382,9 @@ impl PersonaAuditService {
             session_id,
             from_persona_id,
             to_persona_id,
-            from_persona_name: from_persona_name.map(|s| s.to_string()),
-            to_persona_name: to_persona_name.map(|s| s.to_string()),
-            switch_reason: switch_reason.map(|s| s.to_string()),
+            from_persona_name: from_persona_name.map(std::string::ToString::to_string),
+            to_persona_name: to_persona_name.map(std::string::ToString::to_string),
+            switch_reason: switch_reason.map(std::string::ToString::to_string),
             new_jwt_issued,
         };
 
@@ -419,7 +420,7 @@ impl PersonaAuditService {
             to_persona_id: None,
             from_persona_name: Some(from_persona_name.to_string()),
             to_persona_name: None,
-            switch_reason: switch_reason.map(|s| s.to_string()),
+            switch_reason: switch_reason.map(std::string::ToString::to_string),
             new_jwt_issued,
         };
 
@@ -675,6 +676,7 @@ impl PersonaAuditService {
     }
 
     /// Get reference to the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

@@ -68,6 +68,7 @@ impl GroupService {
     }
 
     /// Apply group filter to list of groups
+    #[must_use] 
     pub fn apply_filter(groups: &[GroupInfo], filter: Option<&GroupFilter>) -> Vec<GroupInfo> {
         match filter {
             Some(f) => groups
@@ -80,6 +81,7 @@ impl GroupService {
     }
 
     /// Format groups according to configuration
+    #[must_use] 
     pub fn format_groups(groups: &[GroupInfo], config: &GroupAttributeConfig) -> Vec<String> {
         groups
             .iter()
@@ -88,6 +90,7 @@ impl GroupService {
     }
 
     /// Format a single group value according to format specification
+    #[must_use] 
     pub fn format_group_value(
         group: &GroupInfo,
         format: &GroupValueFormat,
@@ -100,7 +103,7 @@ impl GroupService {
                 let base = dn_base.unwrap_or("ou=Groups,dc=example,dc=com");
                 // Escape special DN characters in group name
                 let escaped_name = Self::escape_dn_value(&group.display_name);
-                format!("cn={},{}", escaped_name, base)
+                format!("cn={escaped_name},{base}")
             }
         }
     }
@@ -134,6 +137,7 @@ impl GroupService {
     }
 
     /// Get the attribute name to use for groups
+    #[must_use] 
     pub fn get_attribute_name(config: &GroupAttributeConfig) -> &str {
         &config.attribute_name
     }

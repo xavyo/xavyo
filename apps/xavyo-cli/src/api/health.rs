@@ -12,7 +12,7 @@ pub async fn check_health(client: &ApiClient, url: &str) -> CliResult<HealthResp
         Ok(resp) if resp.status().is_success() => resp
             .json()
             .await
-            .map_err(|e| CliError::Server(format!("Invalid health response: {}", e))),
+            .map_err(|e| CliError::Server(format!("Invalid health response: {e}"))),
         Ok(resp) => {
             // Non-success status but we got a response
             Err(CliError::Server(format!(

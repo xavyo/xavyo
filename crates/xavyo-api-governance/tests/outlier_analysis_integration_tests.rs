@@ -6,12 +6,11 @@ mod common;
 
 use common::{
     cleanup_outlier_data, cleanup_test_tenant, create_test_application, create_test_assignment,
-    create_test_entitlement, create_test_outlier_alert, create_test_outlier_analysis,
+    create_test_entitlement, create_test_outlier_analysis,
     create_test_outlier_config, create_test_outlier_result, create_test_peer_group,
     create_test_pool, create_test_tenant, create_test_user,
 };
-use uuid::Uuid;
-use xavyo_api_governance::services::{OutlierConfigService, OutlierScoringService};
+use xavyo_api_governance::services::OutlierScoringService;
 use xavyo_db::OutlierTriggerType;
 
 /// T021: Integration test for analysis execution
@@ -100,7 +99,7 @@ async fn test_analysis_prevents_concurrent_execution() {
         "Should not allow concurrent analysis execution"
     );
     let err = result.unwrap_err();
-    assert!(err.is_conflict(), "Error should be a conflict: {:?}", err);
+    assert!(err.is_conflict(), "Error should be a conflict: {err:?}");
 
     // Cleanup
     cleanup_outlier_data(&pool, tenant_id).await;
@@ -273,7 +272,7 @@ async fn test_dashboard_pagination() {
     // Create 5 users with results
     for i in 0..5 {
         let user = create_test_user(&pool, tenant_id).await;
-        let score = 50.0 + (i as f64 * 10.0);
+        let score = 50.0 + (f64::from(i) * 10.0);
         create_test_outlier_result(
             &pool,
             tenant_id,
@@ -332,14 +331,14 @@ async fn test_dashboard_summary_statistics() {
 
     // Mark analysis as completed with proper timestamp
     sqlx::query(
-        r#"
+        r"
         UPDATE gov_outlier_analyses
         SET status = 'completed'::gov_outlier_analysis_status,
             completed_at = NOW(),
             total_users = 4,
             outlier_count = 2
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(analysis_id)
     .execute(&pool)

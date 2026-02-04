@@ -26,7 +26,7 @@ pub struct FieldValidationError {
     pub code: String,
     /// Human-readable error message.
     pub message: String,
-    /// Optional constraint details (e.g., max_length, pattern).
+    /// Optional constraint details (e.g., `max_length`, pattern).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub constraints: Option<serde_json::Value>,
 }
@@ -97,7 +97,7 @@ pub enum ApiUsersError {
     #[error("Maximum number of attribute definitions reached (100)")]
     AttributeDefinitionLimitExceeded,
 
-    /// Cannot change data_type on an attribute definition when user data exists.
+    /// Cannot change `data_type` on an attribute definition when user data exists.
     #[error("Cannot change data type when user data exists for this attribute")]
     AttributeDataTypeChangeRejected,
 

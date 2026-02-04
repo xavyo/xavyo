@@ -5,8 +5,7 @@
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 use xavyo_db::{
-    MicroCertDecision, MicroCertReviewerType, MicroCertScopeType, MicroCertStatus,
-    MicroCertTriggerType,
+    MicroCertDecision, MicroCertStatus,
 };
 
 /// Simulated certification creation input
@@ -122,7 +121,7 @@ mod certification_creation {
         assert!(cert.escalation_deadline.is_some());
 
         // Escalation should be at 75% of timeout (18 hours)
-        let expected_escalation = Utc::now() + Duration::seconds((86400 * 75 / 100) as i64);
+        let expected_escalation = Utc::now() + Duration::seconds(i64::from(86400 * 75 / 100));
         let actual_escalation = cert.escalation_deadline.unwrap();
 
         // Allow 1 second tolerance
@@ -333,7 +332,7 @@ fn create_certification(tenant_id: Uuid, input: CreateCertificationInput) -> Cer
         status: MicroCertStatus::Pending,
         triggering_event_type: input.triggering_event_type,
         triggering_event_id: input.triggering_event_id,
-        deadline: Utc::now() + Duration::seconds(input.timeout_secs as i64),
+        deadline: Utc::now() + Duration::seconds(i64::from(input.timeout_secs)),
         escalation_deadline: None,
         reminder_sent: false,
         escalated: false,
@@ -346,11 +345,11 @@ fn create_certification_with_escalation(
     input: CreateCertificationInput,
     reminder_threshold_percent: i32,
 ) -> Certification {
-    let deadline = Utc::now() + Duration::seconds(input.timeout_secs as i64);
+    let deadline = Utc::now() + Duration::seconds(i64::from(input.timeout_secs));
     let escalation_deadline = if input.backup_reviewer_id.is_some() {
         Some(
             Utc::now()
-                + Duration::seconds((input.timeout_secs * reminder_threshold_percent / 100) as i64),
+                + Duration::seconds(i64::from(input.timeout_secs * reminder_threshold_percent / 100)),
         )
     } else {
         None

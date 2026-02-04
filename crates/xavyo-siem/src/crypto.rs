@@ -1,4 +1,4 @@
-//! AES-GCM encryption/decryption for SIEM destination auth_config.
+//! AES-GCM encryption/decryption for SIEM destination `auth_config`.
 //!
 //! Follows the existing pattern from xavyo-connector credential encryption.
 

@@ -25,11 +25,13 @@ pub struct SchemaCleanupJob {
 
 impl SchemaCleanupJob {
     /// Create a new schema cleanup job with default retention.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self::with_retention(pool, DEFAULT_SCHEMA_RETENTION_COUNT)
     }
 
     /// Create a new schema cleanup job with custom retention count.
+    #[must_use] 
     pub fn with_retention(pool: PgPool, retention_count: i32) -> Self {
         let retention_count = retention_count.max(1); // At least keep 1 version
         Self {
@@ -73,10 +75,10 @@ impl SchemaCleanupJob {
     pub async fn cleanup_all(&self) -> Result<u64, sqlx::Error> {
         // Get distinct connector IDs that have schema versions
         let connector_ids: Vec<(Uuid,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT DISTINCT connector_id
             FROM connector_schema_versions
-            "#,
+            ",
         )
         .fetch_all(self.pool.as_ref())
         .await?;
@@ -108,6 +110,7 @@ impl SchemaCleanupJob {
     }
 
     /// Get the configured retention count.
+    #[must_use] 
     pub fn retention_count(&self) -> i32 {
         self.retention_count
     }

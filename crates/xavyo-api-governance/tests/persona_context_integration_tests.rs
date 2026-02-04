@@ -11,7 +11,7 @@ mod common;
 
 mod context_switching_integration {
     use super::*;
-    use xavyo_db::models::{PersonaAuditEventType, PersonaStatus};
+    use xavyo_db::models::PersonaAuditEventType;
 
     /// T036: Integration test for context switching workflow
     #[test]
@@ -58,7 +58,7 @@ mod context_switching_integration {
         });
 
         // Switch back to physical user
-        let switch_back_request = json!({
+        let _switch_back_request = json!({
             "reason": "Admin tasks completed"
         });
 
@@ -76,10 +76,10 @@ mod context_switching_integration {
     #[test]
     fn test_access_policy_changes_on_switch() {
         // Before switch: Employee entitlements
-        let employee_entitlements = vec!["read:docs", "write:own-docs"];
+        let employee_entitlements = ["read:docs", "write:own-docs"];
 
         // After switch to Admin: Admin entitlements
-        let admin_entitlements = vec!["read:docs", "write:all-docs", "admin:servers"];
+        let admin_entitlements = ["read:docs", "write:all-docs", "admin:servers"];
 
         assert!(admin_entitlements.len() > employee_entitlements.len());
     }
@@ -117,7 +117,7 @@ mod validation_integration {
     fn test_reject_switch_to_other_users_persona() {
         let user_id = Uuid::new_v4();
         let other_user_id = Uuid::new_v4();
-        let other_persona_id = Uuid::new_v4();
+        let _other_persona_id = Uuid::new_v4();
 
         // Persona belongs to other user
         let persona_owner = other_user_id;
@@ -204,7 +204,7 @@ mod session_management_integration {
 
     #[test]
     fn test_persona_deactivation_invalidates_sessions() {
-        let persona_id = Uuid::new_v4();
+        let _persona_id = Uuid::new_v4();
         let active_sessions_before = 3;
         let active_sessions_after = 0;
 
@@ -215,7 +215,7 @@ mod session_management_integration {
 
     #[test]
     fn test_user_deactivation_invalidates_all_sessions() {
-        let user_id = Uuid::new_v4();
+        let _user_id = Uuid::new_v4();
         let sessions_before = 5;
         let sessions_after = 0;
 
@@ -359,7 +359,7 @@ mod audit_integration {
     fn test_audit_event_logged_on_switch_back() {
         let event_type = PersonaAuditEventType::ContextSwitchedBack;
 
-        let audit_event = json!({
+        let _audit_event = json!({
             "event_type": "ContextSwitchedBack",
             "event_data": {
                 "from_persona_id": Uuid::new_v4(),
@@ -376,11 +376,9 @@ mod audit_integration {
 
     #[test]
     fn test_audit_trail_shows_all_context_changes() {
-        let audit_events = vec![
-            json!({"event_type": "ContextSwitched", "to_persona": "admin.john.doe"}),
+        let audit_events = [json!({"event_type": "ContextSwitched", "to_persona": "admin.john.doe"}),
             json!({"event_type": "ContextSwitched", "to_persona": "support.john.doe"}),
-            json!({"event_type": "ContextSwitchedBack", "to_persona": null}),
-        ];
+            json!({"event_type": "ContextSwitchedBack", "to_persona": null})];
 
         assert_eq!(audit_events.len(), 3);
     }
@@ -440,11 +438,9 @@ mod edge_cases_integration {
     #[test]
     fn test_rapid_context_switches() {
         // Multiple rapid switches should all be tracked
-        let switches = vec![
-            json!({"to": "employee_persona", "at": Utc::now().to_rfc3339()}),
+        let switches = [json!({"to": "employee_persona", "at": Utc::now().to_rfc3339()}),
             json!({"to": "admin_persona", "at": (Utc::now() + Duration::seconds(30)).to_rfc3339()}),
-            json!({"to": "physical", "at": (Utc::now() + Duration::minutes(1)).to_rfc3339()}),
-        ];
+            json!({"to": "physical", "at": (Utc::now() + Duration::minutes(1)).to_rfc3339()})];
 
         assert_eq!(switches.len(), 3);
     }
@@ -452,7 +448,7 @@ mod edge_cases_integration {
     #[test]
     fn test_concurrent_session_attempts() {
         // Only one active session per user - concurrent attempts should update, not duplicate
-        let user_id = Uuid::new_v4();
+        let _user_id = Uuid::new_v4();
         let first_session_id = Uuid::new_v4();
         let second_session_id = Uuid::new_v4();
 

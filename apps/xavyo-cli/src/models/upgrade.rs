@@ -99,7 +99,7 @@ impl UpgradeResultJson {
             success: true,
             previous_version: previous.to_string(),
             new_version: new.to_string(),
-            message: format!("Successfully upgraded from {} to {}", previous, new),
+            message: format!("Successfully upgraded from {previous} to {new}"),
         }
     }
 
@@ -119,7 +119,7 @@ impl UpgradeResultJson {
             success: true,
             previous_version: version.to_string(),
             new_version: version.to_string(),
-            message: format!("Already on latest version ({})", version),
+            message: format!("Already on latest version ({version})"),
         }
     }
 }

@@ -1,6 +1,6 @@
 //! Provider Registry for dynamic secret providers (F120).
 //!
-//! Manages instances of DynamicSecretProvider and coordinates
+//! Manages instances of `DynamicSecretProvider` and coordinates
 //! between configured providers and credential generation.
 
 use std::collections::HashMap;
@@ -37,14 +37,15 @@ pub struct ProviderRegistry {
     #[allow(dead_code)]
     pool: PgPool,
     encryption: Arc<EncryptionService>,
-    /// Cache of provider instances: (tenant_id, provider_id) -> Provider
+    /// Cache of provider instances: (`tenant_id`, `provider_id`) -> Provider
     providers: RwLock<HashMap<(Uuid, Uuid), Arc<dyn DynamicSecretProvider>>>,
     /// Internal provider instance (shared across all tenants)
     internal_provider: Arc<InternalSecretProvider>,
 }
 
 impl ProviderRegistry {
-    /// Create a new ProviderRegistry.
+    /// Create a new `ProviderRegistry`.
+    #[must_use] 
     pub fn new(pool: PgPool, encryption: Arc<EncryptionService>) -> Self {
         Self {
             pool,
@@ -84,13 +85,12 @@ impl ProviderRegistry {
                 ))
             }
             other => Err(ApiAgentsError::BadRequest(format!(
-                "Unknown provider type: {}",
-                other
+                "Unknown provider type: {other}"
             ))),
         }
     }
 
-    /// Get or create an OpenBao provider instance.
+    /// Get or create an `OpenBao` provider instance.
     async fn get_or_create_openbao(
         &self,
         tenant_id: Uuid,
@@ -109,7 +109,7 @@ impl ProviderRegistry {
         // Create new provider
         let settings_json = self.encryption.decrypt(&config.connection_settings)?;
         let settings: OpenBaoSettings = serde_json::from_str(&settings_json)
-            .map_err(|e| ApiAgentsError::BadRequest(format!("Invalid OpenBao settings: {}", e)))?;
+            .map_err(|e| ApiAgentsError::BadRequest(format!("Invalid OpenBao settings: {e}")))?;
 
         let auth_method =
             if let (Some(role_id), Some(secret_id)) = (&settings.role_id, &settings.secret_id) {
@@ -140,8 +140,7 @@ impl ProviderRegistry {
             .await
             .map_err(|e| {
                 ApiAgentsError::SecretProviderUnavailable(format!(
-                    "Failed to initialize OpenBao provider: {}",
-                    e
+                    "Failed to initialize OpenBao provider: {e}"
                 ))
             })?;
 
@@ -186,13 +185,13 @@ impl ProviderRegistry {
             .await
             .map_err(|e| match e {
                 SecretError::ProviderUnavailable { provider, detail } => {
-                    ApiAgentsError::SecretProviderUnavailable(format!("{}: {}", provider, detail))
+                    ApiAgentsError::SecretProviderUnavailable(format!("{provider}: {detail}"))
                 }
                 SecretError::PermissionDenied { detail } => {
-                    ApiAgentsError::ProviderAuthFailed(format!("Permission denied: {}", detail))
+                    ApiAgentsError::ProviderAuthFailed(format!("Permission denied: {detail}"))
                 }
                 SecretError::ConfigError { detail } => {
-                    ApiAgentsError::BadRequest(format!("Configuration error: {}", detail))
+                    ApiAgentsError::BadRequest(format!("Configuration error: {detail}"))
                 }
                 other => ApiAgentsError::Internal(other.to_string()),
             })

@@ -1,4 +1,4 @@
-//! UserInfo endpoint handler.
+//! `UserInfo` endpoint handler.
 
 use crate::error::OAuthError;
 use crate::router::OAuthState;

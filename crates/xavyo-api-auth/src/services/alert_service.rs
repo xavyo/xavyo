@@ -10,7 +10,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 use xavyo_db::{set_tenant_context, AlertType, CreateSecurityAlert, SecurityAlert, Severity};
 
-/// Threshold for generating failed_attempts alert.
+/// Threshold for generating `failed_attempts` alert.
 const FAILED_ATTEMPTS_THRESHOLD: i64 = 3;
 
 /// Alert service for security notification management.
@@ -21,6 +21,7 @@ pub struct AlertService {
 
 impl AlertService {
     /// Create a new alert service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -215,8 +216,7 @@ impl AlertService {
             Severity::Info,
             "Login from New Location".to_string(),
             format!(
-                "A login was detected from a new location: {}, {}. If this wasn't you, please review your account security.",
-                city, country
+                "A login was detected from a new location: {city}, {country}. If this wasn't you, please review your account security."
             ),
             metadata,
         )
@@ -240,10 +240,10 @@ impl AlertService {
 
         // Count failed attempts in last hour
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM login_attempts
             WHERE tenant_id = $1 AND user_id = $2 AND success = false AND created_at >= $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -280,8 +280,7 @@ impl AlertService {
                     Severity::Warning,
                     "Multiple Failed Login Attempts".to_string(),
                     format!(
-                        "There have been {} failed login attempts on your account in the last hour. If this wasn't you, please change your password.",
-                        failed_count
+                        "There have been {failed_count} failed login attempts on your account in the last hour. If this wasn't you, please change your password."
                     ),
                     metadata,
                 )

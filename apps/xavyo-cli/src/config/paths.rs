@@ -46,7 +46,7 @@ impl ConfigPaths {
         })
     }
 
-    /// Get the configuration directory, respecting XAVYO_CONFIG_DIR env var
+    /// Get the configuration directory, respecting `XAVYO_CONFIG_DIR` env var
     fn get_config_dir() -> CliResult<PathBuf> {
         // Check for override environment variable
         if let Ok(dir) = std::env::var("XAVYO_CONFIG_DIR") {

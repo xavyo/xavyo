@@ -37,6 +37,7 @@ pub enum ManualTaskEventType {
 
 impl ManualTaskEventType {
     /// Get the string representation for storage.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::TaskCreated => "task_created",
@@ -97,6 +98,7 @@ pub struct CreateManualTaskAuditEvent {
 
 impl GovManualTaskAuditEvent {
     /// Get the typed event type.
+    #[must_use] 
     pub fn typed_event_type(&self) -> Option<ManualTaskEventType> {
         match self.event_type.as_str() {
             "task_created" => Some(ManualTaskEventType::TaskCreated),
@@ -122,13 +124,13 @@ impl GovManualTaskAuditEvent {
         input: CreateManualTaskAuditEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_manual_task_audit_events (
                 tenant_id, task_id, event_type, actor_id, details
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.task_id)
@@ -148,12 +150,12 @@ impl GovManualTaskAuditEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_manual_task_audit_events
             WHERE tenant_id = $1 AND task_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(task_id)
@@ -170,10 +172,10 @@ impl GovManualTaskAuditEvent {
         task_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_manual_task_audit_events
             WHERE tenant_id = $1 AND task_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(task_id)

@@ -1,4 +1,4 @@
-//! Unit tests for PersonaService (US1).
+//! Unit tests for `PersonaService` (US1).
 //!
 //! Tests the core persona lifecycle including creation, activation,
 //! deactivation, attribute inheritance, and link management.
@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 mod persona_creation {
     use super::*;
-    use xavyo_db::models::{PersonaAttributes, PersonaLinkType, PersonaStatus};
+    use xavyo_db::models::{PersonaAttributes, PersonaLinkType};
 
     /// T013: Persona creation validation
     #[test]
@@ -111,7 +111,7 @@ mod persona_creation {
 }
 
 mod persona_status_transitions {
-    use super::*;
+    
     use xavyo_db::models::PersonaStatus;
 
     #[test]
@@ -181,7 +181,7 @@ mod persona_attribute_inheritance {
     #[test]
     fn test_attribute_propagation_default_mode() {
         // "default" mode: attribute is propagated only if not overridden
-        let mode = "default";
+        let _mode = "default";
         let source_value = "Doe";
         let override_value: Option<&str> = None;
 
@@ -226,7 +226,7 @@ mod persona_attribute_inheritance {
 }
 
 mod persona_link_management {
-    use super::*;
+    
     use xavyo_db::models::PersonaLinkType;
 
     #[test]
@@ -265,7 +265,7 @@ mod persona_constraints {
         let tenant_id = Uuid::new_v4();
 
         // Unique constraint: (tenant_id, physical_user_id, archetype_id)
-        let constraint_key = format!("{}-{}-{}", tenant_id, physical_user_id, archetype_id);
+        let constraint_key = format!("{tenant_id}-{physical_user_id}-{archetype_id}");
         assert!(!constraint_key.is_empty());
     }
 

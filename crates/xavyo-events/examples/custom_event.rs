@@ -79,7 +79,7 @@ fn main() {
     // Serialize to JSON
     let json_bytes = envelope.to_json_bytes().expect("Failed to serialize");
     let json_str = String::from_utf8_lossy(&json_bytes);
-    println!("\nSerialized JSON:\n{}", json_str);
+    println!("\nSerialized JSON:\n{json_str}");
 
     // Deserialize back
     let restored: EventEnvelope<OrderCreated> =

@@ -18,11 +18,13 @@ pub struct CorrelationThresholdService {
 
 impl CorrelationThresholdService {
     /// Create a new correlation threshold service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -45,8 +47,8 @@ impl CorrelationThresholdService {
     ///
     /// Validates:
     /// - Thresholds are between 0.0 and 1.0
-    /// - auto_confirm_threshold > manual_review_threshold (when both provided)
-    /// - batch_size is between 50 and 5000
+    /// - `auto_confirm_threshold` > `manual_review_threshold` (when both provided)
+    /// - `batch_size` is between 50 and 5000
     pub async fn upsert(
         &self,
         tenant_id: Uuid,

@@ -39,16 +39,19 @@ pub enum ScheduleStatus {
 
 impl ScheduleStatus {
     /// Check if the schedule is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self, Self::Active)
     }
 
     /// Check if the schedule can be paused.
+    #[must_use] 
     pub fn can_pause(&self) -> bool {
         matches!(self, Self::Active)
     }
 
     /// Check if the schedule can be resumed.
+    #[must_use] 
     pub fn can_resume(&self) -> bool {
         matches!(self, Self::Paused | Self::Disabled)
     }
@@ -162,10 +165,10 @@ impl GovReportSchedule {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_report_schedules
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -180,10 +183,10 @@ impl GovReportSchedule {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_report_schedules
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -200,24 +203,24 @@ impl GovReportSchedule {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_report_schedules
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.template_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND template_id = ${}", param_count));
+            query.push_str(&format!(" AND template_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -248,24 +251,24 @@ impl GovReportSchedule {
         filter: &ReportScheduleFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_report_schedules
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.template_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND template_id = ${}", param_count));
+            query.push_str(&format!(" AND template_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -283,14 +286,14 @@ impl GovReportSchedule {
         q.fetch_one(pool).await
     }
 
-    /// List due schedules (active schedules past their next_run_at).
+    /// List due schedules (active schedules past their `next_run_at`).
     pub async fn list_due(pool: &sqlx::PgPool) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_report_schedules
             WHERE status = 'active' AND next_run_at <= NOW()
             ORDER BY next_run_at ASC
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await
@@ -314,7 +317,7 @@ impl GovReportSchedule {
         );
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_report_schedules (
                 tenant_id, template_id, name, frequency, schedule_hour,
                 schedule_day_of_week, schedule_day_of_month, parameters,
@@ -322,7 +325,7 @@ impl GovReportSchedule {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.template_id)
@@ -358,35 +361,35 @@ impl GovReportSchedule {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.frequency.is_some() {
-            updates.push(format!("frequency = ${}", param_idx));
+            updates.push(format!("frequency = ${param_idx}"));
             param_idx += 1;
         }
         if input.schedule_hour.is_some() {
-            updates.push(format!("schedule_hour = ${}", param_idx));
+            updates.push(format!("schedule_hour = ${param_idx}"));
             param_idx += 1;
         }
         if input.schedule_day_of_week.is_some() {
-            updates.push(format!("schedule_day_of_week = ${}", param_idx));
+            updates.push(format!("schedule_day_of_week = ${param_idx}"));
             param_idx += 1;
         }
         if input.schedule_day_of_month.is_some() {
-            updates.push(format!("schedule_day_of_month = ${}", param_idx));
+            updates.push(format!("schedule_day_of_month = ${param_idx}"));
             param_idx += 1;
         }
         if input.parameters.is_some() {
-            updates.push(format!("parameters = ${}", param_idx));
+            updates.push(format!("parameters = ${param_idx}"));
             param_idx += 1;
         }
         if input.recipients.is_some() {
-            updates.push(format!("recipients = ${}", param_idx));
+            updates.push(format!("recipients = ${param_idx}"));
             param_idx += 1;
         }
         if input.output_format.is_some() {
-            updates.push(format!("output_format = ${}", param_idx));
+            updates.push(format!("output_format = ${param_idx}"));
             param_idx += 1;
         }
 
@@ -397,7 +400,7 @@ impl GovReportSchedule {
             || input.schedule_day_of_month.is_some();
 
         if needs_recalc {
-            updates.push(format!("next_run_at = ${}", param_idx));
+            updates.push(format!("next_run_at = ${param_idx}"));
             let _ = param_idx;
         }
 
@@ -459,10 +462,10 @@ impl GovReportSchedule {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_report_schedules
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -479,12 +482,12 @@ impl GovReportSchedule {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_report_schedules
             SET status = 'paused', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -514,12 +517,12 @@ impl GovReportSchedule {
         );
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_report_schedules
             SET status = 'active', updated_at = NOW(), next_run_at = $3, consecutive_failures = 0
             WHERE id = $1 AND tenant_id = $2 AND status IN ('paused', 'disabled')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -549,13 +552,13 @@ impl GovReportSchedule {
         );
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_report_schedules
             SET last_run_at = NOW(), next_run_at = $3, consecutive_failures = 0,
                 last_error = NULL, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -593,13 +596,13 @@ impl GovReportSchedule {
         );
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_report_schedules
             SET next_run_at = $3, consecutive_failures = $4, last_error = $5,
                 status = $6, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -612,11 +615,13 @@ impl GovReportSchedule {
     }
 
     /// Parse recipients from JSON.
+    #[must_use] 
     pub fn parse_recipients(&self) -> Vec<String> {
         serde_json::from_value(self.recipients.clone()).unwrap_or_default()
     }
 
     /// Check if the schedule should run now.
+    #[must_use] 
     pub fn is_due(&self) -> bool {
         self.status.is_active() && self.next_run_at <= Utc::now()
     }
@@ -655,8 +660,8 @@ fn calculate_next_run(
             };
 
             let current_weekday = today.weekday();
-            let days_until = (target_weekday.num_days_from_sunday() as i64
-                - current_weekday.num_days_from_sunday() as i64
+            let days_until = (i64::from(target_weekday.num_days_from_sunday())
+                - i64::from(current_weekday.num_days_from_sunday())
                 + 7)
                 % 7;
 

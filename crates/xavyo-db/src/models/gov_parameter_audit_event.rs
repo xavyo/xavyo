@@ -60,10 +60,10 @@ impl GovParameterAuditEvent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_parameter_audit_events
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -78,11 +78,11 @@ impl GovParameterAuditEvent {
         assignment_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_parameter_audit_events
             WHERE tenant_id = $1 AND assignment_id = $2
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)
@@ -97,12 +97,12 @@ impl GovParameterAuditEvent {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_parameter_audit_events
             WHERE tenant_id = $1
             ORDER BY created_at DESC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -124,23 +124,23 @@ impl GovParameterAuditEvent {
 
         if filter.assignment_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND assignment_id = ${}", param_count));
+            query.push_str(&format!(" AND assignment_id = ${param_count}"));
         }
         if filter.event_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_type = ${}", param_count));
+            query.push_str(&format!(" AND event_type = ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND actor_id = ${}", param_count));
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -182,23 +182,23 @@ impl GovParameterAuditEvent {
 
         if filter.assignment_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND assignment_id = ${}", param_count));
+            query.push_str(&format!(" AND assignment_id = ${param_count}"));
         }
         if filter.event_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_type = ${}", param_count));
+            query.push_str(&format!(" AND event_type = ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND actor_id = ${}", param_count));
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -234,14 +234,14 @@ impl GovParameterAuditEvent {
         metadata: Option<serde_json::Value>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_parameter_audit_events (
                 tenant_id, assignment_id, event_type, actor_id,
                 old_values, new_values, metadata
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)
@@ -254,7 +254,7 @@ impl GovParameterAuditEvent {
         .await
     }
 
-    /// Record a parameters_set event.
+    /// Record a `parameters_set` event.
     pub async fn record_parameters_set(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -275,7 +275,7 @@ impl GovParameterAuditEvent {
         .await
     }
 
-    /// Record a parameters_updated event.
+    /// Record a `parameters_updated` event.
     pub async fn record_parameters_updated(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -297,7 +297,7 @@ impl GovParameterAuditEvent {
         .await
     }
 
-    /// Record a validation_failed event.
+    /// Record a `validation_failed` event.
     pub async fn record_validation_failed(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -319,7 +319,7 @@ impl GovParameterAuditEvent {
         .await
     }
 
-    /// Record a schema_violation_flagged event.
+    /// Record a `schema_violation_flagged` event.
     pub async fn record_schema_violation(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -347,10 +347,10 @@ impl GovParameterAuditEvent {
         before: DateTime<Utc>,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_parameter_audit_events
             WHERE tenant_id = $1 AND created_at < $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(before)

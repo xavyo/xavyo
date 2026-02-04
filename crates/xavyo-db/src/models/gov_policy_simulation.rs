@@ -1,6 +1,6 @@
 //! Governance Policy Simulation model (F060).
 //!
-//! Represents what-if analysis for SoD rules and birthright policies.
+//! Represents what-if analysis for `SoD` rules and birthright policies.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -97,10 +97,10 @@ impl GovPolicySimulation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_policy_simulations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -117,10 +117,10 @@ impl GovPolicySimulation {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_policy_simulations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
@@ -130,15 +130,15 @@ impl GovPolicySimulation {
 
         if filter.simulation_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND simulation_type = ${}", param_count));
+            query.push_str(&format!(" AND simulation_type = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -169,10 +169,10 @@ impl GovPolicySimulation {
         filter: &PolicySimulationFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_policy_simulations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
@@ -182,15 +182,15 @@ impl GovPolicySimulation {
 
         if filter.simulation_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND simulation_type = ${}", param_count));
+            query.push_str(&format!(" AND simulation_type = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -215,13 +215,13 @@ impl GovPolicySimulation {
         input: CreatePolicySimulation,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_policy_simulations (
                 tenant_id, name, simulation_type, policy_id, policy_config, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -245,7 +245,7 @@ impl GovPolicySimulation {
             serde_json::to_value(&impact_summary).unwrap_or_else(|_| serde_json::json!({}));
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_policy_simulations
             SET status = 'executed',
                 affected_users = $3,
@@ -254,7 +254,7 @@ impl GovPolicySimulation {
                 data_snapshot_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'draft'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -271,12 +271,12 @@ impl GovPolicySimulation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_policy_simulations
             SET status = 'cancelled'
             WHERE id = $1 AND tenant_id = $2 AND status IN ('draft', 'executed')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -291,12 +291,12 @@ impl GovPolicySimulation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_policy_simulations
             SET is_archived = TRUE
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -311,12 +311,12 @@ impl GovPolicySimulation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_policy_simulations
             SET is_archived = FALSE
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -332,12 +332,12 @@ impl GovPolicySimulation {
         notes: Option<String>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_policy_simulations
             SET notes = $3
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -353,12 +353,12 @@ impl GovPolicySimulation {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_policy_simulations
             WHERE id = $1 AND tenant_id = $2
               AND status IN ('draft', 'cancelled')
               AND (retain_until IS NULL OR retain_until < NOW())
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -369,6 +369,7 @@ impl GovPolicySimulation {
     }
 
     /// Parse the impact summary.
+    #[must_use] 
     pub fn parse_impact_summary(&self) -> ImpactSummary {
         serde_json::from_value(self.impact_summary.clone()).unwrap_or_default()
     }
@@ -386,10 +387,10 @@ impl GovPolicySimulation {
             PolicySimulationType::SodRule => {
                 if let Some(policy_id) = self.policy_id {
                     let updated: Option<DateTime<Utc>> = sqlx::query_scalar(
-                        r#"
+                        r"
                         SELECT updated_at FROM gov_sod_rules
                         WHERE id = $1 AND updated_at > $2
-                        "#,
+                        ",
                     )
                     .bind(policy_id)
                     .bind(snapshot_at)
@@ -402,10 +403,10 @@ impl GovPolicySimulation {
             PolicySimulationType::BirthrightPolicy => {
                 if let Some(policy_id) = self.policy_id {
                     let updated: Option<DateTime<Utc>> = sqlx::query_scalar(
-                        r#"
+                        r"
                         SELECT updated_at FROM gov_birthright_policies
                         WHERE id = $1 AND updated_at > $2
-                        "#,
+                        ",
                     )
                     .bind(policy_id)
                     .bind(snapshot_at)

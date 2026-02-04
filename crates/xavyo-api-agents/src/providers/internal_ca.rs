@@ -69,6 +69,7 @@ pub struct InternalCaProvider {
 
 impl InternalCaProvider {
     /// Create a new internal CA provider.
+    #[must_use] 
     pub fn new(config: InternalCaConfig) -> Self {
         Self {
             config,
@@ -77,6 +78,7 @@ impl InternalCaProvider {
     }
 
     /// Create a provider with pre-loaded key pair.
+    #[must_use] 
     pub fn with_key_pair(config: InternalCaConfig, key_pair: KeyPair) -> Self {
         Self {
             config,
@@ -85,6 +87,7 @@ impl InternalCaProvider {
     }
 
     /// Get the CA configuration.
+    #[must_use] 
     pub fn config(&self) -> &InternalCaConfig {
         &self.config
     }
@@ -99,7 +102,7 @@ impl InternalCaProvider {
             })?;
 
             let key_pair = KeyPair::from_pem(key_pem).map_err(|e| {
-                CaProviderError::InvalidConfiguration(format!("Failed to parse CA key: {}", e))
+                CaProviderError::InvalidConfiguration(format!("Failed to parse CA key: {e}"))
             })?;
 
             self.ca_key_pair = Some(key_pair);
@@ -117,7 +120,7 @@ impl InternalCaProvider {
         };
 
         KeyPair::generate_for(alg)
-            .map_err(|e| CaProviderError::Internal(format!("Failed to generate key pair: {}", e)))
+            .map_err(|e| CaProviderError::Internal(format!("Failed to generate key pair: {e}")))
     }
 
     /// Calculate SHA-256 fingerprint of a certificate in DER format.
@@ -128,7 +131,7 @@ impl InternalCaProvider {
 
         result
             .iter()
-            .map(|b| format!("{:02X}", b))
+            .map(|b| format!("{b:02X}"))
             .collect::<Vec<_>>()
             .join(":")
     }
@@ -138,25 +141,25 @@ impl InternalCaProvider {
         // Use UUID as base for serial number (guaranteed unique)
         let uuid = Uuid::new_v4();
         let bytes = uuid.as_bytes();
-        bytes.iter().map(|b| format!("{:02X}", b)).collect()
+        bytes.iter().map(|b| format!("{b:02X}")).collect()
     }
 
     /// Parse a PEM certificate and extract DER bytes.
     fn parse_pem_to_der(pem_str: &str) -> CaResult<Vec<u8>> {
         let pem_data = ::pem::parse(pem_str)
-            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse PEM: {}", e)))?;
+            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse PEM: {e}")))?;
 
         Ok(pem_data.contents().to_vec())
     }
 
-    /// Convert a String to Ia5String for SAN.
+    /// Convert a String to `Ia5String` for SAN.
     fn to_ia5string(s: &str) -> CaResult<Ia5String> {
         Ia5String::try_from(s).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Invalid IA5String '{}': {}", s, e))
+            CaProviderError::InvalidFormat(format!("Invalid IA5String '{s}': {e}"))
         })
     }
 
-    /// Build CertificateParams from an X509 certificate.
+    /// Build `CertificateParams` from an X509 certificate.
     ///
     /// This extracts the distinguished name from the certificate to create
     /// params that can be used as the issuer in `signed_by()`.
@@ -221,7 +224,7 @@ impl CaProvider for InternalCaProvider {
 
         // Verify CA certificate is parseable
         let _ = Self::parse_pem_to_der(&self.config.ca_certificate_pem).map_err(|e| {
-            CaProviderError::InvalidConfiguration(format!("CA certificate invalid: {}", e))
+            CaProviderError::InvalidConfiguration(format!("CA certificate invalid: {e}"))
         })?;
 
         Ok(())
@@ -246,15 +249,14 @@ impl CaProvider for InternalCaProvider {
             )
         })?;
         let ca_key_pair = KeyPair::from_pem(ca_key_pem).map_err(|e| {
-            CaProviderError::InvalidConfiguration(format!("Failed to parse CA private key: {}", e))
+            CaProviderError::InvalidConfiguration(format!("Failed to parse CA private key: {e}"))
         })?;
 
         // Parse CA certificate to extract issuer DN for the CA params
         let ca_der = Self::parse_pem_to_der(&self.config.ca_certificate_pem)?;
         let (_, ca_x509) = X509Certificate::from_der(&ca_der).map_err(|e| {
             CaProviderError::InvalidConfiguration(format!(
-                "Failed to parse CA certificate: {:?}",
-                e
+                "Failed to parse CA certificate: {e:?}"
             ))
         })?;
 
@@ -266,8 +268,7 @@ impl CaProvider for InternalCaProvider {
         // This recreates the CA Certificate object with the correct issuer DN
         let ca_certificate = ca_params.self_signed(&ca_key_pair).map_err(|e| {
             CaProviderError::SigningFailed(format!(
-                "Failed to recreate CA certificate for signing: {}",
-                e
+                "Failed to recreate CA certificate for signing: {e}"
             ))
         })?;
 
@@ -295,7 +296,7 @@ impl CaProvider for InternalCaProvider {
 
         // Set validity period
         let not_before = Utc::now();
-        let not_after = not_before + Duration::days(request.validity_days as i64);
+        let not_after = not_before + Duration::days(i64::from(request.validity_days));
         params.not_before = rcgen::date_time_ymd(
             not_before.date_naive().year(),
             not_before.date_naive().month() as u8,
@@ -369,7 +370,7 @@ impl CaProvider for InternalCaProvider {
         let cert = params
             .signed_by(&agent_key_pair, &ca_certificate, &ca_key_pair)
             .map_err(|e| {
-                CaProviderError::SigningFailed(format!("Failed to sign certificate with CA: {}", e))
+                CaProviderError::SigningFailed(format!("Failed to sign certificate with CA: {e}"))
             })?;
 
         // Get PEM-encoded certificate and private key
@@ -438,7 +439,7 @@ impl CaProvider for InternalCaProvider {
             Err(e) => {
                 return Ok(CertificateValidation::invalid(
                     CertificateStatus::Active, // Status unknown, use Active as placeholder
-                    format!("Failed to parse certificate: {}", e),
+                    format!("Failed to parse certificate: {e}"),
                 ));
             }
         };
@@ -448,7 +449,7 @@ impl CaProvider for InternalCaProvider {
             Err(e) => {
                 return Ok(CertificateValidation::invalid(
                     CertificateStatus::Active,
-                    format!("Failed to parse X.509: {:?}", e),
+                    format!("Failed to parse X.509: {e:?}"),
                 ));
             }
         };
@@ -459,7 +460,7 @@ impl CaProvider for InternalCaProvider {
             Err(e) => {
                 return Ok(CertificateValidation::invalid(
                     CertificateStatus::Active,
-                    format!("Failed to parse CA certificate: {}", e),
+                    format!("Failed to parse CA certificate: {e}"),
                 ));
             }
         };
@@ -469,7 +470,7 @@ impl CaProvider for InternalCaProvider {
             Err(e) => {
                 return Ok(CertificateValidation::invalid(
                     CertificateStatus::Active,
-                    format!("Failed to parse CA X.509: {:?}", e),
+                    format!("Failed to parse CA X.509: {e:?}"),
                 ));
             }
         };
@@ -487,7 +488,7 @@ impl CaProvider for InternalCaProvider {
         if let Err(e) = cert.verify_signature(Some(ca_public_key)) {
             return Ok(CertificateValidation::invalid(
                 CertificateStatus::Active,
-                format!("Certificate signature verification failed: {:?}", e),
+                format!("Certificate signature verification failed: {e:?}"),
             ));
         }
 
@@ -515,7 +516,7 @@ impl CaProvider for InternalCaProvider {
             .serial
             .to_bytes_be()
             .iter()
-            .map(|b| format!("{:02X}", b))
+            .map(|b| format!("{b:02X}"))
             .collect::<String>();
 
         // Try to extract agent_id and tenant_id from SAN URIs
@@ -569,15 +570,14 @@ impl CaProvider for InternalCaProvider {
             )
         })?;
         let ca_key_pair = KeyPair::from_pem(ca_key_pem).map_err(|e| {
-            CaProviderError::InvalidConfiguration(format!("Failed to parse CA private key: {}", e))
+            CaProviderError::InvalidConfiguration(format!("Failed to parse CA private key: {e}"))
         })?;
 
         // Parse CA certificate to get issuer info
         let ca_der = Self::parse_pem_to_der(&self.config.ca_certificate_pem)?;
         let (_, ca_x509) = X509Certificate::from_der(&ca_der).map_err(|e| {
             CaProviderError::InvalidConfiguration(format!(
-                "Failed to parse CA certificate: {:?}",
-                e
+                "Failed to parse CA certificate: {e:?}"
             ))
         })?;
 
@@ -587,8 +587,7 @@ impl CaProvider for InternalCaProvider {
         // Create the issuer certificate (needed for signing the CRL)
         let ca_certificate = ca_params.self_signed(&ca_key_pair).map_err(|e| {
             CaProviderError::SigningFailed(format!(
-                "Failed to recreate CA certificate for CRL signing: {}",
-                e
+                "Failed to recreate CA certificate for CRL signing: {e}"
             ))
         })?;
 
@@ -635,14 +634,11 @@ impl CaProvider for InternalCaProvider {
                     serial_number: SerialNumber::from_slice(&serial_bytes),
                     revocation_time: rcgen::date_time_ymd(
                         chrono::DateTime::from_timestamp(entry.revocation_time, 0)
-                            .map(|dt| dt.date_naive().year())
-                            .unwrap_or(2024),
+                            .map_or(2024, |dt| dt.date_naive().year()),
                         chrono::DateTime::from_timestamp(entry.revocation_time, 0)
-                            .map(|dt| dt.date_naive().month() as u8)
-                            .unwrap_or(1),
+                            .map_or(1, |dt| dt.date_naive().month() as u8),
                         chrono::DateTime::from_timestamp(entry.revocation_time, 0)
-                            .map(|dt| dt.date_naive().day() as u8)
-                            .unwrap_or(1),
+                            .map_or(1, |dt| dt.date_naive().day() as u8),
                     ),
                     reason_code: Some(reason),
                     invalidity_date: None,
@@ -675,7 +671,7 @@ impl CaProvider for InternalCaProvider {
         // Create the CRL signed by the CA
         let crl = crl_params
             .signed_by(&ca_certificate, &ca_key_pair)
-            .map_err(|e| CaProviderError::SigningFailed(format!("Failed to sign CRL: {}", e)))?;
+            .map_err(|e| CaProviderError::SigningFailed(format!("Failed to sign CRL: {e}")))?;
 
         Ok(crl.der().to_vec())
     }
@@ -712,7 +708,7 @@ pub fn create_internal_ca(
 
     // Set validity period
     let not_before = Utc::now();
-    let not_after = not_before + Duration::days(validity_days as i64);
+    let not_after = not_before + Duration::days(i64::from(validity_days));
     params.not_before = rcgen::date_time_ymd(
         not_before.date_naive().year(),
         not_before.date_naive().month() as u8,
@@ -736,12 +732,12 @@ pub fn create_internal_ca(
 
     // Generate the CA certificate using rcgen 0.13 API
     let cert = params.self_signed(&key_pair).map_err(|e| {
-        CaProviderError::SigningFailed(format!("Failed to generate CA certificate: {}", e))
+        CaProviderError::SigningFailed(format!("Failed to generate CA certificate: {e}"))
     })?;
 
     let certificate_pem = cert.pem();
     let private_key_pem = key_pair.serialize_pem();
-    let subject_dn = format!("CN={},O={},C=FR", name, organization);
+    let subject_dn = format!("CN={name},O={organization},C=FR");
 
     Ok((certificate_pem, private_key_pem, subject_dn))
 }

@@ -9,7 +9,7 @@
 //! - `reset_password_handler` - POST /auth/reset-password
 //! - `verify_email_handler` - POST /auth/verify-email
 //! - `resend_verification_handler` - POST /auth/resend-verification
-//! - Session handlers: list, revoke, revoke_all, policy
+//! - Session handlers: list, revoke, `revoke_all`, policy
 //! - Admin handlers: password policy, lockout policy, unlock user
 //! - Password change handler
 //! - Audit handlers: login history, admin audit (F025)

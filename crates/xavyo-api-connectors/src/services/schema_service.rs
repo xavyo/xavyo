@@ -136,6 +136,7 @@ impl SchemaService {
     }
 
     /// Create a new schema service with custom TTL.
+    #[must_use] 
     pub fn with_ttl(mut self, ttl_seconds: i64) -> Self {
         self.cache_ttl_seconds = ttl_seconds;
         self
@@ -231,8 +232,7 @@ impl SchemaService {
 
         let credentials: serde_json::Value = serde_json::from_slice(&decrypted).map_err(|e| {
             ConnectorApiError::InvalidConfiguration(format!(
-                "Failed to deserialize credentials: {}",
-                e
+                "Failed to deserialize credentials: {e}"
             ))
         })?;
 
@@ -436,7 +436,7 @@ impl SchemaService {
             DbConnectorType::Ldap => {
                 let use_ad = full_config
                     .get("use_ad_features")
-                    .and_then(|v| v.as_bool())
+                    .and_then(serde_json::Value::as_bool)
                     .unwrap_or(false);
 
                 if use_ad {
@@ -531,13 +531,9 @@ impl SchemaService {
 
         // Build response from cached schemas
         let discovered_at = cached_schemas
-            .first()
-            .map(|s| s.discovered_at)
-            .unwrap_or_else(Utc::now);
+            .first().map_or_else(Utc::now, |s| s.discovered_at);
         let expires_at = cached_schemas
-            .first()
-            .map(|s| s.expires_at)
-            .unwrap_or_else(Utc::now);
+            .first().map_or_else(Utc::now, |s| s.expires_at);
 
         let object_classes = cached_schemas
             .into_iter()
@@ -626,8 +622,7 @@ impl SchemaService {
 
         let credentials: serde_json::Value = serde_json::from_slice(&decrypted).map_err(|e| {
             ConnectorApiError::InvalidConfiguration(format!(
-                "Failed to deserialize credentials: {}",
-                e
+                "Failed to deserialize credentials: {e}"
             ))
         })?;
 
@@ -670,7 +665,7 @@ impl SchemaService {
         }
     }
 
-    /// Convert a SchemaAttribute to AttributeResponse with IGA edge case fields.
+    /// Convert a `SchemaAttribute` to `AttributeResponse` with IGA edge case fields.
     fn attribute_to_response(
         a: &xavyo_connector::schema::SchemaAttribute,
         source_class: Option<String>,
@@ -715,7 +710,7 @@ impl SchemaService {
     }
 
     /// Internal helper to discover schema from a connector type.
-    /// Separated to allow proper async error handling in execute_discovery.
+    /// Separated to allow proper async error handling in `execute_discovery`.
     async fn discover_schema_internal(
         connector_type: DbConnectorType,
         full_config: serde_json::Value,
@@ -724,7 +719,7 @@ impl SchemaService {
             DbConnectorType::Ldap => {
                 let use_ad = full_config
                     .get("use_ad_features")
-                    .and_then(|v| v.as_bool())
+                    .and_then(serde_json::Value::as_bool)
                     .unwrap_or(false);
 
                 if use_ad {

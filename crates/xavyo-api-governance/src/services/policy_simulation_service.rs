@@ -1,4 +1,4 @@
-//! Policy Simulation service for SoD rule and birthright policy what-if analysis (F060).
+//! Policy Simulation service for `SoD` rule and birthright policy what-if analysis (F060).
 
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -40,6 +40,7 @@ pub struct PolicySimulationService {
 
 impl PolicySimulationService {
     /// Create a new policy simulation service with default limits.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -48,11 +49,13 @@ impl PolicySimulationService {
     }
 
     /// Create a new policy simulation service with custom limits.
+    #[must_use] 
     pub fn with_limits(pool: PgPool, limits: SimulationLimits) -> Self {
         Self { pool, limits }
     }
 
     /// Get the configured limits.
+    #[must_use] 
     pub fn limits(&self) -> &SimulationLimits {
         &self.limits
     }
@@ -116,7 +119,7 @@ impl PolicySimulationService {
 
         // Validate policy config is not empty
         if policy_config.is_null()
-            || (policy_config.is_object() && policy_config.as_object().is_none_or(|o| o.is_empty()))
+            || (policy_config.is_object() && policy_config.as_object().is_none_or(serde_json::Map::is_empty))
         {
             return Err(GovernanceError::Validation(
                 "Policy configuration is required".to_string(),
@@ -339,12 +342,12 @@ impl PolicySimulationService {
     // Private helper methods
     // ========================================================================
 
-    /// Calculate impact of an SoD rule on users.
+    /// Calculate impact of an `SoD` rule on users.
     ///
-    /// Parses the policy_config for SoD rule definition:
+    /// Parses the `policy_config` for `SoD` rule definition:
     /// {
-    ///   "first_entitlement_id": "uuid",
-    ///   "second_entitlement_id": "uuid",
+    ///   "`first_entitlement_id"`: "uuid",
+    ///   "`second_entitlement_id"`: "uuid",
     ///   "severity": "critical|high|medium|low",
     ///   "name": "Rule Name"
     /// }
@@ -494,12 +497,12 @@ impl PolicySimulationService {
 
     /// Calculate impact of a birthright policy on users.
     ///
-    /// Parses the policy_config for birthright policy definition:
+    /// Parses the `policy_config` for birthright policy definition:
     /// {
     ///   "name": "Policy Name",
     ///   "conditions": [{"attribute": "department", "operator": "equals", "value": "Engineering"}],
-    ///   "entitlement_ids": ["uuid1", "uuid2"],
-    ///   "evaluation_mode": "first_match|all_match"
+    ///   "`entitlement_ids"`: ["uuid1", "uuid2"],
+    ///   "`evaluation_mode"`: "`first_match|all_match`"
     /// }
     async fn calculate_birthright_policy_impact(
         &self,
@@ -783,10 +786,10 @@ impl PolicySimulationService {
     /// Count total users in a tenant.
     async fn count_tenant_users(&self, tenant_id: Uuid) -> Result<i64> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM users
             WHERE tenant_id = $1 AND deleted_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -803,7 +806,7 @@ impl PolicySimulationService {
     ) -> Result<Vec<(Uuid, serde_json::Value)>> {
         let rows: Vec<(Uuid, serde_json::Value)> = if let Some(ids) = user_ids {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT
                     id,
                     jsonb_build_object(
@@ -815,7 +818,7 @@ impl PolicySimulationService {
                     ) as attributes
                 FROM users
                 WHERE tenant_id = $1 AND deleted_at IS NULL AND id = ANY($2)
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(ids)
@@ -823,7 +826,7 @@ impl PolicySimulationService {
             .await?
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT
                     id,
                     jsonb_build_object(
@@ -835,7 +838,7 @@ impl PolicySimulationService {
                     ) as attributes
                 FROM users
                 WHERE tenant_id = $1 AND deleted_at IS NULL
-                "#,
+                ",
             )
             .bind(tenant_id)
             .fetch_all(&self.pool)
@@ -851,13 +854,13 @@ impl PolicySimulationService {
         tenant_id: Uuid,
     ) -> Result<std::collections::HashMap<Uuid, std::collections::HashSet<Uuid>>> {
         let rows: Vec<(Uuid, Uuid)> = sqlx::query_as(
-            r#"
+            r"
             SELECT target_id, entitlement_id
             FROM gov_entitlement_assignments
             WHERE tenant_id = $1
               AND target_type = 'user'
               AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)

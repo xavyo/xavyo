@@ -129,7 +129,7 @@ fn validate_jwt(token: &str, _config: &GatewayConfig) -> Result<AuthClaims, Stri
 
     // Decode payload (middle part)
     let payload = parts[1];
-    let decoded = base64_decode_url_safe(payload).map_err(|_| "Invalid JWT payload encoding")?;
+    let decoded = base64_decode_url_safe(payload).map_err(|()| "Invalid JWT payload encoding")?;
 
     let payload_str = String::from_utf8(decoded).map_err(|_| "Invalid JWT payload encoding")?;
 
@@ -147,7 +147,7 @@ fn validate_jwt(token: &str, _config: &GatewayConfig) -> Result<AuthClaims, Stri
     let tenant_id = payload
         .get("tid")
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+        .map(std::string::ToString::to_string);
 
     let roles = payload
         .get("roles")
@@ -155,7 +155,7 @@ fn validate_jwt(token: &str, _config: &GatewayConfig) -> Result<AuthClaims, Stri
         .map(|arr| {
             arr.iter()
                 .filter_map(|v| v.as_str())
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
                 .collect()
         })
         .unwrap_or_default();
@@ -171,8 +171,8 @@ fn validate_jwt(token: &str, _config: &GatewayConfig) -> Result<AuthClaims, Stri
 fn base64_decode_url_safe(input: &str) -> Result<Vec<u8>, ()> {
     // Add padding if needed
     let padded = match input.len() % 4 {
-        2 => format!("{}==", input),
-        3 => format!("{}=", input),
+        2 => format!("{input}=="),
+        3 => format!("{input}="),
         _ => input.to_string(),
     };
 
@@ -196,7 +196,7 @@ fn base64_decoder(input: &str) -> impl std::io::Read + '_ {
         buffer_len: usize,
     }
 
-    impl<'a> std::io::Read for Base64Reader<'a> {
+    impl std::io::Read for Base64Reader<'_> {
         fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
             const DECODE_TABLE: [i8; 128] = [
                 -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,

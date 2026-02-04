@@ -79,7 +79,7 @@ fn extract_user_agent(headers: &axum::http::HeaderMap) -> Option<String> {
     headers
         .get(header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
 }
 
 /// List users with optional filtering.
@@ -139,7 +139,7 @@ pub async fn list_users(
                     None,
                     source_ip,
                     user_agent,
-                    e.status_code().as_u16() as i32,
+                    i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
                 .await;
@@ -200,7 +200,7 @@ pub async fn create_user(
                     None,
                     source_ip,
                     user_agent,
-                    e.status_code().as_u16() as i32,
+                    i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
                 .await;
@@ -277,7 +277,7 @@ pub async fn get_user(
                     Some(id),
                     source_ip,
                     user_agent,
-                    e.status_code().as_u16() as i32,
+                    i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
                 .await;
@@ -342,7 +342,7 @@ pub async fn replace_user(
                     Some(id),
                     source_ip,
                     user_agent,
-                    e.status_code().as_u16() as i32,
+                    i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
                 .await;
@@ -423,7 +423,7 @@ pub async fn update_user(
                     Some(id),
                     source_ip,
                     user_agent,
-                    e.status_code().as_u16() as i32,
+                    i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
                 .await;
@@ -479,7 +479,7 @@ pub async fn delete_user(
     let result = user_service.delete_user(auth.tenant_id, id).await;
 
     match &result {
-        Ok(_) => {
+        Ok(()) => {
             audit_service
                 .log_user_success(
                     auth.tenant_id,
@@ -501,7 +501,7 @@ pub async fn delete_user(
                     Some(id),
                     source_ip,
                     user_agent,
-                    e.status_code().as_u16() as i32,
+                    i32::from(e.status_code().as_u16()),
                     e.to_string(),
                 )
                 .await;

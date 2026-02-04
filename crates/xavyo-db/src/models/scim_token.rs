@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 /// A SCIM Bearer token for API authentication.
 ///
-/// Tokens are scoped to a tenant and used by IdPs to authenticate
+/// Tokens are scoped to a tenant and used by `IdPs` to authenticate
 /// SCIM provisioning requests.
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct ScimToken {
@@ -97,10 +97,10 @@ impl ScimToken {
         token_hash: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_tokens
             WHERE token_hash = $1 AND revoked_at IS NULL
-            "#,
+            ",
         )
         .bind(token_hash)
         .fetch_optional(pool)
@@ -114,10 +114,10 @@ impl ScimToken {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_tokens
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -131,11 +131,11 @@ impl ScimToken {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_tokens
             WHERE tenant_id = $1
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -152,11 +152,11 @@ impl ScimToken {
         created_by: Uuid,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO scim_tokens (tenant_id, name, token_hash, token_prefix, created_by)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -167,13 +167,13 @@ impl ScimToken {
         .await
     }
 
-    /// Update last_used_at timestamp.
+    /// Update `last_used_at` timestamp.
     pub async fn update_last_used(pool: &sqlx::PgPool, id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE scim_tokens SET last_used_at = NOW()
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .execute(pool)
@@ -188,11 +188,11 @@ impl ScimToken {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE scim_tokens SET revoked_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND revoked_at IS NULL
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

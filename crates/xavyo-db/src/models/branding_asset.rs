@@ -40,7 +40,7 @@ impl std::str::FromStr for AssetType {
             "favicon" => Ok(Self::Favicon),
             "background" => Ok(Self::Background),
             "email_logo" => Ok(Self::EmailLogo),
-            _ => Err(format!("Invalid asset type: {}", s)),
+            _ => Err(format!("Invalid asset type: {s}")),
         }
     }
 }
@@ -113,7 +113,7 @@ impl BrandingAsset {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO branding_assets (
                 tenant_id, asset_type, filename, content_type,
                 file_size, storage_path, width, height,
@@ -121,7 +121,7 @@ impl BrandingAsset {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(&data.asset_type)
@@ -139,7 +139,7 @@ impl BrandingAsset {
 
     /// Find asset by ID.
     ///
-    /// **SECURITY WARNING**: This method does NOT filter by tenant_id.
+    /// **SECURITY WARNING**: This method does NOT filter by `tenant_id`.
     /// Use `find_by_id_and_tenant()` for tenant-isolated queries.
     /// This method should only be used for internal operations where
     /// tenant context is already validated or for system-level queries.
@@ -184,11 +184,11 @@ impl BrandingAsset {
     {
         if let Some(asset_type) = filter.asset_type {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM branding_assets
                 WHERE tenant_id = $1 AND asset_type = $2
                 ORDER BY created_at DESC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(&asset_type)
@@ -196,11 +196,11 @@ impl BrandingAsset {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM branding_assets
                 WHERE tenant_id = $1
                 ORDER BY created_at DESC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .fetch_all(executor)
@@ -218,10 +218,10 @@ impl BrandingAsset {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM branding_assets
             WHERE tenant_id = $1 AND checksum = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(checksum)
@@ -234,9 +234,9 @@ impl BrandingAsset {
     where
         E: PgExecutor<'e>,
     {
-        let pattern = format!("%{}%", storage_path);
+        let pattern = format!("%{storage_path}%");
         let result: (bool,) = sqlx::query_as(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM tenant_branding
                 WHERE logo_url LIKE $1
@@ -245,7 +245,7 @@ impl BrandingAsset {
                    OR email_logo_url LIKE $1
                    OR login_page_background_url LIKE $1
             )
-            "#,
+            ",
         )
         .bind(&pattern)
         .fetch_one(executor)

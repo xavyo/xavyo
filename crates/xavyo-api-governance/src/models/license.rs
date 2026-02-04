@@ -312,7 +312,7 @@ impl From<GovLicenseAssignment> for LicenseAssignmentResponse {
             source: a.source,
             status: a.status,
             reclaimed_at: a.reclaimed_at,
-            reclaim_reason: a.reclaim_reason.map(|r| format!("{:?}", r).to_lowercase()),
+            reclaim_reason: a.reclaim_reason.map(|r| format!("{r:?}").to_lowercase()),
             notes: a.notes,
             created_at: a.created_at,
         }
@@ -506,6 +506,7 @@ impl From<LicenseIncompatibilityWithDetails> for LicenseIncompatibilityResponse 
 
 impl LicenseIncompatibilityResponse {
     /// Create a response from a model with pool names.
+    #[must_use] 
     pub fn from_model_with_names(
         model: GovLicenseIncompatibility,
         pool_a_name: Option<String>,
@@ -531,7 +532,7 @@ impl LicenseIncompatibilityResponse {
 /// Query parameters for listing incompatibilities.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, IntoParams)]
 pub struct ListIncompatibilitiesParams {
-    /// Filter by pool (matches either pool_a or pool_b).
+    /// Filter by pool (matches either `pool_a` or `pool_b`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pool_id: Option<Uuid>,
 
@@ -562,7 +563,7 @@ pub struct CreateReclamationRuleRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub threshold_days: Option<i32>,
 
-    /// Lifecycle state that triggers reclamation (required for lifecycle_state trigger).
+    /// Lifecycle state that triggers reclamation (required for `lifecycle_state` trigger).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lifecycle_state: Option<String>,
 

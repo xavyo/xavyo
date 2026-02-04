@@ -1,13 +1,13 @@
-//! WebAuthn challenge model.
+//! `WebAuthn` challenge model.
 //!
-//! Stores temporary challenges for WebAuthn registration and authentication ceremonies.
+//! Stores temporary challenges for `WebAuthn` registration and authentication ceremonies.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgExecutor};
 use uuid::Uuid;
 
-/// Type of WebAuthn ceremony.
+/// Type of `WebAuthn` ceremony.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "varchar", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
@@ -30,7 +30,7 @@ impl std::fmt::Display for CeremonyType {
 /// Challenge expiry time in minutes.
 pub const CHALLENGE_EXPIRY_MINUTES: i64 = 5;
 
-/// A WebAuthn challenge for registration or authentication ceremonies.
+/// A `WebAuthn` challenge for registration or authentication ceremonies.
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct WebAuthnChallenge {
     /// Unique identifier for this challenge.
@@ -49,7 +49,7 @@ pub struct WebAuthnChallenge {
     /// Type of ceremony (registration or authentication).
     pub ceremony_type: String,
 
-    /// Serialized webauthn-rs state (PasskeyRegistration or PasskeyAuthentication).
+    /// Serialized webauthn-rs state (`PasskeyRegistration` or `PasskeyAuthentication`).
     #[serde(skip_serializing)]
     pub state_json: serde_json::Value,
 
@@ -63,7 +63,7 @@ pub struct WebAuthnChallenge {
     pub expires_at: DateTime<Utc>,
 }
 
-/// Data required to create a new WebAuthn challenge.
+/// Data required to create a new `WebAuthn` challenge.
 #[derive(Debug)]
 pub struct CreateWebAuthnChallenge {
     pub user_id: Uuid,
@@ -81,7 +81,7 @@ impl WebAuthnChallenge {
         Utc::now() > self.expires_at
     }
 
-    /// Create a new WebAuthn challenge.
+    /// Create a new `WebAuthn` challenge.
     pub async fn create<'e, E>(
         executor: E,
         data: CreateWebAuthnChallenge,
@@ -90,13 +90,13 @@ impl WebAuthnChallenge {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO webauthn_challenges (
                 user_id, tenant_id, challenge, ceremony_type, state_json, credential_name
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.user_id)
         .bind(data.tenant_id)
@@ -118,12 +118,12 @@ impl WebAuthnChallenge {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM webauthn_challenges
             WHERE user_id = $1 AND ceremony_type = $2 AND expires_at > NOW()
             ORDER BY created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(ceremony_type.to_string())
@@ -194,12 +194,12 @@ impl WebAuthnChallenge {
         E: PgExecutor<'e>,
     {
         let result: (bool,) = sqlx::query_as(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM webauthn_challenges
                 WHERE user_id = $1 AND ceremony_type = $2 AND expires_at > NOW()
             )
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(ceremony_type.to_string())

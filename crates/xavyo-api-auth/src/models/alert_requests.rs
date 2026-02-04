@@ -9,7 +9,7 @@ use uuid::Uuid;
 /// Query parameters for user security alerts.
 #[derive(Debug, Deserialize, IntoParams)]
 pub struct SecurityAlertsQuery {
-    /// Pagination cursor (created_at timestamp).
+    /// Pagination cursor (`created_at` timestamp).
     pub cursor: Option<DateTime<Utc>>,
     /// Number of items per page (max 100).
     #[serde(default = "default_limit")]

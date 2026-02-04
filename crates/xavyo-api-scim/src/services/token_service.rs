@@ -20,6 +20,7 @@ pub struct TokenService {
 
 impl TokenService {
     /// Create a new token service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -28,7 +29,7 @@ impl TokenService {
     ///
     /// Returns the token details including the raw token (shown only once).
     ///
-    /// SECURITY: Uses OsRng directly from the operating system's CSPRNG.
+    /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
     pub async fn generate_token(
         &self,
         tenant_id: Uuid,
@@ -42,7 +43,7 @@ impl TokenService {
 
         // Encode as base64
         let token_body = URL_SAFE_NO_PAD.encode(random_bytes);
-        let raw_token = format!("{}{}", TOKEN_PREFIX, token_body);
+        let raw_token = format!("{TOKEN_PREFIX}{token_body}");
 
         // Hash the token for storage
         let token_hash = Self::hash_token(&raw_token);
@@ -137,7 +138,7 @@ mod hex {
         bytes
             .as_ref()
             .iter()
-            .map(|b| format!("{:02x}", b))
+            .map(|b| format!("{b:02x}"))
             .collect()
     }
 }

@@ -46,7 +46,7 @@ pub enum AttributeType {
     Boolean,
     /// Integer value.
     Integer,
-    /// DateTime value.
+    /// `DateTime` value.
     DateTime,
     /// Reference to another object.
     Reference,
@@ -59,6 +59,7 @@ impl EntraConnector {
     ///
     /// Note: Entra ID doesn't expose a schema discovery API like LDAP,
     /// so this returns a static schema based on the Graph API documentation.
+    #[must_use] 
     pub fn get_schema(&self) -> Vec<ObjectClass> {
         vec![
             self.user_object_class(),

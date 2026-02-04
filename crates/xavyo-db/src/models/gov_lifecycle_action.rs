@@ -27,21 +27,25 @@ pub enum LifecycleActionType {
 
 impl LifecycleActionType {
     /// Check if this action type creates an assignment.
+    #[must_use] 
     pub fn creates_assignment(&self) -> bool {
         matches!(self, Self::Provision)
     }
 
     /// Check if this action type removes an assignment.
+    #[must_use] 
     pub fn removes_assignment(&self) -> bool {
         matches!(self, Self::Revoke)
     }
 
     /// Check if this action type is a scheduled action.
+    #[must_use] 
     pub fn is_scheduled(&self) -> bool {
         matches!(self, Self::ScheduleRevoke)
     }
 
     /// Check if this action type can be cancelled.
+    #[must_use] 
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::ScheduleRevoke)
     }
@@ -115,10 +119,10 @@ impl GovLifecycleAction {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_actions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -132,11 +136,11 @@ impl GovLifecycleAction {
         event_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_actions
             WHERE event_id = $1
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(event_id)
         .fetch_all(pool)
@@ -152,24 +156,24 @@ impl GovLifecycleAction {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_actions
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.event_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_id = ${}", param_count));
+            query.push_str(&format!(" AND event_id = ${param_count}"));
         }
         if filter.action_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND action_type = ${}", param_count));
+            query.push_str(&format!(" AND action_type = ${param_count}"));
         }
         if filter.assignment_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND assignment_id = ${}", param_count));
+            query.push_str(&format!(" AND assignment_id = ${param_count}"));
         }
         if let Some(pending) = filter.pending {
             if pending {
@@ -205,24 +209,24 @@ impl GovLifecycleAction {
         filter: &LifecycleActionFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_lifecycle_actions
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.event_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_id = ${}", param_count));
+            query.push_str(&format!(" AND event_id = ${param_count}"));
         }
         if filter.action_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND action_type = ${}", param_count));
+            query.push_str(&format!(" AND action_type = ${param_count}"));
         }
         if filter.assignment_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND assignment_id = ${}", param_count));
+            query.push_str(&format!(" AND assignment_id = ${param_count}"));
         }
         if let Some(pending) = filter.pending {
             if pending {
@@ -252,7 +256,7 @@ impl GovLifecycleAction {
         before: DateTime<Utc>,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_actions
             WHERE tenant_id = $1
               AND action_type = 'schedule_revoke'
@@ -260,7 +264,7 @@ impl GovLifecycleAction {
               AND executed_at IS NULL
               AND cancelled_at IS NULL
             ORDER BY scheduled_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(before)
@@ -275,13 +279,13 @@ impl GovLifecycleAction {
         input: CreateLifecycleAction,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_lifecycle_actions (
                 tenant_id, event_id, action_type, assignment_id, policy_id, entitlement_id, scheduled_at
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.event_id)
@@ -301,12 +305,12 @@ impl GovLifecycleAction {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_lifecycle_actions
             SET executed_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND executed_at IS NULL AND cancelled_at IS NULL
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -321,7 +325,7 @@ impl GovLifecycleAction {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_lifecycle_actions
             SET cancelled_at = NOW()
             WHERE id = $1 AND tenant_id = $2
@@ -329,7 +333,7 @@ impl GovLifecycleAction {
               AND executed_at IS NULL
               AND cancelled_at IS NULL
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -345,12 +349,12 @@ impl GovLifecycleAction {
         error_message: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_lifecycle_actions
             SET error_message = $3
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -360,16 +364,19 @@ impl GovLifecycleAction {
     }
 
     /// Check if action is pending (scheduled but not executed/cancelled).
+    #[must_use] 
     pub fn is_pending(&self) -> bool {
         self.scheduled_at.is_some() && self.executed_at.is_none() && self.cancelled_at.is_none()
     }
 
     /// Check if action is executed.
+    #[must_use] 
     pub fn is_executed(&self) -> bool {
         self.executed_at.is_some()
     }
 
     /// Check if action is cancelled.
+    #[must_use] 
     pub fn is_cancelled(&self) -> bool {
         self.cancelled_at.is_some()
     }

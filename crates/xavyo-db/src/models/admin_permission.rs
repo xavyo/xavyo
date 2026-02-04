@@ -44,7 +44,7 @@ impl std::str::FromStr for PermissionCategory {
             "security" => Ok(PermissionCategory::Security),
             "audit" => Ok(PermissionCategory::Audit),
             "branding" => Ok(PermissionCategory::Branding),
-            _ => Err(format!("Invalid permission category: {}", s)),
+            _ => Err(format!("Invalid permission category: {s}")),
         }
     }
 }
@@ -80,11 +80,11 @@ impl AdminPermission {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, code, name, description, category, created_at
             FROM admin_permissions
             ORDER BY category, code
-            "#,
+            ",
         )
         .fetch_all(executor)
         .await
@@ -99,12 +99,12 @@ impl AdminPermission {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, code, name, description, category, created_at
             FROM admin_permissions
             WHERE category = $1
             ORDER BY code
-            "#,
+            ",
         )
         .bind(category)
         .fetch_all(executor)
@@ -117,11 +117,11 @@ impl AdminPermission {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, code, name, description, category, created_at
             FROM admin_permissions
             WHERE code = $1
-            "#,
+            ",
         )
         .bind(code)
         .fetch_optional(executor)
@@ -134,11 +134,11 @@ impl AdminPermission {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, code, name, description, category, created_at
             FROM admin_permissions
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .fetch_optional(executor)
@@ -154,12 +154,12 @@ impl AdminPermission {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, code, name, description, category, created_at
             FROM admin_permissions
             WHERE code = ANY($1)
             ORDER BY category, code
-            "#,
+            ",
         )
         .bind(codes)
         .fetch_all(executor)
@@ -174,12 +174,12 @@ impl AdminPermission {
         E: PgExecutor<'e>,
     {
         let rows: Vec<(String, i64)> = sqlx::query_as(
-            r#"
+            r"
             SELECT category, COUNT(*) as count
             FROM admin_permissions
             GROUP BY category
             ORDER BY category
-            "#,
+            ",
         )
         .fetch_all(executor)
         .await?;
@@ -195,6 +195,7 @@ impl AdminPermission {
 
     /// Check if a permission code matches a wildcard pattern.
     /// e.g., "users:read" matches "users:*" or "users:read"
+    #[must_use] 
     pub fn matches_pattern(code: &str, pattern: &str) -> bool {
         if code == pattern {
             return true;

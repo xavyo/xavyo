@@ -599,7 +599,7 @@ async fn test_retry_exhausted() {
         .mount(&server)
         .await;
 
-    let config = RestConfig::new(&server.uri())
+    let config = RestConfig::new(server.uri())
         .with_allow_localhost()
         .with_rate_limit(RateLimitConfig::disabled())
         .with_retry(
@@ -678,7 +678,7 @@ async fn test_rate_limiter_stats() {
         .mount(&server)
         .await;
 
-    let config = RestConfig::new(&server.uri())
+    let config = RestConfig::new(server.uri())
         .with_allow_localhost()
         .with_rate_limit(RateLimitConfig::new(10).with_max_concurrent(5))
         .with_retry(RetryConfig::disabled());
@@ -796,11 +796,10 @@ async fn test_error_message_extraction() {
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    let err_str = format!("{:?}", err);
+    let err_str = format!("{err:?}");
     assert!(
         err_str.contains("Email is required"),
-        "Error should contain message: {}",
-        err_str
+        "Error should contain message: {err_str}"
     );
 }
 

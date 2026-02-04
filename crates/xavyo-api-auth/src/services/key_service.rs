@@ -22,12 +22,13 @@ type KeyCache = HashMap<Uuid, Vec<SigningKey>>;
 #[derive(Clone)]
 pub struct KeyService {
     pool: PgPool,
-    /// In-memory cache: tenant_id → signing keys
+    /// In-memory cache: `tenant_id` → signing keys
     cache: Arc<RwLock<KeyCache>>,
 }
 
 impl KeyService {
     /// Create a new key service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -81,7 +82,7 @@ impl KeyService {
 
     /// Rotate the signing key: generate new active key, retire current.
     ///
-    /// Returns (new_key, old_key) on success.
+    /// Returns (`new_key`, `old_key`) on success.
     pub async fn rotate_key(
         &self,
         tenant_id: Uuid,
@@ -163,7 +164,7 @@ impl KeyService {
         SigningKey::list_by_tenant(&self.pool, tenant_id).await
     }
 
-    /// Build a kid → public_key_pem map for JwtPublicKeys extension.
+    /// Build a kid → `public_key_pem` map for `JwtPublicKeys` extension.
     pub async fn build_public_key_map(
         &self,
         tenant_id: Uuid,
@@ -176,9 +177,9 @@ impl KeyService {
     }
 }
 
-/// Generate an RSA 2048-bit key pair and return (private_pem, public_pem).
+/// Generate an RSA 2048-bit key pair and return (`private_pem`, `public_pem`).
 ///
-/// SECURITY: Uses OsRng directly from the operating system's CSPRNG.
+/// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
 fn generate_rsa_key_pair() -> Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
     use rand::rngs::OsRng;
     use rsa::pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding};

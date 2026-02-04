@@ -22,12 +22,14 @@ pub enum LifecycleEventType {
 }
 
 impl LifecycleEventType {
-    /// Check if this event type requires attributes_before.
+    /// Check if this event type requires `attributes_before`.
+    #[must_use] 
     pub fn requires_attributes_before(&self) -> bool {
         matches!(self, Self::Mover)
     }
 
-    /// Check if this event type requires attributes_after.
+    /// Check if this event type requires `attributes_after`.
+    #[must_use] 
     pub fn requires_attributes_after(&self) -> bool {
         matches!(self, Self::Joiner | Self::Mover)
     }
@@ -92,10 +94,10 @@ impl GovLifecycleEvent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_events
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -112,28 +114,28 @@ impl GovLifecycleEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_events
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.event_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_type = ${}", param_count));
+            query.push_str(&format!(" AND event_type = ${param_count}"));
         }
         if filter.from.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
         if let Some(processed) = filter.processed {
             if processed {
@@ -174,28 +176,28 @@ impl GovLifecycleEvent {
         filter: &LifecycleEventFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_lifecycle_events
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.event_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_type = ${}", param_count));
+            query.push_str(&format!(" AND event_type = ${param_count}"));
         }
         if filter.from.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
         if let Some(processed) = filter.processed {
             if processed {
@@ -230,13 +232,13 @@ impl GovLifecycleEvent {
         input: CreateLifecycleEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_lifecycle_events (
                 tenant_id, user_id, event_type, attributes_before, attributes_after, source
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.user_id)
@@ -255,12 +257,12 @@ impl GovLifecycleEvent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_lifecycle_events
             SET processed_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND processed_at IS NULL
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -269,6 +271,7 @@ impl GovLifecycleEvent {
     }
 
     /// Check if event is processed.
+    #[must_use] 
     pub fn is_processed(&self) -> bool {
         self.processed_at.is_some()
     }

@@ -31,6 +31,7 @@ pub struct MetaRoleService {
 
 impl MetaRoleService {
     /// Create a new meta-role service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -430,7 +431,7 @@ impl MetaRoleService {
         if operator.requires_list() && !value.is_array() {
             return Err(GovernanceError::InvalidMetaRoleCriteriaValue {
                 field: field.to_string(),
-                operator: format!("{:?}", operator),
+                operator: format!("{operator:?}"),
                 reason: "Operator requires array value".to_string(),
             });
         }
@@ -438,7 +439,7 @@ impl MetaRoleService {
         if operator.is_numeric() && !value.is_number() {
             return Err(GovernanceError::InvalidMetaRoleCriteriaValue {
                 field: field.to_string(),
-                operator: format!("{:?}", operator),
+                operator: format!("{operator:?}"),
                 reason: "Operator requires numeric value".to_string(),
             });
         }
@@ -446,7 +447,7 @@ impl MetaRoleService {
         if operator.is_string_match() && !value.is_string() {
             return Err(GovernanceError::InvalidMetaRoleCriteriaValue {
                 field: field.to_string(),
-                operator: format!("{:?}", operator),
+                operator: format!("{operator:?}"),
                 reason: "Operator requires string value".to_string(),
             });
         }

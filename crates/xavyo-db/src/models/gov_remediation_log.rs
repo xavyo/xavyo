@@ -64,10 +64,10 @@ impl GovRemediationLog {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_remediation_logs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -82,11 +82,11 @@ impl GovRemediationLog {
         orphan_detection_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_remediation_logs
             WHERE tenant_id = $1 AND orphan_detection_id = $2
             ORDER BY performed_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(orphan_detection_id)
@@ -102,12 +102,12 @@ impl GovRemediationLog {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_remediation_logs
             WHERE tenant_id = $1 AND performed_by = $2
             ORDER BY performed_at DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(performed_by)
@@ -125,36 +125,36 @@ impl GovRemediationLog {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_remediation_logs
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.orphan_detection_id.is_some() {
-            query.push_str(&format!(" AND orphan_detection_id = ${}", param_idx));
+            query.push_str(&format!(" AND orphan_detection_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.action.is_some() {
-            query.push_str(&format!(" AND action = ${}", param_idx));
+            query.push_str(&format!(" AND action = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.performed_by.is_some() {
-            query.push_str(&format!(" AND performed_by = ${}", param_idx));
+            query.push_str(&format!(" AND performed_by = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.since.is_some() {
-            query.push_str(&format!(" AND performed_at >= ${}", param_idx));
+            query.push_str(&format!(" AND performed_at >= ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.until.is_some() {
-            query.push_str(&format!(" AND performed_at <= ${}", param_idx));
+            query.push_str(&format!(" AND performed_at <= ${param_idx}"));
             param_idx += 1;
         }
 
@@ -198,36 +198,36 @@ impl GovRemediationLog {
         filter: &RemediationLogFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_remediation_logs
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.orphan_detection_id.is_some() {
-            query.push_str(&format!(" AND orphan_detection_id = ${}", param_idx));
+            query.push_str(&format!(" AND orphan_detection_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.action.is_some() {
-            query.push_str(&format!(" AND action = ${}", param_idx));
+            query.push_str(&format!(" AND action = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.performed_by.is_some() {
-            query.push_str(&format!(" AND performed_by = ${}", param_idx));
+            query.push_str(&format!(" AND performed_by = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.since.is_some() {
-            query.push_str(&format!(" AND performed_at >= ${}", param_idx));
+            query.push_str(&format!(" AND performed_at >= ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.until.is_some() {
-            query.push_str(&format!(" AND performed_at <= ${}", param_idx));
+            query.push_str(&format!(" AND performed_at <= ${param_idx}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -262,13 +262,13 @@ impl GovRemediationLog {
         data: CreateGovRemediationLog,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_remediation_logs (
                 tenant_id, orphan_detection_id, action, performed_by, details
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.orphan_detection_id)
@@ -285,12 +285,12 @@ impl GovRemediationLog {
         tenant_id: Uuid,
     ) -> Result<Vec<(RemediationAction, i64)>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT action, COUNT(*) as count
             FROM gov_remediation_logs
             WHERE tenant_id = $1
             GROUP BY action
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -303,13 +303,13 @@ impl GovRemediationLog {
         tenant_id: Uuid,
     ) -> Result<Vec<(Uuid, i64)>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT performed_by, COUNT(*) as count
             FROM gov_remediation_logs
             WHERE tenant_id = $1
             GROUP BY performed_by
             ORDER BY count DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -323,12 +323,12 @@ impl GovRemediationLog {
         days: i32,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_remediation_logs
             WHERE tenant_id = $1
                 AND performed_at >= NOW() - ($2 || ' days')::interval
             ORDER BY performed_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(days)
@@ -343,11 +343,11 @@ impl GovRemediationLog {
         days: i32,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_remediation_logs
             WHERE tenant_id = $1
                 AND performed_at < NOW() - ($2 || ' days')::interval
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(days)

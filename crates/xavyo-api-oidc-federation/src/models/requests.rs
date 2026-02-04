@@ -88,7 +88,7 @@ pub struct ClaimMappingEntry {
     pub group_mapping: Option<std::collections::HashMap<String, String>>,
 }
 
-/// NameID configuration.
+/// `NameID` configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct NameIdConfig {
     pub source: String,
@@ -122,7 +122,7 @@ pub struct AuthorizeParams {
     pub redirect_uri: Option<String>,
 }
 
-/// Callback parameters from IdP.
+/// Callback parameters from `IdP`.
 #[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct CallbackParams {
     pub code: Option<String>,
@@ -133,11 +133,13 @@ pub struct CallbackParams {
 
 impl ClaimMappingConfig {
     /// Convert to JSON value.
+    #[must_use] 
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 
     /// Create default claim mapping.
+    #[must_use] 
     pub fn default_mapping() -> Self {
         Self {
             mappings: vec![

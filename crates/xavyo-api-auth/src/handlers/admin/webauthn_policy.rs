@@ -1,6 +1,6 @@
-//! WebAuthn policy management handlers.
+//! `WebAuthn` policy management handlers.
 //!
-//! Endpoints for managing tenant WebAuthn policy and admin credential management.
+//! Endpoints for managing tenant `WebAuthn` policy and admin credential management.
 
 use axum::{extract::Path, http::StatusCode, Extension, Json};
 use serde::{Deserialize, Serialize};
@@ -17,12 +17,12 @@ use xavyo_db::{set_tenant_context, TenantWebAuthnPolicy, UpsertWebAuthnPolicy};
 use crate::error::ApiAuthError;
 use crate::services::WebAuthnService;
 
-/// Response for WebAuthn policy endpoints.
+/// Response for `WebAuthn` policy endpoints.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct WebAuthnPolicyResponse {
     /// The tenant this policy applies to.
     pub tenant_id: Uuid,
-    /// Whether WebAuthn is enabled for this tenant.
+    /// Whether `WebAuthn` is enabled for this tenant.
     pub webauthn_enabled: bool,
     /// Whether attestation is required for credential registration.
     pub require_attestation: bool,
@@ -48,10 +48,10 @@ impl From<TenantWebAuthnPolicy> for WebAuthnPolicyResponse {
     }
 }
 
-/// Request to update WebAuthn policy.
+/// Request to update `WebAuthn` policy.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateWebAuthnPolicyRequest {
-    /// Whether WebAuthn is enabled.
+    /// Whether `WebAuthn` is enabled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub webauthn_enabled: Option<bool>,
     /// Whether attestation is required.
@@ -70,7 +70,7 @@ pub struct UpdateWebAuthnPolicyRequest {
 
 /// GET /admin/tenants/:tenant_id/webauthn-policy
 ///
-/// Get the WebAuthn policy for a tenant.
+/// Get the `WebAuthn` policy for a tenant.
 #[utoipa::path(
     get,
     path = "/admin/tenants/{tenant_id}/webauthn-policy",
@@ -111,7 +111,7 @@ pub async fn get_webauthn_policy(
 
 /// PUT /admin/tenants/:tenant_id/webauthn-policy
 ///
-/// Update the WebAuthn policy for a tenant.
+/// Update the `WebAuthn` policy for a tenant.
 #[utoipa::path(
     put,
     path = "/admin/tenants/{tenant_id}/webauthn-policy",
@@ -196,7 +196,7 @@ pub async fn update_webauthn_policy(
 pub struct AdminCredentialListResponse {
     /// The user these credentials belong to.
     pub user_id: Uuid,
-    /// List of registered WebAuthn credentials.
+    /// List of registered `WebAuthn` credentials.
     pub credentials: Vec<AdminCredentialInfo>,
     /// Total count of credentials.
     pub count: usize,
@@ -222,9 +222,9 @@ pub struct AdminCredentialInfo {
     pub last_used_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-/// GET /admin/users/:user_id/webauthn/credentials
+/// GET /`admin/users/:user_id/webauthn/credentials`
 ///
-/// Admin endpoint to list a user's WebAuthn credentials.
+/// Admin endpoint to list a user's `WebAuthn` credentials.
 #[utoipa::path(
     get,
     path = "/admin/users/{user_id}/webauthn/credentials",
@@ -278,9 +278,9 @@ pub async fn admin_list_user_credentials(
     ))
 }
 
-/// DELETE /admin/users/:user_id/webauthn/credentials/:credential_id
+/// DELETE /`admin/users/:user_id/webauthn/credentials/:credential_id`
 ///
-/// Admin endpoint to revoke a user's WebAuthn credential.
+/// Admin endpoint to revoke a user's `WebAuthn` credential.
 #[utoipa::path(
     delete,
     path = "/admin/users/{user_id}/webauthn/credentials/{credential_id}",

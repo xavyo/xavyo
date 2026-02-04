@@ -20,6 +20,7 @@ pub struct SimulationComparisonService {
 
 impl SimulationComparisonService {
     /// Create a new simulation comparison service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -231,8 +232,7 @@ impl SimulationComparisonService {
 
                 if sim.status != xavyo_db::SimulationStatus::Executed {
                     return Err(GovernanceError::Validation(format!(
-                        "Policy simulation {} must be executed before comparison",
-                        simulation_id
+                        "Policy simulation {simulation_id} must be executed before comparison"
                     )));
                 }
             }
@@ -245,15 +245,13 @@ impl SimulationComparisonService {
                     && sim.status != xavyo_db::SimulationStatus::Applied
                 {
                     return Err(GovernanceError::Validation(format!(
-                        "Batch simulation {} must be executed before comparison",
-                        simulation_id
+                        "Batch simulation {simulation_id} must be executed before comparison"
                     )));
                 }
             }
             _ => {
                 return Err(GovernanceError::Validation(format!(
-                    "Unknown simulation type: {}",
-                    simulation_type
+                    "Unknown simulation type: {simulation_type}"
                 )));
             }
         }
@@ -422,10 +420,10 @@ impl SimulationComparisonService {
         let mut total_removals = 0i64;
 
         for impact in simulation_impacts.values() {
-            if let Some(gained) = impact.get("entitlements_gained").and_then(|v| v.as_i64()) {
+            if let Some(gained) = impact.get("entitlements_gained").and_then(serde_json::Value::as_i64) {
                 total_additions += gained;
             }
-            if let Some(lost) = impact.get("entitlements_lost").and_then(|v| v.as_i64()) {
+            if let Some(lost) = impact.get("entitlements_lost").and_then(serde_json::Value::as_i64) {
                 total_removals += lost;
             }
             // Also count access_gained/access_lost for batch simulations
@@ -522,8 +520,7 @@ impl SimulationComparisonService {
             }
             _ => {
                 return Err(GovernanceError::Validation(format!(
-                    "Unknown simulation type: {}",
-                    simulation_type
+                    "Unknown simulation type: {simulation_type}"
                 )));
             }
         }

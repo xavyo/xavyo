@@ -132,17 +132,14 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
     }
 
     // Extract user_id from subject — reject if not a valid UUID
-    let user_id = match claims.sub.parse::<Uuid>() {
-        Ok(uid) => uid,
-        Err(_) => {
-            tracing::warn!(
-                target: "token_lifecycle",
-                jti = %jti,
-                sub = %claims.sub,
-                "Cannot revoke access token: subject is not a valid UUID"
-            );
-            return false;
-        }
+    let user_id = if let Ok(uid) = claims.sub.parse::<Uuid>() { uid } else {
+        tracing::warn!(
+            target: "token_lifecycle",
+            jti = %jti,
+            sub = %claims.sub,
+            "Cannot revoke access token: subject is not a valid UUID"
+        );
+        return false;
     };
 
     // Set tenant context for RLS before inserting into revoked_tokens
@@ -194,7 +191,7 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
 
 /// Try to revoke a token as a refresh token (opaque).
 ///
-/// Hashes the token and looks it up in oauth_refresh_tokens.
+/// Hashes the token and looks it up in `oauth_refresh_tokens`.
 /// If found, marks it as revoked and cascades to blacklist access tokens.
 /// Returns true if the token was found and revoked.
 async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &str) -> bool {
@@ -212,11 +209,11 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
 
     // Look up the refresh token by hash
     let row: Option<(Uuid, Uuid, bool)> = sqlx::query_as(
-        r#"
+        r"
         SELECT id, user_id, revoked
         FROM oauth_refresh_tokens
         WHERE token_hash = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(&token_hash)
     .bind(tenant_id)
@@ -236,11 +233,11 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
 
     // Mark refresh token as revoked
     let _ = sqlx::query(
-        r#"
+        r"
         UPDATE oauth_refresh_tokens
         SET revoked = TRUE, revoked_at = now()
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(token_id)
     .bind(tenant_id)
@@ -255,7 +252,7 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
 
 /// Cascade revocation: blacklist all access tokens for a user.
 ///
-/// Inserts a `revoke-all:{user_id}:{timestamp}` sentinel into revoked_tokens.
+/// Inserts a `revoke-all:{user_id}:{timestamp}` sentinel into `revoked_tokens`.
 /// The JWT auth middleware checks for these sentinels and rejects any token
 /// issued before the sentinel timestamp.
 async fn cascade_revoke_user_access_tokens(state: &OAuthState, tenant_id: Uuid, user_id: Uuid) {
@@ -292,7 +289,7 @@ async fn cascade_revoke_user_access_tokens(state: &OAuthState, tenant_id: Uuid, 
     }
 }
 
-/// Hash a token value using SHA-256 (same algorithm as TokenService).
+/// Hash a token value using SHA-256 (same algorithm as `TokenService`).
 fn hash_token(token: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(token.as_bytes());

@@ -40,6 +40,7 @@ pub struct SyncStatus {
 
 impl SyncStatus {
     /// Create a new sync status for a connector.
+    #[must_use] 
     pub fn new(tenant_id: Uuid, connector_id: Uuid) -> Self {
         Self {
             connector_id,
@@ -58,11 +59,13 @@ impl SyncStatus {
     }
 
     /// Check if sync is active.
+    #[must_use] 
     pub fn is_syncing(&self) -> bool {
         self.current_state.is_active()
     }
 
     /// Check if there was an error.
+    #[must_use] 
     pub fn has_error(&self) -> bool {
         self.current_state == SyncState::Error
     }
@@ -76,6 +79,7 @@ pub struct SyncStatusManager {
 
 impl SyncStatusManager {
     /// Create a new sync status manager.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -84,28 +88,28 @@ impl SyncStatusManager {
     #[instrument(skip(self))]
     pub async fn get(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncResult<Option<SyncStatus>> {
         let result = sqlx::query_as::<_, SyncStatusRow>(
-            r#"
+            r"
             SELECT connector_id, tenant_id, current_state, last_sync_started_at,
                    last_sync_completed_at, last_sync_error, changes_processed,
                    changes_pending, conflicts_pending, current_rate, is_throttled,
                    updated_at
             FROM gov_sync_status
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(|r| r.into_status()))
+        Ok(result.map(SyncStatusRow::into_status))
     }
 
     /// Initialize status for a new connector.
     #[instrument(skip(self))]
     pub async fn initialize(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncResult<SyncStatus> {
         let result = sqlx::query_as::<_, SyncStatusRow>(
-            r#"
+            r"
             INSERT INTO gov_sync_status (connector_id, tenant_id)
             VALUES ($1, $2)
             ON CONFLICT (connector_id) DO UPDATE SET updated_at = NOW()
@@ -113,7 +117,7 @@ impl SyncStatusManager {
                       last_sync_completed_at, last_sync_error, changes_processed,
                       changes_pending, conflicts_pending, current_rate, is_throttled,
                       updated_at
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -131,7 +135,7 @@ impl SyncStatusManager {
         connector_id: Uuid,
     ) -> SyncResult<Option<SyncStatus>> {
         let result = sqlx::query_as::<_, SyncStatusRow>(
-            r#"
+            r"
             UPDATE gov_sync_status
             SET current_state = 'syncing',
                 last_sync_started_at = NOW(),
@@ -142,14 +146,14 @@ impl SyncStatusManager {
                       last_sync_completed_at, last_sync_error, changes_processed,
                       changes_pending, conflicts_pending, current_rate, is_throttled,
                       updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(|r| r.into_status()))
+        Ok(result.map(SyncStatusRow::into_status))
     }
 
     /// Mark sync as completed.
@@ -161,7 +165,7 @@ impl SyncStatusManager {
         changes_processed: i64,
     ) -> SyncResult<Option<SyncStatus>> {
         let result = sqlx::query_as::<_, SyncStatusRow>(
-            r#"
+            r"
             UPDATE gov_sync_status
             SET current_state = 'idle',
                 last_sync_completed_at = NOW(),
@@ -172,7 +176,7 @@ impl SyncStatusManager {
                       last_sync_completed_at, last_sync_error, changes_processed,
                       changes_pending, conflicts_pending, current_rate, is_throttled,
                       updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -180,7 +184,7 @@ impl SyncStatusManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(|r| r.into_status()))
+        Ok(result.map(SyncStatusRow::into_status))
     }
 
     /// Set error state.
@@ -192,7 +196,7 @@ impl SyncStatusManager {
         error: &str,
     ) -> SyncResult<Option<SyncStatus>> {
         let result = sqlx::query_as::<_, SyncStatusRow>(
-            r#"
+            r"
             UPDATE gov_sync_status
             SET current_state = 'error',
                 last_sync_error = $3,
@@ -202,7 +206,7 @@ impl SyncStatusManager {
                       last_sync_completed_at, last_sync_error, changes_processed,
                       changes_pending, conflicts_pending, current_rate, is_throttled,
                       updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -210,7 +214,7 @@ impl SyncStatusManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(|r| r.into_status()))
+        Ok(result.map(SyncStatusRow::into_status))
     }
 
     /// Update throttling status.
@@ -223,7 +227,7 @@ impl SyncStatusManager {
     ) -> SyncResult<Option<SyncStatus>> {
         let state = if is_throttled { "throttled" } else { "syncing" };
         let result = sqlx::query_as::<_, SyncStatusRow>(
-            r#"
+            r"
             UPDATE gov_sync_status
             SET current_state = $3,
                 is_throttled = $4,
@@ -233,7 +237,7 @@ impl SyncStatusManager {
                       last_sync_completed_at, last_sync_error, changes_processed,
                       changes_pending, conflicts_pending, current_rate, is_throttled,
                       updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -242,7 +246,7 @@ impl SyncStatusManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(|r| r.into_status()))
+        Ok(result.map(SyncStatusRow::into_status))
     }
 
     /// Update pending counts.
@@ -255,7 +259,7 @@ impl SyncStatusManager {
         conflicts_pending: i32,
     ) -> SyncResult<Option<SyncStatus>> {
         let result = sqlx::query_as::<_, SyncStatusRow>(
-            r#"
+            r"
             UPDATE gov_sync_status
             SET changes_pending = $3,
                 conflicts_pending = $4,
@@ -265,7 +269,7 @@ impl SyncStatusManager {
                       last_sync_completed_at, last_sync_error, changes_processed,
                       changes_pending, conflicts_pending, current_rate, is_throttled,
                       updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -274,7 +278,7 @@ impl SyncStatusManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(|r| r.into_status()))
+        Ok(result.map(SyncStatusRow::into_status))
     }
 
     /// Update current processing rate.
@@ -286,7 +290,7 @@ impl SyncStatusManager {
         rate: f64,
     ) -> SyncResult<Option<SyncStatus>> {
         let result = sqlx::query_as::<_, SyncStatusRow>(
-            r#"
+            r"
             UPDATE gov_sync_status
             SET current_rate = $3,
                 updated_at = NOW()
@@ -295,7 +299,7 @@ impl SyncStatusManager {
                       last_sync_completed_at, last_sync_error, changes_processed,
                       changes_pending, conflicts_pending, current_rate, is_throttled,
                       updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -303,14 +307,14 @@ impl SyncStatusManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(|r| r.into_status()))
+        Ok(result.map(SyncStatusRow::into_status))
     }
 
     /// List all statuses for a tenant.
     #[instrument(skip(self))]
     pub async fn list_by_tenant(&self, tenant_id: Uuid) -> SyncResult<Vec<SyncStatus>> {
         let rows = sqlx::query_as::<_, SyncStatusRow>(
-            r#"
+            r"
             SELECT connector_id, tenant_id, current_state, last_sync_started_at,
                    last_sync_completed_at, last_sync_error, changes_processed,
                    changes_pending, conflicts_pending, current_rate, is_throttled,
@@ -318,13 +322,13 @@ impl SyncStatusManager {
             FROM gov_sync_status
             WHERE tenant_id = $1
             ORDER BY updated_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| r.into_status()).collect())
+        Ok(rows.into_iter().map(SyncStatusRow::into_status).collect())
     }
 }
 

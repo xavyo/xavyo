@@ -130,10 +130,10 @@ async fn handle_sso<'a>(
             let decoded =
                 base64::Engine::decode(&base64::engine::general_purpose::STANDARD, saml_request)
                     .map_err(|e| {
-                        SamlError::InvalidAuthnRequest(format!("Base64 decode failed: {}", e))
+                        SamlError::InvalidAuthnRequest(format!("Base64 decode failed: {e}"))
                     })?;
             let xml = String::from_utf8(decoded)
-                .map_err(|e| SamlError::InvalidAuthnRequest(format!("Invalid UTF-8: {}", e)))?;
+                .map_err(|e| SamlError::InvalidAuthnRequest(format!("Invalid UTF-8: {e}")))?;
             let req = RequestParser::parse_post(saml_request)?;
             (req, Some(xml))
         }
@@ -218,20 +218,17 @@ async fn handle_sso<'a>(
     }
 
     // Check if user is authenticated
-    let user = match user {
-        Some(u) => u,
-        None => {
-            // User not authenticated - would redirect to login
-            // For now, return unauthorized
-            // TODO: In a full implementation, store the AuthnRequest in session
-            // and redirect to login, then resume SSO after authentication
-            tracing::info!(
-                tenant_id = %tenant_id,
-                sp_entity_id = %sp.entity_id,
-                "User not authenticated, SSO requires login"
-            );
-            return Err(SamlError::NotAuthenticated);
-        }
+    let user = if let Some(u) = user { u } else {
+        // User not authenticated - would redirect to login
+        // For now, return unauthorized
+        // TODO: In a full implementation, store the AuthnRequest in session
+        // and redirect to login, then resume SSO after authentication
+        tracing::info!(
+            tenant_id = %tenant_id,
+            sp_entity_id = %sp.entity_id,
+            "User not authenticated, SSO requires login"
+        );
+        return Err(SamlError::NotAuthenticated);
     };
 
     // Build user attributes
@@ -304,7 +301,7 @@ async fn handle_sso<'a>(
     let acs_url = authn_request
         .assertion_consumer_service_url
         .as_deref()
-        .unwrap_or_else(|| sp.acs_urls.first().map(|s| s.as_str()).unwrap_or(""));
+        .unwrap_or_else(|| sp.acs_urls.first().map_or("", std::string::String::as_str));
 
     tracing::info!(
         tenant_id = %tenant_id,

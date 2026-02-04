@@ -34,6 +34,7 @@ pub struct KeyRotationManager {
 
 impl KeyRotationManager {
     /// Create a new rotation manager with the given transition period in days.
+    #[must_use] 
     pub fn new(transition_period_days: i64) -> Self {
         Self {
             keys: Vec::new(),
@@ -48,11 +49,13 @@ impl KeyRotationManager {
     }
 
     /// Get the current active signing key.
+    #[must_use] 
     pub fn current_signing_key(&self) -> Option<&TrackedKey> {
         self.keys.iter().find(|k| k.is_active)
     }
 
     /// Get all keys valid for verification (active + within transition period).
+    #[must_use] 
     pub fn all_verification_keys(&self) -> Vec<&TrackedKey> {
         let now = Utc::now();
         self.keys
@@ -123,11 +126,13 @@ impl KeyRotationManager {
     }
 
     /// Get the number of tracked keys.
+    #[must_use] 
     pub fn key_count(&self) -> usize {
         self.keys.len()
     }
 
     /// Get the transition period in days.
+    #[must_use] 
     pub fn transition_period_days(&self) -> i64 {
         self.transition_period.num_days()
     }

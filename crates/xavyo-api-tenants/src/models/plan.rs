@@ -27,7 +27,7 @@ impl UpgradePlanRequest {
         // Parse the current plan
         let current_tier: PlanTier = current_plan
             .parse()
-            .map_err(|_| format!("Invalid current plan: {}", current_plan))?;
+            .map_err(|_| format!("Invalid current plan: {current_plan}"))?;
 
         // Ensure it's actually an upgrade
         if !new_tier.is_higher_than(&current_tier) {
@@ -64,7 +64,7 @@ impl DowngradePlanRequest {
         // Parse the current plan
         let current_tier: PlanTier = current_plan
             .parse()
-            .map_err(|_| format!("Invalid current plan: {}", current_plan))?;
+            .map_err(|_| format!("Invalid current plan: {current_plan}"))?;
 
         // Ensure it's actually a downgrade
         if !new_tier.is_lower_than(&current_tier) {

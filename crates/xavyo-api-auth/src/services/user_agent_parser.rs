@@ -23,6 +23,7 @@ pub struct DeviceInfo {
 }
 
 /// Parse a user-agent string to extract device information.
+#[must_use] 
 pub fn parse_user_agent(user_agent: &str) -> DeviceInfo {
     let ua = user_agent.to_lowercase();
 
@@ -243,9 +244,9 @@ fn extract_ios_version(ua: &str) -> Option<String> {
 /// Generate a human-readable device name.
 fn generate_device_name(browser: &Option<String>, os: &Option<String>) -> String {
     match (browser, os) {
-        (Some(b), Some(o)) => format!("{} on {}", b, o),
+        (Some(b), Some(o)) => format!("{b} on {o}"),
         (Some(b), None) => b.clone(),
-        (None, Some(o)) => format!("Unknown browser on {}", o),
+        (None, Some(o)) => format!("Unknown browser on {o}"),
         (None, None) => "Unknown device".to_string(),
     }
 }

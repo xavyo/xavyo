@@ -15,7 +15,7 @@ use crate::services::filter_parser::{parse_filter, AttributeMapper};
 /// Maximum allowed hierarchy depth (10 levels).
 const MAX_DEPTH: i32 = 10;
 
-/// Allowed group_type values.
+/// Allowed `group_type` values.
 const ALLOWED_GROUP_TYPES: &[&str] = &[
     "organizational_unit",
     "department",
@@ -40,7 +40,7 @@ impl GroupService {
         }
     }
 
-    /// Validate group_type is one of the allowed values (F071).
+    /// Validate `group_type` is one of the allowed values (F071).
     fn validate_group_type(group_type: &str) -> ScimResult<()> {
         if ALLOWED_GROUP_TYPES.contains(&group_type) {
             Ok(())
@@ -55,7 +55,7 @@ impl GroupService {
 
     /// Validate that setting a parent would not create a cycle or exceed max depth (F071).
     ///
-    /// For new groups (group_id = None), only checks parent depth.
+    /// For new groups (`group_id` = None), only checks parent depth.
     /// For existing groups, also checks that the parent is not a descendant.
     async fn validate_hierarchy(
         &self,
@@ -67,7 +67,7 @@ impl GroupService {
         let parent = Group::find_by_id(&self.pool, tenant_id, parent_id)
             .await?
             .ok_or_else(|| {
-                ScimError::Validation(format!("Parent group {} not found", parent_id))
+                ScimError::Validation(format!("Parent group {parent_id} not found"))
             })?;
 
         // Ensure parent is in the same tenant (defense-in-depth)
@@ -79,7 +79,7 @@ impl GroupService {
 
         // Check depth: parent's depth + 1 must not exceed MAX_DEPTH
         let parent_depth: Option<(Option<i64>,)> = sqlx::query_as(
-            r#"
+            r"
             WITH RECURSIVE depth_calc AS (
                 SELECT id, parent_id, 1 AS depth
                 FROM groups
@@ -93,7 +93,7 @@ impl GroupService {
                 WHERE g.tenant_id = $1
             )
             SELECT MAX(depth) FROM depth_calc
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(parent_id)
@@ -104,15 +104,14 @@ impl GroupService {
 
         if parent_depth + 1 > MAX_DEPTH {
             return Err(ScimError::Validation(format!(
-                "Maximum hierarchy depth of {} levels exceeded",
-                MAX_DEPTH
+                "Maximum hierarchy depth of {MAX_DEPTH} levels exceeded"
             )));
         }
 
         // For existing groups, check that the parent is not a descendant (cycle detection)
         if let Some(gid) = group_id {
             let would_cycle: (bool,) = sqlx::query_as(
-                r#"
+                r"
                 WITH RECURSIVE ancestors AS (
                     SELECT id, parent_id
                     FROM groups
@@ -126,7 +125,7 @@ impl GroupService {
                     WHERE g.tenant_id = $1
                 )
                 SELECT EXISTS(SELECT 1 FROM ancestors WHERE id = $3)
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(parent_id)
@@ -142,7 +141,7 @@ impl GroupService {
 
             // Also check the subtree depth of the group being moved
             let subtree_depth: Option<(Option<i64>,)> = sqlx::query_as(
-                r#"
+                r"
                 WITH RECURSIVE subtree AS (
                     SELECT id, 0 AS relative_depth
                     FROM groups
@@ -156,7 +155,7 @@ impl GroupService {
                     WHERE g.tenant_id = $1
                 )
                 SELECT MAX(relative_depth) FROM subtree
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(gid)
@@ -166,8 +165,7 @@ impl GroupService {
             let subtree_max = subtree_depth.and_then(|(d,)| d).unwrap_or(0) as i32;
             if parent_depth + 1 + subtree_max > MAX_DEPTH {
                 return Err(ScimError::Validation(format!(
-                    "Moving this group would exceed maximum hierarchy depth of {} levels",
-                    MAX_DEPTH
+                    "Moving this group would exceed maximum hierarchy depth of {MAX_DEPTH} levels"
                 )));
             }
         }
@@ -255,16 +253,13 @@ impl GroupService {
 
             // Resolve parent by external_id if provided
             let parent_id = if let Some(ref parent_ext_id) = ext.parent_external_id {
-                match Group::find_by_external_id(&self.pool, tenant_id, parent_ext_id).await? {
-                    Some(parent) => Some(parent.id),
-                    None => {
-                        tracing::warn!(
-                            tenant_id = %tenant_id,
-                            parent_external_id = %parent_ext_id,
-                            "Parent group not found by external_id, creating as root"
-                        );
-                        None
-                    }
+                if let Some(parent) = Group::find_by_external_id(&self.pool, tenant_id, parent_ext_id).await? { Some(parent.id) } else {
+                    tracing::warn!(
+                        tenant_id = %tenant_id,
+                        parent_external_id = %parent_ext_id,
+                        "Parent group not found by external_id, creating as root"
+                    );
+                    None
                 }
             } else {
                 None
@@ -311,7 +306,7 @@ impl GroupService {
     async fn find_group(&self, tenant_id: Uuid, group_id: Uuid) -> ScimResult<Group> {
         Group::find_by_id(&self.pool, tenant_id, group_id)
             .await?
-            .ok_or_else(|| ScimError::NotFound(format!("Group {} not found", group_id)))
+            .ok_or_else(|| ScimError::NotFound(format!("Group {group_id} not found")))
     }
 
     /// List groups with optional filtering and pagination.
@@ -409,16 +404,13 @@ impl GroupService {
             }
 
             let parent_id = if let Some(ref parent_ext_id) = ext.parent_external_id {
-                match Group::find_by_external_id(&self.pool, tenant_id, parent_ext_id).await? {
-                    Some(parent) => Some(parent.id),
-                    None => {
-                        tracing::warn!(
-                            tenant_id = %tenant_id,
-                            parent_external_id = %parent_ext_id,
-                            "Parent group not found by external_id, keeping current parent"
-                        );
-                        existing.parent_id
-                    }
+                if let Some(parent) = Group::find_by_external_id(&self.pool, tenant_id, parent_ext_id).await? { Some(parent.id) } else {
+                    tracing::warn!(
+                        tenant_id = %tenant_id,
+                        parent_external_id = %parent_ext_id,
+                        "Parent group not found by external_id, keeping current parent"
+                    );
+                    existing.parent_id
                 }
             } else {
                 None // Explicitly set to root if no parentExternalId in extension
@@ -450,7 +442,7 @@ impl GroupService {
             &group_type,
         )
         .await?
-        .ok_or_else(|| ScimError::NotFound(format!("Group {} not found", group_id)))?;
+        .ok_or_else(|| ScimError::NotFound(format!("Group {group_id} not found")))?;
 
         // Replace members
         let member_ids: Vec<Uuid> = request.members.iter().map(|m| m.value).collect();
@@ -520,7 +512,7 @@ impl GroupService {
                         }
                     }
                     "externalId" | "externalid" => {
-                        group.external_id = value.as_str().map(|s| s.to_string());
+                        group.external_id = value.as_str().map(std::string::ToString::to_string);
                     }
                     "members" => {
                         // Replace all members
@@ -662,7 +654,7 @@ impl GroupService {
     pub async fn delete_group(&self, tenant_id: Uuid, group_id: Uuid) -> ScimResult<()> {
         // Check for child groups (F071) — prevent deletion if children exist
         let has_children: (bool,) = sqlx::query_as(
-            r#"SELECT EXISTS(SELECT 1 FROM groups WHERE tenant_id = $1 AND parent_id = $2)"#,
+            r"SELECT EXISTS(SELECT 1 FROM groups WHERE tenant_id = $1 AND parent_id = $2)",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -674,8 +666,7 @@ impl GroupService {
                 resource_type: "group".to_string(),
                 field: "children".to_string(),
                 value: format!(
-                    "Group {} has child groups. Remove or reassign children first.",
-                    group_id
+                    "Group {group_id} has child groups. Remove or reassign children first."
                 ),
             });
         }
@@ -687,7 +678,7 @@ impl GroupService {
         let deleted = Group::delete(&self.pool, tenant_id, group_id).await?;
 
         if !deleted {
-            return Err(ScimError::NotFound(format!("Group {} not found", group_id)));
+            return Err(ScimError::NotFound(format!("Group {group_id} not found")));
         }
 
         Ok(())

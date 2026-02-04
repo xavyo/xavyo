@@ -8,7 +8,7 @@
 //!
 //! ## Features
 //!
-//! - Multiple authentication methods (Basic, Bearer, API Key, OAuth2)
+//! - Multiple authentication methods (Basic, Bearer, API Key, `OAuth2`)
 //! - Flexible endpoint configuration
 //! - Multiple pagination styles
 //! - Configurable request/response parsing

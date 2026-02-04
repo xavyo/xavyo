@@ -1,4 +1,4 @@
-//! SCIM target authentication — Bearer token and OAuth2 client credentials.
+//! SCIM target authentication — Bearer token and `OAuth2` client credentials.
 
 use crate::error::{ScimClientError, ScimClientResult};
 use reqwest::RequestBuilder;
@@ -18,7 +18,7 @@ pub enum ScimCredentials {
     #[serde(rename = "bearer")]
     Bearer { token: String },
 
-    /// OAuth2 client credentials grant.
+    /// `OAuth2` client credentials grant.
     #[serde(rename = "oauth2")]
     OAuth2 {
         client_id: String,
@@ -52,7 +52,7 @@ impl std::fmt::Debug for ScimCredentials {
     }
 }
 
-/// OAuth2 token response from the token endpoint.
+/// `OAuth2` token response from the token endpoint.
 #[derive(Debug, Deserialize)]
 struct OAuth2TokenResponse {
     access_token: String,
@@ -62,7 +62,7 @@ struct OAuth2TokenResponse {
     expires_in: Option<u64>,
 }
 
-/// Cached OAuth2 access token with expiry.
+/// Cached `OAuth2` access token with expiry.
 #[derive(Debug, Clone)]
 struct CachedToken {
     access_token: String,
@@ -80,18 +80,19 @@ impl CachedToken {
 
 /// Authentication handler for SCIM targets.
 ///
-/// Supports Bearer token (static) and OAuth2 client credentials (with caching).
+/// Supports Bearer token (static) and `OAuth2` client credentials (with caching).
 #[derive(Debug, Clone)]
 pub struct ScimAuth {
     credentials: ScimCredentials,
-    /// Cached OAuth2 token (shared across clones).
+    /// Cached `OAuth2` token (shared across clones).
     cached_token: Arc<RwLock<Option<CachedToken>>>,
-    /// HTTP client for OAuth2 token requests.
+    /// HTTP client for `OAuth2` token requests.
     http_client: reqwest::Client,
 }
 
 impl ScimAuth {
     /// Create a new auth handler from decrypted credentials.
+    #[must_use] 
     pub fn new(credentials: ScimCredentials, http_client: reqwest::Client) -> Self {
         Self {
             credentials,
@@ -103,7 +104,7 @@ impl ScimAuth {
     /// Get the Bearer token to use for requests.
     ///
     /// For Bearer auth, returns the static token.
-    /// For OAuth2 CC, fetches (or returns cached) access token.
+    /// For `OAuth2` CC, fetches (or returns cached) access token.
     pub async fn get_bearer_token(&self) -> ScimClientResult<String> {
         match &self.credentials {
             ScimCredentials::Bearer { token } => Ok(token.clone()),
@@ -187,7 +188,7 @@ impl ScimAuth {
         Ok(builder.bearer_auth(token))
     }
 
-    /// Invalidate the cached OAuth2 token (e.g., on 401 response).
+    /// Invalidate the cached `OAuth2` token (e.g., on 401 response).
     pub async fn invalidate_cache(&self) {
         let mut cache = self.cached_token.write().await;
         *cache = None;

@@ -101,7 +101,7 @@ impl LdapConnector {
             .await
             .map_err(|e| {
                 ConnectorError::connection_failed_with_source(
-                    format!("Failed to connect to LDAP server at {}", url),
+                    format!("Failed to connect to LDAP server at {url}"),
                     e,
                 )
             })?;
@@ -124,7 +124,7 @@ impl LdapConnector {
             .await
             .map_err(|e| {
                 ConnectorError::connection_failed_with_source(
-                    format!("LDAP bind failed for {}", bind_dn),
+                    format!("LDAP bind failed for {bind_dn}"),
                     e,
                 )
             })?;
@@ -184,7 +184,7 @@ impl LdapConnector {
                 format!("({}<={})", attribute, Self::escape_ldap_value(value))
             }
             Filter::Present { attribute } => {
-                format!("({}=*)", attribute)
+                format!("({attribute}=*)")
             }
         }
     }
@@ -245,7 +245,7 @@ impl LdapConnector {
         result
     }
 
-    /// Convert AttributeValue to strings for LDAP.
+    /// Convert `AttributeValue` to strings for LDAP.
     fn attribute_value_to_strings(value: &AttributeValue) -> Vec<String> {
         match value {
             AttributeValue::String(s) => vec![s.clone()],
@@ -265,7 +265,7 @@ impl LdapConnector {
         }
     }
 
-    /// Convert LDAP search entry to AttributeSet.
+    /// Convert LDAP search entry to `AttributeSet`.
     fn entry_to_attribute_set(entry: SearchEntry) -> AttributeSet {
         let mut attrs = AttributeSet::new();
 
@@ -320,8 +320,7 @@ impl LdapConnector {
             .or_else(|| attrs.get("uid"))
             .ok_or_else(|| ConnectorError::InvalidData {
                 message: format!(
-                    "Cannot determine DN: missing naming attribute '{}', 'cn', or 'uid'",
-                    naming_attr
+                    "Cannot determine DN: missing naming attribute '{naming_attr}', 'cn', or 'uid'"
                 ),
             })?;
 
@@ -330,11 +329,11 @@ impl LdapConnector {
             AttributeValue::Array(arr) => arr
                 .first()
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
                 .unwrap_or_default(),
             _ => {
                 return Err(ConnectorError::InvalidData {
-                    message: format!("Naming attribute must be a string, got {:?}", naming_value),
+                    message: format!("Naming attribute must be a string, got {naming_value:?}"),
                 })
             }
         };
@@ -377,7 +376,7 @@ impl Connector for LdapConnector {
             .map_err(|e| ConnectorError::connection_failed_with_source("Test search failed", e))?;
 
         let (entries, _res) = result.success().map_err(|e| {
-            ConnectorError::connection_failed(format!("Test search failed: {:?}", e))
+            ConnectorError::connection_failed(format!("Test search failed: {e:?}"))
         })?;
 
         if entries.is_empty() {
@@ -424,13 +423,13 @@ impl SchemaDiscovery for LdapConnector {
             )
             .await
             .map_err(|e| ConnectorError::SchemaDiscoveryFailed {
-                message: format!("Failed to read root DSE: {}", e),
+                message: format!("Failed to read root DSE: {e}"),
             })?;
 
         let (entries, _) = result
             .success()
             .map_err(|e| ConnectorError::SchemaDiscoveryFailed {
-                message: format!("Root DSE search failed: {:?}", e),
+                message: format!("Root DSE search failed: {e:?}"),
             })?;
 
         let subschema_dn: Option<String> = entries.into_iter().next().and_then(|e| {
@@ -453,13 +452,13 @@ impl SchemaDiscovery for LdapConnector {
             )
             .await
             .map_err(|e| ConnectorError::SchemaDiscoveryFailed {
-                message: format!("Failed to read schema: {}", e),
+                message: format!("Failed to read schema: {e}"),
             })?;
 
         let (entries, _) = result
             .success()
             .map_err(|e| ConnectorError::SchemaDiscoveryFailed {
-                message: format!("Schema search failed: {:?}", e),
+                message: format!("Schema search failed: {e:?}"),
             })?;
 
         let schema_entry = entries
@@ -638,7 +637,7 @@ impl LdapConnector {
         Some(oc)
     }
 
-    /// Create a SchemaAttribute with metadata from attributeTypes.
+    /// Create a `SchemaAttribute` with metadata from attributeTypes.
     fn create_attribute_with_metadata(
         &self,
         attr_name: &str,
@@ -649,8 +648,7 @@ impl LdapConnector {
 
         let data_type = meta
             .and_then(|m| m.syntax.as_ref())
-            .map(|s| self.ldap_syntax_to_data_type(s))
-            .unwrap_or(AttributeDataType::String);
+            .map_or(AttributeDataType::String, |s| self.ldap_syntax_to_data_type(s));
 
         let mut attr = SchemaAttribute::new(attr_name, attr_name, data_type).case_insensitive(); // LDAP attributes are case-insensitive
 
@@ -690,7 +688,7 @@ impl LdapConnector {
         attr
     }
 
-    /// Convert LDAP syntax OID to AttributeDataType.
+    /// Convert LDAP syntax OID to `AttributeDataType`.
     fn ldap_syntax_to_data_type(&self, syntax_oid: &str) -> AttributeDataType {
         // Common LDAP syntax OIDs (RFC 4517)
         match syntax_oid.split('{').next().unwrap_or(syntax_oid) {
@@ -729,7 +727,7 @@ impl LdapConnector {
 
     /// Extract a keyword value (e.g., USAGE userApplications).
     fn extract_keyword_value(&self, definition: &str, keyword: &str) -> Option<String> {
-        let pattern = format!("{} ", keyword);
+        let pattern = format!("{keyword} ");
         if let Some(idx) = definition.find(&pattern) {
             let after = &definition[idx + pattern.len()..];
             // Take until space, paren, or end
@@ -745,7 +743,7 @@ impl LdapConnector {
 
     /// Extract a quoted value (e.g., DESC 'Some description').
     fn extract_quoted_value(&self, definition: &str, keyword: &str) -> Option<String> {
-        let pattern = format!("{} '", keyword);
+        let pattern = format!("{keyword} '");
         if let Some(idx) = definition.find(&pattern) {
             let after = &definition[idx + pattern.len()..];
             if let Some(end) = after.find('\'') {
@@ -1002,13 +1000,13 @@ impl CreateOp for LdapConnector {
         // Convert to the format ldap3 expects
         let ldap_attrs_vec: Vec<(&str, std::collections::HashSet<&str>)> = ldap_attrs
             .iter()
-            .map(|(k, v)| (k.as_str(), v.iter().map(|s| s.as_str()).collect()))
+            .map(|(k, v)| (k.as_str(), v.iter().map(std::string::String::as_str).collect()))
             .collect();
 
         // Perform the add operation
         let result = ldap.add(&dn, ldap_attrs_vec).await.map_err(|e| {
             ConnectorError::operation_failed_with_source(
-                format!("Failed to create entry: {}", dn),
+                format!("Failed to create entry: {dn}"),
                 e,
             )
         })?;
@@ -1091,7 +1089,7 @@ impl UpdateOp for LdapConnector {
         // Perform the modify operation
         let result = ldap.modify(dn, mods).await.map_err(|e| {
             ConnectorError::operation_failed_with_source(
-                format!("Failed to update entry: {}", dn),
+                format!("Failed to update entry: {dn}"),
                 e,
             )
         })?;
@@ -1128,7 +1126,7 @@ impl DeleteOp for LdapConnector {
         // Perform the delete operation
         let result = ldap.delete(dn).await.map_err(|e| {
             ConnectorError::operation_failed_with_source(
-                format!("Failed to delete entry: {}", dn),
+                format!("Failed to delete entry: {dn}"),
                 e,
             )
         })?;
@@ -1176,7 +1174,7 @@ impl SearchOp for LdapConnector {
 
         // Get requested attributes
         let attrs: Vec<&str> = match &attributes {
-            Some(list) => list.iter().map(|s| s.as_str()).collect(),
+            Some(list) => list.iter().map(std::string::String::as_str).collect(),
             None => vec!["*"],
         };
 
@@ -1198,7 +1196,7 @@ impl SearchOp for LdapConnector {
             .map_err(|e| ConnectorError::operation_failed_with_source("LDAP search failed", e))?;
 
         let (entries, _) = result.success().map_err(|e| {
-            ConnectorError::operation_failed(format!("LDAP search failed: {:?}", e))
+            ConnectorError::operation_failed(format!("LDAP search failed: {e:?}"))
         })?;
 
         let total = entries.len();
@@ -1609,7 +1607,7 @@ mod tests {
 
         for def in defs {
             let oc = connector.parse_object_class_definition(def);
-            assert!(oc.is_some(), "Failed to parse: {}", def);
+            assert!(oc.is_some(), "Failed to parse: {def}");
         }
     }
 

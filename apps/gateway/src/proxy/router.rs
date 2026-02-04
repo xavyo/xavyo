@@ -44,14 +44,14 @@ impl BackendRouter {
         let target_path = if target_path.starts_with('/') {
             target_path.to_string()
         } else {
-            format!("/{}", target_path)
+            format!("/{target_path}")
         };
 
         // Build full URL
         let base_url = backend.url.trim_end_matches('/');
         match query {
-            Some(q) if !q.is_empty() => format!("{}{}?{}", base_url, target_path, q),
-            _ => format!("{}{}", base_url, target_path),
+            Some(q) if !q.is_empty() => format!("{base_url}{target_path}?{q}"),
+            _ => format!("{base_url}{target_path}"),
         }
     }
 

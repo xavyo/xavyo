@@ -21,7 +21,7 @@ pub struct SamlState {
     pub encryption_key: Arc<[u8; 32]>,
 }
 
-/// Return IdP metadata XML
+/// Return `IdP` metadata XML
 #[utoipa::path(
     get,
     path = "/saml/metadata",

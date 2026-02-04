@@ -22,6 +22,7 @@ pub type ProvisioningResult = (User, UserIdentityLink);
 
 impl ProvisioningService {
     /// Create a new provisioning service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -29,7 +30,7 @@ impl ProvisioningService {
         }
     }
 
-    /// Provision or sync a user based on IdP claims.
+    /// Provision or sync a user based on `IdP` claims.
     #[instrument(skip(self, claims))]
     pub async fn provision_or_sync(
         &self,
@@ -94,7 +95,7 @@ impl ProvisioningService {
         }
     }
 
-    /// Provision a new user from IdP claims.
+    /// Provision a new user from `IdP` claims.
     async fn provision_new_user(
         &self,
         tenant_id: Uuid,
@@ -218,7 +219,7 @@ impl ProvisioningService {
         Ok(updated)
     }
 
-    /// Unlink a user from an IdP.
+    /// Unlink a user from an `IdP`.
     #[instrument(skip(self))]
     pub async fn unlink(
         &self,

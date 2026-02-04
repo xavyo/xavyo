@@ -66,7 +66,7 @@ pub struct ConnectorSchema {
     /// Native name in the target system.
     pub native_name: String,
 
-    /// Attributes definition (JSON array of SchemaAttribute).
+    /// Attributes definition (JSON array of `SchemaAttribute`).
     pub attributes: serde_json::Value,
 
     /// Whether this object class supports create operations.
@@ -118,10 +118,10 @@ impl ConnectorSchema {
         object_class: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM connector_schemas
             WHERE connector_id = $1 AND tenant_id = $2 AND object_class = $3
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -139,11 +139,11 @@ impl ConnectorSchema {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if include_expired {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM connector_schemas
                 WHERE connector_id = $1 AND tenant_id = $2
                 ORDER BY object_class
-                "#,
+                ",
             )
             .bind(connector_id)
             .bind(tenant_id)
@@ -151,11 +151,11 @@ impl ConnectorSchema {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM connector_schemas
                 WHERE connector_id = $1 AND tenant_id = $2 AND expires_at > NOW()
                 ORDER BY object_class
-                "#,
+                ",
             )
             .bind(connector_id)
             .bind(tenant_id)
@@ -172,7 +172,7 @@ impl ConnectorSchema {
         input: &UpsertConnectorSchema,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO connector_schemas (
                 tenant_id, connector_id, object_class, native_name, attributes,
                 supports_create, supports_update, supports_delete,
@@ -189,7 +189,7 @@ impl ConnectorSchema {
                 discovered_at = NOW(),
                 expires_at = NOW() + ($9 || ' seconds')::interval
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -211,10 +211,10 @@ impl ConnectorSchema {
         connector_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM connector_schemas
             WHERE connector_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -227,10 +227,10 @@ impl ConnectorSchema {
     /// Delete expired schemas.
     pub async fn delete_expired(pool: &sqlx::PgPool) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM connector_schemas
             WHERE expires_at < NOW()
-            "#,
+            ",
         )
         .execute(pool)
         .await?;
@@ -239,16 +239,17 @@ impl ConnectorSchema {
     }
 
     /// Check if schema is expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         self.expires_at < Utc::now()
     }
 
-    /// Validate schema_data JSONB structure.
+    /// Validate `schema_data` JSONB structure.
     ///
     /// Ensures the attributes array has the correct format:
     /// - Must be an array
-    /// - Each item must have: name (string), native_name (string), data_type (string)
-    /// - data_type must be one of the valid types
+    /// - Each item must have: name (string), `native_name` (string), `data_type` (string)
+    /// - `data_type` must be one of the valid types
     pub fn validate_schema_data(
         schema_data: &serde_json::Value,
     ) -> Result<(), SchemaValidationError> {

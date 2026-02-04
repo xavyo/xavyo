@@ -16,7 +16,7 @@ pub enum CaType {
     Internal,
     /// External CA using step-ca.
     StepCa,
-    /// External CA using HashiCorp Vault PKI.
+    /// External CA using `HashiCorp` Vault PKI.
     VaultPki,
 }
 
@@ -38,7 +38,7 @@ impl std::str::FromStr for CaType {
             "internal" => Ok(CaType::Internal),
             "step_ca" => Ok(CaType::StepCa),
             "vault_pki" => Ok(CaType::VaultPki),
-            _ => Err(format!("Invalid CA type: {}", s)),
+            _ => Err(format!("Invalid CA type: {s}")),
         }
     }
 }
@@ -56,7 +56,7 @@ pub struct CertificateAuthority {
     /// CA display name (unique per tenant).
     pub name: String,
 
-    /// CA type (internal, step_ca, vault_pki).
+    /// CA type (internal, `step_ca`, `vault_pki`).
     pub ca_type: String,
 
     /// CA certificate in PEM format.
@@ -112,21 +112,25 @@ impl CertificateAuthority {
     }
 
     /// Check if the CA is internal.
+    #[must_use] 
     pub fn is_internal(&self) -> bool {
         self.ca_type == "internal"
     }
 
     /// Check if the CA certificate has expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         self.not_after < Utc::now()
     }
 
     /// Check if the CA certificate is not yet valid.
+    #[must_use] 
     pub fn is_not_yet_valid(&self) -> bool {
         self.not_before > Utc::now()
     }
 
     /// Check if the CA is usable (active, not expired, valid).
+    #[must_use] 
     pub fn is_usable(&self) -> bool {
         self.is_active && !self.is_expired() && !self.is_not_yet_valid()
     }
@@ -150,7 +154,7 @@ pub struct CreateInternalCa {
     #[serde(default = "default_max_cert_validity_days")]
     pub max_validity_days: i32,
 
-    /// Key algorithm (rsa2048, rsa4096, ecdsa_p256, ecdsa_p384).
+    /// Key algorithm (rsa2048, rsa4096, `ecdsa_p256`, `ecdsa_p384`).
     #[serde(default = "default_key_algorithm")]
     pub key_algorithm: String,
 
@@ -184,7 +188,7 @@ pub struct CreateExternalCa {
     /// CA display name (unique per tenant).
     pub name: String,
 
-    /// CA type (step_ca, vault_pki).
+    /// CA type (`step_ca`, `vault_pki`).
     pub ca_type: String,
 
     /// CA certificate in PEM format.
@@ -261,10 +265,10 @@ impl CertificateAuthority {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM certificate_authorities
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -285,10 +289,10 @@ impl CertificateAuthority {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM certificate_authorities
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .fetch_optional(pool)
@@ -302,10 +306,10 @@ impl CertificateAuthority {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM certificate_authorities
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -319,10 +323,10 @@ impl CertificateAuthority {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM certificate_authorities
             WHERE tenant_id = $1 AND is_default = true AND is_active = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(pool)
@@ -338,31 +342,31 @@ impl CertificateAuthority {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM certificate_authorities
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.ca_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND ca_type = ${}", param_count));
+            query.push_str(&format!(" AND ca_type = ${param_count}"));
         }
 
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
 
         if filter.is_default.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_default = ${}", param_count));
+            query.push_str(&format!(" AND is_default = ${param_count}"));
         }
 
         if filter.name_prefix.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${} || '%'", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count} || '%'"));
         }
 
         query.push_str(&format!(
@@ -396,31 +400,31 @@ impl CertificateAuthority {
         filter: &CertificateAuthorityFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM certificate_authorities
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.ca_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND ca_type = ${}", param_count));
+            query.push_str(&format!(" AND ca_type = ${param_count}"));
         }
 
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
 
         if filter.is_default.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_default = ${}", param_count));
+            query.push_str(&format!(" AND is_default = ${param_count}"));
         }
 
         if filter.name_prefix.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${} || '%'", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count} || '%'"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -459,11 +463,11 @@ impl CertificateAuthority {
         // If setting as default, clear other defaults first
         if is_default {
             sqlx::query(
-                r#"
+                r"
                 UPDATE certificate_authorities
                 SET is_default = false, updated_at = NOW()
                 WHERE tenant_id = $1 AND is_default = true
-                "#,
+                ",
             )
             .bind(tenant_id)
             .execute(pool)
@@ -471,7 +475,7 @@ impl CertificateAuthority {
         }
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO certificate_authorities (
                 tenant_id, name, ca_type, certificate_pem, private_key_encrypted,
                 subject_dn, not_before, not_after, max_validity_days, is_default,
@@ -479,7 +483,7 @@ impl CertificateAuthority {
             )
             VALUES ($1, $2, 'internal', $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -508,11 +512,11 @@ impl CertificateAuthority {
         // If setting as default, clear other defaults first
         if input.is_default {
             sqlx::query(
-                r#"
+                r"
                 UPDATE certificate_authorities
                 SET is_default = false, updated_at = NOW()
                 WHERE tenant_id = $1 AND is_default = true
-                "#,
+                ",
             )
             .bind(tenant_id)
             .execute(pool)
@@ -520,7 +524,7 @@ impl CertificateAuthority {
         }
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO certificate_authorities (
                 tenant_id, name, ca_type, certificate_pem, chain_pem, external_config,
                 subject_dn, not_before, not_after, max_validity_days, is_default,
@@ -528,7 +532,7 @@ impl CertificateAuthority {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -557,11 +561,11 @@ impl CertificateAuthority {
         // If setting as default, clear other defaults first
         if input.is_default == Some(true) {
             sqlx::query(
-                r#"
+                r"
                 UPDATE certificate_authorities
                 SET is_default = false, updated_at = NOW()
                 WHERE tenant_id = $1 AND is_default = true AND id != $2
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(id)
@@ -573,31 +577,31 @@ impl CertificateAuthority {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_active.is_some() {
-            updates.push(format!("is_active = ${}", param_idx));
+            updates.push(format!("is_active = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_default.is_some() {
-            updates.push(format!("is_default = ${}", param_idx));
+            updates.push(format!("is_default = ${param_idx}"));
             param_idx += 1;
         }
         if input.max_validity_days.is_some() {
-            updates.push(format!("max_validity_days = ${}", param_idx));
+            updates.push(format!("max_validity_days = ${param_idx}"));
             param_idx += 1;
         }
         if input.crl_url.is_some() {
-            updates.push(format!("crl_url = ${}", param_idx));
+            updates.push(format!("crl_url = ${param_idx}"));
             param_idx += 1;
         }
         if input.ocsp_url.is_some() {
-            updates.push(format!("ocsp_url = ${}", param_idx));
+            updates.push(format!("ocsp_url = ${param_idx}"));
             param_idx += 1;
         }
         if input.external_config.is_some() {
-            updates.push(format!("external_config = ${}", param_idx));
+            updates.push(format!("external_config = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -642,10 +646,10 @@ impl CertificateAuthority {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM certificate_authorities
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -663,11 +667,11 @@ impl CertificateAuthority {
     ) -> Result<Option<Self>, sqlx::Error> {
         // Clear other defaults
         sqlx::query(
-            r#"
+            r"
             UPDATE certificate_authorities
             SET is_default = false, updated_at = NOW()
             WHERE tenant_id = $1 AND is_default = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(pool)
@@ -675,12 +679,12 @@ impl CertificateAuthority {
 
         // Set new default
         sqlx::query_as(
-            r#"
+            r"
             UPDATE certificate_authorities
             SET is_default = true, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

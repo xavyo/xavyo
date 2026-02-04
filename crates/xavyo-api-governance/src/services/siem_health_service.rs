@@ -16,6 +16,7 @@ pub struct SiemHealthService {
 }
 
 impl SiemHealthService {
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -47,27 +48,22 @@ impl SiemHealthService {
             destination_id,
             total_events_sent: health_summary
                 .as_ref()
-                .map(|h| h.total_events_sent)
-                .unwrap_or(0),
+                .map_or(0, |h| h.total_events_sent),
             total_events_delivered: health_summary
                 .as_ref()
-                .map(|h| h.total_events_delivered)
-                .unwrap_or(0),
+                .map_or(0, |h| h.total_events_delivered),
             total_events_failed: health_summary
                 .as_ref()
-                .map(|h| h.total_events_failed)
-                .unwrap_or(0),
+                .map_or(0, |h| h.total_events_failed),
             total_events_dropped: health_summary
                 .as_ref()
-                .map(|h| h.total_events_dropped)
-                .unwrap_or(0),
+                .map_or(0, |h| h.total_events_dropped),
             avg_latency_ms: health_summary.as_ref().and_then(|h| h.avg_latency_ms),
             last_success_at: health_summary.as_ref().and_then(|h| h.last_success_at),
             last_failure_at: health_summary.as_ref().and_then(|h| h.last_failure_at),
             success_rate_percent: health_summary
                 .as_ref()
-                .map(|h| h.success_rate_percent)
-                .unwrap_or(0.0),
+                .map_or(0.0, |h| h.success_rate_percent),
             circuit_state: destination.circuit_state,
             dead_letter_count,
         })

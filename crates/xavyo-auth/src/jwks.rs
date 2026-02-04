@@ -28,11 +28,11 @@ pub struct Jwk {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alg: Option<String>,
 
-    /// RSA modulus (Base64URL encoded).
+    /// RSA modulus (`Base64URL` encoded).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub n: Option<String>,
 
-    /// RSA exponent (Base64URL encoded).
+    /// RSA exponent (`Base64URL` encoded).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub e: Option<String>,
 
@@ -60,10 +60,10 @@ impl Jwk {
         // Decode Base64URL
         let n_bytes = URL_SAFE_NO_PAD
             .decode(n)
-            .map_err(|e| AuthError::InvalidKey(format!("Invalid modulus encoding: {}", e)))?;
+            .map_err(|e| AuthError::InvalidKey(format!("Invalid modulus encoding: {e}")))?;
         let e_bytes = URL_SAFE_NO_PAD
             .decode(e)
-            .map_err(|e| AuthError::InvalidKey(format!("Invalid exponent encoding: {}", e)))?;
+            .map_err(|e| AuthError::InvalidKey(format!("Invalid exponent encoding: {e}")))?;
 
         // Build RSA public key in DER format
         let der = build_rsa_public_key_der(&n_bytes, &e_bytes);
@@ -129,7 +129,7 @@ fn encode_length(len: usize) -> Vec<u8> {
 fn encode_integer(data: &[u8]) -> Vec<u8> {
     // Add leading zero if high bit is set (to keep it positive)
     let needs_padding = !data.is_empty() && (data[0] & 0x80) != 0;
-    let len = data.len() + if needs_padding { 1 } else { 0 };
+    let len = data.len() + usize::from(needs_padding);
 
     let mut result = vec![0x02]; // INTEGER tag
     result.extend(encode_length(len));
@@ -250,7 +250,7 @@ impl JwksClient {
             .get(&self.url)
             .send()
             .await
-            .map_err(|e| AuthError::JwksFetchFailed(format!("Request failed: {}", e)))?;
+            .map_err(|e| AuthError::JwksFetchFailed(format!("Request failed: {e}")))?;
 
         if !response.status().is_success() {
             return Err(AuthError::JwksFetchFailed(format!(
@@ -263,7 +263,7 @@ impl JwksClient {
         let jwks: JwkSet = response
             .json()
             .await
-            .map_err(|e| AuthError::JwksFetchFailed(format!("Invalid JSON: {}", e)))?;
+            .map_err(|e| AuthError::JwksFetchFailed(format!("Invalid JSON: {e}")))?;
 
         // Update cache
         let mut cache = self.cache.write().await;

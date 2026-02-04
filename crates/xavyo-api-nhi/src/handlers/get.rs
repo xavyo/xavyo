@@ -52,7 +52,7 @@ pub async fn get_nhi(
 
     match nhi {
         Some(nhi) => Ok(Json(NhiItem::from(nhi))),
-        None => Err((StatusCode::NOT_FOUND, format!("NHI {} not found", id))),
+        None => Err((StatusCode::NOT_FOUND, format!("NHI {id} not found"))),
     }
 }
 

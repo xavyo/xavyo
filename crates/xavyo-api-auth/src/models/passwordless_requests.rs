@@ -36,7 +36,7 @@ pub struct EmailOtpVerifyRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct UpdatePasswordlessPolicyRequest {
     /// Which passwordless methods are enabled.
-    /// Valid values: "disabled", "magic_link_only", "otp_only", "all_methods".
+    /// Valid values: "disabled", "`magic_link_only`", "`otp_only`", "`all_methods`".
     pub enabled_methods: String,
 
     /// Magic link expiry in minutes (must be > 0).

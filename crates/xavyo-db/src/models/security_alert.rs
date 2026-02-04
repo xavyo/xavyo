@@ -151,11 +151,11 @@ impl SecurityAlert {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO security_alerts (tenant_id, user_id, alert_type, severity, title, message, metadata)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(input.user_id)
@@ -202,7 +202,7 @@ impl SecurityAlert {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM security_alerts
             WHERE tenant_id = $1
               AND user_id = $2
@@ -214,7 +214,7 @@ impl SecurityAlert {
               AND ($6::timestamptz IS NULL OR created_at < $6)
             ORDER BY created_at DESC
             LIMIT $7
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -237,10 +237,10 @@ impl SecurityAlert {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM security_alerts
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -260,10 +260,10 @@ impl SecurityAlert {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM security_alerts
             WHERE tenant_id = $1 AND user_id = $2 AND acknowledged_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -283,10 +283,10 @@ impl SecurityAlert {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM security_alerts
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -305,12 +305,12 @@ impl SecurityAlert {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE security_alerts
             SET acknowledged_at = NOW()
             WHERE tenant_id = $1 AND id = $2 AND user_id = $3 AND acknowledged_at IS NULL
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)

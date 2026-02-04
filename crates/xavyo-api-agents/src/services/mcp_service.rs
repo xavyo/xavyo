@@ -24,6 +24,7 @@ pub struct McpService {
 
 impl McpService {
     /// Create a new MCP service.
+    #[must_use] 
     pub fn new(
         pool: PgPool,
         permission_service: Arc<PermissionService>,

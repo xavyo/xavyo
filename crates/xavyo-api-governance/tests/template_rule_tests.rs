@@ -1,9 +1,8 @@
-//! Unit tests for TemplateRuleService (F058).
+//! Unit tests for `TemplateRuleService` (F058).
 //!
 //! Tests CRUD operations, expression validation, circular dependency detection,
 //! and rule type behaviors.
 
-use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
 use xavyo_api_governance::services::TemplateExpressionService;
@@ -853,7 +852,7 @@ fn test_create_rule_with_absolute_time_constraints() {
 
 #[test]
 fn test_create_rule_with_relative_time_constraints() {
-    use chrono::{DateTime, Duration, Utc};
+    use chrono::{DateTime, Duration};
     use xavyo_db::models::TemplateTimeReference;
 
     // For relative time, we interpret the time as offset from Unix epoch

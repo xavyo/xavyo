@@ -95,6 +95,7 @@ pub struct EscalationService {
 
 impl EscalationService {
     /// Create a new escalation service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -181,7 +182,7 @@ impl EscalationService {
                     target_type: EscalationTargetType::SpecificUser,
                     user_ids: vec![target_id],
                     group_id: None,
-                    display_name: format!("Specific user {}", target_id),
+                    display_name: format!("Specific user {target_id}"),
                 })
             }
 
@@ -228,8 +229,7 @@ impl EscalationService {
                     .await?
                     .ok_or_else(|| {
                         GovernanceError::Validation(format!(
-                            "Approver {} has no manager configured",
-                            approver_id
+                            "Approver {approver_id} has no manager configured"
                         ))
                     })?;
 
@@ -257,8 +257,7 @@ impl EscalationService {
 
                 if chain.is_empty() {
                     return Err(GovernanceError::Validation(format!(
-                        "Approver {} has no manager chain available",
-                        approver_id
+                        "Approver {approver_id} has no manager chain available"
                     )));
                 }
 
@@ -266,7 +265,7 @@ impl EscalationService {
                     target_type: EscalationTargetType::ManagerChain,
                     user_ids: chain,
                     group_id: None,
-                    display_name: format!("Manager chain (depth {})", depth),
+                    display_name: format!("Manager chain (depth {depth})"),
                 })
             }
 
@@ -734,7 +733,7 @@ impl EscalationService {
         // This is a simplified implementation - in production, you'd check
         // role assignments more thoroughly
         let rows: Vec<(Uuid,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT DISTINCT u.id
             FROM users u
             JOIN user_roles ur ON ur.user_id = u.id
@@ -744,7 +743,7 @@ impl EscalationService {
               AND u.is_active = true
             ORDER BY u.id
             LIMIT 10
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -851,6 +850,7 @@ impl EscalationService {
     }
 
     /// Get reference to the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

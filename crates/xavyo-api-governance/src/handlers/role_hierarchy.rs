@@ -251,7 +251,7 @@ pub async fn list_roles(
 
     // Parse parent_role_id filter
     let parent_filter = match query.parent_role_id.as_deref() {
-        Some("null") | Some("none") => Some(None), // Root roles only
+        Some("null" | "none") => Some(None), // Root roles only
         Some(id) => Some(Some(Uuid::parse_str(id).map_err(|_| {
             ApiGovernanceError::Validation("Invalid parent_role_id format".to_string())
         })?)),

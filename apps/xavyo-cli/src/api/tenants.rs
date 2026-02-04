@@ -21,7 +21,7 @@ pub async fn provision_tenant(
         let provision_response: ProvisionResponse = response
             .json()
             .await
-            .map_err(|e| CliError::Server(format!("Invalid provision response: {}", e)))?;
+            .map_err(|e| CliError::Server(format!("Invalid provision response: {e}")))?;
         return Ok(provision_response);
     }
 
@@ -43,8 +43,7 @@ pub async fn provision_tenant(
     if status == reqwest::StatusCode::BAD_REQUEST {
         let body = response.text().await.unwrap_or_default();
         return Err(CliError::Validation(format!(
-            "Invalid organization name: {}",
-            body
+            "Invalid organization name: {body}"
         )));
     }
 
@@ -54,8 +53,7 @@ pub async fn provision_tenant(
 
     let body = response.text().await.unwrap_or_default();
     Err(CliError::Server(format!(
-        "Failed to provision tenant: {} - {}",
-        status, body
+        "Failed to provision tenant: {status} - {body}"
     )))
 }
 

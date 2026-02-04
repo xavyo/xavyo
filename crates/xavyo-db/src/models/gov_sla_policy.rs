@@ -73,21 +73,25 @@ pub struct SlaPolicyFilter {
 
 impl GovSlaPolicy {
     /// Calculate warning time threshold.
+    #[must_use] 
     pub fn warning_threshold_seconds(&self) -> i64 {
-        (self.target_duration_seconds as i64 * self.warning_threshold_percent as i64) / 100
+        (i64::from(self.target_duration_seconds) * i64::from(self.warning_threshold_percent)) / 100
     }
 
     /// Calculate deadline from a start time.
+    #[must_use] 
     pub fn deadline_from(&self, start_time: DateTime<Utc>) -> DateTime<Utc> {
-        start_time + chrono::Duration::seconds(self.target_duration_seconds as i64)
+        start_time + chrono::Duration::seconds(i64::from(self.target_duration_seconds))
     }
 
     /// Calculate warning time from a start time.
+    #[must_use] 
     pub fn warning_time_from(&self, start_time: DateTime<Utc>) -> DateTime<Utc> {
         start_time + chrono::Duration::seconds(self.warning_threshold_seconds())
     }
 
     /// Get human-readable duration string.
+    #[must_use] 
     pub fn target_duration_human(&self) -> String {
         let seconds = self.target_duration_seconds;
         if seconds >= 86400 {
@@ -133,10 +137,10 @@ impl GovSlaPolicy {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sla_policies
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -153,16 +157,16 @@ impl GovSlaPolicy {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_sla_policies
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -187,16 +191,16 @@ impl GovSlaPolicy {
         filter: &SlaPolicyFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_sla_policies
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -215,14 +219,14 @@ impl GovSlaPolicy {
         input: CreateSlaPolicy,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_sla_policies (
                 tenant_id, name, description, target_duration_seconds,
                 warning_threshold_percent, escalation_contacts, breach_notification_enabled
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -243,7 +247,7 @@ impl GovSlaPolicy {
         input: UpdateSlaPolicy,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sla_policies
             SET
                 name = COALESCE($3, name),
@@ -256,7 +260,7 @@ impl GovSlaPolicy {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -278,10 +282,10 @@ impl GovSlaPolicy {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_sla_policies
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -298,10 +302,10 @@ impl GovSlaPolicy {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_applications
             WHERE tenant_id = $1 AND sla_policy_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)

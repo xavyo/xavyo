@@ -22,6 +22,7 @@ pub struct AvailableProvider {
 }
 
 impl AvailableProvider {
+    #[must_use] 
     pub fn new(provider: ProviderType, base_url: &str) -> Self {
         let (name, provider_str) = match provider {
             ProviderType::Google => ("Google", "google"),
@@ -33,7 +34,7 @@ impl AvailableProvider {
         Self {
             provider: provider_str.to_string(),
             name: name.to_string(),
-            authorize_url: format!("{}/auth/social/{}/authorize", base_url, provider_str),
+            authorize_url: format!("{base_url}/auth/social/{provider_str}/authorize"),
         }
     }
 }
@@ -107,7 +108,7 @@ pub struct OAuthCallbackQuery {
     pub error_description: Option<String>,
 }
 
-/// Apple callback form data (form_post response mode).
+/// Apple callback form data (`form_post` response mode).
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppleCallbackForm {
     /// Authorization code.

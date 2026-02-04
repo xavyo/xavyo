@@ -147,7 +147,7 @@ impl EntraConnector {
                     enabled_units: v
                         .get("prepaidUnits")
                         .and_then(|pu| pu.get("enabled"))
-                        .and_then(|e| e.as_i64())
+                        .and_then(serde_json::Value::as_i64)
                         .unwrap_or(0),
                 })
             })

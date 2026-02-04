@@ -1,6 +1,6 @@
 //! User unlock admin handler.
 //!
-//! POST /admin/users/:user_id/unlock
+//! POST /`admin/users/:user_id/unlock`
 
 use crate::error::ApiAuthError;
 use crate::models::UnlockUserResponse;
@@ -13,7 +13,7 @@ use xavyo_core::TenantId;
 
 /// Unlock a user account (admin action).
 ///
-/// POST /admin/users/:user_id/unlock
+/// POST /`admin/users/:user_id/unlock`
 pub async fn unlock_user(
     Extension(lockout_service): Extension<Arc<LockoutService>>,
     Extension(tenant_id): Extension<TenantId>,

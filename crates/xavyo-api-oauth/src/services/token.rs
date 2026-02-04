@@ -1,4 +1,4 @@
-//! Token service for OAuth2 token operations.
+//! Token service for `OAuth2` token operations.
 
 use crate::error::OAuthError;
 use crate::models::TokenResponse;
@@ -42,7 +42,7 @@ const REFRESH_TOKEN_LENGTH: usize = 32;
 /// OIDC ID Token claims structure.
 ///
 /// Contains standard OIDC claims plus custom Xavyo claims.
-/// See: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
+/// See: <https://openid.net/specs/openid-connect-core-1_0.html#IDToken>
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdTokenClaims {
     /// Issuer identifier.
@@ -51,7 +51,7 @@ pub struct IdTokenClaims {
     /// Subject identifier (user ID).
     pub sub: String,
 
-    /// Audience (client_id).
+    /// Audience (`client_id`).
     pub aud: String,
 
     /// Expiration time (Unix timestamp).
@@ -79,6 +79,7 @@ pub struct IdTokenClaims {
 
 impl IdTokenClaims {
     /// Create a new builder for ID token claims.
+    #[must_use] 
     pub fn builder() -> IdTokenClaimsBuilder {
         IdTokenClaimsBuilder::default()
     }
@@ -113,7 +114,7 @@ impl IdTokenClaimsBuilder {
         self
     }
 
-    /// Set the audience (client_id).
+    /// Set the audience (`client_id`).
     #[must_use]
     pub fn audience(mut self, aud: impl Into<String>) -> Self {
         self.aud = Some(aud.into());
@@ -185,6 +186,7 @@ pub struct TokenService {
 
 impl TokenService {
     /// Create a new token service.
+    #[must_use] 
     pub fn new(pool: PgPool, issuer: String, private_key: Vec<u8>, key_id: String) -> Self {
         Self {
             pool,
@@ -195,18 +197,20 @@ impl TokenService {
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get the issuer.
+    #[must_use] 
     pub fn issuer(&self) -> &str {
         &self.issuer
     }
 
     /// Generate a cryptographically secure refresh token.
     ///
-    /// SECURITY: Uses OsRng directly from the operating system's CSPRNG.
+    /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
     fn generate_refresh_token_value() -> String {
         use rand::rngs::OsRng;
         use rand::RngCore;
@@ -228,7 +232,7 @@ impl TokenService {
     /// # Arguments
     ///
     /// * `user_id` - Optional user ID (None for client credentials grant)
-    /// * `client_id` - The OAuth2 client ID
+    /// * `client_id` - The `OAuth2` client ID
     /// * `tenant_id` - The tenant ID
     /// * `scope` - The granted scopes
     /// * `expires_in_secs` - Token expiration in seconds
@@ -278,7 +282,7 @@ impl TokenService {
     /// # Arguments
     ///
     /// * `user_id` - The user ID
-    /// * `client_id` - The OAuth2 client ID (used as audience)
+    /// * `client_id` - The `OAuth2` client ID (used as audience)
     /// * `tenant_id` - The tenant ID
     /// * `nonce` - Optional nonce from authorization request
     /// * `auth_time` - Unix timestamp when user authentication occurred
@@ -328,7 +332,7 @@ impl TokenService {
     /// # Arguments
     ///
     /// * `user_id` - The user ID
-    /// * `client_id` - The OAuth2 client's internal UUID
+    /// * `client_id` - The `OAuth2` client's internal UUID
     /// * `tenant_id` - The tenant ID
     /// * `scope` - The granted scopes (space-separated)
     /// * `family_id` - Optional existing family ID (for rotation)
@@ -360,13 +364,13 @@ impl TokenService {
             })?;
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO oauth_refresh_tokens (
                 token_hash, client_id, user_id, tenant_id,
                 scope, family_id, expires_at
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-            "#,
+            ",
         )
         .bind(&token_hash)
         .bind(client_id)
@@ -397,11 +401,11 @@ impl TokenService {
     ///
     /// * `tenant_id` - The tenant ID for RLS
     /// * `refresh_token` - The opaque refresh token
-    /// * `client_id` - The OAuth2 client's internal UUID
+    /// * `client_id` - The `OAuth2` client's internal UUID
     ///
     /// # Returns
     ///
-    /// A tuple of (user_id, scope, new_refresh_token).
+    /// A tuple of (`user_id`, scope, `new_refresh_token`).
     pub async fn validate_and_rotate_refresh_token(
         &self,
         tenant_id: Uuid,
@@ -422,12 +426,12 @@ impl TokenService {
 
         // Look up the refresh token
         let db_token: Option<DbRefreshToken> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, token_hash, client_id, user_id, tenant_id, scope, family_id,
                    expires_at, revoked, revoked_at, created_at
             FROM oauth_refresh_tokens
             WHERE token_hash = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(&token_hash)
         .bind(tenant_id)
@@ -473,11 +477,11 @@ impl TokenService {
 
         // Revoke the current token (rotate)
         sqlx::query(
-            r#"
+            r"
             UPDATE oauth_refresh_tokens
             SET revoked = TRUE, revoked_at = now()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(token.id)
         .bind(tenant_id)
@@ -521,11 +525,11 @@ impl TokenService {
             })?;
 
         sqlx::query(
-            r#"
+            r"
             UPDATE oauth_refresh_tokens
             SET revoked = TRUE, revoked_at = now()
             WHERE family_id = $1 AND tenant_id = $2 AND revoked = FALSE
-            "#,
+            ",
         )
         .bind(family_id)
         .bind(tenant_id)
@@ -559,11 +563,11 @@ impl TokenService {
             })?;
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE oauth_refresh_tokens
             SET revoked = TRUE, revoked_at = now()
             WHERE user_id = $1 AND tenant_id = $2 AND revoked = FALSE
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -585,21 +589,21 @@ impl TokenService {
     /// Issue tokens for authorization code grant.
     ///
     /// Generates access token, ID token (if openid scope), and refresh token
-    /// (if offline_access scope).
+    /// (if `offline_access` scope).
     ///
     /// # Arguments
     ///
     /// * `user_id` - The authenticated user's ID
-    /// * `client_id` - The OAuth2 client ID (string identifier)
-    /// * `client_internal_id` - The OAuth2 client's internal UUID
+    /// * `client_id` - The `OAuth2` client ID (string identifier)
+    /// * `client_internal_id` - The `OAuth2` client's internal UUID
     /// * `tenant_id` - The tenant ID
     /// * `scope` - The granted scopes (space-separated)
     /// * `nonce` - Optional nonce from authorization request
     ///
     /// # Returns
     ///
-    /// A TokenResponse containing access_token, id_token (optional),
-    /// refresh_token (optional), and metadata.
+    /// A `TokenResponse` containing `access_token`, `id_token` (optional),
+    /// `refresh_token` (optional), and metadata.
     pub async fn issue_authorization_code_tokens(
         &self,
         user_id: Uuid,
@@ -664,13 +668,13 @@ impl TokenService {
         let expires_at = Utc::now() + chrono::Duration::seconds(REFRESH_TOKEN_EXPIRY_SECS);
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO oauth_refresh_tokens (
                 token_hash, client_id, user_id, tenant_id,
                 scope, family_id, expires_at
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-            "#,
+            ",
         )
         .bind(&token_hash)
         .bind(client_id)
@@ -695,17 +699,17 @@ impl TokenService {
     /// No user is involved, so:
     /// - No ID token is issued (no openid scope)
     /// - No refresh token is issued (service can re-authenticate anytime)
-    /// - Subject in the access token is the client_id
+    /// - Subject in the access token is the `client_id`
     ///
     /// # Arguments
     ///
-    /// * `client_id` - The OAuth2 client ID (string identifier)
+    /// * `client_id` - The `OAuth2` client ID (string identifier)
     /// * `tenant_id` - The tenant ID
     /// * `scope` - The granted scopes (space-separated)
     ///
     /// # Returns
     ///
-    /// A TokenResponse containing only an access_token (no id_token or refresh_token).
+    /// A `TokenResponse` containing only an `access_token` (no `id_token` or `refresh_token`).
     pub async fn issue_client_credentials_tokens(
         &self,
         client_id: &str,
@@ -735,20 +739,20 @@ impl TokenService {
     ///
     /// Unlike authorization code grant:
     /// - No ID token is issued (only issued during initial authentication)
-    /// - The new refresh token is already provided (from validate_and_rotate)
+    /// - The new refresh token is already provided (from `validate_and_rotate`)
     ///
     /// # Arguments
     ///
     /// * `user_id` - The user ID from the original refresh token
-    /// * `client_id` - The OAuth2 client ID (string identifier)
-    /// * `client_internal_id` - The OAuth2 client's internal UUID
+    /// * `client_id` - The `OAuth2` client ID (string identifier)
+    /// * `client_internal_id` - The `OAuth2` client's internal UUID
     /// * `tenant_id` - The tenant ID
     /// * `scope` - The scope from the original refresh token
     /// * `new_refresh_token` - The new refresh token (already created by rotation)
     ///
     /// # Returns
     ///
-    /// A TokenResponse containing access_token and refresh_token.
+    /// A `TokenResponse` containing `access_token` and `refresh_token`.
     pub async fn issue_refresh_tokens(
         &self,
         user_id: Uuid,
@@ -784,20 +788,20 @@ impl TokenService {
     /// - User has already authenticated in browser
     ///
     /// Issues access token, ID token (if openid scope), and refresh token
-    /// (if offline_access scope).
+    /// (if `offline_access` scope).
     ///
     /// # Arguments
     ///
     /// * `user_id` - The authenticated user's ID
-    /// * `client_id` - The OAuth2 client ID (string identifier)
-    /// * `client_internal_id` - The OAuth2 client's internal UUID
+    /// * `client_id` - The `OAuth2` client ID (string identifier)
+    /// * `client_internal_id` - The `OAuth2` client's internal UUID
     /// * `tenant_id` - The tenant ID
     /// * `scope` - The granted scopes (space-separated)
     ///
     /// # Returns
     ///
-    /// A TokenResponse containing access_token, id_token (optional),
-    /// refresh_token (optional), and metadata.
+    /// A `TokenResponse` containing `access_token`, `id_token` (optional),
+    /// `refresh_token` (optional), and metadata.
     pub async fn issue_device_code_tokens(
         &self,
         user_id: Uuid,
@@ -853,7 +857,7 @@ mod tests {
     use super::*;
 
     /// Test RSA key pair (2048-bit, for testing only).
-    const TEST_PRIVATE_KEY: &[u8] = br#"-----BEGIN PRIVATE KEY-----
+    const TEST_PRIVATE_KEY: &[u8] = br"-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCWvwXoegwG34YX
 q+6MmsAfjZz2OZfBwbGVZSW0tiskb9UXZ2Rdz99ayewaKcLw1xwDcmI3BZWKcgfa
 T2lnJbMeMv0SuewOAkZQ8ucZEScGHNcmBflGPUR/7ktUp55BJXFzkkqURqS3ORMp
@@ -880,7 +884,7 @@ qny16zHzKHLWJ6UzfNDfuU00T5L2+SN2lGTpycECgYEAmoV1LnfOnv7ytid8kHE8
 tOmUhF0TRxS3K/I1d0EGkM0PcR4BVSxHYz0LU0ChL4SOYuo7yKzESChwdDRvm1MN
 6vj1477kZXDY2XxVkiXZSD3kPRZ3RFTRIf4nObHi8sKMbGKkJUyDeN+n2SIvYST2
 xxU7T7aU32bKZLygCDtwsN8=
------END PRIVATE KEY-----"#;
+-----END PRIVATE KEY-----";
 
     /// Helper to create test token service without database.
     /// Uses a wrapper struct that only contains what's needed for token generation.
@@ -925,7 +929,7 @@ xxU7T7aU32bKZLygCDtwsN8=
             let claims = claims_builder.build();
 
             encode_token_with_kid(&claims, &self.private_key, &self.key_id).map_err(|e| {
-                OAuthError::Internal(format!("Failed to generate access token: {}", e))
+                OAuthError::Internal(format!("Failed to generate access token: {e}"))
             })
         }
 
@@ -948,13 +952,13 @@ xxU7T7aU32bKZLygCDtwsN8=
                 .build();
 
             let key = jsonwebtoken::EncodingKey::from_rsa_pem(&self.private_key)
-                .map_err(|e| OAuthError::Internal(format!("Invalid signing key: {}", e)))?;
+                .map_err(|e| OAuthError::Internal(format!("Invalid signing key: {e}")))?;
 
             let mut header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256);
             header.kid = Some(self.key_id.clone());
 
             jsonwebtoken::encode(&header, &id_token_claims, &key)
-                .map_err(|e| OAuthError::Internal(format!("Failed to generate ID token: {}", e)))
+                .map_err(|e| OAuthError::Internal(format!("Failed to generate ID token: {e}")))
         }
     }
 

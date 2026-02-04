@@ -876,7 +876,7 @@ pub struct ValidateCredentialResponse {
     pub agent_id: Uuid,
     /// The tenant ID.
     pub tenant_id: Uuid,
-    /// The NHI type (agent or service_account).
+    /// The NHI type (agent or `service_account`).
     pub nhi_type: String,
     /// A human-readable message.
     pub message: String,

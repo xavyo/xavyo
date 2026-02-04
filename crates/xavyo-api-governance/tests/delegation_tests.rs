@@ -13,8 +13,7 @@ mod tests {
     use uuid::Uuid;
 
     use xavyo_db::models::{
-        CreateGovApprovalDelegation, CreateGovDelegationScope, DelegationFilter, DelegationStatus,
-        GovApprovalDelegation, GovDelegationScope,
+        CreateGovDelegationScope, DelegationFilter, DelegationStatus, GovDelegationScope,
     };
 
     // ========================================================================
@@ -243,7 +242,7 @@ mod tests {
     fn test_delegation_scheduled_future_start() {
         let now = Utc::now();
         let starts_at = now + Duration::days(3);
-        let ends_at = starts_at + Duration::days(7);
+        let _ends_at = starts_at + Duration::days(7);
 
         // Future delegation should start with 'pending' status
         assert!(starts_at > now);
@@ -259,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_multiple_deputies_allowed() {
-        let delegator_id = Uuid::new_v4();
+        let _delegator_id = Uuid::new_v4();
         let deputy1_id = Uuid::new_v4();
         let deputy2_id = Uuid::new_v4();
 
@@ -303,8 +302,8 @@ mod tests {
 
         let deputy_id = Uuid::new_v4();
         let delegator_id = Uuid::new_v4();
-        let delegation_id = Uuid::new_v4();
-        let work_item_id = Uuid::new_v4();
+        let _delegation_id = Uuid::new_v4();
+        let _work_item_id = Uuid::new_v4();
 
         // Verify both IDs are captured
         assert_ne!(deputy_id, delegator_id, "Deputy and delegator must differ");
@@ -331,8 +330,7 @@ mod tests {
         for wf_type in valid_types {
             assert!(
                 ["access_request", "certification", "state_transition"].contains(&wf_type),
-                "{} should be a valid workflow type",
-                wf_type
+                "{wf_type} should be a valid workflow type"
             );
         }
     }

@@ -16,7 +16,7 @@ use crate::models::{
 use crate::router::AgentsState;
 use xavyo_auth::JwtClaims;
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()
@@ -24,7 +24,7 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
         .ok_or(ApiAgentsError::MissingTenant)
 }
 
-/// Extract user_id from JWT claims.
+/// Extract `user_id` from JWT claims.
 fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims.sub.parse().map_err(|_| ApiAgentsError::MissingUser)
 }

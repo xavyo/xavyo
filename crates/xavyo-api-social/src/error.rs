@@ -115,6 +115,7 @@ pub struct ErrorResponse {
 
 impl SocialError {
     /// Get the error code for API responses.
+    #[must_use] 
     pub fn error_code(&self) -> &'static str {
         match self {
             SocialError::ProviderUnavailable { .. } => "provider_unavailable",
@@ -139,6 +140,7 @@ impl SocialError {
     }
 
     /// Get the HTTP status code for this error.
+    #[must_use] 
     pub fn status_code(&self) -> StatusCode {
         match self {
             SocialError::ProviderUnavailable { .. } => StatusCode::NOT_FOUND,

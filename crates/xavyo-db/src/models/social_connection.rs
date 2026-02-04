@@ -58,7 +58,7 @@ impl SocialConnection {
         input: CreateSocialConnection,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO social_connections (
                 tenant_id, user_id, provider, provider_user_id, email, display_name,
                 access_token_encrypted, refresh_token_encrypted, token_expires_at,
@@ -66,7 +66,7 @@ impl SocialConnection {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(input.user_id)
@@ -91,10 +91,10 @@ impl SocialConnection {
         provider_user_id: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM social_connections
             WHERE tenant_id = $1 AND provider = $2 AND provider_user_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(provider)
@@ -111,10 +111,10 @@ impl SocialConnection {
         email: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM social_connections
             WHERE tenant_id = $1 AND provider = $2 AND email = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(provider)
@@ -130,11 +130,11 @@ impl SocialConnection {
         user_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM social_connections
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -150,10 +150,10 @@ impl SocialConnection {
         provider: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM social_connections
             WHERE tenant_id = $1 AND user_id = $2 AND provider = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -169,7 +169,7 @@ impl SocialConnection {
         input: UpdateSocialConnection,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE social_connections
             SET
                 email = COALESCE($2, email),
@@ -181,7 +181,7 @@ impl SocialConnection {
                 updated_at = NOW()
             WHERE id = $1
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(&input.email)
@@ -211,10 +211,10 @@ impl SocialConnection {
         user_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM social_connections
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

@@ -18,7 +18,8 @@ pub enum EntraCloudEnvironment {
 }
 
 impl EntraCloudEnvironment {
-    /// Returns the OAuth2 login endpoint for this cloud environment.
+    /// Returns the `OAuth2` login endpoint for this cloud environment.
+    #[must_use] 
     pub fn login_endpoint(&self) -> &'static str {
         match self {
             Self::Commercial => "https://login.microsoftonline.com",
@@ -29,6 +30,7 @@ impl EntraCloudEnvironment {
     }
 
     /// Returns the Microsoft Graph API endpoint for this cloud environment.
+    #[must_use] 
     pub fn graph_endpoint(&self) -> &'static str {
         match self {
             Self::Commercial => "https://graph.microsoft.com",
@@ -82,9 +84,9 @@ pub struct EntraConfig {
     /// Graph API version (default: v1.0).
     #[serde(default = "default_graph_api_version")]
     pub graph_api_version: String,
-    /// OData filter for users (optional).
+    /// `OData` filter for users (optional).
     pub user_filter: Option<String>,
-    /// OData filter for groups (optional).
+    /// `OData` filter for groups (optional).
     pub group_filter: Option<String>,
     /// Whether to sync groups.
     #[serde(default = "default_true")]
@@ -127,6 +129,7 @@ fn default_page_size() -> u32 {
 
 impl EntraConfig {
     /// Creates a new configuration builder.
+    #[must_use] 
     pub fn builder() -> EntraConfigBuilder {
         EntraConfigBuilder::default()
     }
@@ -145,7 +148,7 @@ impl EntraConfig {
     }
 }
 
-/// Builder for EntraConfig.
+/// Builder for `EntraConfig`.
 #[derive(Debug, Default)]
 pub struct EntraConfigBuilder {
     tenant_id: Option<String>,
@@ -170,48 +173,54 @@ impl EntraConfigBuilder {
     }
 
     /// Sets the cloud environment.
+    #[must_use] 
     pub fn cloud_environment(mut self, env: EntraCloudEnvironment) -> Self {
         self.cloud_environment = env;
         self
     }
 
-    /// Sets the user OData filter.
+    /// Sets the user `OData` filter.
     pub fn user_filter(mut self, filter: impl Into<String>) -> Self {
         self.user_filter = Some(filter.into());
         self
     }
 
-    /// Sets the group OData filter.
+    /// Sets the group `OData` filter.
     pub fn group_filter(mut self, filter: impl Into<String>) -> Self {
         self.group_filter = Some(filter.into());
         self
     }
 
     /// Enables or disables group sync.
+    #[must_use] 
     pub fn sync_groups(mut self, sync: bool) -> Self {
         self.sync_groups = sync;
         self
     }
 
     /// Enables or disables directory role sync.
+    #[must_use] 
     pub fn sync_directory_roles(mut self, sync: bool) -> Self {
         self.sync_directory_roles = sync;
         self
     }
 
     /// Sets the page size for API requests.
+    #[must_use] 
     pub fn page_size(mut self, size: u32) -> Self {
         self.page_size = size;
         self
     }
 
     /// Sets the conflict resolution strategy.
+    #[must_use] 
     pub fn conflict_strategy(mut self, strategy: EntraConflictStrategy) -> Self {
         self.conflict_strategy = strategy;
         self
     }
 
     /// Enables transitive member resolution.
+    #[must_use] 
     pub fn resolve_transitive_members(mut self, resolve: bool) -> Self {
         self.resolve_transitive_members = resolve;
         self
@@ -320,7 +329,7 @@ mod tests {
             client_id: "my-client-id".to_string(),
             client_secret: secrecy::SecretString::from("super-secret".to_string()),
         };
-        let debug_str = format!("{:?}", creds);
+        let debug_str = format!("{creds:?}");
         assert!(debug_str.contains("my-client-id"));
         assert!(debug_str.contains("[REDACTED]"));
         assert!(!debug_str.contains("super-secret"));

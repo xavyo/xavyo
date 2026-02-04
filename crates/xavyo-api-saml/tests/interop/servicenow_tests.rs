@@ -1,10 +1,10 @@
-//! ServiceNow SP Interoperability Tests
+//! `ServiceNow` SP Interoperability Tests
 //!
-//! Tests SAML assertion compatibility with ServiceNow requirements:
-//! - user_name, user_email, user_first_name, user_last_name attributes
+//! Tests SAML assertion compatibility with `ServiceNow` requirements:
+//! - `user_name`, `user_email`, `user_first_name`, `user_last_name` attributes
 //! - Multi-value Roles attribute for group membership
-//! - SessionIndex in AuthnStatement
-//! - NameID format respects SP metadata
+//! - `SessionIndex` in `AuthnStatement`
+//! - `NameID` format respects SP metadata
 
 use super::common::*;
 
@@ -42,8 +42,7 @@ fn test_servicenow_basic_assertion_structure() {
 
     assert!(
         errors.is_empty(),
-        "ServiceNow assertion structure validation failed: {:?}",
-        errors
+        "ServiceNow assertion structure validation failed: {errors:?}"
     );
 }
 
@@ -141,8 +140,7 @@ fn test_servicenow_multi_value_roles_attribute() {
     for group in &user.groups {
         assert!(
             values.contains(group),
-            "Roles should contain group: {}",
-            group
+            "Roles should contain group: {group}"
         );
     }
 }

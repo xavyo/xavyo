@@ -1,4 +1,4 @@
-//! Security tests for SAML AuthnRequest session management
+//! Security tests for SAML `AuthnRequest` session management
 //!
 //! These tests verify:
 //! - Session storage and retrieval

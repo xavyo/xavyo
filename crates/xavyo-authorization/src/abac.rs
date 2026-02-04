@@ -7,14 +7,15 @@
 ///
 /// # Arguments
 ///
-/// * `user_attributes` - The user's custom_attributes JSONB value
+/// * `user_attributes` - The user's `custom_attributes` JSONB value
 /// * `attribute_path` - Path to the attribute (e.g., "department")
-/// * `operator` - Comparison operator as string (e.g., "equals", "not_equals")
+/// * `operator` - Comparison operator as string (e.g., "equals", "`not_equals`")
 /// * `value` - Expected value from the condition
 ///
 /// # Returns
 ///
 /// `false` if the attribute is missing (fail-safe: missing data = not satisfied).
+#[must_use] 
 pub fn evaluate_abac_condition(
     user_attributes: &serde_json::Value,
     attribute_path: &str,

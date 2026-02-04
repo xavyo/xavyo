@@ -19,7 +19,7 @@ pub struct WebhookProvider {
     client: Client,
     /// URL to POST ticket creation requests to.
     create_url: String,
-    /// Optional URL to GET ticket status from (with {ticket_id} placeholder).
+    /// Optional URL to GET ticket status from (with {`ticket_id`} placeholder).
     status_url: Option<String>,
     /// Authentication method.
     auth: WebhookAuth,
@@ -48,7 +48,7 @@ impl WebhookProvider {
             .as_ref()
             .and_then(|c| c.get("status_url"))
             .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
+            .map(std::string::ToString::to_string);
 
         // Determine authentication method
         let auth = if let Some(bearer) = credentials.get("bearer_token").and_then(|v| v.as_str()) {
@@ -90,7 +90,7 @@ impl WebhookProvider {
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e| {
-                TicketingError::InvalidConfiguration(format!("Failed to build HTTP client: {}", e))
+                TicketingError::InvalidConfiguration(format!("Failed to build HTTP client: {e}"))
             })?;
 
         Ok(Self {
@@ -223,14 +223,14 @@ impl TicketingProvider for WebhookProvider {
                 } else {
                     Ok(ConnectivityTestResponse {
                         success: false,
-                        error_message: Some(format!("Endpoint returned status {}", status)),
+                        error_message: Some(format!("Endpoint returned status {status}")),
                         details: None,
                     })
                 }
             }
             Err(e) => Ok(ConnectivityTestResponse {
                 success: false,
-                error_message: Some(format!("Connection failed: {}", e)),
+                error_message: Some(format!("Connection failed: {e}")),
                 details: None,
             }),
         }
@@ -274,23 +274,20 @@ impl TicketingProvider for WebhookProvider {
             // Try to parse the response
             let response_text = response.text().await?;
 
-            match serde_json::from_str::<WebhookCreateResponse>(&response_text) {
-                Ok(webhook_response) => Ok(CreateTicketResponse {
-                    external_reference: webhook_response.ticket_id,
-                    external_url: webhook_response.ticket_url,
+            if let Ok(webhook_response) = serde_json::from_str::<WebhookCreateResponse>(&response_text) { Ok(CreateTicketResponse {
+                external_reference: webhook_response.ticket_id,
+                external_url: webhook_response.ticket_url,
+                raw_response: serde_json::from_str(&response_text).ok(),
+            }) } else {
+                // If response doesn't match expected format, use task_id as reference
+                tracing::warn!(
+                    "Webhook response didn't match expected format, using task_id as reference"
+                );
+                Ok(CreateTicketResponse {
+                    external_reference: request.task_id.to_string(),
+                    external_url: None,
                     raw_response: serde_json::from_str(&response_text).ok(),
-                }),
-                Err(_) => {
-                    // If response doesn't match expected format, use task_id as reference
-                    tracing::warn!(
-                        "Webhook response didn't match expected format, using task_id as reference"
-                    );
-                    Ok(CreateTicketResponse {
-                        external_reference: request.task_id.to_string(),
-                        external_url: None,
-                        raw_response: serde_json::from_str(&response_text).ok(),
-                    })
-                }
+                })
             }
         } else if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
             Err(TicketingError::AuthenticationFailed(
@@ -309,8 +306,7 @@ impl TicketingProvider for WebhookProvider {
         } else if status == StatusCode::SERVICE_UNAVAILABLE || status == StatusCode::GATEWAY_TIMEOUT
         {
             Err(TicketingError::ProviderUnavailable(format!(
-                "Webhook endpoint unavailable: {}",
-                status
+                "Webhook endpoint unavailable: {status}"
             )))
         } else {
             let error_text = response.text().await.unwrap_or_default();

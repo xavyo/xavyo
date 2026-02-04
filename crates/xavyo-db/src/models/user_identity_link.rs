@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-/// User Identity Link entity - links local user to external IdP identity.
+/// User Identity Link entity - links local user to external `IdP` identity.
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct UserIdentityLink {
     pub id: Uuid,
@@ -44,13 +44,13 @@ impl UserIdentityLink {
         input: CreateUserIdentityLink,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO user_identity_links (
                 tenant_id, user_id, identity_provider_id, subject, issuer, raw_claims
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(input.user_id)
@@ -64,7 +64,7 @@ impl UserIdentityLink {
 
     /// Find by ID.
     ///
-    /// **SECURITY WARNING**: This method does NOT filter by tenant_id.
+    /// **SECURITY WARNING**: This method does NOT filter by `tenant_id`.
     /// Use `find_by_id_and_tenant()` for tenant-isolated queries.
     #[deprecated(
         since = "0.1.0",
@@ -79,7 +79,7 @@ impl UserIdentityLink {
 
     /// Find by ID with tenant isolation.
     ///
-    /// SECURITY: This method ensures tenant isolation by requiring tenant_id.
+    /// SECURITY: This method ensures tenant isolation by requiring `tenant_id`.
     pub async fn find_by_id_and_tenant(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -99,11 +99,11 @@ impl UserIdentityLink {
         user_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_identity_links
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -111,7 +111,7 @@ impl UserIdentityLink {
         .await
     }
 
-    /// Find by IdP subject claim.
+    /// Find by `IdP` subject claim.
     pub async fn find_by_subject(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -119,10 +119,10 @@ impl UserIdentityLink {
         subject: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_identity_links
             WHERE tenant_id = $1 AND identity_provider_id = $2 AND subject = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(identity_provider_id)
@@ -131,7 +131,7 @@ impl UserIdentityLink {
         .await
     }
 
-    /// Find by user and IdP.
+    /// Find by user and `IdP`.
     pub async fn find_by_user_and_idp(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -139,10 +139,10 @@ impl UserIdentityLink {
         identity_provider_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_identity_links
             WHERE tenant_id = $1 AND user_id = $2 AND identity_provider_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -151,7 +151,7 @@ impl UserIdentityLink {
         .await
     }
 
-    /// Count links for an IdP (to prevent deletion when users are linked).
+    /// Count links for an `IdP` (to prevent deletion when users are linked).
     pub async fn count_by_idp(
         pool: &sqlx::PgPool,
         identity_provider_id: Uuid,
@@ -172,7 +172,7 @@ impl UserIdentityLink {
         input: UpdateUserIdentityLink,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_identity_links
             SET
                 raw_claims = COALESCE($2, raw_claims),
@@ -180,7 +180,7 @@ impl UserIdentityLink {
                 updated_at = NOW()
             WHERE id = $1
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(&input.raw_claims)
@@ -195,11 +195,11 @@ impl UserIdentityLink {
         user_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_identity_links
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -225,7 +225,7 @@ impl UserIdentityLink {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Delete all links for an IdP.
+    /// Delete all links for an `IdP`.
     pub async fn delete_by_idp(
         pool: &sqlx::PgPool,
         identity_provider_id: Uuid,

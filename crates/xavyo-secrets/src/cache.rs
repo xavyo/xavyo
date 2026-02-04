@@ -9,7 +9,7 @@ use tokio::sync::RwLock;
 
 use crate::{SecretError, SecretProvider, SecretValue};
 
-/// Internal cache entry wrapping a SecretValue with TTL metadata.
+/// Internal cache entry wrapping a `SecretValue` with TTL metadata.
 #[derive(Debug, Clone)]
 pub struct CachedSecret {
     /// The cached secret value.
@@ -38,6 +38,7 @@ pub struct SecretCache {
 
 impl SecretCache {
     /// Create a new cache with the given TTL in seconds.
+    #[must_use] 
     pub fn new(ttl_seconds: u64) -> Self {
         Self {
             entries: RwLock::new(HashMap::new()),
@@ -102,7 +103,7 @@ impl SecretCache {
     }
 }
 
-/// A SecretProvider wrapper that adds TTL-based caching to any inner provider.
+/// A `SecretProvider` wrapper that adds TTL-based caching to any inner provider.
 pub struct CachedSecretProvider {
     inner: Arc<dyn SecretProvider>,
     cache: SecretCache,

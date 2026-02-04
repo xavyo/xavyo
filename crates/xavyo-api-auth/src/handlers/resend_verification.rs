@@ -49,7 +49,7 @@ pub async fn resend_verification_handler(
             .flat_map(|errors| {
                 errors
                     .iter()
-                    .filter_map(|e| e.message.as_ref().map(|m| m.to_string()))
+                    .filter_map(|e| e.message.as_ref().map(std::string::ToString::to_string))
             })
             .collect();
         ApiAuthError::Validation(errors.join(", "))
@@ -111,16 +111,13 @@ async fn process_resend_verification(
     .fetch_optional(pool)
     .await?;
 
-    let (user_id, is_active, email_verified) = match user_row {
-        Some((id, active, verified)) => (id, active, verified),
-        None => {
-            tracing::debug!(
-                email = %email,
-                tenant_id = %tenant_id,
-                "Resend verification requested for non-existent email"
-            );
-            return Ok(()); // Don't leak that user doesn't exist
-        }
+    let (user_id, is_active, email_verified) = if let Some((id, active, verified)) = user_row { (id, active, verified) } else {
+        tracing::debug!(
+            email = %email,
+            tenant_id = %tenant_id,
+            "Resend verification requested for non-existent email"
+        );
+        return Ok(()); // Don't leak that user doesn't exist
     };
 
     // Check if user is active
@@ -157,10 +154,10 @@ async fn process_resend_verification(
 
     // Store token hash in database
     sqlx::query(
-        r#"
+        r"
         INSERT INTO email_verification_tokens (tenant_id, user_id, token_hash, expires_at, ip_address)
         VALUES ($1, $2, $3, $4, $5)
-        "#,
+        ",
     )
     .bind(tenant_id.as_uuid())
     .bind(user_id)

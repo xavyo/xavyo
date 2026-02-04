@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 #[sqlx(type_name = "micro_cert_trigger_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum MicroCertTriggerType {
-    /// Entitlement with risk_level = high/critical assigned.
+    /// Entitlement with `risk_level` = high/critical assigned.
     HighRiskAssignment,
-    /// SoD rule violation detected.
+    /// `SoD` rule violation detected.
     SodViolation,
     /// User's manager changed.
     ManagerChange,
@@ -68,7 +68,7 @@ pub enum MicroCertStatus {
     AutoRevoked,
     /// Flagged for investigation (Reduce decision), access remains but monitored.
     FlaggedForReview,
-    /// Deadline passed, no decision made (auto_revoke=false).
+    /// Deadline passed, no decision made (`auto_revoke=false`).
     Expired,
     /// Assignment deleted before decision.
     Skipped,
@@ -124,11 +124,13 @@ pub enum MicroCertEventType {
 
 impl MicroCertTriggerType {
     /// Check if this trigger type is event-driven (vs scheduled).
+    #[must_use] 
     pub fn is_event_driven(&self) -> bool {
         !matches!(self, Self::PeriodicRecert)
     }
 
     /// Get the Kafka topic that triggers this certification type.
+    #[must_use] 
     pub fn trigger_topic(&self) -> Option<&'static str> {
         match self {
             Self::HighRiskAssignment => Some("xavyo.governance.entitlement.assigned"),
@@ -141,14 +143,16 @@ impl MicroCertTriggerType {
 }
 
 impl MicroCertScopeType {
-    /// Check if scope_id is required for this scope type.
+    /// Check if `scope_id` is required for this scope type.
+    #[must_use] 
     pub fn requires_scope_id(&self) -> bool {
         matches!(self, Self::Application | Self::Entitlement)
     }
 }
 
 impl MicroCertReviewerType {
-    /// Check if specific_reviewer_id is required for this reviewer type.
+    /// Check if `specific_reviewer_id` is required for this reviewer type.
+    #[must_use] 
     pub fn requires_specific_reviewer(&self) -> bool {
         matches!(self, Self::SpecificUser)
     }
@@ -156,16 +160,19 @@ impl MicroCertReviewerType {
 
 impl MicroCertStatus {
     /// Check if this status represents a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         !matches!(self, Self::Pending)
     }
 
     /// Check if this status means access was revoked.
+    #[must_use] 
     pub fn is_revoked(&self) -> bool {
         matches!(self, Self::Revoked | Self::AutoRevoked)
     }
 
     /// Check if a decision was made (vs timeout/skip).
+    #[must_use] 
     pub fn has_decision(&self) -> bool {
         matches!(
             self,
@@ -174,6 +181,7 @@ impl MicroCertStatus {
     }
 
     /// Check if this status requires follow-up action.
+    #[must_use] 
     pub fn requires_followup(&self) -> bool {
         matches!(self, Self::FlaggedForReview | Self::Expired)
     }
@@ -182,6 +190,7 @@ impl MicroCertStatus {
 impl MicroCertDecision {
     /// Convert decision to resulting status.
     /// Note: Delegate doesn't change status (certification remains Pending with new reviewer).
+    #[must_use] 
     pub fn to_status(&self) -> Option<MicroCertStatus> {
         match self {
             Self::Approve => Some(MicroCertStatus::Approved),
@@ -192,16 +201,19 @@ impl MicroCertDecision {
     }
 
     /// Check if this decision terminates the certification.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Approve | Self::Revoke | Self::Reduce)
     }
 
-    /// Check if this decision requires a delegate_to user ID.
+    /// Check if this decision requires a `delegate_to` user ID.
+    #[must_use] 
     pub fn requires_delegate_to(&self) -> bool {
         matches!(self, Self::Delegate)
     }
 
     /// Check if this decision revokes access.
+    #[must_use] 
     pub fn revokes_access(&self) -> bool {
         matches!(self, Self::Revoke)
     }
@@ -209,6 +221,7 @@ impl MicroCertDecision {
 
 impl MicroCertEventType {
     /// Check if this event type represents a status change.
+    #[must_use] 
     pub fn is_status_change(&self) -> bool {
         matches!(
             self,
@@ -222,6 +235,7 @@ impl MicroCertEventType {
     }
 
     /// Check if this event type requires an actor (not system-generated).
+    #[must_use] 
     pub fn requires_actor(&self) -> bool {
         matches!(
             self,

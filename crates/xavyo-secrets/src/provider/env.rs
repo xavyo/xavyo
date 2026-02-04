@@ -11,23 +11,24 @@ use crate::{SecretError, SecretProvider, SecretValue};
 
 /// Secret provider that reads secrets from environment variables.
 ///
-/// Logical names are mapped to env var names via the `mappings` HashMap,
+/// Logical names are mapped to env var names via the `mappings` `HashMap`,
 /// or by converting to uppercase with underscores if no explicit mapping exists.
 #[derive(Debug)]
 pub struct EnvSecretProvider {
-    /// Explicit logical name → env var name mappings from SECRET_MAP_* vars.
+    /// Explicit logical name → env var name mappings from `SECRET_MAP`_* vars.
     mappings: HashMap<String, String>,
 }
 
 impl EnvSecretProvider {
-    /// Create a new EnvSecretProvider with the given logical name mappings.
+    /// Create a new `EnvSecretProvider` with the given logical name mappings.
+    #[must_use] 
     pub fn new(mappings: HashMap<String, String>) -> Self {
         Self { mappings }
     }
 
     /// Resolve a logical secret name to an environment variable name.
     ///
-    /// If an explicit mapping exists (from SECRET_MAP_*), use the mapped value
+    /// If an explicit mapping exists (from `SECRET_MAP`_*), use the mapped value
     /// as the env var name. Otherwise, convert the logical name to uppercase.
     fn resolve_env_var_name(&self, logical_name: &str) -> String {
         if let Some(mapped) = self.mappings.get(logical_name) {

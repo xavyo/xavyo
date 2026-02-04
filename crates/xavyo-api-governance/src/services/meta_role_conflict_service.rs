@@ -36,6 +36,7 @@ pub struct MetaRoleConflictService {
 
 impl MetaRoleConflictService {
     /// Create a new conflict service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -613,7 +614,7 @@ impl MetaRoleConflictService {
     // =========================================================================
 
     /// List conflicts with optional status filter.
-    /// Returns (conflicts, total_count) for proper pagination.
+    /// Returns (conflicts, `total_count`) for proper pagination.
     pub async fn list_conflicts(
         &self,
         tenant_id: Uuid,

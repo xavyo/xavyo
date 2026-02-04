@@ -85,12 +85,12 @@ impl UserImportJob {
     /// Create a new import job record.
     pub async fn create(pool: &PgPool, data: CreateImportJob) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO user_import_jobs
                 (tenant_id, file_name, file_hash, file_size_bytes, total_rows, send_invitations, created_by)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(&data.file_name)
@@ -110,10 +110,10 @@ impl UserImportJob {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_import_jobs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -129,63 +129,60 @@ impl UserImportJob {
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<Self>, i64), sqlx::Error> {
-        let (jobs, total) = match status {
-            Some(s) => {
-                let jobs = sqlx::query_as(
-                    r#"
-                    SELECT * FROM user_import_jobs
-                    WHERE tenant_id = $1 AND status = $2
-                    ORDER BY created_at DESC
-                    LIMIT $3 OFFSET $4
-                    "#,
-                )
-                .bind(tenant_id)
-                .bind(s)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(pool)
-                .await?;
+        let (jobs, total) = if let Some(s) = status {
+            let jobs = sqlx::query_as(
+                r"
+                SELECT * FROM user_import_jobs
+                WHERE tenant_id = $1 AND status = $2
+                ORDER BY created_at DESC
+                LIMIT $3 OFFSET $4
+                ",
+            )
+            .bind(tenant_id)
+            .bind(s)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await?;
 
-                let total: i64 = sqlx::query_scalar(
-                    r#"
-                    SELECT COUNT(*) FROM user_import_jobs
-                    WHERE tenant_id = $1 AND status = $2
-                    "#,
-                )
-                .bind(tenant_id)
-                .bind(s)
-                .fetch_one(pool)
-                .await?;
+            let total: i64 = sqlx::query_scalar(
+                r"
+                SELECT COUNT(*) FROM user_import_jobs
+                WHERE tenant_id = $1 AND status = $2
+                ",
+            )
+            .bind(tenant_id)
+            .bind(s)
+            .fetch_one(pool)
+            .await?;
 
-                (jobs, total)
-            }
-            None => {
-                let jobs = sqlx::query_as(
-                    r#"
-                    SELECT * FROM user_import_jobs
-                    WHERE tenant_id = $1
-                    ORDER BY created_at DESC
-                    LIMIT $2 OFFSET $3
-                    "#,
-                )
-                .bind(tenant_id)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(pool)
-                .await?;
+            (jobs, total)
+        } else {
+            let jobs = sqlx::query_as(
+                r"
+                SELECT * FROM user_import_jobs
+                WHERE tenant_id = $1
+                ORDER BY created_at DESC
+                LIMIT $2 OFFSET $3
+                ",
+            )
+            .bind(tenant_id)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await?;
 
-                let total: i64 = sqlx::query_scalar(
-                    r#"
-                    SELECT COUNT(*) FROM user_import_jobs
-                    WHERE tenant_id = $1
-                    "#,
-                )
-                .bind(tenant_id)
-                .fetch_one(pool)
-                .await?;
+            let total: i64 = sqlx::query_scalar(
+                r"
+                SELECT COUNT(*) FROM user_import_jobs
+                WHERE tenant_id = $1
+                ",
+            )
+            .bind(tenant_id)
+            .fetch_one(pool)
+            .await?;
 
-                (jobs, total)
-            }
+            (jobs, total)
         };
 
         Ok((jobs, total))
@@ -198,10 +195,10 @@ impl UserImportJob {
         tenant_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM user_import_jobs
             WHERE tenant_id = $1 AND status IN ('pending', 'processing')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -218,12 +215,12 @@ impl UserImportJob {
         status: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_import_jobs
             SET status = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -243,11 +240,11 @@ impl UserImportJob {
         skip_count: i32,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE user_import_jobs
             SET processed_rows = $3, success_count = $4, error_count = $5, skip_count = $6, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -267,12 +264,12 @@ impl UserImportJob {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_import_jobs
             SET status = 'processing', started_at = NOW(), updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -290,7 +287,7 @@ impl UserImportJob {
         skip_count: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_import_jobs
             SET status = 'completed',
                 completed_at = NOW(),
@@ -301,7 +298,7 @@ impl UserImportJob {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -320,12 +317,12 @@ impl UserImportJob {
         error_message: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_import_jobs
             SET status = 'failed', completed_at = NOW(), error_message = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

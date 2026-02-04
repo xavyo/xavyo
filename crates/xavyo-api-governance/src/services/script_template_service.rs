@@ -17,6 +17,7 @@ pub struct ScriptTemplateService {
 
 impl ScriptTemplateService {
     /// Create a new script template service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

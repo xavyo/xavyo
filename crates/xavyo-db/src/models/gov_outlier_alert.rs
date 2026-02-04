@@ -84,10 +84,10 @@ impl GovOutlierAlert {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_outlier_alerts
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -108,27 +108,27 @@ impl GovOutlierAlert {
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.analysis_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND analysis_id = ${}", param_count));
+            query.push_str(&format!(" AND analysis_id = ${param_count}"));
         }
         if filter.alert_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND alert_type = ${}", param_count));
+            query.push_str(&format!(" AND alert_type = ${param_count}"));
         }
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ${}", param_count));
+            query.push_str(&format!(" AND severity = ${param_count}"));
         }
         if filter.is_read.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_read = ${}", param_count));
+            query.push_str(&format!(" AND is_read = ${param_count}"));
         }
         if filter.is_dismissed.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_dismissed = ${}", param_count));
+            query.push_str(&format!(" AND is_dismissed = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -173,27 +173,27 @@ impl GovOutlierAlert {
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.analysis_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND analysis_id = ${}", param_count));
+            query.push_str(&format!(" AND analysis_id = ${param_count}"));
         }
         if filter.alert_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND alert_type = ${}", param_count));
+            query.push_str(&format!(" AND alert_type = ${param_count}"));
         }
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ${}", param_count));
+            query.push_str(&format!(" AND severity = ${param_count}"));
         }
         if filter.is_read.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_read = ${}", param_count));
+            query.push_str(&format!(" AND is_read = ${param_count}"));
         }
         if filter.is_dismissed.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_dismissed = ${}", param_count));
+            query.push_str(&format!(" AND is_dismissed = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -226,7 +226,7 @@ impl GovOutlierAlert {
         tenant_id: Uuid,
     ) -> Result<AlertSummary, sqlx::Error> {
         let row: (i64, i64, i64, i64, i64, i64) = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 COUNT(*) as total_count,
                 COUNT(*) FILTER (WHERE is_read = false AND is_dismissed = false) as unread_count,
@@ -236,7 +236,7 @@ impl GovOutlierAlert {
                 COUNT(*) FILTER (WHERE severity = 'low' AND is_dismissed = false) as low_count
             FROM gov_outlier_alerts
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -261,13 +261,13 @@ impl GovOutlierAlert {
         let severity = OutlierAlertSeverity::from_score(input.score);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_outlier_alerts (
                 tenant_id, analysis_id, user_id, alert_type, severity, score, classification
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.analysis_id)
@@ -297,12 +297,12 @@ impl GovOutlierAlert {
             let severity = OutlierAlertSeverity::from_score(input.score);
 
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO gov_outlier_alerts (
                     tenant_id, analysis_id, user_id, alert_type, severity, score, classification
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(input.analysis_id)
@@ -327,12 +327,12 @@ impl GovOutlierAlert {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_outlier_alerts
             SET is_read = true
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -347,12 +347,12 @@ impl GovOutlierAlert {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_outlier_alerts
             SET is_dismissed = true, is_read = true
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -363,11 +363,11 @@ impl GovOutlierAlert {
     /// Mark all alerts as read for a tenant.
     pub async fn mark_all_read(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_outlier_alerts
             SET is_read = true
             WHERE tenant_id = $1 AND is_read = false
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(pool)
@@ -383,7 +383,7 @@ impl GovOutlierAlert {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_outlier_alerts
             WHERE tenant_id = $1 AND is_read = false AND is_dismissed = false
             ORDER BY
@@ -395,7 +395,7 @@ impl GovOutlierAlert {
                 END,
                 created_at DESC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -410,10 +410,10 @@ impl GovOutlierAlert {
         analysis_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_outlier_alerts
             WHERE tenant_id = $1 AND analysis_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(analysis_id)
@@ -430,11 +430,11 @@ impl GovOutlierAlert {
         days: i32,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_outlier_alerts
             WHERE tenant_id = $1 AND is_dismissed = true
                 AND created_at < NOW() - ($2 || ' days')::INTERVAL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(days)
@@ -452,12 +452,12 @@ impl GovOutlierAlert {
         user_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let exists: bool = sqlx::query_scalar(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM gov_outlier_alerts
                 WHERE tenant_id = $1 AND analysis_id = $2 AND user_id = $3
             )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(analysis_id)
@@ -469,11 +469,13 @@ impl GovOutlierAlert {
     }
 
     /// Check if this is a critical alert.
+    #[must_use] 
     pub fn is_critical(&self) -> bool {
         matches!(self.severity, OutlierAlertSeverity::Critical)
     }
 
     /// Check if this requires immediate attention.
+    #[must_use] 
     pub fn requires_attention(&self) -> bool {
         !self.is_read && !self.is_dismissed
     }

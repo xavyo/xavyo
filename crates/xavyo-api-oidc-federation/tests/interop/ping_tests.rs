@@ -12,9 +12,9 @@ use xavyo_api_oidc_federation::services::{TokenVerifierService, VerificationConf
 mod ping_fixtures {
     use super::*;
 
-    /// PingOne issuer pattern
+    /// `PingOne` issuer pattern
     pub fn issuer(base_url: &str, environment_id: &str) -> String {
-        format!("{}/{}/as", base_url, environment_id)
+        format!("{base_url}/{environment_id}/as")
     }
 
     /// Ping Identity discovery document
@@ -57,7 +57,7 @@ mod ping_fixtures {
     /// Create Ping Identity claims
     pub fn claims(sub: &str, issuer: &str) -> TestClaims {
         TestClaims::new(sub, issuer, vec!["app-client-id".to_string()])
-            .with_email(&format!("{}@example.com", sub))
+            .with_email(&format!("{sub}@example.com"))
             .with_name("Test User")
     }
 }

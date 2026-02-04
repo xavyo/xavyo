@@ -25,7 +25,8 @@ pub struct BaselineService {
 }
 
 impl BaselineService {
-    /// Create a new BaselineService.
+    /// Create a new `BaselineService`.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -39,7 +40,7 @@ impl BaselineService {
         // Fetch all baselines for this agent
         let db_baselines = AnomalyBaseline::get_by_agent(&self.pool, tenant_id, agent_id)
             .await
-            .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+            .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
         if db_baselines.is_empty() {
             return Ok(BaselineResponse {
@@ -137,7 +138,7 @@ impl BaselineService {
 
         AnomalyBaseline::upsert(&self.pool, create_data)
             .await
-            .map_err(|e| ApiAgentsError::Internal(format!("Failed to save baseline: {}", e)))?;
+            .map_err(|e| ApiAgentsError::Internal(format!("Failed to save baseline: {e}")))?;
 
         Ok(Baseline {
             baseline_type: BaselineType::HourlyVolume,
@@ -158,7 +159,7 @@ impl BaselineService {
     ) -> Result<Vec<f64>, ApiAgentsError> {
         // Query to get event count per hour
         let rows = sqlx::query_as::<_, (i64,)>(
-            r#"
+            r"
             SELECT COUNT(*) as count
             FROM ai_agent_audit_events
             WHERE tenant_id = $1
@@ -167,7 +168,7 @@ impl BaselineService {
               AND timestamp < $4
             GROUP BY date_trunc('hour', timestamp)
             ORDER BY date_trunc('hour', timestamp)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -175,7 +176,7 @@ impl BaselineService {
         .bind(end)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| ApiAgentsError::Internal(format!("Database query failed: {}", e)))?;
+        .map_err(|e| ApiAgentsError::Internal(format!("Database query failed: {e}")))?;
 
         Ok(rows.into_iter().map(|(count,)| count as f64).collect())
     }
@@ -233,7 +234,7 @@ impl BaselineService {
 
         AnomalyBaseline::upsert(&self.pool, create_data)
             .await
-            .map_err(|e| ApiAgentsError::Internal(format!("Failed to save baseline: {}", e)))?;
+            .map_err(|e| ApiAgentsError::Internal(format!("Failed to save baseline: {e}")))?;
 
         Ok(Baseline {
             baseline_type: BaselineType::ToolDistribution,
@@ -253,7 +254,7 @@ impl BaselineService {
         end: DateTime<Utc>,
     ) -> Result<std::collections::HashMap<String, i64>, ApiAgentsError> {
         let rows = sqlx::query_as::<_, (String, i64)>(
-            r#"
+            r"
             SELECT COALESCE(tool_name, 'unknown') as tool, COUNT(*) as count
             FROM ai_agent_audit_events
             WHERE tenant_id = $1
@@ -262,7 +263,7 @@ impl BaselineService {
               AND timestamp < $4
               AND event_type = 'tool_invocation'
             GROUP BY tool_name
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -270,7 +271,7 @@ impl BaselineService {
         .bind(end)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| ApiAgentsError::Internal(format!("Database query failed: {}", e)))?;
+        .map_err(|e| ApiAgentsError::Internal(format!("Database query failed: {e}")))?;
 
         Ok(rows.into_iter().collect())
     }
@@ -328,7 +329,7 @@ impl BaselineService {
 
         AnomalyBaseline::upsert(&self.pool, create_data)
             .await
-            .map_err(|e| ApiAgentsError::Internal(format!("Failed to save baseline: {}", e)))?;
+            .map_err(|e| ApiAgentsError::Internal(format!("Failed to save baseline: {e}")))?;
 
         Ok(Baseline {
             baseline_type: BaselineType::HourDistribution,
@@ -348,7 +349,7 @@ impl BaselineService {
         end: DateTime<Utc>,
     ) -> Result<std::collections::HashMap<i32, i64>, ApiAgentsError> {
         let rows = sqlx::query_as::<_, (i32, i64)>(
-            r#"
+            r"
             SELECT EXTRACT(HOUR FROM timestamp)::int as hour, COUNT(*) as count
             FROM ai_agent_audit_events
             WHERE tenant_id = $1
@@ -356,7 +357,7 @@ impl BaselineService {
               AND timestamp >= $3
               AND timestamp < $4
             GROUP BY EXTRACT(HOUR FROM timestamp)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -364,7 +365,7 @@ impl BaselineService {
         .bind(end)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| ApiAgentsError::Internal(format!("Database query failed: {}", e)))?;
+        .map_err(|e| ApiAgentsError::Internal(format!("Database query failed: {e}")))?;
 
         Ok(rows.into_iter().collect())
     }
@@ -408,18 +409,18 @@ impl BaselineService {
         let since = Utc::now() - Duration::days(BASELINE_WINDOW_DAYS);
 
         let rows = sqlx::query_as::<_, (Uuid,)>(
-            r#"
+            r"
             SELECT DISTINCT agent_id
             FROM ai_agent_audit_events
             WHERE tenant_id = $1
               AND timestamp >= $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(since)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| ApiAgentsError::Internal(format!("Database query failed: {}", e)))?;
+        .map_err(|e| ApiAgentsError::Internal(format!("Database query failed: {e}")))?;
 
         Ok(rows.into_iter().map(|(id,)| id).collect())
     }
@@ -456,6 +457,7 @@ impl BaselineService {
     ///
     /// This spawns a tokio task that computes baselines for all active agents.
     /// Returns immediately with a job handle.
+    #[must_use] 
     pub fn spawn_baseline_job(
         &self,
         tenant_id: Uuid,
@@ -468,6 +470,7 @@ impl BaselineService {
     ///
     /// This spawns a tokio task that runs baseline computation at the specified interval.
     /// The interval should typically be 1 hour.
+    #[must_use] 
     pub fn start_periodic_baseline_job(
         &self,
         tenant_id: Uuid,

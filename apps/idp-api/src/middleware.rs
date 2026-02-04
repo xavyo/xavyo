@@ -46,7 +46,7 @@ fn extract_otel_context(headers: &axum::http::HeaderMap) -> opentelemetry::Conte
             self.0.get(key).and_then(|v| v.to_str().ok())
         }
         fn keys(&self) -> Vec<&str> {
-            self.0.keys().map(|k| k.as_str()).collect()
+            self.0.keys().map(axum::http::HeaderName::as_str).collect()
         }
     }
 
@@ -78,9 +78,7 @@ pub async fn otel_trace_middleware(
     let method = request.method().to_string();
     let target = request.uri().path().to_string();
     let route = matched_path
-        .as_ref()
-        .map(|m| m.as_str().to_string())
-        .unwrap_or_else(|| "unmatched".to_string());
+        .as_ref().map_or_else(|| "unmatched".to_string(), |m| m.as_str().to_string());
 
     // Extract W3C trace context from incoming headers (FR-002)
     let otel_cx = extract_otel_context(request.headers());
@@ -180,31 +178,26 @@ pub async fn request_timeout_middleware(
     let timeout_secs = request
         .extensions()
         .get::<RequestTimeoutSecs>()
-        .map(|t| t.0)
-        .unwrap_or(30);
+        .map_or(30, |t| t.0);
 
-    match tokio::time::timeout(
+    if let Ok(response) = tokio::time::timeout(
         std::time::Duration::from_secs(timeout_secs),
         next.run(request),
     )
-    .await
-    {
-        Ok(response) => response,
-        Err(_) => {
-            let mut response = Response::new(Body::from(
-                serde_json::json!({
-                    "error": "request_timeout",
-                    "error_description": "Request timed out"
-                })
-                .to_string(),
-            ));
-            *response.status_mut() = axum::http::StatusCode::REQUEST_TIMEOUT;
-            response.headers_mut().insert(
-                axum::http::header::CONTENT_TYPE,
-                HeaderValue::from_static("application/json"),
-            );
-            response
-        }
+    .await { response } else {
+        let mut response = Response::new(Body::from(
+            serde_json::json!({
+                "error": "request_timeout",
+                "error_description": "Request timed out"
+            })
+            .to_string(),
+        ));
+        *response.status_mut() = axum::http::StatusCode::REQUEST_TIMEOUT;
+        response.headers_mut().insert(
+            axum::http::header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json"),
+        );
+        response
     }
 }
 
@@ -308,7 +301,7 @@ use std::sync::Arc;
 /// Shared rate limiter state for per-endpoint rate limiting.
 ///
 /// Each endpoint group (login, token, registration) gets its own keyed limiter.
-/// Keys are derived from client IP address, account identifier, or client_id.
+/// Keys are derived from client IP address, account identifier, or `client_id`.
 #[derive(Clone)]
 pub struct EndpointRateLimiters {
     /// Login rate limiter per IP (5/min default)
@@ -329,7 +322,7 @@ pub struct EndpointRateLimiters {
             DefaultClock,
         >,
     >,
-    /// Token endpoint rate limiter per client_id (30/min default)
+    /// Token endpoint rate limiter per `client_id` (30/min default)
     pub token_client: Arc<
         governor::RateLimiter<
             String,
@@ -386,7 +379,7 @@ impl EndpointRateLimiters {
     }
 }
 
-/// Extract client IP from request, checking X-Forwarded-For first, then ConnectInfo.
+/// Extract client IP from request, checking X-Forwarded-For first, then `ConnectInfo`.
 fn extract_client_ip(request: &axum::http::Request<Body>) -> String {
     // Check X-Forwarded-For header (first IP in chain)
     if let Some(forwarded) = request.headers().get("x-forwarded-for") {
@@ -440,7 +433,7 @@ pub async fn login_rate_limit_middleware(
     next.run(request).await
 }
 
-/// Axum middleware for token endpoint rate limiting (client_id based).
+/// Axum middleware for token endpoint rate limiting (`client_id` based).
 ///
 /// Returns 429 Too Many Requests with Retry-After header when limits are exceeded.
 pub async fn token_rate_limit_middleware(
@@ -618,8 +611,7 @@ pub fn extract_idempotency_key(
 
     if key_str.len() > MAX_KEY_LENGTH {
         return Err(IdempotencyError::InvalidKey(format!(
-            "Idempotency key must be at most {} characters",
-            MAX_KEY_LENGTH
+            "Idempotency key must be at most {MAX_KEY_LENGTH} characters"
         )));
     }
 
@@ -648,7 +640,7 @@ pub struct IdempotencyState {
     pub pool: PgPool,
 }
 
-/// Axum middleware for HTTP-level idempotency (TenantId extension variant).
+/// Axum middleware for HTTP-level idempotency (`TenantId` extension variant).
 ///
 /// When a request includes an `Idempotency-Key` header:
 /// 1. Validates the key format
@@ -672,23 +664,20 @@ pub async fn idempotency_middleware(
 
 /// Axum middleware for HTTP-level idempotency (JWT claims variant).
 ///
-/// This variant extracts tenant_id from JWT claims, suitable for endpoints
-/// that authenticate via JWT but don't have a TenantId extension (e.g., provisioning).
+/// This variant extracts `tenant_id` from JWT claims, suitable for endpoints
+/// that authenticate via JWT but don't have a `TenantId` extension (e.g., provisioning).
 pub async fn idempotency_middleware_jwt(
     axum::extract::State(state): axum::extract::State<IdempotencyState>,
     axum::extract::Extension(claims): axum::extract::Extension<xavyo_auth::JwtClaims>,
     request: axum::http::Request<Body>,
     next: Next,
 ) -> Response {
-    let tenant_uuid = match claims.tenant_id() {
-        Some(tid) => *tid.as_uuid(),
-        None => {
-            tracing::error!("Idempotency middleware: JWT claims missing tenant_id");
-            return IdempotencyError::Database(sqlx::Error::Protocol(
-                "Missing tenant context".to_string(),
-            ))
-            .into_response();
-        }
+    let tenant_uuid = if let Some(tid) = claims.tenant_id() { *tid.as_uuid() } else {
+        tracing::error!("Idempotency middleware: JWT claims missing tenant_id");
+        return IdempotencyError::Database(sqlx::Error::Protocol(
+            "Missing tenant context".to_string(),
+        ))
+        .into_response();
     };
 
     idempotency_middleware_inner(state, tenant_uuid, request, next).await

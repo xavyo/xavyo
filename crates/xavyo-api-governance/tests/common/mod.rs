@@ -4,7 +4,6 @@
 
 #![allow(dead_code)]
 
-use serde_json;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::env;
@@ -27,13 +26,13 @@ pub async fn create_test_tenant(pool: &PgPool) -> Uuid {
     let tenant_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO tenants (id, name, slug, created_at)
         VALUES ($1, $2, $3, NOW())
-        "#,
+        ",
     )
     .bind(tenant_id)
-    .bind(format!("Test Tenant {}", tenant_id))
+    .bind(format!("Test Tenant {tenant_id}"))
     .bind(format!("test-{}", &tenant_id.to_string()[..8]))
     .execute(pool)
     .await
@@ -47,14 +46,14 @@ pub async fn create_test_user(pool: &PgPool, tenant_id: Uuid) -> Uuid {
     let user_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO users (id, tenant_id, email, password_hash, is_active, created_at, updated_at)
         VALUES ($1, $2, $3, $4, true, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(user_id)
     .bind(tenant_id)
-    .bind(format!("user-{}@test.com", user_id))
+    .bind(format!("user-{user_id}@test.com"))
     .bind("$argon2id$v=19$m=65536,t=3,p=4$dummy$hash") // Fake hash for testing
     .execute(pool)
     .await
@@ -68,14 +67,14 @@ pub async fn create_test_application(pool: &PgPool, tenant_id: Uuid) -> Uuid {
     let app_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_applications (id, tenant_id, name, app_type, status, description, created_at, updated_at)
         VALUES ($1, $2, $3, 'internal', 'active', $4, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(app_id)
     .bind(tenant_id)
-    .bind(format!("Test App {}", app_id))
+    .bind(format!("Test App {app_id}"))
     .bind("A test application for integration tests")
     .execute(pool)
     .await
@@ -94,15 +93,15 @@ pub async fn create_test_entitlement(
     let entitlement_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_entitlements (id, tenant_id, application_id, name, description, risk_level, status, owner_id, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, 'low', 'active', $6, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(entitlement_id)
     .bind(tenant_id)
     .bind(application_id)
-    .bind(format!("Test Entitlement {}", entitlement_id))
+    .bind(format!("Test Entitlement {entitlement_id}"))
     .bind("A test entitlement")
     .bind(owner_id)
     .execute(pool)
@@ -123,15 +122,15 @@ pub async fn create_test_entitlement_with_risk(
     let entitlement_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_entitlements (id, tenant_id, application_id, name, description, risk_level, status, owner_id, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6::gov_risk_level, 'active'::gov_entitlement_status, $7, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(entitlement_id)
     .bind(tenant_id)
     .bind(application_id)
-    .bind(format!("Test Entitlement {}", entitlement_id))
+    .bind(format!("Test Entitlement {entitlement_id}"))
     .bind("A test entitlement")
     .bind(risk_level)
     .bind(owner_id)
@@ -152,10 +151,10 @@ pub async fn create_test_assignment(
     let assignment_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_entitlement_assignments (id, tenant_id, user_id, entitlement_id, status, granted_at, created_at, updated_at)
         VALUES ($1, $2, $3, $4, 'active', NOW(), NOW(), NOW())
-        "#,
+        ",
     )
     .bind(assignment_id)
     .bind(tenant_id)
@@ -177,14 +176,14 @@ pub async fn create_test_user_with_manager(
     let user_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO users (id, tenant_id, email, password_hash, manager_id, is_active, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(user_id)
     .bind(tenant_id)
-    .bind(format!("user-{}@test.com", user_id))
+    .bind(format!("user-{user_id}@test.com"))
     .bind("$argon2id$v=19$m=65536,t=3,p=4$dummy$hash")
     .bind(manager_id)
     .execute(pool)
@@ -322,15 +321,15 @@ pub async fn create_test_meta_role(
     let meta_role_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_meta_roles (id, tenant_id, name, description, priority, status, criteria_logic, created_by, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, 'active', 'and', $6, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(meta_role_id)
     .bind(tenant_id)
     .bind(name)
-    .bind(format!("Test meta-role: {}", name))
+    .bind(format!("Test meta-role: {name}"))
     .bind(priority)
     .bind(created_by)
     .execute(pool)
@@ -352,10 +351,10 @@ pub async fn create_test_meta_role_criterion(
     let criterion_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_meta_role_criteria (id, tenant_id, meta_role_id, field, operator, value, created_at)
         VALUES ($1, $2, $3, $4, $5::gov_meta_role_criteria_operator, $6, NOW())
-        "#,
+        ",
     )
     .bind(criterion_id)
     .bind(tenant_id)
@@ -381,10 +380,10 @@ pub async fn create_test_meta_role_entitlement(
     let id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_meta_role_entitlements (id, tenant_id, meta_role_id, entitlement_id, permission_type, created_at)
         VALUES ($1, $2, $3, $4, $5::gov_meta_role_permission_type, NOW())
-        "#,
+        ",
     )
     .bind(id)
     .bind(tenant_id)
@@ -409,10 +408,10 @@ pub async fn create_test_meta_role_constraint(
     let id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_meta_role_constraints (id, tenant_id, meta_role_id, constraint_type, constraint_value, created_at)
         VALUES ($1, $2, $3, $4, $5, NOW())
-        "#,
+        ",
     )
     .bind(id)
     .bind(tenant_id)
@@ -507,10 +506,10 @@ pub async fn create_test_peer_group(
     let peer_group_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_peer_groups (id, tenant_id, name, group_type, attribute_key, attribute_value, user_count, created_at, updated_at)
         VALUES ($1, $2, $3, $4::gov_peer_group_type, $5, $6, 0, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(peer_group_id)
     .bind(tenant_id)
@@ -530,10 +529,10 @@ pub async fn create_test_outlier_config(pool: &PgPool, tenant_id: Uuid) -> Uuid 
     let config_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_outlier_configurations (id, tenant_id, enabled, confidence_threshold, frequency_threshold, min_peer_group_size, created_at, updated_at)
         VALUES ($1, $2, true, 2.0, 0.1, 5, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(config_id)
     .bind(tenant_id)
@@ -549,10 +548,10 @@ pub async fn create_test_outlier_analysis(pool: &PgPool, tenant_id: Uuid, status
     let analysis_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_outlier_analyses (id, tenant_id, status, triggered_by, config_snapshot, total_users, outlier_count, started_at, created_at)
         VALUES ($1, $2, $3::gov_outlier_analysis_status, 'manual'::gov_outlier_trigger_type, '{}', 0, 0, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(analysis_id)
     .bind(tenant_id)
@@ -576,10 +575,10 @@ pub async fn create_test_outlier_result(
     let result_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_outlier_results (id, tenant_id, analysis_id, user_id, overall_score, classification, peer_scores, factor_breakdown, created_at)
         VALUES ($1, $2, $3, $4, $5, $6::gov_outlier_classification, '[]', '{}', NOW())
-        "#,
+        ",
     )
     .bind(result_id)
     .bind(tenant_id)
@@ -606,10 +605,10 @@ pub async fn create_test_outlier_alert(
     let alert_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_outlier_alerts (id, tenant_id, analysis_id, user_id, alert_type, severity, score, classification, is_read, is_dismissed, created_at)
         VALUES ($1, $2, $3, $4, 'new_outlier'::gov_outlier_alert_type, $5::gov_outlier_alert_severity, $6, 'outlier'::gov_outlier_classification, false, false, NOW())
-        "#,
+        ",
     )
     .bind(alert_id)
     .bind(tenant_id)
@@ -668,7 +667,7 @@ pub async fn cleanup_outlier_data(pool: &PgPool, tenant_id: Uuid) {
 // =========================================================================
 
 /// Create a test user with department attribute.
-/// Uses custom_attributes JSONB column per F070 schema.
+/// Uses `custom_attributes` JSONB column per F070 schema.
 pub async fn create_test_user_with_attributes(
     pool: &PgPool,
     tenant_id: Uuid,
@@ -694,14 +693,14 @@ pub async fn create_test_user_with_attributes(
     let custom_attributes = serde_json::Value::Object(attrs);
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO users (id, tenant_id, email, password_hash, custom_attributes, is_active, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(user_id)
     .bind(tenant_id)
-    .bind(format!("user-{}@test.com", user_id))
+    .bind(format!("user-{user_id}@test.com"))
     .bind("$argon2id$v=19$m=65536,t=3,p=4$dummy$hash")
     .bind(custom_attributes)
     .execute(pool)
@@ -711,7 +710,7 @@ pub async fn create_test_user_with_attributes(
     user_id
 }
 
-/// Create a test entitlement assignment with target_type.
+/// Create a test entitlement assignment with `target_type`.
 pub async fn create_test_entitlement_assignment(
     pool: &PgPool,
     tenant_id: Uuid,
@@ -721,10 +720,10 @@ pub async fn create_test_entitlement_assignment(
     let assignment_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, granted_at, created_at, updated_at)
         VALUES ($1, $2, 'user', $3, $4, 'active', NOW(), NOW(), NOW())
-        "#,
+        ",
     )
     .bind(assignment_id)
     .bind(tenant_id)

@@ -11,7 +11,7 @@ use crate::error::SocialError;
 
 /// Tenant ID extracted from request headers.
 ///
-/// Extracts tenant_id from X-Tenant-ID header.
+/// Extracts `tenant_id` from X-Tenant-ID header.
 /// For public social login routes, this is required to identify the tenant configuration.
 #[derive(Debug, Clone, Copy)]
 pub struct TenantId(pub Uuid);
@@ -47,7 +47,7 @@ fn extract_tenant_id(headers: &HeaderMap) -> Result<TenantId, SocialError> {
 
 /// User context extracted from authenticated request.
 ///
-/// This extractor gets user_id and tenant_id from JWT claims in request extensions.
+/// This extractor gets `user_id` and `tenant_id` from JWT claims in request extensions.
 /// Used for routes that require authentication.
 #[derive(Debug, Clone)]
 pub struct AuthenticatedUser {

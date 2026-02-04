@@ -24,13 +24,13 @@ pub struct GovPersona {
     /// Owning physical user.
     pub physical_user_id: Uuid,
 
-    /// Generated from naming_pattern (e.g., "admin.john.doe").
+    /// Generated from `naming_pattern` (e.g., "admin.john.doe").
     pub persona_name: String,
 
     /// Computed or overridden display name.
     pub display_name: String,
 
-    /// Persona-specific attributes (overrides, persona_specific, inherited).
+    /// Persona-specific attributes (overrides, `persona_specific`, inherited).
     pub attributes: serde_json::Value,
 
     /// Lifecycle status.
@@ -114,10 +114,10 @@ impl GovPersona {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_personas
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -132,10 +132,10 @@ impl GovPersona {
         persona_name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_personas
             WHERE tenant_id = $1 AND persona_name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(persona_name)
@@ -151,10 +151,10 @@ impl GovPersona {
         archetype_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_personas
             WHERE tenant_id = $1 AND physical_user_id = $2 AND archetype_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(physical_user_id)
@@ -172,11 +172,11 @@ impl GovPersona {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if include_archived {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_personas
                 WHERE tenant_id = $1 AND physical_user_id = $2
                 ORDER BY persona_name ASC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(physical_user_id)
@@ -184,11 +184,11 @@ impl GovPersona {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_personas
                 WHERE tenant_id = $1 AND physical_user_id = $2 AND status != 'archived'
                 ORDER BY persona_name ASC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(physical_user_id)
@@ -210,22 +210,22 @@ impl GovPersona {
 
         if filter.archetype_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND archetype_id = ${}", param_count));
+            query.push_str(&format!(" AND archetype_id = ${param_count}"));
         }
         if filter.physical_user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND physical_user_id = ${}", param_count));
+            query.push_str(&format!(" AND physical_user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.expiring_within_days.is_some() {
             query.push_str(
                 " AND status = 'active' AND valid_until IS NOT NULL AND valid_until <= NOW() + $",
             );
             param_count += 1;
-            query.push_str(&format!("{}::interval", param_count));
+            query.push_str(&format!("{param_count}::interval"));
         }
 
         query.push_str(&format!(
@@ -246,7 +246,7 @@ impl GovPersona {
             q = q.bind(status);
         }
         if let Some(days) = filter.expiring_within_days {
-            q = q.bind(format!("{} days", days));
+            q = q.bind(format!("{days} days"));
         }
 
         q.bind(limit).bind(offset).fetch_all(pool).await
@@ -263,22 +263,22 @@ impl GovPersona {
 
         if filter.archetype_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND archetype_id = ${}", param_count));
+            query.push_str(&format!(" AND archetype_id = ${param_count}"));
         }
         if filter.physical_user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND physical_user_id = ${}", param_count));
+            query.push_str(&format!(" AND physical_user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.expiring_within_days.is_some() {
             query.push_str(
                 " AND status = 'active' AND valid_until IS NOT NULL AND valid_until <= NOW() + $",
             );
             param_count += 1;
-            query.push_str(&format!("{}::interval", param_count));
+            query.push_str(&format!("{param_count}::interval"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -293,7 +293,7 @@ impl GovPersona {
             q = q.bind(status);
         }
         if let Some(days) = filter.expiring_within_days {
-            q = q.bind(format!("{} days", days));
+            q = q.bind(format!("{days} days"));
         }
 
         q.fetch_one(pool).await
@@ -307,37 +307,37 @@ impl GovPersona {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_personas
             WHERE tenant_id = $1 AND status = 'active'
               AND valid_until IS NOT NULL
               AND valid_until <= NOW() + $2::interval
             ORDER BY valid_until ASC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
-        .bind(format!("{} days", within_days))
+        .bind(format!("{within_days} days"))
         .bind(limit)
         .fetch_all(pool)
         .await
     }
 
-    /// Find all personas that have expired (past valid_until).
+    /// Find all personas that have expired (past `valid_until`).
     pub async fn find_expired(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_personas
             WHERE tenant_id = $1 AND status = 'active'
               AND valid_until IS NOT NULL
               AND valid_until < NOW()
             ORDER BY valid_until ASC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -354,14 +354,14 @@ impl GovPersona {
         let valid_from = input.valid_from.unwrap_or_else(Utc::now);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_personas (
                 tenant_id, archetype_id, physical_user_id, persona_name,
                 display_name, attributes, status, valid_from, valid_until
             )
             VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.archetype_id)
@@ -392,7 +392,7 @@ impl GovPersona {
         let valid_until = input.valid_until.or(current.valid_until);
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_personas
             SET display_name = $3,
                 attributes = $4,
@@ -400,7 +400,7 @@ impl GovPersona {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -418,12 +418,12 @@ impl GovPersona {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_personas
             SET status = 'active', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status IN ('draft', 'suspended', 'expired')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -440,7 +440,7 @@ impl GovPersona {
         reason: Option<String>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_personas
             SET status = 'suspended',
                 deactivated_at = NOW(),
@@ -449,7 +449,7 @@ impl GovPersona {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status IN ('active', 'expiring')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -466,7 +466,7 @@ impl GovPersona {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_personas
             SET status = 'expired',
                 deactivated_at = NOW(),
@@ -474,7 +474,7 @@ impl GovPersona {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status IN ('active', 'expiring')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -489,12 +489,12 @@ impl GovPersona {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_personas
             SET status = 'expiring', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -511,7 +511,7 @@ impl GovPersona {
         reason: Option<String>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_personas
             SET status = 'archived',
                 deactivated_at = COALESCE(deactivated_at, NOW()),
@@ -520,7 +520,7 @@ impl GovPersona {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status != 'archived'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -538,14 +538,14 @@ impl GovPersona {
         new_valid_until: DateTime<Utc>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_personas
             SET valid_until = $3,
                 status = CASE WHEN status = 'expired' THEN 'active' ELSE status END,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -575,12 +575,12 @@ impl GovPersona {
         let new_attrs = serde_json::to_value(&attrs).unwrap_or_default();
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_personas
             SET attributes = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -597,14 +597,14 @@ impl GovPersona {
         reason: &str,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_personas
             SET status = 'suspended',
                 deactivated_at = NOW(),
                 deactivation_reason = $3,
                 updated_at = NOW()
             WHERE tenant_id = $1 AND physical_user_id = $2 AND status IN ('active', 'expiring')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(physical_user_id)
@@ -621,11 +621,13 @@ impl GovPersona {
     }
 
     /// Check if persona can be switched to.
+    #[must_use] 
     pub fn can_switch_to(&self) -> bool {
         self.status.can_switch_to()
     }
 
     /// Check if persona has expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         if let Some(valid_until) = self.valid_until {
             Utc::now() > valid_until
@@ -635,6 +637,7 @@ impl GovPersona {
     }
 
     /// Get remaining time until expiration.
+    #[must_use] 
     pub fn time_until_expiration(&self) -> Option<chrono::Duration> {
         self.valid_until.map(|until| until - Utc::now())
     }
@@ -647,7 +650,7 @@ impl GovPersona {
         threshold: DateTime<Utc>,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_personas
             WHERE tenant_id = $1
               AND status IN ('active', 'expiring')
@@ -655,7 +658,7 @@ impl GovPersona {
               AND valid_until <= $2
               AND valid_until > NOW()
             ORDER BY valid_until ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(threshold)
@@ -663,7 +666,7 @@ impl GovPersona {
         .await
     }
 
-    /// Find personas that have passed their valid_until date.
+    /// Find personas that have passed their `valid_until` date.
     /// Used by expiration service to expire personas.
     pub async fn find_past_valid_until(
         pool: &sqlx::PgPool,
@@ -671,14 +674,14 @@ impl GovPersona {
         _now: DateTime<Utc>,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_personas
             WHERE tenant_id = $1
               AND status IN ('active', 'expiring')
               AND valid_until IS NOT NULL
               AND valid_until < NOW()
             ORDER BY valid_until ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -693,14 +696,14 @@ impl GovPersona {
         new_status: PersonaStatus,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_personas
             SET status = $3,
                 deactivated_at = CASE WHEN $3 IN ('suspended', 'expired', 'archived') THEN NOW() ELSE deactivated_at END,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -716,16 +719,16 @@ impl GovPersona {
         within_days: i32,
     ) -> Result<i64, sqlx::Error> {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_personas
             WHERE tenant_id = $1
               AND status = 'expired'
               AND deactivated_at >= NOW() - $2::interval
-            "#,
+            ",
         )
         .bind(tenant_id)
-        .bind(format!("{} days", within_days))
+        .bind(format!("{within_days} days"))
         .fetch_one(pool)
         .await?;
 

@@ -108,6 +108,7 @@ pub enum BinaryOperator {
 
 impl BinaryOperator {
     /// Parse an operator from its string representation.
+    #[must_use] 
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "+" => Some(Self::Add),
@@ -127,6 +128,7 @@ impl BinaryOperator {
     }
 
     /// Get the precedence of this operator (higher = binds tighter).
+    #[must_use] 
     pub fn precedence(&self) -> u8 {
         match self {
             Self::Or => 1,
@@ -147,6 +149,7 @@ pub struct Expression {
 
 impl Expression {
     /// Create a new expression from a token.
+    #[must_use] 
     pub fn new(token: Token) -> Self {
         Self { token }
     }
@@ -170,6 +173,7 @@ impl Expression {
     }
 
     /// Create a binary operation expression.
+    #[must_use] 
     pub fn binary_op(op: BinaryOperator, left: Expression, right: Expression) -> Self {
         Self::new(Token::BinaryOp {
             op,
@@ -179,21 +183,25 @@ impl Expression {
     }
 
     /// Create a number expression.
+    #[must_use] 
     pub fn number(n: f64) -> Self {
         Self::new(Token::Number(n))
     }
 
     /// Create a boolean expression.
+    #[must_use] 
     pub fn boolean(b: bool) -> Self {
         Self::new(Token::Boolean(b))
     }
 
     /// Create a null expression.
+    #[must_use] 
     pub fn null() -> Self {
         Self::new(Token::Null)
     }
 
     /// Create a unary NOT expression.
+    #[must_use] 
     pub fn unary_not(operand: Expression) -> Self {
         Self::new(Token::UnaryNot {
             operand: Box::new(operand),
@@ -201,6 +209,7 @@ impl Expression {
     }
 
     /// Get all attribute references in this expression.
+    #[must_use] 
     pub fn get_references(&self) -> HashSet<String> {
         let mut refs = HashSet::new();
         self.collect_references(&mut refs);
@@ -277,7 +286,7 @@ impl<'a> Cursor<'a> {
 
 /// Template Expression Service for parsing and evaluating expressions.
 pub struct TemplateExpressionService {
-    /// Cache of compiled regex patterns for matches() function.
+    /// Cache of compiled regex patterns for `matches()` function.
     regex_cache: std::sync::RwLock<HashMap<String, Regex>>,
 }
 
@@ -289,6 +298,7 @@ impl Default for TemplateExpressionService {
 
 impl TemplateExpressionService {
     /// Create a new expression service.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             regex_cache: std::sync::RwLock::new(HashMap::new()),
@@ -407,13 +417,12 @@ impl TemplateExpressionService {
                     && remaining
                         .chars()
                         .nth(1)
-                        .map(|c2| c2.is_ascii_digit())
-                        .unwrap_or(false))
+                        .is_some_and(|c2| c2.is_ascii_digit()))
             {
                 if let Some(m) = NUMBER_PATTERN.find(remaining) {
                     let num_str = m.as_str();
                     let num: f64 = num_str.parse().map_err(|_| {
-                        ExpressionError::InvalidSyntax(format!("Invalid number: {}", num_str))
+                        ExpressionError::InvalidSyntax(format!("Invalid number: {num_str}"))
                     })?;
                     cursor.advance(m.end());
                     return Ok(Expression::number(num));
@@ -437,8 +446,7 @@ impl TemplateExpressionService {
                 let path = &remaining[2..end];
                 if !path.chars().all(|c| c.is_alphanumeric() || c == '_') {
                     return Err(ExpressionError::InvalidSyntax(format!(
-                        "Invalid path reference: {}",
-                        path
+                        "Invalid path reference: {path}"
                     )));
                 }
                 cursor.advance(end + 1);
@@ -591,7 +599,7 @@ impl TemplateExpressionService {
                 // String concatenation or numeric addition
                 match (&left, &right) {
                     (Value::String(l), Value::String(r)) => {
-                        Ok(Value::String(format!("{}{}", l, r)))
+                        Ok(Value::String(format!("{l}{r}")))
                     }
                     (Value::String(l), r) => {
                         Ok(Value::String(format!("{}{}", l, value_to_string(r))))
@@ -604,8 +612,7 @@ impl TemplateExpressionService {
                         Ok(serde_json::json!(result))
                     }
                     _ => Err(ExpressionError::TypeError(format!(
-                        "Cannot add {:?} and {:?}",
-                        left, right
+                        "Cannot add {left:?} and {right:?}"
                     ))),
                 }
             }
@@ -881,7 +888,7 @@ impl TemplateExpressionService {
     }
 
     /// Check for circular dependencies in a set of computed value expressions.
-    /// Returns Ok(ordered_attrs) with attributes in dependency order, or Err with cycle info.
+    /// Returns `Ok(ordered_attrs)` with attributes in dependency order, or Err with cycle info.
     pub fn detect_cycles(
         &self,
         expressions: &HashMap<String, String>,
@@ -969,10 +976,9 @@ fn value_to_bool(v: &Value) -> ExpressionResult<bool> {
         Value::Bool(b) => Ok(*b),
         Value::Null => Ok(false),
         Value::String(s) => Ok(!s.is_empty()),
-        Value::Number(n) => Ok(n.as_f64().map(|f| f != 0.0).unwrap_or(false)),
+        Value::Number(n) => Ok(n.as_f64().is_some_and(|f| f != 0.0)),
         _ => Err(ExpressionError::TypeError(format!(
-            "Cannot convert {:?} to boolean",
-            v
+            "Cannot convert {v:?} to boolean"
         ))),
     }
 }
@@ -985,10 +991,9 @@ fn value_to_f64(v: &Value) -> ExpressionResult<f64> {
             .ok_or_else(|| ExpressionError::TypeError("Invalid number".to_string())),
         Value::String(s) => s
             .parse()
-            .map_err(|_| ExpressionError::TypeError(format!("Cannot parse '{}' as number", s))),
+            .map_err(|_| ExpressionError::TypeError(format!("Cannot parse '{s}' as number"))),
         _ => Err(ExpressionError::TypeError(format!(
-            "Cannot convert {:?} to number",
-            v
+            "Cannot convert {v:?} to number"
         ))),
     }
 }
@@ -1005,7 +1010,7 @@ fn values_equal(a: &Value, b: &Value) -> bool {
         // Loose comparison for string/number
         (Value::String(s), Value::Number(n)) | (Value::Number(n), Value::String(s)) => {
             if let Ok(parsed) = s.parse::<f64>() {
-                n.as_f64().map(|f| f == parsed).unwrap_or(false)
+                n.as_f64().is_some_and(|f| f == parsed)
             } else {
                 false
             }

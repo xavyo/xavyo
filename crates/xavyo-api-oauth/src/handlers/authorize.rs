@@ -15,7 +15,7 @@ use uuid::Uuid;
 /// Initiates the authorization code flow. Validates the request and
 /// redirects to login/consent if not authenticated.
 ///
-/// SECURITY: This endpoint validates the redirect_uri against the client's
+/// SECURITY: This endpoint validates the `redirect_uri` against the client's
 /// registered URIs to prevent open redirect attacks and authorization code theft.
 #[utoipa::path(
     get,
@@ -97,8 +97,7 @@ pub async fn authorize_handler(
 
     // F082-US6: Set CSRF token as HttpOnly cookie (double-submit cookie pattern)
     let cookie_value = format!(
-        "csrf_token={}; HttpOnly; SameSite=Strict; Path=/oauth; Max-Age=600",
-        csrf_token
+        "csrf_token={csrf_token}; HttpOnly; SameSite=Strict; Path=/oauth; Max-Age=600"
     );
     let mut response = Redirect::to(&consent_url).into_response();
     if let Ok(header_val) = cookie_value.parse() {
@@ -137,7 +136,7 @@ pub async fn consent_handler(
             .and_then(|cookies| {
                 cookies.split(';').find_map(|c| {
                     let c = c.trim();
-                    c.strip_prefix("csrf_token=").map(|v| v.to_string())
+                    c.strip_prefix("csrf_token=").map(std::string::ToString::to_string)
                 })
             })
             .unwrap_or_default();

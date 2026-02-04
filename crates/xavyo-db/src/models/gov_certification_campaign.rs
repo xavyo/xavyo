@@ -59,21 +59,25 @@ pub enum CertCampaignStatus {
 
 impl CertCampaignStatus {
     /// Check if the campaign is in an active state (can accept decisions).
+    #[must_use] 
     pub fn can_decide(&self) -> bool {
         matches!(self, Self::Active | Self::Overdue)
     }
 
     /// Check if the campaign is in a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Cancelled)
     }
 
     /// Check if the campaign can be cancelled.
+    #[must_use] 
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Draft | Self::Active | Self::Overdue)
     }
 
     /// Check if the campaign can be launched.
+    #[must_use] 
     pub fn can_launch(&self) -> bool {
         matches!(self, Self::Draft)
     }
@@ -97,13 +101,13 @@ pub struct GovCertificationCampaign {
     /// What scope of access to certify.
     pub scope_type: CertScopeType,
 
-    /// Scope configuration (e.g., application_id, department name).
+    /// Scope configuration (e.g., `application_id`, department name).
     pub scope_config: Option<serde_json::Value>,
 
     /// How to assign reviewers.
     pub reviewer_type: CertReviewerType,
 
-    /// Specific reviewer user IDs (when reviewer_type is SpecificUsers).
+    /// Specific reviewer user IDs (when `reviewer_type` is `SpecificUsers`).
     pub specific_reviewers: Vec<Uuid>,
 
     /// Campaign status.
@@ -165,10 +169,10 @@ impl GovCertificationCampaign {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_certification_campaigns
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -183,10 +187,10 @@ impl GovCertificationCampaign {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_certification_campaigns
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -203,20 +207,20 @@ impl GovCertificationCampaign {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_certification_campaigns
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -244,20 +248,20 @@ impl GovCertificationCampaign {
         filter: &CampaignFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_certification_campaigns
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -281,14 +285,14 @@ impl GovCertificationCampaign {
         let specific_reviewers = input.specific_reviewers.unwrap_or_default();
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_certification_campaigns (
                 tenant_id, name, description, scope_type, scope_config,
                 reviewer_type, specific_reviewers, deadline, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -314,15 +318,15 @@ impl GovCertificationCampaign {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.deadline.is_some() {
-            updates.push(format!("deadline = ${}", param_idx));
+            updates.push(format!("deadline = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -355,10 +359,10 @@ impl GovCertificationCampaign {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_certification_campaigns
             WHERE id = $1 AND tenant_id = $2 AND status = 'draft'
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -375,14 +379,14 @@ impl GovCertificationCampaign {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_certification_campaigns
             SET status = 'active',
                 launched_at = NOW(),
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'draft'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -397,14 +401,14 @@ impl GovCertificationCampaign {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_certification_campaigns
             SET status = 'completed',
                 completed_at = NOW(),
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status IN ('active', 'overdue')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -419,13 +423,13 @@ impl GovCertificationCampaign {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_certification_campaigns
             SET status = 'cancelled',
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status IN ('draft', 'active', 'overdue')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -436,11 +440,11 @@ impl GovCertificationCampaign {
     /// Mark campaigns as overdue if deadline passed.
     pub async fn mark_overdue(pool: &sqlx::PgPool, now: DateTime<Utc>) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_certification_campaigns
             SET status = 'overdue', updated_at = NOW()
             WHERE status = 'active' AND deadline < $1
-            "#,
+            ",
         )
         .bind(now)
         .execute(pool)
@@ -455,10 +459,10 @@ impl GovCertificationCampaign {
         now: DateTime<Utc>,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_certification_campaigns
             WHERE status = 'active' AND deadline < $1
-            "#,
+            ",
         )
         .bind(now)
         .fetch_all(pool)
@@ -466,11 +470,13 @@ impl GovCertificationCampaign {
     }
 
     /// Check if the campaign is in draft status.
+    #[must_use] 
     pub fn is_draft(&self) -> bool {
         matches!(self.status, CertCampaignStatus::Draft)
     }
 
     /// Check if the campaign can accept decisions.
+    #[must_use] 
     pub fn can_decide(&self) -> bool {
         self.status.can_decide()
     }

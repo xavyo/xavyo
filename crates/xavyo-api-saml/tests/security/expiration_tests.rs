@@ -218,7 +218,7 @@ mod tests {
         for i in 0..5 {
             let mut session = AuthnRequestSession::new(
                 tenant_id,
-                format!("expired-multi-{}", i),
+                format!("expired-multi-{i}"),
                 "https://sp.example.com".to_string(),
                 None,
             );
@@ -230,7 +230,7 @@ mod tests {
         for i in 0..3 {
             let session = AuthnRequestSession::new(
                 tenant_id,
-                format!("valid-multi-{}", i),
+                format!("valid-multi-{i}"),
                 "https://sp.example.com".to_string(),
                 None,
             );
@@ -244,7 +244,7 @@ mod tests {
         // Verify valid sessions still exist
         for i in 0..3 {
             let exists = store
-                .get(tenant_id, &format!("valid-multi-{}", i))
+                .get(tenant_id, &format!("valid-multi-{i}"))
                 .await
                 .unwrap();
             assert!(exists.is_some());

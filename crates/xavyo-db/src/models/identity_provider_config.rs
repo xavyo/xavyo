@@ -42,7 +42,7 @@ impl std::str::FromStr for CloudProviderType {
             "gcp" => Ok(CloudProviderType::Gcp),
             "azure" => Ok(CloudProviderType::Azure),
             "kubernetes" => Ok(CloudProviderType::Kubernetes),
-            _ => Err(format!("Unknown provider type: {}", s)),
+            _ => Err(format!("Unknown provider type: {s}")),
         }
     }
 }
@@ -342,7 +342,7 @@ impl std::str::FromStr for IdpHealthStatus {
             "pending" => Ok(IdpHealthStatus::Pending),
             "healthy" => Ok(IdpHealthStatus::Healthy),
             "unhealthy" => Ok(IdpHealthStatus::Unhealthy),
-            _ => Err(format!("Unknown health status: {}", s)),
+            _ => Err(format!("Unknown health status: {s}")),
         }
     }
 }

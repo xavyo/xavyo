@@ -1,4 +1,4 @@
-//! Unit tests for TemplateScopeService (F058 - User Story 2).
+//! Unit tests for `TemplateScopeService` (F058 - User Story 2).
 //!
 //! Tests scope matching logic for determining which templates apply to objects.
 
@@ -103,8 +103,7 @@ fn test_organization_scope_case_sensitive() {
 fn matches_organization(obj: &serde_json::Value, scope_value: &str, attribute: &str) -> bool {
     obj.get(attribute)
         .and_then(|v| v.as_str())
-        .map(|v| v == scope_value)
-        .unwrap_or(false)
+        .is_some_and(|v| v == scope_value)
 }
 
 // =============================================================================
@@ -139,8 +138,7 @@ fn test_category_scope_with_role_type() {
 fn matches_category(obj: &serde_json::Value, category: &str, attribute: &str) -> bool {
     obj.get(attribute)
         .and_then(|v| v.as_str())
-        .map(|v| v == category)
-        .unwrap_or(false)
+        .is_some_and(|v| v == category)
 }
 
 // =============================================================================
@@ -175,7 +173,7 @@ fn test_condition_scope_simple_equality() {
 
 #[test]
 fn test_condition_scope_with_and() {
-    let condition = "${department} == \"Engineering\" && ${level} >= 3";
+    let _condition = "${department} == \"Engineering\" && ${level} >= 3";
 
     let obj_match = json!({"department": "Engineering", "level": 5});
     let obj_partial = json!({"department": "Engineering", "level": 1});
@@ -270,8 +268,7 @@ fn test_condition_scope_contains_function() {
 fn evaluate_simple_equality(obj: &serde_json::Value, attr: &str, expected: &str) -> bool {
     obj.get(attr)
         .and_then(|v| v.as_str())
-        .map(|v| v == expected)
-        .unwrap_or(false)
+        .is_some_and(|v| v == expected)
 }
 
 fn evaluate_compound_condition(
@@ -284,14 +281,12 @@ fn evaluate_compound_condition(
     let attr1_match = obj
         .get(attr1)
         .and_then(|v| v.as_str())
-        .map(|v| v == expected1)
-        .unwrap_or(false);
+        .is_some_and(|v| v == expected1);
 
     let attr2_match = obj
         .get(attr2)
-        .and_then(|v| v.as_i64())
-        .map(|v| v >= min_value)
-        .unwrap_or(false);
+        .and_then(serde_json::Value::as_i64)
+        .is_some_and(|v| v >= min_value);
 
     attr1_match && attr2_match
 }
@@ -299,26 +294,23 @@ fn evaluate_compound_condition(
 fn evaluate_or_condition(obj: &serde_json::Value, attr: &str, values: &[&str]) -> bool {
     obj.get(attr)
         .and_then(|v| v.as_str())
-        .map(|v| values.contains(&v))
-        .unwrap_or(false)
+        .is_some_and(|v| values.contains(&v))
 }
 
 fn has_non_null_attribute(obj: &serde_json::Value, attr: &str) -> bool {
-    obj.get(attr).map(|v| !v.is_null()).unwrap_or(false)
+    obj.get(attr).is_some_and(|v| !v.is_null())
 }
 
 fn starts_with_value(obj: &serde_json::Value, attr: &str, prefix: &str) -> bool {
     obj.get(attr)
         .and_then(|v| v.as_str())
-        .map(|v| v.starts_with(prefix))
-        .unwrap_or(false)
+        .is_some_and(|v| v.starts_with(prefix))
 }
 
 fn contains_value(obj: &serde_json::Value, attr: &str, substring: &str) -> bool {
     obj.get(attr)
         .and_then(|v| v.as_str())
-        .map(|v| v.contains(substring))
-        .unwrap_or(false)
+        .is_some_and(|v| v.contains(substring))
 }
 
 // =============================================================================
@@ -389,9 +381,8 @@ fn test_object_matches_multiple_templates() {
     // Template 4: Condition scope (level >= 3)
     let condition_matches = obj
         .get("level")
-        .and_then(|v| v.as_i64())
-        .map(|v| v >= 3)
-        .unwrap_or(false);
+        .and_then(serde_json::Value::as_i64)
+        .is_some_and(|v| v >= 3);
 
     assert!(global_matches);
     assert!(org_matches);

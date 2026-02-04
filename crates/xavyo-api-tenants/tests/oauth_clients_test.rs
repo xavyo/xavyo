@@ -9,7 +9,7 @@ use xavyo_api_tenants::models::{
     RotateOAuthSecretResponse,
 };
 
-/// Test that the RotateOAuthSecretRequest can be created with defaults.
+/// Test that the `RotateOAuthSecretRequest` can be created with defaults.
 #[test]
 fn test_rotate_oauth_secret_request_default() {
     let request = RotateOAuthSecretRequest::default();
@@ -17,7 +17,7 @@ fn test_rotate_oauth_secret_request_default() {
     let _ = request;
 }
 
-/// Test response serialization for RotateOAuthSecretResponse.
+/// Test response serialization for `RotateOAuthSecretResponse`.
 #[test]
 fn test_rotate_oauth_secret_response_serialization() {
     let response = RotateOAuthSecretResponse {
@@ -36,7 +36,7 @@ fn test_rotate_oauth_secret_response_serialization() {
     assert!(json.contains("\"refresh_tokens_revoked\":true"));
 }
 
-/// Test response serialization for OAuthClientDetails.
+/// Test response serialization for `OAuthClientDetails`.
 #[test]
 fn test_oauth_client_details_serialization() {
     let details = OAuthClientDetails {
@@ -90,7 +90,7 @@ fn test_oauth_client_details_public_client() {
     assert!(json.contains("spa_client"));
 }
 
-/// Test response serialization for OAuthClientListResponse.
+/// Test response serialization for `OAuthClientListResponse`.
 #[test]
 fn test_oauth_client_list_response_serialization() {
     let response = OAuthClientListResponse {

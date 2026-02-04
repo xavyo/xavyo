@@ -1,6 +1,6 @@
 //! Ticket Sync Job for F064 Semi-manual Resources.
 //!
-//! Polls external ticketing systems (ServiceNow, Jira, webhooks) for status updates.
+//! Polls external ticketing systems (`ServiceNow`, Jira, webhooks) for status updates.
 //! This job runs periodically (default: every 5 minutes) to sync ticket statuses.
 
 use std::sync::Arc;
@@ -65,6 +65,7 @@ pub enum TicketSyncJobError {
 
 impl TicketSyncJob {
     /// Create a new ticket sync job.
+    #[must_use] 
     pub fn new(sync_service: TicketSyncService) -> Self {
         Self {
             sync_service: Arc::new(sync_service),

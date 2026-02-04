@@ -20,6 +20,7 @@ pub struct CorrelationStatsService {
 
 impl CorrelationStatsService {
     /// Create a new correlation statistics service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -46,7 +47,7 @@ impl CorrelationStatsService {
         // Note: We count events where event_type = 'auto_evaluated' to track automatic correlation results
         let rows: Vec<(String, i64, Option<f64>)> =
             sqlx::query_as::<_, (String, i64, Option<f64>)>(
-                r#"
+                r"
             SELECT
                 outcome::text,
                 COUNT(*)::bigint,
@@ -61,7 +62,7 @@ impl CorrelationStatsService {
                 AND created_at >= COALESCE($3, '1970-01-01'::timestamptz)
                 AND created_at <= COALESCE($4, NOW())
             GROUP BY outcome
-            "#,
+            ",
             )
             .bind(tenant_id)
             .bind(connector_id)
@@ -146,13 +147,13 @@ impl CorrelationStatsService {
 
         // Get current review queue depth
         let review_queue_depth: i64 = sqlx::query_scalar::<_, i64>(
-            r#"
+            r"
             SELECT COUNT(*)::bigint
             FROM gov_correlation_cases
             WHERE tenant_id = $1
                 AND connector_id = $2
                 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -203,7 +204,7 @@ impl CorrelationStatsService {
     ) -> Result<CorrelationTrendsResponse> {
         // Query daily aggregates
         let rows: Vec<(String, i64, i64, i64, i64, Option<f64>)> = sqlx::query_as::<_, (String, i64, i64, i64, i64, Option<f64>)>(
-            r#"
+            r"
             SELECT
                 DATE(created_at)::text,
                 COUNT(*)::bigint,
@@ -222,7 +223,7 @@ impl CorrelationStatsService {
                 AND created_at <= $4
             GROUP BY DATE(created_at)
             ORDER BY DATE(created_at)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -271,14 +272,14 @@ impl CorrelationStatsService {
         };
 
         // Calculate average confidence across all days
-        let avg_confidence = if !daily_trends.is_empty() {
+        let avg_confidence = if daily_trends.is_empty() {
+            0.0
+        } else {
             daily_trends
                 .iter()
                 .map(|d| d.average_confidence)
                 .sum::<f64>()
                 / daily_trends.len() as f64
-        } else {
-            0.0
         };
 
         let suggestions =

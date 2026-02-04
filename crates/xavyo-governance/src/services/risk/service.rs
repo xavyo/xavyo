@@ -49,9 +49,9 @@ pub struct RiskAssessmentService {
 impl RiskAssessmentService {
     /// Weight for entitlement risk factor (60%).
     const ENTITLEMENT_WEIGHT: f64 = 0.6;
-    /// Weight for SoD violation factor (40%).
+    /// Weight for `SoD` violation factor (40%).
     const SOD_WEIGHT: f64 = 0.4;
-    /// Penalty points per SoD violation.
+    /// Penalty points per `SoD` violation.
     const SOD_PENALTY_PER_VIOLATION: f64 = 25.0;
 
     /// Create a new risk assessment service.
@@ -73,10 +73,10 @@ impl RiskAssessmentService {
     /// * `tenant_id` - Tenant for isolation
     /// * `user_id` - User to assess
     /// * `entitlements` - User's current entitlement risk levels
-    /// * `sod_violation_count` - Count of active SoD violations
+    /// * `sod_violation_count` - Count of active `SoD` violations
     ///
     /// # Returns
-    /// Calculated RiskScore with factor breakdown
+    /// Calculated `RiskScore` with factor breakdown
     ///
     /// # Risk Calculation Formula
     ///
@@ -115,8 +115,7 @@ impl RiskAssessmentService {
         factors.push(
             RiskFactorResult::new("sod_violations", Self::SOD_WEIGHT, sod_factor).with_description(
                 format!(
-                    "{} active SoD violation(s) (25 points each, max 100)",
-                    sod_violation_count
+                    "{sod_violation_count} active SoD violation(s) (25 points each, max 100)"
                 ),
             ),
         );
@@ -134,7 +133,7 @@ impl RiskAssessmentService {
 
     /// Calculate the entitlement risk factor.
     ///
-    /// Returns the average of mapped RiskLevel scores (0-100).
+    /// Returns the average of mapped `RiskLevel` scores (0-100).
     fn calculate_entitlement_factor(&self, entitlements: &[RiskLevel]) -> f64 {
         if entitlements.is_empty() {
             return 0.0;
@@ -147,7 +146,7 @@ impl RiskAssessmentService {
         sum / entitlements.len() as f64
     }
 
-    /// Map RiskLevel to a numeric score (0-100).
+    /// Map `RiskLevel` to a numeric score (0-100).
     fn risk_level_score(&self, level: &RiskLevel) -> f64 {
         match level {
             RiskLevel::Low => 10.0,
@@ -157,9 +156,9 @@ impl RiskAssessmentService {
         }
     }
 
-    /// Calculate the SoD violation risk factor.
+    /// Calculate the `SoD` violation risk factor.
     ///
-    /// Returns min(100, violation_count × 25).
+    /// Returns min(100, `violation_count` × 25).
     fn calculate_sod_violation_factor(&self, violation_count: usize) -> f64 {
         (violation_count as f64 * Self::SOD_PENALTY_PER_VIOLATION).min(100.0)
     }
@@ -257,7 +256,7 @@ impl RiskAssessmentService {
 
     /// Get risk trend for a user over a time period.
     ///
-    /// Returns entries ordered by recorded_at ascending.
+    /// Returns entries ordered by `recorded_at` ascending.
     pub async fn get_risk_trend(
         &self,
         tenant_id: Uuid,

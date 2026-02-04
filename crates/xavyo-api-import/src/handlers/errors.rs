@@ -1,7 +1,7 @@
 //! Import error handlers (F086).
 //!
-//! - GET /admin/users/imports/:job_id/errors — List per-row errors
-//! - GET /admin/users/imports/:job_id/errors/download — Download errors as CSV
+//! - GET /`admin/users/imports/:job_id/errors` — List per-row errors
+//! - GET /`admin/users/imports/:job_id/errors/download` — Download errors as CSV
 
 use axum::{
     extract::{Path, Query},
@@ -18,7 +18,7 @@ use crate::models::{ImportErrorListResponse, ImportErrorResponse, ListImportErro
 use crate::services::import_service::ImportService;
 use xavyo_db::models::UserImportError;
 
-/// GET /admin/users/imports/:job_id/errors
+/// GET /`admin/users/imports/:job_id/errors`
 ///
 /// List per-row errors for an import job with pagination.
 pub async fn list_import_errors(
@@ -49,7 +49,7 @@ pub async fn list_import_errors(
     }))
 }
 
-/// GET /admin/users/imports/:job_id/errors/download
+/// GET /`admin/users/imports/:job_id/errors/download`
 ///
 /// Download all errors for an import job as a CSV file.
 pub async fn download_import_errors(
@@ -76,7 +76,7 @@ pub async fn download_import_errors(
             "error_type",
             "error_message",
         ])
-        .map_err(|e| ImportError::Internal(format!("CSV write error: {}", e)))?;
+        .map_err(|e| ImportError::Internal(format!("CSV write error: {e}")))?;
 
     // Write error rows
     for err in &errors {
@@ -88,12 +88,12 @@ pub async fn download_import_errors(
                 err.error_type.clone(),
                 err.error_message.clone(),
             ])
-            .map_err(|e| ImportError::Internal(format!("CSV write error: {}", e)))?;
+            .map_err(|e| ImportError::Internal(format!("CSV write error: {e}")))?;
     }
 
     let csv_bytes = csv_writer
         .into_inner()
-        .map_err(|e| ImportError::Internal(format!("CSV flush error: {}", e)))?;
+        .map_err(|e| ImportError::Internal(format!("CSV flush error: {e}")))?;
 
     // Sanitize filename to prevent Content-Disposition header injection
     let safe_name: String = job
@@ -117,14 +117,14 @@ pub async fn download_import_errors(
             (header::CONTENT_TYPE, "text/csv; charset=utf-8".to_string()),
             (
                 header::CONTENT_DISPOSITION,
-                format!("attachment; filename=\"{}\"", filename),
+                format!("attachment; filename=\"{filename}\""),
             ),
         ],
         csv_bytes,
     ))
 }
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ImportError> {
     claims
         .tenant_id()

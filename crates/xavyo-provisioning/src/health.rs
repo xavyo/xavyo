@@ -83,12 +83,13 @@ pub struct ConnectorHealthInfo {
 pub struct HealthService {
     pool: sqlx::PgPool,
     config: HealthConfig,
-    /// Cache of connector health status (connector_id -> is_online).
+    /// Cache of connector health status (`connector_id` -> `is_online`).
     cache: Arc<RwLock<std::collections::HashMap<Uuid, bool>>>,
 }
 
 impl HealthService {
     /// Create a new health service.
+    #[must_use] 
     pub fn new(pool: sqlx::PgPool) -> Self {
         Self {
             pool,
@@ -98,6 +99,7 @@ impl HealthService {
     }
 
     /// Create with custom configuration.
+    #[must_use] 
     pub fn with_config(pool: sqlx::PgPool, config: HealthConfig) -> Self {
         Self {
             pool,
@@ -124,7 +126,7 @@ impl HealthService {
 
         // Query database
         let health = self.get_health(tenant_id, connector_id).await?;
-        let is_online = health.map(|h| h.is_online).unwrap_or(true); // Assume online if no record
+        let is_online = health.map_or(true, |h| h.is_online); // Assume online if no record
 
         // Update cache
         {
@@ -142,12 +144,12 @@ impl HealthService {
         connector_id: Uuid,
     ) -> HealthResult<Option<ConnectorHealthInfo>> {
         let row: Option<HealthRow> = sqlx::query_as(
-            r#"
+            r"
             SELECT connector_id, status, consecutive_failures, offline_since,
                    last_success_at, last_error, last_check_at
             FROM connector_health
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -174,14 +176,14 @@ impl HealthService {
         error: Option<&str>,
     ) -> HealthResult<()> {
         sqlx::query(
-            r#"
+            r"
             UPDATE connector_health
             SET status = 'disconnected',
                 offline_since = COALESCE(offline_since, NOW()),
                 last_error = $3,
                 updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -211,7 +213,7 @@ impl HealthService {
         connector_id: Uuid,
     ) -> HealthResult<()> {
         sqlx::query(
-            r#"
+            r"
             UPDATE connector_health
             SET status = 'connected',
                 offline_since = NULL,
@@ -222,7 +224,7 @@ impl HealthService {
                 last_error = NULL,
                 updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -243,7 +245,7 @@ impl HealthService {
     /// Record a successful operation.
     pub async fn record_success(&self, tenant_id: Uuid, connector_id: Uuid) -> HealthResult<()> {
         sqlx::query(
-            r#"
+            r"
             UPDATE connector_health
             SET consecutive_failures = 0,
                 last_success_at = NOW(),
@@ -255,7 +257,7 @@ impl HealthService {
                 last_error = NULL,
                 updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -282,7 +284,7 @@ impl HealthService {
     ) -> HealthResult<bool> {
         // Increment failure count
         let row: (i32,) = sqlx::query_as(
-            r#"
+            r"
             UPDATE connector_health
             SET consecutive_failures = consecutive_failures + 1,
                 last_error = $3,
@@ -290,7 +292,7 @@ impl HealthService {
                 updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING consecutive_failures
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -315,14 +317,14 @@ impl HealthService {
         tenant_id: Uuid,
     ) -> HealthResult<Vec<ConnectorHealthInfo>> {
         let rows: Vec<HealthRow> = sqlx::query_as(
-            r#"
+            r"
             SELECT connector_id, status, consecutive_failures, offline_since,
                    last_success_at, last_error, last_check_at
             FROM connector_health
             WHERE tenant_id = $1
                 AND (status = 'disconnected' OR consecutive_failures >= $2)
             ORDER BY offline_since ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(self.config.offline_threshold)
@@ -350,21 +352,25 @@ impl HealthService {
     }
 
     /// Get check interval as Duration.
+    #[must_use] 
     pub fn check_interval(&self) -> Duration {
         Duration::from_secs(self.config.check_interval_secs)
     }
 
     /// Get check timeout as Duration.
+    #[must_use] 
     pub fn check_timeout(&self) -> Duration {
         Duration::from_secs(self.config.check_timeout_secs)
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &sqlx::PgPool {
         &self.pool
     }
 
     /// Get the configuration.
+    #[must_use] 
     pub fn config(&self) -> &HealthConfig {
         &self.config
     }
@@ -383,6 +389,7 @@ pub struct HealthMonitor {
 
 impl HealthMonitor {
     /// Create a new health monitor.
+    #[must_use] 
     pub fn new(
         health_service: Arc<HealthService>,
         queue: Arc<crate::queue::OperationQueue>,

@@ -1,4 +1,4 @@
-//! IdP quirk definitions and documentation.
+//! `IdP` quirk definitions and documentation.
 
 /// Severity level for a quirk.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -159,7 +159,7 @@ pub fn azure_ad_quirks() -> Vec<QuirkDefinition> {
     ]
 }
 
-/// OneLogin quirk definitions.
+/// `OneLogin` quirk definitions.
 pub fn onelogin_quirks() -> Vec<QuirkDefinition> {
     vec![
         QuirkDefinition::new(

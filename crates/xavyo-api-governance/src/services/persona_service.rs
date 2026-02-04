@@ -38,6 +38,7 @@ pub struct PersonaService {
 
 impl PersonaService {
     /// Create a new persona service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         let handlebars = Handlebars::new();
         Self {
@@ -50,11 +51,13 @@ impl PersonaService {
     }
 
     /// Get reference to authorization service.
+    #[must_use] 
     pub fn authorization_service(&self) -> &PersonaAuthorizationService {
         &self.authorization_service
     }
 
     /// Get reference to validation service.
+    #[must_use] 
     pub fn validation_service(&self) -> &PersonaValidationService {
         &self.validation_service
     }
@@ -202,11 +205,11 @@ impl PersonaService {
         // 9. Calculate validity period from lifecycle policy
         let lifecycle_policy = archetype
             .parse_lifecycle_policy()
-            .map_err(|e| GovernanceError::Validation(format!("Invalid lifecycle policy: {}", e)))?;
+            .map_err(|e| GovernanceError::Validation(format!("Invalid lifecycle policy: {e}")))?;
 
         let valid_from = Utc::now();
         let valid_until =
-            valid_from + Duration::days(lifecycle_policy.default_validity_days as i64);
+            valid_from + Duration::days(i64::from(lifecycle_policy.default_validity_days));
 
         // Create persona
         let input = CreatePersona {
@@ -465,7 +468,7 @@ impl PersonaService {
         // Simple template replacement (not using handlebars for simple patterns)
         let mut result = pattern.clone();
         for (key, value) in &context {
-            let placeholder = format!("{{{}}}", key);
+            let placeholder = format!("{{{key}}}");
             if let Some(s) = value.as_str() {
                 result = result.replace(&placeholder, s);
             }
@@ -474,8 +477,7 @@ impl PersonaService {
         // Check if any unreplaced placeholders remain
         if result.contains('{') && result.contains('}') {
             return Err(GovernanceError::Validation(format!(
-                "Unable to replace all placeholders in naming pattern: {}",
-                result
+                "Unable to replace all placeholders in naming pattern: {result}"
             )));
         }
 
@@ -494,7 +496,7 @@ impl PersonaService {
         overrides: Option<serde_json::Map<String, serde_json::Value>>,
     ) -> Result<(PersonaAttributes, String)> {
         let mappings = archetype.parse_attribute_mappings().map_err(|e| {
-            GovernanceError::Validation(format!("Invalid attribute mappings: {}", e))
+            GovernanceError::Validation(format!("Invalid attribute mappings: {e}"))
         })?;
 
         // Build user attributes map from User struct fields
@@ -543,7 +545,7 @@ impl PersonaService {
                 .get("surname")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            display_name = format!("{} {}", given, surname).trim().to_string();
+            display_name = format!("{given} {surname}").trim().to_string();
             if display_name.is_empty() {
                 display_name = "Persona".to_string();
             }
@@ -590,7 +592,7 @@ impl PersonaService {
 
         // Parse mappings
         let mappings = archetype.parse_attribute_mappings().map_err(|e| {
-            GovernanceError::Validation(format!("Invalid attribute mappings: {}", e))
+            GovernanceError::Validation(format!("Invalid attribute mappings: {e}"))
         })?;
 
         // Build user attributes map from User struct fields
@@ -663,8 +665,7 @@ impl PersonaService {
                 Ok(0)
             }
             _ => Err(GovernanceError::Validation(format!(
-                "Invalid deactivation action: {}",
-                action
+                "Invalid deactivation action: {action}"
             ))),
         }
     }
@@ -769,11 +770,13 @@ impl PersonaService {
     }
 
     /// Get reference to the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get reference to archetype service.
+    #[must_use] 
     pub fn archetype_service(&self) -> &PersonaArchetypeService {
         &self.archetype_service
     }
@@ -801,7 +804,7 @@ pub fn render_persona_template(
     // Simple placeholder replacement
     let mut result = template.to_string();
     for (key, value) in &context {
-        let placeholder = format!("{{{}}}", key);
+        let placeholder = format!("{{{key}}}");
         result = result.replace(&placeholder, value);
     }
 

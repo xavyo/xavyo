@@ -1,11 +1,11 @@
 //! Integration tests for xavyo-api-import.
 //!
-//! These tests require a running PostgreSQL instance.
+//! These tests require a running `PostgreSQL` instance.
 //! Run with: `cargo test -p xavyo-api-import --features integration`
 //!
 //! Prerequisites:
 //! 1. Start the test environment: `./scripts/dev-env.sh start`
-//! 2. Set DATABASE_URL (optional, defaults to test database)
+//! 2. Set `DATABASE_URL` (optional, defaults to test database)
 
 #![cfg(feature = "integration")]
 

@@ -34,7 +34,7 @@ impl std::str::FromStr for ScopeType {
             "group" => Ok(ScopeType::Group),
             "department" => Ok(ScopeType::Department),
             "custom" => Ok(ScopeType::Custom),
-            _ => Err(format!("Invalid scope type: {}", s)),
+            _ => Err(format!("Invalid scope type: {s}")),
         }
     }
 }
@@ -87,6 +87,7 @@ pub struct AssignmentFilter {
 
 impl UserAdminAssignment {
     /// Check if the assignment is currently active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         if self.revoked_at.is_some() {
             return false;
@@ -100,6 +101,7 @@ impl UserAdminAssignment {
     }
 
     /// Get the scope type as enum.
+    #[must_use] 
     pub fn scope_type_enum(&self) -> Option<ScopeType> {
         self.scope_type.as_ref().and_then(|s| s.parse().ok())
     }
@@ -110,13 +112,13 @@ impl UserAdminAssignment {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO user_admin_assignments
                 (tenant_id, user_id, template_id, scope_type, scope_value, assigned_by, expires_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id, tenant_id, user_id, template_id, scope_type, scope_value,
                       assigned_by, assigned_at, expires_at, revoked_at
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(input.user_id)
@@ -139,12 +141,12 @@ impl UserAdminAssignment {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, user_id, template_id, scope_type, scope_value,
                    assigned_by, assigned_at, expires_at, revoked_at
             FROM user_admin_assignments
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -167,12 +169,12 @@ impl UserAdminAssignment {
         let mut param_idx = 2;
 
         if filter.user_id.is_some() {
-            conditions.push(format!("user_id = ${}", param_idx));
+            conditions.push(format!("user_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.template_id.is_some() {
-            conditions.push(format!("template_id = ${}", param_idx));
+            conditions.push(format!("template_id = ${param_idx}"));
             param_idx += 1;
         }
 
@@ -185,21 +187,20 @@ impl UserAdminAssignment {
         }
 
         if cursor.is_some() {
-            conditions.push(format!("assigned_at < ${}", param_idx));
+            conditions.push(format!("assigned_at < ${param_idx}"));
             param_idx += 1;
         }
 
         let where_clause = conditions.join(" AND ");
         let query = format!(
-            r#"
+            r"
             SELECT id, tenant_id, user_id, template_id, scope_type, scope_value,
                    assigned_by, assigned_at, expires_at, revoked_at
             FROM user_admin_assignments
-            WHERE {}
+            WHERE {where_clause}
             ORDER BY assigned_at DESC
-            LIMIT ${}
-            "#,
-            where_clause, param_idx
+            LIMIT ${param_idx}
+            "
         );
 
         // Build the query dynamically
@@ -232,7 +233,7 @@ impl UserAdminAssignment {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, user_id, template_id, scope_type, scope_value,
                    assigned_by, assigned_at, expires_at, revoked_at
             FROM user_admin_assignments
@@ -240,7 +241,7 @@ impl UserAdminAssignment {
               AND revoked_at IS NULL
               AND (expires_at IS NULL OR expires_at > now())
             ORDER BY assigned_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -258,13 +259,13 @@ impl UserAdminAssignment {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE user_admin_assignments
             SET revoked_at = now()
             WHERE tenant_id = $1 AND id = $2 AND revoked_at IS NULL
             RETURNING id, tenant_id, user_id, template_id, scope_type, scope_value,
                       assigned_by, assigned_at, expires_at, revoked_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -283,11 +284,11 @@ impl UserAdminAssignment {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE user_admin_assignments
             SET revoked_at = now()
             WHERE tenant_id = $1 AND template_id = $2 AND revoked_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -303,11 +304,11 @@ impl UserAdminAssignment {
         E: PgExecutor<'e>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM user_admin_assignments
             WHERE tenant_id = $1 AND revoked_at IS NULL
               AND (expires_at IS NULL OR expires_at > now())
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(executor)
@@ -322,10 +323,10 @@ impl UserAdminAssignment {
         E: PgExecutor<'e>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM user_admin_assignments
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(executor)
@@ -344,14 +345,14 @@ impl UserAdminAssignment {
         E: PgExecutor<'e>,
     {
         let row: (bool,) = sqlx::query_as(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM user_admin_assignments
                 WHERE tenant_id = $1 AND user_id = $2
                   AND revoked_at IS NULL
                   AND (expires_at IS NULL OR expires_at > now())
             )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

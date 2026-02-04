@@ -158,7 +158,7 @@ mod event_filtering {
     #[test]
     fn test_filter_by_multiple_event_types() {
         // Should be able to filter by multiple types (e.g., all decisions)
-        let filter_types = vec![MicroCertEventType::Approved, MicroCertEventType::Rejected];
+        let filter_types = [MicroCertEventType::Approved, MicroCertEventType::Rejected];
         assert_eq!(filter_types.len(), 2);
     }
 

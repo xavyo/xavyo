@@ -1,6 +1,6 @@
 //! Connector Framework traits
 //!
-//! Capability-based trait definitions for connectors, inspired by ConnId.
+//! Capability-based trait definitions for connectors, inspired by `ConnId`.
 
 use async_trait::async_trait;
 
@@ -295,6 +295,7 @@ impl SyncChange {
     }
 
     /// Set the timestamp of the change.
+    #[must_use] 
     pub fn with_timestamp(mut self, timestamp: chrono::DateTime<chrono::Utc>) -> Self {
         self.timestamp = Some(timestamp);
         self
@@ -336,6 +337,7 @@ pub struct SyncResult {
 
 impl SyncResult {
     /// Create a new sync result with no changes.
+    #[must_use] 
     pub fn empty() -> Self {
         Self {
             changes: Vec::new(),
@@ -345,6 +347,7 @@ impl SyncResult {
     }
 
     /// Create a new sync result with changes.
+    #[must_use] 
     pub fn with_changes(changes: Vec<SyncChange>) -> Self {
         Self {
             changes,
@@ -360,6 +363,7 @@ impl SyncResult {
     }
 
     /// Indicate that there are more changes to fetch.
+    #[must_use] 
     pub fn with_more(mut self) -> Self {
         self.has_more = true;
         self
@@ -373,7 +377,7 @@ impl SyncResult {
 ///
 /// This supports various synchronization mechanisms:
 /// - **LDAP Sync Cookie**: Persistent searches with sync control (RFC 4533)
-/// - **AD DirSync**: Active Directory's DirSync control
+/// - **AD `DirSync`**: Active Directory's `DirSync` control
 /// - **Database Triggers**: Polling change tables populated by triggers
 /// - **Polling**: Periodic full or incremental scans with timestamp tracking
 ///
@@ -382,7 +386,7 @@ impl SyncResult {
 /// The sync token is an opaque string that represents the synchronization state.
 /// Different systems use different token formats:
 /// - LDAP: sync cookie (binary, base64 encoded)
-/// - AD: DirSync cookie
+/// - AD: `DirSync` cookie
 /// - Database: Last processed sequence number or timestamp
 /// - REST: Page cursor or version number
 ///

@@ -477,7 +477,7 @@ fn test_simulation_large_role_count() {
     let roles_to_add: Vec<SimulationRoleChange> = (0..1000)
         .map(|i| SimulationRoleChange {
             role_id: Uuid::new_v4(),
-            role_name: format!("Role {}", i),
+            role_name: format!("Role {i}"),
             application_id: None,
             reason: json!({"reason": "batch simulation"}),
             entitlements_affected: vec![],
@@ -679,7 +679,7 @@ fn test_simulation_result_ordering() {
     let roles: Vec<SimulationRoleChange> = (0..5)
         .map(|i| SimulationRoleChange {
             role_id: Uuid::new_v4(),
-            role_name: format!("Role Priority {}", i),
+            role_name: format!("Role Priority {i}"),
             application_id: None,
             reason: json!({"priority": i}),
             entitlements_affected: vec![],

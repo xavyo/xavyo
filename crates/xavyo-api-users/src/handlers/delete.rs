@@ -11,7 +11,7 @@ use xavyo_auth::JwtClaims;
 use xavyo_core::UserId;
 use xavyo_webhooks::{EventPublisher, WebhookEvent};
 
-/// Soft deletes a user by setting is_active=false.
+/// Soft deletes a user by setting `is_active=false`.
 #[utoipa::path(
     delete,
     path = "/users/{id}",

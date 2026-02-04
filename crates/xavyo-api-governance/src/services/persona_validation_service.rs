@@ -22,6 +22,7 @@ pub struct ConflictCheckResult {
 }
 
 impl ConflictCheckResult {
+    #[must_use] 
     pub fn no_conflict() -> Self {
         Self {
             has_conflict: false,
@@ -30,6 +31,7 @@ impl ConflictCheckResult {
         }
     }
 
+    #[must_use] 
     pub fn conflict(archetypes: Vec<Uuid>, details: Vec<String>) -> Self {
         Self {
             has_conflict: true,
@@ -48,6 +50,7 @@ pub struct MultiPersonaOperationResult {
 }
 
 impl MultiPersonaOperationResult {
+    #[must_use] 
     pub fn all_succeeded(ids: Vec<Uuid>) -> Self {
         Self {
             succeeded: ids,
@@ -56,6 +59,7 @@ impl MultiPersonaOperationResult {
         }
     }
 
+    #[must_use] 
     pub fn partial_failure(succeeded: Vec<Uuid>, failed: Vec<(Uuid, String)>) -> Self {
         Self {
             succeeded,
@@ -64,6 +68,7 @@ impl MultiPersonaOperationResult {
         }
     }
 
+    #[must_use] 
     pub fn all_rolled_back(failed: Vec<(Uuid, String)>) -> Self {
         Self {
             succeeded: vec![],
@@ -80,6 +85,7 @@ pub struct PersonaValidationService {
 
 impl PersonaValidationService {
     /// Create a new validation service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -96,7 +102,7 @@ impl PersonaValidationService {
     /// We check for:
     /// 1. Overlapping target attributes in computed mappings
     /// 2. Conflicting propagation rules (same source, different modes)
-    /// 3. Conflicting persona_only attributes
+    /// 3. Conflicting `persona_only` attributes
     pub async fn check_archetype_conflicts(
         &self,
         tenant_id: Uuid,

@@ -22,7 +22,7 @@ pub trait ConnectorConfig: Serialize + DeserializeOwned + Clone + Send + Sync {
 
     /// Get credentials that need to be encrypted.
     ///
-    /// Returns a list of (field_name, value) pairs for sensitive data.
+    /// Returns a list of (`field_name`, value) pairs for sensitive data.
     fn get_credentials(&self) -> Vec<(&'static str, String)>;
 
     /// Create a redacted version of this config (for logging/display).
@@ -89,34 +89,40 @@ impl Default for ConnectionSettings {
 
 impl ConnectionSettings {
     /// Create new connection settings with default values.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Set the connection timeout.
+    #[must_use] 
     pub fn with_connection_timeout(mut self, secs: u64) -> Self {
         self.connection_timeout_secs = secs;
         self
     }
 
     /// Set the read timeout.
+    #[must_use] 
     pub fn with_read_timeout(mut self, secs: u64) -> Self {
         self.read_timeout_secs = secs;
         self
     }
 
     /// Set the pool size.
+    #[must_use] 
     pub fn with_pool_size(mut self, size: u32) -> Self {
         self.pool_size = size;
         self
     }
 
     /// Get connection timeout as Duration.
+    #[must_use] 
     pub fn connection_timeout(&self) -> std::time::Duration {
         std::time::Duration::from_secs(self.connection_timeout_secs)
     }
 
     /// Get read timeout as Duration.
+    #[must_use] 
     pub fn read_timeout(&self) -> std::time::Duration {
         std::time::Duration::from_secs(self.read_timeout_secs)
     }
@@ -192,6 +198,7 @@ impl TlsConfig {
     }
 
     /// Create a new TLS config with SSL enabled.
+    #[must_use] 
     pub fn enabled() -> Self {
         Self {
             enabled: true,
@@ -284,7 +291,7 @@ pub enum AuthConfig {
     /// Bearer token authentication.
     Bearer { token: String },
 
-    /// OAuth2 client credentials flow.
+    /// `OAuth2` client credentials flow.
     #[serde(rename = "oauth2")]
     OAuth2 {
         token_url: String,
@@ -324,7 +331,7 @@ impl AuthConfig {
         }
     }
 
-    /// Create OAuth2 client credentials config.
+    /// Create `OAuth2` client credentials config.
     pub fn oauth2(
         token_url: impl Into<String>,
         client_id: impl Into<String>,
@@ -339,6 +346,7 @@ impl AuthConfig {
     }
 
     /// Get credentials that need to be encrypted.
+    #[must_use] 
     pub fn get_credentials(&self) -> Vec<(&'static str, String)> {
         match self {
             AuthConfig::None => vec![],
@@ -354,6 +362,7 @@ impl AuthConfig {
     }
 
     /// Create a redacted version.
+    #[must_use] 
     pub fn redacted(&self) -> Self {
         match self {
             AuthConfig::None => AuthConfig::None,

@@ -15,7 +15,7 @@ use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
 use xavyo_db::{EnabledMethods, PasswordlessPolicy};
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<uuid::Uuid, ApiAuthError> {
     claims
         .tenant_id()

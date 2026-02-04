@@ -61,6 +61,7 @@ pub struct EnforcementDecision {
 
 impl EnforcementDecision {
     /// Create a skip decision for disabled enforcement mode.
+    #[must_use] 
     pub fn skip() -> Self {
         Self {
             action: EnforcementAction::None,
@@ -73,6 +74,7 @@ impl EnforcementDecision {
     }
 
     /// Returns true if the action requires blocking or MFA challenge.
+    #[must_use] 
     pub fn is_action_required(&self) -> bool {
         self.enforced
             && matches!(
@@ -82,11 +84,13 @@ impl EnforcementDecision {
     }
 
     /// Returns true if the decision requires blocking login.
+    #[must_use] 
     pub fn is_blocked(&self) -> bool {
         self.enforced && self.action == EnforcementAction::Block
     }
 
     /// Returns true if the decision requires step-up MFA.
+    #[must_use] 
     pub fn requires_mfa(&self) -> bool {
         self.enforced && self.action == EnforcementAction::RequireMfa
     }
@@ -99,6 +103,7 @@ pub struct RiskEnforcementService {
 
 impl RiskEnforcementService {
     /// Create a new risk enforcement service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -195,7 +200,7 @@ impl RiskEnforcementService {
         let decision = EnforcementDecision {
             action,
             risk_score: total_score,
-            risk_level: format!("{:?}", risk_level).to_lowercase(),
+            risk_level: format!("{risk_level:?}").to_lowercase(),
             factor_breakdown,
             enforced,
             enforcement_mode: policy.enforcement_mode,
@@ -249,7 +254,7 @@ impl RiskEnforcementService {
         // New location event
         if context.is_new_location {
             let source_ref = match (&context.geo_country, &context.geo_city) {
-                (Some(country), Some(city)) => Some(format!("{}/{}", country, city)),
+                (Some(country), Some(city)) => Some(format!("{country}/{city}")),
                 (Some(country), None) => Some(country.clone()),
                 _ => None,
             };
@@ -492,7 +497,7 @@ impl RiskEnforcementService {
     }
 
     /// Calculate risk score from enabled factors and active events.
-    /// Returns (total_score, factor_breakdown_json).
+    /// Returns (`total_score`, `factor_breakdown_json`).
     async fn calculate_score(
         &self,
         tenant_id: Uuid,
@@ -600,19 +605,19 @@ impl RiskEnforcementService {
         };
 
         // Determine severity based on action and enforcement mode
-        let severity = if !decision.enforced {
-            // Monitor mode: info-level alerts
-            AlertSeverity::Info
-        } else {
+        let severity = if decision.enforced {
             match decision.action {
                 EnforcementAction::Block => AlertSeverity::Critical,
                 EnforcementAction::RequireMfa => AlertSeverity::Warning,
                 _ => AlertSeverity::Info,
             }
+        } else {
+            // Monitor mode: info-level alerts
+            AlertSeverity::Info
         };
 
         // Check cooldown to avoid alert spam
-        let cooldown_hours = threshold.map(|t| t.cooldown_hours).unwrap_or(24);
+        let cooldown_hours = threshold.map_or(24, |t| t.cooldown_hours);
         let exists = xavyo_db::GovRiskAlert::exists_within_cooldown(
             &self.pool,
             tenant_id,

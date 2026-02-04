@@ -95,12 +95,14 @@ pub struct ManualTaskFilter {
 
 impl GovManualProvisioningTask {
     /// Calculate time remaining until SLA breach.
+    #[must_use] 
     pub fn time_remaining_seconds(&self, now: DateTime<Utc>) -> Option<i64> {
         self.sla_deadline
             .map(|deadline| (deadline - now).num_seconds())
     }
 
     /// Check if task is approaching SLA warning threshold.
+    #[must_use] 
     pub fn is_approaching_warning(&self, warning_time: DateTime<Utc>, now: DateTime<Utc>) -> bool {
         if self.sla_warning_sent || self.status.is_terminal() {
             return false;
@@ -115,10 +117,10 @@ impl GovManualProvisioningTask {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_manual_provisioning_tasks
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -133,12 +135,12 @@ impl GovManualProvisioningTask {
         assignment_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_manual_provisioning_tasks
             WHERE tenant_id = $1 AND assignment_id = $2
             ORDER BY created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)
@@ -155,32 +157,32 @@ impl GovManualProvisioningTask {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_manual_provisioning_tasks
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.application_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND application_id = ${}", param_count));
+            query.push_str(&format!(" AND application_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.assignment_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND assignment_id = ${}", param_count));
+            query.push_str(&format!(" AND assignment_id = ${param_count}"));
         }
         if filter.sla_breached.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND sla_breached = ${}", param_count));
+            query.push_str(&format!(" AND sla_breached = ${param_count}"));
         }
         if filter.assignee_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND assignee_id = ${}", param_count));
+            query.push_str(&format!(" AND assignee_id = ${param_count}"));
         }
         // Note: status filtering with array is handled separately
 
@@ -218,24 +220,24 @@ impl GovManualProvisioningTask {
         filter: &ManualTaskFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_manual_provisioning_tasks
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.application_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND application_id = ${}", param_count));
+            query.push_str(&format!(" AND application_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.sla_breached.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND sla_breached = ${}", param_count));
+            query.push_str(&format!(" AND sla_breached = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -260,14 +262,14 @@ impl GovManualProvisioningTask {
         input: CreateManualTask,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_manual_provisioning_tasks (
                 tenant_id, assignment_id, application_id, user_id,
                 entitlement_id, operation_type, sla_deadline
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.assignment_id)
@@ -294,12 +296,12 @@ impl GovManualProvisioningTask {
         };
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_manual_provisioning_tasks
             SET status = $3, completed_at = COALESCE($4, completed_at), updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -317,12 +319,12 @@ impl GovManualProvisioningTask {
         external_ticket_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_manual_provisioning_tasks
             SET external_ticket_id = $3, status = 'ticket_created', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -346,7 +348,7 @@ impl GovManualProvisioningTask {
         };
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_manual_provisioning_tasks
             SET
                 status = $3,
@@ -356,7 +358,7 @@ impl GovManualProvisioningTask {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -375,7 +377,7 @@ impl GovManualProvisioningTask {
         notes: Option<&str>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_manual_provisioning_tasks
             SET
                 status = 'completed',
@@ -384,7 +386,7 @@ impl GovManualProvisioningTask {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -401,7 +403,7 @@ impl GovManualProvisioningTask {
         reason: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_manual_provisioning_tasks
             SET
                 status = 'rejected',
@@ -410,7 +412,7 @@ impl GovManualProvisioningTask {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -427,7 +429,7 @@ impl GovManualProvisioningTask {
         reason: Option<&str>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_manual_provisioning_tasks
             SET
                 status = 'cancelled',
@@ -436,7 +438,7 @@ impl GovManualProvisioningTask {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -452,12 +454,12 @@ impl GovManualProvisioningTask {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_manual_provisioning_tasks
             SET sla_warning_sent = true, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -472,12 +474,12 @@ impl GovManualProvisioningTask {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_manual_provisioning_tasks
             SET sla_breached = true, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -492,14 +494,14 @@ impl GovManualProvisioningTask {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_manual_provisioning_tasks
             WHERE status IN ('pending', 'pending_ticket', 'ticket_failed')
               AND (next_retry_at IS NULL OR next_retry_at <= $1)
             ORDER BY next_retry_at ASC NULLS FIRST
             LIMIT $2
             FOR UPDATE SKIP LOCKED
-            "#,
+            ",
         )
         .bind(now)
         .bind(limit)
@@ -514,7 +516,7 @@ impl GovManualProvisioningTask {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_manual_provisioning_tasks
             WHERE status NOT IN ('completed', 'rejected', 'cancelled', 'failed_permanent')
               AND sla_deadline IS NOT NULL
@@ -523,7 +525,7 @@ impl GovManualProvisioningTask {
             ORDER BY sla_deadline ASC
             LIMIT $2
             FOR UPDATE SKIP LOCKED
-            "#,
+            ",
         )
         .bind(now)
         .bind(limit)
@@ -538,7 +540,7 @@ impl GovManualProvisioningTask {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_manual_provisioning_tasks
             WHERE status NOT IN ('completed', 'rejected', 'cancelled', 'failed_permanent')
               AND sla_deadline IS NOT NULL
@@ -547,7 +549,7 @@ impl GovManualProvisioningTask {
             ORDER BY sla_deadline ASC
             LIMIT $2
             FOR UPDATE SKIP LOCKED
-            "#,
+            ",
         )
         .bind(now)
         .bind(limit)
@@ -561,7 +563,7 @@ impl GovManualProvisioningTask {
         tenant_id: Uuid,
     ) -> Result<DashboardMetrics, sqlx::Error> {
         let row = sqlx::query_as::<_, DashboardMetricsRow>(
-            r#"
+            r"
             SELECT
                 COUNT(*) FILTER (WHERE status IN ('pending', 'pending_ticket', 'ticket_created', 'ticket_failed')) as pending_count,
                 COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress_count,
@@ -571,7 +573,7 @@ impl GovManualProvisioningTask {
                 AVG(EXTRACT(EPOCH FROM (completed_at - created_at))) FILTER (WHERE status = 'completed' AND completed_at IS NOT NULL) as avg_completion_time
             FROM gov_manual_provisioning_tasks
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)

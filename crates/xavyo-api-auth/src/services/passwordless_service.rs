@@ -56,6 +56,7 @@ pub struct PasswordlessRateLimiter {
 
 impl PasswordlessRateLimiter {
     /// Create a new rate limiter.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             email_requests: HashMap::new(),
@@ -153,7 +154,7 @@ impl PasswordlessService {
 
     /// Generate a 6-digit OTP code and its hash.
     ///
-    /// SECURITY: Uses OsRng directly from the operating system's CSPRNG.
+    /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
     fn generate_otp_code() -> (String, String) {
         use rand::rngs::OsRng;
         use rand::Rng;
@@ -486,8 +487,7 @@ impl PasswordlessService {
                     })?;
 
             return Err(ApiAuthError::Validation(format!(
-                "Invalid verification code. {} attempts remaining.",
-                remaining
+                "Invalid verification code. {remaining} attempts remaining."
             )));
         }
 
@@ -556,11 +556,11 @@ impl PasswordlessService {
         email: &str,
     ) -> Result<Option<UserBasic>, ApiAuthError> {
         let user = sqlx::query_as::<_, UserBasic>(
-            r#"
+            r"
             SELECT id, email, email_verified, is_active
             FROM users
             WHERE tenant_id = $1 AND LOWER(email) = LOWER($2)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(email)
@@ -574,12 +574,12 @@ impl PasswordlessService {
     async fn check_lockout(&self, tenant_id: Uuid, user_id: Uuid) -> Result<(), ApiAuthError> {
         // Check if there's an active lockout for this user
         let locked: Option<bool> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM account_lockouts
                 WHERE tenant_id = $1 AND user_id = $2 AND locked_until > NOW()
             )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

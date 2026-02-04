@@ -1,7 +1,7 @@
-//! SoD (Separation of Duties) service for managing SoD rules.
+//! `SoD` (Separation of Duties) service for managing `SoD` rules.
 //!
 //! This module provides the `SodService` for creating, updating, and deleting
-//! SoD rules that define prohibited or required entitlement combinations.
+//! `SoD` rules that define prohibited or required entitlement combinations.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,7 +19,7 @@ use crate::types::{SodConflictType, SodRuleId, SodRuleStatus, SodSeverity};
 // Domain Types
 // ============================================================================
 
-/// An SoD rule defining prohibited or required entitlement combinations.
+/// An `SoD` rule defining prohibited or required entitlement combinations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SodRule {
     /// Unique identifier.
@@ -50,7 +50,7 @@ pub struct SodRule {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Input for creating an SoD rule.
+/// Input for creating an `SoD` rule.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateSodRuleInput {
     /// Human-readable rule name.
@@ -69,7 +69,7 @@ pub struct CreateSodRuleInput {
     pub created_by: Uuid,
 }
 
-/// Input for updating an SoD rule.
+/// Input for updating an `SoD` rule.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UpdateSodRuleInput {
     /// New name (if updating).
@@ -86,7 +86,7 @@ pub struct UpdateSodRuleInput {
 // Store Trait
 // ============================================================================
 
-/// Trait for SoD rule storage backends.
+/// Trait for `SoD` rule storage backends.
 #[async_trait::async_trait]
 pub trait SodRuleStore: Send + Sync {
     /// Get a rule by ID.
@@ -124,7 +124,7 @@ pub trait SodRuleStore: Send + Sync {
 // In-Memory Store (for testing)
 // ============================================================================
 
-/// In-memory SoD rule store for testing.
+/// In-memory `SoD` rule store for testing.
 #[derive(Debug, Default)]
 pub struct InMemorySodRuleStore {
     rules: Arc<RwLock<HashMap<Uuid, SodRule>>>,
@@ -132,6 +132,7 @@ pub struct InMemorySodRuleStore {
 
 impl InMemorySodRuleStore {
     /// Create a new in-memory store.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             rules: Arc::new(RwLock::new(HashMap::new())),
@@ -278,14 +279,14 @@ impl SodRuleStore for InMemorySodRuleStore {
 // Service
 // ============================================================================
 
-/// Service for managing SoD rules.
+/// Service for managing `SoD` rules.
 pub struct SodService {
     rule_store: Arc<dyn SodRuleStore>,
     audit_store: Arc<dyn AuditStore>,
 }
 
 impl SodService {
-    /// Create a new SoD service.
+    /// Create a new `SoD` service.
     pub fn new(rule_store: Arc<dyn SodRuleStore>, audit_store: Arc<dyn AuditStore>) -> Self {
         Self {
             rule_store,
@@ -325,7 +326,7 @@ impl SodService {
         Ok(())
     }
 
-    /// Create a new SoD rule.
+    /// Create a new `SoD` rule.
     pub async fn create_rule(&self, tenant_id: Uuid, input: CreateSodRuleInput) -> Result<SodRule> {
         Self::validate_rule_input(&input)?;
 
@@ -346,17 +347,17 @@ impl SodService {
         Ok(rule)
     }
 
-    /// Get an SoD rule by ID.
+    /// Get an `SoD` rule by ID.
     pub async fn get_rule(&self, tenant_id: Uuid, id: SodRuleId) -> Result<Option<SodRule>> {
         self.rule_store.get(tenant_id, id).await
     }
 
-    /// List all active SoD rules for a tenant.
+    /// List all active `SoD` rules for a tenant.
     pub async fn list_rules(&self, tenant_id: Uuid) -> Result<Vec<SodRule>> {
         self.rule_store.list_active(tenant_id).await
     }
 
-    /// Update an SoD rule.
+    /// Update an `SoD` rule.
     pub async fn update_rule(
         &self,
         tenant_id: Uuid,
@@ -393,7 +394,7 @@ impl SodService {
         Ok(updated)
     }
 
-    /// Delete an SoD rule.
+    /// Delete an `SoD` rule.
     pub async fn delete_rule(
         &self,
         tenant_id: Uuid,

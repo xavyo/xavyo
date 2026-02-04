@@ -22,6 +22,7 @@ pub struct SyslogTcpWorker {
 }
 
 impl SyslogTcpWorker {
+    #[must_use] 
     pub fn new(host: String, port: u16, tls_verify_cert: bool) -> Self {
         Self {
             host,
@@ -35,7 +36,7 @@ impl SyslogTcpWorker {
     async fn connect(&self) -> Result<TlsStream<TcpStream>, DeliveryError> {
         let addr = format!("{}:{}", self.host, self.port);
         let stream = TcpStream::connect(&addr).await.map_err(|e| {
-            DeliveryError::ConnectionFailed(format!("TCP connect to {} failed: {}", addr, e))
+            DeliveryError::ConnectionFailed(format!("TCP connect to {addr} failed: {e}"))
         })?;
 
         let connector = native_tls::TlsConnector::builder()
@@ -57,7 +58,7 @@ impl SyslogTcpWorker {
 impl DeliveryWorker for SyslogTcpWorker {
     async fn deliver(&self, payload: &str) -> Result<DeliveryResult, DeliveryError> {
         let start = Instant::now();
-        let message = format!("{}\n", payload);
+        let message = format!("{payload}\n");
 
         let mut guard = self.conn.lock().await;
 

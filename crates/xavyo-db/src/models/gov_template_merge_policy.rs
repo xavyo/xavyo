@@ -27,7 +27,7 @@ pub struct GovTemplateMergePolicy {
     /// Merge strategy to use.
     pub strategy: TemplateMergeStrategy,
 
-    /// Ordered list of sources for source_precedence strategy.
+    /// Ordered list of sources for `source_precedence` strategy.
     pub source_precedence: Option<serde_json::Value>,
 
     /// How to handle null values.
@@ -65,10 +65,10 @@ impl GovTemplateMergePolicy {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_merge_policies
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -84,10 +84,10 @@ impl GovTemplateMergePolicy {
         attribute: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_merge_policies
             WHERE tenant_id = $1 AND template_id = $2 AND attribute = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -103,11 +103,11 @@ impl GovTemplateMergePolicy {
         template_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_merge_policies
             WHERE tenant_id = $1 AND template_id = $2
             ORDER BY attribute ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -123,11 +123,11 @@ impl GovTemplateMergePolicy {
         strategy: TemplateMergeStrategy,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_merge_policies
             WHERE tenant_id = $1 AND template_id = $2 AND strategy = $3
             ORDER BY attribute ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -149,14 +149,14 @@ impl GovTemplateMergePolicy {
             .map(|sp| serde_json::to_value(sp).unwrap_or(serde_json::Value::Null));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_template_merge_policies (
                 tenant_id, template_id, attribute, strategy,
                 source_precedence, null_handling
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -180,15 +180,15 @@ impl GovTemplateMergePolicy {
 
         if input.strategy.is_some() {
             param_count += 1;
-            updates.push(format!("strategy = ${}", param_count));
+            updates.push(format!("strategy = ${param_count}"));
         }
         if input.source_precedence.is_some() {
             param_count += 1;
-            updates.push(format!("source_precedence = ${}", param_count));
+            updates.push(format!("source_precedence = ${param_count}"));
         }
         if input.null_handling.is_some() {
             param_count += 1;
-            updates.push(format!("null_handling = ${}", param_count));
+            updates.push(format!("null_handling = ${param_count}"));
         }
 
         if updates.is_empty() {
@@ -225,10 +225,10 @@ impl GovTemplateMergePolicy {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_template_merge_policies
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -245,10 +245,10 @@ impl GovTemplateMergePolicy {
         template_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_template_merge_policies
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -265,10 +265,10 @@ impl GovTemplateMergePolicy {
         template_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_template_merge_policies
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -277,6 +277,7 @@ impl GovTemplateMergePolicy {
     }
 
     /// Get the source precedence as a Vec<String>.
+    #[must_use] 
     pub fn get_source_precedence(&self) -> Option<Vec<String>> {
         self.source_precedence
             .as_ref()
@@ -284,26 +285,31 @@ impl GovTemplateMergePolicy {
     }
 
     /// Check if this policy uses source precedence strategy.
+    #[must_use] 
     pub fn is_source_precedence(&self) -> bool {
         self.strategy == TemplateMergeStrategy::SourcePrecedence
     }
 
     /// Check if this policy uses timestamp wins strategy.
+    #[must_use] 
     pub fn is_timestamp_wins(&self) -> bool {
         self.strategy == TemplateMergeStrategy::TimestampWins
     }
 
     /// Check if this policy uses concatenate unique strategy.
+    #[must_use] 
     pub fn is_concatenate_unique(&self) -> bool {
         self.strategy == TemplateMergeStrategy::ConcatenateUnique
     }
 
     /// Check if this policy uses first wins strategy.
+    #[must_use] 
     pub fn is_first_wins(&self) -> bool {
         self.strategy == TemplateMergeStrategy::FirstWins
     }
 
     /// Check if this policy uses manual only strategy.
+    #[must_use] 
     pub fn is_manual_only(&self) -> bool {
         self.strategy == TemplateMergeStrategy::ManualOnly
     }

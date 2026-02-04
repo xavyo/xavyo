@@ -27,11 +27,13 @@ pub enum DelegationStatus {
 
 impl DelegationStatus {
     /// Check if the delegation is in a state that can be acted upon.
+    #[must_use] 
     pub fn is_actionable(&self) -> bool {
         matches!(self, Self::Active)
     }
 
     /// Check if the delegation is in a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Expired | Self::Revoked)
     }
@@ -110,10 +112,10 @@ impl GovApprovalDelegation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_delegations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -129,14 +131,14 @@ impl GovApprovalDelegation {
         at_time: DateTime<Utc>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_delegations
             WHERE tenant_id = $1
               AND delegator_id = $2
               AND is_active = TRUE
               AND starts_at <= $3
               AND ends_at > $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(delegator_id)
@@ -153,14 +155,14 @@ impl GovApprovalDelegation {
         at_time: DateTime<Utc>,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_delegations
             WHERE tenant_id = $1
               AND delegate_id = $2
               AND is_active = TRUE
               AND starts_at <= $3
               AND ends_at > $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(delegate_id)
@@ -178,7 +180,7 @@ impl GovApprovalDelegation {
         at_time: DateTime<Utc>,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_approval_delegations
             WHERE tenant_id = $1
               AND delegator_id = $2
@@ -186,7 +188,7 @@ impl GovApprovalDelegation {
               AND is_active = TRUE
               AND starts_at <= $4
               AND ends_at > $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(delegator_id)
@@ -208,30 +210,29 @@ impl GovApprovalDelegation {
     ) -> Result<Vec<Self>, sqlx::Error> {
         let now = Utc::now();
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_approval_delegations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.delegator_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND delegator_id = ${}", param_count));
+            query.push_str(&format!(" AND delegator_id = ${param_count}"));
         }
         if filter.delegate_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND delegate_id = ${}", param_count));
+            query.push_str(&format!(" AND delegate_id = ${param_count}"));
         }
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.active_now == Some(true) {
             param_count += 1;
             query.push_str(&format!(
-                " AND is_active = TRUE AND starts_at <= ${0} AND ends_at > ${0}",
-                param_count
+                " AND is_active = TRUE AND starts_at <= ${param_count} AND ends_at > ${param_count}"
             ));
         }
 
@@ -267,30 +268,29 @@ impl GovApprovalDelegation {
     ) -> Result<i64, sqlx::Error> {
         let now = Utc::now();
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_approval_delegations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.delegator_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND delegator_id = ${}", param_count));
+            query.push_str(&format!(" AND delegator_id = ${param_count}"));
         }
         if filter.delegate_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND delegate_id = ${}", param_count));
+            query.push_str(&format!(" AND delegate_id = ${param_count}"));
         }
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.active_now == Some(true) {
             param_count += 1;
             query.push_str(&format!(
-                " AND is_active = TRUE AND starts_at <= ${0} AND ends_at > ${0}",
-                param_count
+                " AND is_active = TRUE AND starts_at <= ${param_count} AND ends_at > ${param_count}"
             ));
         }
 
@@ -327,13 +327,13 @@ impl GovApprovalDelegation {
         };
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_approval_delegations (
                 tenant_id, delegator_id, delegate_id, starts_at, ends_at, scope_id, status, is_active
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.delegator_id)
@@ -354,12 +354,12 @@ impl GovApprovalDelegation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_approval_delegations
             SET is_active = FALSE, revoked_at = NOW(), status = 'revoked'
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -374,12 +374,12 @@ impl GovApprovalDelegation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_approval_delegations
             SET is_active = TRUE, status = 'active'
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -394,12 +394,12 @@ impl GovApprovalDelegation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_approval_delegations
             SET is_active = FALSE, status = 'expired'
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -415,12 +415,12 @@ impl GovApprovalDelegation {
         new_ends_at: DateTime<Utc>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_approval_delegations
             SET ends_at = $3, expiry_warning_sent = FALSE
             WHERE id = $1 AND tenant_id = $2 AND status IN ('pending', 'active')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -436,12 +436,12 @@ impl GovApprovalDelegation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_approval_delegations
             SET expiry_warning_sent = TRUE
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -449,21 +449,21 @@ impl GovApprovalDelegation {
         .await
     }
 
-    /// Find delegations pending activation (starts_at <= now and status = pending).
+    /// Find delegations pending activation (`starts_at` <= now and status = pending).
     pub async fn find_pending_activation(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_delegations
             WHERE tenant_id = $1
               AND status = 'pending'
               AND starts_at <= NOW()
             ORDER BY starts_at ASC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -471,21 +471,21 @@ impl GovApprovalDelegation {
         .await
     }
 
-    /// Find delegations due for expiration (ends_at <= now and status = active).
+    /// Find delegations due for expiration (`ends_at` <= now and status = active).
     pub async fn find_expired(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_delegations
             WHERE tenant_id = $1
               AND status = 'active'
               AND ends_at <= NOW()
             ORDER BY ends_at ASC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -501,7 +501,7 @@ impl GovApprovalDelegation {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_delegations
             WHERE tenant_id = $1
               AND status = 'active'
@@ -510,7 +510,7 @@ impl GovApprovalDelegation {
               AND expiry_warning_sent = FALSE
             ORDER BY ends_at ASC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(warning_hours.to_string())
@@ -524,18 +524,19 @@ impl GovApprovalDelegation {
         pool: &sqlx::PgPool,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT tenant_id FROM gov_approval_delegations
             WHERE (status = 'pending' AND starts_at <= NOW())
                OR (status = 'active' AND ends_at <= NOW())
                OR (status = 'active' AND ends_at <= NOW() + interval '24 hours' AND expiry_warning_sent = FALSE)
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await
     }
 
     /// Check if this delegation is currently active.
+    #[must_use] 
     pub fn is_currently_active(&self, now: DateTime<Utc>) -> bool {
         self.is_active && self.starts_at <= now && self.ends_at > now
     }
@@ -549,7 +550,7 @@ impl GovApprovalDelegation {
         at_time: DateTime<Utc>,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_delegations
             WHERE tenant_id = $1
               AND delegate_id = $2
@@ -557,7 +558,7 @@ impl GovApprovalDelegation {
               AND starts_at <= $3
               AND ends_at > $3
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(deputy_id)
@@ -583,7 +584,7 @@ impl GovApprovalDelegation {
     ) -> Result<Option<Self>, sqlx::Error> {
         // Build query with optional delegator filter
         let base_query = if delegator_id.is_some() {
-            r#"
+            r"
             SELECT d.* FROM gov_approval_delegations d
             WHERE d.tenant_id = $1
               AND d.delegate_id = $2
@@ -594,9 +595,9 @@ impl GovApprovalDelegation {
               AND work_item_matches_delegation_scope(d.id, $5, $6, $7, $8)
             ORDER BY d.created_at ASC
             LIMIT 1
-            "#
+            "
         } else {
-            r#"
+            r"
             SELECT d.* FROM gov_approval_delegations d
             WHERE d.tenant_id = $1
               AND d.delegate_id = $2
@@ -606,7 +607,7 @@ impl GovApprovalDelegation {
               AND work_item_matches_delegation_scope(d.id, $4, $5, $6, $7)
             ORDER BY d.created_at ASC
             LIMIT 1
-            "#
+            "
         };
 
         if let Some(del_id) = delegator_id {
@@ -635,8 +636,8 @@ impl GovApprovalDelegation {
         }
     }
 
-    /// Check if a delegation (by scope_id) matches a work item.
-    /// If scope_id is None, returns true (full delegation).
+    /// Check if a delegation (by `scope_id`) matches a work item.
+    /// If `scope_id` is None, returns true (full delegation).
     pub async fn delegation_matches_work_item(
         pool: &sqlx::PgPool,
         delegation_id: Uuid,
@@ -646,9 +647,9 @@ impl GovApprovalDelegation {
         workflow_type: Option<&str>,
     ) -> Result<bool, sqlx::Error> {
         let result: bool = sqlx::query_scalar(
-            r#"
+            r"
             SELECT work_item_matches_delegation_scope($1, $2, $3, $4, $5)
-            "#,
+            ",
         )
         .bind(delegation_id)
         .bind(application_id)
@@ -669,14 +670,14 @@ impl GovApprovalDelegation {
         at_time: DateTime<Utc>,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT delegator_id FROM gov_approval_delegations
             WHERE tenant_id = $1
               AND delegate_id = $2
               AND status = 'active'
               AND starts_at <= $3
               AND ends_at > $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(deputy_id)

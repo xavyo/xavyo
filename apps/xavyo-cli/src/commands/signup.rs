@@ -56,7 +56,7 @@ pub async fn execute(args: SignupArgs) -> CliResult<()> {
             }
         })
         .interact_text()
-        .map_err(|e| CliError::InputError(format!("Failed to read email: {}", e)))?;
+        .map_err(|e| CliError::InputError(format!("Failed to read email: {e}")))?;
 
     // Prompt for password
     let password = Password::new()
@@ -69,13 +69,13 @@ pub async fn execute(args: SignupArgs) -> CliResult<()> {
             }
         })
         .interact()
-        .map_err(|e| CliError::InputError(format!("Failed to read password: {}", e)))?;
+        .map_err(|e| CliError::InputError(format!("Failed to read password: {e}")))?;
 
     // Confirm password
     let password_confirm = Password::new()
         .with_prompt("Confirm password")
         .interact()
-        .map_err(|e| CliError::InputError(format!("Failed to read password: {}", e)))?;
+        .map_err(|e| CliError::InputError(format!("Failed to read password: {e}")))?;
 
     if password != password_confirm {
         return Err(CliError::InputError("Passwords do not match".to_string()));
@@ -86,7 +86,7 @@ pub async fn execute(args: SignupArgs) -> CliResult<()> {
         .with_prompt("Display name (optional, press Enter to skip)")
         .allow_empty(true)
         .interact_text()
-        .map_err(|e| CliError::InputError(format!("Failed to read display name: {}", e)))?;
+        .map_err(|e| CliError::InputError(format!("Failed to read display name: {e}")))?;
 
     let display_name = if display_name.is_empty() {
         None
@@ -98,7 +98,7 @@ pub async fn execute(args: SignupArgs) -> CliResult<()> {
     let client = Client::builder()
         .timeout(Duration::from_secs(config.timeout_secs))
         .build()
-        .map_err(|e| CliError::Network(format!("Failed to create HTTP client: {}", e)))?;
+        .map_err(|e| CliError::Network(format!("Failed to create HTTP client: {e}")))?;
 
     // Call signup API
     println!();

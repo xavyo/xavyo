@@ -15,6 +15,7 @@ pub struct MetricsService {
 
 impl MetricsService {
     /// Create a new metrics service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -79,17 +80,19 @@ impl MetricsService {
 
     /// Calculate utilization rate for a role.
     ///
-    /// Utilization = active_users / total_users
+    /// Utilization = `active_users` / `total_users`
+    #[must_use] 
     pub fn calculate_utilization_rate(total_users: i32, active_users: i32) -> f64 {
         if total_users == 0 {
             return 0.0;
         }
-        (active_users as f64 / total_users as f64).min(1.0)
+        (f64::from(active_users) / f64::from(total_users)).min(1.0)
     }
 
     /// Calculate coverage rate for a role.
     ///
-    /// Coverage = used_entitlements / total_entitlements
+    /// Coverage = `used_entitlements` / `total_entitlements`
+    #[must_use] 
     pub fn calculate_coverage_rate(entitlement_usage: &[EntitlementUsage]) -> f64 {
         if entitlement_usage.is_empty() {
             return 0.0;
@@ -104,6 +107,7 @@ impl MetricsService {
     }
 
     /// Calculate trend direction by comparing current to previous metrics.
+    #[must_use] 
     pub fn calculate_trend(
         current_utilization: f64,
         previous_utilization: Option<f64>,
@@ -129,9 +133,9 @@ impl MetricsService {
     ///
     /// This is the main entry point for calculating metrics for multiple roles.
     /// Note: Role metrics are calculated based on group assignments and entitlement usage.
-    /// The role_id should correspond to a group ID in the system.
+    /// The `role_id` should correspond to a group ID in the system.
     ///
-    /// The input is limited to MAX_BATCH_SIZE (100) roles to prevent memory issues.
+    /// The input is limited to `MAX_BATCH_SIZE` (100) roles to prevent memory issues.
     /// For larger sets, call this method multiple times with different batches.
     pub async fn calculate_metrics_for_roles(
         &self,
@@ -175,11 +179,11 @@ impl MetricsService {
         // Query user count for this role (group membership via user_groups table)
         // role_id corresponds to a group_id
         let user_count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(DISTINCT user_id)
             FROM user_groups
             WHERE tenant_id = $1 AND group_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -190,13 +194,13 @@ impl MetricsService {
         // For active users, count users who have logged in recently
         // Fall back to users with recent group membership activity
         let active_user_count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(DISTINCT ug.user_id)
             FROM user_groups ug
             LEFT JOIN login_history lh ON lh.user_id = ug.user_id AND lh.tenant_id = ug.tenant_id
             WHERE ug.tenant_id = $1 AND ug.group_id = $2
               AND (lh.created_at > NOW() - INTERVAL '30 days' OR ug.created_at > NOW() - INTERVAL '30 days')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -207,11 +211,11 @@ impl MetricsService {
         // Get entitlements assigned to this role (via group assignment)
         // Note: role_id is treated as a group_id, and entitlements are assigned to groups
         let entitlement_ids: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT entitlement_id
             FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND target_type = 'group' AND target_id = $2 AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -224,11 +228,11 @@ impl MetricsService {
         for ent_id in &entitlement_ids {
             // Count how many users have this specific entitlement assigned
             let used_by: i64 = sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*)
                 FROM gov_entitlement_assignments
                 WHERE tenant_id = $1 AND entitlement_id = $2 AND status = 'active'
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(ent_id)

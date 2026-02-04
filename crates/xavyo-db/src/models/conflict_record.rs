@@ -43,7 +43,7 @@ impl std::str::FromStr for ConflictType {
             "stale_data" => Ok(ConflictType::StaleData),
             "missing_target" => Ok(ConflictType::MissingTarget),
             "external_change" => Ok(ConflictType::ExternalChange),
-            _ => Err(format!("Unknown conflict type: {}", s)),
+            _ => Err(format!("Unknown conflict type: {s}")),
         }
     }
 }
@@ -84,7 +84,7 @@ impl std::str::FromStr for ResolutionStrategy {
             "first_write_wins" => Ok(ResolutionStrategy::FirstWriteWins),
             "manual" => Ok(ResolutionStrategy::Manual),
             "merge" => Ok(ResolutionStrategy::Merge),
-            _ => Err(format!("Unknown resolution strategy: {}", s)),
+            _ => Err(format!("Unknown resolution strategy: {s}")),
         }
     }
 }
@@ -129,7 +129,7 @@ impl std::str::FromStr for ResolutionOutcome {
             "merged" => Ok(ResolutionOutcome::Merged),
             "rejected" => Ok(ResolutionOutcome::Rejected),
             "pending" => Ok(ResolutionOutcome::Pending),
-            _ => Err(format!("Unknown resolution outcome: {}", s)),
+            _ => Err(format!("Unknown resolution outcome: {s}")),
         }
     }
 }
@@ -208,10 +208,10 @@ impl ConflictRecord {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM conflict_records
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -226,12 +226,12 @@ impl ConflictRecord {
         operation_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM conflict_records
             WHERE (operation_id = $1 OR conflicting_operation_id = $1)
                 AND tenant_id = $2
             ORDER BY detected_at DESC
-            "#,
+            ",
         )
         .bind(operation_id)
         .bind(tenant_id)
@@ -247,13 +247,13 @@ impl ConflictRecord {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM conflict_records
             WHERE tenant_id = $1
                 AND (resolution_outcome IS NULL OR resolution_outcome = 'pending')
             ORDER BY detected_at DESC
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -265,11 +265,11 @@ impl ConflictRecord {
     /// Count pending conflicts.
     pub async fn count_pending(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM conflict_records
             WHERE tenant_id = $1
                 AND (resolution_outcome IS NULL OR resolution_outcome = 'pending')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -285,10 +285,10 @@ impl ConflictRecord {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM conflict_records
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
@@ -298,17 +298,16 @@ impl ConflictRecord {
         if filter.operation_id.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND (operation_id = ${} OR conflicting_operation_id = ${})",
-                param_count, param_count
+                " AND (operation_id = ${param_count} OR conflicting_operation_id = ${param_count})"
             ));
         }
         if filter.conflict_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND conflict_type = ${}", param_count));
+            query.push_str(&format!(" AND conflict_type = ${param_count}"));
         }
         if filter.resolution_outcome.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND resolution_outcome = ${}", param_count));
+            query.push_str(&format!(" AND resolution_outcome = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -342,14 +341,14 @@ impl ConflictRecord {
             serde_json::to_value(&input.affected_attributes).unwrap_or(serde_json::json!([]));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO conflict_records (
                 tenant_id, operation_id, conflicting_operation_id, conflict_type,
                 affected_attributes, detected_at, resolution_strategy
             )
             VALUES ($1, $2, $3, $4, $5, NOW(), $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.operation_id)
@@ -370,7 +369,7 @@ impl ConflictRecord {
         input: &ResolveConflict,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE conflict_records
             SET resolved_at = NOW(),
                 resolution_outcome = $3,
@@ -379,7 +378,7 @@ impl ConflictRecord {
             WHERE id = $1 AND tenant_id = $2
                 AND (resolution_outcome IS NULL OR resolution_outcome = 'pending')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -391,6 +390,7 @@ impl ConflictRecord {
     }
 
     /// Check if the conflict is pending resolution.
+    #[must_use] 
     pub fn is_pending(&self) -> bool {
         self.resolution_outcome.is_none()
             || matches!(self.resolution_outcome, Some(ResolutionOutcome::Pending))

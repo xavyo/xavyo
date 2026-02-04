@@ -10,13 +10,13 @@ use crate::metrics::RateLimitMetrics;
 use crate::rate_limit::{RateLimitConfig, RateLimiter};
 use crate::{EntraCloudEnvironment, EntraError, EntraResult, TokenCache};
 
-/// OData error response from Microsoft Graph.
+/// `OData` error response from Microsoft Graph.
 #[derive(Debug, Deserialize)]
 pub struct ODataError {
     pub error: ODataErrorBody,
 }
 
-/// OData error body.
+/// `OData` error body.
 #[derive(Debug, Deserialize)]
 pub struct ODataErrorBody {
     pub code: String,
@@ -79,10 +79,10 @@ impl GraphClient {
         let http_client = reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
-            .map_err(|e| EntraError::Config(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| EntraError::Config(format!("Failed to create HTTP client: {e}")))?;
 
         let rate_limiter = RateLimiter::new(rate_limit_config)
-            .map_err(|e| EntraError::Config(format!("Invalid rate limit config: {}", e)))?;
+            .map_err(|e| EntraError::Config(format!("Invalid rate limit config: {e}")))?;
 
         Ok(Self {
             http_client,
@@ -95,6 +95,7 @@ impl GraphClient {
     }
 
     /// Returns the rate limiter for direct access.
+    #[must_use] 
     pub fn rate_limiter(&self) -> &Arc<RateLimiter> {
         &self.rate_limiter
     }
@@ -105,6 +106,7 @@ impl GraphClient {
     }
 
     /// Returns the base URL for Graph API requests.
+    #[must_use] 
     pub fn base_url(&self) -> String {
         format!(
             "{}/{}",

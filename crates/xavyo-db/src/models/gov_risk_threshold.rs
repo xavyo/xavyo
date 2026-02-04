@@ -23,11 +23,13 @@ pub enum AlertSeverity {
 
 impl AlertSeverity {
     /// Check if this is a critical severity.
+    #[must_use] 
     pub fn is_critical(&self) -> bool {
         matches!(self, Self::Critical)
     }
 
     /// Check if this severity requires immediate attention.
+    #[must_use] 
     pub fn requires_attention(&self) -> bool {
         matches!(self, Self::Warning | Self::Critical)
     }
@@ -49,11 +51,13 @@ pub enum ThresholdAction {
 
 impl ThresholdAction {
     /// Check if this action blocks access.
+    #[must_use] 
     pub fn blocks_access(&self) -> bool {
         matches!(self, Self::Block)
     }
 
     /// Check if this action requires MFA.
+    #[must_use] 
     pub fn requires_mfa(&self) -> bool {
         matches!(self, Self::RequireMfa | Self::Block)
     }
@@ -131,10 +135,10 @@ impl GovRiskThreshold {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_thresholds
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -149,10 +153,10 @@ impl GovRiskThreshold {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_thresholds
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -166,11 +170,11 @@ impl GovRiskThreshold {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_thresholds
             WHERE tenant_id = $1 AND is_enabled = true
             ORDER BY score_value ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -184,11 +188,11 @@ impl GovRiskThreshold {
         score: i32,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_thresholds
             WHERE tenant_id = $1 AND is_enabled = true AND score_value <= $2
             ORDER BY score_value DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(score)
@@ -203,12 +207,12 @@ impl GovRiskThreshold {
         score: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_thresholds
             WHERE tenant_id = $1 AND is_enabled = true AND score_value <= $2
             ORDER BY score_value DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(score)
@@ -225,24 +229,24 @@ impl GovRiskThreshold {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_risk_thresholds
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ${}", param_count));
+            query.push_str(&format!(" AND severity = ${param_count}"));
         }
         if filter.action.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND action = ${}", param_count));
+            query.push_str(&format!(" AND action = ${param_count}"));
         }
         if filter.is_enabled.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_enabled = ${}", param_count));
+            query.push_str(&format!(" AND is_enabled = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -273,24 +277,24 @@ impl GovRiskThreshold {
         filter: &RiskThresholdFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_risk_thresholds
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ${}", param_count));
+            query.push_str(&format!(" AND severity = ${param_count}"));
         }
         if filter.action.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND action = ${}", param_count));
+            query.push_str(&format!(" AND action = ${param_count}"));
         }
         if filter.is_enabled.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_enabled = ${}", param_count));
+            query.push_str(&format!(" AND is_enabled = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -315,13 +319,13 @@ impl GovRiskThreshold {
         input: CreateGovRiskThreshold,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_risk_thresholds (
                 tenant_id, name, score_value, severity, action, cooldown_hours, is_enabled
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -345,27 +349,27 @@ impl GovRiskThreshold {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.score_value.is_some() {
-            updates.push(format!("score_value = ${}", param_idx));
+            updates.push(format!("score_value = ${param_idx}"));
             param_idx += 1;
         }
         if input.severity.is_some() {
-            updates.push(format!("severity = ${}", param_idx));
+            updates.push(format!("severity = ${param_idx}"));
             param_idx += 1;
         }
         if input.action.is_some() {
-            updates.push(format!("action = ${}", param_idx));
+            updates.push(format!("action = ${param_idx}"));
             param_idx += 1;
         }
         if input.cooldown_hours.is_some() {
-            updates.push(format!("cooldown_hours = ${}", param_idx));
+            updates.push(format!("cooldown_hours = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_enabled.is_some() {
-            updates.push(format!("is_enabled = ${}", param_idx));
+            updates.push(format!("is_enabled = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -407,10 +411,10 @@ impl GovRiskThreshold {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_risk_thresholds
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -427,12 +431,12 @@ impl GovRiskThreshold {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_risk_thresholds
             SET is_enabled = true, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND is_enabled = false
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -447,12 +451,12 @@ impl GovRiskThreshold {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_risk_thresholds
             SET is_enabled = false, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND is_enabled = true
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

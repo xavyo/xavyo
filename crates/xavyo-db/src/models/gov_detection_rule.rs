@@ -25,11 +25,13 @@ pub enum DetectionRuleType {
 
 impl DetectionRuleType {
     /// Check if this rule type requires parameters.
+    #[must_use] 
     pub fn requires_parameters(&self) -> bool {
         matches!(self, Self::Inactive | Self::Custom)
     }
 
     /// Get default parameters for this rule type.
+    #[must_use] 
     pub fn default_parameters(&self) -> serde_json::Value {
         match self {
             Self::NoManager => serde_json::json!({}),
@@ -61,7 +63,7 @@ pub struct GovDetectionRule {
     /// Priority for rule execution (lower = higher priority).
     pub priority: i32,
 
-    /// Rule-specific parameters (e.g., days_threshold for inactive).
+    /// Rule-specific parameters (e.g., `days_threshold` for inactive).
     pub parameters: serde_json::Value,
 
     /// Human-readable description.
@@ -110,10 +112,10 @@ impl GovDetectionRule {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_detection_rules
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -128,10 +130,10 @@ impl GovDetectionRule {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_detection_rules
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -145,11 +147,11 @@ impl GovDetectionRule {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_detection_rules
             WHERE tenant_id = $1 AND is_enabled = true
             ORDER BY priority ASC, name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -163,11 +165,11 @@ impl GovDetectionRule {
         rule_type: DetectionRuleType,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_detection_rules
             WHERE tenant_id = $1 AND rule_type = $2
             ORDER BY priority ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_type)
@@ -184,21 +186,21 @@ impl GovDetectionRule {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_detection_rules
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.rule_type.is_some() {
-            query.push_str(&format!(" AND rule_type = ${}", param_idx));
+            query.push_str(&format!(" AND rule_type = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.is_enabled.is_some() {
-            query.push_str(&format!(" AND is_enabled = ${}", param_idx));
+            query.push_str(&format!(" AND is_enabled = ${param_idx}"));
             param_idx += 1;
         }
 
@@ -230,21 +232,21 @@ impl GovDetectionRule {
         filter: &DetectionRuleFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_detection_rules
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.rule_type.is_some() {
-            query.push_str(&format!(" AND rule_type = ${}", param_idx));
+            query.push_str(&format!(" AND rule_type = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.is_enabled.is_some() {
-            query.push_str(&format!(" AND is_enabled = ${}", param_idx));
+            query.push_str(&format!(" AND is_enabled = ${param_idx}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -271,13 +273,13 @@ impl GovDetectionRule {
             .unwrap_or_else(|| data.rule_type.default_parameters());
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_detection_rules (
                 tenant_id, name, rule_type, is_enabled, priority, parameters, description
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&data.name)
@@ -298,7 +300,7 @@ impl GovDetectionRule {
         data: UpdateGovDetectionRule,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_detection_rules
             SET
                 name = COALESCE($3, name),
@@ -308,7 +310,7 @@ impl GovDetectionRule {
                 description = COALESCE($7, description)
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -328,12 +330,12 @@ impl GovDetectionRule {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_detection_rules
             SET is_enabled = true
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -348,12 +350,12 @@ impl GovDetectionRule {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_detection_rules
             SET is_enabled = false
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -368,10 +370,10 @@ impl GovDetectionRule {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_detection_rules
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

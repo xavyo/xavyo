@@ -44,14 +44,14 @@ impl UserRecoveryCode {
         E: PgExecutor<'e>,
     {
         // Use unnest for bulk insert
-        let code_hashes_vec: Vec<&str> = code_hashes.iter().map(|s| s.as_str()).collect();
+        let code_hashes_vec: Vec<&str> = code_hashes.iter().map(std::string::String::as_str).collect();
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO user_recovery_codes (user_id, tenant_id, code_hash)
             SELECT $1, $2, unnest($3::text[])
             RETURNING *
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -99,11 +99,11 @@ impl UserRecoveryCode {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE user_recovery_codes
             SET used_at = NOW()
             WHERE user_id = $1 AND code_hash = $2 AND used_at IS NULL
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(code_hash)

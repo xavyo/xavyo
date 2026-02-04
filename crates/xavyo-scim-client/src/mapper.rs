@@ -32,6 +32,7 @@ impl AttributeMapper {
     /// When `mappings` is non-empty, the mapper uses those entries to decide
     /// which SCIM paths to populate and how.  When `mappings` is empty, the
     /// built-in default mapping (equivalent to the default DB rows) is used.
+    #[must_use] 
     pub fn map_user_to_scim(
         user_id: Uuid,
         email: Option<&str>,
@@ -43,10 +44,10 @@ impl AttributeMapper {
     ) -> ScimUser {
         // Collect source field values into a lookup table.
         let source_values: Vec<(&str, Option<String>)> = vec![
-            ("email", email.map(|s| s.to_string())),
-            ("display_name", display_name.map(|s| s.to_string())),
-            ("first_name", first_name.map(|s| s.to_string())),
-            ("last_name", last_name.map(|s| s.to_string())),
+            ("email", email.map(std::string::ToString::to_string)),
+            ("display_name", display_name.map(std::string::ToString::to_string)),
+            ("first_name", first_name.map(std::string::ToString::to_string)),
+            ("last_name", last_name.map(std::string::ToString::to_string)),
             ("is_active", Some(active.to_string())),
         ];
 
@@ -86,7 +87,7 @@ impl AttributeMapper {
         // Apply each mapping entry.
         for (source_field, scim_path, mapping_type, constant_value, transform) in &user_mappings {
             let raw_value = match *mapping_type {
-                "constant" => constant_value.map(|v| v.to_string()),
+                "constant" => constant_value.map(std::string::ToString::to_string),
                 _ => {
                     // "direct" or "expression" — look up source field value.
                     source_values
@@ -122,7 +123,7 @@ impl AttributeMapper {
         user
     }
 
-    /// Apply a value to a specific SCIM path on a ScimUser.
+    /// Apply a value to a specific SCIM path on a `ScimUser`.
     fn apply_scim_path(user: &mut ScimUser, scim_path: &str, value: &str) {
         match scim_path {
             "userName" => user.user_name = value.to_string(),
@@ -166,6 +167,7 @@ impl AttributeMapper {
     /// SCIM-side resource IDs of members that have already been provisioned.
     /// These are string identifiers returned by the target system and may or
     /// may not be valid UUIDs depending on the target.
+    #[must_use] 
     pub fn map_group_to_scim(
         group_id: Uuid,
         display_name: &str,
@@ -201,6 +203,7 @@ impl AttributeMapper {
     ///
     /// Returns `None` if no patch operations would be generated (e.g. no fields
     /// map to any SCIM path).
+    #[must_use] 
     pub fn build_user_patch(
         changed_fields: &[(String, Option<String>)],
         mappings: &[ScimTargetAttributeMapping],

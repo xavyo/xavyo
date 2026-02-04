@@ -1,6 +1,6 @@
-//! WebAuthn Service for FIDO2/WebAuthn authentication.
+//! `WebAuthn` Service for FIDO2/WebAuthn authentication.
 //!
-//! Handles WebAuthn credential registration, authentication, and management.
+//! Handles `WebAuthn` credential registration, authentication, and management.
 
 use crate::error::ApiAuthError;
 use sqlx::PgPool;
@@ -14,20 +14,20 @@ use xavyo_db::{
     WebAuthnAuditAction, WebAuthnAuditLog, WebAuthnChallenge,
 };
 
-/// Maximum failed WebAuthn authentication attempts before lockout.
+/// Maximum failed `WebAuthn` authentication attempts before lockout.
 pub const MAX_FAILED_ATTEMPTS: i64 = 5;
 
 /// Lockout duration in minutes after max failed attempts.
 pub const LOCKOUT_MINUTES: i64 = 5;
 
-/// Configuration for the WebAuthn service.
+/// Configuration for the `WebAuthn` service.
 #[derive(Debug, Clone)]
 pub struct WebAuthnConfig {
     /// Relying Party ID (usually the domain, e.g., "xavyo.net").
     pub rp_id: String,
     /// Relying Party name (displayed to users).
     pub rp_name: String,
-    /// Origin URL for WebAuthn requests.
+    /// Origin URL for `WebAuthn` requests.
     pub origin: Url,
 }
 
@@ -40,7 +40,7 @@ impl WebAuthnConfig {
             .unwrap_or_else(|_| "http://localhost:8080".to_string());
 
         let origin = Url::parse(&origin_str)
-            .map_err(|e| ApiAuthError::Internal(format!("Invalid WEBAUTHN_ORIGIN: {}", e)))?;
+            .map_err(|e| ApiAuthError::Internal(format!("Invalid WEBAUTHN_ORIGIN: {e}")))?;
 
         Ok(Self {
             rp_id,
@@ -50,7 +50,7 @@ impl WebAuthnConfig {
     }
 }
 
-/// WebAuthn Service for handling FIDO2/WebAuthn operations.
+/// `WebAuthn` Service for handling FIDO2/WebAuthn operations.
 #[derive(Clone)]
 pub struct WebAuthnService {
     pool: PgPool,
@@ -59,16 +59,16 @@ pub struct WebAuthnService {
 }
 
 impl WebAuthnService {
-    /// Create a new WebAuthn service.
+    /// Create a new `WebAuthn` service.
     pub fn new(pool: PgPool, config: WebAuthnConfig) -> Result<Self, ApiAuthError> {
         let rp_origin = config.origin.clone();
         let builder = WebauthnBuilder::new(&config.rp_id, &rp_origin)
-            .map_err(|e| ApiAuthError::Internal(format!("WebAuthn builder error: {}", e)))?
+            .map_err(|e| ApiAuthError::Internal(format!("WebAuthn builder error: {e}")))?
             .rp_name(&config.rp_name);
 
         let webauthn = builder
             .build()
-            .map_err(|e| ApiAuthError::Internal(format!("WebAuthn build error: {}", e)))?;
+            .map_err(|e| ApiAuthError::Internal(format!("WebAuthn build error: {e}")))?;
 
         Ok(Self {
             pool,
@@ -83,7 +83,7 @@ impl WebAuthnService {
         Self::new(pool, config)
     }
 
-    /// Start WebAuthn credential registration.
+    /// Start `WebAuthn` credential registration.
     ///
     /// Returns the creation challenge options to send to the client.
     #[allow(clippy::too_many_arguments)]
@@ -116,7 +116,7 @@ impl WebAuthnService {
             .await
             .map_err(ApiAuthError::Database)?;
 
-        if credential_count >= policy.max_credentials_per_user as i64 {
+        if credential_count >= i64::from(policy.max_credentials_per_user) {
             return Err(ApiAuthError::MaxWebAuthnCredentials);
         }
 
@@ -148,12 +148,12 @@ impl WebAuthnService {
                 Some(exclude_credentials),
             )
             .map_err(|e| {
-                ApiAuthError::Internal(format!("WebAuthn registration start failed: {}", e))
+                ApiAuthError::Internal(format!("WebAuthn registration start failed: {e}"))
             })?;
 
         // Serialize and store the registration state
         let state_json = serde_json::to_value(&reg_state).map_err(|e| {
-            ApiAuthError::Internal(format!("Failed to serialize registration state: {}", e))
+            ApiAuthError::Internal(format!("Failed to serialize registration state: {e}"))
         })?;
 
         // Extract challenge bytes (use serialization to get the underlying bytes)
@@ -194,7 +194,7 @@ impl WebAuthnService {
         Ok(ccr)
     }
 
-    /// Complete WebAuthn credential registration.
+    /// Complete `WebAuthn` credential registration.
     ///
     /// Verifies the authenticator response and stores the credential.
     pub async fn finish_registration(
@@ -229,7 +229,7 @@ impl WebAuthnService {
         // Deserialize registration state
         let reg_state: PasskeyRegistration = serde_json::from_value(challenge.state_json.clone())
             .map_err(|e| {
-            ApiAuthError::Internal(format!("Failed to deserialize registration state: {}", e))
+            ApiAuthError::Internal(format!("Failed to deserialize registration state: {e}"))
         })?;
 
         // Complete registration
@@ -238,7 +238,7 @@ impl WebAuthnService {
             .finish_passkey_registration(reg_response, &reg_state)
             .map_err(|e| {
                 tracing::error!("WebAuthn registration finish failed: {:?}", e);
-                ApiAuthError::WebAuthnVerificationFailed(format!("{:?}", e))
+                ApiAuthError::WebAuthnVerificationFailed(format!("{e:?}"))
             })?;
 
         // T064: Enforce require_attestation policy
@@ -269,7 +269,7 @@ impl WebAuthnService {
             .response
             .transports
             .as_ref()
-            .map(|t| {
+            .is_some_and(|t| {
                 t.iter().any(|transport| {
                     matches!(
                         transport,
@@ -277,7 +277,6 @@ impl WebAuthnService {
                     )
                 })
             })
-            .unwrap_or(false)
         {
             "platform"
         } else {
@@ -303,7 +302,7 @@ impl WebAuthnService {
 
         // Serialize passkey for storage (we'll use this to reconstruct for authentication)
         let passkey_json = serde_json::to_vec(&passkey)
-            .map_err(|e| ApiAuthError::Internal(format!("Failed to serialize passkey: {}", e)))?;
+            .map_err(|e| ApiAuthError::Internal(format!("Failed to serialize passkey: {e}")))?;
 
         // Use default authenticator type since we can't access private cred field
         let auth_type = "cross-platform";
@@ -362,7 +361,7 @@ impl WebAuthnService {
         Ok(credential.into())
     }
 
-    /// Start WebAuthn authentication.
+    /// Start `WebAuthn` authentication.
     ///
     /// Returns the request challenge options to send to the client.
     pub async fn start_authentication(
@@ -420,12 +419,12 @@ impl WebAuthnService {
             .webauthn
             .start_passkey_authentication(&passkeys)
             .map_err(|e| {
-                ApiAuthError::Internal(format!("WebAuthn authentication start failed: {}", e))
+                ApiAuthError::Internal(format!("WebAuthn authentication start failed: {e}"))
             })?;
 
         // Serialize and store the authentication state
         let state_json = serde_json::to_value(&auth_state).map_err(|e| {
-            ApiAuthError::Internal(format!("Failed to serialize authentication state: {}", e))
+            ApiAuthError::Internal(format!("Failed to serialize authentication state: {e}"))
         })?;
 
         // Extract challenge bytes
@@ -466,7 +465,7 @@ impl WebAuthnService {
         Ok(rcr)
     }
 
-    /// Complete WebAuthn authentication.
+    /// Complete `WebAuthn` authentication.
     ///
     /// Verifies the authenticator assertion and updates the credential counter.
     pub async fn finish_authentication(
@@ -501,7 +500,7 @@ impl WebAuthnService {
         // Deserialize authentication state
         let auth_state: PasskeyAuthentication =
             serde_json::from_value(challenge.state_json.clone()).map_err(|e| {
-                ApiAuthError::Internal(format!("Failed to deserialize authentication state: {}", e))
+                ApiAuthError::Internal(format!("Failed to deserialize authentication state: {e}"))
             })?;
 
         // Complete authentication
@@ -510,7 +509,7 @@ impl WebAuthnService {
             .finish_passkey_authentication(auth_response, &auth_state)
             .map_err(|e| {
                 tracing::error!("WebAuthn authentication finish failed: {:?}", e);
-                ApiAuthError::WebAuthnVerificationFailed(format!("{:?}", e))
+                ApiAuthError::WebAuthnVerificationFailed(format!("{e:?}"))
             })?;
 
         // T065: Enforce user_verification policy
@@ -561,7 +560,7 @@ impl WebAuthnService {
             &mut *tx,
             tenant_id,
             credential.id,
-            new_counter as i64,
+            i64::from(new_counter),
         )
         .await
         .map_err(ApiAuthError::Database)?;
@@ -594,7 +593,7 @@ impl WebAuthnService {
         Ok(credential.id)
     }
 
-    /// List all WebAuthn credentials for a user.
+    /// List all `WebAuthn` credentials for a user.
     pub async fn list_credentials(
         &self,
         user_id: Uuid,
@@ -612,7 +611,7 @@ impl WebAuthnService {
         Ok(credentials.into_iter().map(Into::into).collect())
     }
 
-    /// Rename a WebAuthn credential.
+    /// Rename a `WebAuthn` credential.
     pub async fn rename_credential(
         &self,
         user_id: Uuid,
@@ -667,7 +666,7 @@ impl WebAuthnService {
         Ok(updated.into())
     }
 
-    /// Delete a WebAuthn credential.
+    /// Delete a `WebAuthn` credential.
     pub async fn delete_credential(
         &self,
         user_id: Uuid,
@@ -720,7 +719,7 @@ impl WebAuthnService {
         Ok(())
     }
 
-    /// Check if user has any enabled WebAuthn credentials.
+    /// Check if user has any enabled `WebAuthn` credentials.
     pub async fn has_webauthn_enabled(
         &self,
         user_id: Uuid,
@@ -736,7 +735,7 @@ impl WebAuthnService {
             .map_err(ApiAuthError::Database)
     }
 
-    /// Get tenant WebAuthn policy.
+    /// Get tenant `WebAuthn` policy.
     pub async fn get_tenant_policy(
         &self,
         tenant_id: Uuid,

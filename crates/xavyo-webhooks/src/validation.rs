@@ -107,7 +107,7 @@ fn is_internal_ip(ip: &IpAddr) -> bool {
 // Event type validation
 // ---------------------------------------------------------------------------
 
-/// Validate that all event type strings are known WebhookEventType variants.
+/// Validate that all event type strings are known `WebhookEventType` variants.
 ///
 /// Returns the first invalid event type found, or Ok(()) if all are valid.
 pub fn validate_event_types(event_types: &[String]) -> Result<(), WebhookError> {

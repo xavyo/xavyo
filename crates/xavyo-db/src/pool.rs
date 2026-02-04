@@ -1,12 +1,12 @@
-//! Connection pool management for PostgreSQL.
+//! Connection pool management for `PostgreSQL`.
 //!
-//! Provides a configurable connection pool using SQLx's `PgPool`.
+//! Provides a configurable connection pool using `SQLx`'s `PgPool`.
 
 use crate::error::DbError;
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::time::Duration;
 
-/// A wrapper around SQLx's PostgreSQL connection pool.
+/// A wrapper around `SQLx`'s `PostgreSQL` connection pool.
 ///
 /// # Example
 ///
@@ -26,13 +26,13 @@ pub struct DbPool {
 }
 
 impl DbPool {
-    /// Connect to PostgreSQL using the provided database URL.
+    /// Connect to `PostgreSQL` using the provided database URL.
     ///
     /// Uses default pool options (min: 1, max: 10, timeout: 5s).
     ///
     /// # Arguments
     ///
-    /// * `database_url` - PostgreSQL connection string (e.g., `postgres://user:pass@host/db`)
+    /// * `database_url` - `PostgreSQL` connection string (e.g., `postgres://user:pass@host/db`)
     ///
     /// # Errors
     ///
@@ -41,11 +41,11 @@ impl DbPool {
         Self::connect_with_options(database_url, DbPoolOptions::default()).await
     }
 
-    /// Connect to PostgreSQL with custom pool options.
+    /// Connect to `PostgreSQL` with custom pool options.
     ///
     /// # Arguments
     ///
-    /// * `database_url` - PostgreSQL connection string
+    /// * `database_url` - `PostgreSQL` connection string
     /// * `options` - Custom pool configuration options
     ///
     /// # Example
@@ -77,9 +77,9 @@ impl DbPool {
         Ok(Self { inner: pool })
     }
 
-    /// Get a reference to the inner SQLx pool.
+    /// Get a reference to the inner `SQLx` pool.
     ///
-    /// This allows direct access to SQLx's `PgPool` for advanced use cases.
+    /// This allows direct access to `SQLx`'s `PgPool` for advanced use cases.
     #[must_use]
     pub fn inner(&self) -> &PgPool {
         &self.inner

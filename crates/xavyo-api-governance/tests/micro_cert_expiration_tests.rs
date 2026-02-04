@@ -4,7 +4,7 @@
 
 use chrono::{Duration, Utc};
 use uuid::Uuid;
-use xavyo_db::{MicroCertDecision, MicroCertEventType, MicroCertStatus};
+use xavyo_db::{MicroCertDecision, MicroCertStatus};
 
 /// Simulated certification for testing expiration logic
 #[derive(Debug, Clone)]
@@ -44,7 +44,7 @@ mod reminder_tests {
         let reminder_threshold_percent = 75;
 
         // When: Calculate when reminder should be sent
-        let reminder_time_secs = (timeout_secs * reminder_threshold_percent / 100) as i64;
+        let reminder_time_secs = i64::from(timeout_secs * reminder_threshold_percent / 100);
 
         // Then: Reminder should be at 18 hours (75% of 24h)
         assert_eq!(reminder_time_secs, 64800); // 18 hours in seconds
@@ -79,7 +79,7 @@ mod reminder_tests {
 
     #[test]
     fn test_no_reminder_when_already_sent() {
-        let mut cert = TestCertification {
+        let cert = TestCertification {
             id: Uuid::new_v4(),
             tenant_id: Uuid::new_v4(),
             trigger_rule_id: Uuid::new_v4(),
@@ -230,8 +230,8 @@ mod expiration_tests {
 
     #[test]
     fn test_auto_revoke_on_deadline_expiration() {
-        let assignment_id = Uuid::new_v4();
-        let mut cert = TestCertification {
+        let _assignment_id = Uuid::new_v4();
+        let cert = TestCertification {
             id: Uuid::new_v4(),
             tenant_id: Uuid::new_v4(),
             trigger_rule_id: Uuid::new_v4(),

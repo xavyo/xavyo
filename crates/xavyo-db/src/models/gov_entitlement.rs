@@ -133,10 +133,10 @@ impl GovEntitlement {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_entitlements
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -152,10 +152,10 @@ impl GovEntitlement {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_entitlements
             WHERE tenant_id = $1 AND application_id = $2 AND name = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(application_id)
@@ -173,32 +173,32 @@ impl GovEntitlement {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_entitlements
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.application_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND application_id = ${}", param_count));
+            query.push_str(&format!(" AND application_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.risk_level.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND risk_level = ${}", param_count));
+            query.push_str(&format!(" AND risk_level = ${param_count}"));
         }
         if filter.owner_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND owner_id = ${}", param_count));
+            query.push_str(&format!(" AND owner_id = ${param_count}"));
         }
         if filter.is_delegable.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_delegable = ${}", param_count));
+            query.push_str(&format!(" AND is_delegable = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -235,32 +235,32 @@ impl GovEntitlement {
         filter: &EntitlementFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_entitlements
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.application_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND application_id = ${}", param_count));
+            query.push_str(&format!(" AND application_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.risk_level.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND risk_level = ${}", param_count));
+            query.push_str(&format!(" AND risk_level = ${param_count}"));
         }
         if filter.owner_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND owner_id = ${}", param_count));
+            query.push_str(&format!(" AND owner_id = ${param_count}"));
         }
         if filter.is_delegable.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_delegable = ${}", param_count));
+            query.push_str(&format!(" AND is_delegable = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -291,11 +291,11 @@ impl GovEntitlement {
         input: CreateGovEntitlement,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_entitlements (tenant_id, application_id, name, description, risk_level, owner_id, external_id, metadata, is_delegable)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.application_id)
@@ -321,35 +321,35 @@ impl GovEntitlement {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.risk_level.is_some() {
-            updates.push(format!("risk_level = ${}", param_idx));
+            updates.push(format!("risk_level = ${param_idx}"));
             param_idx += 1;
         }
         if input.status.is_some() {
-            updates.push(format!("status = ${}", param_idx));
+            updates.push(format!("status = ${param_idx}"));
             param_idx += 1;
         }
         if input.owner_id.is_some() {
-            updates.push(format!("owner_id = ${}", param_idx));
+            updates.push(format!("owner_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.external_id.is_some() {
-            updates.push(format!("external_id = ${}", param_idx));
+            updates.push(format!("external_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.metadata.is_some() {
-            updates.push(format!("metadata = ${}", param_idx));
+            updates.push(format!("metadata = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_delegable.is_some() {
-            updates.push(format!("is_delegable = ${}", param_idx));
+            updates.push(format!("is_delegable = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -397,10 +397,10 @@ impl GovEntitlement {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_entitlements
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -418,12 +418,12 @@ impl GovEntitlement {
         owner_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_entitlements
             SET owner_id = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -439,12 +439,12 @@ impl GovEntitlement {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_entitlements
             SET owner_id = NULL, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -459,10 +459,10 @@ impl GovEntitlement {
         entitlement_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_entitlement_assignments
             WHERE entitlement_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(entitlement_id)
         .bind(tenant_id)
@@ -479,12 +479,12 @@ impl GovEntitlement {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_entitlements
             WHERE tenant_id = $1 AND owner_id = $2
             ORDER BY name
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(owner_id)
@@ -495,6 +495,7 @@ impl GovEntitlement {
     }
 
     /// Check if entitlement is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self.status, GovEntitlementStatus::Active)
     }
@@ -502,11 +503,11 @@ impl GovEntitlement {
     /// List all active entitlements for a tenant (used by role mining).
     pub async fn list_all(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_entitlements
             WHERE tenant_id = $1 AND status = 'active'
             ORDER BY name
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)

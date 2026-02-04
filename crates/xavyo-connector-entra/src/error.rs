@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-/// Result type alias using EntraError.
+/// Result type alias using `EntraError`.
 pub type EntraResult<T> = Result<T, EntraError>;
 
 /// Errors that can occur when interacting with Entra ID.
@@ -12,7 +12,7 @@ pub enum EntraError {
     #[error("Configuration error: {0}")]
     Config(String),
 
-    /// OAuth2 authentication error.
+    /// `OAuth2` authentication error.
     #[error("Authentication error: {0}")]
     Auth(String),
 

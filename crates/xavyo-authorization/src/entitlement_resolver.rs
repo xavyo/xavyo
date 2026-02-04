@@ -27,7 +27,7 @@ impl EntitlementResolver {
     /// 3. **Role-based**: Entitlements linked to roles the user holds
     ///
     /// Only active, non-expired assignments are included.
-    /// Results are deduplicated by entitlement_id (first source wins).
+    /// Results are deduplicated by `entitlement_id` (first source wins).
     pub async fn resolve_entitlements(
         pool: &PgPool,
         tenant_id: Uuid,

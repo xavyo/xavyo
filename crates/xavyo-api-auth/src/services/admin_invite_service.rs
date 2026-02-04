@@ -78,9 +78,7 @@ impl AdminInviteService {
         if !email_result.is_valid {
             return Err(ApiAuthError::Validation(
                 email_result
-                    .error
-                    .map(|e| e.to_string())
-                    .unwrap_or_else(|| "Invalid email".to_string()),
+                    .error.map_or_else(|| "Invalid email".to_string(), |e| e.to_string()),
             ));
         }
 
@@ -116,8 +114,7 @@ impl AdminInviteService {
 
         if pending_count >= MAX_PENDING_INVITATIONS {
             return Err(ApiAuthError::MaxInvitationsReached(format!(
-                "Maximum of {} pending invitations per tenant",
-                MAX_PENDING_INVITATIONS
+                "Maximum of {MAX_PENDING_INVITATIONS} pending invitations per tenant"
             )));
         }
 
@@ -157,7 +154,7 @@ impl AdminInviteService {
         let invitation_url = format!("{}/invite/{}", self.frontend_base_url, raw_token);
         let subject = "You're invited to join as an administrator";
         let body = format!(
-            r#"Hi,
+            r"Hi,
 
 You have been invited to set up an administrator account.
 
@@ -168,7 +165,7 @@ This link will expire in {DEFAULT_EXPIRY_DAYS} days.
 
 If you didn't expect this invitation, you can safely ignore this email.
 
-- The xavyo Team"#
+- The xavyo Team"
         );
 
         self.email_sender
@@ -234,9 +231,7 @@ If you didn't expect this invitation, you can safely ignore this email.
         if !password_result.is_valid {
             let error_msg = password_result
                 .errors
-                .first()
-                .map(|e| e.to_string())
-                .unwrap_or_else(|| "Invalid password".to_string());
+                .first().map_or_else(|| "Invalid password".to_string(), std::string::ToString::to_string);
             return Err(ApiAuthError::Validation(error_msg));
         }
 
@@ -275,18 +270,18 @@ If you didn't expect this invitation, you can safely ignore this email.
 
         // Hash password
         let password_hash = xavyo_auth::hash_password(password)
-            .map_err(|e| ApiAuthError::Internal(format!("Failed to hash password: {}", e)))?;
+            .map_err(|e| ApiAuthError::Internal(format!("Failed to hash password: {e}")))?;
 
         // Create user account with password (direct SQL like auth_service)
         let user_id = uuid::Uuid::new_v4();
         let now = chrono::Utc::now();
 
         let user: User = sqlx::query_as(
-            r#"
+            r"
             INSERT INTO users (id, tenant_id, email, password_hash, is_active, email_verified, email_verified_at, created_at, updated_at)
             VALUES ($1, $2, $3, $4, true, true, $5, $5, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(invitation.tenant_id)
@@ -411,7 +406,7 @@ If you didn't expect this invitation, you can safely ignore this email.
         let invitation_url = format!("{}/invite/{}", self.frontend_base_url, raw_token);
         let subject = "You're invited to join as an administrator";
         let body = format!(
-            r#"Hi,
+            r"Hi,
 
 You have been invited to set up an administrator account.
 
@@ -422,7 +417,7 @@ This link will expire in {DEFAULT_EXPIRY_DAYS} days.
 
 If you didn't expect this invitation, you can safely ignore this email.
 
-- The xavyo Team"#
+- The xavyo Team"
         );
 
         self.email_sender

@@ -122,13 +122,13 @@ impl GovLifecycleFailedOperation {
         let next_retry_at = Utc::now() + Duration::minutes(1);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_lifecycle_failed_operations
             (tenant_id, operation_type, related_request_id, object_id, object_type,
              operation_payload, error_message, max_retries, next_retry_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.operation_type)
@@ -150,14 +150,14 @@ impl GovLifecycleFailedOperation {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_failed_operations
             WHERE tenant_id = $1
               AND status IN ('pending', 'retrying')
               AND next_retry_at <= NOW()
             ORDER BY next_retry_at ASC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -168,11 +168,11 @@ impl GovLifecycleFailedOperation {
     /// Mark operation as retrying.
     pub async fn mark_retrying(pool: &sqlx::PgPool, id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_lifecycle_failed_operations
             SET status = 'retrying', last_attempted_at = NOW()
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .execute(pool)
@@ -183,11 +183,11 @@ impl GovLifecycleFailedOperation {
     /// Mark operation as succeeded.
     pub async fn mark_succeeded(pool: &sqlx::PgPool, id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_lifecycle_failed_operations
             SET status = 'succeeded', resolved_at = NOW()
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .execute(pool)
@@ -199,7 +199,7 @@ impl GovLifecycleFailedOperation {
     pub async fn schedule_next_retry(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
         // Exponential backoff: 1min, 2min, 4min, 8min, 16min
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_lifecycle_failed_operations
             SET
                 retry_count = retry_count + 1,
@@ -217,7 +217,7 @@ impl GovLifecycleFailedOperation {
                 END
             WHERE id = $1
             RETURNING status
-            "#,
+            ",
         )
         .bind(id)
         .fetch_one(pool)
@@ -235,12 +235,12 @@ impl GovLifecycleFailedOperation {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_failed_operations
             WHERE tenant_id = $1 AND status = 'dead_letter'
             ORDER BY resolved_at DESC
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -255,10 +255,10 @@ impl GovLifecycleFailedOperation {
         tenant_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_lifecycle_failed_operations
             WHERE tenant_id = $1 AND status = 'dead_letter'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -272,12 +272,12 @@ impl GovLifecycleFailedOperation {
         pool: &sqlx::PgPool,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         let rows: Vec<(Uuid,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT DISTINCT tenant_id
             FROM gov_lifecycle_failed_operations
             WHERE status IN ('pending', 'retrying')
               AND next_retry_at <= NOW()
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await?;

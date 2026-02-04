@@ -37,7 +37,7 @@ impl std::str::FromStr for ConnectorReconciliationMode {
         match s.to_lowercase().as_str() {
             "full" => Ok(Self::Full),
             "delta" => Ok(Self::Delta),
-            _ => Err(format!("Unknown reconciliation mode: {}", s)),
+            _ => Err(format!("Unknown reconciliation mode: {s}")),
         }
     }
 }
@@ -61,16 +61,19 @@ pub enum ConnectorReconciliationStatus {
 
 impl ConnectorReconciliationStatus {
     /// Check if this status is terminal (run has ended).
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
     }
 
     /// Check if run can be cancelled.
+    #[must_use] 
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Pending | Self::Running)
     }
 
     /// Check if run can be resumed.
+    #[must_use] 
     pub fn can_resume(&self) -> bool {
         matches!(self, Self::Failed | Self::Cancelled)
     }
@@ -98,7 +101,7 @@ impl std::str::FromStr for ConnectorReconciliationStatus {
             "completed" => Ok(Self::Completed),
             "failed" => Ok(Self::Failed),
             "cancelled" => Ok(Self::Cancelled),
-            _ => Err(format!("Unknown reconciliation status: {}", s)),
+            _ => Err(format!("Unknown reconciliation status: {s}")),
         }
     }
 }
@@ -123,11 +126,13 @@ pub struct ConnectorReconciliationRun {
 
 impl ConnectorReconciliationRun {
     /// Get the mode enum.
+    #[must_use] 
     pub fn mode(&self) -> ConnectorReconciliationMode {
         self.mode.parse().unwrap_or_default()
     }
 
     /// Get the status enum.
+    #[must_use] 
     pub fn status(&self) -> ConnectorReconciliationStatus {
         self.status
             .parse()
@@ -141,13 +146,13 @@ impl ConnectorReconciliationRun {
         input: &CreateConnectorReconciliationRun,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_connector_reconciliation_runs (
                 tenant_id, connector_id, mode, triggered_by, status, started_at
             )
             VALUES ($1, $2, $3, $4, 'running', NOW())
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.connector_id)
@@ -164,10 +169,10 @@ impl ConnectorReconciliationRun {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_connector_reconciliation_runs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -182,11 +187,11 @@ impl ConnectorReconciliationRun {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_connector_reconciliation_runs
             WHERE tenant_id = $1 AND connector_id = $2 AND status = 'running'
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -203,31 +208,31 @@ impl ConnectorReconciliationRun {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query =
-            String::from(r#"SELECT * FROM gov_connector_reconciliation_runs WHERE tenant_id = $1"#);
+            String::from(r"SELECT * FROM gov_connector_reconciliation_runs WHERE tenant_id = $1");
         let mut param_idx = 2;
 
         if filter.connector_id.is_some() {
-            query.push_str(&format!(" AND connector_id = ${}", param_idx));
+            query.push_str(&format!(" AND connector_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.mode.is_some() {
-            query.push_str(&format!(" AND mode = ${}", param_idx));
+            query.push_str(&format!(" AND mode = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_idx));
+            query.push_str(&format!(" AND status = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.triggered_by.is_some() {
-            query.push_str(&format!(" AND triggered_by = ${}", param_idx));
+            query.push_str(&format!(" AND triggered_by = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.since.is_some() {
-            query.push_str(&format!(" AND created_at >= ${}", param_idx));
+            query.push_str(&format!(" AND created_at >= ${param_idx}"));
             param_idx += 1;
         }
 
@@ -266,28 +271,28 @@ impl ConnectorReconciliationRun {
         filter: &ConnectorReconciliationRunFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"SELECT COUNT(*) FROM gov_connector_reconciliation_runs WHERE tenant_id = $1"#,
+            r"SELECT COUNT(*) FROM gov_connector_reconciliation_runs WHERE tenant_id = $1",
         );
         let mut param_idx = 2;
 
         if filter.connector_id.is_some() {
-            query.push_str(&format!(" AND connector_id = ${}", param_idx));
+            query.push_str(&format!(" AND connector_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.mode.is_some() {
-            query.push_str(&format!(" AND mode = ${}", param_idx));
+            query.push_str(&format!(" AND mode = ${param_idx}"));
             param_idx += 1;
         }
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_idx));
+            query.push_str(&format!(" AND status = ${param_idx}"));
             param_idx += 1;
         }
         if filter.triggered_by.is_some() {
-            query.push_str(&format!(" AND triggered_by = ${}", param_idx));
+            query.push_str(&format!(" AND triggered_by = ${param_idx}"));
             param_idx += 1;
         }
         if filter.since.is_some() {
-            query.push_str(&format!(" AND created_at >= ${}", param_idx));
+            query.push_str(&format!(" AND created_at >= ${param_idx}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -320,12 +325,12 @@ impl ConnectorReconciliationRun {
         statistics: JsonValue,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_connector_reconciliation_runs
             SET checkpoint = $3, statistics = $4
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -343,12 +348,12 @@ impl ConnectorReconciliationRun {
         statistics: JsonValue,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_connector_reconciliation_runs
             SET status = 'completed', completed_at = NOW(), statistics = $3, checkpoint = NULL
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -366,12 +371,12 @@ impl ConnectorReconciliationRun {
         statistics: JsonValue,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_connector_reconciliation_runs
             SET status = 'failed', completed_at = NOW(), error_message = $3, statistics = $4
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -388,12 +393,12 @@ impl ConnectorReconciliationRun {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_connector_reconciliation_runs
             SET status = 'cancelled', completed_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status IN ('pending', 'running')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -408,12 +413,12 @@ impl ConnectorReconciliationRun {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_connector_reconciliation_runs
             SET status = 'running', started_at = NOW(), completed_at = NULL, error_message = NULL
             WHERE id = $1 AND tenant_id = $2 AND status IN ('failed', 'cancelled')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -424,10 +429,10 @@ impl ConnectorReconciliationRun {
     /// Delete a run.
     pub async fn delete(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_connector_reconciliation_runs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -444,12 +449,12 @@ impl ConnectorReconciliationRun {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_connector_reconciliation_runs
             WHERE tenant_id = $1 AND connector_id = $2 AND status = 'completed'
             ORDER BY completed_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -477,20 +482,24 @@ pub struct ConnectorReconciliationRunFilter {
 }
 
 impl ConnectorReconciliationRunFilter {
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use] 
     pub fn for_connector(mut self, connector_id: Uuid) -> Self {
         self.connector_id = Some(connector_id);
         self
     }
 
+    #[must_use] 
     pub fn with_mode(mut self, mode: ConnectorReconciliationMode) -> Self {
         self.mode = Some(mode);
         self
     }
 
+    #[must_use] 
     pub fn with_status(mut self, status: ConnectorReconciliationStatus) -> Self {
         self.status = Some(status);
         self

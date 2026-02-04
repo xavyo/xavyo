@@ -34,6 +34,7 @@ pub struct InboundCorrelationRule {
 
 impl InboundCorrelationRule {
     /// Create a new exact match rule.
+    #[must_use] 
     pub fn exact(name: &str, source: &str, target: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -46,6 +47,7 @@ impl InboundCorrelationRule {
     }
 
     /// Create a case-sensitive exact match rule.
+    #[must_use] 
     pub fn exact_case_sensitive(name: &str, source: &str, target: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -58,6 +60,7 @@ impl InboundCorrelationRule {
     }
 
     /// Set the weight for confidence scoring.
+    #[must_use] 
     pub fn with_weight(mut self, weight: f64) -> Self {
         self.weight = weight;
         self
@@ -121,6 +124,7 @@ pub struct DatabaseInboundCorrelator {
 
 impl DatabaseInboundCorrelator {
     /// Create a new database-backed correlator.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -129,6 +133,7 @@ impl DatabaseInboundCorrelator {
     }
 
     /// Create with custom configuration.
+    #[must_use] 
     pub fn with_config(pool: PgPool, config: InboundCorrelationConfig) -> Self {
         Self { pool, config }
     }
@@ -140,7 +145,7 @@ impl DatabaseInboundCorrelator {
             Some(serde_json::Value::Number(n)) => Some(n.to_string()),
             Some(serde_json::Value::Bool(b)) => Some(b.to_string()),
             Some(serde_json::Value::Array(arr)) => {
-                arr.first().and_then(|v| v.as_str().map(|s| s.to_string()))
+                arr.first().and_then(|v| v.as_str().map(std::string::ToString::to_string))
             }
             _ => None,
         }
@@ -156,9 +161,9 @@ impl DatabaseInboundCorrelator {
 
         let pattern = match rule.match_type {
             InboundMatchType::Exact | InboundMatchType::CaseInsensitive => search_value.clone(),
-            InboundMatchType::Prefix => format!("{}%", search_value),
-            InboundMatchType::Suffix => format!("%{}", search_value),
-            InboundMatchType::Contains => format!("%{}%", search_value),
+            InboundMatchType::Prefix => format!("{search_value}%"),
+            InboundMatchType::Suffix => format!("%{search_value}"),
+            InboundMatchType::Contains => format!("%{search_value}%"),
         };
 
         (search_value, pattern)
@@ -284,30 +289,30 @@ impl InboundCorrelator for DatabaseInboundCorrelator {
             if let Some((_, pattern, case_sensitive)) = email_condition {
                 let rows = if *case_sensitive {
                     sqlx::query_as::<_, (Uuid, String)>(
-                        r#"
+                        r"
                     SELECT id, email
                     FROM users
                     WHERE tenant_id = $1 AND email LIKE $2
                     LIMIT $3
-                    "#,
+                    ",
                     )
                     .bind(tenant_id)
                     .bind(pattern)
-                    .bind(self.config.max_candidates as i64)
+                    .bind(i64::from(self.config.max_candidates))
                     .fetch_all(&self.pool)
                     .await
                 } else {
                     sqlx::query_as::<_, (Uuid, String)>(
-                        r#"
+                        r"
                     SELECT id, email
                     FROM users
                     WHERE tenant_id = $1 AND LOWER(email) LIKE LOWER($2)
                     LIMIT $3
-                    "#,
+                    ",
                     )
                     .bind(tenant_id)
                     .bind(pattern)
-                    .bind(self.config.max_candidates as i64)
+                    .bind(i64::from(self.config.max_candidates))
                     .fetch_all(&self.pool)
                     .await
                 };
@@ -323,8 +328,7 @@ impl InboundCorrelator for DatabaseInboundCorrelator {
                         .collect(),
                     Err(e) => {
                         return Err(SyncError::internal(format!(
-                            "Database error during correlation: {}",
-                            e
+                            "Database error during correlation: {e}"
                         )));
                     }
                 }

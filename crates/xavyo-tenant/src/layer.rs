@@ -37,7 +37,7 @@ pub struct TenantLayer {
 }
 
 impl TenantLayer {
-    /// Create a new TenantLayer with default configuration.
+    /// Create a new `TenantLayer` with default configuration.
     ///
     /// Default configuration:
     /// - Header name: "X-Tenant-ID"
@@ -48,7 +48,7 @@ impl TenantLayer {
         Self::with_config(TenantConfig::default())
     }
 
-    /// Create a new TenantLayer with custom configuration.
+    /// Create a new `TenantLayer` with custom configuration.
     ///
     /// # Example
     ///

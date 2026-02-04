@@ -109,7 +109,7 @@ pub struct EscalationLevelResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_id: Option<Uuid>,
 
-    /// Depth for manager_chain type.
+    /// Depth for `manager_chain` type.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub manager_chain_depth: Option<i32>,
 
@@ -258,11 +258,11 @@ pub struct CreateEscalationLevelRequest {
     /// Type of escalation target.
     pub target_type: EscalationTargetType,
 
-    /// Target ID (user or group ID, required for specific_user and approval_group types).
+    /// Target ID (user or group ID, required for `specific_user` and `approval_group` types).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_id: Option<Uuid>,
 
-    /// Depth for manager_chain type (1-10).
+    /// Depth for `manager_chain` type (1-10).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub manager_chain_depth: Option<i32>,
 }
@@ -486,6 +486,7 @@ pub struct StepEscalationResponse {
 
 impl StepEscalationResponse {
     /// Create response from step with optional rule.
+    #[must_use] 
     pub fn from_step_and_rule(
         step_id: Uuid,
         escalation_enabled: bool,
@@ -607,7 +608,7 @@ pub struct EscalationEventResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub new_deadline: Option<DateTime<Utc>>,
 
-    /// Additional metadata (e.g., fallback action, levels_exhausted).
+    /// Additional metadata (e.g., fallback action, `levels_exhausted`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
 

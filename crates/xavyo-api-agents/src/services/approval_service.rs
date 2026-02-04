@@ -31,7 +31,8 @@ pub struct ApprovalService {
 }
 
 impl ApprovalService {
-    /// Create a new ApprovalService.
+    /// Create a new `ApprovalService`.
+    #[must_use] 
     pub fn new(
         pool: PgPool,
         audit_service: Arc<AuditService>,
@@ -91,16 +92,12 @@ impl ApprovalService {
                     AiAgent::find_by_id(&pool_clone, tenant_id, approval_clone.agent_id)
                         .await
                         .ok()
-                        .flatten()
-                        .map(|a| a.name)
-                        .unwrap_or_else(|| "unknown".to_string());
+                        .flatten().map_or_else(|| "unknown".to_string(), |a| a.name);
 
                 let tool_name = AiTool::find_by_id(&pool_clone, tenant_id, approval_clone.tool_id)
                     .await
                     .ok()
-                    .flatten()
-                    .map(|t| t.name)
-                    .unwrap_or_else(|| "unknown".to_string());
+                    .flatten().map_or_else(|| "unknown".to_string(), |t| t.name);
 
                 let payload = ApprovalWebhookPayload {
                     event: "approval_requested".to_string(),
@@ -164,14 +161,10 @@ impl ApprovalService {
         let mut summaries = Vec::with_capacity(approvals.len());
         for approval in approvals {
             let agent_name = AiAgent::find_by_id(&self.pool, tenant_id, approval.agent_id)
-                .await?
-                .map(|a| a.name)
-                .unwrap_or_else(|| "unknown".to_string());
+                .await?.map_or_else(|| "unknown".to_string(), |a| a.name);
 
             let tool_name = AiTool::find_by_id(&self.pool, tenant_id, approval.tool_id)
-                .await?
-                .map(|t| t.name)
-                .unwrap_or_else(|| "unknown".to_string());
+                .await?.map_or_else(|| "unknown".to_string(), |t| t.name);
 
             summaries.push(ApprovalSummary {
                 id: approval.id,
@@ -205,14 +198,10 @@ impl ApprovalService {
             .ok_or(ApiAgentsError::ApprovalNotFound)?;
 
         let agent_name = AiAgent::find_by_id(&self.pool, tenant_id, approval.agent_id)
-            .await?
-            .map(|a| a.name)
-            .unwrap_or_else(|| "unknown".to_string());
+            .await?.map_or_else(|| "unknown".to_string(), |a| a.name);
 
         let tool_name = AiTool::find_by_id(&self.pool, tenant_id, approval.tool_id)
-            .await?
-            .map(|t| t.name)
-            .unwrap_or_else(|| "unknown".to_string());
+            .await?.map_or_else(|| "unknown".to_string(), |t| t.name);
 
         Ok(self.to_response(approval, agent_name, tool_name))
     }
@@ -308,14 +297,10 @@ impl ApprovalService {
             .await;
 
         let agent_name = AiAgent::find_by_id(&self.pool, tenant_id, updated.agent_id)
-            .await?
-            .map(|a| a.name)
-            .unwrap_or_else(|| "unknown".to_string());
+            .await?.map_or_else(|| "unknown".to_string(), |a| a.name);
 
         let tool_name = AiTool::find_by_id(&self.pool, tenant_id, updated.tool_id)
-            .await?
-            .map(|t| t.name)
-            .unwrap_or_else(|| "unknown".to_string());
+            .await?.map_or_else(|| "unknown".to_string(), |t| t.name);
 
         Ok(self.to_response(updated, agent_name, tool_name))
     }
@@ -382,22 +367,18 @@ impl ApprovalService {
             .await;
 
         let agent_name = AiAgent::find_by_id(&self.pool, tenant_id, updated.agent_id)
-            .await?
-            .map(|a| a.name)
-            .unwrap_or_else(|| "unknown".to_string());
+            .await?.map_or_else(|| "unknown".to_string(), |a| a.name);
 
         let tool_name = AiTool::find_by_id(&self.pool, tenant_id, updated.tool_id)
-            .await?
-            .map(|t| t.name)
-            .unwrap_or_else(|| "unknown".to_string());
+            .await?.map_or_else(|| "unknown".to_string(), |t| t.name);
 
         Ok(self.to_response(updated, agent_name, tool_name))
     }
 
     /// Check if a user is authorized to approve/deny requests for an agent.
     /// Authorized users are:
-    /// - The agent owner (ai_agents.owner_id)
-    /// - Members of the agent's team (ai_agents.team_id)
+    /// - The agent owner (`ai_agents.owner_id`)
+    /// - Members of the agent's team (`ai_agents.team_id`)
     async fn is_authorized_approver(
         &self,
         tenant_id: Uuid,

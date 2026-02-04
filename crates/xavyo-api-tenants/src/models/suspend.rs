@@ -15,6 +15,7 @@ pub struct SuspendTenantRequest {
 
 impl SuspendTenantRequest {
     /// Validate the request.
+    #[must_use] 
     pub fn validate(&self) -> Option<String> {
         if self.reason.trim().is_empty() {
             return Some("reason is required".to_string());
@@ -106,7 +107,7 @@ mod tests {
     #[test]
     fn test_validate_suspend_request_empty_reason() {
         let req = SuspendTenantRequest {
-            reason: "".to_string(),
+            reason: String::new(),
         };
         assert!(req.validate().is_some());
         assert!(req.validate().unwrap().contains("required"));

@@ -93,7 +93,7 @@ pub async fn list_batch_simulations(
         )
         .await?;
 
-    let items: Vec<BatchSimulationResponse> = simulations.into_iter().map(|s| s.into()).collect();
+    let items: Vec<BatchSimulationResponse> = simulations.into_iter().map(std::convert::Into::into).collect();
 
     Ok(Json(PaginatedResponse {
         items,
@@ -414,7 +414,7 @@ pub async fn get_batch_simulation_results(
         )
         .await?;
 
-    let items: Vec<BatchSimulationResultResponse> = results.into_iter().map(|r| r.into()).collect();
+    let items: Vec<BatchSimulationResultResponse> = results.into_iter().map(std::convert::Into::into).collect();
 
     Ok(Json(PaginatedResponse {
         items,
@@ -511,66 +511,63 @@ pub async fn export_batch_simulation(
 
     let format = query.format.as_deref().unwrap_or("json");
 
-    match format {
-        "csv" => {
-            // Generate CSV export
-            let mut csv_output =
-                String::from("user_id,access_gained,access_lost,has_warnings,warnings\n");
+    if format == "csv" {
+        // Generate CSV export
+        let mut csv_output =
+            String::from("user_id,access_gained,access_lost,has_warnings,warnings\n");
 
-            for result in results {
-                let access_gained_count = result.parse_access_gained().len();
-                let access_lost_count = result.parse_access_lost().len();
-                let warnings = result.parse_warnings();
-                let warnings_str = warnings.join("; ").replace('"', "\"\"");
+        for result in results {
+            let access_gained_count = result.parse_access_gained().len();
+            let access_lost_count = result.parse_access_lost().len();
+            let warnings = result.parse_warnings();
+            let warnings_str = warnings.join("; ").replace('"', "\"\"");
 
-                csv_output.push_str(&format!(
-                    "{},{},{},{},\"{}\"\n",
-                    result.user_id,
-                    access_gained_count,
-                    access_lost_count,
-                    result.has_warnings(),
-                    warnings_str
-                ));
-            }
-
-            let filename = format!("batch_simulation_{}.csv", simulation_id);
-
-            Ok((
-                [
-                    (header::CONTENT_TYPE, "text/csv"),
-                    (
-                        header::CONTENT_DISPOSITION,
-                        &format!("attachment; filename=\"{}\"", filename),
-                    ),
-                ],
-                csv_output,
-            )
-                .into_response())
+            csv_output.push_str(&format!(
+                "{},{},{},{},\"{}\"\n",
+                result.user_id,
+                access_gained_count,
+                access_lost_count,
+                result.has_warnings(),
+                warnings_str
+            ));
         }
-        _ => {
-            // JSON export (default)
-            let export_data = BatchSimulationExport {
-                simulation: BatchSimulationResponse::from(simulation),
-                results: results.into_iter().map(|r| r.into()).collect(),
-            };
 
-            let json = serde_json::to_string_pretty(&export_data)
-                .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?;
+        let filename = format!("batch_simulation_{simulation_id}.csv");
 
-            let filename = format!("batch_simulation_{}.json", simulation_id);
+        Ok((
+            [
+                (header::CONTENT_TYPE, "text/csv"),
+                (
+                    header::CONTENT_DISPOSITION,
+                    &format!("attachment; filename=\"{filename}\""),
+                ),
+            ],
+            csv_output,
+        )
+            .into_response())
+    } else {
+        // JSON export (default)
+        let export_data = BatchSimulationExport {
+            simulation: BatchSimulationResponse::from(simulation),
+            results: results.into_iter().map(std::convert::Into::into).collect(),
+        };
 
-            Ok((
-                [
-                    (header::CONTENT_TYPE, "application/json"),
-                    (
-                        header::CONTENT_DISPOSITION,
-                        &format!("attachment; filename=\"{}\"", filename),
-                    ),
-                ],
-                json,
-            )
-                .into_response())
-        }
+        let json = serde_json::to_string_pretty(&export_data)
+            .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?;
+
+        let filename = format!("batch_simulation_{simulation_id}.json");
+
+        Ok((
+            [
+                (header::CONTENT_TYPE, "application/json"),
+                (
+                    header::CONTENT_DISPOSITION,
+                    &format!("attachment; filename=\"{filename}\""),
+                ),
+            ],
+            json,
+        )
+            .into_response())
     }
 }
 

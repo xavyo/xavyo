@@ -36,12 +36,12 @@ impl std::str::FromStr for ProviderType {
             "okta" => Ok(ProviderType::Okta),
             "google_workspace" => Ok(ProviderType::GoogleWorkspace),
             "generic_oidc" => Ok(ProviderType::GenericOidc),
-            _ => Err(format!("Unknown provider type: {}", s)),
+            _ => Err(format!("Unknown provider type: {s}")),
         }
     }
 }
 
-/// Validation status for IdP configuration.
+/// Validation status for `IdP` configuration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "VARCHAR", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
@@ -114,14 +114,14 @@ impl TenantIdentityProvider {
         input: CreateIdentityProvider,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_identity_providers (
                 tenant_id, name, provider_type, issuer_url, client_id,
                 client_secret_encrypted, claim_mapping, scopes, sync_on_login
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(&input.name)
@@ -165,12 +165,12 @@ impl TenantIdentityProvider {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM tenant_identity_providers
             WHERE tenant_id = $1
             ORDER BY created_at DESC
             OFFSET $2 LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(offset)
@@ -185,11 +185,11 @@ impl TenantIdentityProvider {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM tenant_identity_providers
             WHERE tenant_id = $1 AND is_enabled = true
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -215,12 +215,12 @@ impl TenantIdentityProvider {
     ) -> Result<bool, sqlx::Error> {
         let result: (bool,) = if let Some(exclude) = exclude_id {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT EXISTS(
                     SELECT 1 FROM tenant_identity_providers
                     WHERE tenant_id = $1 AND issuer_url = $2 AND id != $3
                 )
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(issuer_url)
@@ -229,12 +229,12 @@ impl TenantIdentityProvider {
             .await?
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT EXISTS(
                     SELECT 1 FROM tenant_identity_providers
                     WHERE tenant_id = $1 AND issuer_url = $2
                 )
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(issuer_url)
@@ -251,7 +251,7 @@ impl TenantIdentityProvider {
         input: UpdateIdentityProvider,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE tenant_identity_providers
             SET
                 name = COALESCE($2, name),
@@ -264,7 +264,7 @@ impl TenantIdentityProvider {
                 updated_at = NOW()
             WHERE id = $1
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(&input.name)
@@ -285,7 +285,7 @@ impl TenantIdentityProvider {
         status: ValidationStatus,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE tenant_identity_providers
             SET
                 validation_status = $2,
@@ -293,7 +293,7 @@ impl TenantIdentityProvider {
                 updated_at = NOW()
             WHERE id = $1
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(status.to_string())
@@ -308,12 +308,12 @@ impl TenantIdentityProvider {
         is_enabled: bool,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE tenant_identity_providers
             SET is_enabled = $2, updated_at = NOW()
             WHERE id = $1
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(is_enabled)
@@ -350,6 +350,7 @@ impl TenantIdentityProvider {
 
     /// Create a default instance for testing.
     /// Available in all builds for downstream crate tests.
+    #[must_use] 
     pub fn default_for_test() -> Self {
         Self {
             id: Uuid::new_v4(),

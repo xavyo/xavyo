@@ -98,8 +98,7 @@ pub async fn get_snapshot(
             .await
             .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Access snapshot {} not found",
-                id
+                "Access snapshot {id} not found"
             )))?;
 
     Ok(Json(snapshot.into()))

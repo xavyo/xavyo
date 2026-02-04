@@ -189,12 +189,12 @@ impl TenantBranding {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT tb.*
             FROM tenant_branding tb
             JOIN tenants t ON t.id = tb.tenant_id
             WHERE t.slug = $1
-            "#,
+            ",
         )
         .bind(slug)
         .fetch_optional(executor)
@@ -212,7 +212,7 @@ impl TenantBranding {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_branding (
                 tenant_id,
                 logo_url,
@@ -259,7 +259,7 @@ impl TenantBranding {
                 updated_by = $20,
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&data.logo_url)

@@ -53,7 +53,7 @@ pub async fn reset_password_handler(
             .flat_map(|errors| {
                 errors
                     .iter()
-                    .filter_map(|e| e.message.as_ref().map(|m| m.to_string()))
+                    .filter_map(|e| e.message.as_ref().map(std::string::ToString::to_string))
             })
             .collect();
         ApiAuthError::Validation(errors.join(", "))
@@ -66,7 +66,7 @@ pub async fn reset_password_handler(
 
     let validation = PasswordPolicyService::validate_password(&request.new_password, &policy);
     if !validation.is_valid {
-        let errors: Vec<String> = validation.errors.iter().map(|e| e.to_string()).collect();
+        let errors: Vec<String> = validation.errors.iter().map(std::string::ToString::to_string).collect();
         return Err(ApiAuthError::WeakPassword(errors));
     }
 
@@ -75,11 +75,11 @@ pub async fn reset_password_handler(
 
     // Look up the token
     let token_row: Option<PasswordResetTokenRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, user_id, token_hash, expires_at, used_at
         FROM password_reset_tokens
         WHERE token_hash = $1
-        "#,
+        ",
     )
     .bind(&token_hash)
     .fetch_optional(&pool)

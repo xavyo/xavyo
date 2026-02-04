@@ -48,7 +48,7 @@ pub struct ConfirmationCreated {
 pub struct DeviceConfirmationService {
     pool: PgPool,
     email_sender: Arc<dyn EmailSender>,
-    /// Base URL for confirmation links (e.g., "https://api.xavyo.com").
+    /// Base URL for confirmation links (e.g., "<https://api.xavyo.com>").
     base_url: String,
 }
 
@@ -291,18 +291,18 @@ impl DeviceConfirmationService {
 
         let app_name = client_name.unwrap_or("an application");
         let ip_info = requested_from_ip
-            .map(|ip| format!(" from IP address {}", ip))
+            .map(|ip| format!(" from IP address {ip}"))
             .unwrap_or_default();
 
         let subject = "Confirm your device authorization request";
         let body = format!(
-            r#"You requested to authorize {} to access your account{}.
+            r"You requested to authorize {app_name} to access your account{ip_info}.
 
 To confirm this request, click the link below:
 
-{}
+{confirmation_url}
 
-This link will expire in {} minutes.
+This link will expire in {CONFIRMATION_EXPIRY_MINUTES} minutes.
 
 If you did not request this authorization, please ignore this email.
 Someone may have entered your email address by mistake.
@@ -311,8 +311,7 @@ Security Notice: This confirmation was requested because the authorization
 attempt came from a different location than where the device code was created.
 This is a security measure to protect your account.
 
-- The xavyo Team"#,
-            app_name, ip_info, confirmation_url, CONFIRMATION_EXPIRY_MINUTES
+- The xavyo Team"
         );
 
         self.email_sender

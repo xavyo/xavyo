@@ -154,7 +154,7 @@ impl GovScriptExecutionLog {
         params: CreateExecutionLog,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_script_execution_logs (
                 tenant_id, script_id, binding_id, connector_id,
                 script_version, hook_phase, operation_type, execution_status,
@@ -163,7 +163,7 @@ impl GovScriptExecutionLog {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
-            "#,
+            ",
         )
         .bind(params.tenant_id)
         .bind(params.script_id)
@@ -189,10 +189,10 @@ impl GovScriptExecutionLog {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_execution_logs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -200,9 +200,9 @@ impl GovScriptExecutionLog {
         .await
     }
 
-    /// List execution logs for a tenant with dynamic filtering, ordered by executed_at DESC.
+    /// List execution logs for a tenant with dynamic filtering, ordered by `executed_at` DESC.
     ///
-    /// Returns a tuple of (rows, total_count) for pagination.
+    /// Returns a tuple of (rows, `total_count`) for pagination.
     pub async fn list_by_tenant(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -215,37 +215,36 @@ impl GovScriptExecutionLog {
 
         if filter.script_id.is_some() {
             param_count += 1;
-            where_clause.push_str(&format!(" AND script_id = ${}", param_count));
+            where_clause.push_str(&format!(" AND script_id = ${param_count}"));
         }
         if filter.connector_id.is_some() {
             param_count += 1;
-            where_clause.push_str(&format!(" AND connector_id = ${}", param_count));
+            where_clause.push_str(&format!(" AND connector_id = ${param_count}"));
         }
         if filter.binding_id.is_some() {
             param_count += 1;
-            where_clause.push_str(&format!(" AND binding_id = ${}", param_count));
+            where_clause.push_str(&format!(" AND binding_id = ${param_count}"));
         }
         if filter.execution_status.is_some() {
             param_count += 1;
-            where_clause.push_str(&format!(" AND execution_status = ${}", param_count));
+            where_clause.push_str(&format!(" AND execution_status = ${param_count}"));
         }
         if filter.dry_run.is_some() {
             param_count += 1;
-            where_clause.push_str(&format!(" AND dry_run = ${}", param_count));
+            where_clause.push_str(&format!(" AND dry_run = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            where_clause.push_str(&format!(" AND executed_at >= ${}", param_count));
+            where_clause.push_str(&format!(" AND executed_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            where_clause.push_str(&format!(" AND executed_at <= ${}", param_count));
+            where_clause.push_str(&format!(" AND executed_at <= ${param_count}"));
         }
 
         // Count query
         let count_query = format!(
-            "SELECT COUNT(*) FROM gov_script_execution_logs {}",
-            where_clause
+            "SELECT COUNT(*) FROM gov_script_execution_logs {where_clause}"
         );
 
         let mut count_q = sqlx::query_scalar::<_, i64>(&count_query).bind(tenant_id);
@@ -311,9 +310,9 @@ impl GovScriptExecutionLog {
         Ok((rows, total))
     }
 
-    /// List execution logs for a specific script, ordered by executed_at DESC.
+    /// List execution logs for a specific script, ordered by `executed_at` DESC.
     ///
-    /// Returns a tuple of (rows, total_count) for pagination.
+    /// Returns a tuple of (rows, `total_count`) for pagination.
     pub async fn list_by_script(
         pool: &sqlx::PgPool,
         script_id: Uuid,
@@ -322,10 +321,10 @@ impl GovScriptExecutionLog {
         offset: i64,
     ) -> Result<(Vec<Self>, i64), sqlx::Error> {
         let total: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_script_execution_logs
             WHERE script_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(script_id)
         .bind(tenant_id)
@@ -333,12 +332,12 @@ impl GovScriptExecutionLog {
         .await?;
 
         let rows = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_execution_logs
             WHERE script_id = $1 AND tenant_id = $2
             ORDER BY executed_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(script_id)
         .bind(tenant_id)
@@ -357,7 +356,7 @@ impl GovScriptExecutionLog {
         since: DateTime<Utc>,
     ) -> Result<DashboardStats, sqlx::Error> {
         let row = sqlx::query_as::<_, DashboardStatsRow>(
-            r#"
+            r"
             SELECT
                 COUNT(*) AS total_executions,
                 COUNT(*) FILTER (WHERE execution_status = 'success') AS success_count,
@@ -366,7 +365,7 @@ impl GovScriptExecutionLog {
                 AVG(duration_ms)::float8 AS avg_duration_ms
             FROM gov_script_execution_logs
             WHERE tenant_id = $1 AND executed_at >= $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(since)
@@ -389,7 +388,7 @@ impl GovScriptExecutionLog {
         since: DateTime<Utc>,
     ) -> Result<Vec<ScriptStats>, sqlx::Error> {
         let rows = sqlx::query_as::<_, ScriptStatsRow>(
-            r#"
+            r"
             SELECT
                 script_id,
                 COUNT(*) AS total_executions,
@@ -400,7 +399,7 @@ impl GovScriptExecutionLog {
             WHERE tenant_id = $1 AND executed_at >= $2
             GROUP BY script_id
             ORDER BY total_executions DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(since)
@@ -427,7 +426,7 @@ impl GovScriptExecutionLog {
         days: i32,
     ) -> Result<Vec<DailyTrendRow>, sqlx::Error> {
         let rows = sqlx::query_as::<_, DailyTrendRawRow>(
-            r#"
+            r"
             SELECT
                 DATE(executed_at) AS date,
                 COUNT(*) AS executions,
@@ -440,7 +439,7 @@ impl GovScriptExecutionLog {
               AND executed_at >= NOW() - ($3 || ' days')::interval
             GROUP BY DATE(executed_at)
             ORDER BY date ASC
-            "#,
+            ",
         )
         .bind(script_id)
         .bind(tenant_id)
@@ -472,7 +471,7 @@ impl GovScriptExecutionLog {
         since: DateTime<Utc>,
     ) -> Result<f64, sqlx::Error> {
         let rate: Option<f64> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT
                 CASE
                     WHEN COUNT(*) = 0 THEN 0.0
@@ -482,7 +481,7 @@ impl GovScriptExecutionLog {
             WHERE script_id = $1
               AND tenant_id = $2
               AND executed_at >= $3
-            "#,
+            ",
         )
         .bind(script_id)
         .bind(tenant_id)

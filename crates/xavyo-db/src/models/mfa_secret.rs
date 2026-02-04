@@ -90,11 +90,11 @@ impl UserTotpSecret {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO user_totp_secrets (user_id, tenant_id, secret_encrypted, iv, is_enabled)
             VALUES ($1, $2, $3, $4, false)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.user_id)
         .bind(data.tenant_id)
@@ -124,12 +124,12 @@ impl UserTotpSecret {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_totp_secrets
             SET is_enabled = true, setup_completed_at = NOW(), failed_attempts = 0
             WHERE user_id = $1
             RETURNING *
-            "#,
+            ",
         )
         .bind(user_id)
         .fetch_one(executor)
@@ -142,11 +142,11 @@ impl UserTotpSecret {
         E: PgExecutor<'e>,
     {
         sqlx::query(
-            r#"
+            r"
             UPDATE user_totp_secrets
             SET last_used_at = NOW(), failed_attempts = 0, locked_until = NULL
             WHERE user_id = $1
-            "#,
+            ",
         )
         .bind(user_id)
         .execute(executor)
@@ -155,7 +155,7 @@ impl UserTotpSecret {
     }
 
     /// Record failed TOTP verification and potentially lock.
-    /// Returns the new failed_attempts count.
+    /// Returns the new `failed_attempts` count.
     pub async fn record_failure<'e, E>(
         executor: E,
         user_id: Uuid,
@@ -166,7 +166,7 @@ impl UserTotpSecret {
         E: PgExecutor<'e>,
     {
         let result: (i32,) = sqlx::query_as(
-            r#"
+            r"
             UPDATE user_totp_secrets
             SET
                 failed_attempts = failed_attempts + 1,
@@ -176,7 +176,7 @@ impl UserTotpSecret {
                 END
             WHERE user_id = $1
             RETURNING failed_attempts
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(max_attempts)
@@ -247,7 +247,7 @@ impl std::str::FromStr for MfaPolicy {
             "disabled" => Ok(Self::Disabled),
             "optional" => Ok(Self::Optional),
             "required" => Ok(Self::Required),
-            _ => Err(format!("Invalid MFA policy: {}", s)),
+            _ => Err(format!("Invalid MFA policy: {s}")),
         }
     }
 }

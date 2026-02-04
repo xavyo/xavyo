@@ -15,7 +15,7 @@ use crate::models::{
 use crate::router::WebhooksState;
 use xavyo_db::models::{WebhookDelivery, WebhookSubscription};
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, WebhookError> {
     claims
         .tenant_id()

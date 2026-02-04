@@ -66,9 +66,9 @@ pub struct ComplianceReport {
     pub pool_summaries: Vec<PoolComplianceSummary>,
     /// Total number of pools included in the report.
     pub total_pools: usize,
-    /// Sum of total_capacity across all pools.
+    /// Sum of `total_capacity` across all pools.
     pub total_licenses: i64,
-    /// Sum of allocated_count across all pools.
+    /// Sum of `allocated_count` across all pools.
     pub total_assigned: i64,
     /// Overall compliance score (0-100 percentage).
     pub overall_compliance_score: f64,
@@ -95,7 +95,7 @@ pub struct PoolComplianceSummary {
     pub status: LicensePoolStatus,
     pub license_type: LicenseType,
     pub expiration_date: Option<DateTime<Utc>>,
-    /// Whether allocated_count exceeds total_capacity.
+    /// Whether `allocated_count` exceeds `total_capacity`.
     pub is_over_allocated: bool,
     /// Count of active assignments for this pool.
     pub assignment_count: i64,
@@ -127,6 +127,7 @@ pub struct LicenseReportService {
 
 impl LicenseReportService {
     /// Create a new license report service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -186,8 +187,8 @@ impl LicenseReportService {
                 expired_count += 1;
             }
 
-            total_licenses += pool_record.total_capacity as i64;
-            total_assigned += pool_record.allocated_count as i64;
+            total_licenses += i64::from(pool_record.total_capacity);
+            total_assigned += i64::from(pool_record.allocated_count);
 
             pool_summaries.push(PoolComplianceSummary {
                 pool_id: pool_record.id,
@@ -307,6 +308,7 @@ impl LicenseReportService {
     }
 
     /// Get the underlying database pool reference.
+    #[must_use] 
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }
@@ -351,7 +353,7 @@ fn convert_to_audit_trail(entry: ServiceAuditEntry) -> AuditTrailEntry {
 fn escape_csv_field(field: &str) -> String {
     if field.contains(',') || field.contains('"') || field.contains('\n') {
         let escaped = field.replace('"', "\"\"");
-        format!("\"{}\"", escaped)
+        format!("\"{escaped}\"")
     } else {
         field.to_string()
     }

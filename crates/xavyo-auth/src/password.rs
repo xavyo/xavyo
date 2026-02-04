@@ -69,7 +69,7 @@ impl PasswordHasher {
         parallelism: u32,
     ) -> Result<Self, AuthError> {
         let params = Params::new(memory_kib, iterations, parallelism, None)
-            .map_err(|e| AuthError::HashingFailed(format!("Invalid parameters: {}", e)))?;
+            .map_err(|e| AuthError::HashingFailed(format!("Invalid parameters: {e}")))?;
 
         Ok(Self { params })
     }
@@ -93,7 +93,7 @@ impl PasswordHasher {
 
         let hash = argon2
             .hash_password(password.as_bytes(), &salt)
-            .map_err(|e| AuthError::HashingFailed(format!("Hashing failed: {}", e)))?;
+            .map_err(|e| AuthError::HashingFailed(format!("Hashing failed: {e}")))?;
 
         Ok(hash.to_string())
     }

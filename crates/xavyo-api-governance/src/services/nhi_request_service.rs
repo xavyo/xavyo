@@ -41,6 +41,7 @@ pub struct NhiRequestService {
 
 impl NhiRequestService {
     /// Create a new NHI request service.
+    #[must_use] 
     pub fn new(
         pool: PgPool,
         nhi_service: Arc<NhiService>,
@@ -148,7 +149,7 @@ impl NhiRequestService {
         let total = GovNhiRequest::count(&self.pool, tenant_id, &filter).await?;
 
         Ok(NhiRequestListResponse {
-            items: requests.into_iter().map(|r| r.into()).collect(),
+            items: requests.into_iter().map(std::convert::Into::into).collect(),
             total,
             limit,
             offset,

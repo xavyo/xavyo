@@ -59,6 +59,7 @@ pub struct TemplateApplicationService {
 
 impl TemplateApplicationService {
     /// Create a new template application service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             scope_service: TemplateScopeService::new(pool.clone()),
@@ -107,7 +108,7 @@ impl TemplateApplicationService {
 
     /// Apply templates during object creation with optional object creation time.
     ///
-    /// The object_created_at parameter is used for time constraint evaluation.
+    /// The `object_created_at` parameter is used for time constraint evaluation.
     /// If None, the current time is used.
     pub async fn apply_on_create_with_time(
         &self,
@@ -177,7 +178,7 @@ impl TemplateApplicationService {
 
     /// Apply templates during object modification.
     ///
-    /// Similar to apply_on_create but handles:
+    /// Similar to `apply_on_create` but handles:
     /// - Authoritative flag for value removal
     /// - Re-evaluation of all rules on any attribute change
     pub async fn apply_on_update(
@@ -201,7 +202,7 @@ impl TemplateApplicationService {
 
     /// Apply templates during object modification with optional object creation time.
     ///
-    /// The object_created_at parameter is used for time constraint evaluation.
+    /// The `object_created_at` parameter is used for time constraint evaluation.
     /// If None, the current time is used.
     pub async fn apply_on_update_with_time(
         &self,
@@ -300,7 +301,7 @@ impl TemplateApplicationService {
                     TemplateRuleType::Computed => computed_rules.push((template.id, rule)),
                     TemplateRuleType::Validation => validation_rules.push((template.id, rule)),
                     TemplateRuleType::Normalization => {
-                        normalization_rules.push((template.id, rule))
+                        normalization_rules.push((template.id, rule));
                     }
                 }
             }
@@ -606,7 +607,7 @@ impl TemplateApplicationService {
                     let passes = match result {
                         JsonValue::Bool(b) => b,
                         JsonValue::Null => false,
-                        JsonValue::Number(n) => n.as_f64().map(|f| f != 0.0).unwrap_or(false),
+                        JsonValue::Number(n) => n.as_f64().is_some_and(|f| f != 0.0),
                         JsonValue::String(s) => !s.is_empty(),
                         _ => true,
                     };
@@ -631,7 +632,7 @@ impl TemplateApplicationService {
                         template_id: *template_id,
                         rule_id: rule.id,
                         attribute: rule.target_attribute.clone(),
-                        message: format!("Validation error: {}", e),
+                        message: format!("Validation error: {e}"),
                     });
                 }
             }
@@ -652,7 +653,7 @@ impl TemplateApplicationService {
                 let parsed = self.expression_service.parse(expr).map_err(|e| {
                     GovernanceError::TemplateRuleExpressionError {
                         rule_id: Uuid::nil(),
-                        message: format!("Invalid condition: {}", e),
+                        message: format!("Invalid condition: {e}"),
                     }
                 })?;
 
@@ -662,7 +663,7 @@ impl TemplateApplicationService {
                     .evaluate(&parsed, &context)
                     .map_err(|e| GovernanceError::TemplateRuleExpressionError {
                         rule_id: Uuid::nil(),
-                        message: format!("Condition evaluation error: {}", e),
+                        message: format!("Condition evaluation error: {e}"),
                     })?;
 
                 match result {
@@ -682,7 +683,7 @@ impl TemplateApplicationService {
         let parsed = self.expression_service.parse(expression).map_err(|e| {
             GovernanceError::TemplateRuleExpressionError {
                 rule_id: Uuid::nil(),
-                message: format!("Invalid expression: {}", e),
+                message: format!("Invalid expression: {e}"),
             }
         })?;
 

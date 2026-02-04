@@ -48,7 +48,7 @@ pub struct GovEntitlementAssignment {
     /// The type of target (user or group).
     pub target_type: GovAssignmentTargetType,
 
-    /// The target ID (user_id or group_id).
+    /// The target ID (`user_id` or `group_id`).
     pub target_id: Uuid,
 
     /// Who assigned this entitlement.
@@ -143,10 +143,10 @@ impl GovEntitlementAssignment {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_entitlement_assignments
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -163,10 +163,10 @@ impl GovEntitlementAssignment {
         target_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND entitlement_id = $2 AND target_type = $3 AND target_id = $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_id)
@@ -185,32 +185,32 @@ impl GovEntitlementAssignment {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_entitlement_assignments
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.entitlement_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND entitlement_id = ${}", param_count));
+            query.push_str(&format!(" AND entitlement_id = ${param_count}"));
         }
         if filter.target_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND target_type = ${}", param_count));
+            query.push_str(&format!(" AND target_type = ${param_count}"));
         }
         if filter.target_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND target_id = ${}", param_count));
+            query.push_str(&format!(" AND target_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.assigned_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND assigned_by = ${}", param_count));
+            query.push_str(&format!(" AND assigned_by = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -247,32 +247,32 @@ impl GovEntitlementAssignment {
         filter: &GovAssignmentFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_entitlement_assignments
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.entitlement_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND entitlement_id = ${}", param_count));
+            query.push_str(&format!(" AND entitlement_id = ${param_count}"));
         }
         if filter.target_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND target_type = ${}", param_count));
+            query.push_str(&format!(" AND target_type = ${param_count}"));
         }
         if filter.target_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND target_id = ${}", param_count));
+            query.push_str(&format!(" AND target_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.assigned_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND assigned_by = ${}", param_count));
+            query.push_str(&format!(" AND assigned_by = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -303,14 +303,14 @@ impl GovEntitlementAssignment {
         input: CreateGovAssignment,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_entitlement_assignments (
                 tenant_id, entitlement_id, target_type, target_id, assigned_by,
                 expires_at, justification, parameter_hash, valid_from, valid_to
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.entitlement_id)
@@ -333,10 +333,10 @@ impl GovEntitlementAssignment {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_entitlement_assignments
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -353,12 +353,12 @@ impl GovEntitlementAssignment {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_entitlement_assignments
             SET status = 'suspended', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -373,12 +373,12 @@ impl GovEntitlementAssignment {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_entitlement_assignments
             SET status = 'active', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'suspended'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -393,10 +393,10 @@ impl GovEntitlementAssignment {
         user_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT entitlement_id FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND target_type = 'user' AND target_id = $2 AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -411,10 +411,10 @@ impl GovEntitlementAssignment {
         group_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT entitlement_id FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND target_type = 'group' AND target_id = $2 AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -425,11 +425,11 @@ impl GovEntitlementAssignment {
     /// Expire assignments past their expiration date.
     pub async fn expire_past_due(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_entitlement_assignments
             SET status = 'expired', updated_at = NOW()
             WHERE tenant_id = $1 AND status = 'active' AND expires_at IS NOT NULL AND expires_at < NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(pool)
@@ -439,11 +439,13 @@ impl GovEntitlementAssignment {
     }
 
     /// Check if assignment is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self.status, GovAssignmentStatus::Active)
     }
 
     /// Check if assignment is expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
             expires_at < Utc::now()
@@ -453,19 +455,19 @@ impl GovEntitlementAssignment {
     }
 
     /// Get all user-entitlement mappings for role mining analysis.
-    /// Returns a list of (user_id, entitlement_ids) tuples for all active assignments.
+    /// Returns a list of (`user_id`, `entitlement_ids`) tuples for all active assignments.
     pub async fn get_user_entitlement_mappings(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
     ) -> Result<Vec<(Uuid, Vec<Uuid>)>, sqlx::Error> {
         // Get all active user assignments grouped by user
         let rows: Vec<(Uuid, Vec<Uuid>)> = sqlx::query_as(
-            r#"
+            r"
             SELECT target_id as user_id, array_agg(entitlement_id) as entitlement_ids
             FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND target_type = 'user' AND status = 'active'
             GROUP BY target_id
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -480,11 +482,11 @@ impl GovEntitlementAssignment {
         tenant_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT target_id
             FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND target_type = 'user' AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -505,11 +507,11 @@ impl GovEntitlementAssignment {
         parameter_hash: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND entitlement_id = $2 AND target_type = $3
                 AND target_id = $4 AND parameter_hash = $5
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_id)
@@ -528,12 +530,12 @@ impl GovEntitlementAssignment {
         entitlement_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND target_type = 'user' AND target_id = $2
                 AND entitlement_id = $3 AND parameter_hash IS NOT NULL
             ORDER BY assigned_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -543,7 +545,7 @@ impl GovEntitlementAssignment {
     }
 
     /// List all currently active parametric assignments for a user.
-    /// Considers both status and temporal validity (valid_from/valid_to).
+    /// Considers both status and temporal validity (`valid_from/valid_to`).
     pub async fn list_active_parametric_by_user(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -552,12 +554,12 @@ impl GovEntitlementAssignment {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if include_inactive {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_entitlement_assignments
                 WHERE tenant_id = $1 AND target_type = 'user' AND target_id = $2
                     AND parameter_hash IS NOT NULL
                 ORDER BY entitlement_id, assigned_at DESC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(user_id)
@@ -565,7 +567,7 @@ impl GovEntitlementAssignment {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_entitlement_assignments
                 WHERE tenant_id = $1 AND target_type = 'user' AND target_id = $2
                     AND parameter_hash IS NOT NULL
@@ -573,7 +575,7 @@ impl GovEntitlementAssignment {
                     AND (valid_from IS NULL OR valid_from <= NOW())
                     AND (valid_to IS NULL OR valid_to > NOW())
                 ORDER BY entitlement_id, assigned_at DESC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(user_id)
@@ -590,12 +592,12 @@ impl GovEntitlementAssignment {
         parameter_hash: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_entitlement_assignments
             SET parameter_hash = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -613,12 +615,12 @@ impl GovEntitlementAssignment {
         valid_to: Option<DateTime<Utc>>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_entitlement_assignments
             SET valid_from = $3, valid_to = $4, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -628,7 +630,8 @@ impl GovEntitlementAssignment {
         .await
     }
 
-    /// Check if assignment is temporally active (within valid_from/valid_to window).
+    /// Check if assignment is temporally active (within `valid_from/valid_to` window).
+    #[must_use] 
     pub fn is_temporally_active(&self) -> bool {
         let now = Utc::now();
         let from_ok = self.valid_from.is_none_or(|from| from <= now);
@@ -637,11 +640,13 @@ impl GovEntitlementAssignment {
     }
 
     /// Check if this is a parametric assignment.
+    #[must_use] 
     pub fn is_parametric(&self) -> bool {
         self.parameter_hash.is_some()
     }
 
     /// Check if assignment is fully active (status + temporal validity).
+    #[must_use] 
     pub fn is_fully_active(&self) -> bool {
         self.is_active() && self.is_temporally_active()
     }

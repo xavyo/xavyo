@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 /// Service for managing event processing idempotence.
 ///
-/// Uses PostgreSQL's unique constraint to ensure each event
+/// Uses `PostgreSQL`'s unique constraint to ensure each event
 /// is only processed once per consumer group.
 pub struct IdempotenceService {
     pool: PgPool,
@@ -27,12 +27,12 @@ impl IdempotenceService {
     #[instrument(skip(self), fields(consumer_group = %self.consumer_group))]
     pub async fn is_processed(&self, event_id: Uuid) -> Result<bool, EventError> {
         let result: (bool,) = sqlx::query_as(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM processed_events
                 WHERE event_id = $1 AND consumer_group = $2
             )
-            "#,
+            ",
         )
         .bind(event_id)
         .bind(&self.consumer_group)
@@ -58,11 +58,11 @@ impl IdempotenceService {
         topic: &str,
     ) -> Result<bool, EventError> {
         let result = sqlx::query(
-            r#"
+            r"
             INSERT INTO processed_events (event_id, consumer_group, topic)
             VALUES ($1, $2, $3)
             ON CONFLICT (event_id, consumer_group) DO NOTHING
-            "#,
+            ",
         )
         .bind(event_id)
         .bind(&self.consumer_group)
@@ -86,6 +86,7 @@ impl IdempotenceService {
     }
 
     /// Get the consumer group name.
+    #[must_use] 
     pub fn consumer_group(&self) -> &str {
         &self.consumer_group
     }

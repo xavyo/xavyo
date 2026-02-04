@@ -44,7 +44,7 @@ pub struct CreateTriggerRuleRequest {
     #[serde(default)]
     pub reviewer_type: Option<MicroCertReviewerType>,
 
-    /// Specific reviewer user ID (required when reviewer_type is specific_user).
+    /// Specific reviewer user ID (required when `reviewer_type` is `specific_user`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub specific_reviewer_id: Option<Uuid>,
 
@@ -69,7 +69,7 @@ pub struct CreateTriggerRuleRequest {
     #[serde(default)]
     pub auto_revoke: Option<bool>,
 
-    /// For SoD: revoke triggering assignment (default: true).
+    /// For `SoD`: revoke triggering assignment (default: true).
     #[serde(default)]
     pub revoke_triggering_assignment: Option<bool>,
 
@@ -239,7 +239,7 @@ pub struct TriggerRuleResponse {
     /// Whether to auto-revoke on timeout.
     pub auto_revoke: bool,
 
-    /// For SoD: revoke triggering assignment.
+    /// For `SoD`: revoke triggering assignment.
     pub revoke_triggering_assignment: bool,
 
     /// Whether the rule is active.
@@ -354,7 +354,7 @@ pub struct CreateMicroCertificationRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct DecideMicroCertificationRequest {
     /// Decision type (approve, revoke, reduce).
-    /// Note: For delegate decision, use DelegateMicroCertificationRequest instead.
+    /// Note: For delegate decision, use `DelegateMicroCertificationRequest` instead.
     pub decision: MicroCertDecision,
 
     /// Comment/justification (required for revoke/reduce, optional for approve).
@@ -507,7 +507,7 @@ pub struct MicroCertificationResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decided_at: Option<DateTime<Utc>>,
 
-    /// Which assignment was revoked (for SoD violations).
+    /// Which assignment was revoked (for `SoD` violations).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revoked_assignment_id: Option<Uuid>,
 
@@ -683,7 +683,7 @@ pub struct MicroCertificationStatsResponse {
     /// Revoked certifications (manual).
     pub revoked: i64,
 
-    /// Auto-revoked certifications (timeout with auto_revoke=true).
+    /// Auto-revoked certifications (timeout with `auto_revoke=true`).
     pub auto_revoked: i64,
 
     /// Flagged for review certifications (Reduce decision).

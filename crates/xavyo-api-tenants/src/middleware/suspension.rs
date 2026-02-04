@@ -40,7 +40,7 @@ pub struct ProblemDetails {
 }
 
 /// Legacy error response for backwards compatibility.
-/// Use ProblemDetails for new code.
+/// Use `ProblemDetails` for new code.
 #[derive(Debug, Serialize)]
 pub struct TenantAccessError {
     pub error: String,
@@ -63,13 +63,13 @@ enum TenantStatus {
 /// Middleware function that checks if the tenant (from JWT claims) is accessible.
 ///
 /// This middleware should be applied to tenant-scoped routes after JWT authentication.
-/// It extracts the tenant_id from JWT claims and checks the database for suspension
+/// It extracts the `tenant_id` from JWT claims and checks the database for suspension
 /// and deletion status.
 ///
 /// ## Behavior
 ///
 /// - If no JWT claims present: passes through (let auth middleware handle it)
-/// - If tenant_id missing in claims: passes through (let other middleware handle it)
+/// - If `tenant_id` missing in claims: passes through (let other middleware handle it)
 /// - If tenant is system tenant: always passes through (system tenant cannot be suspended/deleted)
 /// - If tenant is active: passes through
 /// - If tenant is suspended: returns 403 Forbidden with suspension message
@@ -161,11 +161,11 @@ async fn check_tenant_access_status(
     tenant_id: Uuid,
 ) -> Result<TenantStatus, sqlx::Error> {
     let result: Option<TenantTimestamps> = sqlx::query_as(
-        r#"
+        r"
         SELECT suspended_at, deleted_at
         FROM tenants
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(tenant_id)
     .fetch_optional(pool)
@@ -191,7 +191,7 @@ const PROBLEM_TYPE_BASE: &str = "https://api.xavyo.net/problems";
 /// Create a 403 Forbidden response for suspended tenants using RFC 7807 Problem Details.
 fn suspended_response(request_uri: &Uri) -> Response {
     let body = ProblemDetails {
-        problem_type: format!("{}/tenant-suspended", PROBLEM_TYPE_BASE),
+        problem_type: format!("{PROBLEM_TYPE_BASE}/tenant-suspended"),
         title: "Tenant Suspended".to_string(),
         status: 403,
         detail:
@@ -210,7 +210,7 @@ fn suspended_response(request_uri: &Uri) -> Response {
 /// Create a 403 Forbidden response for deleted tenants using RFC 7807 Problem Details.
 fn deleted_response(request_uri: &Uri) -> Response {
     let body = ProblemDetails {
-        problem_type: format!("{}/tenant-deleted", PROBLEM_TYPE_BASE),
+        problem_type: format!("{PROBLEM_TYPE_BASE}/tenant-deleted"),
         title: "Tenant Deleted".to_string(),
         status: 403,
         detail: "Your organization has been deleted. Please contact support if you believe this is an error.".to_string(),
@@ -227,7 +227,7 @@ fn deleted_response(request_uri: &Uri) -> Response {
 /// Create a 404 Not Found response for unknown tenants using RFC 7807 Problem Details.
 fn not_found_response(request_uri: &Uri) -> Response {
     let body = ProblemDetails {
-        problem_type: format!("{}/tenant-not-found", PROBLEM_TYPE_BASE),
+        problem_type: format!("{PROBLEM_TYPE_BASE}/tenant-not-found"),
         title: "Tenant Not Found".to_string(),
         status: 404,
         detail: "Organization not found.".to_string(),
@@ -277,7 +277,7 @@ mod tests {
     #[test]
     fn test_problem_details_serialization() {
         let problem = ProblemDetails {
-            problem_type: format!("{}/tenant-suspended", PROBLEM_TYPE_BASE),
+            problem_type: format!("{PROBLEM_TYPE_BASE}/tenant-suspended"),
             title: "Tenant Suspended".to_string(),
             status: 403,
             detail: "Test detail".to_string(),

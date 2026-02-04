@@ -52,7 +52,7 @@ pub struct WebhookQueryParams {
 
 /// Handle webhook callback from external ticketing system.
 ///
-/// This endpoint is called by external ticketing systems (ServiceNow, Jira, or custom webhooks)
+/// This endpoint is called by external ticketing systems (`ServiceNow`, Jira, or custom webhooks)
 /// to notify us of ticket status changes. The endpoint authenticates using a shared secret
 /// passed as a query parameter or header.
 #[utoipa::path(
@@ -80,10 +80,10 @@ pub async fn handle_webhook_callback(
 ) -> ApiResult<(StatusCode, Json<WebhookCallbackResponse>)> {
     // Get the configuration to verify the webhook secret and find the tenant
     let config = sqlx::query_as::<_, GovTicketingConfiguration>(
-        r#"
+        r"
         SELECT * FROM gov_ticketing_configurations
         WHERE id = $1 AND is_active = true
-        "#,
+        ",
     )
     .bind(configuration_id)
     .fetch_optional(state.ticket_sync_service.pool())
@@ -91,8 +91,7 @@ pub async fn handle_webhook_callback(
     .map_err(ApiGovernanceError::Database)?
     .ok_or_else(|| {
         ApiGovernanceError::NotFound(format!(
-            "Ticketing configuration {} not found",
-            configuration_id
+            "Ticketing configuration {configuration_id} not found"
         ))
     })?;
 
@@ -101,7 +100,7 @@ pub async fn handle_webhook_callback(
         headers
             .get("x-webhook-secret")
             .and_then(|v| v.to_str().ok())
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
     });
 
     if let Some(expected_secret) = &config.webhook_callback_secret {
@@ -243,7 +242,7 @@ pub async fn sync_single_ticket(
         .await
         .map_err(|e| match &e {
             xavyo_governance::error::GovernanceError::ExternalTicketNotFound(_) => {
-                ApiGovernanceError::NotFound(format!("Ticket {} not found", ticket_id))
+                ApiGovernanceError::NotFound(format!("Ticket {ticket_id} not found"))
             }
             _ => ApiGovernanceError::Internal(e.to_string()),
         })?;

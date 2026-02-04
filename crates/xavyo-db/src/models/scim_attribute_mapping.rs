@@ -34,7 +34,7 @@ impl std::str::FromStr for AttributeTransform {
             "lowercase" => Ok(AttributeTransform::Lowercase),
             "uppercase" => Ok(AttributeTransform::Uppercase),
             "trim" => Ok(AttributeTransform::Trim),
-            _ => Err(format!("Invalid transform: {}", s)),
+            _ => Err(format!("Invalid transform: {s}")),
         }
     }
 }
@@ -110,11 +110,11 @@ impl ScimAttributeMapping {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_attribute_mappings
             WHERE tenant_id = $1
             ORDER BY scim_path
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -128,10 +128,10 @@ impl ScimAttributeMapping {
         scim_path: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_attribute_mappings
             WHERE tenant_id = $1 AND scim_path = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(scim_path)
@@ -149,7 +149,7 @@ impl ScimAttributeMapping {
         required: bool,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO scim_attribute_mappings (tenant_id, scim_path, xavyo_field, transform, required)
             VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (tenant_id, scim_path) DO UPDATE SET
@@ -158,7 +158,7 @@ impl ScimAttributeMapping {
                 required = EXCLUDED.required,
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(scim_path)
@@ -176,10 +176,10 @@ impl ScimAttributeMapping {
         scim_path: &str,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM scim_attribute_mappings
             WHERE tenant_id = $1 AND scim_path = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(scim_path)

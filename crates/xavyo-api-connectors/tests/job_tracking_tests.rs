@@ -318,7 +318,7 @@ fn test_list_jobs_query_with_status_filter() {
 #[test]
 fn test_list_jobs_query_with_connector_filter() {
     let connector_id = Uuid::new_v4();
-    let json = format!(r#"{{"connector_id": "{}"}}"#, connector_id);
+    let json = format!(r#"{{"connector_id": "{connector_id}"}}"#);
     let query: ListJobsQuery = serde_json::from_str(&json).unwrap();
 
     assert_eq!(query.connector_id, Some(connector_id));
@@ -350,13 +350,12 @@ fn test_list_jobs_query_combined_filters() {
     let connector_id = Uuid::new_v4();
     let json = format!(
         r#"{{
-            "connector_id": "{}",
+            "connector_id": "{connector_id}",
             "status": "failed",
             "from": "2026-02-01T00:00:00Z",
             "limit": 10,
             "offset": 20
-        }}"#,
-        connector_id
+        }}"#
     );
     let query: ListJobsQuery = serde_json::from_str(&json).unwrap();
 
@@ -780,7 +779,7 @@ fn test_replay_response_serialization() {
 fn test_bulk_replay_request() {
     let id1 = Uuid::new_v4();
     let id2 = Uuid::new_v4();
-    let json = format!(r#"{{"ids": ["{}", "{}"], "force": false}}"#, id1, id2);
+    let json = format!(r#"{{"ids": ["{id1}", "{id2}"], "force": false}}"#);
 
     let request: BulkReplayRequest = serde_json::from_str(&json).unwrap();
     assert_eq!(request.ids.len(), 2);
@@ -870,7 +869,7 @@ fn test_list_dlq_query_defaults() {
 #[test]
 fn test_list_dlq_query_with_connector() {
     let connector_id = Uuid::new_v4();
-    let json = format!(r#"{{"connector_id": "{}"}}"#, connector_id);
+    let json = format!(r#"{{"connector_id": "{connector_id}"}}"#);
 
     let query: ListDlqQuery = serde_json::from_str(&json).unwrap();
     assert_eq!(query.connector_id, Some(connector_id));
@@ -942,7 +941,7 @@ fn test_failed_job_structure_for_retention() {
 
     // This job is 60 days old and failed - within 90 day retention
     let age_days = (Utc::now() - detail.created_at).num_days();
-    assert!(age_days >= 30 && age_days < 90);
+    assert!((30..90).contains(&age_days));
     assert_eq!(detail.status, "failed");
 }
 

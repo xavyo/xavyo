@@ -35,7 +35,7 @@ pub struct GovScriptHookBinding {
     /// What to do when the script fails.
     pub failure_policy: FailurePolicy,
 
-    /// Maximum number of retry attempts (when failure_policy is Retry).
+    /// Maximum number of retry attempts (when `failure_policy` is Retry).
     pub max_retries: i32,
 
     /// Maximum execution time in seconds before timeout.
@@ -92,7 +92,7 @@ impl GovScriptHookBinding {
         params: &CreateScriptHookBinding,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_script_hook_bindings (
                 tenant_id, script_id, connector_id, hook_phase,
                 operation_type, execution_order, failure_policy,
@@ -100,7 +100,7 @@ impl GovScriptHookBinding {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(params.tenant_id)
         .bind(params.script_id)
@@ -122,10 +122,10 @@ impl GovScriptHookBinding {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_hook_bindings
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -148,31 +148,31 @@ impl GovScriptHookBinding {
 
         if filter.connector_id.is_some() {
             param_count += 1;
-            let clause = format!(" AND connector_id = ${}", param_count);
+            let clause = format!(" AND connector_id = ${param_count}");
             query.push_str(&clause);
             count_query.push_str(&clause);
         }
         if filter.script_id.is_some() {
             param_count += 1;
-            let clause = format!(" AND script_id = ${}", param_count);
+            let clause = format!(" AND script_id = ${param_count}");
             query.push_str(&clause);
             count_query.push_str(&clause);
         }
         if filter.hook_phase.is_some() {
             param_count += 1;
-            let clause = format!(" AND hook_phase = ${}", param_count);
+            let clause = format!(" AND hook_phase = ${param_count}");
             query.push_str(&clause);
             count_query.push_str(&clause);
         }
         if filter.operation_type.is_some() {
             param_count += 1;
-            let clause = format!(" AND operation_type = ${}", param_count);
+            let clause = format!(" AND operation_type = ${param_count}");
             query.push_str(&clause);
             count_query.push_str(&clause);
         }
         if filter.enabled.is_some() {
             param_count += 1;
-            let clause = format!(" AND enabled = ${}", param_count);
+            let clause = format!(" AND enabled = ${param_count}");
             query.push_str(&clause);
             count_query.push_str(&clause);
         }
@@ -224,18 +224,18 @@ impl GovScriptHookBinding {
         Ok((rows, total))
     }
 
-    /// List all bindings for a connector, ordered by hook_phase, operation_type, execution_order.
+    /// List all bindings for a connector, ordered by `hook_phase`, `operation_type`, `execution_order`.
     pub async fn list_by_connector(
         pool: &sqlx::PgPool,
         connector_id: Uuid,
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_hook_bindings
             WHERE connector_id = $1 AND tenant_id = $2
             ORDER BY hook_phase, operation_type, execution_order
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -250,11 +250,11 @@ impl GovScriptHookBinding {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_hook_bindings
             WHERE script_id = $1 AND tenant_id = $2
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(script_id)
         .bind(tenant_id)
@@ -265,7 +265,7 @@ impl GovScriptHookBinding {
     /// Get enabled bindings for a specific connector, hook phase, and operation type.
     ///
     /// This is the HOT PATH query used during provisioning execution.
-    /// Returns bindings ordered by execution_order for sequential execution.
+    /// Returns bindings ordered by `execution_order` for sequential execution.
     pub async fn list_for_execution(
         pool: &sqlx::PgPool,
         connector_id: Uuid,
@@ -274,7 +274,7 @@ impl GovScriptHookBinding {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_hook_bindings
             WHERE connector_id = $1
               AND hook_phase = $2
@@ -282,7 +282,7 @@ impl GovScriptHookBinding {
               AND tenant_id = $4
               AND enabled = true
             ORDER BY execution_order
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(hook_phase)
@@ -300,7 +300,7 @@ impl GovScriptHookBinding {
         params: &UpdateScriptHookBinding,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_script_hook_bindings
             SET
                 execution_order = COALESCE($3, execution_order),
@@ -311,7 +311,7 @@ impl GovScriptHookBinding {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -331,10 +331,10 @@ impl GovScriptHookBinding {
         tenant_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_script_hook_bindings
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -355,13 +355,13 @@ impl GovScriptHookBinding {
         tenant_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_script_hook_bindings
             WHERE connector_id = $1
               AND hook_phase = $2
               AND operation_type = $3
               AND tenant_id = $4
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(hook_phase)
@@ -378,12 +378,12 @@ impl GovScriptHookBinding {
         tenant_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_script_hook_bindings
             WHERE script_id = $1
               AND tenant_id = $2
               AND enabled = true
-            "#,
+            ",
         )
         .bind(script_id)
         .bind(tenant_id)

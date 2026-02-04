@@ -12,12 +12,14 @@ pub struct JwkSet {
 
 impl JwkSet {
     /// Find a key by its key ID (kid).
+    #[must_use] 
     pub fn find_key(&self, kid: &str) -> Option<&Jwk> {
         self.keys.iter().find(|k| k.kid.as_deref() == Some(kid))
     }
 
     /// Find a key suitable for signature verification.
     /// If kid is provided, match by kid. Otherwise, return first RSA signing key.
+    #[must_use] 
     pub fn find_signing_key(&self, kid: Option<&str>) -> Option<&Jwk> {
         if let Some(kid) = kid {
             self.find_key(kid)
@@ -65,11 +67,13 @@ pub struct Jwk {
 
 impl Jwk {
     /// Check if this key is an RSA key.
+    #[must_use] 
     pub fn is_rsa(&self) -> bool {
         self.kty == "RSA"
     }
 
     /// Check if this key is suitable for signature verification.
+    #[must_use] 
     pub fn is_signing_key(&self) -> bool {
         self.use_.is_none() || self.use_.as_deref() == Some("sig")
     }
@@ -77,6 +81,7 @@ impl Jwk {
     /// Convert RSA JWK to PEM-encoded public key.
     ///
     /// Returns None if the key is not an RSA key or required components are missing.
+    #[must_use] 
     pub fn to_pem(&self) -> Option<Vec<u8>> {
         if !self.is_rsa() {
             return None;
@@ -149,7 +154,7 @@ fn build_der_integer(data: &[u8]) -> Vec<u8> {
     // Add leading zero if high bit is set (to ensure positive integer)
     let needs_zero = !trimmed.is_empty() && (trimmed[0] & 0x80) != 0;
 
-    let len = trimmed.len() + if needs_zero { 1 } else { 0 };
+    let len = trimmed.len() + usize::from(needs_zero);
     encode_der_length(&mut result, len);
 
     if needs_zero {
@@ -192,7 +197,7 @@ fn encode_der_length(buf: &mut Vec<u8>, len: usize) {
 fn build_pem(label: &str, der: &[u8]) -> Vec<u8> {
     use base64::engine::general_purpose::STANDARD;
 
-    let mut pem = format!("-----BEGIN {}-----\n", label).into_bytes();
+    let mut pem = format!("-----BEGIN {label}-----\n").into_bytes();
 
     let b64 = STANDARD.encode(der);
     for chunk in b64.as_bytes().chunks(64) {
@@ -200,7 +205,7 @@ fn build_pem(label: &str, der: &[u8]) -> Vec<u8> {
         pem.push(b'\n');
     }
 
-    pem.extend_from_slice(format!("-----END {}-----\n", label).as_bytes());
+    pem.extend_from_slice(format!("-----END {label}-----\n").as_bytes());
     pem
 }
 

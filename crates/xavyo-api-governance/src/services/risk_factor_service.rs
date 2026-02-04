@@ -21,6 +21,7 @@ pub struct RiskFactorService {
 
 impl RiskFactorService {
     /// Create a new risk factor service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -69,8 +70,7 @@ impl RiskFactorService {
         let factor = GovRiskFactor::find_by_id(&self.pool, tenant_id, factor_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk factor not found: {}",
-                factor_id
+                "Risk factor not found: {factor_id}"
             )))?;
 
         Ok(RiskFactorResponse::from(factor))
@@ -95,8 +95,7 @@ impl RiskFactorService {
         let existing = GovRiskFactor::find_by_id(&self.pool, tenant_id, factor_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk factor not found: {}",
-                factor_id
+                "Risk factor not found: {factor_id}"
             )))?;
 
         // Validate category and factor type combination if either is being updated
@@ -135,8 +134,7 @@ impl RiskFactorService {
         let factor = GovRiskFactor::update(&self.pool, tenant_id, factor_id, input)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk factor not found: {}",
-                factor_id
+                "Risk factor not found: {factor_id}"
             )))?;
 
         Ok(RiskFactorResponse::from(factor))
@@ -148,8 +146,7 @@ impl RiskFactorService {
         GovRiskFactor::find_by_id(&self.pool, tenant_id, factor_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk factor not found: {}",
-                factor_id
+                "Risk factor not found: {factor_id}"
             )))?;
 
         GovRiskFactor::delete(&self.pool, tenant_id, factor_id).await?;
@@ -189,8 +186,7 @@ impl RiskFactorService {
         let factor = GovRiskFactor::enable(&self.pool, tenant_id, factor_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk factor not found: {}",
-                factor_id
+                "Risk factor not found: {factor_id}"
             )))?;
 
         Ok(RiskFactorResponse::from(factor))
@@ -201,8 +197,7 @@ impl RiskFactorService {
         let factor = GovRiskFactor::disable(&self.pool, tenant_id, factor_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk factor not found: {}",
-                factor_id
+                "Risk factor not found: {factor_id}"
             )))?;
 
         Ok(RiskFactorResponse::from(factor))
@@ -212,8 +207,7 @@ impl RiskFactorService {
     fn validate_weight(&self, weight: f64) -> ApiResult<()> {
         if !(0.0..=10.0).contains(&weight) {
             return Err(ApiGovernanceError::Validation(format!(
-                "Weight must be between 0.0 and 10.0, got: {}",
-                weight
+                "Weight must be between 0.0 and 10.0, got: {weight}"
             )));
         }
         Ok(())
@@ -250,8 +244,7 @@ impl RiskFactorService {
                     && !factor_type.starts_with("custom_static_")
                 {
                     return Err(ApiGovernanceError::Validation(format!(
-                        "Invalid static factor type '{}'. Valid types: {:?} or custom_static_* prefix",
-                        factor_type, static_types
+                        "Invalid static factor type '{factor_type}'. Valid types: {static_types:?} or custom_static_* prefix"
                     )));
                 }
             }
@@ -260,8 +253,7 @@ impl RiskFactorService {
                     && !factor_type.starts_with("custom_dynamic_")
                 {
                     return Err(ApiGovernanceError::Validation(format!(
-                        "Invalid dynamic factor type '{}'. Valid types: {:?} or custom_dynamic_* prefix",
-                        factor_type, dynamic_types
+                        "Invalid dynamic factor type '{factor_type}'. Valid types: {dynamic_types:?} or custom_dynamic_* prefix"
                     )));
                 }
             }

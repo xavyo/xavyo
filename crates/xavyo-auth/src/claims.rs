@@ -1,7 +1,7 @@
 //! JWT claims structure with standard and custom claims.
 //!
 //! Provides the `JwtClaims` struct containing both RFC 7519 standard claims
-//! and Xavyo-specific custom claims (tenant_id, roles).
+//! and Xavyo-specific custom claims (`tenant_id`, roles).
 
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -70,7 +70,7 @@ pub struct JwtClaims {
     #[serde(default)]
     pub roles: Vec<String>,
 
-    /// Token purpose (e.g., "mfa_verification" for partial tokens).
+    /// Token purpose (e.g., "`mfa_verification`" for partial tokens).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
 
@@ -211,7 +211,7 @@ impl JwtClaimsBuilder {
         self
     }
 
-    /// Set the token purpose (e.g., "mfa_verification").
+    /// Set the token purpose (e.g., "`mfa_verification`").
     #[must_use]
     pub fn purpose(mut self, purpose: impl Into<String>) -> Self {
         self.purpose = Some(purpose.into());

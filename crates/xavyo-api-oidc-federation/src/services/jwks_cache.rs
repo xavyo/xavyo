@@ -1,4 +1,4 @@
-//! JWKS caching service for fetching and caching IdP signing keys.
+//! JWKS caching service for fetching and caching `IdP` signing keys.
 //!
 //! This service fetches JWKS (JSON Web Key Sets) from federated Identity Providers
 //! and caches them to reduce network latency and improve token verification performance.
@@ -31,7 +31,7 @@ impl CachedJwks {
 
 /// JWKS caching service.
 ///
-/// Fetches and caches JWKS from IdP endpoints with configurable TTL.
+/// Fetches and caches JWKS from `IdP` endpoints with configurable TTL.
 #[derive(Clone)]
 pub struct JwksCache {
     /// Cached JWKS keyed by JWKS URI.
@@ -57,6 +57,7 @@ pub struct JwksCacheStats {
 
 impl JwksCache {
     /// Create a new JWKS cache with default TTL.
+    #[must_use] 
     pub fn new(default_ttl: Duration) -> Self {
         Self {
             cache: Arc::new(RwLock::new(HashMap::new())),
@@ -69,6 +70,7 @@ impl JwksCache {
     }
 
     /// Create a new JWKS cache with custom HTTP client.
+    #[must_use] 
     pub fn with_client(default_ttl: Duration, http_client: reqwest::Client) -> Self {
         Self {
             cache: Arc::new(RwLock::new(HashMap::new())),
@@ -184,7 +186,7 @@ impl JwksCache {
             .get(jwks_uri)
             .send()
             .await
-            .map_err(|e| FederationError::JwksFetchFailed(format!("HTTP error: {}", e)))?;
+            .map_err(|e| FederationError::JwksFetchFailed(format!("HTTP error: {e}")))?;
 
         if !response.status().is_success() {
             return Err(FederationError::JwksFetchFailed(format!(
@@ -196,7 +198,7 @@ impl JwksCache {
         let jwks: JwkSet = response
             .json()
             .await
-            .map_err(|e| FederationError::JwksFetchFailed(format!("JSON parse error: {}", e)))?;
+            .map_err(|e| FederationError::JwksFetchFailed(format!("JSON parse error: {e}")))?;
 
         if jwks.keys.is_empty() {
             warn!(jwks_uri = %jwks_uri, "JWKS returned empty key set");

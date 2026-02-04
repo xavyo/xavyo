@@ -1,13 +1,13 @@
-//! OAuth2 client entity model.
+//! `OAuth2` client entity model.
 //!
-//! Represents a registered OAuth2 application that can request authorization.
+//! Represents a registered `OAuth2` application that can request authorization.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use xavyo_core::TenantId;
 
-/// OAuth2 client type.
+/// `OAuth2` client type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClientType {
@@ -39,7 +39,7 @@ impl ClientType {
     }
 }
 
-/// A registered OAuth2 client application.
+/// A registered `OAuth2` client application.
 ///
 /// Clients are scoped to a tenant and can request authorization on behalf of users.
 #[derive(Debug, Clone, FromRow)]
@@ -50,7 +50,7 @@ pub struct OAuth2Client {
     /// The tenant this client belongs to.
     pub tenant_id: uuid::Uuid,
 
-    /// Public client identifier used in OAuth2 flows.
+    /// Public client identifier used in `OAuth2` flows.
     pub client_id: String,
 
     /// Argon2id hash of the client secret (None for public clients).
@@ -65,10 +65,10 @@ pub struct OAuth2Client {
     /// Allowed redirect URIs (exact match required).
     pub redirect_uris: Vec<String>,
 
-    /// Allowed grant types (e.g., "authorization_code", "client_credentials").
+    /// Allowed grant types (e.g., "`authorization_code`", "`client_credentials`").
     pub grant_types: Vec<String>,
 
-    /// Allowed OAuth2 scopes.
+    /// Allowed `OAuth2` scopes.
     pub scopes: Vec<String>,
 
     /// Whether the client is active (false = deactivated).
@@ -131,7 +131,7 @@ impl OAuth2Client {
     }
 }
 
-/// Builder for creating a new OAuth2 client.
+/// Builder for creating a new `OAuth2` client.
 #[derive(Debug, Clone)]
 pub struct OAuth2ClientBuilder {
     tenant_id: uuid::Uuid,
@@ -248,7 +248,7 @@ impl OAuth2ClientBuilder {
     }
 }
 
-/// Data for creating a new OAuth2 client.
+/// Data for creating a new `OAuth2` client.
 #[derive(Debug, Clone)]
 pub struct NewOAuth2Client {
     pub tenant_id: uuid::Uuid,

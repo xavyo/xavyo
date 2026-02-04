@@ -25,7 +25,7 @@ pub struct CreatePolicySimulationRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub policy_id: Option<Uuid>,
 
-    /// Draft policy configuration to simulate (required if policy_id is None).
+    /// Draft policy configuration to simulate (required if `policy_id` is None).
     pub policy_config: serde_json::Value,
 }
 

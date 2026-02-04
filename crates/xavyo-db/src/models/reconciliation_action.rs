@@ -38,7 +38,7 @@ impl std::str::FromStr for ReconciliationActionResult {
         match s.to_lowercase().as_str() {
             "success" => Ok(Self::Success),
             "failure" => Ok(Self::Failure),
-            _ => Err(format!("Unknown action result: {}", s)),
+            _ => Err(format!("Unknown action result: {s}")),
         }
     }
 }
@@ -61,6 +61,7 @@ pub struct ReconciliationAction {
 
 impl ReconciliationAction {
     /// Get action type enum.
+    #[must_use] 
     pub fn action_type(&self) -> ReconciliationActionType {
         self.action_type
             .parse()
@@ -68,6 +69,7 @@ impl ReconciliationAction {
     }
 
     /// Get result enum.
+    #[must_use] 
     pub fn result(&self) -> ReconciliationActionResult {
         self.result
             .parse()
@@ -75,6 +77,7 @@ impl ReconciliationAction {
     }
 
     /// Check if action succeeded.
+    #[must_use] 
     pub fn is_success(&self) -> bool {
         self.result().eq(&ReconciliationActionResult::Success)
     }
@@ -86,14 +89,14 @@ impl ReconciliationAction {
         input: &CreateReconciliationAction,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_reconciliation_actions (
                 discrepancy_id, tenant_id, action_type, executed_by,
                 result, error_message, before_state, after_state, dry_run
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.discrepancy_id)
         .bind(tenant_id)
@@ -115,10 +118,10 @@ impl ReconciliationAction {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_reconciliation_actions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -133,11 +136,11 @@ impl ReconciliationAction {
         discrepancy_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_reconciliation_actions
             WHERE tenant_id = $1 AND discrepancy_id = $2
             ORDER BY executed_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(discrepancy_id)
@@ -154,31 +157,31 @@ impl ReconciliationAction {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query =
-            String::from(r#"SELECT * FROM gov_reconciliation_actions WHERE tenant_id = $1"#);
+            String::from(r"SELECT * FROM gov_reconciliation_actions WHERE tenant_id = $1");
         let mut param_idx = 2;
 
         if filter.discrepancy_id.is_some() {
-            query.push_str(&format!(" AND discrepancy_id = ${}", param_idx));
+            query.push_str(&format!(" AND discrepancy_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.action_type.is_some() {
-            query.push_str(&format!(" AND action_type = ${}", param_idx));
+            query.push_str(&format!(" AND action_type = ${param_idx}"));
             param_idx += 1;
         }
         if filter.result.is_some() {
-            query.push_str(&format!(" AND result = ${}", param_idx));
+            query.push_str(&format!(" AND result = ${param_idx}"));
             param_idx += 1;
         }
         if filter.executed_by.is_some() {
-            query.push_str(&format!(" AND executed_by = ${}", param_idx));
+            query.push_str(&format!(" AND executed_by = ${param_idx}"));
             param_idx += 1;
         }
         if filter.dry_run.is_some() {
-            query.push_str(&format!(" AND dry_run = ${}", param_idx));
+            query.push_str(&format!(" AND dry_run = ${param_idx}"));
             param_idx += 1;
         }
         if filter.since.is_some() {
-            query.push_str(&format!(" AND executed_at >= ${}", param_idx));
+            query.push_str(&format!(" AND executed_at >= ${param_idx}"));
             param_idx += 1;
         }
 
@@ -220,31 +223,31 @@ impl ReconciliationAction {
         filter: &ReconciliationActionFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query =
-            String::from(r#"SELECT COUNT(*) FROM gov_reconciliation_actions WHERE tenant_id = $1"#);
+            String::from(r"SELECT COUNT(*) FROM gov_reconciliation_actions WHERE tenant_id = $1");
         let mut param_idx = 2;
 
         if filter.discrepancy_id.is_some() {
-            query.push_str(&format!(" AND discrepancy_id = ${}", param_idx));
+            query.push_str(&format!(" AND discrepancy_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.action_type.is_some() {
-            query.push_str(&format!(" AND action_type = ${}", param_idx));
+            query.push_str(&format!(" AND action_type = ${param_idx}"));
             param_idx += 1;
         }
         if filter.result.is_some() {
-            query.push_str(&format!(" AND result = ${}", param_idx));
+            query.push_str(&format!(" AND result = ${param_idx}"));
             param_idx += 1;
         }
         if filter.executed_by.is_some() {
-            query.push_str(&format!(" AND executed_by = ${}", param_idx));
+            query.push_str(&format!(" AND executed_by = ${param_idx}"));
             param_idx += 1;
         }
         if filter.dry_run.is_some() {
-            query.push_str(&format!(" AND dry_run = ${}", param_idx));
+            query.push_str(&format!(" AND dry_run = ${param_idx}"));
             param_idx += 1;
         }
         if filter.since.is_some() {
-            query.push_str(&format!(" AND executed_at >= ${}", param_idx));
+            query.push_str(&format!(" AND executed_at >= ${param_idx}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -279,12 +282,12 @@ impl ReconciliationAction {
     ) -> Result<Vec<(String, i64)>, sqlx::Error> {
         if let Some(since) = since {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT action_type, COUNT(*) as count
                 FROM gov_reconciliation_actions
                 WHERE tenant_id = $1 AND executed_at >= $2
                 GROUP BY action_type
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(since)
@@ -292,12 +295,12 @@ impl ReconciliationAction {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT action_type, COUNT(*) as count
                 FROM gov_reconciliation_actions
                 WHERE tenant_id = $1
                 GROUP BY action_type
-                "#,
+                ",
             )
             .bind(tenant_id)
             .fetch_all(pool)
@@ -313,12 +316,12 @@ impl ReconciliationAction {
     ) -> Result<Vec<(String, i64)>, sqlx::Error> {
         if let Some(since) = since {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT result, COUNT(*) as count
                 FROM gov_reconciliation_actions
                 WHERE tenant_id = $1 AND executed_at >= $2
                 GROUP BY result
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(since)
@@ -326,12 +329,12 @@ impl ReconciliationAction {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT result, COUNT(*) as count
                 FROM gov_reconciliation_actions
                 WHERE tenant_id = $1
                 GROUP BY result
-                "#,
+                ",
             )
             .bind(tenant_id)
             .fetch_all(pool)
@@ -359,6 +362,7 @@ pub struct CreateReconciliationAction {
 
 impl CreateReconciliationAction {
     /// Create a success action record.
+    #[must_use] 
     pub fn success(
         discrepancy_id: Uuid,
         action_type: ReconciliationActionType,
@@ -378,6 +382,7 @@ impl CreateReconciliationAction {
     }
 
     /// Create a failure action record.
+    #[must_use] 
     pub fn failure(
         discrepancy_id: Uuid,
         action_type: ReconciliationActionType,
@@ -398,12 +403,14 @@ impl CreateReconciliationAction {
     }
 
     /// Add before state.
+    #[must_use] 
     pub fn with_before_state(mut self, state: JsonValue) -> Self {
         self.before_state = Some(state);
         self
     }
 
     /// Add after state.
+    #[must_use] 
     pub fn with_after_state(mut self, state: JsonValue) -> Self {
         self.after_state = Some(state);
         self
@@ -422,25 +429,30 @@ pub struct ReconciliationActionFilter {
 }
 
 impl ReconciliationActionFilter {
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use] 
     pub fn for_discrepancy(mut self, discrepancy_id: Uuid) -> Self {
         self.discrepancy_id = Some(discrepancy_id);
         self
     }
 
+    #[must_use] 
     pub fn with_type(mut self, action_type: ReconciliationActionType) -> Self {
         self.action_type = Some(action_type);
         self
     }
 
+    #[must_use] 
     pub fn successful_only(mut self) -> Self {
         self.result = Some(ReconciliationActionResult::Success);
         self
     }
 
+    #[must_use] 
     pub fn exclude_dry_run(mut self) -> Self {
         self.dry_run = Some(false);
         self

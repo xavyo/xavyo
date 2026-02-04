@@ -1,7 +1,7 @@
 //! Country code extraction utilities for Storm-2372 remediation.
 //!
 //! Extracts the country code from HTTP headers set by CDNs/proxies.
-//! Currently supports CloudFlare and custom X-Country-Code headers.
+//! Currently supports `CloudFlare` and custom X-Country-Code headers.
 
 use axum::http::HeaderMap;
 
@@ -11,7 +11,7 @@ pub const UNKNOWN_COUNTRY: &str = "XX";
 /// Extract the country code from request headers.
 ///
 /// Priority order:
-/// 1. CF-IPCountry (CloudFlare)
+/// 1. CF-IPCountry (`CloudFlare`)
 /// 2. X-Country-Code (custom header)
 /// 3. Returns "XX" if no country information available
 ///
@@ -20,6 +20,7 @@ pub const UNKNOWN_COUNTRY: &str = "XX";
 ///
 /// # Returns
 /// A 2-letter ISO 3166-1 alpha-2 country code, or "XX" if unknown.
+#[must_use] 
 pub fn extract_country_code(headers: &HeaderMap) -> String {
     // 1. CloudFlare: CF-IPCountry
     if let Some(cf_country) = headers.get("CF-IPCountry") {
@@ -48,7 +49,7 @@ pub fn extract_country_code(headers: &HeaderMap) -> String {
 /// Validate that a string is a valid 2-letter country code.
 ///
 /// Accepts standard ISO 3166-1 alpha-2 codes (2 alphabetic characters)
-/// as well as CloudFlare special codes:
+/// as well as `CloudFlare` special codes:
 /// - T1: Tor exit node
 /// - A1: Anonymous proxy
 /// - A2: Satellite provider

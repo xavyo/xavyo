@@ -183,8 +183,7 @@ fn test_transfer_ownership_serialization() {
 fn test_transfer_ownership_deserialization() {
     let new_owner_id = Uuid::new_v4();
     let json = format!(
-        r#"{{"new_owner_id": "{}", "reason": "Owner transition"}}"#,
-        new_owner_id
+        r#"{{"new_owner_id": "{new_owner_id}", "reason": "Owner transition"}}"#
     );
 
     let request: TransferOwnershipRequest = serde_json::from_str(&json).unwrap();
@@ -328,7 +327,7 @@ fn test_nhi_exceeds_inactivity_threshold() {
     let days_inactive = (Utc::now() - last_used_at).num_days();
 
     // NHI is inactive beyond threshold
-    assert!(days_inactive > inactivity_threshold_days as i64);
+    assert!(days_inactive > i64::from(inactivity_threshold_days));
 }
 
 #[test]
@@ -339,7 +338,7 @@ fn test_nhi_within_inactivity_threshold() {
     let days_inactive = (Utc::now() - last_used_at).num_days();
 
     // NHI is active within threshold
-    assert!(days_inactive <= inactivity_threshold_days as i64);
+    assert!(days_inactive <= i64::from(inactivity_threshold_days));
 }
 
 #[test]
@@ -349,11 +348,11 @@ fn test_nhi_approaching_inactivity_grace_period() {
     let last_used_at = Utc::now() - Duration::days(25); // 25 days ago
 
     let days_inactive = (Utc::now() - last_used_at).num_days();
-    let warning_threshold = inactivity_threshold_days as i64 - grace_period_days;
+    let warning_threshold = i64::from(inactivity_threshold_days) - grace_period_days;
 
     // NHI is approaching threshold (should trigger warning)
     assert!(days_inactive >= warning_threshold);
-    assert!(days_inactive < inactivity_threshold_days as i64);
+    assert!(days_inactive < i64::from(inactivity_threshold_days));
 }
 
 #[test]

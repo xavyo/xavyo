@@ -72,13 +72,13 @@ impl GovProvisioningScript {
         params: CreateProvisioningScript,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_provisioning_scripts (
                 tenant_id, name, description, created_by
             )
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(params.tenant_id)
         .bind(&params.name)
@@ -95,10 +95,10 @@ impl GovProvisioningScript {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_provisioning_scripts
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -108,7 +108,7 @@ impl GovProvisioningScript {
 
     /// List scripts for a tenant with optional filtering and pagination.
     ///
-    /// Returns a tuple of (scripts, total_count) for pagination support.
+    /// Returns a tuple of (scripts, `total_count`) for pagination support.
     pub async fn list_by_tenant(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -117,28 +117,28 @@ impl GovProvisioningScript {
         offset: i64,
     ) -> Result<(Vec<Self>, i64), sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_provisioning_scripts
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut count_query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_provisioning_scripts
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            let clause = format!(" AND status = ${}", param_count);
+            let clause = format!(" AND status = ${param_count}");
             query.push_str(&clause);
             count_query.push_str(&clause);
         }
         if filter.search.is_some() {
             param_count += 1;
-            let clause = format!(" AND name ILIKE ${}", param_count);
+            let clause = format!(" AND name ILIKE ${param_count}");
             query.push_str(&clause);
             count_query.push_str(&clause);
         }
@@ -157,7 +157,7 @@ impl GovProvisioningScript {
             cq = cq.bind(status);
         }
         if let Some(ref search) = filter.search {
-            let pattern = format!("%{}%", search);
+            let pattern = format!("%{search}%");
             q = q.bind(pattern.clone());
             cq = cq.bind(pattern);
         }
@@ -179,11 +179,11 @@ impl GovProvisioningScript {
         let mut param_idx = 3;
 
         if params.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if params.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             let _ = param_idx;
         }
 
@@ -214,12 +214,12 @@ impl GovProvisioningScript {
         status: GovScriptStatus,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_provisioning_scripts
             SET status = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -236,12 +236,12 @@ impl GovProvisioningScript {
         version: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_provisioning_scripts
             SET current_version = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -257,10 +257,10 @@ impl GovProvisioningScript {
         tenant_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_provisioning_scripts
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -277,10 +277,10 @@ impl GovProvisioningScript {
         status: GovScriptStatus,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_provisioning_scripts
             WHERE tenant_id = $1 AND status = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(status)

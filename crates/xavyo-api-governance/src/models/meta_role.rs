@@ -236,7 +236,7 @@ pub struct MetaRoleListResponse {
 /// Request to create a meta-role criterion.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct CreateMetaRoleCriteriaRequest {
-    /// Field to match against (risk_level, application_id, owner_id, status, is_delegable, metadata).
+    /// Field to match against (`risk_level`, `application_id`, `owner_id`, status, `is_delegable`, metadata).
     #[validate(length(
         min = 1,
         max = 100,
@@ -363,7 +363,7 @@ pub struct MetaRoleEntitlementSummary {
 /// Request to add a constraint to a meta-role.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct CreateMetaRoleConstraintRequest {
-    /// Constraint type (max_session_duration, require_mfa, ip_whitelist, approval_required).
+    /// Constraint type (`max_session_duration`, `require_mfa`, `ip_whitelist`, `approval_required`).
     #[validate(length(
         min = 1,
         max = 100,
@@ -600,7 +600,7 @@ impl Default for ListConflictsQuery {
 /// Request to resolve a conflict.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct ResolveConflictRequest {
-    /// Resolution status (resolved_priority, resolved_manual, ignored).
+    /// Resolution status (`resolved_priority`, `resolved_manual`, ignored).
     pub resolution_status: ResolutionStatus,
 
     /// Resolution choice (which meta-role wins, custom configuration, etc.).

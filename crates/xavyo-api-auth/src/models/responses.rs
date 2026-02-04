@@ -36,6 +36,7 @@ pub struct TokenResponse {
 
 impl TokenResponse {
     /// Create a new token response.
+    #[must_use] 
     pub fn new(access_token: String, refresh_token: String, expires_in: i64) -> Self {
         Self {
             access_token,
@@ -93,6 +94,7 @@ pub struct VerifyEmailResponse {
 
 impl VerifyEmailResponse {
     /// Create a new response for a newly verified email.
+    #[must_use] 
     pub fn verified() -> Self {
         Self {
             message: "Email verified successfully.".to_string(),
@@ -101,6 +103,7 @@ impl VerifyEmailResponse {
     }
 
     /// Create a response for an already verified email.
+    #[must_use] 
     pub fn already_verified() -> Self {
         Self {
             message: "Email verified successfully.".to_string(),
@@ -132,7 +135,7 @@ pub struct PasswordChangeResponse {
     /// Success message.
     pub message: String,
 
-    /// Number of other sessions revoked (if revoke_other_sessions was true).
+    /// Number of other sessions revoked (if `revoke_other_sessions` was true).
     pub sessions_revoked: i64,
 }
 

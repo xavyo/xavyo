@@ -1,4 +1,4 @@
-//! Session storage for SAML AuthnRequest tracking
+//! Session storage for SAML `AuthnRequest` tracking
 //!
 //! Provides both in-memory (for testing) and PostgreSQL-backed
 //! session stores for production use.
@@ -12,10 +12,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-/// Session store trait for AuthnRequest tracking
+/// Session store trait for `AuthnRequest` tracking
 #[async_trait]
 pub trait SessionStore: Send + Sync {
-    /// Store a new AuthnRequest session
+    /// Store a new `AuthnRequest` session
     async fn store(&self, session: AuthnRequestSession) -> Result<(), SessionError>;
 
     /// Look up a session by tenant and request ID
@@ -48,6 +48,7 @@ pub struct InMemorySessionStore {
 }
 
 impl InMemorySessionStore {
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
@@ -128,6 +129,7 @@ pub struct PostgresSessionStore {
 }
 
 impl PostgresSessionStore {
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -137,13 +139,13 @@ impl PostgresSessionStore {
 impl SessionStore for PostgresSessionStore {
     async fn store(&self, session: AuthnRequestSession) -> Result<(), SessionError> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO saml_authn_request_sessions
                 (id, tenant_id, request_id, sp_entity_id, created_at, expires_at, consumed_at, relay_state)
             VALUES
                 ($1, $2, $3, $4, $5, $6, $7, $8)
             ON CONFLICT (tenant_id, request_id) DO NOTHING
-            "#,
+            ",
         )
         .bind(session.id)
         .bind(session.tenant_id)
@@ -174,11 +176,11 @@ impl SessionStore for PostgresSessionStore {
         request_id: &str,
     ) -> Result<Option<AuthnRequestSession>, SessionError> {
         let row = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, request_id, sp_entity_id, created_at, expires_at, consumed_at, relay_state
             FROM saml_authn_request_sessions
             WHERE tenant_id = $1 AND request_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(request_id)
@@ -209,7 +211,7 @@ impl SessionStore for PostgresSessionStore {
         // Attempt to atomically update consumed_at where it's NULL and not expired
         // This prevents race conditions in concurrent requests
         let row = sqlx::query(
-            r#"
+            r"
             UPDATE saml_authn_request_sessions
             SET consumed_at = $3
             WHERE tenant_id = $1
@@ -217,7 +219,7 @@ impl SessionStore for PostgresSessionStore {
               AND consumed_at IS NULL
               AND expires_at > ($3 - INTERVAL '30 seconds')
             RETURNING id, tenant_id, request_id, sp_entity_id, created_at, expires_at, consumed_at, relay_state
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(request_id)
@@ -226,58 +228,55 @@ impl SessionStore for PostgresSessionStore {
         .await
         .map_err(|e| SessionError::StorageError(e.to_string()))?;
 
-        match row {
-            Some(r) => {
-                let session = AuthnRequestSession {
-                    id: r.get("id"),
-                    tenant_id: r.get("tenant_id"),
-                    request_id: r.get("request_id"),
-                    sp_entity_id: r.get("sp_entity_id"),
-                    created_at: r.get("created_at"),
-                    expires_at: r.get("expires_at"),
-                    consumed_at: r.get("consumed_at"),
-                    relay_state: r.get("relay_state"),
-                };
+        if let Some(r) = row {
+            let session = AuthnRequestSession {
+                id: r.get("id"),
+                tenant_id: r.get("tenant_id"),
+                request_id: r.get("request_id"),
+                sp_entity_id: r.get("sp_entity_id"),
+                created_at: r.get("created_at"),
+                expires_at: r.get("expires_at"),
+                consumed_at: r.get("consumed_at"),
+                relay_state: r.get("relay_state"),
+            };
 
-                tracing::info!(
-                    tenant_id = %tenant_id,
-                    request_id = %request_id,
-                    "SAML AuthnRequest session consumed"
-                );
+            tracing::info!(
+                tenant_id = %tenant_id,
+                request_id = %request_id,
+                "SAML AuthnRequest session consumed"
+            );
 
-                Ok(session)
-            }
-            None => {
-                // The update didn't match - need to determine why
-                // Look up the session to provide the right error
-                let existing = self.get(tenant_id, request_id).await?;
+            Ok(session)
+        } else {
+            // The update didn't match - need to determine why
+            // Look up the session to provide the right error
+            let existing = self.get(tenant_id, request_id).await?;
 
-                match existing {
-                    None => Err(SessionError::NotFound(request_id.to_string())),
-                    Some(session) => {
-                        if session.is_consumed() {
-                            tracing::warn!(
-                                tenant_id = %tenant_id,
-                                request_id = %request_id,
-                                consumed_at = ?session.consumed_at,
-                                "Replay attack detected: AuthnRequest already consumed"
-                            );
-                            Err(SessionError::AlreadyConsumed {
-                                request_id: request_id.to_string(),
-                                consumed_at: session.consumed_at.unwrap(),
-                            })
-                        } else {
-                            tracing::warn!(
-                                tenant_id = %tenant_id,
-                                request_id = %request_id,
-                                expires_at = %session.expires_at,
-                                "Expired AuthnRequest replay attempt"
-                            );
-                            Err(SessionError::Expired {
-                                request_id: request_id.to_string(),
-                                expired_at: session.expires_at,
-                            })
-                        }
+            match existing {
+                None => Err(SessionError::NotFound(request_id.to_string())),
+                Some(session) => {
+                    if session.is_consumed() {
+                        tracing::warn!(
+                            tenant_id = %tenant_id,
+                            request_id = %request_id,
+                            consumed_at = ?session.consumed_at,
+                            "Replay attack detected: AuthnRequest already consumed"
+                        );
+                        Err(SessionError::AlreadyConsumed {
+                            request_id: request_id.to_string(),
+                            consumed_at: session.consumed_at.unwrap(),
+                        })
+                    } else {
+                        tracing::warn!(
+                            tenant_id = %tenant_id,
+                            request_id = %request_id,
+                            expires_at = %session.expires_at,
+                            "Expired AuthnRequest replay attempt"
+                        );
+                        Err(SessionError::Expired {
+                            request_id: request_id.to_string(),
+                            expired_at: session.expires_at,
+                        })
                     }
                 }
             }
@@ -286,10 +285,10 @@ impl SessionStore for PostgresSessionStore {
 
     async fn cleanup_expired(&self) -> Result<u64, SessionError> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM saml_authn_request_sessions
             WHERE expires_at < NOW() - INTERVAL '30 seconds'
-            "#,
+            ",
         )
         .execute(&self.pool)
         .await

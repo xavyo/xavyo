@@ -52,6 +52,7 @@ pub struct DeliveryResult {
 }
 
 impl DeliveryResult {
+    #[must_use] 
     pub fn success(latency_ms: u64) -> Self {
         Self {
             success: true,
@@ -60,6 +61,7 @@ impl DeliveryResult {
         }
     }
 
+    #[must_use] 
     pub fn failure(latency_ms: u64, error: String) -> Self {
         Self {
             success: false,
@@ -82,7 +84,7 @@ pub trait DeliveryWorker: Send + Sync {
     }
 }
 
-/// HTTP headers that must not be overridden by tenant-provided auth_config.
+/// HTTP headers that must not be overridden by tenant-provided `auth_config`.
 const DENIED_HEADERS: &[&str] = &[
     "host",
     "content-length",
@@ -106,8 +108,7 @@ fn validate_host_not_internal(host: &str) -> Result<(), DeliveryError> {
     if let Ok(ip) = host.parse::<IpAddr>() {
         if is_internal_ip(&ip) {
             return Err(DeliveryError::ConnectionFailed(format!(
-                "Destination host {} is a private/internal address",
-                host
+                "Destination host {host} is a private/internal address"
             )));
         }
     }
@@ -120,8 +121,7 @@ fn validate_host_not_internal(host: &str) -> Result<(), DeliveryError> {
         || lower.ends_with(".local")
     {
         return Err(DeliveryError::ConnectionFailed(format!(
-            "Destination host {} is a restricted internal hostname",
-            host
+            "Destination host {host} is a restricted internal hostname"
         )));
     }
 
@@ -182,7 +182,7 @@ pub fn create_worker(
             let headers = sanitize_headers(raw_headers);
             // SECURITY: WebhookWorker::new validates URL against SSRF attacks
             let worker =
-                webhook::WebhookWorker::new(format!("https://{}:{}", host, port), headers)?;
+                webhook::WebhookWorker::new(format!("https://{host}:{port}"), headers)?;
             Ok(Box::new(worker))
         }
         crate::models::DestinationType::SplunkHec => {

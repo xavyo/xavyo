@@ -117,6 +117,7 @@ pub struct BatchProcessingResult {
 
 impl BatchProcessingResult {
     /// Get the success rate as a percentage.
+    #[must_use] 
     pub fn success_rate(&self) -> f64 {
         if self.total_operations == 0 {
             100.0
@@ -126,11 +127,13 @@ impl BatchProcessingResult {
     }
 
     /// Check if all operations succeeded.
+    #[must_use] 
     pub fn all_succeeded(&self) -> bool {
         self.failed_operations == 0
     }
 
     /// Get connectors that had failures.
+    #[must_use] 
     pub fn failed_connectors(&self) -> Vec<Uuid> {
         self.connector_results
             .iter()
@@ -155,6 +158,7 @@ pub struct ConnectorBatchResult {
 
 impl ConnectorBatchResult {
     /// Get the success rate for this connector.
+    #[must_use] 
     pub fn success_rate(&self) -> f64 {
         if self.operations_processed == 0 {
             100.0
@@ -283,6 +287,7 @@ impl DefaultOperationProcessor {
     }
 
     /// Create with custom configuration.
+    #[must_use] 
     pub fn with_config(mut self, config: ProcessorConfig) -> Self {
         self.config = config;
         self
@@ -295,12 +300,14 @@ impl DefaultOperationProcessor {
     }
 
     /// Set the health monitoring service.
+    #[must_use] 
     pub fn with_health_service(mut self, service: Arc<HealthService>) -> Self {
         self.health_service = Some(service);
         self
     }
 
     /// Set the conflict detection service.
+    #[must_use] 
     pub fn with_conflict_service(mut self, service: Arc<ConflictService>) -> Self {
         self.conflict_service = Some(service);
         self
@@ -926,7 +933,7 @@ impl DefaultOperationProcessor {
         Ok(Some(target_uid.clone()))
     }
 
-    /// Parse source attributes from payload as HashMap<String, String>.
+    /// Parse source attributes from payload as `HashMap`<String, String>.
     ///
     /// Nested JSON objects (e.g., `custom_attributes`) are flattened into dotted keys
     /// so that `${custom_attributes.department}` resolves in mapping expressions.
@@ -952,7 +959,7 @@ impl DefaultOperationProcessor {
                     serde_json::Value::Object(nested) => {
                         // Flatten nested objects with dotted keys
                         for (nested_key, nested_value) in nested {
-                            let dotted_key = format!("{}.{}", key, nested_key);
+                            let dotted_key = format!("{key}.{nested_key}");
                             let str_value = match nested_value {
                                 serde_json::Value::String(s) => s.clone(),
                                 serde_json::Value::Number(n) => n.to_string(),
@@ -1008,7 +1015,7 @@ impl DefaultOperationProcessor {
         Ok(target_attrs)
     }
 
-    /// Convert AttributeSet to AttributeDelta (replace operations).
+    /// Convert `AttributeSet` to `AttributeDelta` (replace operations).
     fn attribute_set_to_delta(&self, attrs: &AttributeSet) -> AttributeDelta {
         let mut delta = AttributeDelta::new();
         for (name, value) in attrs.iter() {

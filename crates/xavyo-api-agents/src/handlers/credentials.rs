@@ -17,7 +17,7 @@ use crate::router::AgentsState;
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::credential_request_audit::{CredentialErrorCode, CredentialRequestOutcome};
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()

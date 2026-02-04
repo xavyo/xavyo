@@ -1,7 +1,7 @@
 //! JWT Authentication middleware.
 //!
 //! Extracts and validates JWT tokens from Authorization header,
-//! then inserts JwtClaims, UserId, and TenantId into request extensions.
+//! then inserts `JwtClaims`, `UserId`, and `TenantId` into request extensions.
 //!
 //! ## Dual Auth Support (F113)
 //!
@@ -32,7 +32,7 @@ use crate::services::revocation_cache::RevocationCache;
 /// This middleware:
 /// 1. Extracts the Bearer token from the Authorization header
 /// 2. Decodes and validates the JWT
-/// 3. Inserts JwtClaims, UserId, and TenantId into request extensions
+/// 3. Inserts `JwtClaims`, `UserId`, and `TenantId` into request extensions
 ///
 /// # Usage
 ///
@@ -199,17 +199,14 @@ pub async fn jwt_auth_middleware(
     // Extract user ID from sub claim
     // For client_credentials tokens, sub is the client_id (not a UUID)
     // In that case, we mark it as a service account token
-    let (user_uuid, is_service_account) = match claims.sub.parse::<uuid::Uuid>() {
-        Ok(uuid) => (uuid, false),
-        Err(_) => {
-            // This is likely a client_credentials token where sub is the client_id
-            // Use a nil UUID for service accounts - handlers should check ServiceAccountMarker
-            tracing::debug!(
-                client_id = %claims.sub,
-                "Client credentials token detected, using service account mode"
-            );
-            (uuid::Uuid::nil(), true)
-        }
+    let (user_uuid, is_service_account) = if let Ok(uuid) = claims.sub.parse::<uuid::Uuid>() { (uuid, false) } else {
+        // This is likely a client_credentials token where sub is the client_id
+        // Use a nil UUID for service accounts - handlers should check ServiceAccountMarker
+        tracing::debug!(
+            client_id = %claims.sub,
+            "Client credentials token detected, using service account mode"
+        );
+        (uuid::Uuid::nil(), true)
     };
     let user_id = UserId::from_uuid(user_uuid);
 
@@ -218,14 +215,14 @@ pub async fn jwt_auth_middleware(
         .headers()
         .get("X-Device-Fingerprint")
         .and_then(|h| h.to_str().ok())
-        .map(|s| s.to_string());
+        .map(std::string::ToString::to_string);
 
     // Extract user agent from header (optional)
     let user_agent: Option<String> = request
         .headers()
         .get("User-Agent")
         .and_then(|h| h.to_str().ok())
-        .map(|s| s.to_string());
+        .map(std::string::ToString::to_string);
 
     // Extract IP address from X-Forwarded-For header or connection info
     let ip_address: Option<IpAddr> = request
@@ -265,13 +262,14 @@ pub struct JwtPublicKey(pub String);
 #[derive(Clone)]
 pub struct JwtPublicKeys(pub HashMap<String, String>);
 
-/// Marker indicating if the request was authenticated via a service account (client_credentials).
-/// When true, the user_id is a synthetic UUID derived from the client_id.
+/// Marker indicating if the request was authenticated via a service account (`client_credentials`).
+/// When true, the `user_id` is a synthetic UUID derived from the `client_id`.
 #[derive(Clone, Copy, Debug)]
 pub struct ServiceAccountMarker(pub bool);
 
 impl ServiceAccountMarker {
-    /// Returns true if this is a service account (client_credentials) token.
+    /// Returns true if this is a service account (`client_credentials`) token.
+    #[must_use] 
     pub fn is_service_account(&self) -> bool {
         self.0
     }

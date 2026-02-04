@@ -59,7 +59,7 @@ pub async fn get_tenant_usage_handler(
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
         .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {} not found", tenant_id))
+            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
         })?;
 
     // Get or create current period metrics
@@ -135,7 +135,7 @@ pub async fn get_tenant_usage_history_handler(
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
         .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {} not found", tenant_id))
+            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
         })?;
 
     // Get historical metrics
@@ -165,9 +165,9 @@ fn extract_limits_from_settings(settings: &serde_json::Value) -> UsageLimits {
     UsageLimits {
         max_mau: limits
             .get("max_mau")
-            .and_then(|v| v.as_i64())
+            .and_then(serde_json::Value::as_i64)
             .map(|v| v as i32),
-        max_api_calls: limits.get("max_api_calls").and_then(|v| v.as_i64()),
-        max_agent_invocations: limits.get("max_agent_invocations").and_then(|v| v.as_i64()),
+        max_api_calls: limits.get("max_api_calls").and_then(serde_json::Value::as_i64),
+        max_agent_invocations: limits.get("max_agent_invocations").and_then(serde_json::Value::as_i64),
     }
 }

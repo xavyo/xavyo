@@ -1,7 +1,7 @@
 //! CSV parsing service for bulk user import (F086, F-021).
 //!
 //! Handles CSV header validation, row-by-row parsing, configurable delimiters,
-//! column mapping, extended duplicate detection (email, username, external_id),
+//! column mapping, extended duplicate detection (email, username, `external_id`),
 //! and per-field validation including custom attribute columns.
 
 use std::collections::{HashMap, HashSet};
@@ -42,7 +42,7 @@ pub struct ParsedRow {
     pub department: Option<String>,
     /// Whether the user should be active (defaults to false for invitation flow).
     pub is_active: bool,
-    /// Custom attribute values: attribute_name -> raw value string.
+    /// Custom attribute values: `attribute_name` -> raw value string.
     pub custom_attributes: HashMap<String, String>,
     /// Username for login (F-021).
     pub username: Option<String>,
@@ -107,7 +107,7 @@ impl DuplicateChecker {
                     email: Some(email.to_string()),
                     column_name: Some("email".to_string()),
                     error_type: "duplicate_in_file".to_string(),
-                    error_message: format!("Duplicate email '{}' within CSV file", email),
+                    error_message: format!("Duplicate email '{email}' within CSV file"),
                 });
             }
             self.seen_emails.insert(email_lower);
@@ -125,8 +125,7 @@ impl DuplicateChecker {
                             column_name: Some("username".to_string()),
                             error_type: "duplicate_username_in_file".to_string(),
                             error_message: format!(
-                                "Duplicate username '{}' within CSV file",
-                                uname
+                                "Duplicate username '{uname}' within CSV file"
                             ),
                         });
                     }
@@ -146,8 +145,7 @@ impl DuplicateChecker {
                             column_name: Some("external_id".to_string()),
                             error_type: "duplicate_external_id_in_file".to_string(),
                             error_message: format!(
-                                "Duplicate external_id '{}' within CSV file",
-                                ext_id
+                                "Duplicate external_id '{ext_id}' within CSV file"
                             ),
                         });
                     }
@@ -202,9 +200,9 @@ pub fn parse_csv_with_config(
     // Parse and validate headers
     let mut headers: Vec<String> = reader
         .headers()
-        .map_err(|e| format!("Failed to read CSV headers: {}", e))?
+        .map_err(|e| format!("Failed to read CSV headers: {e}"))?
         .iter()
-        .map(|h| h.to_string())
+        .map(std::string::ToString::to_string)
         .collect();
 
     // Apply column mapping if configured
@@ -239,8 +237,7 @@ pub fn parse_csv_with_config(
         // Check max_rows limit
         if total_rows > max_rows {
             return Err(format!(
-                "CSV file exceeds maximum row limit of {}. Processing stopped at row {}.",
-                max_rows, total_rows
+                "CSV file exceeds maximum row limit of {max_rows}. Processing stopped at row {total_rows}."
             ));
         }
 
@@ -252,25 +249,22 @@ pub fn parse_csv_with_config(
                     email: None,
                     column_name: None,
                     error_type: "parse_error".to_string(),
-                    error_message: format!("Failed to parse CSV row: {}", e),
+                    error_message: format!("Failed to parse CSV row: {e}"),
                 });
                 continue;
             }
         };
 
         // Extract email (required)
-        let email_idx = match known_columns.get("email") {
-            Some(&idx) => idx,
-            None => {
-                errors.push(RowError {
-                    line_number,
-                    email: None,
-                    column_name: Some("email".to_string()),
-                    error_type: "validation".to_string(),
-                    error_message: "Email column index not found".to_string(),
-                });
-                continue;
-            }
+        let email_idx = if let Some(&idx) = known_columns.get("email") { idx } else {
+            errors.push(RowError {
+                line_number,
+                email: None,
+                column_name: Some("email".to_string()),
+                error_type: "validation".to_string(),
+                error_message: "Email column index not found".to_string(),
+            });
+            continue;
         };
 
         let raw_email = record.get(email_idx).unwrap_or("").trim().to_string();
@@ -332,8 +326,7 @@ pub fn parse_csv_with_config(
 
         // Parse is_active (defaults to false for invitation flow)
         let is_active = get_optional_field(&record, &known_columns, "is_active")
-            .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes"))
-            .unwrap_or(false);
+            .is_some_and(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes"));
 
         // Extract custom attribute columns
         let mut custom_attributes = HashMap::new();
@@ -711,7 +704,7 @@ mod tests {
     fn test_parse_csv_max_rows_limit() {
         let mut csv = String::from("email\n");
         for i in 0..15 {
-            csv.push_str(&format!("user{}@example.com\n", i));
+            csv.push_str(&format!("user{i}@example.com\n"));
         }
         let config = CsvParseConfig::new().with_max_rows(10);
         let result = parse_csv_with_config(csv.as_bytes(), &config);
@@ -740,7 +733,7 @@ mod tests {
         // Generate a file with 1000 rows
         let mut csv = String::from("email,first_name,last_name\n");
         for i in 0..1000 {
-            csv.push_str(&format!("user{}@example.com,User{},Last{}\n", i, i, i));
+            csv.push_str(&format!("user{i}@example.com,User{i},Last{i}\n"));
         }
         let config = CsvParseConfig::new().with_max_rows(2000);
         let result = parse_csv_with_config(csv.as_bytes(), &config).unwrap();

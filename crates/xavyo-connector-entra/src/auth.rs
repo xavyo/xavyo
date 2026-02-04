@@ -1,4 +1,4 @@
-//! OAuth2 authentication for Microsoft Graph API.
+//! `OAuth2` authentication for Microsoft Graph API.
 
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
@@ -8,7 +8,7 @@ use tracing::{debug, instrument};
 
 use crate::{EntraCloudEnvironment, EntraCredentials, EntraError, EntraResult};
 
-/// OAuth2 token response from Azure AD.
+/// `OAuth2` token response from Azure AD.
 #[derive(Debug, Deserialize)]
 struct TokenResponse {
     access_token: String,
@@ -17,7 +17,7 @@ struct TokenResponse {
     token_type: String,
 }
 
-/// Cached OAuth2 access token.
+/// Cached `OAuth2` access token.
 #[derive(Debug, Clone)]
 struct CachedToken {
     access_token: String,
@@ -31,7 +31,7 @@ impl CachedToken {
     }
 }
 
-/// Token cache for managing OAuth2 access tokens.
+/// Token cache for managing `OAuth2` access tokens.
 #[derive(Debug)]
 pub struct TokenCache {
     credentials: EntraCredentials,
@@ -45,6 +45,7 @@ pub struct TokenCache {
 
 impl TokenCache {
     /// Creates a new token cache.
+    #[must_use] 
     pub fn new(
         credentials: EntraCredentials,
         cloud_environment: EntraCloudEnvironment,
@@ -117,21 +118,20 @@ impl TokenCache {
             .form(&params)
             .send()
             .await
-            .map_err(|e| EntraError::Auth(format!("Token request failed: {}", e)))?;
+            .map_err(|e| EntraError::Auth(format!("Token request failed: {e}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
             return Err(EntraError::Auth(format!(
-                "Token request failed with status {}: {}",
-                status, body
+                "Token request failed with status {status}: {body}"
             )));
         }
 
         let token_response: TokenResponse = response
             .json()
             .await
-            .map_err(|e| EntraError::Auth(format!("Failed to parse token response: {}", e)))?;
+            .map_err(|e| EntraError::Auth(format!("Failed to parse token response: {e}")))?;
 
         let expires_at = Utc::now() + Duration::seconds(token_response.expires_in);
 

@@ -18,6 +18,7 @@ pub struct AuthService {
 
 impl AuthService {
     /// Create a new authentication service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -53,9 +54,7 @@ impl AuthService {
         if !email_result.is_valid {
             return Err(ApiAuthError::InvalidEmail(
                 email_result
-                    .error
-                    .map(|e| e.to_string())
-                    .unwrap_or_else(|| "Invalid email format".to_string()),
+                    .error.map_or_else(|| "Invalid email format".to_string(), |e| e.to_string()),
             ));
         }
 
@@ -65,7 +64,7 @@ impl AuthService {
             let errors: Vec<String> = password_result
                 .errors
                 .iter()
-                .map(|e| e.to_string())
+                .map(std::string::ToString::to_string)
                 .collect();
             return Err(ApiAuthError::WeakPassword(errors));
         }
@@ -92,10 +91,10 @@ impl AuthService {
         let created_at = chrono::Utc::now();
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO users (id, tenant_id, email, password_hash, is_active, created_at, updated_at)
             VALUES ($1, $2, $3, $4, true, $5, $5)
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id.as_uuid())
@@ -141,11 +140,11 @@ impl AuthService {
 
         // Find user by email and tenant
         let user: Option<User> = sqlx::query_as(
-            r#"
+            r"
             SELECT *
             FROM users
             WHERE email = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(&normalized_email)
         .bind(tenant_id.as_uuid())
@@ -207,11 +206,11 @@ impl AuthService {
     /// Get a user by ID.
     pub async fn get_user(&self, user_id: UserId) -> Result<Option<User>, ApiAuthError> {
         let user: Option<User> = sqlx::query_as(
-            r#"
+            r"
             SELECT *
             FROM users
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(user_id.as_uuid())
         .fetch_optional(&self.pool)
@@ -232,11 +231,11 @@ impl AuthService {
         let normalized_email = normalize_email(email);
 
         let user: Option<User> = sqlx::query_as(
-            r#"
+            r"
             SELECT *
             FROM users
             WHERE email = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(&normalized_email)
         .bind(tenant_id.as_uuid())

@@ -1,4 +1,4 @@
-//! AD Connector wrapping LdapConnector with AD-specific behavior.
+//! AD Connector wrapping `LdapConnector` with AD-specific behavior.
 //!
 //! The `AdConnector` delegates LDAP operations to the underlying `LdapConnector`
 //! while adding:
@@ -64,7 +64,7 @@ pub struct ConnectionTestResult {
     pub server_info: Option<AdServerInfo>,
 }
 
-/// Active Directory connector wrapping LdapConnector.
+/// Active Directory connector wrapping `LdapConnector`.
 ///
 /// Provides AD-specific features on top of the base LDAP connector:
 /// - Enhanced configuration validation (domain required, SSL for passwords)
@@ -100,11 +100,13 @@ impl AdConnector {
     }
 
     /// Get the AD configuration.
+    #[must_use] 
     pub fn config(&self) -> &ActiveDirectoryConfig {
         &self.config
     }
 
     /// Get the underlying LDAP connector for direct operations.
+    #[must_use] 
     pub fn ldap(&self) -> &LdapConnector {
         &self.ldap
     }
@@ -148,7 +150,7 @@ impl AdConnector {
         for (i, sb) in config.search_bases.iter().enumerate() {
             if sb.dn.is_empty() {
                 return Err(ConnectorError::InvalidConfiguration {
-                    message: format!("search_bases[{}].dn cannot be empty", i),
+                    message: format!("search_bases[{i}].dn cannot be empty"),
                 });
             }
             let valid_scopes = ["subtree", "onelevel", "base"];
@@ -174,6 +176,7 @@ impl AdConnector {
     ///
     /// If no search bases are configured, yields a single entry using the
     /// base DN from the LDAP config with subtree scope.
+    #[must_use] 
     pub fn iterate_search_bases<'a>(
         &'a self,
         object_type: &'a str,
@@ -201,16 +204,19 @@ impl AdConnector {
     }
 
     /// Get the user LDAP filter for AD.
+    #[must_use] 
     pub fn user_filter(&self) -> &str {
         &self.config.user_filter
     }
 
     /// Get the group LDAP filter for AD.
+    #[must_use] 
     pub fn group_filter(&self) -> &str {
         &self.config.group_filter
     }
 
     /// Get the maximum nested group depth.
+    #[must_use] 
     pub fn max_nesting_depth(&self) -> u32 {
         self.config.max_nesting_depth
     }
@@ -312,7 +318,7 @@ impl CreateOp for AdConnector {
             }
 
             // Handle password if provided — encode as unicodePwd
-            if let Some(password) = attributes.get_string("password").map(|s| s.to_string()) {
+            if let Some(password) = attributes.get_string("password").map(std::string::ToString::to_string) {
                 validate_password_connection(self.config.ldap.use_ssl)?;
                 let encoded = encode_ad_password(&password)?;
                 attributes.remove("password");
@@ -471,8 +477,7 @@ impl AdConnector {
 
         uac_str.parse::<u32>().map_err(|_| {
             ConnectorError::operation_failed(format!(
-                "Invalid userAccountControl value: {}",
-                uac_str
+                "Invalid userAccountControl value: {uac_str}"
             ))
         })
     }
@@ -542,8 +547,7 @@ mod tests {
             config.conflict_strategy = strategy.to_string();
             assert!(
                 AdConnector::validate_ad_config(&config).is_ok(),
-                "Strategy '{}' should be valid",
-                strategy
+                "Strategy '{strategy}' should be valid"
             );
         }
     }

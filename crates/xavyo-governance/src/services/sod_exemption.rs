@@ -1,7 +1,7 @@
-//! SoD exemption service for managing approved violations.
+//! `SoD` exemption service for managing approved violations.
 //!
 //! This module provides the `SodExemptionService` for creating, revoking, and
-//! checking SoD exemptions that allow users to bypass specific SoD rules.
+//! checking `SoD` exemptions that allow users to bypass specific `SoD` rules.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -42,7 +42,7 @@ impl std::fmt::Display for SodExemptionStatus {
     }
 }
 
-/// An SoD exemption allowing a user to bypass a specific rule.
+/// An `SoD` exemption allowing a user to bypass a specific rule.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SodExemption {
     /// Unique identifier.
@@ -71,6 +71,7 @@ pub struct SodExemption {
 
 impl SodExemption {
     /// Check if the exemption is currently valid.
+    #[must_use] 
     pub fn is_valid(&self) -> bool {
         if self.status != SodExemptionStatus::Active {
             return false;
@@ -87,7 +88,7 @@ impl SodExemption {
     }
 }
 
-/// Input for creating an SoD exemption.
+/// Input for creating an `SoD` exemption.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateSodExemptionInput {
     /// The rule to exempt.
@@ -106,7 +107,7 @@ pub struct CreateSodExemptionInput {
 // Store Trait
 // ============================================================================
 
-/// Trait for SoD exemption storage backends.
+/// Trait for `SoD` exemption storage backends.
 #[async_trait::async_trait]
 pub trait SodExemptionStore: Send + Sync {
     /// Get an exemption by ID.
@@ -153,7 +154,7 @@ pub trait SodExemptionStore: Send + Sync {
 // In-Memory Store (for testing)
 // ============================================================================
 
-/// In-memory SoD exemption store for testing.
+/// In-memory `SoD` exemption store for testing.
 #[derive(Debug, Default)]
 pub struct InMemorySodExemptionStore {
     exemptions: Arc<RwLock<HashMap<Uuid, SodExemption>>>,
@@ -161,6 +162,7 @@ pub struct InMemorySodExemptionStore {
 
 impl InMemorySodExemptionStore {
     /// Create a new in-memory store.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             exemptions: Arc::new(RwLock::new(HashMap::new())),
@@ -322,14 +324,14 @@ impl SodExemptionStore for InMemorySodExemptionStore {
 /// Minimum justification length.
 const MIN_JUSTIFICATION_LENGTH: usize = 10;
 
-/// Service for managing SoD exemptions.
+/// Service for managing `SoD` exemptions.
 pub struct SodExemptionService {
     exemption_store: Arc<dyn SodExemptionStore>,
     audit_store: Arc<dyn AuditStore>,
 }
 
 impl SodExemptionService {
-    /// Create a new SoD exemption service.
+    /// Create a new `SoD` exemption service.
     pub fn new(
         exemption_store: Arc<dyn SodExemptionStore>,
         audit_store: Arc<dyn AuditStore>,

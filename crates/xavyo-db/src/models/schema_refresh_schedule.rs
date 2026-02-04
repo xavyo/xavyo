@@ -20,6 +20,7 @@ pub enum ScheduleType {
 
 impl ScheduleType {
     /// Get the string representation.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             ScheduleType::Interval => "interval",
@@ -28,6 +29,7 @@ impl ScheduleType {
     }
 
     /// Parse from string.
+    #[must_use] 
     pub fn parse_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "interval" => Some(ScheduleType::Interval),
@@ -114,10 +116,10 @@ impl SchemaRefreshSchedule {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM schema_refresh_schedules
             WHERE connector_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -131,14 +133,14 @@ impl SchemaRefreshSchedule {
         limit: i32,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM schema_refresh_schedules
             WHERE enabled = true
               AND next_run_at IS NOT NULL
               AND next_run_at <= NOW()
             ORDER BY next_run_at ASC
             LIMIT $1
-            "#,
+            ",
         )
         .bind(limit)
         .fetch_all(pool)
@@ -154,7 +156,7 @@ impl SchemaRefreshSchedule {
         next_run_at: Option<DateTime<Utc>>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO schema_refresh_schedules (
                 tenant_id, connector_id, enabled, schedule_type,
                 interval_hours, cron_expression, next_run_at,
@@ -172,7 +174,7 @@ impl SchemaRefreshSchedule {
                 notify_email = EXCLUDED.notify_email,
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -195,14 +197,14 @@ impl SchemaRefreshSchedule {
         error: Option<&str>,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE schema_refresh_schedules
             SET last_run_at = NOW(),
                 next_run_at = $2,
                 last_error = $3,
                 updated_at = NOW()
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .bind(next_run_at)
@@ -220,10 +222,10 @@ impl SchemaRefreshSchedule {
         connector_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM schema_refresh_schedules
             WHERE connector_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -234,16 +236,19 @@ impl SchemaRefreshSchedule {
     }
 
     /// Get schedule type as enum.
+    #[must_use] 
     pub fn get_schedule_type(&self) -> ScheduleType {
         ScheduleType::parse_str(&self.schedule_type).unwrap_or_default()
     }
 
     /// Check if this is an interval schedule.
+    #[must_use] 
     pub fn is_interval(&self) -> bool {
         self.get_schedule_type() == ScheduleType::Interval
     }
 
     /// Check if this is a cron schedule.
+    #[must_use] 
     pub fn is_cron(&self) -> bool {
         self.get_schedule_type() == ScheduleType::Cron
     }

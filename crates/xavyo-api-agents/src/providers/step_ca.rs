@@ -116,7 +116,7 @@ struct StepCaHealthResponse {
 }
 
 /// Claims for step-ca One-Time Token (OTT) JWT.
-/// See: https://smallstep.com/docs/step-ca/provisioners/#jwk
+/// See: <https://smallstep.com/docs/step-ca/provisioners/#jwk>
 #[derive(Debug, Serialize)]
 struct StepCaOttClaims {
     /// Audience - typically the step-ca URL.
@@ -148,6 +148,7 @@ pub struct StepCaProvider {
 
 impl StepCaProvider {
     /// Create a new Step-CA provider.
+    #[must_use] 
     pub fn new(config: StepCaConfig) -> Self {
         let http_client = Client::builder()
             .timeout(StdDuration::from_millis(config.timeout_ms))
@@ -162,6 +163,7 @@ impl StepCaProvider {
     }
 
     /// Create a provider with pre-loaded provisioner password.
+    #[must_use] 
     pub fn with_password(config: StepCaConfig, password: String) -> Self {
         let http_client = Client::builder()
             .timeout(StdDuration::from_millis(config.timeout_ms))
@@ -176,6 +178,7 @@ impl StepCaProvider {
     }
 
     /// Get the provider configuration.
+    #[must_use] 
     pub fn config(&self) -> &StepCaConfig {
         &self.config
     }
@@ -189,7 +192,7 @@ impl StepCaProvider {
         };
 
         KeyPair::generate_for(alg)
-            .map_err(|e| CaProviderError::Internal(format!("Failed to generate key pair: {}", e)))
+            .map_err(|e| CaProviderError::Internal(format!("Failed to generate key pair: {e}")))
     }
 
     /// Generate a CSR for the given request.
@@ -218,11 +221,11 @@ impl StepCaProvider {
         // Create SAN entries
         let dns_san = rcgen::SanType::DnsName(
             rcgen::Ia5String::try_from(request.agent_name.as_str())
-                .map_err(|e| CaProviderError::InvalidCsr(format!("Invalid DNS name: {}", e)))?,
+                .map_err(|e| CaProviderError::InvalidCsr(format!("Invalid DNS name: {e}")))?,
         );
         let uri_san = rcgen::SanType::URI(
             rcgen::Ia5String::try_from(agent_uri.as_str())
-                .map_err(|e| CaProviderError::InvalidCsr(format!("Invalid URI: {}", e)))?,
+                .map_err(|e| CaProviderError::InvalidCsr(format!("Invalid URI: {e}")))?,
         );
 
         params.subject_alt_names.push(dns_san);
@@ -233,13 +236,13 @@ impl StepCaProvider {
             if let Some(dns_name) = san.strip_prefix("dns:") {
                 params.subject_alt_names.push(rcgen::SanType::DnsName(
                     rcgen::Ia5String::try_from(dns_name).map_err(|e| {
-                        CaProviderError::InvalidCsr(format!("Invalid DNS SAN: {}", e))
+                        CaProviderError::InvalidCsr(format!("Invalid DNS SAN: {e}"))
                     })?,
                 ));
             } else if let Some(uri) = san.strip_prefix("uri:") {
                 params.subject_alt_names.push(rcgen::SanType::URI(
                     rcgen::Ia5String::try_from(uri).map_err(|e| {
-                        CaProviderError::InvalidCsr(format!("Invalid URI SAN: {}", e))
+                        CaProviderError::InvalidCsr(format!("Invalid URI SAN: {e}"))
                     })?,
                 ));
             }
@@ -248,10 +251,10 @@ impl StepCaProvider {
         // Generate proper PKCS#10 CSR using rcgen's serialize_request
         let csr = params
             .serialize_request(key_pair)
-            .map_err(|e| CaProviderError::InvalidCsr(format!("Failed to create CSR: {}", e)))?;
+            .map_err(|e| CaProviderError::InvalidCsr(format!("Failed to create CSR: {e}")))?;
 
         csr.pem().map_err(|e| {
-            CaProviderError::InvalidCsr(format!("Failed to serialize CSR to PEM: {}", e))
+            CaProviderError::InvalidCsr(format!("Failed to serialize CSR to PEM: {e}"))
         })
     }
 
@@ -260,7 +263,7 @@ impl StepCaProvider {
     /// This generates a JWT signed with HS256 using the provisioner password.
     /// The JWT follows the step-ca OTT format for JWK provisioners.
     ///
-    /// See: https://smallstep.com/docs/step-ca/provisioners/#jwk
+    /// See: <https://smallstep.com/docs/step-ca/provisioners/#jwk>
     fn generate_ott(&self, subject: &str, sans: &[String]) -> CaResult<String> {
         let password = self.provisioner_password.as_ref().ok_or_else(|| {
             CaProviderError::NotAvailable("Provisioner password not configured".to_string())
@@ -286,7 +289,7 @@ impl StepCaProvider {
         let encoding_key = EncodingKey::from_secret(password.as_bytes());
 
         encode(&header, &claims, &encoding_key)
-            .map_err(|e| CaProviderError::Internal(format!("Failed to generate OTT JWT: {}", e)))
+            .map_err(|e| CaProviderError::Internal(format!("Failed to generate OTT JWT: {e}")))
     }
 
     /// Calculate SHA-256 fingerprint of a certificate in DER format.
@@ -297,7 +300,7 @@ impl StepCaProvider {
 
         result
             .iter()
-            .map(|b| format!("{:02X}", b))
+            .map(|b| format!("{b:02X}"))
             .collect::<Vec<_>>()
             .join(":")
     }
@@ -305,7 +308,7 @@ impl StepCaProvider {
     /// Parse a PEM certificate and extract DER bytes.
     fn parse_pem_to_der(pem_str: &str) -> CaResult<Vec<u8>> {
         let pem_data = ::pem::parse(pem_str)
-            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse PEM: {}", e)))?;
+            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse PEM: {e}")))?;
 
         Ok(pem_data.contents().to_vec())
     }
@@ -314,14 +317,14 @@ impl StepCaProvider {
     fn extract_serial_number(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
         let (_, cert) = X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
         })?;
 
         Ok(cert
             .serial
             .to_bytes_be()
             .iter()
-            .map(|b| format!("{:02X}", b))
+            .map(|b| format!("{b:02X}"))
             .collect())
     }
 
@@ -329,7 +332,7 @@ impl StepCaProvider {
     fn extract_subject_dn(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
         let (_, cert) = X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
         })?;
 
         Ok(cert.subject().to_string())
@@ -339,7 +342,7 @@ impl StepCaProvider {
     fn extract_issuer_dn(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
         let (_, cert) = X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
         })?;
 
         Ok(cert.issuer().to_string())
@@ -349,7 +352,7 @@ impl StepCaProvider {
     fn extract_validity(cert_pem: &str) -> CaResult<(i64, i64)> {
         let der = Self::parse_pem_to_der(cert_pem)?;
         let (_, cert) = X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
         })?;
 
         let not_before = cert.validity().not_before.timestamp();
@@ -370,7 +373,7 @@ impl CaProvider for StepCaProvider {
 
         let response =
             self.http_client.get(&url).send().await.map_err(|e| {
-                CaProviderError::NetworkError(format!("Health check failed: {}", e))
+                CaProviderError::NetworkError(format!("Health check failed: {e}"))
             })?;
 
         if !response.status().is_success() {
@@ -381,7 +384,7 @@ impl CaProvider for StepCaProvider {
         }
 
         let health: StepCaHealthResponse = response.json().await.map_err(|e| {
-            CaProviderError::ExternalCaError(format!("Invalid health response: {}", e))
+            CaProviderError::ExternalCaError(format!("Invalid health response: {e}"))
         })?;
 
         if health.status != "ok" {
@@ -431,7 +434,7 @@ impl CaProvider for StepCaProvider {
 
         // Calculate not_after duration
         let validity_hours = request.validity_days * 24;
-        let not_after = format!("{}h", validity_hours);
+        let not_after = format!("{validity_hours}h");
 
         // Build sign request
         let sign_request = StepCaSignRequest {
@@ -448,18 +451,17 @@ impl CaProvider for StepCaProvider {
             .json(&sign_request)
             .send()
             .await
-            .map_err(|e| CaProviderError::NetworkError(format!("Sign request failed: {}", e)))?;
+            .map_err(|e| CaProviderError::NetworkError(format!("Sign request failed: {e}")))?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(CaProviderError::ExternalCaError(format!(
-                "Step-CA sign failed: {}",
-                error_text
+                "Step-CA sign failed: {error_text}"
             )));
         }
 
         let sign_response: StepCaSignResponse = response.json().await.map_err(|e| {
-            CaProviderError::ExternalCaError(format!("Invalid sign response: {}", e))
+            CaProviderError::ExternalCaError(format!("Invalid sign response: {e}"))
         })?;
 
         // Parse the issued certificate
@@ -527,18 +529,17 @@ impl CaProvider for StepCaProvider {
             .json(&revoke_request)
             .send()
             .await
-            .map_err(|e| CaProviderError::NetworkError(format!("Revoke request failed: {}", e)))?;
+            .map_err(|e| CaProviderError::NetworkError(format!("Revoke request failed: {e}")))?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(CaProviderError::ExternalCaError(format!(
-                "Step-CA revoke failed: {}",
-                error_text
+                "Step-CA revoke failed: {error_text}"
             )));
         }
 
         let _revoke_response: StepCaRevokeResponse = response.json().await.map_err(|e| {
-            CaProviderError::ExternalCaError(format!("Invalid revoke response: {}", e))
+            CaProviderError::ExternalCaError(format!("Invalid revoke response: {e}"))
         })?;
 
         Ok(RevocationResult {
@@ -556,7 +557,7 @@ impl CaProvider for StepCaProvider {
             Err(e) => {
                 return Ok(CertificateValidation::invalid(
                     CertificateStatus::Active,
-                    format!("Failed to parse certificate: {}", e),
+                    format!("Failed to parse certificate: {e}"),
                 ));
             }
         };
@@ -566,7 +567,7 @@ impl CaProvider for StepCaProvider {
             Err(e) => {
                 return Ok(CertificateValidation::invalid(
                     CertificateStatus::Active,
-                    format!("Failed to parse X.509: {:?}", e),
+                    format!("Failed to parse X.509: {e:?}"),
                 ));
             }
         };
@@ -595,7 +596,7 @@ impl CaProvider for StepCaProvider {
             .serial
             .to_bytes_be()
             .iter()
-            .map(|b| format!("{:02X}", b))
+            .map(|b| format!("{b:02X}"))
             .collect::<String>();
 
         // Extract agent_id and tenant_id from SAN URIs
@@ -646,7 +647,7 @@ impl CaProvider for StepCaProvider {
             .get(&url)
             .send()
             .await
-            .map_err(|e| CaProviderError::NetworkError(format!("CRL fetch failed: {}", e)))?;
+            .map_err(|e| CaProviderError::NetworkError(format!("CRL fetch failed: {e}")))?;
 
         if !response.status().is_success() {
             return Err(CaProviderError::ExternalCaError(format!(
@@ -658,7 +659,7 @@ impl CaProvider for StepCaProvider {
         let crl_bytes = response
             .bytes()
             .await
-            .map_err(|e| CaProviderError::ExternalCaError(format!("Failed to read CRL: {}", e)))?;
+            .map_err(|e| CaProviderError::ExternalCaError(format!("Failed to read CRL: {e}")))?;
 
         Ok(crl_bytes.to_vec())
     }

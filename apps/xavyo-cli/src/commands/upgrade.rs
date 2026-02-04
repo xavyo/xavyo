@@ -50,7 +50,7 @@ pub async fn execute(args: UpgradeArgs) -> CliResult<()> {
     // Get current version from Cargo.toml at compile time
     let current_version = env!("CARGO_PKG_VERSION");
     let current = Version::parse(current_version)
-        .map_err(|e| CliError::InvalidVersion(format!("{}: {}", current_version, e)))?;
+        .map_err(|e| CliError::InvalidVersion(format!("{current_version}: {e}")))?;
 
     // Detect platform
     let platform = Platform::current();
@@ -71,8 +71,7 @@ pub async fn execute(args: UpgradeArgs) -> CliResult<()> {
                 let result = UpgradeResultJson::failure(
                     current_version,
                     &format!(
-                        "CLI installed via package manager. Use: {}. Or run with --force to override.",
-                        cmd
+                        "CLI installed via package manager. Use: {cmd}. Or run with --force to override."
                     ),
                 );
                 println!("{}", serde_json::to_string_pretty(&result)?);
@@ -81,7 +80,7 @@ pub async fn execute(args: UpgradeArgs) -> CliResult<()> {
 
             println!("Warning: xavyo appears to be installed via a package manager\n");
             println!("To maintain consistent package management, use:");
-            println!("  {}\n", cmd);
+            println!("  {cmd}\n");
             println!("To upgrade anyway, run:");
             println!("  xavyo upgrade --force");
             return Ok(());
@@ -123,14 +122,14 @@ pub async fn execute(args: UpgradeArgs) -> CliResult<()> {
             let result = UpgradeResultJson::up_to_date(current_version);
             println!("{}", serde_json::to_string_pretty(&result)?);
         } else {
-            println!("Already on latest version ({})", current_version);
+            println!("Already on latest version ({current_version})");
         }
         return Ok(());
     }
 
     // Display release info and confirm upgrade
     if !args.json {
-        println!("Current version: {}", current_version);
+        println!("Current version: {current_version}");
         println!("Latest version:  {}\n", release.version);
 
         // Display release notes
@@ -158,7 +157,7 @@ pub async fn execute(args: UpgradeArgs) -> CliResult<()> {
         .ok_or_else(|| CliError::NoAssetFound(platform.asset_suffix.clone()))?;
 
     let asset_name = platform.asset_name(&release.version.to_string());
-    let expected_size = release.find_asset(&asset_name).map(|a| a.size).unwrap_or(0);
+    let expected_size = release.find_asset(&asset_name).map_or(0, |a| a.size);
 
     // Fetch checksum
     let checksum = fetch_checksum(&client, &release, &asset_name).await?;
@@ -212,7 +211,7 @@ fn display_release_notes(release: &Release) {
     if let Some(body) = &release.body {
         // Indent the release notes
         for line in body.lines() {
-            println!("  {}", line);
+            println!("  {line}");
         }
         println!();
     } else {
@@ -232,8 +231,7 @@ fn create_http_client() -> CliResult<Client> {
 /// Fetch the latest release from GitHub
 async fn fetch_latest_release(client: &Client) -> CliResult<Release> {
     let url = format!(
-        "https://api.github.com/repos/{}/{}/releases/latest",
-        GITHUB_OWNER, GITHUB_REPO
+        "https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
     );
 
     let response = client
@@ -256,10 +254,10 @@ async fn fetch_latest_release(client: &Client) -> CliResult<Release> {
     let gh_release: GitHubRelease = response
         .json()
         .await
-        .map_err(|e| CliError::Network(format!("Failed to parse release: {}", e)))?;
+        .map_err(|e| CliError::Network(format!("Failed to parse release: {e}")))?;
 
     Release::try_from(gh_release)
-        .map_err(|e| CliError::InvalidVersion(format!("Invalid release version: {}", e)))
+        .map_err(|e| CliError::InvalidVersion(format!("Invalid release version: {e}")))
 }
 
 /// Fetch checksum for the given asset
@@ -287,8 +285,7 @@ async fn fetch_checksum(client: &Client, release: &Release, asset_name: &str) ->
     }
 
     Err(CliError::NotFound(format!(
-        "Checksum for {} not found",
-        asset_name
+        "Checksum for {asset_name} not found"
     )))
 }
 
@@ -392,9 +389,9 @@ fn verify_checksum(file_path: &PathBuf, expected: &str) -> CliResult<()> {
 /// Get the path to the current binary
 fn get_current_binary_path() -> CliResult<String> {
     env::current_exe()
-        .map_err(|e| CliError::Io(format!("Could not determine binary path: {}", e)))?
+        .map_err(|e| CliError::Io(format!("Could not determine binary path: {e}")))?
         .to_str()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .ok_or_else(|| CliError::Io("Binary path contains invalid UTF-8".to_string()))
 }
 
@@ -420,7 +417,7 @@ fn atomic_replace_binary(new_binary: &PathBuf, target_path: &str) -> CliResult<(
             if e.kind() == std::io::ErrorKind::PermissionDenied {
                 CliError::PermissionDenied(target_path.to_string())
             } else {
-                CliError::Io(format!("Failed to backup current binary: {}", e))
+                CliError::Io(format!("Failed to backup current binary: {e}"))
             }
         })?;
     }
@@ -436,7 +433,7 @@ fn atomic_replace_binary(new_binary: &PathBuf, target_path: &str) -> CliResult<(
         return Err(if e.kind() == std::io::ErrorKind::PermissionDenied {
             CliError::PermissionDenied(target_path.to_string())
         } else {
-            CliError::Io(format!("Failed to install new binary: {}", e))
+            CliError::Io(format!("Failed to install new binary: {e}"))
         });
     }
 

@@ -231,7 +231,7 @@ pub struct ReplayRequest {
 pub struct ReplayResponse {
     /// Entry ID.
     pub id: Uuid,
-    /// Status: "queued" or "already_replayed".
+    /// Status: "queued" or "`already_replayed`".
     pub status: String,
     /// Additional message.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -275,6 +275,7 @@ pub struct JobState {
 
 impl JobState {
     /// Create a new job state.
+    #[must_use] 
     pub fn new(job_service: Arc<JobService>) -> Self {
         Self { job_service }
     }
@@ -306,8 +307,8 @@ fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ApiError> {
 /// GET /jobs
 ///
 /// Query Parameters:
-/// - connector_id: Filter by connector ID
-/// - status: Filter by status (pending, in_progress, completed, failed, dead_letter, cancelled)
+/// - `connector_id`: Filter by connector ID
+/// - status: Filter by status (pending, `in_progress`, completed, failed, `dead_letter`, cancelled)
 /// - from: Filter jobs created after this time
 /// - to: Filter jobs created before this time
 /// - limit: Page size (default 50, max 100)
@@ -390,7 +391,7 @@ pub async fn cancel_job(
 /// GET /dlq
 ///
 /// Query Parameters:
-/// - connector_id: Filter by connector ID
+/// - `connector_id`: Filter by connector ID
 /// - limit: Page size (default 50, max 100)
 /// - offset: Page offset
 pub async fn list_dlq(

@@ -185,7 +185,7 @@ pub struct MergeEntitlementSummary {
     pub application: Option<String>,
 }
 
-/// SoD check result for merge operations.
+/// `SoD` check result for merge operations.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MergeSodCheckResponse {
     pub has_violations: bool,
@@ -193,12 +193,12 @@ pub struct MergeSodCheckResponse {
     pub violations: Vec<MergeSodViolationResponse>,
 }
 
-/// SoD violation details for merge operations.
+/// `SoD` violation details for merge operations.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MergeSodViolationResponse {
-    /// The SoD rule that would be violated.
+    /// The `SoD` rule that would be violated.
     pub rule_id: Uuid,
-    /// The name of the SoD rule.
+    /// The name of the `SoD` rule.
     pub rule_name: String,
     /// Severity level of the violation.
     pub severity: String,

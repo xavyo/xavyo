@@ -1,6 +1,6 @@
 //! Mock client accuracy validation tests.
 //!
-//! These tests verify that the mock IdP clients accurately simulate
+//! These tests verify that the mock `IdP` clients accurately simulate
 //! the behavior documented in their respective quirks.
 
 mod common;

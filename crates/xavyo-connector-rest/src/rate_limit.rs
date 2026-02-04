@@ -67,6 +67,7 @@ impl Default for RateLimitConfig {
 
 impl RateLimitConfig {
     /// Create a new rate limit config with custom RPS.
+    #[must_use] 
     pub fn new(requests_per_second: u32) -> Self {
         Self {
             requests_per_second,
@@ -75,6 +76,7 @@ impl RateLimitConfig {
     }
 
     /// Disable rate limiting.
+    #[must_use] 
     pub fn disabled() -> Self {
         Self {
             enabled: false,
@@ -83,6 +85,7 @@ impl RateLimitConfig {
     }
 
     /// Set max concurrent requests.
+    #[must_use] 
     pub fn with_max_concurrent(mut self, max: u32) -> Self {
         self.max_concurrent = max;
         self
@@ -116,6 +119,7 @@ fn default_endpoint_concurrent() -> u32 {
 
 impl EndpointRateLimit {
     /// Create a new endpoint rate limit.
+    #[must_use] 
     pub fn new(requests_per_second: u32) -> Self {
         Self {
             requests_per_second,
@@ -124,6 +128,7 @@ impl EndpointRateLimit {
     }
 
     /// Set max concurrent for this endpoint.
+    #[must_use] 
     pub fn with_max_concurrent(mut self, max: u32) -> Self {
         self.max_concurrent = max;
         self
@@ -197,6 +202,7 @@ impl Default for RetryConfig {
 
 impl RetryConfig {
     /// Create a new retry config with custom max retries.
+    #[must_use] 
     pub fn new(max_retries: u32) -> Self {
         Self {
             max_retries,
@@ -205,6 +211,7 @@ impl RetryConfig {
     }
 
     /// Disable retries.
+    #[must_use] 
     pub fn disabled() -> Self {
         Self {
             max_retries: 0,
@@ -213,18 +220,21 @@ impl RetryConfig {
     }
 
     /// Set initial backoff.
+    #[must_use] 
     pub fn with_initial_backoff(mut self, ms: u64) -> Self {
         self.initial_backoff_ms = ms;
         self
     }
 
     /// Set max backoff.
+    #[must_use] 
     pub fn with_max_backoff(mut self, ms: u64) -> Self {
         self.max_backoff_ms = ms;
         self
     }
 
     /// Calculate backoff duration for a given attempt.
+    #[must_use] 
     pub fn calculate_backoff(&self, attempt: u32) -> Duration {
         if attempt == 0 {
             return Duration::from_millis(0);
@@ -247,6 +257,7 @@ impl RetryConfig {
     }
 
     /// Check if a status code should trigger a retry.
+    #[must_use] 
     pub fn should_retry(&self, status_code: u16) -> bool {
         self.retry_status_codes.contains(&status_code)
     }
@@ -260,7 +271,7 @@ fn rand_simple() -> f64 {
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap_or_default()
         .subsec_nanos();
-    (nanos as f64 / u32::MAX as f64).fract()
+    (f64::from(nanos) / f64::from(u32::MAX)).fract()
 }
 
 /// Logging verbosity level for request/response logging.
@@ -280,16 +291,19 @@ pub enum LogVerbosity {
 
 impl LogVerbosity {
     /// Check if headers should be logged.
+    #[must_use] 
     pub fn log_headers(&self) -> bool {
         matches!(self, LogVerbosity::Verbose | LogVerbosity::Debug)
     }
 
     /// Check if bodies should be logged.
+    #[must_use] 
     pub fn log_bodies(&self) -> bool {
         matches!(self, LogVerbosity::Debug)
     }
 
     /// Check if any logging should occur.
+    #[must_use] 
     pub fn is_enabled(&self) -> bool {
         !matches!(self, LogVerbosity::Quiet)
     }
@@ -340,9 +354,9 @@ struct TokenBucket {
 impl TokenBucket {
     fn new(tokens_per_second: u32) -> Self {
         Self {
-            tokens: tokens_per_second as f64,
-            max_tokens: tokens_per_second as f64,
-            refill_rate: tokens_per_second as f64,
+            tokens: f64::from(tokens_per_second),
+            max_tokens: f64::from(tokens_per_second),
+            refill_rate: f64::from(tokens_per_second),
             last_refill: Instant::now(),
         }
     }
@@ -374,6 +388,7 @@ impl TokenBucket {
 
 impl RateLimiter {
     /// Create a new rate limiter with the given configuration.
+    #[must_use] 
     pub fn new(config: RateLimitConfig) -> Self {
         let global_semaphore = Arc::new(Semaphore::new(config.max_concurrent as usize));
         let global_tokens = Arc::new(Mutex::new(TokenBucket::new(config.requests_per_second)));
@@ -627,6 +642,7 @@ impl std::error::Error for RateLimitError {}
 ///
 /// Supports both delay-seconds format (e.g., "120") and
 /// HTTP-date format (e.g., "Wed, 21 Oct 2015 07:28:00 GMT").
+#[must_use] 
 pub fn parse_retry_after(value: &str) -> Option<Duration> {
     // Try parsing as seconds first
     if let Ok(seconds) = value.parse::<u64>() {

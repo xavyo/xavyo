@@ -19,7 +19,7 @@ pub struct GovMetaRoleConstraint {
     /// The parent meta-role.
     pub meta_role_id: Uuid,
 
-    /// Type of constraint (max_session_duration, require_mfa, etc.).
+    /// Type of constraint (`max_session_duration`, `require_mfa`, etc.).
     pub constraint_type: String,
 
     /// Constraint configuration (JSON format).
@@ -44,10 +44,10 @@ impl GovMetaRoleConstraint {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_constraints
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -63,10 +63,10 @@ impl GovMetaRoleConstraint {
         constraint_type: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_constraints
             WHERE tenant_id = $1 AND meta_role_id = $2 AND constraint_type = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -82,11 +82,11 @@ impl GovMetaRoleConstraint {
         meta_role_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_constraints
             WHERE tenant_id = $1 AND meta_role_id = $2
             ORDER BY constraint_type ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -102,13 +102,13 @@ impl GovMetaRoleConstraint {
         input: CreateGovMetaRoleConstraint,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_meta_role_constraints (
                 tenant_id, meta_role_id, constraint_type, constraint_value
             )
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -126,12 +126,12 @@ impl GovMetaRoleConstraint {
         constraint_value: serde_json::Value,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_meta_role_constraints
             SET constraint_value = $3
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -147,10 +147,10 @@ impl GovMetaRoleConstraint {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_meta_role_constraints
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -167,10 +167,10 @@ impl GovMetaRoleConstraint {
         meta_role_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_meta_role_constraints
             WHERE tenant_id = $1 AND meta_role_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)

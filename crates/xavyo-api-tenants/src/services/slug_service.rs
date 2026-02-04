@@ -11,6 +11,7 @@ pub struct SlugService {
 
 impl SlugService {
     /// Create a new slug service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -25,6 +26,7 @@ impl SlugService {
     /// - Trimming leading/trailing hyphens
     ///
     /// This is a pure function that doesn't require database access.
+    #[must_use] 
     pub fn generate_slug(name: &str) -> String {
         let slug: String = name
             .to_lowercase()
@@ -92,7 +94,7 @@ impl SlugService {
 
         // Try with numeric suffixes
         for i in 2..=100 {
-            let candidate = format!("{}-{}", base_slug, i);
+            let candidate = format!("{base_slug}-{i}");
             if !Tenant::slug_exists(&self.pool, &candidate)
                 .await
                 .map_err(|e| crate::error::TenantError::Database(e.to_string()))?

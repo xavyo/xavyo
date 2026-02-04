@@ -23,11 +23,13 @@ pub struct ManualTaskService {
 
 impl ManualTaskService {
     /// Create a new manual task service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -97,12 +99,12 @@ impl ManualTaskService {
 
         // Update task with assignee
         let updated = sqlx::query_as::<_, GovManualProvisioningTask>(
-            r#"
+            r"
             UPDATE gov_manual_provisioning_tasks
             SET assignee_id = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

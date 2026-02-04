@@ -13,7 +13,7 @@
 //! - `GET /governance/users/{id}/effective-access` - Effective access queries
 //!
 //! ## Separation of Duties (F034)
-//! - `GET/POST /governance/sod-rules` - SoD rule management
+//! - `GET/POST /governance/sod-rules` - `SoD` rule management
 //! - `GET/PUT/DELETE /governance/sod-rules/{id}` - Individual rule operations
 //! - `POST /governance/sod-rules/{id}/enable` - Enable a rule
 //! - `POST /governance/sod-rules/{id}/disable` - Disable a rule

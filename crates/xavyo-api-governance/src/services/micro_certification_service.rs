@@ -54,7 +54,7 @@ pub struct MicroCertDecisionResult {
     pub auto_revoked: bool,
     /// The revoked assignment ID (if any).
     pub revoked_assignment_id: Option<Uuid>,
-    /// The created exemption ID (for SoD approvals).
+    /// The created exemption ID (for `SoD` approvals).
     pub created_exemption_id: Option<Uuid>,
 }
 
@@ -76,6 +76,7 @@ pub struct MicroCertificationService {
 
 impl MicroCertificationService {
     /// Create a new micro-certification service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -133,12 +134,12 @@ impl MicroCertificationService {
     /// Resolve the reviewer for a micro-certification.
     ///
     /// Handles different reviewer types:
-    /// - user_manager: Get the user's manager
-    /// - entitlement_owner: Get the entitlement owner
-    /// - application_owner: Get the application owner
-    /// - specific_user: Use the configured user ID
+    /// - `user_manager`: Get the user's manager
+    /// - `entitlement_owner`: Get the entitlement owner
+    /// - `application_owner`: Get the application owner
+    /// - `specific_user`: Use the configured user ID
     ///
-    /// Falls back to fallback_reviewer_id if primary cannot be resolved.
+    /// Falls back to `fallback_reviewer_id` if primary cannot be resolved.
     pub async fn resolve_reviewer(
         &self,
         tenant_id: Uuid,
@@ -334,7 +335,7 @@ impl MicroCertificationService {
     // T040: Create from SoD violation
     // =========================================================================
 
-    /// Create a micro-certification from an SoD violation event.
+    /// Create a micro-certification from an `SoD` violation event.
     ///
     /// When a user receives conflicting entitlements, a certification is created
     /// to decide whether to approve (create exemption) or revoke the triggering assignment.
@@ -590,12 +591,12 @@ impl MicroCertificationService {
     /// Make a decision on a micro-certification.
     ///
     /// For approval:
-    /// - For SoD violations: Creates an exemption
+    /// - For `SoD` violations: Creates an exemption
     /// - For other types: Simply approves the access
     ///
     /// For revocation:
     /// - Revokes the triggering assignment
-    /// - For SoD: Revokes the newest assignment that caused the conflict
+    /// - For `SoD`: Revokes the newest assignment that caused the conflict
     pub async fn decide(
         &self,
         tenant_id: Uuid,
@@ -1411,6 +1412,7 @@ impl MicroCertificationService {
     }
 
     /// Get reference to the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

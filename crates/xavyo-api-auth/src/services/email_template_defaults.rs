@@ -13,6 +13,7 @@ pub struct DefaultTemplate {
 }
 
 /// Get the default template for a given type.
+#[must_use] 
 pub fn get_default_template(template_type: TemplateType) -> DefaultTemplate {
     match template_type {
         TemplateType::Welcome => DefaultTemplate {
@@ -51,7 +52,7 @@ pub fn get_default_template(template_type: TemplateType) -> DefaultTemplate {
     </div>
 </body>
 </html>"#,
-            body_text: r#"Welcome to {{tenant_name}}, {{user_name}}!
+            body_text: r"Welcome to {{tenant_name}}, {{user_name}}!
 
 Thank you for creating an account. Your account has been successfully created with the email address: {{user_email}}
 
@@ -59,7 +60,7 @@ Thank you for creating an account. Your account has been successfully created wi
 Get started: {{action_url}}
 {{/if}}
 
-{{footer_text}}"#,
+{{footer_text}}",
             variables: vec![
                 TemplateVariable {
                     name: "user_name".to_string(),
@@ -125,7 +126,7 @@ Get started: {{action_url}}
     </div>
 </body>
 </html>"#,
-            body_text: r#"Password Reset Request
+            body_text: r"Password Reset Request
 
 Hi {{user_name}},
 
@@ -137,7 +138,7 @@ This link will expire in {{expiry_time}}.
 
 If you didn't request this password reset, you can safely ignore this email. Your password will remain unchanged.
 
-{{footer_text}}"#,
+{{footer_text}}",
             variables: vec![
                 TemplateVariable {
                     name: "user_name".to_string(),
@@ -205,7 +206,7 @@ If you didn't request this password reset, you can safely ignore this email. You
     </div>
 </body>
 </html>"#,
-            body_text: r#"Verify Your Email
+            body_text: r"Verify Your Email
 
 Hi {{user_name}},
 
@@ -215,7 +216,7 @@ Verify your email: {{action_url}}
 
 This link will expire in {{expiry_time}}.
 
-{{footer_text}}"#,
+{{footer_text}}",
             variables: vec![
                 TemplateVariable {
                     name: "user_name".to_string(),
@@ -283,7 +284,7 @@ This link will expire in {{expiry_time}}.
     </div>
 </body>
 </html>"#,
-            body_text: r#"MFA Enabled
+            body_text: r"MFA Enabled
 
 Hi {{user_name}},
 
@@ -293,7 +294,7 @@ From now on, you'll need to enter a verification code from your authenticator ap
 
 If you didn't make this change, please contact support immediately.
 
-{{footer_text}}"#,
+{{footer_text}}",
             variables: vec![
                 TemplateVariable {
                     name: "user_name".to_string(),
@@ -360,7 +361,7 @@ If you didn't make this change, please contact support immediately.
     </div>
 </body>
 </html>"#,
-            body_text: r#"Security Alert
+            body_text: r"Security Alert
 
 Hi {{user_name}},
 
@@ -375,7 +376,7 @@ Device Details:
 
 If this was you, you can safely ignore this email. If you don't recognize this activity, please secure your account immediately.
 
-{{footer_text}}"#,
+{{footer_text}}",
             variables: vec![
                 TemplateVariable {
                     name: "user_name".to_string(),
@@ -452,7 +453,7 @@ If this was you, you can safely ignore this email. If you don't recognize this a
     </div>
 </body>
 </html>"#,
-            body_text: r#"Account Locked
+            body_text: r"Account Locked
 
 Hi {{user_name}},
 
@@ -464,7 +465,7 @@ If you've forgotten your password, you can reset it here: {{action_url}}
 
 If you didn't attempt to log in, please contact support immediately as someone may be trying to access your account.
 
-{{footer_text}}"#,
+{{footer_text}}",
             variables: vec![
                 TemplateVariable {
                     name: "user_name".to_string(),
@@ -500,6 +501,7 @@ If you didn't attempt to log in, please contact support immediately as someone m
 }
 
 /// Get all template types.
+#[must_use] 
 pub fn get_all_template_types() -> Vec<TemplateType> {
     vec![
         TemplateType::Welcome,

@@ -1,8 +1,8 @@
 //! Delegation Lifecycle Service for governance API (F053).
 //!
 //! Handles automatic delegation lifecycle management:
-//! - Activating pending delegations when start_at is reached
-//! - Expiring delegations when ends_at is reached
+//! - Activating pending delegations when `start_at` is reached
+//! - Expiring delegations when `ends_at` is reached
 //! - Sending expiration warnings before delegation ends
 
 use chrono::{Duration, Utc};
@@ -36,13 +36,14 @@ pub struct LifecycleProcessingResult {
 
 impl DelegationLifecycleService {
     /// Create a new delegation lifecycle service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
-    /// Activate pending delegations whose start_at has been reached.
+    /// Activate pending delegations whose `start_at` has been reached.
     ///
-    /// Finds all delegations with status = pending and starts_at <= now,
+    /// Finds all delegations with status = pending and `starts_at` <= now,
     /// then updates their status to active.
     pub async fn activate_pending_delegations(
         &self,
@@ -52,13 +53,13 @@ impl DelegationLifecycleService {
 
         // Find pending delegations that should be activated
         let pending_delegations: Vec<GovApprovalDelegation> = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_delegations
             WHERE tenant_id = $1
                 AND status = 'pending'
                 AND starts_at <= $2
                 AND is_active = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(now)
@@ -80,22 +81,22 @@ impl DelegationLifecycleService {
         Ok(activated)
     }
 
-    /// Expire delegations whose ends_at has been reached.
+    /// Expire delegations whose `ends_at` has been reached.
     ///
-    /// Finds all delegations with status = active and ends_at <= now,
+    /// Finds all delegations with status = active and `ends_at` <= now,
     /// then updates their status to expired.
     pub async fn expire_delegations(&self, tenant_id: Uuid) -> Result<Vec<GovApprovalDelegation>> {
         let now = Utc::now();
 
         // Find active delegations that should be expired
         let active_delegations: Vec<GovApprovalDelegation> = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_delegations
             WHERE tenant_id = $1
                 AND status = 'active'
                 AND ends_at <= $2
                 AND is_active = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(now)
@@ -119,8 +120,8 @@ impl DelegationLifecycleService {
 
     /// Send expiration warnings for delegations expiring soon.
     ///
-    /// Finds all delegations with status = active, ends_at <= now + 24h,
-    /// and expiry_warning_sent = false, then marks them as warned.
+    /// Finds all delegations with status = active, `ends_at` <= now + 24h,
+    /// and `expiry_warning_sent` = false, then marks them as warned.
     /// The actual notification sending is handled by notification service.
     pub async fn send_expiration_warnings(
         &self,
@@ -132,7 +133,7 @@ impl DelegationLifecycleService {
 
         // Find delegations expiring soon that haven't been warned
         let expiring_delegations: Vec<GovApprovalDelegation> = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_delegations
             WHERE tenant_id = $1
                 AND status = 'active'
@@ -140,7 +141,7 @@ impl DelegationLifecycleService {
                 AND ends_at > $3
                 AND is_active = true
                 AND expiry_warning_sent = false
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(warning_threshold)
@@ -198,10 +199,10 @@ impl DelegationLifecycleService {
     ) -> Result<Vec<(Uuid, LifecycleProcessingResult)>> {
         // Get all distinct tenant IDs with active delegations
         let tenant_ids: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT tenant_id FROM gov_approval_delegations
             WHERE is_active = true OR status IN ('pending', 'active')
-            "#,
+            ",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -217,6 +218,7 @@ impl DelegationLifecycleService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

@@ -71,10 +71,10 @@ impl KnownUserIp {
             .await?;
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM known_user_ips
             WHERE tenant_id = $1 AND user_id = $2 AND ip_address = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -98,11 +98,11 @@ impl KnownUserIp {
             .await?;
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM known_user_ips
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY last_seen_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -125,10 +125,10 @@ impl KnownUserIp {
             .await?;
 
         let records = sqlx::query_scalar::<_, String>(
-            r#"
+            r"
             SELECT DISTINCT country_code FROM known_user_ips
             WHERE tenant_id = $1 AND user_id = $2 AND country_code IS NOT NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -140,7 +140,7 @@ impl KnownUserIp {
 
     /// Record or update a user IP address.
     ///
-    /// If the IP exists, updates last_seen_at and increments access_count.
+    /// If the IP exists, updates `last_seen_at` and increments `access_count`.
     /// If it doesn't exist, creates a new record.
     pub async fn record_access(
         pool: &PgPool,
@@ -158,7 +158,7 @@ impl KnownUserIp {
             .await?;
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO known_user_ips (tenant_id, user_id, ip_address, country_code)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (tenant_id, user_id, ip_address) DO UPDATE
@@ -166,7 +166,7 @@ impl KnownUserIp {
                 access_count = known_user_ips.access_count + 1,
                 country_code = COALESCE($4, known_user_ips.country_code)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -192,12 +192,12 @@ impl KnownUserIp {
             .await?;
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE known_user_ips
             SET is_trusted = $3
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -217,10 +217,10 @@ impl KnownUserIp {
             .await?;
 
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM known_user_ips
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -233,11 +233,11 @@ impl KnownUserIp {
     /// Cleanup old IP records not seen in the specified days.
     pub async fn cleanup_old(pool: &PgPool, days: i64) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM known_user_ips
             WHERE last_seen_at < NOW() - make_interval(days => $1)
               AND is_trusted = FALSE
-            "#,
+            ",
         )
         .bind(days as i32)
         .execute(pool)

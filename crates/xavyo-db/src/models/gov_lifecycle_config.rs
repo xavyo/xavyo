@@ -91,10 +91,10 @@ impl GovLifecycleConfig {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_configs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -109,10 +109,10 @@ impl GovLifecycleConfig {
         object_type: LifecycleObjectType,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_configs
             WHERE tenant_id = $1 AND object_type = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(object_type)
@@ -129,21 +129,21 @@ impl GovLifecycleConfig {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_configs
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_num = 2;
 
         if filter.object_type.is_some() {
-            query.push_str(&format!(" AND object_type = ${}", param_num));
+            query.push_str(&format!(" AND object_type = ${param_num}"));
             param_num += 1;
         }
 
         if filter.is_active.is_some() {
-            query.push_str(&format!(" AND is_active = ${}", param_num));
+            query.push_str(&format!(" AND is_active = ${param_num}"));
             param_num += 1;
         }
 
@@ -173,21 +173,21 @@ impl GovLifecycleConfig {
         filter: &LifecycleConfigFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_lifecycle_configs
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_num = 2;
 
         if filter.object_type.is_some() {
-            query.push_str(&format!(" AND object_type = ${}", param_num));
+            query.push_str(&format!(" AND object_type = ${param_num}"));
             param_num += 1;
         }
 
         if filter.is_active.is_some() {
-            query.push_str(&format!(" AND is_active = ${}", param_num));
+            query.push_str(&format!(" AND is_active = ${param_num}"));
         }
 
         let mut db_query = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -210,11 +210,11 @@ impl GovLifecycleConfig {
         input: &CreateGovLifecycleConfig,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_lifecycle_configs (tenant_id, name, object_type, description)
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -232,7 +232,7 @@ impl GovLifecycleConfig {
         input: &UpdateGovLifecycleConfig,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_lifecycle_configs
             SET
                 name = COALESCE($3, name),
@@ -241,7 +241,7 @@ impl GovLifecycleConfig {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -259,10 +259,10 @@ impl GovLifecycleConfig {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_lifecycle_configs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

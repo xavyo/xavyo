@@ -273,7 +273,7 @@ pub async fn claim_manual_task(
     Ok(Json(result))
 }
 
-/// Start working on a manual task (set to in_progress).
+/// Start working on a manual task (set to `in_progress`).
 #[utoipa::path(
     post,
     path = "/governance/manual-tasks/{id}/start",

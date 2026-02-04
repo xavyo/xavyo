@@ -1,6 +1,6 @@
 //! Integration tests for xavyo-api-auth.
 //!
-//! These tests require a running PostgreSQL database with the test schema.
+//! These tests require a running `PostgreSQL` database with the test schema.
 //! Run with: `cargo test -p xavyo-api-auth --features integration`
 
 mod common;

@@ -2,7 +2,7 @@
 //!
 //! Comprehensive tests for error handling including:
 //! - Provider downtime (HTTP 5xx errors)
-//! - OAuth2 protocol errors (RFC 6749)
+//! - `OAuth2` protocol errors (RFC 6749)
 //! - Security validation errors (state, PKCE)
 //! - Network errors (timeout, connection refused)
 //! - Provider-specific error formats

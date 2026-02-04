@@ -43,6 +43,7 @@ pub struct IdentityFederationService {
 
 impl IdentityFederationService {
     /// Create a new identity federation service.
+    #[must_use] 
     pub fn new(
         pool: PgPool,
         provider_service: IdentityProviderService,
@@ -200,7 +201,7 @@ impl IdentityFederationService {
         )
         .await?;
 
-        if count >= max_requests as i64 {
+        if count >= i64::from(max_requests) {
             warn!(
                 agent_id = %agent_id,
                 count = count,
@@ -352,8 +353,7 @@ impl IdentityFederationService {
 
         // Audit log
         let role_identifier = mapping
-            .map(|m| m.role_identifier.as_str())
-            .unwrap_or("unknown");
+            .map_or("unknown", |m| m.role_identifier.as_str());
 
         self.audit_service
             .log_credential_request(
@@ -373,10 +373,10 @@ impl IdentityFederationService {
     fn map_provider_error(&self, error: CloudProviderError) -> ApiAgentsError {
         match error {
             CloudProviderError::AuthenticationFailed(msg) => {
-                ApiAgentsError::CloudCredentialDenied(format!("Authentication failed: {}", msg))
+                ApiAgentsError::CloudCredentialDenied(format!("Authentication failed: {msg}"))
             }
             CloudProviderError::RoleNotAllowed(role) => {
-                ApiAgentsError::CloudCredentialDenied(format!("Role not allowed: {}", role))
+                ApiAgentsError::CloudCredentialDenied(format!("Role not allowed: {role}"))
             }
             CloudProviderError::RateLimitExceeded => {
                 ApiAgentsError::CloudCredentialRateLimited(0, 0)

@@ -1,4 +1,4 @@
-//! OAuth2 client service.
+//! `OAuth2` client service.
 
 use crate::error::OAuthError;
 use crate::models::{ClientResponse, ClientType, CreateClientRequest, UpdateClientRequest};
@@ -13,7 +13,7 @@ const CLIENT_ID_LENGTH: usize = 16;
 /// Length of generated client secrets (bytes).
 const CLIENT_SECRET_LENGTH: usize = 32;
 
-/// Database representation of an OAuth2 client.
+/// Database representation of an `OAuth2` client.
 #[derive(Debug, FromRow)]
 #[allow(dead_code)] // Fields used by SQLx query_as
 struct DbOAuth2Client {
@@ -31,7 +31,7 @@ struct DbOAuth2Client {
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// Service for managing OAuth2 clients.
+/// Service for managing `OAuth2` clients.
 #[derive(Debug, Clone)]
 pub struct OAuth2ClientService {
     pool: PgPool,
@@ -39,23 +39,25 @@ pub struct OAuth2ClientService {
 
 impl OAuth2ClientService {
     /// Create a new client service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
 
-    /// Create a new OAuth2 client.
+    /// Create a new `OAuth2` client.
     ///
-    /// Generates a unique client_id and, for confidential clients, a client_secret.
-    /// The client_secret is returned in plaintext only once; the hash is stored.
+    /// Generates a unique `client_id` and, for confidential clients, a `client_secret`.
+    /// The `client_secret` is returned in plaintext only once; the hash is stored.
     ///
     /// # Returns
     ///
-    /// A tuple of (ClientResponse, Option<plaintext_secret>). The secret is only
+    /// A tuple of (`ClientResponse`, Option<`plaintext_secret`>). The secret is only
     /// present for confidential clients.
     pub async fn create_client(
         &self,
@@ -102,12 +104,12 @@ impl OAuth2ClientService {
 
         // Insert the client using the same connection
         sqlx::query(
-            r#"
+            r"
             INSERT INTO oauth_clients (
                 id, tenant_id, client_id, client_secret_hash, name, client_type,
                 redirect_uris, grant_types, scopes, is_active, created_at, updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $10)
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -144,7 +146,7 @@ impl OAuth2ClientService {
 
     /// Generate a cryptographically secure client ID.
     ///
-    /// SECURITY: Uses OsRng directly from the operating system's CSPRNG.
+    /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
     fn generate_client_id(&self) -> String {
         use rand::rngs::OsRng;
         let mut bytes = vec![0u8; CLIENT_ID_LENGTH];
@@ -154,7 +156,7 @@ impl OAuth2ClientService {
 
     /// Generate a cryptographically secure client secret.
     ///
-    /// SECURITY: Uses OsRng directly from the operating system's CSPRNG.
+    /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
     fn generate_client_secret(&self) -> String {
         use rand::rngs::OsRng;
         let mut bytes = vec![0u8; CLIENT_SECRET_LENGTH];
@@ -162,7 +164,7 @@ impl OAuth2ClientService {
         hex::encode(bytes)
     }
 
-    /// Get a client by its public client_id.
+    /// Get a client by its public `client_id`.
     pub async fn get_client_by_client_id(
         &self,
         tenant_id: Uuid,
@@ -185,12 +187,12 @@ impl OAuth2ClientService {
             })?;
 
         let client: DbOAuth2Client = sqlx::query_as(
-            r#"
+            r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
                    redirect_uris, grant_types, scopes, is_active, created_at, updated_at
             FROM oauth_clients
             WHERE client_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(client_id)
         .bind(tenant_id)
@@ -228,12 +230,12 @@ impl OAuth2ClientService {
             })?;
 
         let client: DbOAuth2Client = sqlx::query_as(
-            r#"
+            r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
                    redirect_uris, grant_types, scopes, is_active, created_at, updated_at
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -269,13 +271,13 @@ impl OAuth2ClientService {
             })?;
 
         let clients: Vec<DbOAuth2Client> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
                    redirect_uris, grant_types, scopes, is_active, created_at, updated_at
             FROM oauth_clients
             WHERE tenant_id = $1
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&mut *conn)
@@ -294,7 +296,7 @@ impl OAuth2ClientService {
     /// Update a client.
     ///
     /// Only updates fields that are provided in the request.
-    /// Client type and client_id cannot be changed after creation.
+    /// Client type and `client_id` cannot be changed after creation.
     pub async fn update_client(
         &self,
         tenant_id: Uuid,
@@ -319,12 +321,12 @@ impl OAuth2ClientService {
 
         // First, verify the client exists
         let existing: DbOAuth2Client = sqlx::query_as(
-            r#"
+            r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
                    redirect_uris, grant_types, scopes, is_active, created_at, updated_at
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -345,12 +347,12 @@ impl OAuth2ClientService {
         let now = chrono::Utc::now();
 
         sqlx::query(
-            r#"
+            r"
             UPDATE oauth_clients
             SET name = $1, redirect_uris = $2, grant_types = $3, scopes = $4,
                 is_active = $5, updated_at = $6
             WHERE id = $7 AND tenant_id = $8
-            "#,
+            ",
         )
         .bind(&name)
         .bind(&redirect_uris)
@@ -389,7 +391,7 @@ impl OAuth2ClientService {
 
     /// Deactivate a client.
     ///
-    /// Performs a soft delete by setting is_active to false.
+    /// Performs a soft delete by setting `is_active` to false.
     /// Also revokes all refresh tokens for this client.
     pub async fn deactivate_client(&self, tenant_id: Uuid, id: Uuid) -> Result<(), OAuthError> {
         // Acquire a single connection to ensure set_config and query use the same connection
@@ -410,11 +412,11 @@ impl OAuth2ClientService {
 
         // Verify client exists
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE oauth_clients
             SET is_active = false, updated_at = $1
             WHERE id = $2 AND tenant_id = $3
-            "#,
+            ",
         )
         .bind(chrono::Utc::now())
         .bind(id)
@@ -432,11 +434,11 @@ impl OAuth2ClientService {
 
         // Revoke all refresh tokens for this client
         sqlx::query(
-            r#"
+            r"
             UPDATE oauth_refresh_tokens
             SET revoked = true, revoked_at = $1
             WHERE client_id = $2 AND tenant_id = $3 AND revoked = false
-            "#,
+            ",
         )
         .bind(chrono::Utc::now())
         .bind(id)
@@ -477,12 +479,12 @@ impl OAuth2ClientService {
 
         // Verify client exists and is confidential
         let client: DbOAuth2Client = sqlx::query_as(
-            r#"
+            r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
                    redirect_uris, grant_types, scopes, is_active, created_at, updated_at
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -509,11 +511,11 @@ impl OAuth2ClientService {
 
         // Update the secret
         sqlx::query(
-            r#"
+            r"
             UPDATE oauth_clients
             SET client_secret_hash = $1, updated_at = $2
             WHERE id = $3 AND tenant_id = $4
-            "#,
+            ",
         )
         .bind(&new_hash)
         .bind(chrono::Utc::now())
@@ -528,11 +530,11 @@ impl OAuth2ClientService {
 
         // Revoke all existing refresh tokens (security measure)
         sqlx::query(
-            r#"
+            r"
             UPDATE oauth_refresh_tokens
             SET revoked = true, revoked_at = $1
             WHERE client_id = $2 AND tenant_id = $3 AND revoked = false
-            "#,
+            ",
         )
         .bind(chrono::Utc::now())
         .bind(id)
@@ -549,7 +551,7 @@ impl OAuth2ClientService {
 
     /// Verify client credentials for confidential clients.
     ///
-    /// Authenticates a client using its client_id and client_secret.
+    /// Authenticates a client using its `client_id` and `client_secret`.
     /// Only confidential clients can be authenticated this way.
     ///
     /// # Arguments
@@ -598,12 +600,12 @@ impl OAuth2ClientService {
 
         // Look up the client by client_id
         let client: Option<DbOAuth2Client> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
                    redirect_uris, grant_types, scopes, is_active, created_at, updated_at
             FROM oauth_clients
             WHERE client_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(client_id)
         .bind(tenant_id)
@@ -614,15 +616,12 @@ impl OAuth2ClientService {
             OAuthError::Internal("Database error".to_string())
         })?;
 
-        let client = match client {
-            Some(c) => c,
-            None => {
-                tracing::warn!(
-                    client_id = %client_id,
-                    "Client authentication failed: client not found"
-                );
-                return Err(OAuthError::InvalidClient(GENERIC_AUTH_ERROR.to_string()));
-            }
+        let client = if let Some(c) = client { c } else {
+            tracing::warn!(
+                client_id = %client_id,
+                "Client authentication failed: client not found"
+            );
+            return Err(OAuthError::InvalidClient(GENERIC_AUTH_ERROR.to_string()));
         };
 
         // Check if client is active
@@ -645,15 +644,12 @@ impl OAuth2ClientService {
         }
 
         // Verify the secret
-        let secret_hash = match client.client_secret_hash.as_ref() {
-            Some(hash) => hash,
-            None => {
-                tracing::warn!(
-                    client_id = %client_id,
-                    "Client authentication failed: no secret configured"
-                );
-                return Err(OAuthError::InvalidClient(GENERIC_AUTH_ERROR.to_string()));
-            }
+        let secret_hash = if let Some(hash) = client.client_secret_hash.as_ref() { hash } else {
+            tracing::warn!(
+                client_id = %client_id,
+                "Client authentication failed: no secret configured"
+            );
+            return Err(OAuthError::InvalidClient(GENERIC_AUTH_ERROR.to_string()));
         };
 
         let is_valid = verify_password(client_secret, secret_hash).map_err(|e| {
@@ -733,7 +729,7 @@ impl OAuth2ClientService {
         let path = parsed.path();
         let query = parsed.query();
 
-        let mut normalized = format!("{}://{}", scheme, host);
+        let mut normalized = format!("{scheme}://{host}");
 
         // Only include port if non-default
         if let Some(p) = port {
@@ -757,7 +753,7 @@ impl OAuth2ClientService {
     /// Validate redirect URI against registered URIs.
     ///
     /// Performs strict validation with URL normalization to prevent bypass attacks.
-    /// The redirect_uri must match one of the client's registered redirect URIs
+    /// The `redirect_uri` must match one of the client's registered redirect URIs
     /// after normalization.
     ///
     /// # Security
@@ -820,8 +816,7 @@ impl OAuth2ClientService {
                 "Grant type validation failed: not allowed for client"
             );
             Err(OAuthError::UnauthorizedClient(format!(
-                "Client is not authorized for {} grant type",
-                grant_type
+                "Client is not authorized for {grant_type} grant type"
             )))
         }
     }
@@ -851,8 +846,7 @@ impl OAuth2ClientService {
                     "Scope validation failed: scope not allowed"
                 );
                 return Err(OAuthError::InvalidScope(format!(
-                    "Scope '{}' is not allowed for this client",
-                    scope
+                    "Scope '{scope}' is not allowed for this client"
                 )));
             }
         }
@@ -863,6 +857,7 @@ impl OAuth2ClientService {
 
 impl ClientType {
     /// Check if this client type requires a secret.
+    #[must_use] 
     pub fn requires_secret(&self) -> bool {
         matches!(self, ClientType::Confidential)
     }

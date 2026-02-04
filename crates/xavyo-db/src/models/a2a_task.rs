@@ -22,6 +22,7 @@ pub enum A2aTaskState {
 
 impl A2aTaskState {
     /// Returns the string representation of the state.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -33,11 +34,13 @@ impl A2aTaskState {
     }
 
     /// Check if this is a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
     }
 
     /// Parse a state from string.
+    #[must_use] 
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "pending" => Some(Self::Pending),
@@ -67,6 +70,7 @@ pub enum CallbackStatus {
 }
 
 impl CallbackStatus {
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -100,13 +104,15 @@ pub struct A2aTask {
 
 impl A2aTask {
     /// Get the parsed task state.
+    #[must_use] 
     pub fn get_state(&self) -> Option<A2aTaskState> {
         A2aTaskState::parse(&self.state)
     }
 
     /// Check if the task is in a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
-        self.get_state().map(|s| s.is_terminal()).unwrap_or(false)
+        self.get_state().is_some_and(|s| s.is_terminal())
     }
 }
 
@@ -138,13 +144,13 @@ impl A2aTask {
         req: CreateA2aTask,
     ) -> Result<Self, sqlx::Error> {
         let task = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO a2a_tasks (
                 tenant_id, source_agent_id, target_agent_id, task_type, input, callback_url
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(source_agent_id)
@@ -165,10 +171,10 @@ impl A2aTask {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         let task = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM a2a_tasks
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -189,7 +195,7 @@ impl A2aTask {
         let offset = filter.offset.unwrap_or(0);
 
         let tasks = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM a2a_tasks
             WHERE tenant_id = $1
               AND source_agent_id = $2
@@ -197,7 +203,7 @@ impl A2aTask {
               AND ($4::uuid IS NULL OR target_agent_id = $4)
             ORDER BY created_at DESC
             LIMIT $5 OFFSET $6
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(source_agent_id)
@@ -219,13 +225,13 @@ impl A2aTask {
         filter: &A2aTaskFilter,
     ) -> Result<i64, sqlx::Error> {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM a2a_tasks
             WHERE tenant_id = $1
               AND source_agent_id = $2
               AND ($3::varchar IS NULL OR state = $3)
               AND ($4::uuid IS NULL OR target_agent_id = $4)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(source_agent_id)
@@ -260,7 +266,7 @@ impl A2aTask {
         };
 
         let task = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE a2a_tasks
             SET state = $3,
                 result = COALESCE($4, result),
@@ -271,7 +277,7 @@ impl A2aTask {
                 updated_at = NOW()
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -294,7 +300,7 @@ impl A2aTask {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         let task = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE a2a_tasks
             SET state = 'cancelled',
                 completed_at = NOW(),
@@ -302,7 +308,7 @@ impl A2aTask {
             WHERE tenant_id = $1 AND id = $2
               AND state IN ('pending', 'running')
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -320,14 +326,14 @@ impl A2aTask {
         status: CallbackStatus,
     ) -> Result<Option<Self>, sqlx::Error> {
         let task = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE a2a_tasks
             SET callback_status = $3,
                 callback_attempts = callback_attempts + 1,
                 updated_at = NOW()
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -346,7 +352,7 @@ impl A2aTask {
         limit: i32,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let tasks = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM a2a_tasks
             WHERE tenant_id = $1
               AND callback_url IS NOT NULL
@@ -355,7 +361,7 @@ impl A2aTask {
               AND callback_attempts < $2
             ORDER BY completed_at ASC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(max_attempts)

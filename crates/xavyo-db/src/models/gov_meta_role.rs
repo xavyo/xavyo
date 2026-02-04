@@ -87,10 +87,10 @@ impl GovMetaRole {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_roles
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -105,10 +105,10 @@ impl GovMetaRole {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_roles
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -122,11 +122,11 @@ impl GovMetaRole {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_roles
             WHERE tenant_id = $1 AND status = 'active'
             ORDER BY priority ASC, name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -146,19 +146,19 @@ impl GovMetaRole {
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.name_contains.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${}", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count}"));
         }
         if filter.priority_min.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND priority >= ${}", param_count));
+            query.push_str(&format!(" AND priority >= ${param_count}"));
         }
         if filter.priority_max.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND priority <= ${}", param_count));
+            query.push_str(&format!(" AND priority <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -173,7 +173,7 @@ impl GovMetaRole {
             q = q.bind(status);
         }
         if let Some(ref name_contains) = filter.name_contains {
-            q = q.bind(format!("%{}%", name_contains));
+            q = q.bind(format!("%{name_contains}%"));
         }
         if let Some(priority_min) = filter.priority_min {
             q = q.bind(priority_min);
@@ -196,19 +196,19 @@ impl GovMetaRole {
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.name_contains.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${}", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count}"));
         }
         if filter.priority_min.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND priority >= ${}", param_count));
+            query.push_str(&format!(" AND priority >= ${param_count}"));
         }
         if filter.priority_max.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND priority <= ${}", param_count));
+            query.push_str(&format!(" AND priority <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -217,7 +217,7 @@ impl GovMetaRole {
             q = q.bind(status);
         }
         if let Some(ref name_contains) = filter.name_contains {
-            q = q.bind(format!("%{}%", name_contains));
+            q = q.bind(format!("%{name_contains}%"));
         }
         if let Some(priority_min) = filter.priority_min {
             q = q.bind(priority_min);
@@ -240,13 +240,13 @@ impl GovMetaRole {
         let criteria_logic = input.criteria_logic.unwrap_or_default();
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_meta_roles (
                 tenant_id, name, description, priority, criteria_logic, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -271,19 +271,19 @@ impl GovMetaRole {
 
         if input.name.is_some() {
             param_count += 1;
-            updates.push(format!("name = ${}", param_count));
+            updates.push(format!("name = ${param_count}"));
         }
         if input.description.is_some() {
             param_count += 1;
-            updates.push(format!("description = ${}", param_count));
+            updates.push(format!("description = ${param_count}"));
         }
         if input.priority.is_some() {
             param_count += 1;
-            updates.push(format!("priority = ${}", param_count));
+            updates.push(format!("priority = ${param_count}"));
         }
         if input.criteria_logic.is_some() {
             param_count += 1;
-            updates.push(format!("criteria_logic = ${}", param_count));
+            updates.push(format!("criteria_logic = ${param_count}"));
         }
 
         if updates.is_empty() {
@@ -321,12 +321,12 @@ impl GovMetaRole {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_meta_roles
             SET status = 'disabled', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -341,12 +341,12 @@ impl GovMetaRole {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_meta_roles
             SET status = 'active', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'disabled'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -361,10 +361,10 @@ impl GovMetaRole {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_meta_roles
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -375,6 +375,7 @@ impl GovMetaRole {
     }
 
     /// Check if meta-role is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         self.status == MetaRoleStatus::Active
     }

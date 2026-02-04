@@ -15,10 +15,10 @@ use crate::services::{
 /// Shared state for federation handlers.
 ///
 /// Note: Tenant ID is NOT stored in state. It is extracted per-request from
-/// the TenantLayer middleware via `Extension<xavyo_core::TenantId>`.
+/// the `TenantLayer` middleware via `Extension<xavyo_core::TenantId>`.
 #[derive(Clone)]
 pub struct FederationState {
-    /// IdP configuration service.
+    /// `IdP` configuration service.
     pub idp_config: IdpConfigService,
     /// Validation service.
     pub validation: ValidationService,
@@ -39,12 +39,13 @@ pub struct FederationConfig {
     pub pool: PgPool,
     /// Master encryption key for client secrets.
     pub master_key: [u8; 32],
-    /// Base URL for callbacks (e.g., "https://idp.example.com").
+    /// Base URL for callbacks (e.g., "<https://idp.example.com>").
     pub callback_base_url: String,
 }
 
 impl FederationState {
     /// Create a new federation state.
+    #[must_use] 
     pub fn new(config: &FederationConfig) -> Self {
         let encryption = EncryptionService::new(config.master_key);
         let idp_config = IdpConfigService::new(config.pool.clone(), encryption.clone());
@@ -74,13 +75,13 @@ impl FederationState {
 /// These routes are protected and require admin authentication.
 ///
 /// Routes:
-/// - GET /admin/federation/identity-providers - List IdPs
-/// - POST /admin/federation/identity-providers - Create IdP
-/// - GET /admin/federation/identity-providers/:idp_id - Get IdP
-/// - PUT /admin/federation/identity-providers/:idp_id - Update IdP
-/// - DELETE /admin/federation/identity-providers/:idp_id - Delete IdP
-/// - POST /admin/federation/identity-providers/:idp_id/validate - Validate IdP
-/// - POST /admin/federation/identity-providers/:idp_id/toggle - Toggle IdP enabled
+/// - GET /admin/federation/identity-providers - List `IdPs`
+/// - POST /admin/federation/identity-providers - Create `IdP`
+/// - GET /admin/federation/identity-providers/:idp_id - Get `IdP`
+/// - PUT /admin/federation/identity-providers/:idp_id - Update `IdP`
+/// - DELETE /admin/federation/identity-providers/:idp_id - Delete `IdP`
+/// - POST /admin/federation/identity-providers/:idp_id/validate - Validate `IdP`
+/// - POST /admin/federation/identity-providers/:idp_id/toggle - Toggle `IdP` enabled
 /// - GET /admin/federation/identity-providers/:idp_id/domains - List domains
 /// - POST /admin/federation/identity-providers/:idp_id/domains - Add domain
 /// - DELETE /admin/federation/identity-providers/:idp_id/domains/:domain_id - Remove domain
@@ -127,7 +128,7 @@ pub fn admin_routes() -> Router<FederationState> {
 /// Routes:
 /// - POST /auth/federation/discover - Discover realm for email
 /// - GET /auth/federation/authorize - Initiate auth flow
-/// - GET /auth/federation/callback - Handle IdP callback
+/// - GET /auth/federation/callback - Handle `IdP` callback
 /// - POST /auth/federation/logout - Logout (cleanup)
 pub fn auth_routes() -> Router<FederationState> {
     Router::new()
@@ -139,7 +140,7 @@ pub fn auth_routes() -> Router<FederationState> {
 
 /// Create the full federation router with all routes.
 ///
-/// Tenant ID is extracted per-request by the TenantLayer middleware,
+/// Tenant ID is extracted per-request by the `TenantLayer` middleware,
 /// not baked into the state at creation time.
 pub fn create_federation_router(config: FederationConfig) -> Router {
     let state = FederationState::new(&config);

@@ -1,6 +1,6 @@
 //! Admin MFA status handler.
 //!
-//! GET /admin/users/:user_id/mfa/status - View MFA status for any user.
+//! GET /`admin/users/:user_id/mfa/status` - View MFA status for any user.
 
 use axum::{extract::Path, http::StatusCode, Extension, Json};
 use sqlx::PgPool;
@@ -15,7 +15,7 @@ use crate::{
 };
 use std::sync::Arc;
 
-/// GET /admin/users/:user_id/mfa/status
+/// GET /`admin/users/:user_id/mfa/status`
 ///
 /// Get MFA status for a specific user (admin view).
 /// Requires authentication and admin role.

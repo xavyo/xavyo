@@ -23,6 +23,7 @@ pub enum ConsolidationStatus {
 
 impl ConsolidationStatus {
     /// Check if suggestion can be updated.
+    #[must_use] 
     pub fn can_update(&self) -> bool {
         matches!(self, Self::Pending)
     }
@@ -97,10 +98,10 @@ impl GovConsolidationSuggestion {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_consolidation_suggestions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -118,26 +119,25 @@ impl GovConsolidationSuggestion {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_consolidation_suggestions
             WHERE tenant_id = $1 AND job_id = $2
-            "#,
+            ",
         );
         let mut param_count = 2;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.min_overlap.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND overlap_percent >= ${}", param_count));
+            query.push_str(&format!(" AND overlap_percent >= ${param_count}"));
         }
         if filter.role_id.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND (role_a_id = ${} OR role_b_id = ${})",
-                param_count, param_count
+                " AND (role_a_id = ${param_count} OR role_b_id = ${param_count})"
             ));
         }
 
@@ -172,26 +172,25 @@ impl GovConsolidationSuggestion {
         filter: &ConsolidationSuggestionFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_consolidation_suggestions
             WHERE tenant_id = $1 AND job_id = $2
-            "#,
+            ",
         );
         let mut param_count = 2;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.min_overlap.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND overlap_percent >= ${}", param_count));
+            query.push_str(&format!(" AND overlap_percent >= ${param_count}"));
         }
         if filter.role_id.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND (role_a_id = ${} OR role_b_id = ${})",
-                param_count, param_count
+                " AND (role_a_id = ${param_count} OR role_b_id = ${param_count})"
             ));
         }
 
@@ -219,14 +218,14 @@ impl GovConsolidationSuggestion {
         input: CreateConsolidationSuggestion,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_consolidation_suggestions (
                 tenant_id, job_id, role_a_id, role_b_id,
                 overlap_percent, shared_entitlements, unique_to_a, unique_to_b
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.job_id)
@@ -261,12 +260,12 @@ impl GovConsolidationSuggestion {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_consolidation_suggestions
             SET status = 'merged'
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -282,12 +281,12 @@ impl GovConsolidationSuggestion {
         reason: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_consolidation_suggestions
             SET status = 'dismissed', dismissed_reason = $3
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

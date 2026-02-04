@@ -72,7 +72,7 @@ pub struct LicensePoolExpired {
     pub pool_name: String,
     /// The vendor name.
     pub vendor: String,
-    /// The expiration policy applied (block_new/revoke_all/warn_only).
+    /// The expiration policy applied (`block_new/revoke_all/warn_only`).
     pub expiration_policy: String,
     /// Number of assignments revoked as a result.
     pub assignments_revoked: i64,
@@ -120,7 +120,7 @@ pub struct LicenseBulkOperation {
     pub pool_id: Uuid,
     /// The license pool name.
     pub pool_name: String,
-    /// The operation type (bulk_assign/bulk_reclaim).
+    /// The operation type (`bulk_assign/bulk_reclaim`).
     pub operation: String,
     /// Number of licenses affected.
     pub count: i64,

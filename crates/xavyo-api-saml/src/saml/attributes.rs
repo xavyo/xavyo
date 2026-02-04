@@ -24,6 +24,7 @@ pub struct ResolvedAttribute {
 }
 
 /// Resolve user attributes based on SP's attribute mapping configuration
+#[must_use] 
 pub fn resolve_attributes(
     user: &UserAttributes,
     mapping: &AttributeMapping,
@@ -74,7 +75,8 @@ fn resolve_single_attribute(
     })
 }
 
-/// Get the NameID value based on configuration
+/// Get the `NameID` value based on configuration
+#[must_use] 
 pub fn get_name_id_value(user: &UserAttributes, name_id_source: &str) -> Option<String> {
     match name_id_source {
         "email" => Some(user.email.clone()),
@@ -85,6 +87,7 @@ pub fn get_name_id_value(user: &UserAttributes, name_id_source: &str) -> Option<
 }
 
 /// Get default attribute mapping when none is configured
+#[must_use] 
 pub fn default_attributes(user: &UserAttributes) -> Vec<ResolvedAttribute> {
     let mut attrs = vec![ResolvedAttribute {
         name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress".to_string(),
@@ -114,12 +117,13 @@ pub fn default_attributes(user: &UserAttributes) -> Vec<ResolvedAttribute> {
     attrs
 }
 
-/// Supported NameID formats
+/// Supported `NameID` formats
 pub const NAMEID_FORMAT_EMAIL: &str = "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress";
 pub const NAMEID_FORMAT_PERSISTENT: &str = "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent";
 pub const NAMEID_FORMAT_TRANSIENT: &str = "urn:oasis:names:tc:SAML:2.0:nameid-format:transient";
 
-/// Check if a NameID format is supported
+/// Check if a `NameID` format is supported
+#[must_use] 
 pub fn is_supported_nameid_format(format: &str) -> bool {
     matches!(
         format,
@@ -127,7 +131,7 @@ pub fn is_supported_nameid_format(format: &str) -> bool {
     )
 }
 
-/// Get NameID value for the specified format
+/// Get `NameID` value for the specified format
 pub fn get_nameid_for_format(
     user: &UserAttributes,
     format: &str,

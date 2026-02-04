@@ -110,7 +110,7 @@ pub async fn create_archetype(
 
     let attribute_mappings = if let Some(mappings) = request.attribute_mappings {
         serde_json::to_value(&mappings).map_err(|e| {
-            ApiGovernanceError::Validation(format!("Invalid attribute mappings: {}", e))
+            ApiGovernanceError::Validation(format!("Invalid attribute mappings: {e}"))
         })?
     } else {
         serde_json::json!({
@@ -123,7 +123,7 @@ pub async fn create_archetype(
     let lifecycle_policy = if let Some(policy) = request.lifecycle_policy {
         policy.validate()?;
         serde_json::to_value(&policy).map_err(|e| {
-            ApiGovernanceError::Validation(format!("Invalid lifecycle policy: {}", e))
+            ApiGovernanceError::Validation(format!("Invalid lifecycle policy: {e}"))
         })?
     } else {
         serde_json::json!({
@@ -141,7 +141,7 @@ pub async fn create_archetype(
         .map(serde_json::to_value)
         .transpose()
         .map_err(|e| {
-            ApiGovernanceError::Validation(format!("Invalid default entitlements: {}", e))
+            ApiGovernanceError::Validation(format!("Invalid default entitlements: {e}"))
         })?;
 
     let input = CreatePersonaArchetype {
@@ -245,12 +245,12 @@ pub async fn update_archetype(
         .map(serde_json::to_value)
         .transpose()
         .map_err(|e| {
-            ApiGovernanceError::Validation(format!("Invalid attribute mappings: {}", e))
+            ApiGovernanceError::Validation(format!("Invalid attribute mappings: {e}"))
         })?;
     let lifecycle_policy = if let Some(policy) = request.lifecycle_policy {
         policy.validate()?;
         Some(serde_json::to_value(&policy).map_err(|e| {
-            ApiGovernanceError::Validation(format!("Invalid lifecycle policy: {}", e))
+            ApiGovernanceError::Validation(format!("Invalid lifecycle policy: {e}"))
         })?)
     } else {
         None
@@ -260,7 +260,7 @@ pub async fn update_archetype(
         .map(serde_json::to_value)
         .transpose()
         .map_err(|e| {
-            ApiGovernanceError::Validation(format!("Invalid default entitlements: {}", e))
+            ApiGovernanceError::Validation(format!("Invalid default entitlements: {e}"))
         })?;
 
     let input = UpdatePersonaArchetype {
@@ -835,7 +835,7 @@ pub async fn get_user_personas(
     Ok(Json(response))
 }
 
-/// Query parameters for include_archived.
+/// Query parameters for `include_archived`.
 #[derive(Debug, Clone, serde::Deserialize, utoipa::IntoParams)]
 pub struct IncludeArchivedQuery {
     pub include_archived: Option<bool>,
@@ -1151,7 +1151,7 @@ pub async fn list_context_sessions(
         .await?;
 
     let total = sessions.len() as i64;
-    let items: Vec<ContextSessionSummary> = sessions.into_iter().map(|s| s.into()).collect();
+    let items: Vec<ContextSessionSummary> = sessions.into_iter().map(std::convert::Into::into).collect();
 
     Ok(Json(ContextSessionListResponse {
         items,

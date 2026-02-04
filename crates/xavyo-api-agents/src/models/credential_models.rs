@@ -30,8 +30,8 @@ pub struct CredentialRequest {
     /// Type of secret to request (e.g., "postgres-readonly").
     pub secret_type: String,
 
-    /// Requested TTL in seconds (will not exceed max_ttl for type).
-    /// If not specified, uses the default_ttl for the secret type.
+    /// Requested TTL in seconds (will not exceed `max_ttl` for type).
+    /// If not specified, uses the `default_ttl` for the secret type.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ttl_seconds: Option<i32>,
 

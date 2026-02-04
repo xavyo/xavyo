@@ -15,41 +15,41 @@ use xavyo_secrets::SecretProvider;
 
 // ── Insecure default constants (F069-S1) ──────────────────────────────────
 
-/// Default SOCIAL_ENCRYPTION_KEY: base64-encoded 32 zero bytes.
+/// Default `SOCIAL_ENCRYPTION_KEY`: base64-encoded 32 zero bytes.
 pub const INSECURE_SOCIAL_KEY: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
-/// Default SAML_ENCRYPTION_KEY: 64 hex '0' characters.
+/// Default `SAML_ENCRYPTION_KEY`: 64 hex '0' characters.
 #[allow(dead_code)] // Reserved for insecure key detection
 pub const INSECURE_SAML_KEY: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
 
-/// Default FEDERATION_ENCRYPTION_KEY: 64 hex '1' characters.
+/// Default `FEDERATION_ENCRYPTION_KEY`: 64 hex '1' characters.
 #[allow(dead_code)] // Reserved for insecure key detection
 pub const INSECURE_FEDERATION_KEY: &str =
     "1111111111111111111111111111111111111111111111111111111111111111";
 
-/// Default MFA_ENCRYPTION_KEY: 64 hex '2' characters.
+/// Default `MFA_ENCRYPTION_KEY`: 64 hex '2' characters.
 #[allow(dead_code)] // Reserved for insecure key detection
 pub const INSECURE_MFA_KEY: &str =
     "2222222222222222222222222222222222222222222222222222222222222222";
 
-/// Default CONNECTOR_ENCRYPTION_KEY: 64 hex '3' characters.
+/// Default `CONNECTOR_ENCRYPTION_KEY`: 64 hex '3' characters.
 #[allow(dead_code)] // Reserved for insecure key detection
 pub const INSECURE_CONNECTOR_KEY: &str =
     "3333333333333333333333333333333333333333333333333333333333333333";
 
-/// Default WEBHOOK_ENCRYPTION_KEY: 64 hex '4' characters.
+/// Default `WEBHOOK_ENCRYPTION_KEY`: 64 hex '4' characters.
 #[allow(dead_code)] // Reserved for insecure key detection
 pub const INSECURE_WEBHOOK_KEY: &str =
     "4444444444444444444444444444444444444444444444444444444444444444";
 
-/// Default CSRF_SECRET: 64 hex '5' characters (insecure, for development only).
+/// Default `CSRF_SECRET`: 64 hex '5' characters (insecure, for development only).
 /// Note: This constant is for documentation; validation uses the parsed byte pattern [0x55u8; 32].
 #[allow(dead_code)]
 pub const INSECURE_CSRF_SECRET: &str =
     "5555555555555555555555555555555555555555555555555555555555555555";
 
-/// Default SOCIAL_STATE_SECRET.
+/// Default `SOCIAL_STATE_SECRET`.
 pub const INSECURE_SOCIAL_STATE_SECRET: &str =
     "development-social-state-secret-change-in-production";
 
@@ -191,7 +191,7 @@ pub enum ConfigError {
 /// is silently disabled (the system operates normally without a collector).
 #[derive(Debug, Clone)]
 pub struct OtelConfig {
-    /// OTLP collector endpoint (e.g., "http://localhost:4317").
+    /// OTLP collector endpoint (e.g., "<http://localhost:4317>").
     /// When None, OTLP export is disabled.
     pub otlp_endpoint: Option<String>,
 
@@ -204,7 +204,7 @@ pub struct OtelConfig {
     /// Whether metrics collection is enabled. Default: true.
     pub metrics_enabled: bool,
 
-    /// Application environment label (from APP_ENV).
+    /// Application environment label (from `APP_ENV`).
     pub environment: String,
 }
 
@@ -255,7 +255,7 @@ pub struct RateLimitingConfig {
     pub login_per_ip: u32,
     /// Login endpoint: max attempts per minute per account. Default: 10.
     pub login_per_account: u32,
-    /// Token endpoint: max requests per minute per client_id. Default: 30.
+    /// Token endpoint: max requests per minute per `client_id`. Default: 30.
     pub token_per_client: u32,
     /// Registration endpoint: max registrations per hour per IP. Default: 3.
     pub registration_per_ip: u32,
@@ -290,7 +290,7 @@ impl RateLimitingConfig {
 /// Controls body size limits and request timeouts.
 #[derive(Debug, Clone)]
 pub struct InputValidationConfig {
-    /// Maximum request body size in bytes. Default: 1MB (1_048_576).
+    /// Maximum request body size in bytes. Default: 1MB (`1_048_576`).
     pub max_body_size: usize,
     /// Request timeout in seconds. Default: 30.
     pub request_timeout_secs: u64,
@@ -358,7 +358,7 @@ pub struct KafkaConfig {
     /// Kafka bootstrap servers (e.g., "localhost:9092")
     pub bootstrap_servers: String,
 
-    /// Kafka security protocol (PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL)
+    /// Kafka security protocol (PLAINTEXT, SSL, `SASL_PLAINTEXT`, `SASL_SSL`)
     pub security_protocol: String,
 
     /// SASL mechanism (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512) - optional
@@ -381,7 +381,7 @@ pub struct Config {
     /// Application environment (development or production).
     pub app_env: AppEnvironment,
 
-    /// PostgreSQL connection string
+    /// `PostgreSQL` connection string
     pub database_url: String,
 
     /// RS256 private key in PEM format for signing JWTs (single-key fallback)
@@ -394,10 +394,10 @@ pub struct Config {
     pub jwt_key_id: String,
 
     /// Multiple JWT signing keys for key rotation (F069-S5).
-    /// If set, takes precedence over single jwt_private_key/jwt_public_key/jwt_key_id.
+    /// If set, takes precedence over single `jwt_private_key/jwt_public_key/jwt_key_id`.
     pub signing_keys: Vec<SigningKey>,
 
-    /// OAuth2/OIDC issuer URL (e.g., "https://idp.xavyo.com")
+    /// OAuth2/OIDC issuer URL (e.g., "<https://idp.xavyo.com>")
     pub issuer_url: String,
 
     /// Tracing filter directive (e.g., "info,xavyo=debug")
@@ -418,10 +418,10 @@ pub struct Config {
     /// Social login state secret for signing OAuth state tokens
     pub social_state_secret: String,
 
-    /// Frontend URL for social login redirects (e.g., "https://app.xavyo.com")
+    /// Frontend URL for social login redirects (e.g., "<https://app.xavyo.com>")
     pub frontend_url: String,
 
-    /// SAML encryption key (32 bytes, hex-encoded) for encrypting IdP private keys
+    /// SAML encryption key (32 bytes, hex-encoded) for encrypting `IdP` private keys
     pub saml_encryption_key: [u8; 32],
 
     /// OIDC Federation encryption key (32 bytes, hex-encoded) for encrypting client secrets
@@ -433,13 +433,13 @@ pub struct Config {
     /// MFA issuer name (shown in authenticator apps)
     pub mfa_issuer: String,
 
-    /// WebAuthn Relying Party ID (usually the domain, e.g., "xavyo.net")
+    /// `WebAuthn` Relying Party ID (usually the domain, e.g., "xavyo.net")
     pub webauthn_rp_id: String,
 
-    /// WebAuthn Relying Party name (displayed to users)
+    /// `WebAuthn` Relying Party name (displayed to users)
     pub webauthn_rp_name: String,
 
-    /// WebAuthn origin URL (must match the origin of the WebAuthn request)
+    /// `WebAuthn` origin URL (must match the origin of the `WebAuthn` request)
     pub webauthn_origin: String,
 
     /// Connector encryption key (32 bytes, hex-encoded) for encrypting connector credentials
@@ -452,7 +452,7 @@ pub struct Config {
     /// SECURITY: This MUST be generated independently of the JWT signing key.
     pub csrf_secret: [u8; 32],
 
-    /// Kafka configuration (optional - only if KAFKA_BOOTSTRAP_SERVERS is set)
+    /// Kafka configuration (optional - only if `KAFKA_BOOTSTRAP_SERVERS` is set)
     pub kafka: Option<KafkaConfig>,
 
     /// OpenTelemetry configuration (F072)
@@ -492,7 +492,7 @@ impl Config {
     ///
     /// # Required Variables
     ///
-    /// - `DATABASE_URL` - PostgreSQL connection string
+    /// - `DATABASE_URL` - `PostgreSQL` connection string
     /// - `JWT_PRIVATE_KEY` - RS256 private key (PEM format)
     /// - `JWT_PUBLIC_KEY` - RS256 public key (PEM format)
     ///
@@ -546,9 +546,7 @@ impl Config {
         // Optional variables with defaults
         let rust_log = env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
 
-        let cors_origins = env::var("CORS_ORIGINS")
-            .map(|s| s.split(',').map(|o| o.trim().to_string()).collect())
-            .unwrap_or_else(|_| vec!["*".to_string()]);
+        let cors_origins = env::var("CORS_ORIGINS").map_or_else(|_| vec!["*".to_string()], |s| s.split(',').map(|o| o.trim().to_string()).collect());
 
         // F082-US3: Validate CORS origin URL formats at startup
         validate_cors_origins(&cors_origins, &app_env)?;
@@ -863,13 +861,13 @@ impl Config {
     /// In **development** mode: returns `Ok(warnings)` listing all insecure defaults found.
     ///
     /// This function checks:
-    /// - SOCIAL_ENCRYPTION_KEY is not the zero-byte default
-    /// - SAML_ENCRYPTION_KEY is not all zeros
-    /// - FEDERATION_ENCRYPTION_KEY is not all ones
-    /// - MFA_ENCRYPTION_KEY is not all twos
-    /// - CONNECTOR_ENCRYPTION_KEY is not all threes
-    /// - SOCIAL_STATE_SECRET is not the default string
-    /// - CORS_ORIGINS is not wildcard ("*") in production
+    /// - `SOCIAL_ENCRYPTION_KEY` is not the zero-byte default
+    /// - `SAML_ENCRYPTION_KEY` is not all zeros
+    /// - `FEDERATION_ENCRYPTION_KEY` is not all ones
+    /// - `MFA_ENCRYPTION_KEY` is not all twos
+    /// - `CONNECTOR_ENCRYPTION_KEY` is not all threes
+    /// - `SOCIAL_STATE_SECRET` is not the default string
+    /// - `CORS_ORIGINS` is not wildcard ("*") in production
     pub fn validate_security_config(&self) -> Result<Vec<String>, Vec<String>> {
         let mut issues = Vec::new();
 
@@ -980,24 +978,21 @@ fn validate_cors_origins(origins: &[String], app_env: &AppEnvironment) -> Result
         let is_valid = origin.starts_with("http://") || origin.starts_with("https://");
         if !is_valid {
             let msg = format!(
-                "CORS origin '{}' is not a valid URL (must start with http:// or https://)",
-                origin
+                "CORS origin '{origin}' is not a valid URL (must start with http:// or https://)"
             );
             if app_env.is_production() {
                 return Err(ConfigError::InvalidValue {
                     var: "CORS_ORIGINS".to_string(),
                     message: msg,
                 });
-            } else {
-                tracing::warn!(target: "security", origin = %origin, "{}", msg);
             }
+            tracing::warn!(target: "security", origin = %origin, "{}", msg);
         }
 
         // Check for trailing slash (common mistake)
         if is_valid && origin.ends_with('/') {
             let msg = format!(
-                "CORS origin '{}' has a trailing slash — origins should not end with '/'",
-                origin
+                "CORS origin '{origin}' has a trailing slash — origins should not end with '/'"
             );
             tracing::warn!(target: "security", origin = %origin, "{}", msg);
         }

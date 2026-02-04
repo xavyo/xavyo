@@ -246,7 +246,7 @@ impl From<crate::services::JobServiceError> for ConnectorApiError {
                 id: id.to_string(),
             },
             JobServiceError::AlreadyReplayed(id) => {
-                ConnectorApiError::Conflict(format!("DLQ entry {} has already been replayed", id))
+                ConnectorApiError::Conflict(format!("DLQ entry {id} has already been replayed"))
             }
         }
     }

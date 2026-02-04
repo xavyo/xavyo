@@ -1,6 +1,6 @@
-//! Mock OAuth2 Server Infrastructure
+//! Mock `OAuth2` Server Infrastructure
 //!
-//! Provides mock servers for testing OAuth2 flows without external dependencies.
+//! Provides mock servers for testing `OAuth2` flows without external dependencies.
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -9,7 +9,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use super::common::{MockToken, MockUser, ProviderTestFixture, ProviderType};
 
-/// OAuth2 error response structure
+/// `OAuth2` error response structure
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OAuthError {
     pub error: String,
@@ -17,6 +17,7 @@ pub struct OAuthError {
 }
 
 impl OAuthError {
+    #[must_use] 
     pub fn invalid_grant() -> Self {
         Self {
             error: "invalid_grant".to_string(),
@@ -24,6 +25,7 @@ impl OAuthError {
         }
     }
 
+    #[must_use] 
     pub fn access_denied() -> Self {
         Self {
             error: "access_denied".to_string(),
@@ -31,6 +33,7 @@ impl OAuthError {
         }
     }
 
+    #[must_use] 
     pub fn invalid_client() -> Self {
         Self {
             error: "invalid_client".to_string(),
@@ -38,6 +41,7 @@ impl OAuthError {
         }
     }
 
+    #[must_use] 
     pub fn rate_limit_exceeded() -> Self {
         Self {
             error: "rate_limit_exceeded".to_string(),
@@ -223,7 +227,7 @@ pub async fn setup_github_abuse_error(server: &MockServer) {
         .await;
 }
 
-/// Setup Microsoft interaction_required error (AADSTS codes)
+/// Setup Microsoft `interaction_required` error (AADSTS codes)
 pub async fn setup_microsoft_interaction_required(server: &MockServer) {
     let response = json!({
         "error": "interaction_required",
@@ -258,6 +262,7 @@ pub async fn setup_google_token_revoked(server: &MockServer) {
 
 /// Generate a mock Apple identity token (JWT)
 /// Uses a simple structure for testing purposes
+#[must_use] 
 pub fn generate_apple_id_token(user: &MockUser, client_id: &str, nonce: Option<&str>) -> String {
     // For testing, we create a simple JWT structure
     // In real tests, you would use jsonwebtoken with test RSA keys
@@ -280,7 +285,7 @@ pub fn generate_apple_id_token(user: &MockUser, client_id: &str, nonce: Option<&
     // Mock signature (not cryptographically valid, but works for structure testing)
     let signature = base64_url_encode("mock_signature_for_testing");
 
-    format!("{}.{}.{}", header, payload, signature)
+    format!("{header}.{payload}.{signature}")
 }
 
 /// Setup Apple public keys endpoint (JWKS)
@@ -333,6 +338,7 @@ fn base64_url_encode(data: &str) -> String {
 }
 
 /// Validate PKCE code challenge matches verifier
+#[must_use] 
 pub fn validate_pkce(code_verifier: &str, code_challenge: &str) -> bool {
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
     use sha2::{Digest, Sha256};
@@ -346,6 +352,7 @@ pub fn validate_pkce(code_verifier: &str, code_challenge: &str) -> bool {
 }
 
 /// Build authorization URL for testing
+#[must_use] 
 pub fn build_auth_url(
     base_url: &str,
     client_id: &str,

@@ -30,6 +30,7 @@ pub enum ReconciliationDiscrepancyType {
 
 impl ReconciliationDiscrepancyType {
     /// Get suggested actions for this discrepancy type.
+    #[must_use] 
     pub fn suggested_actions(&self) -> Vec<ReconciliationActionType> {
         match self {
             Self::Missing => vec![ReconciliationActionType::Create],
@@ -73,7 +74,7 @@ impl std::str::FromStr for ReconciliationDiscrepancyType {
             "collision" => Ok(Self::Collision),
             "unlinked" => Ok(Self::Unlinked),
             "deleted" => Ok(Self::Deleted),
-            _ => Err(format!("Unknown discrepancy type: {}", s)),
+            _ => Err(format!("Unknown discrepancy type: {s}")),
         }
     }
 }
@@ -110,7 +111,7 @@ impl std::str::FromStr for ReconciliationResolutionStatus {
             "pending" => Ok(Self::Pending),
             "resolved" => Ok(Self::Resolved),
             "ignored" => Ok(Self::Ignored),
-            _ => Err(format!("Unknown resolution status: {}", s)),
+            _ => Err(format!("Unknown resolution status: {s}")),
         }
     }
 }
@@ -158,7 +159,7 @@ impl std::str::FromStr for ReconciliationActionType {
             "link" => Ok(Self::Link),
             "unlink" => Ok(Self::Unlink),
             "inactivate_identity" => Ok(Self::InactivateIdentity),
-            _ => Err(format!("Unknown action type: {}", s)),
+            _ => Err(format!("Unknown action type: {s}")),
         }
     }
 }
@@ -182,6 +183,7 @@ pub struct ReconciliationDiscrepancy {
 
 impl ReconciliationDiscrepancy {
     /// Get discrepancy type enum.
+    #[must_use] 
     pub fn discrepancy_type(&self) -> ReconciliationDiscrepancyType {
         self.discrepancy_type
             .parse()
@@ -189,11 +191,13 @@ impl ReconciliationDiscrepancy {
     }
 
     /// Get resolution status enum.
+    #[must_use] 
     pub fn resolution_status(&self) -> ReconciliationResolutionStatus {
         self.resolution_status.parse().unwrap_or_default()
     }
 
     /// Get resolved action enum.
+    #[must_use] 
     pub fn resolved_action(&self) -> Option<ReconciliationActionType> {
         self.resolved_action.as_ref().and_then(|s| s.parse().ok())
     }
@@ -205,14 +209,14 @@ impl ReconciliationDiscrepancy {
         input: &CreateReconciliationDiscrepancy,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_reconciliation_discrepancies (
                 run_id, tenant_id, discrepancy_type, identity_id,
                 external_uid, mismatched_attributes
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.run_id)
         .bind(tenant_id)
@@ -249,10 +253,10 @@ impl ReconciliationDiscrepancy {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_reconciliation_discrepancies
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -269,27 +273,27 @@ impl ReconciliationDiscrepancy {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query =
-            String::from(r#"SELECT * FROM gov_reconciliation_discrepancies WHERE tenant_id = $1"#);
+            String::from(r"SELECT * FROM gov_reconciliation_discrepancies WHERE tenant_id = $1");
         let mut param_idx = 2;
 
         if filter.run_id.is_some() {
-            query.push_str(&format!(" AND run_id = ${}", param_idx));
+            query.push_str(&format!(" AND run_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.discrepancy_type.is_some() {
-            query.push_str(&format!(" AND discrepancy_type = ${}", param_idx));
+            query.push_str(&format!(" AND discrepancy_type = ${param_idx}"));
             param_idx += 1;
         }
         if filter.resolution_status.is_some() {
-            query.push_str(&format!(" AND resolution_status = ${}", param_idx));
+            query.push_str(&format!(" AND resolution_status = ${param_idx}"));
             param_idx += 1;
         }
         if filter.identity_id.is_some() {
-            query.push_str(&format!(" AND identity_id = ${}", param_idx));
+            query.push_str(&format!(" AND identity_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.external_uid.is_some() {
-            query.push_str(&format!(" AND external_uid ILIKE ${}", param_idx));
+            query.push_str(&format!(" AND external_uid ILIKE ${param_idx}"));
             param_idx += 1;
         }
 
@@ -314,7 +318,7 @@ impl ReconciliationDiscrepancy {
             q = q.bind(identity_id);
         }
         if let Some(ref external_uid) = filter.external_uid {
-            q = q.bind(format!("%{}%", external_uid));
+            q = q.bind(format!("%{external_uid}%"));
         }
 
         q = q.bind(limit).bind(offset);
@@ -328,28 +332,28 @@ impl ReconciliationDiscrepancy {
         filter: &ReconciliationDiscrepancyFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"SELECT COUNT(*) FROM gov_reconciliation_discrepancies WHERE tenant_id = $1"#,
+            r"SELECT COUNT(*) FROM gov_reconciliation_discrepancies WHERE tenant_id = $1",
         );
         let mut param_idx = 2;
 
         if filter.run_id.is_some() {
-            query.push_str(&format!(" AND run_id = ${}", param_idx));
+            query.push_str(&format!(" AND run_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.discrepancy_type.is_some() {
-            query.push_str(&format!(" AND discrepancy_type = ${}", param_idx));
+            query.push_str(&format!(" AND discrepancy_type = ${param_idx}"));
             param_idx += 1;
         }
         if filter.resolution_status.is_some() {
-            query.push_str(&format!(" AND resolution_status = ${}", param_idx));
+            query.push_str(&format!(" AND resolution_status = ${param_idx}"));
             param_idx += 1;
         }
         if filter.identity_id.is_some() {
-            query.push_str(&format!(" AND identity_id = ${}", param_idx));
+            query.push_str(&format!(" AND identity_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.external_uid.is_some() {
-            query.push_str(&format!(" AND external_uid ILIKE ${}", param_idx));
+            query.push_str(&format!(" AND external_uid ILIKE ${param_idx}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -367,7 +371,7 @@ impl ReconciliationDiscrepancy {
             q = q.bind(identity_id);
         }
         if let Some(ref external_uid) = filter.external_uid {
-            q = q.bind(format!("%{}%", external_uid));
+            q = q.bind(format!("%{external_uid}%"));
         }
 
         q.fetch_one(pool).await
@@ -380,12 +384,12 @@ impl ReconciliationDiscrepancy {
         run_id: Uuid,
     ) -> Result<Vec<(String, i64)>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT discrepancy_type, COUNT(*) as count
             FROM gov_reconciliation_discrepancies
             WHERE tenant_id = $1 AND run_id = $2
             GROUP BY discrepancy_type
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(run_id)
@@ -402,7 +406,7 @@ impl ReconciliationDiscrepancy {
         resolved_by: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_reconciliation_discrepancies
             SET resolution_status = 'resolved',
                 resolved_action = $3,
@@ -410,7 +414,7 @@ impl ReconciliationDiscrepancy {
                 resolved_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -428,14 +432,14 @@ impl ReconciliationDiscrepancy {
         ignored_by: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_reconciliation_discrepancies
             SET resolution_status = 'ignored',
                 resolved_by = $3,
                 resolved_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -451,10 +455,10 @@ impl ReconciliationDiscrepancy {
         run_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_reconciliation_discrepancies
             WHERE run_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(run_id)
         .bind(tenant_id)
@@ -475,7 +479,7 @@ impl ReconciliationDiscrepancy {
     ) -> Result<Vec<DiscrepancyTrendPoint>, sqlx::Error> {
         if let Some(cid) = connector_id {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT
                     DATE(d.detected_at) as date,
                     d.discrepancy_type as discrepancy_type,
@@ -488,7 +492,7 @@ impl ReconciliationDiscrepancy {
                   AND d.detected_at <= $4
                 GROUP BY DATE(d.detected_at), d.discrepancy_type
                 ORDER BY date ASC, discrepancy_type ASC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(cid)
@@ -498,7 +502,7 @@ impl ReconciliationDiscrepancy {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT
                     DATE(detected_at) as date,
                     discrepancy_type,
@@ -509,7 +513,7 @@ impl ReconciliationDiscrepancy {
                   AND detected_at <= $3
                 GROUP BY DATE(detected_at), discrepancy_type
                 ORDER BY date ASC, discrepancy_type ASC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(from)
@@ -549,20 +553,24 @@ pub struct ReconciliationDiscrepancyFilter {
 }
 
 impl ReconciliationDiscrepancyFilter {
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
+    #[must_use] 
     pub fn for_run(mut self, run_id: Uuid) -> Self {
         self.run_id = Some(run_id);
         self
     }
 
+    #[must_use] 
     pub fn with_type(mut self, dtype: ReconciliationDiscrepancyType) -> Self {
         self.discrepancy_type = Some(dtype);
         self
     }
 
+    #[must_use] 
     pub fn pending_only(mut self) -> Self {
         self.resolution_status = Some(ReconciliationResolutionStatus::Pending);
         self

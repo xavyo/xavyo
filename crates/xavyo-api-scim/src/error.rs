@@ -48,7 +48,7 @@ impl std::fmt::Display for ScimErrorType {
             ScimErrorType::InvalidVers => "invalidVers",
             ScimErrorType::Sensitive => "sensitive",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -137,6 +137,7 @@ pub enum ScimError {
 
 impl ScimError {
     /// Get the HTTP status code for this error
+    #[must_use] 
     pub fn status_code(&self) -> StatusCode {
         match self {
             ScimError::Unauthorized => StatusCode::UNAUTHORIZED,
@@ -154,6 +155,7 @@ impl ScimError {
     }
 
     /// Get the SCIM error type for this error
+    #[must_use] 
     pub fn scim_type(&self) -> Option<ScimErrorType> {
         match self {
             ScimError::Conflict { .. } => Some(ScimErrorType::Uniqueness),
@@ -167,6 +169,7 @@ impl ScimError {
     }
 
     /// Convert to SCIM error response
+    #[must_use] 
     pub fn to_response(&self) -> ScimErrorResponse {
         ScimErrorResponse::new(self.status_code(), self.to_string(), self.scim_type())
     }

@@ -55,6 +55,7 @@ pub struct OAuthService {
 
 impl OAuthService {
     /// Create a new OAuth service.
+    #[must_use] 
     pub fn new(state_secret: &str) -> Self {
         Self {
             state_secret: state_secret.as_bytes().to_vec(),
@@ -62,6 +63,7 @@ impl OAuthService {
     }
 
     /// Generate a new PKCE challenge pair.
+    #[must_use] 
     pub fn generate_pkce() -> PkceChallenge {
         // Generate random verifier
         let mut verifier_bytes = [0u8; PKCE_VERIFIER_LENGTH];
@@ -81,6 +83,7 @@ impl OAuthService {
     }
 
     /// Verify a PKCE verifier against a challenge.
+    #[must_use] 
     pub fn verify_pkce(verifier: &str, challenge: &str) -> bool {
         let mut hasher = Sha256::new();
         hasher.update(verifier.as_bytes());

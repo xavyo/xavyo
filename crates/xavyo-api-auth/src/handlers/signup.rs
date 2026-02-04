@@ -3,7 +3,7 @@
 //! POST /auth/signup - Create a new user account in the system tenant.
 //!
 //! This handler allows new users to create accounts without prior authentication.
-//! It uses the pre-configured system tenant (SYSTEM_TENANT_ID) and returns a JWT
+//! It uses the pre-configured system tenant (`SYSTEM_TENANT_ID`) and returns a JWT
 //! for immediate use in the device code flow.
 
 use crate::error::ApiAuthError;
@@ -40,7 +40,7 @@ use xavyo_db::SYSTEM_TENANT_ID;
 ///
 /// # Errors
 ///
-/// - 400 Bad Request: Invalid input (weak password, invalid email, invalid display_name)
+/// - 400 Bad Request: Invalid input (weak password, invalid email, invalid `display_name`)
 /// - 409 Conflict: Email already registered in system tenant
 /// - 429 Too Many Requests: Rate limit exceeded
 /// - 503 Service Unavailable: System tenant not configured
@@ -73,7 +73,7 @@ pub async fn signup_handler(
             .flat_map(|errors| {
                 errors
                     .iter()
-                    .filter_map(|e| e.message.as_ref().map(|m| m.to_string()))
+                    .filter_map(|e| e.message.as_ref().map(std::string::ToString::to_string))
             })
             .collect();
         if errors.iter().any(|e| e.contains("email")) {
@@ -243,10 +243,10 @@ async fn send_verification_email(
 
     // Store token hash in database
     sqlx::query(
-        r#"
+        r"
         INSERT INTO email_verification_tokens (tenant_id, user_id, token_hash, expires_at, ip_address)
         VALUES ($1, $2, $3, $4, $5)
-        "#,
+        ",
     )
     .bind(tenant_id.as_uuid())
     .bind(user_id)

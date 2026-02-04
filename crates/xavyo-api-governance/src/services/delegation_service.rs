@@ -16,7 +16,7 @@ use xavyo_governance::error::{GovernanceError, Result};
 use crate::models::{CreateDelegationScopeRequest, DelegatedWorkItem};
 
 /// Type alias for pending work item row returned from the database query.
-/// Contains: (request_id, entitlement_id, application_id, summary, created_at)
+/// Contains: (`request_id`, `entitlement_id`, `application_id`, summary, `created_at`)
 type PendingWorkItemRow = (Uuid, Uuid, Option<Uuid>, String, chrono::DateTime<Utc>);
 
 /// Service for delegation operations.
@@ -26,6 +26,7 @@ pub struct DelegationService {
 
 impl DelegationService {
     /// Create a new delegation service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -173,8 +174,7 @@ impl DelegationService {
                     for wf_type in &scope_req.workflow_types {
                         if !valid_types.contains(&wf_type.as_str()) {
                             return Err(GovernanceError::Validation(format!(
-                                "Invalid workflow type: {}. Valid types: {:?}",
-                                wf_type, valid_types
+                                "Invalid workflow type: {wf_type}. Valid types: {valid_types:?}"
                             )));
                         }
                     }
@@ -362,7 +362,7 @@ impl DelegationService {
             // Query pending access requests where delegator is an approver
             // Only include entitlements that are marked as delegable (IGA edge case)
             let requests: Vec<PendingWorkItemRow> = sqlx::query_as(
-                r#"
+                r"
                 SELECT
                     ar.id,
                     ar.entitlement_id,
@@ -385,7 +385,7 @@ impl DelegationService {
                         OR (step.approver_type = 'entitlement_owner' AND e.owner_id = $2)
                     )
                 ORDER BY ar.created_at ASC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(delegation.delegator_id)
@@ -486,6 +486,7 @@ impl DelegationService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

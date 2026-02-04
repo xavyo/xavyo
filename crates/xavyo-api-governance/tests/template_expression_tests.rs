@@ -1,4 +1,4 @@
-//! Integration tests for TemplateExpressionService (F058).
+//! Integration tests for `TemplateExpressionService` (F058).
 //!
 //! These tests verify the expression parsing and evaluation functionality
 //! beyond the unit tests included in the service module.

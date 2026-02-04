@@ -5,8 +5,8 @@
 //! - Performance under load
 //! - Concurrent cascade operations
 //!
-//! NOTE: These tests require a running PostgreSQL database and are ignored
-//! by default in CI. Run with `cargo test --ignored` locally with DATABASE_URL set.
+//! NOTE: These tests require a running `PostgreSQL` database and are ignored
+//! by default in CI. Run with `cargo test --ignored` locally with `DATABASE_URL` set.
 
 mod common;
 
@@ -103,7 +103,7 @@ async fn test_cascade_performance_200_roles() {
     let app_id = create_test_application(&pool, tenant_id).await;
 
     // Create meta-role
-    let meta_role_id =
+    let _meta_role_id =
         create_test_meta_role(&pool, tenant_id, user_id, "Performance Test", 100).await;
 
     // Create 200 roles
@@ -115,7 +115,7 @@ async fn test_cascade_performance_200_roles() {
     .await;
 
     let creation_time = start.elapsed();
-    println!("Created 200 roles in {:?}", creation_time);
+    println!("Created 200 roles in {creation_time:?}");
 
     // Count roles
     let role_count: (i64,) = sqlx::query_as(
@@ -403,8 +403,7 @@ async fn test_cascade_sla_1000_roles() {
     // Verify completion time (scaled: 100 roles should complete in under 1 minute)
     assert!(
         elapsed.as_secs() < 60,
-        "Cascade for 100 roles should complete within 60 seconds, took {:?}",
-        elapsed
+        "Cascade for 100 roles should complete within 60 seconds, took {elapsed:?}"
     );
 
     // Verify all inheritances created

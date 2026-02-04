@@ -83,7 +83,7 @@ pub struct ScimMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub location: Option<String>,
 
-    /// Resource version (ETag).
+    /// Resource version (`ETag`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 }
@@ -99,7 +99,7 @@ pub struct ScimUser {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<Uuid>,
 
-    /// External identifier from IdP.
+    /// External identifier from `IdP`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub external_id: Option<String>,
 
@@ -198,6 +198,7 @@ impl ScimUser {
     }
 
     /// Get the primary email address.
+    #[must_use] 
     pub fn primary_email(&self) -> Option<&str> {
         self.emails
             .iter()
@@ -207,6 +208,7 @@ impl ScimUser {
     }
 
     /// Set the resource ID and generate metadata.
+    #[must_use] 
     pub fn with_meta(
         mut self,
         id: Uuid,
@@ -219,7 +221,7 @@ impl ScimUser {
             resource_type: "User".to_string(),
             created: created_at,
             last_modified: updated_at,
-            location: Some(format!("{}/scim/v2/Users/{}", base_url, id)),
+            location: Some(format!("{base_url}/scim/v2/Users/{id}")),
             version: None,
         });
         self

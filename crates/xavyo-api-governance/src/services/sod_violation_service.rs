@@ -1,6 +1,6 @@
-//! SoD violation service for governance API.
+//! `SoD` violation service for governance API.
 //!
-//! Provides detective enforcement by scanning for and managing SoD violations.
+//! Provides detective enforcement by scanning for and managing `SoD` violations.
 
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -26,7 +26,7 @@ pub struct ScanResult {
     pub existing_violations: usize,
 }
 
-/// Service for SoD violation operations.
+/// Service for `SoD` violation operations.
 pub struct SodViolationService {
     pool: PgPool,
     #[allow(dead_code)]
@@ -34,7 +34,8 @@ pub struct SodViolationService {
 }
 
 impl SodViolationService {
-    /// Create a new SoD violation service.
+    /// Create a new `SoD` violation service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             effective_access_service: EffectiveAccessService::new(pool.clone()),
@@ -272,6 +273,7 @@ impl SodViolationService {
     }
 
     /// Convert database model to API response format.
+    #[must_use] 
     pub fn to_api_response(violation: &GovSodViolation) -> SodViolationResponse {
         SodViolationResponse {
             id: violation.id,
@@ -290,6 +292,7 @@ impl SodViolationService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

@@ -75,7 +75,7 @@ impl TenantError {
 /// ```
 #[derive(Debug, Clone, Serialize)]
 pub struct ErrorResponse {
-    /// Machine-readable error code (e.g., "unauthorized", "internal_error")
+    /// Machine-readable error code (e.g., "unauthorized", "`internal_error`")
     pub error: String,
     /// Human-readable error message
     pub message: String,

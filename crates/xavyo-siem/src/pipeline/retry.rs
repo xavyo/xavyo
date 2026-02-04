@@ -17,36 +17,42 @@ pub struct RetryPolicy {
 }
 
 impl RetryPolicy {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             max_retries: MAX_RETRIES,
         }
     }
 
+    #[must_use] 
     pub fn with_max_retries(max_retries: u8) -> Self {
         Self { max_retries }
     }
 
     /// Check if another retry should be attempted.
+    #[must_use] 
     pub fn should_retry(&self, attempt: u8) -> bool {
         attempt < self.max_retries
     }
 
     /// Check if the event should be moved to dead letter.
+    #[must_use] 
     pub fn is_dead_letter(&self, attempt: u8) -> bool {
         attempt >= self.max_retries
     }
 
     /// Calculate the next retry delay using exponential backoff.
     /// Intervals: 1s, 2s, 4s, 8s, 16s, 32s, 60s (capped)
+    #[must_use] 
     pub fn next_delay(&self, attempt: u8) -> Duration {
         let backoff = BASE_BACKOFF
-            .checked_mul(2u32.saturating_pow(attempt as u32))
+            .checked_mul(2u32.saturating_pow(u32::from(attempt)))
             .unwrap_or(MAX_BACKOFF);
         backoff.min(MAX_BACKOFF)
     }
 
     /// Get the maximum number of retries.
+    #[must_use] 
     pub fn max_retries(&self) -> u8 {
         self.max_retries
     }

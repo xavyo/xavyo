@@ -65,11 +65,11 @@ impl GovRoleEffectiveEntitlement {
         role_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_effective_entitlements
             WHERE role_id = $1 AND tenant_id = $2
             ORDER BY is_inherited, entitlement_id
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -84,7 +84,7 @@ impl GovRoleEffectiveEntitlement {
         role_id: Uuid,
     ) -> Result<Vec<EffectiveEntitlementDetails>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT
                 ee.entitlement_id,
                 e.name AS entitlement_name,
@@ -98,7 +98,7 @@ impl GovRoleEffectiveEntitlement {
             JOIN gov_roles sr ON ee.source_role_id = sr.id
             WHERE ee.role_id = $1 AND ee.tenant_id = $2
             ORDER BY ee.is_inherited, e.name
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -106,17 +106,17 @@ impl GovRoleEffectiveEntitlement {
         .await
     }
 
-    /// Get entitlement IDs for a role (for SoD checks etc.)
+    /// Get entitlement IDs for a role (for `SoD` checks etc.)
     pub async fn get_entitlement_ids_for_role(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         role_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT entitlement_id FROM gov_role_effective_entitlements
             WHERE role_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -134,10 +134,10 @@ impl GovRoleEffectiveEntitlement {
     ) -> Result<Vec<Self>, sqlx::Error> {
         // Clear existing cache for this role
         sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_effective_entitlements
             WHERE role_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -146,10 +146,10 @@ impl GovRoleEffectiveEntitlement {
 
         // Get blocked entitlements for this role
         let blocked: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT entitlement_id FROM gov_role_inheritance_blocks
             WHERE role_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -158,13 +158,13 @@ impl GovRoleEffectiveEntitlement {
 
         // Insert direct entitlements (from gov_role_entitlements where role_id matches)
         sqlx::query(
-            r#"
+            r"
             INSERT INTO gov_role_effective_entitlements (tenant_id, role_id, entitlement_id, source_role_id, is_inherited)
             SELECT $2, $1, entitlement_id, $1, false
             FROM gov_role_entitlements
             WHERE role_id = $1 AND tenant_id = $2
             ON CONFLICT (role_id, entitlement_id) DO NOTHING
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -175,7 +175,7 @@ impl GovRoleEffectiveEntitlement {
         // Using recursive CTE to walk up the hierarchy
         if blocked.is_empty() {
             sqlx::query(
-                r#"
+                r"
                 WITH RECURSIVE ancestors AS (
                     -- Base case: direct parent
                     SELECT r.id, r.parent_role_id
@@ -196,7 +196,7 @@ impl GovRoleEffectiveEntitlement {
                 FROM ancestors a
                 JOIN gov_role_entitlements re ON re.role_id = a.id AND re.tenant_id = $2
                 ON CONFLICT (role_id, entitlement_id) DO NOTHING
-                "#,
+                ",
             )
             .bind(role_id)
             .bind(tenant_id)
@@ -205,7 +205,7 @@ impl GovRoleEffectiveEntitlement {
         } else {
             // Exclude blocked entitlements
             sqlx::query(
-                r#"
+                r"
                 WITH RECURSIVE ancestors AS (
                     SELECT r.id, r.parent_role_id
                     FROM gov_roles r
@@ -225,7 +225,7 @@ impl GovRoleEffectiveEntitlement {
                 JOIN gov_role_entitlements re ON re.role_id = a.id AND re.tenant_id = $2
                 WHERE re.entitlement_id != ALL($3)
                 ON CONFLICT (role_id, entitlement_id) DO NOTHING
-                "#,
+                ",
             )
             .bind(role_id)
             .bind(tenant_id)
@@ -249,7 +249,7 @@ impl GovRoleEffectiveEntitlement {
 
         // Get all descendants
         let descendants: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             WITH RECURSIVE descendants AS (
                 SELECT id FROM gov_roles WHERE parent_role_id = $1 AND tenant_id = $2
 
@@ -261,7 +261,7 @@ impl GovRoleEffectiveEntitlement {
             )
             SELECT id FROM descendants
             ORDER BY (SELECT hierarchy_depth FROM gov_roles WHERE id = descendants.id)
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -283,10 +283,10 @@ impl GovRoleEffectiveEntitlement {
         role_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_effective_entitlements
             WHERE role_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -301,10 +301,10 @@ impl GovRoleEffectiveEntitlement {
         role_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_effective_entitlements
             WHERE role_id = $1 AND tenant_id = $2 AND is_inherited = false
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -319,10 +319,10 @@ impl GovRoleEffectiveEntitlement {
         role_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_effective_entitlements
             WHERE role_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -340,12 +340,12 @@ impl GovRoleEffectiveEntitlement {
         entitlement_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let exists: bool = sqlx::query_scalar(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM gov_role_effective_entitlements
                 WHERE role_id = $1 AND tenant_id = $2 AND entitlement_id = $3
             )
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)

@@ -634,7 +634,7 @@ pub async fn preview_batch_merge(
 
 /// Get batch merge job status (synchronous - returns immediately after execution).
 /// Note: Since batch merge executes synchronously, jobs are not persisted.
-/// This endpoint returns 404 for any job_id as jobs complete immediately.
+/// This endpoint returns 404 for any `job_id` as jobs complete immediately.
 #[utoipa::path(
     get,
     path = "/governance/merges/batch/{job_id}",

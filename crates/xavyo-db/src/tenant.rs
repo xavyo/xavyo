@@ -1,7 +1,7 @@
 //! Tenant context injection for Row-Level Security.
 //!
 //! This module provides functions to set and manage tenant context
-//! in PostgreSQL sessions, enabling automatic RLS filtering.
+//! in `PostgreSQL` sessions, enabling automatic RLS filtering.
 
 use crate::error::DbError;
 use sqlx::{Executor, Postgres};
@@ -9,7 +9,7 @@ use xavyo_core::TenantId;
 
 /// Set the tenant context for the current transaction.
 ///
-/// This sets the PostgreSQL session variable `app.current_tenant` which is
+/// This sets the `PostgreSQL` session variable `app.current_tenant` which is
 /// used by Row-Level Security policies to filter data by tenant.
 ///
 /// Uses `SET LOCAL` so the context is automatically cleared when the

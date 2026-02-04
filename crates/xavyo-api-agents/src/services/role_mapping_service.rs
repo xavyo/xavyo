@@ -22,6 +22,7 @@ pub struct RoleMappingService {
 
 impl RoleMappingService {
     /// Create a new role mapping service.
+    #[must_use] 
     pub fn new(pool: PgPool, audit_service: IdentityAuditService) -> Self {
         Self {
             pool,
@@ -174,7 +175,7 @@ impl RoleMappingService {
     ///
     /// This method implements the role resolution logic:
     /// 1. First, try to find a specific mapping for the agent type
-    /// 2. If not found, fall back to the default mapping (agent_type = NULL)
+    /// 2. If not found, fall back to the default mapping (`agent_type` = NULL)
     /// 3. If neither exists, return an error
     #[instrument(skip(self), fields(tenant_id = %tenant_id, agent_type = %agent_type))]
     pub async fn find_mapping_for_agent(
@@ -248,6 +249,7 @@ impl RoleMappingService {
     /// Get the effective TTL for a mapping request.
     ///
     /// Clamps the requested TTL to the mapping's max TTL.
+    #[must_use] 
     pub fn get_effective_ttl(&self, mapping: &IamRoleMapping, requested_ttl: i32) -> i32 {
         requested_ttl
             .max(900) // Minimum 15 minutes

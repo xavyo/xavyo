@@ -62,7 +62,7 @@ impl ConnectorService {
             ConnectorConfiguration::list_by_tenant(&self.pool, tenant_id, &filter, limit, offset)
                 .await?;
 
-        let summaries: Vec<ConnectorSummary> = connectors.iter().map(|c| c.to_summary()).collect();
+        let summaries: Vec<ConnectorSummary> = connectors.iter().map(xavyo_db::models::ConnectorConfiguration::to_summary).collect();
 
         let total = ConnectorConfiguration::count_by_tenant(&self.pool, tenant_id, &filter).await?;
 
@@ -116,8 +116,7 @@ impl ConnectorService {
         // Encrypt credentials
         let credentials_json = serde_json::to_vec(&input.credentials).map_err(|e| {
             ConnectorApiError::InvalidConfiguration(format!(
-                "Failed to serialize credentials: {}",
-                e
+                "Failed to serialize credentials: {e}"
             ))
         })?;
 
@@ -194,8 +193,7 @@ impl ConnectorService {
             if let Some(ref creds) = input.credentials {
                 let credentials_json = serde_json::to_vec(creds).map_err(|e| {
                     ConnectorApiError::InvalidConfiguration(format!(
-                        "Failed to serialize credentials: {}",
-                        e
+                        "Failed to serialize credentials: {e}"
                     ))
                 })?;
 
@@ -391,8 +389,7 @@ impl ConnectorService {
 
         serde_json::from_slice(&decrypted).map_err(|e| {
             ConnectorApiError::InvalidConfiguration(format!(
-                "Failed to deserialize credentials: {}",
-                e
+                "Failed to deserialize credentials: {e}"
             ))
         })
     }
@@ -409,7 +406,7 @@ impl ConnectorService {
                 let use_ad = config
                     .config
                     .get("use_ad_features")
-                    .and_then(|v| v.as_bool())
+                    .and_then(serde_json::Value::as_bool)
                     .unwrap_or(false);
 
                 if use_ad {
@@ -435,7 +432,7 @@ impl ConnectorService {
                 let use_entra = config
                     .config
                     .get("use_entra_features")
-                    .and_then(|v| v.as_bool())
+                    .and_then(serde_json::Value::as_bool)
                     .unwrap_or(false);
 
                 if use_entra {
@@ -472,7 +469,7 @@ impl ConnectorService {
                 // AD-specific validation
                 let use_ad = config
                     .get("use_ad_features")
-                    .and_then(|v| v.as_bool())
+                    .and_then(serde_json::Value::as_bool)
                     .unwrap_or(false);
 
                 if use_ad && config.get("domain").and_then(|v| v.as_str()).is_none() {
@@ -503,7 +500,7 @@ impl ConnectorService {
             DbConnectorType::Rest => {
                 let use_entra = config
                     .get("use_entra_features")
-                    .and_then(|v| v.as_bool())
+                    .and_then(serde_json::Value::as_bool)
                     .unwrap_or(false);
 
                 if use_entra {
@@ -549,7 +546,7 @@ impl ConnectorService {
         let mut ldap_config = LdapConfig::new(host, base_dn, bind_dn);
 
         // Apply SSL
-        if let Some(ssl) = config.get("use_ssl").and_then(|v| v.as_bool()) {
+        if let Some(ssl) = config.get("use_ssl").and_then(serde_json::Value::as_bool) {
             if ssl {
                 ldap_config = ldap_config.with_ssl();
             }
@@ -587,11 +584,11 @@ impl ConnectorService {
             use_ad_features: true,
             sync_account_disabled: config
                 .get("sync_account_disabled")
-                .and_then(|v| v.as_bool())
+                .and_then(serde_json::Value::as_bool)
                 .unwrap_or(true),
             enable_exchange: config
                 .get("enable_exchange")
-                .and_then(|v| v.as_bool())
+                .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false),
             search_bases: Vec::new(),
             user_filter: config
@@ -606,11 +603,11 @@ impl ConnectorService {
                 .to_string(),
             max_nesting_depth: config
                 .get("max_nesting_depth")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(10) as u32,
             max_referral_hops: config
                 .get("max_referral_hops")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(3) as u32,
             incremental_attribute: config
                 .get("incremental_attribute")
@@ -620,7 +617,7 @@ impl ConnectorService {
             outbound_target_ou: config
                 .get("outbound_target_ou")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
+                .map(std::string::ToString::to_string),
             conflict_strategy: config
                 .get("conflict_strategy")
                 .and_then(|v| v.as_str())
@@ -642,13 +639,13 @@ impl ConnectorService {
                         filter: base
                             .get("filter")
                             .and_then(|v| v.as_str())
-                            .map(|s| s.to_string()),
+                            .map(std::string::ToString::to_string),
                         object_types: base
                             .get("object_types")
                             .and_then(|v| v.as_array())
                             .map(|arr| {
                                 arr.iter()
-                                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                    .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
                                     .collect()
                             })
                             .unwrap_or_else(|| vec!["all".to_string()]),
@@ -687,8 +684,7 @@ impl ConnectorService {
                 "postgresql" | "postgres" => Ok(DatabaseDriver::PostgreSQL),
                 // MySQL, MSSQL, Oracle skipped per Constitution Principle XI
                 _ => Err(ConnectorApiError::InvalidConfiguration(format!(
-                    "Unsupported database driver: {}. Only PostgreSQL is supported.",
-                    s
+                    "Unsupported database driver: {s}. Only PostgreSQL is supported."
                 ))),
             })
             .transpose()?
@@ -703,7 +699,7 @@ impl ConnectorService {
         let mut db_config = DatabaseConfig::new(driver, host, database, username);
 
         // Apply port
-        if let Some(port) = config.get("port").and_then(|v| v.as_u64()) {
+        if let Some(port) = config.get("port").and_then(serde_json::Value::as_u64) {
             db_config = db_config.with_port(port as u16);
         }
 
@@ -776,8 +772,7 @@ impl ConnectorService {
     fn build_entra_config(&self, config: &serde_json::Value) -> Result<EntraConfig> {
         serde_json::from_value(config.clone()).map_err(|e| {
             ConnectorApiError::InvalidConfiguration(format!(
-                "Failed to parse Entra ID configuration: {}",
-                e
+                "Failed to parse Entra ID configuration: {e}"
             ))
         })
     }

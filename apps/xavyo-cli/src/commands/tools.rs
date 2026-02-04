@@ -282,8 +282,7 @@ fn validate_risk_level(risk_level: &str) -> CliResult<()> {
     match risk_level {
         "low" | "medium" | "high" | "critical" => Ok(()),
         _ => Err(CliError::Validation(format!(
-            "Invalid risk level '{}'. Must be one of: low, medium, high, critical",
-            risk_level
+            "Invalid risk level '{risk_level}'. Must be one of: low, medium, high, critical"
         ))),
     }
 }
@@ -292,8 +291,7 @@ fn validate_risk_level(risk_level: &str) -> CliResult<()> {
 fn parse_tool_id(id_str: &str) -> CliResult<Uuid> {
     Uuid::parse_str(id_str).map_err(|_| {
         CliError::Validation(format!(
-            "Invalid tool ID '{}'. Must be a valid UUID.",
-            id_str
+            "Invalid tool ID '{id_str}'. Must be a valid UUID."
         ))
     })
 }
@@ -301,7 +299,7 @@ fn parse_tool_id(id_str: &str) -> CliResult<Uuid> {
 /// Parse JSON schema from string
 fn parse_json_schema(schema_str: &str) -> CliResult<serde_json::Value> {
     serde_json::from_str(schema_str)
-        .map_err(|e| CliError::Validation(format!("Invalid JSON schema: {}", e)))
+        .map_err(|e| CliError::Validation(format!("Invalid JSON schema: {e}")))
 }
 
 /// Interactive prompt for risk level
@@ -379,7 +377,7 @@ fn print_tool_details(tool: &ToolResponse) {
     println!("ID:                {}", tool.id);
 
     if let Some(ref category) = tool.category {
-        println!("Category:          {}", category);
+        println!("Category:          {category}");
     }
 
     println!("Risk Level:        {}", tool.risk_level);
@@ -390,11 +388,11 @@ fn print_tool_details(tool: &ToolResponse) {
     println!("Status:            {}", tool.status);
 
     if let Some(ref desc) = tool.description {
-        println!("Description:       {}", desc);
+        println!("Description:       {desc}");
     }
 
     if let Some(ref provider) = tool.provider {
-        println!("Provider:          {}", provider);
+        println!("Provider:          {provider}");
         println!(
             "Provider Verified: {}",
             if tool.provider_verified { "Yes" } else { "No" }
@@ -402,7 +400,7 @@ fn print_tool_details(tool: &ToolResponse) {
     }
 
     if let Some(max_calls) = tool.max_calls_per_hour {
-        println!("Max Calls/Hour:    {}", max_calls);
+        println!("Max Calls/Hour:    {max_calls}");
     }
 
     println!(

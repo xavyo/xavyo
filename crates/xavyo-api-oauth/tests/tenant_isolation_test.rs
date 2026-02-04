@@ -6,11 +6,11 @@
 //! - Authorization requests must match tenant context
 //!
 //! Run with:
-//! cargo test -p xavyo-api-oauth --features integration --test tenant_isolation_test
+//! cargo test -p xavyo-api-oauth --features integration --test `tenant_isolation_test`
 //!
 //! Prerequisites:
-//! - PostgreSQL running with migrations applied
-//! - DATABASE_URL and DATABASE_URL_SUPERUSER environment variables set
+//! - `PostgreSQL` running with migrations applied
+//! - `DATABASE_URL` and `DATABASE_URL_SUPERUSER` environment variables set
 
 mod common;
 

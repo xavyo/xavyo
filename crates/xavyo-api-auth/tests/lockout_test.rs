@@ -14,7 +14,7 @@ fn test_default_lockout_policy() {
     assert!(!policy.notify_on_lockout);
 }
 
-/// Test lockout policy is_enabled check.
+/// Test lockout policy `is_enabled` check.
 #[test]
 fn test_lockout_policy_is_enabled() {
     let mut policy = TenantLockoutPolicy::default();
@@ -24,7 +24,7 @@ fn test_lockout_policy_is_enabled() {
     assert!(!policy.is_enabled());
 }
 
-/// Test lockout policy is_permanent_lockout check.
+/// Test lockout policy `is_permanent_lockout` check.
 #[test]
 fn test_lockout_policy_is_permanent() {
     let mut policy = TenantLockoutPolicy::default();

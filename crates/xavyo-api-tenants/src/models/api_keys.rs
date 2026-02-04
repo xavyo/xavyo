@@ -17,7 +17,7 @@ pub struct RotateApiKeyRequest {
     pub deactivate_old_immediately: Option<bool>,
 
     /// Grace period in hours before the old key is deactivated.
-    /// Default: 24 hours. Only applies if deactivate_old_immediately is false.
+    /// Default: 24 hours. Only applies if `deactivate_old_immediately` is false.
     #[serde(default)]
     #[schema(example = 24)]
     pub grace_period_hours: Option<u32>,
@@ -30,6 +30,7 @@ pub struct RotateApiKeyRequest {
 
 impl RotateApiKeyRequest {
     /// Validate the request.
+    #[must_use] 
     pub fn validate(&self) -> Option<String> {
         if let Some(hours) = self.grace_period_hours {
             if hours == 0 {

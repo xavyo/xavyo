@@ -174,10 +174,10 @@ impl GovStateTransitionRequest {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_state_transition_requests
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -192,7 +192,7 @@ impl GovStateTransitionRequest {
         id: Uuid,
     ) -> Result<Option<GovStateTransitionRequestWithStates>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT
                 r.id, r.tenant_id, r.config_id, r.transition_id, t.name as transition_name,
                 r.object_id, r.object_type, r.from_state_id, fs.name as from_state_name,
@@ -205,7 +205,7 @@ impl GovStateTransitionRequest {
             JOIN gov_lifecycle_states fs ON r.from_state_id = fs.id
             JOIN gov_lifecycle_states ts ON r.to_state_id = ts.id
             WHERE r.id = $1 AND r.tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -220,12 +220,12 @@ impl GovStateTransitionRequest {
         object_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_state_transition_requests
             WHERE object_id = $1 AND tenant_id = $2
             ORDER BY created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(object_id)
         .bind(tenant_id)
@@ -240,14 +240,14 @@ impl GovStateTransitionRequest {
         object_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_state_transition_requests
             WHERE object_id = $1 AND tenant_id = $2
             AND rollback_available = true
             AND grace_period_ends_at > NOW()
             ORDER BY created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(object_id)
         .bind(tenant_id)
@@ -262,11 +262,11 @@ impl GovStateTransitionRequest {
         approval_request_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_state_transition_requests
             WHERE approval_request_id = $1 AND tenant_id = $2
             AND status = 'pending_approval'
-            "#,
+            ",
         )
         .bind(approval_request_id)
         .bind(tenant_id)
@@ -283,36 +283,36 @@ impl GovStateTransitionRequest {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_state_transition_requests
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_num = 2;
 
         if filter.object_id.is_some() {
-            query.push_str(&format!(" AND object_id = ${}", param_num));
+            query.push_str(&format!(" AND object_id = ${param_num}"));
             param_num += 1;
         }
 
         if filter.object_type.is_some() {
-            query.push_str(&format!(" AND object_type = ${}", param_num));
+            query.push_str(&format!(" AND object_type = ${param_num}"));
             param_num += 1;
         }
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_num));
+            query.push_str(&format!(" AND status = ${param_num}"));
             param_num += 1;
         }
 
         if filter.requested_by.is_some() {
-            query.push_str(&format!(" AND requested_by = ${}", param_num));
+            query.push_str(&format!(" AND requested_by = ${param_num}"));
             param_num += 1;
         }
 
         if filter.rollback_available.is_some() {
-            query.push_str(&format!(" AND rollback_available = ${}", param_num));
+            query.push_str(&format!(" AND rollback_available = ${param_num}"));
             param_num += 1;
         }
 
@@ -356,12 +356,12 @@ impl GovStateTransitionRequest {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_state_transition_requests
             WHERE object_id = $1 AND tenant_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(object_id)
         .bind(tenant_id)
@@ -378,36 +378,36 @@ impl GovStateTransitionRequest {
         filter: &TransitionRequestFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_state_transition_requests
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_num = 2;
 
         if filter.object_id.is_some() {
-            query.push_str(&format!(" AND object_id = ${}", param_num));
+            query.push_str(&format!(" AND object_id = ${param_num}"));
             param_num += 1;
         }
 
         if filter.object_type.is_some() {
-            query.push_str(&format!(" AND object_type = ${}", param_num));
+            query.push_str(&format!(" AND object_type = ${param_num}"));
             param_num += 1;
         }
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_num));
+            query.push_str(&format!(" AND status = ${param_num}"));
             param_num += 1;
         }
 
         if filter.requested_by.is_some() {
-            query.push_str(&format!(" AND requested_by = ${}", param_num));
+            query.push_str(&format!(" AND requested_by = ${param_num}"));
             param_num += 1;
         }
 
         if filter.rollback_available.is_some() {
-            query.push_str(&format!(" AND rollback_available = ${}", param_num));
+            query.push_str(&format!(" AND rollback_available = ${param_num}"));
         }
 
         let mut db_query = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -438,13 +438,13 @@ impl GovStateTransitionRequest {
     /// Find requests with expired grace periods that need to be finalized.
     pub async fn find_expired_grace_periods(pool: &sqlx::PgPool) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_state_transition_requests
             WHERE rollback_available = true
             AND grace_period_ends_at <= NOW()
             ORDER BY grace_period_ends_at ASC
             LIMIT 100
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await
@@ -457,14 +457,14 @@ impl GovStateTransitionRequest {
         input: &CreateGovStateTransitionRequest,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_state_transition_requests (
                 tenant_id, config_id, transition_id, object_id, object_type,
                 from_state_id, to_state_id, requested_by, scheduled_for
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.config_id)
@@ -487,7 +487,7 @@ impl GovStateTransitionRequest {
         input: &UpdateGovStateTransitionRequest,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_state_transition_requests
             SET
                 status = COALESCE($3, status),
@@ -499,7 +499,7 @@ impl GovStateTransitionRequest {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -516,11 +516,11 @@ impl GovStateTransitionRequest {
     /// Mark grace period as expired (rollback no longer available).
     pub async fn expire_grace_period(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_state_transition_requests
             SET rollback_available = false, updated_at = NOW()
             WHERE id = $1 AND rollback_available = true
-            "#,
+            ",
         )
         .bind(id)
         .execute(pool)
@@ -536,10 +536,10 @@ impl GovStateTransitionRequest {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_state_transition_requests
             WHERE id = $1 AND tenant_id = $2 AND status IN ('pending', 'cancelled')
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -549,7 +549,7 @@ impl GovStateTransitionRequest {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Expire grace periods for a tenant, marking rollback_available as false.
+    /// Expire grace periods for a tenant, marking `rollback_available` as false.
     ///
     /// Returns the number of records updated.
     pub async fn expire_grace_periods(
@@ -558,7 +558,7 @@ impl GovStateTransitionRequest {
         limit: i64,
     ) -> Result<i64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_state_transition_requests
             SET rollback_available = false, updated_at = NOW()
             WHERE tenant_id = $1
@@ -571,7 +571,7 @@ impl GovStateTransitionRequest {
                 AND grace_period_ends_at <= NOW()
                 LIMIT $2
             )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -584,7 +584,7 @@ impl GovStateTransitionRequest {
     /// Expire grace periods and return the affected request details.
     ///
     /// This is used when we need to emit events for each expired grace period.
-    /// Returns a list of (request_id, object_id, object_type, to_state_id) tuples.
+    /// Returns a list of (`request_id`, `object_id`, `object_type`, `to_state_id`) tuples.
     pub async fn expire_grace_periods_with_details(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -592,7 +592,7 @@ impl GovStateTransitionRequest {
     ) -> Result<Vec<(Uuid, Uuid, LifecycleObjectType, Uuid)>, sqlx::Error> {
         // First, get the IDs of requests to be expired
         let expired: Vec<(Uuid, Uuid, LifecycleObjectType, Uuid)> = sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_state_transition_requests
             SET rollback_available = false, updated_at = NOW()
             WHERE tenant_id = $1
@@ -606,7 +606,7 @@ impl GovStateTransitionRequest {
                 LIMIT $2
             )
             RETURNING id, object_id, object_type, to_state_id
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -621,11 +621,11 @@ impl GovStateTransitionRequest {
         pool: &sqlx::PgPool,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT tenant_id FROM gov_state_transition_requests
             WHERE rollback_available = true
             AND grace_period_ends_at <= NOW()
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await

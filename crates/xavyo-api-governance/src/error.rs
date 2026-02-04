@@ -187,38 +187,38 @@ impl IntoResponse for ApiGovernanceError {
             Self::StepNotFound(id) => (
                 StatusCode::NOT_FOUND,
                 "step_not_found",
-                format!("Approval step not found: {}", id),
+                format!("Approval step not found: {id}"),
             ),
             Self::MicroCertificationNotFound(id) => (
                 StatusCode::NOT_FOUND,
                 "micro_certification_not_found",
-                format!("Micro-certification not found: {}", id),
+                format!("Micro-certification not found: {id}"),
             ),
             Self::MicroCertTriggerNotFound(id) => (
                 StatusCode::NOT_FOUND,
                 "micro_cert_trigger_not_found",
-                format!("Micro-certification trigger rule not found: {}", id),
+                format!("Micro-certification trigger rule not found: {id}"),
             ),
             // Semi-manual Resources errors (F064)
             Self::TicketingConfigurationNotFound(id) => (
                 StatusCode::NOT_FOUND,
                 "ticketing_configuration_not_found",
-                format!("Ticketing configuration not found: {}", id),
+                format!("Ticketing configuration not found: {id}"),
             ),
             Self::SlaPolicyNotFound(id) => (
                 StatusCode::NOT_FOUND,
                 "sla_policy_not_found",
-                format!("SLA policy not found: {}", id),
+                format!("SLA policy not found: {id}"),
             ),
             Self::ManualProvisioningTaskNotFound(id) => (
                 StatusCode::NOT_FOUND,
                 "manual_provisioning_task_not_found",
-                format!("Manual provisioning task not found: {}", id),
+                format!("Manual provisioning task not found: {id}"),
             ),
             Self::ExternalTicketNotFound(id) => (
                 StatusCode::NOT_FOUND,
                 "external_ticket_not_found",
-                format!("External ticket not found: {}", id),
+                format!("External ticket not found: {id}"),
             ),
             Self::TicketingIntegrationFailed(msg) => (
                 StatusCode::BAD_GATEWAY,
@@ -228,19 +228,18 @@ impl IntoResponse for ApiGovernanceError {
             Self::TaskAlreadyCompleted(id) => (
                 StatusCode::CONFLICT,
                 "task_already_completed",
-                format!("Task is already completed: {}", id),
+                format!("Task is already completed: {id}"),
             ),
             Self::InvalidTaskStatusTransition { from, to } => (
                 StatusCode::BAD_REQUEST,
                 "invalid_task_status_transition",
-                format!("Invalid task status transition from {} to {}", from, to),
+                format!("Invalid task status transition from {from} to {to}"),
             ),
             Self::ApplicationNotSemiManual(id) => (
                 StatusCode::BAD_REQUEST,
                 "application_not_semi_manual",
                 format!(
-                    "Application {} is not configured for semi-manual provisioning",
-                    id
+                    "Application {id} is not configured for semi-manual provisioning"
                 ),
             ),
             Self::TicketCreationFailed(msg) => (
@@ -254,7 +253,7 @@ impl IntoResponse for ApiGovernanceError {
             Self::SlaBreached(id) => (
                 StatusCode::CONFLICT,
                 "sla_breached",
-                format!("SLA breach detected for task {}", id),
+                format!("SLA breach detected for task {id}"),
             ),
             Self::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg.clone()),
             Self::Internal(msg) => (

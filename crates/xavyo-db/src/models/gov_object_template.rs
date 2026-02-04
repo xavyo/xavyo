@@ -95,10 +95,10 @@ impl GovObjectTemplate {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_object_templates
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -113,10 +113,10 @@ impl GovObjectTemplate {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_object_templates
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -131,11 +131,11 @@ impl GovObjectTemplate {
         object_type: TemplateObjectType,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_object_templates
             WHERE tenant_id = $1 AND status = 'active' AND object_type = $2
             ORDER BY priority ASC, name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(object_type)
@@ -156,27 +156,27 @@ impl GovObjectTemplate {
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.object_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND object_type = ${}", param_count));
+            query.push_str(&format!(" AND object_type = ${param_count}"));
         }
         if filter.name_contains.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${}", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count}"));
         }
         if filter.priority_min.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND priority >= ${}", param_count));
+            query.push_str(&format!(" AND priority >= ${param_count}"));
         }
         if filter.priority_max.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND priority <= ${}", param_count));
+            query.push_str(&format!(" AND priority <= ${param_count}"));
         }
         if filter.parent_template_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND parent_template_id = ${}", param_count));
+            query.push_str(&format!(" AND parent_template_id = ${param_count}"));
         }
         if let Some(include_orphans) = filter.include_orphans {
             if !include_orphans {
@@ -199,7 +199,7 @@ impl GovObjectTemplate {
             q = q.bind(object_type);
         }
         if let Some(ref name_contains) = filter.name_contains {
-            q = q.bind(format!("%{}%", name_contains));
+            q = q.bind(format!("%{name_contains}%"));
         }
         if let Some(priority_min) = filter.priority_min {
             q = q.bind(priority_min);
@@ -226,27 +226,27 @@ impl GovObjectTemplate {
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.object_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND object_type = ${}", param_count));
+            query.push_str(&format!(" AND object_type = ${param_count}"));
         }
         if filter.name_contains.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${}", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count}"));
         }
         if filter.priority_min.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND priority >= ${}", param_count));
+            query.push_str(&format!(" AND priority >= ${param_count}"));
         }
         if filter.priority_max.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND priority <= ${}", param_count));
+            query.push_str(&format!(" AND priority <= ${param_count}"));
         }
         if filter.parent_template_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND parent_template_id = ${}", param_count));
+            query.push_str(&format!(" AND parent_template_id = ${param_count}"));
         }
         if let Some(include_orphans) = filter.include_orphans {
             if !include_orphans {
@@ -263,7 +263,7 @@ impl GovObjectTemplate {
             q = q.bind(object_type);
         }
         if let Some(ref name_contains) = filter.name_contains {
-            q = q.bind(format!("%{}%", name_contains));
+            q = q.bind(format!("%{name_contains}%"));
         }
         if let Some(priority_min) = filter.priority_min {
             q = q.bind(priority_min);
@@ -288,14 +288,14 @@ impl GovObjectTemplate {
         let priority = input.priority.unwrap_or(DEFAULT_TEMPLATE_PRIORITY);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_object_templates (
                 tenant_id, name, description, object_type, priority,
                 parent_template_id, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -320,19 +320,19 @@ impl GovObjectTemplate {
 
         if input.name.is_some() {
             param_count += 1;
-            updates.push(format!("name = ${}", param_count));
+            updates.push(format!("name = ${param_count}"));
         }
         if input.description.is_some() {
             param_count += 1;
-            updates.push(format!("description = ${}", param_count));
+            updates.push(format!("description = ${param_count}"));
         }
         if input.priority.is_some() {
             param_count += 1;
-            updates.push(format!("priority = ${}", param_count));
+            updates.push(format!("priority = ${param_count}"));
         }
         if input.parent_template_id.is_some() {
             param_count += 1;
-            updates.push(format!("parent_template_id = ${}", param_count));
+            updates.push(format!("parent_template_id = ${param_count}"));
         }
 
         if updates.is_empty() {
@@ -370,12 +370,12 @@ impl GovObjectTemplate {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_object_templates
             SET status = 'active', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'draft'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -390,12 +390,12 @@ impl GovObjectTemplate {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_object_templates
             SET status = 'disabled', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -410,12 +410,12 @@ impl GovObjectTemplate {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_object_templates
             SET status = 'active', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'disabled'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -430,10 +430,10 @@ impl GovObjectTemplate {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_object_templates
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -450,11 +450,11 @@ impl GovObjectTemplate {
         parent_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_object_templates
             WHERE tenant_id = $1 AND parent_template_id = $2
             ORDER BY priority ASC, name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(parent_id)
@@ -469,10 +469,10 @@ impl GovObjectTemplate {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_object_templates
             WHERE tenant_id = $1 AND parent_template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -489,7 +489,7 @@ impl GovObjectTemplate {
         id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             WITH RECURSIVE ancestors AS (
                 SELECT * FROM gov_object_templates
                 WHERE id = $1 AND tenant_id = $2
@@ -500,7 +500,7 @@ impl GovObjectTemplate {
             )
             SELECT * FROM ancestors WHERE id != $1
             ORDER BY id
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -509,16 +509,19 @@ impl GovObjectTemplate {
     }
 
     /// Check if template is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         self.status == ObjectTemplateStatus::Active
     }
 
     /// Check if template is draft.
+    #[must_use] 
     pub fn is_draft(&self) -> bool {
         self.status == ObjectTemplateStatus::Draft
     }
 
     /// Check if template is disabled.
+    #[must_use] 
     pub fn is_disabled(&self) -> bool {
         self.status == ObjectTemplateStatus::Disabled
     }

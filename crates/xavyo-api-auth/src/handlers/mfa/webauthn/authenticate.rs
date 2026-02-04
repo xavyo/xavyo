@@ -1,6 +1,6 @@
-//! WebAuthn authentication handlers.
+//! `WebAuthn` authentication handlers.
 //!
-//! Handles the two-step WebAuthn authentication process for MFA.
+//! Handles the two-step `WebAuthn` authentication process for MFA.
 
 use axum::{extract::State, http::StatusCode, Extension, Json};
 use serde::{Deserialize, Serialize};
@@ -14,28 +14,28 @@ use xavyo_webhooks::{EventPublisher, WebhookEvent};
 
 use crate::{error::ApiAuthError, router::AuthState};
 
-/// Response containing WebAuthn authentication options.
+/// Response containing `WebAuthn` authentication options.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct AuthenticationOptionsResponse {
-    /// The authentication options to pass to navigator.credentials.get().
-    /// This is the WebAuthn PublicKeyCredentialRequestOptions structure.
+    /// The authentication options to pass to `navigator.credentials.get()`.
+    /// This is the `WebAuthn` `PublicKeyCredentialRequestOptions` structure.
     #[serde(flatten)]
     #[schema(value_type = Object)]
     pub options: RequestChallengeResponse,
 }
 
-/// Request to finish WebAuthn authentication.
-/// Contains the authenticator's response from navigator.credentials.get().
+/// Request to finish `WebAuthn` authentication.
+/// Contains the authenticator's response from `navigator.credentials.get()`.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct FinishAuthenticationRequest {
     /// The credential assertion response from the authenticator.
-    /// This is the WebAuthn PublicKeyCredential structure returned by navigator.credentials.get().
+    /// This is the `WebAuthn` `PublicKeyCredential` structure returned by `navigator.credentials.get()`.
     #[serde(flatten)]
     #[schema(value_type = Object)]
     pub credential: PublicKeyCredential,
 }
 
-/// Response after successful WebAuthn authentication.
+/// Response after successful `WebAuthn` authentication.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct AuthenticationSuccessResponse {
     /// Success message.
@@ -46,9 +46,9 @@ pub struct AuthenticationSuccessResponse {
 
 /// POST /auth/mfa/webauthn/authenticate/start
 ///
-/// Start WebAuthn authentication for MFA.
+/// Start `WebAuthn` authentication for MFA.
 /// Requires a valid partial token from the login flow.
-/// Returns challenge and allowed credentials for navigator.credentials.get().
+/// Returns challenge and allowed credentials for `navigator.credentials.get()`.
 #[utoipa::path(
     post,
     path = "/auth/mfa/webauthn/authenticate/start",
@@ -91,7 +91,7 @@ pub async fn start_webauthn_authentication(
 
 /// POST /auth/mfa/webauthn/authenticate/finish
 ///
-/// Complete WebAuthn authentication for MFA.
+/// Complete `WebAuthn` authentication for MFA.
 /// Verifies the authenticator assertion and returns full tokens on success.
 #[utoipa::path(
     post,

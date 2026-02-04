@@ -60,10 +60,10 @@ impl GovAccessPattern {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_access_patterns
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -81,20 +81,20 @@ impl GovAccessPattern {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_access_patterns
             WHERE tenant_id = $1 AND job_id = $2
-            "#,
+            ",
         );
         let mut param_count = 2;
 
         if filter.min_frequency.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND frequency >= ${}", param_count));
+            query.push_str(&format!(" AND frequency >= ${param_count}"));
         }
         if filter.min_users.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_count >= ${}", param_count));
+            query.push_str(&format!(" AND user_count >= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -125,20 +125,20 @@ impl GovAccessPattern {
         filter: &AccessPatternFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_access_patterns
             WHERE tenant_id = $1 AND job_id = $2
-            "#,
+            ",
         );
         let mut param_count = 2;
 
         if filter.min_frequency.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND frequency >= ${}", param_count));
+            query.push_str(&format!(" AND frequency >= ${param_count}"));
         }
         if filter.min_users.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_count >= ${}", param_count));
+            query.push_str(&format!(" AND user_count >= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query)
@@ -162,14 +162,14 @@ impl GovAccessPattern {
         input: CreateAccessPattern,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_access_patterns (
                 tenant_id, job_id, entitlement_ids, frequency,
                 user_count, sample_user_ids
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.job_id)
@@ -202,10 +202,10 @@ impl GovAccessPattern {
         job_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_access_patterns
             WHERE tenant_id = $1 AND job_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(job_id)

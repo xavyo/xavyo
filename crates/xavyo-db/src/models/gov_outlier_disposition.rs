@@ -87,10 +87,10 @@ impl GovOutlierDisposition {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_outlier_dispositions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -105,10 +105,10 @@ impl GovOutlierDisposition {
         result_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_outlier_dispositions
             WHERE result_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(result_id)
         .bind(tenant_id)
@@ -123,12 +123,12 @@ impl GovOutlierDisposition {
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_outlier_dispositions
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -149,15 +149,15 @@ impl GovOutlierDisposition {
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.reviewed_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND reviewed_by = ${}", param_count));
+            query.push_str(&format!(" AND reviewed_by = ${param_count}"));
         }
         if !filter.include_expired {
             query.push_str(" AND (expires_at IS NULL OR expires_at > NOW())");
@@ -196,15 +196,15 @@ impl GovOutlierDisposition {
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.reviewed_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND reviewed_by = ${}", param_count));
+            query.push_str(&format!(" AND reviewed_by = ${param_count}"));
         }
         if !filter.include_expired {
             query.push_str(" AND (expires_at IS NULL OR expires_at > NOW())");
@@ -231,7 +231,7 @@ impl GovOutlierDisposition {
         tenant_id: Uuid,
     ) -> Result<DispositionSummary, sqlx::Error> {
         let row: (i64, i64, i64, i64, i64) = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 COUNT(*) FILTER (WHERE status = 'new') as new_count,
                 COUNT(*) FILTER (WHERE status = 'legitimate') as legitimate_count,
@@ -240,7 +240,7 @@ impl GovOutlierDisposition {
                 COUNT(*) FILTER (WHERE status = 'remediated') as remediated_count
             FROM gov_outlier_dispositions
             WHERE tenant_id = $1 AND (expires_at IS NULL OR expires_at > NOW())
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -262,11 +262,11 @@ impl GovOutlierDisposition {
         input: CreateDisposition,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_outlier_dispositions (tenant_id, result_id, user_id)
             VALUES ($1, $2, $3)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.result_id)
@@ -289,13 +289,13 @@ impl GovOutlierDisposition {
         }
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_outlier_dispositions
             SET status = $3, justification = $4, reviewed_by = $5,
                 reviewed_at = NOW(), expires_at = $6, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -314,11 +314,11 @@ impl GovOutlierDisposition {
         user_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_outlier_dispositions
             SET status = 'new', updated_at = NOW()
             WHERE tenant_id = $1 AND user_id = $2 AND status = 'legitimate'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -328,20 +328,20 @@ impl GovOutlierDisposition {
         Ok(result.rows_affected())
     }
 
-    /// Find dispositions pending review (New or RequiresRemediation).
+    /// Find dispositions pending review (New or `RequiresRemediation`).
     pub async fn find_pending_review(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_outlier_dispositions
             WHERE tenant_id = $1 AND status IN ('new', 'requires_remediation')
                 AND (expires_at IS NULL OR expires_at > NOW())
             ORDER BY created_at ASC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -356,13 +356,13 @@ impl GovOutlierDisposition {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_outlier_dispositions
             WHERE tenant_id = $1 AND status = 'legitimate'
                 AND expires_at IS NOT NULL AND expires_at <= NOW()
             ORDER BY expires_at ASC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -377,10 +377,10 @@ impl GovOutlierDisposition {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_outlier_dispositions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -391,11 +391,13 @@ impl GovOutlierDisposition {
     }
 
     /// Check if this disposition requires attention.
+    #[must_use] 
     pub fn requires_attention(&self) -> bool {
         self.status.requires_attention()
     }
 
     /// Check if this disposition has expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
             expires_at <= Utc::now()

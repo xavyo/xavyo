@@ -46,7 +46,7 @@ impl LocalAssetStorage {
     ///
     /// # Arguments
     /// * `base_path` - Directory where assets will be stored
-    /// * `url_prefix` - URL prefix for serving assets (e.g., "/assets" or "https://cdn.example.com")
+    /// * `url_prefix` - URL prefix for serving assets (e.g., "/assets" or "<https://cdn.example.com>")
     pub fn new(base_path: impl AsRef<Path>, url_prefix: impl Into<String>) -> Self {
         Self {
             base_path: base_path.as_ref().to_path_buf(),
@@ -58,14 +58,14 @@ impl LocalAssetStorage {
     fn get_file_path(&self, tenant_id: TenantId, asset_id: Uuid, extension: &str) -> PathBuf {
         self.base_path
             .join(tenant_id.to_string())
-            .join(format!("{}.{}", asset_id, extension))
+            .join(format!("{asset_id}.{extension}"))
     }
 
     /// Ensure the tenant directory exists.
     async fn ensure_tenant_dir(&self, tenant_id: TenantId) -> Result<(), ApiAuthError> {
         let dir = self.base_path.join(tenant_id.to_string());
         fs::create_dir_all(&dir).await.map_err(|e| {
-            ApiAuthError::Internal(format!("Failed to create asset directory: {}", e))
+            ApiAuthError::Internal(format!("Failed to create asset directory: {e}"))
         })?;
         Ok(())
     }
@@ -77,7 +77,7 @@ impl LocalAssetStorage {
     /// - Contain exactly one `/`
     /// - Have valid UUIDs for tenant and asset
     /// - Not contain `..`, `./`, or other traversal sequences
-    /// - Result in a path that stays within base_path when canonicalized
+    /// - Result in a path that stays within `base_path` when canonicalized
     fn validate_storage_path(&self, storage_path: &str) -> Result<PathBuf, ApiAuthError> {
         // Check for path traversal patterns
         if storage_path.contains("..")
@@ -190,10 +190,10 @@ impl AssetStorage for LocalAssetStorage {
         // Write file
         fs::write(&file_path, data)
             .await
-            .map_err(|e| ApiAuthError::Internal(format!("Failed to write asset file: {}", e)))?;
+            .map_err(|e| ApiAuthError::Internal(format!("Failed to write asset file: {e}")))?;
 
         // Return relative storage path
-        let storage_path = format!("{}/{}.{}", tenant_id, asset_id, extension);
+        let storage_path = format!("{tenant_id}/{asset_id}.{extension}");
         Ok(storage_path)
     }
 
@@ -203,7 +203,7 @@ impl AssetStorage for LocalAssetStorage {
 
         if file_path.exists() {
             fs::remove_file(&file_path).await.map_err(|e| {
-                ApiAuthError::Internal(format!("Failed to delete asset file: {}", e))
+                ApiAuthError::Internal(format!("Failed to delete asset file: {e}"))
             })?;
         }
 

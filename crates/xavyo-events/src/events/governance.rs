@@ -2,7 +2,7 @@
 //!
 //! Events for governance operations that can trigger micro-certifications:
 //! - Entitlement assignment events (high-risk assignment trigger)
-//! - SoD violation events (SoD violation trigger)
+//! - `SoD` violation events (`SoD` violation trigger)
 //!
 //! These events are consumed by micro-certification consumers to automatically
 //! create certifications when relevant governance actions occur.
@@ -64,16 +64,16 @@ impl Event for EntitlementAssignmentRevoked {
     const EVENT_TYPE: &'static str = "xavyo.governance.assignment.revoked";
 }
 
-/// Published when an SoD violation is detected.
+/// Published when an `SoD` violation is detected.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SodViolationDetected {
     /// The violation ID.
     pub violation_id: Uuid,
     /// The tenant ID.
     pub tenant_id: Uuid,
-    /// The SoD rule that was violated.
+    /// The `SoD` rule that was violated.
     pub rule_id: Uuid,
-    /// The SoD rule name.
+    /// The `SoD` rule name.
     pub rule_name: String,
     /// The user who has the violation.
     pub user_id: Uuid,
@@ -83,7 +83,7 @@ pub struct SodViolationDetected {
     pub entitlement_b_id: Uuid,
     /// The assignment that triggered the violation.
     pub triggering_assignment_id: Uuid,
-    /// The severity of the SoD rule.
+    /// The severity of the `SoD` rule.
     pub severity: String,
     /// When the violation was detected.
     pub detected_at: DateTime<Utc>,
@@ -94,14 +94,14 @@ impl Event for SodViolationDetected {
     const EVENT_TYPE: &'static str = "xavyo.governance.sod.violation_detected";
 }
 
-/// Published when an SoD violation is resolved (exemption granted or assignment revoked).
+/// Published when an `SoD` violation is resolved (exemption granted or assignment revoked).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SodViolationResolved {
     /// The violation ID.
     pub violation_id: Uuid,
     /// The tenant ID.
     pub tenant_id: Uuid,
-    /// The SoD rule that was violated.
+    /// The `SoD` rule that was violated.
     pub rule_id: Uuid,
     /// The user who had the violation.
     pub user_id: Uuid,
@@ -118,7 +118,7 @@ impl Event for SodViolationResolved {
     const EVENT_TYPE: &'static str = "xavyo.governance.sod.violation_resolved";
 }
 
-/// How an SoD violation was resolved.
+/// How an `SoD` violation was resolved.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SodResolutionType {

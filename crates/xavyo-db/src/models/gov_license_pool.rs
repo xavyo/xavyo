@@ -72,26 +72,31 @@ pub struct GovLicensePool {
 
 impl GovLicensePool {
     /// Get the number of available (unallocated) licenses.
+    #[must_use] 
     pub fn available_count(&self) -> i32 {
         self.total_capacity - self.allocated_count
     }
 
     /// Check if the pool has available capacity.
+    #[must_use] 
     pub fn has_capacity(&self) -> bool {
         self.available_count() > 0
     }
 
     /// Check if the pool is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self.status, LicensePoolStatus::Active)
     }
 
     /// Check if the pool is expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         matches!(self.status, LicensePoolStatus::Expired)
     }
 
-    /// Check if new allocations are blocked (expired with block_new policy or no capacity).
+    /// Check if new allocations are blocked (expired with `block_new` policy or no capacity).
+    #[must_use] 
     pub fn is_allocation_blocked(&self) -> bool {
         if self.is_expired() && self.expiration_policy == LicenseExpirationPolicy::BlockNew {
             return true;
@@ -100,14 +105,16 @@ impl GovLicensePool {
     }
 
     /// Get utilization percentage.
+    #[must_use] 
     pub fn utilization_percent(&self) -> f64 {
         if self.total_capacity == 0 {
             return 0.0;
         }
-        (self.allocated_count as f64 / self.total_capacity as f64) * 100.0
+        (f64::from(self.allocated_count) / f64::from(self.total_capacity)) * 100.0
     }
 
     /// Calculate monthly cost based on allocated licenses.
+    #[must_use] 
     pub fn monthly_allocated_cost(&self) -> Option<Decimal> {
         self.cost_per_license.map(|cost| {
             let count = Decimal::from(self.allocated_count);
@@ -120,10 +127,11 @@ impl GovLicensePool {
     }
 
     /// Check if expiration warning should be shown.
+    #[must_use] 
     pub fn should_show_expiration_warning(&self) -> bool {
         if let Some(expiration) = self.expiration_date {
             let now = Utc::now();
-            let warning_threshold = expiration - chrono::Duration::days(self.warning_days as i64);
+            let warning_threshold = expiration - chrono::Duration::days(i64::from(self.warning_days));
             now >= warning_threshold && now < expiration
         } else {
             false
@@ -137,10 +145,10 @@ impl GovLicensePool {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_pools
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -155,10 +163,10 @@ impl GovLicensePool {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_pools
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -175,24 +183,24 @@ impl GovLicensePool {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_license_pools
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.vendor.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND vendor = ${}", param_count));
+            query.push_str(&format!(" AND vendor = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.license_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND license_type = ${}", param_count));
+            query.push_str(&format!(" AND license_type = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -223,24 +231,24 @@ impl GovLicensePool {
         filter: &LicensePoolFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_license_pools
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.vendor.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND vendor = ${}", param_count));
+            query.push_str(&format!(" AND vendor = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.license_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND license_type = ${}", param_count));
+            query.push_str(&format!(" AND license_type = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -265,7 +273,7 @@ impl GovLicensePool {
         input: CreateGovLicensePool,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_license_pools (
                 tenant_id, name, vendor, description, total_capacity,
                 cost_per_license, currency, billing_period, license_type,
@@ -273,7 +281,7 @@ impl GovLicensePool {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -303,43 +311,43 @@ impl GovLicensePool {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.vendor.is_some() {
-            updates.push(format!("vendor = ${}", param_idx));
+            updates.push(format!("vendor = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.total_capacity.is_some() {
-            updates.push(format!("total_capacity = ${}", param_idx));
+            updates.push(format!("total_capacity = ${param_idx}"));
             param_idx += 1;
         }
         if input.cost_per_license.is_some() {
-            updates.push(format!("cost_per_license = ${}", param_idx));
+            updates.push(format!("cost_per_license = ${param_idx}"));
             param_idx += 1;
         }
         if input.currency.is_some() {
-            updates.push(format!("currency = ${}", param_idx));
+            updates.push(format!("currency = ${param_idx}"));
             param_idx += 1;
         }
         if input.billing_period.is_some() {
-            updates.push(format!("billing_period = ${}", param_idx));
+            updates.push(format!("billing_period = ${param_idx}"));
             param_idx += 1;
         }
         if input.expiration_date.is_some() {
-            updates.push(format!("expiration_date = ${}", param_idx));
+            updates.push(format!("expiration_date = ${param_idx}"));
             param_idx += 1;
         }
         if input.expiration_policy.is_some() {
-            updates.push(format!("expiration_policy = ${}", param_idx));
+            updates.push(format!("expiration_policy = ${param_idx}"));
             param_idx += 1;
         }
         if input.warning_days.is_some() {
-            updates.push(format!("warning_days = ${}", param_idx));
+            updates.push(format!("warning_days = ${param_idx}"));
             let _ = param_idx;
         }
 
@@ -393,12 +401,12 @@ impl GovLicensePool {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_license_pools
             SET status = 'archived', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -413,10 +421,10 @@ impl GovLicensePool {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_license_pools
             WHERE id = $1 AND tenant_id = $2 AND allocated_count = 0
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -434,14 +442,14 @@ impl GovLicensePool {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_license_pools
             SET allocated_count = allocated_count + 1, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
               AND allocated_count < total_capacity
               AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -456,12 +464,12 @@ impl GovLicensePool {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_license_pools
             SET allocated_count = allocated_count - 1, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND allocated_count > 0
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -476,12 +484,12 @@ impl GovLicensePool {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_license_pools
             SET status = 'expired', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -496,7 +504,7 @@ impl GovLicensePool {
         days: i32,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_pools
             WHERE tenant_id = $1
               AND status = 'active'
@@ -504,7 +512,7 @@ impl GovLicensePool {
               AND expiration_date <= NOW() + INTERVAL '1 day' * $2
               AND expiration_date > NOW()
             ORDER BY expiration_date ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(days)
@@ -518,13 +526,13 @@ impl GovLicensePool {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_pools
             WHERE tenant_id = $1
               AND status = 'active'
               AND expiration_date IS NOT NULL
               AND expiration_date <= NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -537,11 +545,11 @@ impl GovLicensePool {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_pools
             WHERE tenant_id = $1 AND status = 'active'
             ORDER BY name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -555,11 +563,11 @@ impl GovLicensePool {
         vendor: &str,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_pools
             WHERE tenant_id = $1 AND vendor = $2
             ORDER BY name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(vendor)

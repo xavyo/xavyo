@@ -13,7 +13,7 @@ use crate::error::ApiUsersError;
 /// Maximum allowed hierarchy depth (10 levels).
 const MAX_DEPTH: i32 = 10;
 
-/// Allowed group_type values.
+/// Allowed `group_type` values.
 const ALLOWED_GROUP_TYPES: &[&str] = &[
     "organizational_unit",
     "department",
@@ -31,11 +31,12 @@ pub struct GroupHierarchyService {
 
 impl GroupHierarchyService {
     /// Create a new hierarchy service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
-    /// Validate that a group_type value is one of the allowed types.
+    /// Validate that a `group_type` value is one of the allowed types.
     pub fn validate_group_type(group_type: &str) -> Result<(), ApiUsersError> {
         if ALLOWED_GROUP_TYPES.contains(&group_type) {
             Ok(())
@@ -55,7 +56,7 @@ impl GroupHierarchyService {
         group_id: Uuid,
     ) -> Result<i32, ApiUsersError> {
         let result: Option<(Option<i64>,)> = sqlx::query_as(
-            r#"
+            r"
             WITH RECURSIVE depth_calc AS (
                 SELECT id, parent_id, 1 AS depth
                 FROM groups
@@ -69,7 +70,7 @@ impl GroupHierarchyService {
                 WHERE g.tenant_id = $1
             )
             SELECT MAX(depth) AS group_depth FROM depth_calc
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -82,10 +83,10 @@ impl GroupHierarchyService {
         }
     }
 
-    /// Check if setting new_parent_id as the parent of group_id would create a cycle.
+    /// Check if setting `new_parent_id` as the parent of `group_id` would create a cycle.
     ///
-    /// A cycle would occur if group_id is an ancestor of new_parent_id (i.e., new_parent_id
-    /// is already a descendant of group_id).
+    /// A cycle would occur if `group_id` is an ancestor of `new_parent_id` (i.e., `new_parent_id`
+    /// is already a descendant of `group_id`).
     pub async fn would_create_cycle(
         &self,
         tenant_id: Uuid,
@@ -93,7 +94,7 @@ impl GroupHierarchyService {
         new_parent_id: Uuid,
     ) -> Result<bool, ApiUsersError> {
         let result: (bool,) = sqlx::query_as(
-            r#"
+            r"
             WITH RECURSIVE ancestors_of_new_parent AS (
                 SELECT id, parent_id
                 FROM groups
@@ -109,7 +110,7 @@ impl GroupHierarchyService {
             SELECT EXISTS (
                 SELECT 1 FROM ancestors_of_new_parent WHERE id = $2
             ) AS would_create_cycle
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -120,8 +121,8 @@ impl GroupHierarchyService {
         Ok(result.0)
     }
 
-    /// Calculate what the depth of group_id would be if moved under new_parent_id.
-    /// Returns the depth of the deepest descendant of group_id in the new position.
+    /// Calculate what the depth of `group_id` would be if moved under `new_parent_id`.
+    /// Returns the depth of the deepest descendant of `group_id` in the new position.
     async fn calculate_new_subtree_depth(
         &self,
         tenant_id: Uuid,
@@ -133,7 +134,7 @@ impl GroupHierarchyService {
 
         // Get the maximum depth within the subtree rooted at group_id (relative)
         let result: (Option<i64>,) = sqlx::query_as(
-            r#"
+            r"
             WITH RECURSIVE subtree AS (
                 SELECT id, parent_id, 0 AS relative_depth
                 FROM groups
@@ -147,7 +148,7 @@ impl GroupHierarchyService {
                 WHERE g.tenant_id = $1
             )
             SELECT MAX(relative_depth) AS max_relative_depth FROM subtree
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -204,11 +205,11 @@ impl GroupHierarchyService {
         group_id: Uuid,
     ) -> Result<bool, ApiUsersError> {
         let result: (bool,) = sqlx::query_as(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM groups WHERE tenant_id = $1 AND parent_id = $2
             )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -264,12 +265,12 @@ impl GroupHierarchyService {
         }
 
         let children: Vec<Group> = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM groups
             WHERE tenant_id = $1 AND parent_id = $2
             ORDER BY display_name
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -301,7 +302,7 @@ impl GroupHierarchyService {
         }
 
         let ancestors: Vec<AncestorRow> = sqlx::query_as(
-            r#"
+            r"
             WITH RECURSIVE ancestors AS (
                 SELECT id, parent_id, display_name, group_type, 0 AS depth
                 FROM groups
@@ -318,7 +319,7 @@ impl GroupHierarchyService {
             FROM ancestors
             WHERE id != $2
             ORDER BY depth DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -328,7 +329,7 @@ impl GroupHierarchyService {
         Ok(ancestors)
     }
 
-    /// Get ancestor display_name path from root to the group's immediate parent.
+    /// Get ancestor `display_name` path from root to the group's immediate parent.
     pub async fn get_ancestor_path_names(
         &self,
         tenant_id: Uuid,
@@ -353,7 +354,7 @@ impl GroupHierarchyService {
         }
 
         let descendants: Vec<SubtreeRow> = sqlx::query_as(
-            r#"
+            r"
             WITH RECURSIVE subtree AS (
                 SELECT id, parent_id, display_name, group_type, 0 AS relative_depth
                 FROM groups
@@ -371,7 +372,7 @@ impl GroupHierarchyService {
             WHERE id != $2
             ORDER BY relative_depth, display_name
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -398,12 +399,12 @@ impl GroupHierarchyService {
         offset: i64,
     ) -> Result<(Vec<Group>, bool), ApiUsersError> {
         let roots: Vec<Group> = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM groups
             WHERE tenant_id = $1 AND parent_id IS NULL
             ORDER BY display_name
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit + 1)
@@ -437,7 +438,7 @@ impl GroupHierarchyService {
 
         // Get total count
         let count_result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             WITH RECURSIVE subtree AS (
                 SELECT id FROM groups
                 WHERE id = $2 AND tenant_id = $1
@@ -453,7 +454,7 @@ impl GroupHierarchyService {
             FROM subtree s
             JOIN group_memberships gm ON gm.group_id = s.id AND gm.tenant_id = $1
             JOIN users u ON u.id = gm.user_id AND u.tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -464,7 +465,7 @@ impl GroupHierarchyService {
 
         // Get paginated members
         let members: Vec<SubtreeMemberRow> = sqlx::query_as(
-            r#"
+            r"
             WITH RECURSIVE subtree AS (
                 SELECT id FROM groups
                 WHERE id = $2 AND tenant_id = $1
@@ -482,7 +483,7 @@ impl GroupHierarchyService {
             JOIN users u ON u.id = gm.user_id AND u.tenant_id = $1
             ORDER BY u.email
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -505,12 +506,12 @@ impl GroupHierarchyService {
         let groups = match group_type {
             Some(gt) => {
                 sqlx::query_as::<_, Group>(
-                    r#"
+                    r"
                     SELECT * FROM groups
                     WHERE tenant_id = $1 AND group_type = $2
                     ORDER BY display_name
                     LIMIT $3 OFFSET $4
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(gt)
@@ -521,12 +522,12 @@ impl GroupHierarchyService {
             }
             None => {
                 sqlx::query_as::<_, Group>(
-                    r#"
+                    r"
                     SELECT * FROM groups
                     WHERE tenant_id = $1
                     ORDER BY display_name
                     LIMIT $2 OFFSET $3
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(limit + 1)

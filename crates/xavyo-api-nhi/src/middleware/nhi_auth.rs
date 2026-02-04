@@ -7,7 +7,7 @@
 //! 1. Extracts the Bearer token from the Authorization header
 //! 2. Checks if it's an NHI credential (starts with "xnhi_")
 //! 3. Validates the credential against the database
-//! 4. Inserts NhiAuthContext into request extensions
+//! 4. Inserts `NhiAuthContext` into request extensions
 //!
 //! # Token Format
 //!
@@ -47,13 +47,14 @@ pub struct NhiCredentialService {
 
 impl NhiCredentialService {
     /// Create a new NHI credential service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Validate a credential and return the associated NHI information.
     ///
-    /// Returns (tenant_id, nhi_id, nhi_type) if valid.
+    /// Returns (`tenant_id`, `nhi_id`, `nhi_type`) if valid.
     pub async fn validate(
         &self,
         credential: &str,

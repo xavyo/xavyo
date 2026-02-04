@@ -35,11 +35,11 @@ async fn create_test_credential(
 
     // Try to insert into nhi_credentials table
     let result = sqlx::query(
-        r#"
+        r"
         INSERT INTO nhi_credentials (id, nhi_id, tenant_id, credential_type, secret_hash, is_active, created_at, updated_at)
         VALUES ($1, $2, $3, 'api_key', 'hash_placeholder', $4, $5, $5)
         ON CONFLICT (id) DO NOTHING
-        "#,
+        ",
     )
     .bind(cred_id)
     .bind(sa_id)
@@ -81,12 +81,12 @@ async fn test_list_credentials() {
 
     // Try to list credentials
     let credentials: Vec<CredentialRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT id, nhi_id, tenant_id, is_active
         FROM nhi_credentials
         WHERE nhi_id = $1 AND tenant_id = $2
         ORDER BY created_at DESC
-        "#,
+        ",
     )
     .bind(sa_id)
     .bind(tenant_id)
@@ -125,11 +125,11 @@ async fn test_rotate_credentials() {
 
     // Simulate rotation: deactivate old, create new
     sqlx::query(
-        r#"
+        r"
         UPDATE nhi_credentials
         SET is_active = false, updated_at = NOW()
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(old_cred_id)
     .bind(tenant_id)
@@ -146,11 +146,11 @@ async fn test_rotate_credentials() {
 
     // Verify old is inactive
     let row = sqlx::query(
-        r#"
+        r"
         SELECT is_active
         FROM nhi_credentials
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(old_cred_id)
     .fetch_one(&pool)
@@ -188,11 +188,11 @@ async fn test_revoke_credential() {
 
     // Revoke the first credential
     sqlx::query(
-        r#"
+        r"
         UPDATE nhi_credentials
         SET is_active = false, updated_at = NOW()
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(cred1_id)
     .bind(tenant_id)
@@ -202,11 +202,11 @@ async fn test_revoke_credential() {
 
     // Verify cred1 is inactive
     let row1 = sqlx::query(
-        r#"
+        r"
         SELECT is_active
         FROM nhi_credentials
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(cred1_id)
     .fetch_one(&pool)
@@ -218,11 +218,11 @@ async fn test_revoke_credential() {
 
     // Verify cred2 is still active
     let row2 = sqlx::query(
-        r#"
+        r"
         SELECT is_active
         FROM nhi_credentials
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(cred2_id)
     .fetch_one(&pool)
@@ -258,11 +258,11 @@ async fn test_old_credential_invalid_after_rotation() {
 
     // Simulate full rotation: deactivate all, create new
     sqlx::query(
-        r#"
+        r"
         UPDATE nhi_credentials
         SET is_active = false, updated_at = NOW()
         WHERE nhi_id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id)
     .bind(tenant_id)
@@ -275,11 +275,11 @@ async fn test_old_credential_invalid_after_rotation() {
 
     // Verify old credential is invalid
     let row = sqlx::query(
-        r#"
+        r"
         SELECT is_active
         FROM nhi_credentials
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(old_cred_id)
     .fetch_one(&pool)
@@ -294,11 +294,11 @@ async fn test_old_credential_invalid_after_rotation() {
 
     // Verify only one active credential exists
     let count_row: (i64,) = sqlx::query_as(
-        r#"
+        r"
         SELECT COUNT(*) as count
         FROM nhi_credentials
         WHERE nhi_id = $1 AND tenant_id = $2 AND is_active = true
-        "#,
+        ",
     )
     .bind(sa_id)
     .bind(tenant_id)

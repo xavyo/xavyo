@@ -33,7 +33,8 @@ pub struct ServiceAccountsState {
 }
 
 impl ServiceAccountsState {
-    /// Create a new ServiceAccountsState with the given database pool.
+    /// Create a new `ServiceAccountsState` with the given database pool.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         let nhi_service = Arc::new(NhiService::new(pool.clone()));
         let credential_service = Arc::new(NhiCredentialService::new(pool.clone()));
@@ -57,7 +58,7 @@ impl ServiceAccountsState {
 
 /// State for tools endpoints under /nhi/tools.
 ///
-/// Uses the ToolService from xavyo-api-agents.
+/// Uses the `ToolService` from xavyo-api-agents.
 #[derive(Clone)]
 pub struct ToolsState {
     /// The agents state containing tool service.
@@ -65,16 +66,17 @@ pub struct ToolsState {
 }
 
 impl ToolsState {
-    /// Create a new ToolsState with the given agents state.
+    /// Create a new `ToolsState` with the given agents state.
+    #[must_use] 
     pub fn new(agents_state: AgentsState) -> Self {
         Self { agents_state }
     }
 
-    /// Create a new ToolsState with the given database pool.
+    /// Create a new `ToolsState` with the given database pool.
     ///
     /// # Errors
     ///
-    /// Returns an error if the AgentsState cannot be created.
+    /// Returns an error if the `AgentsState` cannot be created.
     pub fn from_pool(pool: PgPool) -> Result<Self, crate::error::ApiNhiError> {
         Ok(Self {
             agents_state: AgentsState::new(pool)?,
@@ -84,7 +86,7 @@ impl ToolsState {
 
 /// State for approvals endpoints under /nhi/approvals.
 ///
-/// Uses the ApprovalService from xavyo-api-agents.
+/// Uses the `ApprovalService` from xavyo-api-agents.
 #[derive(Clone)]
 pub struct ApprovalsState {
     /// The agents state containing approval service.
@@ -92,16 +94,17 @@ pub struct ApprovalsState {
 }
 
 impl ApprovalsState {
-    /// Create a new ApprovalsState with the given agents state.
+    /// Create a new `ApprovalsState` with the given agents state.
+    #[must_use] 
     pub fn new(agents_state: AgentsState) -> Self {
         Self { agents_state }
     }
 
-    /// Create a new ApprovalsState with the given database pool.
+    /// Create a new `ApprovalsState` with the given database pool.
     ///
     /// # Errors
     ///
-    /// Returns an error if the AgentsState cannot be created.
+    /// Returns an error if the `AgentsState` cannot be created.
     pub fn from_pool(pool: PgPool) -> Result<Self, crate::error::ApiNhiError> {
         Ok(Self {
             agents_state: AgentsState::new(pool)?,
@@ -127,11 +130,11 @@ pub struct ConsolidatedNhiState {
 }
 
 impl ConsolidatedNhiState {
-    /// Create a new ConsolidatedNhiState with the given database pool.
+    /// Create a new `ConsolidatedNhiState` with the given database pool.
     ///
     /// # Errors
     ///
-    /// Returns an error if the AgentsState cannot be created.
+    /// Returns an error if the `AgentsState` cannot be created.
     pub fn new(pool: PgPool) -> Result<Self, crate::error::ApiNhiError> {
         let agents_state = AgentsState::new(pool.clone())?;
 

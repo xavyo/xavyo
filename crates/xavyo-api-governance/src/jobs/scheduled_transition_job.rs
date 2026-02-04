@@ -17,7 +17,7 @@ pub const DEFAULT_BATCH_SIZE: i32 = 50;
 
 /// Job for executing scheduled state transitions.
 ///
-/// This job polls the gov_scheduled_transitions table for due transitions
+/// This job polls the `gov_scheduled_transitions` table for due transitions
 /// and processes them, either executing immediately or creating approval requests.
 pub struct ScheduledTransitionJob {
     scheduled_transition_service: Arc<ScheduledTransitionService>,
@@ -29,6 +29,7 @@ pub use crate::services::scheduled_transition_service::ProcessingStats as JobPro
 
 impl ScheduledTransitionJob {
     /// Create a new scheduled transition job.
+    #[must_use] 
     pub fn new(scheduled_transition_service: ScheduledTransitionService) -> Self {
         Self {
             scheduled_transition_service: Arc::new(scheduled_transition_service),

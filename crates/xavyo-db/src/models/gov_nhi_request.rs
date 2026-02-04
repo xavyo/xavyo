@@ -112,6 +112,7 @@ pub struct NhiRequestFilter {
 
 impl GovNhiRequest {
     /// Check if the request can still be actioned.
+    #[must_use] 
     pub fn is_actionable(&self) -> bool {
         self.status == NhiRequestStatus::Pending && self.expires_at > Utc::now()
     }
@@ -123,10 +124,10 @@ impl GovNhiRequest {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_nhi_requests
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -143,21 +144,21 @@ impl GovNhiRequest {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_nhi_requests
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.requester_id.is_some() {
-            query.push_str(&format!(" AND requester_id = ${}", param_idx));
+            query.push_str(&format!(" AND requester_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_idx));
+            query.push_str(&format!(" AND status = ${param_idx}"));
             param_idx += 1;
         }
 
@@ -193,21 +194,21 @@ impl GovNhiRequest {
         filter: &NhiRequestFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_nhi_requests
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.requester_id.is_some() {
-            query.push_str(&format!(" AND requester_id = ${}", param_idx));
+            query.push_str(&format!(" AND requester_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_idx));
+            query.push_str(&format!(" AND status = ${param_idx}"));
         }
 
         if filter.pending_only == Some(true) {
@@ -234,7 +235,7 @@ impl GovNhiRequest {
         data: CreateGovNhiRequest,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_nhi_requests (
                 tenant_id, requester_id, requested_name, purpose,
                 requested_permissions, requested_expiration,
@@ -242,7 +243,7 @@ impl GovNhiRequest {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.requester_id)
@@ -264,7 +265,7 @@ impl GovNhiRequest {
         data: ApproveGovNhiRequest,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_nhi_requests
             SET
                 status = 'approved',
@@ -274,7 +275,7 @@ impl GovNhiRequest {
                 created_nhi_id = $5
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -293,7 +294,7 @@ impl GovNhiRequest {
         data: RejectGovNhiRequest,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_nhi_requests
             SET
                 status = 'rejected',
@@ -302,7 +303,7 @@ impl GovNhiRequest {
                 decision_comments = $4
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -320,12 +321,12 @@ impl GovNhiRequest {
         requester_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_nhi_requests
             SET status = 'cancelled'
             WHERE id = $1 AND tenant_id = $2 AND requester_id = $3 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -340,11 +341,11 @@ impl GovNhiRequest {
         tenant_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_nhi_requests
             SET status = 'cancelled'
             WHERE tenant_id = $1 AND status = 'pending' AND expires_at < NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(pool)
@@ -361,14 +362,14 @@ impl GovNhiRequest {
         name: &str,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_nhi_requests
             WHERE tenant_id = $1
                 AND requester_id = $2
                 AND requested_name = $3
                 AND status = 'pending'
                 AND expires_at > NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(requester_id)

@@ -252,7 +252,7 @@ impl GatewayConfig {
     /// Parse configuration from a YAML string.
     pub fn from_yaml(content: &str) -> GatewayResult<Self> {
         serde_yaml::from_str(content)
-            .map_err(|e| GatewayError::Config(format!("Failed to parse config: {}", e)))
+            .map_err(|e| GatewayError::Config(format!("Failed to parse config: {e}")))
     }
 
     /// Get the configuration file path from environment or default.

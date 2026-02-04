@@ -70,8 +70,7 @@ pub fn validate_username(username: &str) -> Result<(), ValidationError> {
             "username",
             "too_short",
             format!(
-                "Username must be at least {} characters",
-                MIN_USERNAME_LENGTH
+                "Username must be at least {MIN_USERNAME_LENGTH} characters"
             ),
             json!({"min_length": MIN_USERNAME_LENGTH, "actual": username.len()}),
         ));
@@ -83,8 +82,7 @@ pub fn validate_username(username: &str) -> Result<(), ValidationError> {
             "username",
             "too_long",
             format!(
-                "Username must not exceed {} characters",
-                MAX_USERNAME_LENGTH
+                "Username must not exceed {MAX_USERNAME_LENGTH} characters"
             ),
             json!({"max_length": MAX_USERNAME_LENGTH, "actual": username.len()}),
         ));

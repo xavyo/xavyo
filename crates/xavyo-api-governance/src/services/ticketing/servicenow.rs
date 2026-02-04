@@ -1,6 +1,6 @@
-//! ServiceNow ticketing provider (F064).
+//! `ServiceNow` ticketing provider (F064).
 //!
-//! Integrates with ServiceNow's REST API to create incidents/requests
+//! Integrates with `ServiceNow`'s REST API to create incidents/requests
 //! and track their status.
 
 use async_trait::async_trait;
@@ -14,7 +14,7 @@ use super::{
     TicketStatusResponse, TicketingError, TicketingProvider, TicketingResult,
 };
 
-/// ServiceNow API client.
+/// `ServiceNow` API client.
 pub struct ServiceNowProvider {
     client: Client,
     instance_url: String,
@@ -29,7 +29,7 @@ pub struct ServiceNowProvider {
 }
 
 impl ServiceNowProvider {
-    /// Create a new ServiceNow provider from configuration.
+    /// Create a new `ServiceNow` provider from configuration.
     pub fn new(
         config: &GovTicketingConfiguration,
         credentials: &serde_json::Value,
@@ -65,7 +65,7 @@ impl ServiceNowProvider {
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e| {
-                TicketingError::InvalidConfiguration(format!("Failed to build HTTP client: {}", e))
+                TicketingError::InvalidConfiguration(format!("Failed to build HTTP client: {e}"))
             })?;
 
         Ok(Self {
@@ -88,7 +88,7 @@ impl ServiceNowProvider {
         )
     }
 
-    /// Map priority to ServiceNow urgency/impact.
+    /// Map priority to `ServiceNow` urgency/impact.
     fn map_priority(&self, priority: i32) -> (i32, i32) {
         // ServiceNow uses urgency (1-3) and impact (1-3)
         // Priority 1 (Critical) -> urgency=1, impact=1
@@ -103,7 +103,7 @@ impl ServiceNowProvider {
         }
     }
 
-    /// Map ServiceNow state to our ticket status.
+    /// Map `ServiceNow` state to our ticket status.
     fn map_state_to_status(&self, state: i32) -> TicketStatus {
         // ServiceNow incident states:
         // 1 = New, 2 = In Progress, 3 = On Hold
@@ -115,12 +115,12 @@ impl ServiceNowProvider {
             6 => TicketStatus::Resolved,
             7 => TicketStatus::Closed,
             8 => TicketStatus::Cancelled,
-            _ => TicketStatus::Unknown(format!("state={}", state)),
+            _ => TicketStatus::Unknown(format!("state={state}")),
         }
     }
 }
 
-/// ServiceNow incident creation request.
+/// `ServiceNow` incident creation request.
 #[derive(Debug, Serialize)]
 struct ServiceNowCreateRequest {
     short_description: String,
@@ -139,13 +139,13 @@ struct ServiceNowCreateRequest {
     correlation_id: Option<String>,
 }
 
-/// ServiceNow API response wrapper.
+/// `ServiceNow` API response wrapper.
 #[derive(Debug, Deserialize)]
 struct ServiceNowResponse<T> {
     result: T,
 }
 
-/// ServiceNow incident record.
+/// `ServiceNow` incident record.
 #[derive(Debug, Deserialize)]
 struct ServiceNowIncident {
     sys_id: String,
@@ -159,14 +159,14 @@ struct ServiceNowIncident {
     sys_updated_on: Option<String>,
 }
 
-/// ServiceNow user reference.
+/// `ServiceNow` user reference.
 #[derive(Debug, Deserialize)]
 struct ServiceNowUser {
     #[serde(default)]
     display_value: Option<String>,
 }
 
-/// ServiceNow error response.
+/// `ServiceNow` error response.
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)] // Reserved for error handling
 struct ServiceNowError {
@@ -223,7 +223,7 @@ impl TicketingProvider for ServiceNowProvider {
             let error_text = response.text().await.unwrap_or_default();
             Ok(ConnectivityTestResponse {
                 success: false,
-                error_message: Some(format!("API returned status {}: {}", status, error_text)),
+                error_message: Some(format!("API returned status {status}: {error_text}")),
                 details: None,
             })
         }
@@ -255,14 +255,14 @@ impl TicketingProvider for ServiceNowProvider {
             .as_ref()
             .and_then(|m| m.get("category"))
             .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
+            .map(std::string::ToString::to_string);
 
         let subcategory = self
             .field_mappings
             .as_ref()
             .and_then(|m| m.get("subcategory"))
             .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
+            .map(std::string::ToString::to_string);
 
         let assignment_group = self.assignment_group.clone();
 

@@ -43,11 +43,13 @@ pub struct SyncConflict {
 
 impl SyncConflict {
     /// Check if this conflict is resolved.
+    #[must_use] 
     pub fn is_resolved(&self) -> bool {
         self.resolved_at.is_some()
     }
 
     /// Check if this conflict needs manual resolution.
+    #[must_use] 
     pub fn needs_manual_resolution(&self) -> bool {
         self.resolution_strategy == ResolutionStrategy::Manual && !self.is_resolved()
     }
@@ -60,6 +62,7 @@ pub struct SyncConflictDetector {
 
 impl SyncConflictDetector {
     /// Create a new conflict detector.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -115,7 +118,7 @@ impl SyncConflictDetector {
         initial_strategy: ResolutionStrategy,
     ) -> SyncResult<SyncConflict> {
         let result = sqlx::query_as::<_, SyncConflictRow>(
-            r#"
+            r"
             INSERT INTO gov_sync_conflicts (
                 tenant_id, inbound_change_id, outbound_operation_id,
                 conflict_type, affected_attributes, inbound_value,
@@ -126,7 +129,7 @@ impl SyncConflictDetector {
                       conflict_type, affected_attributes, inbound_value,
                       outbound_value, resolution_strategy, resolved_by,
                       resolved_at, resolution_notes, created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(conflict.inbound_change_id)
@@ -153,7 +156,7 @@ impl SyncConflictDetector {
         notes: Option<String>,
     ) -> SyncResult<Option<SyncConflict>> {
         let result = sqlx::query_as::<_, SyncConflictRow>(
-            r#"
+            r"
             UPDATE gov_sync_conflicts
             SET resolution_strategy = $3,
                 resolved_by = $4,
@@ -164,7 +167,7 @@ impl SyncConflictDetector {
                       conflict_type, affected_attributes, inbound_value,
                       outbound_value, resolution_strategy, resolved_by,
                       resolved_at, resolution_notes, created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(conflict_id)
@@ -174,7 +177,7 @@ impl SyncConflictDetector {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(|r| r.into_conflict()))
+        Ok(result.map(SyncConflictRow::into_conflict))
     }
 
     /// Get pending conflicts for a connector.
@@ -186,7 +189,7 @@ impl SyncConflictDetector {
         limit: i64,
     ) -> SyncResult<Vec<SyncConflict>> {
         let rows = sqlx::query_as::<_, SyncConflictRow>(
-            r#"
+            r"
             SELECT c.id, c.tenant_id, c.inbound_change_id, c.outbound_operation_id,
                    c.conflict_type, c.affected_attributes, c.inbound_value,
                    c.outbound_value, c.resolution_strategy, c.resolved_by,
@@ -198,7 +201,7 @@ impl SyncConflictDetector {
                 AND c.resolution_strategy = 'pending'
             ORDER BY c.created_at DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -206,20 +209,20 @@ impl SyncConflictDetector {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(|r| r.into_conflict()).collect())
+        Ok(rows.into_iter().map(SyncConflictRow::into_conflict).collect())
     }
 
     /// Count pending conflicts for a connector.
     #[instrument(skip(self))]
     pub async fn count_pending(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncResult<i64> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_sync_conflicts c
             JOIN gov_inbound_changes ic ON c.inbound_change_id = ic.id
             WHERE c.tenant_id = $1
                 AND ic.connector_id = $2
                 AND c.resolution_strategy = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -232,14 +235,14 @@ impl SyncConflictDetector {
     /// Find pending operations that might conflict with an inbound change.
     async fn find_pending_operations(&self, change: &InboundChange) -> SyncResult<Vec<PendingOp>> {
         let rows = sqlx::query_as::<_, PendingOp>(
-            r#"
+            r"
             SELECT id, attributes FROM provisioning_operations
             WHERE tenant_id = $1
                 AND connector_id = $2
                 AND target_uid = $3
                 AND status IN ('pending', 'in_progress')
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(change.tenant_id)
         .bind(change.connector_id)

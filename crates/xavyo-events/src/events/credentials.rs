@@ -132,7 +132,7 @@ pub struct CredentialRevoked {
     pub secret_type: String,
     /// Revocation reason (optional).
     pub reason: Option<String>,
-    /// Who revoked (user_id or "system").
+    /// Who revoked (`user_id` or "system").
     pub revoked_by: String,
     /// Revocation timestamp.
     pub timestamp: DateTime<Utc>,

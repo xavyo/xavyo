@@ -22,11 +22,13 @@ pub struct ServiceAccountService {
 
 impl ServiceAccountService {
     /// Create a new service account service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

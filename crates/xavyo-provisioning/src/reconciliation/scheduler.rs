@@ -31,7 +31,7 @@ impl std::fmt::Display for ScheduleFrequency {
             Self::Daily => write!(f, "daily"),
             Self::Weekly => write!(f, "weekly"),
             Self::Monthly => write!(f, "monthly"),
-            Self::Cron(expr) => write!(f, "{}", expr),
+            Self::Cron(expr) => write!(f, "{expr}"),
         }
     }
 }
@@ -46,7 +46,7 @@ impl std::str::FromStr for ScheduleFrequency {
             "weekly" => Ok(Self::Weekly),
             "monthly" => Ok(Self::Monthly),
             _ if s.contains(' ') => Ok(Self::Cron(s.to_string())), // Likely a cron expression
-            _ => Err(format!("Invalid schedule frequency: {}", s)),
+            _ => Err(format!("Invalid schedule frequency: {s}")),
         }
     }
 }
@@ -84,6 +84,7 @@ pub struct ScheduleConfig {
 
 impl ScheduleConfig {
     /// Create a new schedule configuration.
+    #[must_use] 
     pub fn new(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -106,18 +107,21 @@ impl ScheduleConfig {
     }
 
     /// Set day of week for weekly schedule.
+    #[must_use] 
     pub fn with_day_of_week(mut self, day: u8) -> Self {
         self.day_of_week = Some(day.min(6));
         self
     }
 
     /// Set day of month for monthly schedule.
+    #[must_use] 
     pub fn with_day_of_month(mut self, day: u8) -> Self {
         self.day_of_month = Some(day.clamp(1, 28));
         self
     }
 
     /// Set hour of day.
+    #[must_use] 
     pub fn with_hour(mut self, hour: u8) -> Self {
         self.hour_of_day = hour.min(23);
         self
@@ -142,11 +146,12 @@ pub struct ReconciliationScheduler;
 
 impl ReconciliationScheduler {
     /// Calculate the next run time based on schedule configuration.
+    #[must_use] 
     pub fn calculate_next_run(
         config: &ScheduleConfig,
         from: DateTime<Utc>,
     ) -> Option<DateTime<Utc>> {
-        let target_time = NaiveTime::from_hms_opt(config.hour_of_day as u32, 0, 0)?;
+        let target_time = NaiveTime::from_hms_opt(u32::from(config.hour_of_day), 0, 0)?;
 
         match &config.frequency {
             ScheduleFrequency::Hourly => {
@@ -204,8 +209,8 @@ impl ReconciliationScheduler {
         };
 
         let current_weekday = from.weekday();
-        let days_until = (target_weekday.num_days_from_sunday() as i64
-            - current_weekday.num_days_from_sunday() as i64
+        let days_until = (i64::from(target_weekday.num_days_from_sunday())
+            - i64::from(current_weekday.num_days_from_sunday())
             + 7)
             % 7;
 
@@ -227,7 +232,7 @@ impl ReconciliationScheduler {
         target_time: NaiveTime,
         day_of_month: u8,
     ) -> Option<DateTime<Utc>> {
-        let day = day_of_month.min(28) as u32;
+        let day = u32::from(day_of_month.min(28));
 
         // Try this month
         let this_month_date = from.date_naive().with_day(day)?;
@@ -249,6 +254,7 @@ impl ReconciliationScheduler {
     }
 
     /// Check if a schedule is due for execution.
+    #[must_use] 
     pub fn is_due(config: &ScheduleConfig, now: DateTime<Utc>, tolerance: Duration) -> bool {
         if !config.enabled {
             return false;

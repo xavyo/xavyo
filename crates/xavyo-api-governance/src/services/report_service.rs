@@ -17,6 +17,7 @@ pub struct ReportService {
 
 impl ReportService {
     /// Create a new report service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

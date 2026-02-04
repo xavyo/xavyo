@@ -144,8 +144,7 @@ impl RateLimiter {
 
         entries
             .get(&ip)
-            .map(|entry| entry.is_exceeded(now, &self.config))
-            .unwrap_or(false)
+            .is_some_and(|entry| entry.is_exceeded(now, &self.config))
     }
 
     /// Record an attempt from the given IP.
@@ -174,8 +173,7 @@ impl RateLimiter {
 
         let count = entries
             .get(&ip)
-            .map(|entry| entry.count(now, self.config.window))
-            .unwrap_or(0);
+            .map_or(0, |entry| entry.count(now, self.config.window));
 
         self.config.max_attempts.saturating_sub(count)
     }
@@ -275,13 +273,11 @@ impl EmailRateLimiter {
 
         let email_limited = entries
             .get(&email_key)
-            .map(|e| e.is_exceeded(now, &self.email_config))
-            .unwrap_or(false);
+            .is_some_and(|e| e.is_exceeded(now, &self.email_config));
 
         let ip_limited = entries
             .get(&ip_key)
-            .map(|e| e.is_exceeded(now, &self.ip_config))
-            .unwrap_or(false);
+            .is_some_and(|e| e.is_exceeded(now, &self.ip_config));
 
         email_limited || ip_limited
     }
@@ -295,8 +291,7 @@ impl EmailRateLimiter {
 
         entries
             .get(&key)
-            .map(|e| e.is_exceeded(now, &self.email_config))
-            .unwrap_or(false)
+            .is_some_and(|e| e.is_exceeded(now, &self.email_config))
     }
 
     /// Check if rate limited by IP only.
@@ -308,8 +303,7 @@ impl EmailRateLimiter {
 
         entries
             .get(&key)
-            .map(|e| e.is_exceeded(now, &self.ip_config))
-            .unwrap_or(false)
+            .is_some_and(|e| e.is_exceeded(now, &self.ip_config))
     }
 
     /// Record an attempt for both email and IP.
@@ -325,13 +319,11 @@ impl EmailRateLimiter {
         // Check if already exceeded
         let email_exceeded = entries
             .get(&email_key)
-            .map(|e| e.is_exceeded(now, &self.email_config))
-            .unwrap_or(false);
+            .is_some_and(|e| e.is_exceeded(now, &self.email_config));
 
         let ip_exceeded = entries
             .get(&ip_key)
-            .map(|e| e.is_exceeded(now, &self.ip_config))
-            .unwrap_or(false);
+            .is_some_and(|e| e.is_exceeded(now, &self.ip_config));
 
         if email_exceeded || ip_exceeded {
             return false;
@@ -360,8 +352,7 @@ impl EmailRateLimiter {
 
         let count = entries
             .get(&key)
-            .map(|e| e.count(now, self.email_config.window))
-            .unwrap_or(0);
+            .map_or(0, |e| e.count(now, self.email_config.window));
 
         self.email_config.max_attempts.saturating_sub(count)
     }
@@ -375,8 +366,7 @@ impl EmailRateLimiter {
 
         let count = entries
             .get(&key)
-            .map(|e| e.count(now, self.ip_config.window))
-            .unwrap_or(0);
+            .map_or(0, |e| e.count(now, self.ip_config.window));
 
         self.ip_config.max_attempts.saturating_sub(count)
     }

@@ -42,6 +42,7 @@ pub struct GovLicenseAuditEvent {
 
 impl GovLicenseAuditEvent {
     /// Get the action as an enum (if it's a known action type).
+    #[must_use] 
     pub fn action_type(&self) -> Option<LicenseAuditAction> {
         LicenseAuditAction::parse(&self.action)
     }
@@ -53,10 +54,10 @@ impl GovLicenseAuditEvent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_audit_events
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -71,14 +72,14 @@ impl GovLicenseAuditEvent {
         input: CreateGovLicenseAuditEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_license_audit_events (
                 tenant_id, license_pool_id, license_assignment_id, user_id,
                 action, actor_id, details
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.license_pool_id)
@@ -100,36 +101,36 @@ impl GovLicenseAuditEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_license_audit_events
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.license_pool_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND license_pool_id = ${}", param_count));
+            query.push_str(&format!(" AND license_pool_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.action.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND action = ${}", param_count));
+            query.push_str(&format!(" AND action = ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND actor_id = ${}", param_count));
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
         }
         if filter.start_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.end_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -169,36 +170,36 @@ impl GovLicenseAuditEvent {
         filter: &LicenseAuditEventFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_license_audit_events
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.license_pool_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND license_pool_id = ${}", param_count));
+            query.push_str(&format!(" AND license_pool_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.action.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND action = ${}", param_count));
+            query.push_str(&format!(" AND action = ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND actor_id = ${}", param_count));
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
         }
         if filter.start_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.end_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -234,12 +235,12 @@ impl GovLicenseAuditEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_audit_events
             WHERE tenant_id = $1 AND license_pool_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(license_pool_id)
@@ -258,12 +259,12 @@ impl GovLicenseAuditEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_audit_events
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -280,12 +281,12 @@ impl GovLicenseAuditEvent {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_license_audit_events
             WHERE tenant_id = $1
             ORDER BY created_at DESC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -303,11 +304,11 @@ impl GovLicenseAuditEvent {
     ) -> Result<i64, sqlx::Error> {
         if let Some(pool_id) = license_pool_id {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM gov_license_audit_events
                 WHERE tenant_id = $1 AND license_pool_id = $2
                   AND created_at >= $3 AND created_at <= $4
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(pool_id)
@@ -317,10 +318,10 @@ impl GovLicenseAuditEvent {
             .await
         } else {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM gov_license_audit_events
                 WHERE tenant_id = $1 AND created_at >= $2 AND created_at <= $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(start_date)
@@ -349,6 +350,7 @@ fn default_details() -> serde_json::Value {
 
 impl CreateGovLicenseAuditEvent {
     /// Create a pool-related event.
+    #[must_use] 
     pub fn pool_event(
         pool_id: Uuid,
         action: LicenseAuditAction,
@@ -366,6 +368,7 @@ impl CreateGovLicenseAuditEvent {
     }
 
     /// Create an assignment-related event.
+    #[must_use] 
     pub fn assignment_event(
         pool_id: Uuid,
         assignment_id: Uuid,
@@ -385,6 +388,7 @@ impl CreateGovLicenseAuditEvent {
     }
 
     /// Create a bulk operation event.
+    #[must_use] 
     pub fn bulk_event(
         pool_id: Uuid,
         action: LicenseAuditAction,
@@ -445,7 +449,7 @@ impl LicenseAuditEventWithDetails {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT
                 e.id, e.tenant_id, e.license_pool_id, p.name as pool_name,
                 e.license_assignment_id, e.user_id, u.email as user_email,
@@ -456,33 +460,33 @@ impl LicenseAuditEventWithDetails {
             LEFT JOIN users u ON e.user_id = u.id
             JOIN users actor ON e.actor_id = actor.id
             WHERE e.tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.license_pool_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND e.license_pool_id = ${}", param_count));
+            query.push_str(&format!(" AND e.license_pool_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND e.user_id = ${}", param_count));
+            query.push_str(&format!(" AND e.user_id = ${param_count}"));
         }
         if filter.action.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND e.action = ${}", param_count));
+            query.push_str(&format!(" AND e.action = ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND e.actor_id = ${}", param_count));
+            query.push_str(&format!(" AND e.actor_id = ${param_count}"));
         }
         if filter.start_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND e.created_at >= ${}", param_count));
+            query.push_str(&format!(" AND e.created_at >= ${param_count}"));
         }
         if filter.end_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND e.created_at <= ${}", param_count));
+            query.push_str(&format!(" AND e.created_at <= ${param_count}"));
         }
 
         query.push_str(&format!(

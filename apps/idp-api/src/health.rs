@@ -411,7 +411,7 @@ pub async fn healthz_handler(state: State<AppState>) -> (StatusCode, Json<Readin
 /// Startup probe handler (`GET /startupz`).
 ///
 /// Returns 503 during initialization and 200 once startup is complete.
-/// This is a one-time gate: once startup_complete is set to true, this
+/// This is a one-time gate: once `startup_complete` is set to true, this
 /// endpoint always returns 200 (FR-003, FR-014).
 #[utoipa::path(
     get,

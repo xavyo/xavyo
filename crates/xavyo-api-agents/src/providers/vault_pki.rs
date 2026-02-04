@@ -1,6 +1,6 @@
-//! HashiCorp Vault PKI Certificate Authority Provider (F127).
+//! `HashiCorp` Vault PKI Certificate Authority Provider (F127).
 //!
-//! This provider integrates with HashiCorp Vault's PKI secrets engine
+//! This provider integrates with `HashiCorp` Vault's PKI secrets engine
 //! for certificate issuance.
 //!
 //! ## Vault PKI API Endpoints Used:
@@ -37,7 +37,7 @@ pub struct VaultPkiConfig {
     /// Vault server URL.
     pub vault_url: String,
 
-    /// PKI mount path (e.g., "pki" or "pki_int").
+    /// PKI mount path (e.g., "pki" or "`pki_int`").
     pub mount_path: String,
 
     /// Role name for issuing certificates.
@@ -162,6 +162,7 @@ pub struct VaultPkiProvider {
 
 impl VaultPkiProvider {
     /// Create a new Vault PKI provider.
+    #[must_use] 
     pub fn new(config: VaultPkiConfig) -> Self {
         let http_client = Client::builder()
             .timeout(StdDuration::from_millis(config.timeout_ms))
@@ -176,6 +177,7 @@ impl VaultPkiProvider {
     }
 
     /// Create a provider with pre-loaded Vault token.
+    #[must_use] 
     pub fn with_token(config: VaultPkiConfig, token: String) -> Self {
         let http_client = Client::builder()
             .timeout(StdDuration::from_millis(config.timeout_ms))
@@ -190,6 +192,7 @@ impl VaultPkiProvider {
     }
 
     /// Get the provider configuration.
+    #[must_use] 
     pub fn config(&self) -> &VaultPkiConfig {
         &self.config
     }
@@ -201,7 +204,7 @@ impl VaultPkiProvider {
             .ok_or_else(|| CaProviderError::NotAvailable("Vault token not configured".to_string()))
     }
 
-    /// Map key algorithm to Vault key_type and key_bits.
+    /// Map key algorithm to Vault `key_type` and `key_bits`.
     fn map_key_algorithm(algorithm: KeyAlgorithm) -> (String, Option<i32>) {
         match algorithm {
             KeyAlgorithm::EcdsaP256 => ("ec".to_string(), Some(256)),
@@ -219,7 +222,7 @@ impl VaultPkiProvider {
 
         result
             .iter()
-            .map(|b| format!("{:02X}", b))
+            .map(|b| format!("{b:02X}"))
             .collect::<Vec<_>>()
             .join(":")
     }
@@ -227,7 +230,7 @@ impl VaultPkiProvider {
     /// Parse a PEM certificate and extract DER bytes.
     fn parse_pem_to_der(pem_str: &str) -> CaResult<Vec<u8>> {
         let pem_data = ::pem::parse(pem_str)
-            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse PEM: {}", e)))?;
+            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse PEM: {e}")))?;
 
         Ok(pem_data.contents().to_vec())
     }
@@ -236,7 +239,7 @@ impl VaultPkiProvider {
     fn extract_subject_dn(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
         let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
         })?;
 
         Ok(cert.subject().to_string())
@@ -246,7 +249,7 @@ impl VaultPkiProvider {
     fn extract_issuer_dn(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
         let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
         })?;
 
         Ok(cert.issuer().to_string())
@@ -256,7 +259,7 @@ impl VaultPkiProvider {
     fn extract_validity(cert_pem: &str) -> CaResult<(i64, i64)> {
         let der = Self::parse_pem_to_der(cert_pem)?;
         let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {:?}", e))
+            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
         })?;
 
         let not_before = cert.validity().not_before.timestamp();
@@ -285,7 +288,7 @@ impl CaProvider for VaultPkiProvider {
 
         let response =
             self.http_client.get(&url).send().await.map_err(|e| {
-                CaProviderError::NetworkError(format!("Health check failed: {}", e))
+                CaProviderError::NetworkError(format!("Health check failed: {e}"))
             })?;
 
         // Vault health endpoint returns different status codes based on state
@@ -319,7 +322,7 @@ impl CaProvider for VaultPkiProvider {
             .header("X-Vault-Token", token)
             .send()
             .await
-            .map_err(|e| CaProviderError::NetworkError(format!("PKI mount check failed: {}", e)))?;
+            .map_err(|e| CaProviderError::NetworkError(format!("PKI mount check failed: {e}")))?;
 
         if !response.status().is_success() {
             return Err(CaProviderError::NotAvailable(format!(
@@ -404,18 +407,17 @@ impl CaProvider for VaultPkiProvider {
             .json(&issue_request)
             .send()
             .await
-            .map_err(|e| CaProviderError::NetworkError(format!("Issue request failed: {}", e)))?;
+            .map_err(|e| CaProviderError::NetworkError(format!("Issue request failed: {e}")))?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(CaProviderError::ExternalCaError(format!(
-                "Vault PKI issue failed: {}",
-                error_text
+                "Vault PKI issue failed: {error_text}"
             )));
         }
 
         let issue_response: VaultIssueResponse = response.json().await.map_err(|e| {
-            CaProviderError::ExternalCaError(format!("Invalid issue response: {}", e))
+            CaProviderError::ExternalCaError(format!("Invalid issue response: {e}"))
         })?;
 
         // Parse the issued certificate
@@ -497,18 +499,17 @@ impl CaProvider for VaultPkiProvider {
             .json(&revoke_request)
             .send()
             .await
-            .map_err(|e| CaProviderError::NetworkError(format!("Revoke request failed: {}", e)))?;
+            .map_err(|e| CaProviderError::NetworkError(format!("Revoke request failed: {e}")))?;
 
         if !response.status().is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(CaProviderError::ExternalCaError(format!(
-                "Vault PKI revoke failed: {}",
-                error_text
+                "Vault PKI revoke failed: {error_text}"
             )));
         }
 
         let revoke_response: VaultRevokeResponse = response.json().await.map_err(|e| {
-            CaProviderError::ExternalCaError(format!("Invalid revoke response: {}", e))
+            CaProviderError::ExternalCaError(format!("Invalid revoke response: {e}"))
         })?;
 
         Ok(RevocationResult {
@@ -526,7 +527,7 @@ impl CaProvider for VaultPkiProvider {
             Err(e) => {
                 return Ok(CertificateValidation::invalid(
                     CertificateStatus::Active,
-                    format!("Failed to parse certificate: {}", e),
+                    format!("Failed to parse certificate: {e}"),
                 ));
             }
         };
@@ -536,7 +537,7 @@ impl CaProvider for VaultPkiProvider {
             Err(e) => {
                 return Ok(CertificateValidation::invalid(
                     CertificateStatus::Active,
-                    format!("Failed to parse X.509: {:?}", e),
+                    format!("Failed to parse X.509: {e:?}"),
                 ));
             }
         };
@@ -565,7 +566,7 @@ impl CaProvider for VaultPkiProvider {
             .serial
             .to_bytes_be()
             .iter()
-            .map(|b| format!("{:02X}", b))
+            .map(|b| format!("{b:02X}"))
             .collect::<String>();
 
         // Extract agent_id and tenant_id from SAN URIs
@@ -646,7 +647,7 @@ impl CaProvider for VaultPkiProvider {
             .header("X-Vault-Token", token)
             .send()
             .await
-            .map_err(|e| CaProviderError::NetworkError(format!("CRL fetch failed: {}", e)))?;
+            .map_err(|e| CaProviderError::NetworkError(format!("CRL fetch failed: {e}")))?;
 
         if !response.status().is_success() {
             return Err(CaProviderError::ExternalCaError(format!(
@@ -658,7 +659,7 @@ impl CaProvider for VaultPkiProvider {
         let crl_bytes = response
             .bytes()
             .await
-            .map_err(|e| CaProviderError::ExternalCaError(format!("Failed to read CRL: {}", e)))?;
+            .map_err(|e| CaProviderError::ExternalCaError(format!("Failed to read CRL: {e}")))?;
 
         Ok(crl_bytes.to_vec())
     }

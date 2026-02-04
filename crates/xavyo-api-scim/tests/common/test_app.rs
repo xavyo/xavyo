@@ -80,7 +80,7 @@ impl TestApp {
         let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("Failed to read response body");
-        let body: Value = serde_json::from_slice(&body_bytes).unwrap_or_else(|_| Value::Null);
+        let body: Value = serde_json::from_slice(&body_bytes).unwrap_or(Value::Null);
 
         TestResponse { status, body }
     }

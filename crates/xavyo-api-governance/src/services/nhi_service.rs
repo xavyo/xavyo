@@ -42,6 +42,7 @@ pub struct NhiService {
 
 impl NhiService {
     /// Create a new NHI service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -51,6 +52,7 @@ impl NhiService {
     }
 
     /// Get the database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -861,12 +863,12 @@ impl NhiService {
 
         // Update using raw SQL since we don't have a direct method for grace_period_ends_at
         let updated = sqlx::query_as::<_, GovServiceAccount>(
-            r#"
+            r"
             UPDATE gov_service_accounts
             SET grace_period_ends_at = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -907,12 +909,12 @@ impl NhiService {
 
         // Update baseline using raw SQL since UpdateGovServiceAccount doesn't have this field yet
         let updated = sqlx::query_as::<_, GovServiceAccount>(
-            r#"
+            r"
             UPDATE gov_service_accounts
             SET anomaly_baseline = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -947,12 +949,12 @@ impl NhiService {
             .ok_or(GovernanceError::NhiNotFound(id))?;
 
         let updated = sqlx::query_as::<_, GovServiceAccount>(
-            r#"
+            r"
             UPDATE gov_service_accounts
             SET anomaly_threshold = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -977,11 +979,11 @@ impl NhiService {
     /// Called after running anomaly detection to track when the check was performed.
     pub async fn record_anomaly_check(&self, tenant_id: Uuid, id: Uuid) -> Result<()> {
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_service_accounts
             SET last_anomaly_check_at = NOW(), updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -995,8 +997,8 @@ impl NhiService {
     /// Get NHIs that need anomaly detection check (F108 US7).
     ///
     /// Returns NHIs where:
-    /// - anomaly_threshold is configured
-    /// - last_anomaly_check_at is NULL or older than the specified interval
+    /// - `anomaly_threshold` is configured
+    /// - `last_anomaly_check_at` is NULL or older than the specified interval
     pub async fn get_needing_anomaly_check(
         &self,
         tenant_id: Uuid,
@@ -1005,7 +1007,7 @@ impl NhiService {
         let cutoff = Utc::now() - chrono::Duration::hours(check_interval_hours);
 
         let accounts = sqlx::query_as::<_, GovServiceAccount>(
-            r#"
+            r"
             SELECT * FROM gov_service_accounts
             WHERE tenant_id = $1
               AND deleted_at IS NULL
@@ -1014,7 +1016,7 @@ impl NhiService {
               AND (last_anomaly_check_at IS NULL OR last_anomaly_check_at < $2)
             ORDER BY last_anomaly_check_at ASC NULLS FIRST
             LIMIT 100
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(cutoff)
@@ -1278,14 +1280,14 @@ impl NhiService {
     pub async fn detect_orphaned(&self, tenant_id: Uuid) -> Result<Vec<OrphanedNhiInfo>> {
         // Find all active NHIs where owner is inactive
         let orphaned = sqlx::query_as::<_, (Uuid, String, Uuid, Option<Uuid>)>(
-            r#"
+            r"
             SELECT sa.id, sa.name, sa.owner_id, sa.backup_owner_id
             FROM gov_service_accounts sa
             LEFT JOIN users u ON sa.owner_id = u.id AND u.tenant_id = sa.tenant_id
             WHERE sa.tenant_id = $1
               AND sa.status = 'active'
               AND (u.id IS NULL OR u.is_active = false)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)

@@ -48,7 +48,7 @@ impl std::str::FromStr for AdminAction {
             "revoke" => Ok(AdminAction::Revoke),
             "access_denied" => Ok(AdminAction::AccessDenied),
             "move" => Ok(AdminAction::Move),
-            _ => Err(format!("Invalid admin action: {}", s)),
+            _ => Err(format!("Invalid admin action: {s}")),
         }
     }
 }
@@ -119,7 +119,7 @@ impl std::str::FromStr for AdminResourceType {
             "tenant_settings" => Ok(AdminResourceType::TenantSettings),
             "tenant_plan" => Ok(AdminResourceType::TenantPlan),
             "admin_invitation" => Ok(AdminResourceType::AdminInvitation),
-            _ => Err(format!("Invalid resource type: {}", s)),
+            _ => Err(format!("Invalid resource type: {s}")),
         }
     }
 }
@@ -177,11 +177,13 @@ pub struct AuditLogFilter {
 
 impl AdminAuditLog {
     /// Get the action as enum.
+    #[must_use] 
     pub fn action_enum(&self) -> Option<AdminAction> {
         self.action.parse().ok()
     }
 
     /// Get the resource type as enum.
+    #[must_use] 
     pub fn resource_type_enum(&self) -> Option<AdminResourceType> {
         self.resource_type.parse().ok()
     }
@@ -192,14 +194,14 @@ impl AdminAuditLog {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO admin_audit_log
                 (tenant_id, admin_user_id, action, resource_type, resource_id,
                  old_value, new_value, ip_address, user_agent)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id, tenant_id, admin_user_id, action, resource_type, resource_id,
                       old_value, new_value, ip_address, user_agent, created_at
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(input.admin_user_id)
@@ -224,12 +226,12 @@ impl AdminAuditLog {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, admin_user_id, action, resource_type, resource_id,
                    old_value, new_value, ip_address, user_agent, created_at
             FROM admin_audit_log
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -252,46 +254,45 @@ impl AdminAuditLog {
         let mut param_idx = 2;
 
         if filter.admin_user_id.is_some() {
-            conditions.push(format!("admin_user_id = ${}", param_idx));
+            conditions.push(format!("admin_user_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.action.is_some() {
-            conditions.push(format!("action = ${}", param_idx));
+            conditions.push(format!("action = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.resource_type.is_some() {
-            conditions.push(format!("resource_type = ${}", param_idx));
+            conditions.push(format!("resource_type = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.start_date.is_some() {
-            conditions.push(format!("created_at >= ${}", param_idx));
+            conditions.push(format!("created_at >= ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.end_date.is_some() {
-            conditions.push(format!("created_at <= ${}", param_idx));
+            conditions.push(format!("created_at <= ${param_idx}"));
             param_idx += 1;
         }
 
         if cursor.is_some() {
-            conditions.push(format!("created_at < ${}", param_idx));
+            conditions.push(format!("created_at < ${param_idx}"));
             param_idx += 1;
         }
 
         let where_clause = conditions.join(" AND ");
         let query = format!(
-            r#"
+            r"
             SELECT id, tenant_id, admin_user_id, action, resource_type, resource_id,
                    old_value, new_value, ip_address, user_agent, created_at
             FROM admin_audit_log
-            WHERE {}
+            WHERE {where_clause}
             ORDER BY created_at DESC
-            LIMIT ${}
-            "#,
-            where_clause, param_idx
+            LIMIT ${param_idx}
+            "
         );
 
         let mut q = sqlx::query_as::<_, Self>(&query).bind(tenant_id);
@@ -338,37 +339,36 @@ impl AdminAuditLog {
         let mut param_idx = 2;
 
         if filter.admin_user_id.is_some() {
-            conditions.push(format!("admin_user_id = ${}", param_idx));
+            conditions.push(format!("admin_user_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.action.is_some() {
-            conditions.push(format!("action = ${}", param_idx));
+            conditions.push(format!("action = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.resource_type.is_some() {
-            conditions.push(format!("resource_type = ${}", param_idx));
+            conditions.push(format!("resource_type = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.start_date.is_some() {
-            conditions.push(format!("created_at >= ${}", param_idx));
+            conditions.push(format!("created_at >= ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.end_date.is_some() {
-            conditions.push(format!("created_at <= ${}", param_idx));
+            conditions.push(format!("created_at <= ${param_idx}"));
             // param_idx += 1;  // Not needed after last parameter
         }
 
         let where_clause = conditions.join(" AND ");
         let query = format!(
-            r#"
+            r"
             SELECT COUNT(*) FROM admin_audit_log
-            WHERE {}
-            "#,
-            where_clause
+            WHERE {where_clause}
+            "
         );
 
         let mut q = sqlx::query_as::<_, (i64,)>(&query).bind(tenant_id);
@@ -409,14 +409,14 @@ impl AdminAuditLog {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, admin_user_id, action, resource_type, resource_id,
                    old_value, new_value, ip_address, user_agent, created_at
             FROM admin_audit_log
             WHERE tenant_id = $1 AND resource_type = $2 AND resource_id = $3
             ORDER BY created_at DESC
             LIMIT $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(resource_type)

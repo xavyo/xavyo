@@ -39,7 +39,7 @@ impl std::str::FromStr for DeviceType {
             "desktop" => Ok(DeviceType::Desktop),
             "mobile" => Ok(DeviceType::Mobile),
             "tablet" => Ok(DeviceType::Tablet),
-            _ => Err(format!("Unknown device type: {}", s)),
+            _ => Err(format!("Unknown device type: {s}")),
         }
     }
 }
@@ -107,6 +107,7 @@ pub struct UserDevice {
 
 impl UserDevice {
     /// Check if the device trust is currently valid.
+    #[must_use] 
     pub fn is_trust_valid(&self) -> bool {
         if !self.is_trusted {
             return false;
@@ -131,13 +132,13 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let row: (bool,) = sqlx::query_as(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM user_devices
                 WHERE tenant_id = $1 AND user_id = $2 AND device_fingerprint = $3
                 AND revoked_at IS NULL
             )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -159,11 +160,11 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_devices
             WHERE tenant_id = $1 AND user_id = $2 AND device_fingerprint = $3
             AND revoked_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -182,11 +183,11 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_devices
             WHERE tenant_id = $1 AND id = $2
             AND revoked_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -205,11 +206,11 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_devices
             WHERE tenant_id = $1 AND id = $2 AND user_id = $3
             AND revoked_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -218,9 +219,9 @@ impl UserDevice {
         .await
     }
 
-    /// Upsert a device (create or update last_seen and login_count).
+    /// Upsert a device (create or update `last_seen` and `login_count`).
     ///
-    /// Returns (device, is_new) where is_new indicates if this was a new device.
+    /// Returns (device, `is_new`) where `is_new` indicates if this was a new device.
     pub async fn upsert<'e, E>(
         executor: E,
         tenant_id: Uuid,
@@ -232,13 +233,13 @@ impl UserDevice {
     {
         // Try to update existing device first
         let existing: Option<Self> = sqlx::query_as(
-            r#"
+            r"
             UPDATE user_devices
             SET last_seen_at = NOW(), login_count = login_count + 1
             WHERE tenant_id = $1 AND user_id = $2 AND device_fingerprint = $3
             AND revoked_at IS NULL
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -267,13 +268,13 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO user_devices (tenant_id, user_id, device_fingerprint)
             VALUES ($1, $2, $3)
             ON CONFLICT (tenant_id, user_id, device_fingerprint)
             DO UPDATE SET last_seen_at = NOW(), login_count = user_devices.login_count + 1
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -284,7 +285,7 @@ impl UserDevice {
 
     /// Record a device login (upsert with ON CONFLICT).
     ///
-    /// Returns (device, is_new) where is_new indicates if this was a new device.
+    /// Returns (device, `is_new`) where `is_new` indicates if this was a new device.
     pub async fn record_login<'e, E>(
         executor: E,
         tenant_id: Uuid,
@@ -296,13 +297,13 @@ impl UserDevice {
     {
         // Use INSERT with ON CONFLICT and check if it was an insert or update
         let device: Self = sqlx::query_as(
-            r#"
+            r"
             INSERT INTO user_devices (tenant_id, user_id, device_fingerprint)
             VALUES ($1, $2, $3)
             ON CONFLICT (tenant_id, user_id, device_fingerprint)
             DO UPDATE SET last_seen_at = NOW(), login_count = user_devices.login_count + 1
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -325,12 +326,12 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_devices
             WHERE tenant_id = $1 AND user_id = $2
             AND revoked_at IS NULL
             ORDER BY last_seen_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -350,11 +351,11 @@ impl UserDevice {
     {
         if include_revoked {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM user_devices
                 WHERE tenant_id = $1 AND user_id = $2
                 ORDER BY last_seen_at DESC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(user_id)
@@ -375,11 +376,11 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM user_devices
             WHERE tenant_id = $1 AND user_id = $2
             AND revoked_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -401,13 +402,13 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_devices
             SET device_name = $4
             WHERE tenant_id = $1 AND id = $2 AND user_id = $3
             AND revoked_at IS NULL
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -436,7 +437,7 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_devices
             SET device_type = COALESCE($3, device_type),
                 browser = COALESCE($4, browser),
@@ -450,7 +451,7 @@ impl UserDevice {
             WHERE tenant_id = $1 AND id = $2
             AND revoked_at IS NULL
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -478,13 +479,13 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_devices
             SET is_trusted = TRUE, trust_expires_at = $4
             WHERE tenant_id = $1 AND id = $2 AND user_id = $3
             AND revoked_at IS NULL
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -505,13 +506,13 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_devices
             SET is_trusted = FALSE, trust_expires_at = NULL
             WHERE tenant_id = $1 AND id = $2 AND user_id = $3
             AND revoked_at IS NULL
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -531,12 +532,12 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE user_devices
             SET revoked_at = NOW(), is_trusted = FALSE, trust_expires_at = NULL
             WHERE tenant_id = $1 AND id = $2 AND user_id = $3
             AND revoked_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -547,7 +548,7 @@ impl UserDevice {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Revoke (soft-delete) a device (admin, no user_id check).
+    /// Revoke (soft-delete) a device (admin, no `user_id` check).
     pub async fn revoke_admin<'e, E>(
         executor: E,
         tenant_id: Uuid,
@@ -557,12 +558,12 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE user_devices
             SET revoked_at = NOW(), is_trusted = FALSE, trust_expires_at = NULL
             WHERE tenant_id = $1 AND id = $2
             AND revoked_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -583,10 +584,10 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM user_devices
             WHERE tenant_id = $1 AND id = $2 AND user_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -608,13 +609,13 @@ impl UserDevice {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_devices
             WHERE tenant_id = $1 AND user_id = $2 AND device_fingerprint = $3
             AND is_trusted = TRUE
             AND revoked_at IS NULL
             AND (trust_expires_at IS NULL OR trust_expires_at > NOW())
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

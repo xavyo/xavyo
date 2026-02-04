@@ -72,6 +72,7 @@ pub struct UpdateIpSettings {
 
 impl TenantIpSettings {
     /// Get default settings for a tenant (doesn't persist).
+    #[must_use] 
     pub fn default_for_tenant(tenant_id: Uuid) -> Self {
         Self {
             tenant_id,
@@ -118,7 +119,7 @@ impl TenantIpSettings {
         let bypass_for_super_admin = data.bypass_for_super_admin.unwrap_or(true);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_ip_settings (
                 tenant_id,
                 enforcement_mode,
@@ -133,7 +134,7 @@ impl TenantIpSettings {
                 updated_at = NOW(),
                 updated_by = $4
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(enforcement_mode)

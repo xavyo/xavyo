@@ -101,10 +101,10 @@ impl GovAccessSnapshot {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_access_snapshots
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -119,10 +119,10 @@ impl GovAccessSnapshot {
         event_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_access_snapshots
             WHERE tenant_id = $1 AND event_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(event_id)
@@ -139,12 +139,12 @@ impl GovAccessSnapshot {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_access_snapshots
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -161,10 +161,10 @@ impl GovAccessSnapshot {
         user_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_access_snapshots
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -181,24 +181,24 @@ impl GovAccessSnapshot {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_access_snapshots
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.event_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_id = ${}", param_count));
+            query.push_str(&format!(" AND event_id = ${param_count}"));
         }
         if filter.snapshot_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND snapshot_type = ${}", param_count));
+            query.push_str(&format!(" AND snapshot_type = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -232,13 +232,13 @@ impl GovAccessSnapshot {
             .unwrap_or_else(|_| serde_json::json!({"assignments": [], "total_count": 0}));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_access_snapshots (
                 tenant_id, user_id, event_id, snapshot_type, assignments
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.user_id)
@@ -250,11 +250,13 @@ impl GovAccessSnapshot {
     }
 
     /// Parse the assignments JSON.
+    #[must_use] 
     pub fn parse_assignments(&self) -> SnapshotContent {
         serde_json::from_value(self.assignments.clone()).unwrap_or_default()
     }
 
     /// Get the total count of assignments in the snapshot.
+    #[must_use] 
     pub fn assignment_count(&self) -> i32 {
         self.parse_assignments().total_count
     }

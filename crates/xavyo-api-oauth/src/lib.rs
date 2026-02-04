@@ -1,6 +1,6 @@
 //! OAuth2/OIDC Provider API for xavyo.
 //!
-//! This crate implements an OAuth2 Authorization Server with OpenID Connect support.
+//! This crate implements an `OAuth2` Authorization Server with `OpenID` Connect support.
 //!
 //! # Supported Grant Types
 //!
@@ -14,8 +14,8 @@
 //! ## OAuth2/OIDC Endpoints (mounted at /oauth)
 //!
 //! - `GET /oauth/authorize` - Authorization endpoint
-//! - `POST /oauth/token` - Token endpoint (supports device_code grant)
-//! - `GET /oauth/userinfo` - UserInfo endpoint
+//! - `POST /oauth/token` - Token endpoint (supports `device_code` grant)
+//! - `GET /oauth/userinfo` - `UserInfo` endpoint
 //! - `POST /oauth/device/code` - RFC 8628 Device Authorization endpoint
 //!
 //! ## Device Verification Endpoints (mounted at /device)

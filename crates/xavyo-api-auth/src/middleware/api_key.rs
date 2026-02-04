@@ -1,7 +1,7 @@
 //! API Key Authentication middleware.
 //!
 //! Extracts and validates API keys from Authorization header,
-//! then inserts TenantId, UserId, and ApiKeyContext into request extensions.
+//! then inserts `TenantId`, `UserId`, and `ApiKeyContext` into request extensions.
 //!
 //! # Key Format
 //!
@@ -85,7 +85,7 @@ pub enum ApiKeyError {
     NotFound,
     /// The API key has expired.
     Expired,
-    /// The API key has been revoked (is_active = false).
+    /// The API key has been revoked (`is_active` = false).
     Revoked,
     /// The API key's tenant doesn't match X-Tenant-ID header.
     TenantMismatch,
@@ -155,7 +155,7 @@ fn extract_tenant_header(request: &Request<Body>) -> Option<Uuid> {
 
 /// Validate an API key against the database.
 ///
-/// Returns the ApiKey record if valid, or an appropriate error.
+/// Returns the `ApiKey` record if valid, or an appropriate error.
 async fn validate_api_key(
     pool: &PgPool,
     token: &str,
@@ -210,7 +210,7 @@ async fn validate_api_key(
 /// This middleware:
 /// 1. Extracts the Bearer token from the Authorization header
 /// 2. If the token starts with `xavyo_sk_`, validates it as an API key
-/// 3. If valid, inserts TenantId, UserId, and ApiKeyContext into request extensions
+/// 3. If valid, inserts `TenantId`, `UserId`, and `ApiKeyContext` into request extensions
 /// 4. If the token is not an API key, passes through to allow JWT middleware to handle it
 ///
 /// # Dual Auth Support
@@ -272,7 +272,7 @@ pub async fn api_key_auth_middleware(
     // Validate the API key
     let api_key = validate_api_key(&pool, token, tenant_header)
         .await
-        .map_err(|e| e.into_response())?;
+        .map_err(axum::response::IntoResponse::into_response)?;
 
     // Log successful authentication
     tracing::debug!(

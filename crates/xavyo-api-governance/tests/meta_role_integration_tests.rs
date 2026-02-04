@@ -948,8 +948,7 @@ async fn test_large_scale_matching() {
     // Performance sanity check - should complete within reasonable time
     assert!(
         duration.as_secs() < 30,
-        "Re-evaluation took too long: {:?}",
-        duration
+        "Re-evaluation took too long: {duration:?}"
     );
 
     cleanup_meta_role_data(&pool, tenant_id).await;

@@ -107,7 +107,7 @@ pub struct DeviceResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_current: Option<bool>,
 
-    /// Revocation timestamp (only in admin view with include_revoked).
+    /// Revocation timestamp (only in admin view with `include_revoked`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revoked_at: Option<DateTime<Utc>>,
 }
@@ -169,8 +169,9 @@ impl Default for DevicePolicyResponse {
 // ============================================================================
 
 impl DeviceResponse {
-    /// Create a device response from a UserDevice.
+    /// Create a device response from a `UserDevice`.
     /// Use `with_admin_details` for admin responses.
+    #[must_use] 
     pub fn from_user_device(device: xavyo_db::UserDevice, is_current: bool) -> Self {
         Self {
             id: device.id,
@@ -196,7 +197,8 @@ impl DeviceResponse {
         }
     }
 
-    /// Create a device response with admin details (includes IP, geo, and revoked_at).
+    /// Create a device response with admin details (includes IP, geo, and `revoked_at`).
+    #[must_use] 
     pub fn from_user_device_admin(device: xavyo_db::UserDevice, include_revoked: bool) -> Self {
         Self {
             id: device.id,

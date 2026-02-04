@@ -77,30 +77,35 @@ impl DeliveryService {
     }
 
     /// Set the maximum delivery attempts.
+    #[must_use] 
     pub fn with_max_attempts(mut self, max: i32) -> Self {
         self.max_attempts = max;
         self
     }
 
     /// Set the consecutive failure threshold for auto-disable.
+    #[must_use] 
     pub fn with_disable_threshold(mut self, threshold: i32) -> Self {
         self.disable_threshold = threshold;
         self
     }
 
     /// Set the circuit breaker registry for endpoint health tracking.
+    #[must_use] 
     pub fn with_circuit_breaker(mut self, registry: Arc<CircuitBreakerRegistry>) -> Self {
         self.circuit_breaker_registry = Some(registry);
         self
     }
 
     /// Set the DLQ service for storing failed webhooks.
+    #[must_use] 
     pub fn with_dlq_service(mut self, service: Arc<DlqService>) -> Self {
         self.dlq_service = Some(service);
         self
     }
 
     /// Set the rate limiter registry for per-destination throttling.
+    #[must_use] 
     pub fn with_rate_limiter(mut self, registry: Arc<RateLimiterRegistry>) -> Self {
         self.rate_limiter_registry = Some(registry);
         self
@@ -108,7 +113,7 @@ impl DeliveryService {
 
     /// Deliver an event to all matching active subscriptions.
     ///
-    /// For each active subscription whose event_types include the event's type,
+    /// For each active subscription whose `event_types` include the event's type,
     /// creates a delivery record and attempts immediate delivery.
     pub async fn deliver_event(&self, event: &WebhookEvent) {
         let subscriptions = match WebhookSubscription::find_active_by_event_type(
@@ -558,7 +563,7 @@ impl DeliveryService {
                         subscription,
                         error_message.to_string(),
                         response_code,
-                        response_body.map(|s| s.to_string()),
+                        response_body.map(std::string::ToString::to_string),
                         attempt_history,
                     )
                     .await
@@ -730,6 +735,7 @@ impl DeliveryService {
     }
 
     /// Get a reference to the connection pool (for the worker).
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -738,6 +744,7 @@ impl DeliveryService {
 /// Calculate the next retry timestamp based on attempt number and backoff schedule.
 ///
 /// Returns None if all retries are exhausted.
+#[must_use] 
 pub fn calculate_next_attempt_at(
     attempt_number: i32,
     max_attempts: i32,
@@ -757,12 +764,12 @@ pub fn calculate_next_attempt_at(
     Some(Utc::now() + Duration::seconds(delay_secs))
 }
 
-/// Convert reqwest HeaderMap to a JSON-serializable map.
+/// Convert reqwest `HeaderMap` to a JSON-serializable map.
 fn headers_to_map(
     headers: &reqwest::header::HeaderMap,
 ) -> serde_json::Map<String, serde_json::Value> {
     let mut map = serde_json::Map::new();
-    for (name, value) in headers.iter() {
+    for (name, value) in headers {
         if let Ok(v) = value.to_str() {
             map.insert(name.to_string(), serde_json::Value::String(v.to_string()));
         }

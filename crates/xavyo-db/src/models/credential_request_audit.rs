@@ -2,7 +2,7 @@
 //!
 //! Immutable audit log of all credential requests for compliance
 //! and security monitoring.
-//! Part of the SecretlessAI feature (F120).
+//! Part of the `SecretlessAI` feature (F120).
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -48,7 +48,7 @@ impl std::str::FromStr for CredentialRequestOutcome {
             "denied" => Ok(CredentialRequestOutcome::Denied),
             "rate_limited" => Ok(CredentialRequestOutcome::RateLimited),
             "error" => Ok(CredentialRequestOutcome::Error),
-            _ => Err(format!("Invalid credential request outcome: {}", s)),
+            _ => Err(format!("Invalid credential request outcome: {s}")),
         }
     }
 }
@@ -130,7 +130,7 @@ pub struct CredentialRequestAudit {
     /// Error code (if denied/error).
     pub error_code: Option<String>,
 
-    /// Source IP of the request (stored as string, use source_ip_addr() for parsing).
+    /// Source IP of the request (stored as string, use `source_ip_addr()` for parsing).
     pub source_ip: Option<String>,
 
     /// User agent string.
@@ -139,7 +139,7 @@ pub struct CredentialRequestAudit {
     /// Request processing latency in milliseconds.
     pub latency_ms: f32,
 
-    /// Additional context (conversation_id, session_id, etc.).
+    /// Additional context (`conversation_id`, `session_id`, etc.).
     pub context: Option<JsonValue>,
 
     /// When the request was made.
@@ -153,11 +153,13 @@ impl CredentialRequestAudit {
     }
 
     /// Check if the request was successful.
+    #[must_use] 
     pub fn is_success(&self) -> bool {
         self.outcome == "success"
     }
 
-    /// Parse the source IP as an IpAddr.
+    /// Parse the source IP as an `IpAddr`.
+    #[must_use] 
     pub fn source_ip_addr(&self) -> Option<IpAddr> {
         self.source_ip.as_ref().and_then(|s| s.parse().ok())
     }
@@ -235,14 +237,14 @@ impl CredentialRequestAudit {
         input: CreateCredentialRequestAudit,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO credential_request_audit (
                 tenant_id, agent_id, secret_type, outcome, ttl_granted,
                 error_code, source_ip, user_agent, latency_ms, context
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.agent_id)
@@ -265,10 +267,10 @@ impl CredentialRequestAudit {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM credential_request_audit
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -285,36 +287,36 @@ impl CredentialRequestAudit {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM credential_request_audit
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.agent_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND agent_id = ${}", param_count));
+            query.push_str(&format!(" AND agent_id = ${param_count}"));
         }
 
         if filter.secret_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND secret_type = ${}", param_count));
+            query.push_str(&format!(" AND secret_type = ${param_count}"));
         }
 
         if filter.outcome.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND outcome = ${}", param_count));
+            query.push_str(&format!(" AND outcome = ${param_count}"));
         }
 
         if filter.from_time.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
 
         if filter.to_time.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at < ${}", param_count));
+            query.push_str(&format!(" AND created_at < ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -351,36 +353,36 @@ impl CredentialRequestAudit {
         filter: &CredentialRequestAuditFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM credential_request_audit
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.agent_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND agent_id = ${}", param_count));
+            query.push_str(&format!(" AND agent_id = ${param_count}"));
         }
 
         if filter.secret_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND secret_type = ${}", param_count));
+            query.push_str(&format!(" AND secret_type = ${param_count}"));
         }
 
         if filter.outcome.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND outcome = ${}", param_count));
+            query.push_str(&format!(" AND outcome = ${param_count}"));
         }
 
         if filter.from_time.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
 
         if filter.to_time.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at < ${}", param_count));
+            query.push_str(&format!(" AND created_at < ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -413,11 +415,11 @@ impl CredentialRequestAudit {
         window_start: DateTime<Utc>,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM credential_request_audit
             WHERE tenant_id = $1 AND agent_id = $2 AND secret_type = $3
             AND created_at >= $4 AND outcome = 'success'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -435,7 +437,7 @@ impl CredentialRequestAudit {
         since: DateTime<Utc>,
     ) -> Result<AuditStats, sqlx::Error> {
         let row = sqlx::query_as::<_, AuditStatsRow>(
-            r#"
+            r"
             SELECT
                 COUNT(*) as total_requests,
                 COUNT(*) FILTER (WHERE outcome = 'success') as successful_requests,
@@ -445,7 +447,7 @@ impl CredentialRequestAudit {
                 COALESCE(AVG(latency_ms), 0) as avg_latency_ms
             FROM credential_request_audit
             WHERE tenant_id = $1 AND agent_id = $2 AND created_at >= $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)

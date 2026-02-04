@@ -67,12 +67,12 @@ impl RevokedToken {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO revoked_tokens (jti, user_id, tenant_id, reason, expires_at, revoked_by)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (jti) DO NOTHING
             RETURNING *
-            "#,
+            ",
         )
         .bind(&input.jti)
         .bind(input.user_id)
@@ -93,12 +93,12 @@ impl RevokedToken {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let result: (bool,) = sqlx::query_as(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM revoked_tokens
                 WHERE jti = $1
             )
-            "#,
+            ",
         )
         .bind(jti)
         .fetch_one(executor)
@@ -117,10 +117,10 @@ impl RevokedToken {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM revoked_tokens
             WHERE tenant_id = $1 AND jti = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(jti)
@@ -138,11 +138,11 @@ impl RevokedToken {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM revoked_tokens
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY revoked_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -160,10 +160,10 @@ impl RevokedToken {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM revoked_tokens
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -183,10 +183,10 @@ impl RevokedToken {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM revoked_tokens
             WHERE expires_at < NOW()
-            "#,
+            ",
         )
         .execute(executor)
         .await?;

@@ -4,7 +4,7 @@ use crate::format::{EventFormatter, FormatError};
 use crate::models::{SiemEvent, SYSLOG_APP_NAME, SYSLOG_HOSTNAME, SYSLOG_PEN};
 
 /// Syslog facility codes.
-/// Default: AUTH_PRIV (10)
+/// Default: `AUTH_PRIV` (10)
 #[allow(dead_code)]
 const DEFAULT_FACILITY: u8 = 10;
 
@@ -15,6 +15,7 @@ pub struct SyslogFormatter {
 }
 
 impl SyslogFormatter {
+    #[must_use] 
     pub fn new(facility: u8, hostname: Option<String>) -> Self {
         Self {
             facility,
@@ -24,7 +25,7 @@ impl SyslogFormatter {
 
     /// Calculate PRI value: facility * 8 + severity
     fn calculate_pri(&self, severity: u8) -> u16 {
-        (self.facility as u16) * 8 + Self::map_severity(severity) as u16
+        u16::from(self.facility) * 8 + u16::from(Self::map_severity(severity))
     }
 
     /// Map CEF severity (0-10) to syslog severity (0-7).
@@ -44,7 +45,7 @@ impl SyslogFormatter {
     /// Format structured data element per RFC 5424.
     /// [xavyo@PEN key="value" ...]
     fn format_structured_data(event: &SiemEvent) -> String {
-        let mut sd = format!("[xavyo@{}", SYSLOG_PEN);
+        let mut sd = format!("[xavyo@{SYSLOG_PEN}");
 
         sd.push_str(&format!(
             " tenant_id=\"{}\"",

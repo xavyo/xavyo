@@ -1,4 +1,4 @@
-//! Authorization service for OAuth2 authorization code flow.
+//! Authorization service for `OAuth2` authorization code flow.
 
 use crate::error::OAuthError;
 use crate::models::AuthorizationRequest;
@@ -36,18 +36,20 @@ pub struct AuthorizationService {
 
 impl AuthorizationService {
     /// Create a new authorization service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Generate a cryptographically secure authorization code.
     ///
-    /// SECURITY: Uses OsRng directly from the operating system's CSPRNG for maximum security.
+    /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG for maximum security.
     fn generate_code() -> String {
         use rand::rngs::OsRng;
         use rand::RngCore;
@@ -65,6 +67,7 @@ impl AuthorizationService {
     }
 
     /// Generate a PKCE code challenge from a verifier using S256.
+    #[must_use] 
     pub fn generate_code_challenge(code_verifier: &str) -> String {
         let mut hasher = Sha256::new();
         hasher.update(code_verifier.as_bytes());
@@ -73,6 +76,7 @@ impl AuthorizationService {
     }
 
     /// Verify a PKCE code verifier against a code challenge.
+    #[must_use] 
     pub fn verify_code_verifier(code_verifier: &str, code_challenge: &str) -> bool {
         let computed_challenge = Self::generate_code_challenge(code_verifier);
         // Use constant-time comparison to prevent timing attacks
@@ -161,14 +165,14 @@ impl AuthorizationService {
 
         // Store the hashed code in the database
         sqlx::query(
-            r#"
+            r"
             INSERT INTO authorization_codes (
                 code_hash, client_id, user_id, tenant_id,
                 redirect_uri, scope, code_challenge, code_challenge_method,
                 nonce, expires_at
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            "#,
+            ",
         )
         .bind(&code_hash)
         .bind(client_id)
@@ -199,7 +203,7 @@ impl AuthorizationService {
     /// 4. Redirect URI matches
     /// 5. PKCE code verifier matches the stored challenge
     ///
-    /// Returns (user_id, scope, nonce) if valid.
+    /// Returns (`user_id`, scope, nonce) if valid.
     pub async fn validate_and_consume_code(
         &self,
         tenant_id: Uuid,
@@ -228,13 +232,13 @@ impl AuthorizationService {
 
         // Fetch the authorization code record
         let record: Option<AuthCodeRecord> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, client_id, user_id, redirect_uri, scope,
                    code_challenge, nonce, expires_at, used
             FROM authorization_codes
             WHERE code_hash = $1 AND tenant_id = $2
             FOR UPDATE
-            "#,
+            ",
         )
         .bind(&code_hash)
         .bind(tenant_id)
@@ -295,11 +299,11 @@ impl AuthorizationService {
 
         // Mark the code as used
         sqlx::query(
-            r#"
+            r"
             UPDATE authorization_codes
             SET used = TRUE
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(record.id)
         .execute(&mut *tx)

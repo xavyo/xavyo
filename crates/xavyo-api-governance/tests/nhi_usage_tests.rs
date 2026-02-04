@@ -267,7 +267,7 @@ fn test_usage_summary_success_rate_calculation() {
 
     for (total, successful, expected_rate) in scenarios {
         let calculated_rate = if total > 0 {
-            (successful as f64 / total as f64) * 100.0
+            (f64::from(successful) / f64::from(total)) * 100.0
         } else {
             0.0
         };
@@ -555,7 +555,7 @@ fn test_ipv6_source_ip() {
         metadata: None,
     };
 
-    assert!(request.source_ip.unwrap().contains(":"));
+    assert!(request.source_ip.unwrap().contains(':'));
 }
 
 #[test]
@@ -605,9 +605,7 @@ fn test_usage_event_response_with_all_outcomes() {
         let json = serde_json::to_string(&response).expect("Serialization failed");
         assert!(
             json.contains(expected_json),
-            "Expected JSON to contain '{}' but got: {}",
-            expected_json,
-            json
+            "Expected JSON to contain '{expected_json}' but got: {json}"
         );
     }
 }

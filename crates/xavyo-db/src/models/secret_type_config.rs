@@ -2,7 +2,7 @@
 //!
 //! Defines the configuration for different types of secrets including
 //! TTL settings, rate limits, and provider information.
-//! Part of the SecretlessAI feature (F120).
+//! Part of the `SecretlessAI` feature (F120).
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ pub struct SecretTypeConfiguration {
     /// Provider type (openbao, infisical, internal, aws).
     pub provider_type: String,
 
-    /// Provider-specific path (e.g., OpenBao mount path).
+    /// Provider-specific path (e.g., `OpenBao` mount path).
     pub provider_path: Option<String>,
 
     /// Rate limit per agent per hour.
@@ -75,10 +75,10 @@ impl SecretTypeConfiguration {
     }
 
     /// Get the effective TTL (use default if not specified).
+    #[must_use] 
     pub fn effective_ttl(&self, requested_ttl: Option<i32>) -> i32 {
         requested_ttl
-            .map(|ttl| ttl.min(self.max_ttl_seconds))
-            .unwrap_or(self.default_ttl_seconds)
+            .map_or(self.default_ttl_seconds, |ttl| ttl.min(self.max_ttl_seconds))
     }
 }
 
@@ -167,10 +167,10 @@ impl SecretTypeConfiguration {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM secret_type_configurations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -185,10 +185,10 @@ impl SecretTypeConfiguration {
         type_name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM secret_type_configurations
             WHERE tenant_id = $1 AND type_name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(type_name)
@@ -205,26 +205,26 @@ impl SecretTypeConfiguration {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM secret_type_configurations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.provider_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND provider_type = ${}", param_count));
+            query.push_str(&format!(" AND provider_type = ${param_count}"));
         }
 
         if filter.enabled.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND enabled = ${}", param_count));
+            query.push_str(&format!(" AND enabled = ${param_count}"));
         }
 
         if filter.type_name_prefix.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND type_name ILIKE ${} || '%'", param_count));
+            query.push_str(&format!(" AND type_name ILIKE ${param_count} || '%'"));
         }
 
         query.push_str(&format!(
@@ -255,26 +255,26 @@ impl SecretTypeConfiguration {
         filter: &SecretTypeConfigFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM secret_type_configurations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.provider_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND provider_type = ${}", param_count));
+            query.push_str(&format!(" AND provider_type = ${param_count}"));
         }
 
         if filter.enabled.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND enabled = ${}", param_count));
+            query.push_str(&format!(" AND enabled = ${param_count}"));
         }
 
         if filter.type_name_prefix.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND type_name ILIKE ${} || '%'", param_count));
+            query.push_str(&format!(" AND type_name ILIKE ${param_count} || '%'"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -299,14 +299,14 @@ impl SecretTypeConfiguration {
         input: CreateSecretTypeConfiguration,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO secret_type_configurations (
                 tenant_id, type_name, description, default_ttl_seconds,
                 max_ttl_seconds, provider_type, provider_path, rate_limit_per_hour
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.type_name)
@@ -331,27 +331,27 @@ impl SecretTypeConfiguration {
         let mut param_idx = 3;
 
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.default_ttl_seconds.is_some() {
-            updates.push(format!("default_ttl_seconds = ${}", param_idx));
+            updates.push(format!("default_ttl_seconds = ${param_idx}"));
             param_idx += 1;
         }
         if input.max_ttl_seconds.is_some() {
-            updates.push(format!("max_ttl_seconds = ${}", param_idx));
+            updates.push(format!("max_ttl_seconds = ${param_idx}"));
             param_idx += 1;
         }
         if input.provider_path.is_some() {
-            updates.push(format!("provider_path = ${}", param_idx));
+            updates.push(format!("provider_path = ${param_idx}"));
             param_idx += 1;
         }
         if input.rate_limit_per_hour.is_some() {
-            updates.push(format!("rate_limit_per_hour = ${}", param_idx));
+            updates.push(format!("rate_limit_per_hour = ${param_idx}"));
             param_idx += 1;
         }
         if input.enabled.is_some() {
-            updates.push(format!("enabled = ${}", param_idx));
+            updates.push(format!("enabled = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -393,10 +393,10 @@ impl SecretTypeConfiguration {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM secret_type_configurations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -413,12 +413,12 @@ impl SecretTypeConfiguration {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE secret_type_configurations
             SET enabled = true, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -433,12 +433,12 @@ impl SecretTypeConfiguration {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE secret_type_configurations
             SET enabled = false, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

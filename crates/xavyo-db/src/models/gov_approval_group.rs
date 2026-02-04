@@ -66,10 +66,10 @@ impl GovApprovalGroup {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_groups
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -84,10 +84,10 @@ impl GovApprovalGroup {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_groups
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -108,11 +108,11 @@ impl GovApprovalGroup {
 
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.member_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND ${} = ANY(member_ids)", param_count));
+            query.push_str(&format!(" AND ${param_count} = ANY(member_ids)"));
         }
 
         query.push_str(&format!(
@@ -145,11 +145,11 @@ impl GovApprovalGroup {
 
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.member_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND ${} = ANY(member_ids)", param_count));
+            query.push_str(&format!(" AND ${param_count} = ANY(member_ids)"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -171,11 +171,11 @@ impl GovApprovalGroup {
         input: CreateApprovalGroup,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_approval_groups (tenant_id, name, description, member_ids)
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -196,15 +196,15 @@ impl GovApprovalGroup {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_active.is_some() {
-            updates.push(format!("is_active = ${}", param_idx));
+            updates.push(format!("is_active = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -235,10 +235,10 @@ impl GovApprovalGroup {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_approval_groups
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -256,7 +256,7 @@ impl GovApprovalGroup {
         new_member_ids: &[Uuid],
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_approval_groups
             SET member_ids = (
                 SELECT ARRAY(
@@ -266,7 +266,7 @@ impl GovApprovalGroup {
             updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -283,7 +283,7 @@ impl GovApprovalGroup {
         member_ids_to_remove: &[Uuid],
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_approval_groups
             SET member_ids = (
                 SELECT ARRAY(
@@ -293,7 +293,7 @@ impl GovApprovalGroup {
             updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -303,11 +303,13 @@ impl GovApprovalGroup {
     }
 
     /// Get member count.
+    #[must_use] 
     pub fn member_count(&self) -> usize {
         self.member_ids.len()
     }
 
     /// Check if a user is a member.
+    #[must_use] 
     pub fn has_member(&self, user_id: Uuid) -> bool {
         self.member_ids.contains(&user_id)
     }
@@ -319,12 +321,12 @@ impl GovApprovalGroup {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_escalation_levels
             WHERE tenant_id = $1
               AND target_type = 'approval_group'
               AND target_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)

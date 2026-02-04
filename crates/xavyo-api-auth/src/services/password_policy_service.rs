@@ -121,6 +121,7 @@ pub struct PasswordPolicyService {
 
 impl PasswordPolicyService {
     /// Create a new password policy service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -283,6 +284,7 @@ impl PasswordPolicyService {
     }
 
     /// Check if a user's password has expired.
+    #[must_use] 
     pub fn check_password_expired(
         password_changed_at: Option<chrono::DateTime<chrono::Utc>>,
         expiration_days: i32,
@@ -328,7 +330,7 @@ impl PasswordPolicyService {
 
     /// Calculate the password expiration timestamp based on policy.
     ///
-    /// Returns None if expiration is disabled (expiration_days = 0).
+    /// Returns None if expiration is disabled (`expiration_days` = 0).
     #[must_use]
     pub fn calculate_password_expiration(
         expiration_days: i32,
@@ -358,14 +360,14 @@ impl PasswordPolicyService {
         let expires_at = Self::calculate_password_expiration(expiration_days);
 
         sqlx::query(
-            r#"
+            r"
             UPDATE users
             SET password_changed_at = $2,
                 password_expires_at = $3,
                 must_change_password = false,
                 updated_at = NOW()
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(now)

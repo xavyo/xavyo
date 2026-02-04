@@ -20,7 +20,7 @@ use crate::router::AgentsState;
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::{CloudProviderType, IdentityAuditEventFilter, IdentityAuditOutcome};
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()
@@ -77,10 +77,10 @@ pub struct CloudCredentialData {
     /// AWS region (if AWS).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub region: Option<String>,
-    /// OAuth2 access token (GCP, Azure, Kubernetes).
+    /// `OAuth2` access token (GCP, Azure, Kubernetes).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub access_token: Option<String>,
-    /// Token type (Bearer for OAuth2 tokens).
+    /// Token type (Bearer for `OAuth2` tokens).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_type: Option<String>,
     /// Kubernetes namespace (if applicable).

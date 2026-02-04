@@ -50,11 +50,13 @@ impl Default for RateLimitConfig {
 
 impl RateLimitConfig {
     /// Creates a new configuration with all defaults.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Creates a configuration optimized for testing (shorter delays).
+    #[must_use] 
     pub fn for_testing() -> Self {
         Self {
             base_delay_ms: 10,
@@ -117,10 +119,10 @@ impl RateLimitState {
     }
 
     /// Checks if still within retry-after period.
+    #[must_use] 
     pub fn is_within_retry_after(&self) -> bool {
         self.retry_after_until
-            .map(|until| Instant::now() < until)
-            .unwrap_or(false)
+            .is_some_and(|until| Instant::now() < until)
     }
 }
 
@@ -160,11 +162,13 @@ impl RateLimiter {
     }
 
     /// Creates a rate limiter with default configuration.
+    #[must_use] 
     pub fn with_defaults() -> Self {
         Self::new(RateLimitConfig::default()).expect("default config should be valid")
     }
 
     /// Returns the current configuration.
+    #[must_use] 
     pub fn config(&self) -> &RateLimitConfig {
         &self.config
     }
@@ -190,6 +194,7 @@ impl RateLimiter {
     }
 
     /// Parses the Retry-After header value.
+    #[must_use] 
     pub fn parse_retry_after(header_value: &str) -> Option<u64> {
         // Retry-After can be either seconds or HTTP-date
         // We only support seconds format for simplicity
@@ -197,6 +202,7 @@ impl RateLimiter {
     }
 
     /// Calculates backoff delay with exponential growth.
+    #[must_use] 
     pub fn calculate_backoff_delay(&self, attempt: u32) -> Duration {
         let base = self.config.base_delay_ms as f64;
         let max = self.config.max_delay_ms as f64;
@@ -208,6 +214,7 @@ impl RateLimiter {
     }
 
     /// Adds jitter to a delay using the configured factor.
+    #[must_use] 
     pub fn add_jitter(&self, delay: Duration) -> Duration {
         use rand::Rng;
 
@@ -431,7 +438,7 @@ mod tests {
             let delay = limiter.add_jitter(base_delay);
             let delay_ms = delay.as_millis() as u64;
             // Should be in range [base, base + max_jitter]
-            assert!(delay_ms >= 1000, "delay {} should be >= 1000", delay_ms);
+            assert!(delay_ms >= 1000, "delay {delay_ms} should be >= 1000");
             assert!(
                 delay_ms <= 1000 + max_jitter,
                 "delay {} should be <= {}",
@@ -497,8 +504,7 @@ mod tests {
         // Should complete quickly with Retry-After: 0
         assert!(
             elapsed < Duration::from_millis(100),
-            "elapsed {:?}",
-            elapsed
+            "elapsed {elapsed:?}"
         );
     }
 
@@ -537,13 +543,11 @@ mod tests {
         // Should have waited approximately base_delay (50ms)
         assert!(
             elapsed >= Duration::from_millis(45),
-            "elapsed {:?}",
-            elapsed
+            "elapsed {elapsed:?}"
         );
         assert!(
             elapsed < Duration::from_millis(200),
-            "elapsed {:?}",
-            elapsed
+            "elapsed {elapsed:?}"
         );
     }
 
@@ -577,9 +581,9 @@ mod tests {
         let elapsed3 = start.elapsed();
 
         // Verify exponential growth pattern
-        assert!(elapsed1 >= Duration::from_millis(15), "e1: {:?}", elapsed1);
-        assert!(elapsed2 >= Duration::from_millis(35), "e2: {:?}", elapsed2);
-        assert!(elapsed3 >= Duration::from_millis(70), "e3: {:?}", elapsed3);
+        assert!(elapsed1 >= Duration::from_millis(15), "e1: {elapsed1:?}");
+        assert!(elapsed2 >= Duration::from_millis(35), "e2: {elapsed2:?}");
+        assert!(elapsed3 >= Duration::from_millis(70), "e3: {elapsed3:?}");
         assert!(elapsed2 > elapsed1, "e2 should > e1");
         assert!(elapsed3 > elapsed2, "e3 should > e2");
     }

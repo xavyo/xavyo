@@ -435,10 +435,10 @@ async fn test_cascade_creates_audit_events() {
     // Manually insert an audit event (simulating what the service would do)
     let event_id = Uuid::new_v4();
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_meta_role_events (id, tenant_id, meta_role_id, event_type, actor_id, created_at)
         VALUES ($1, $2, $3, 'created'::gov_meta_role_event_type, $4, NOW())
-        "#,
+        ",
     )
     .bind(event_id)
     .bind(tenant_id)

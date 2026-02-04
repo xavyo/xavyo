@@ -1,7 +1,7 @@
 //! HTTP handlers for public branding endpoint (F030).
 //!
 //! Public endpoint for login pages (no authentication required):
-//! - GET /public/branding/:tenant_slug - Get branding for login page
+//! - GET /`public/branding/:tenant_slug` - Get branding for login page
 
 use axum::{extract::Path, Extension, Json};
 use std::sync::Arc;

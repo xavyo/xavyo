@@ -29,7 +29,7 @@ pub struct CreateSimulationComparisonRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub simulation_a_type: Option<String>,
 
-    /// Second simulation ID (required for simulation_vs_simulation).
+    /// Second simulation ID (required for `simulation_vs_simulation`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub simulation_b_id: Option<Uuid>,
 

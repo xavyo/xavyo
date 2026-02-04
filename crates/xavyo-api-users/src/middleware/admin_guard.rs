@@ -13,10 +13,10 @@ pub const ADMIN_ROLE: &str = "admin";
 /// Super admin role (has all admin privileges).
 pub const SUPER_ADMIN_ROLE: &str = "super_admin";
 
-/// Middleware that requires the authenticated user to have the "admin" or "super_admin" role.
+/// Middleware that requires the authenticated user to have the "admin" or "`super_admin`" role.
 ///
 /// This middleware extracts `JwtClaims` from request extensions and verifies
-/// the user has either the "admin" or "super_admin" role. If the claims are missing
+/// the user has either the "admin" or "`super_admin`" role. If the claims are missing
 /// (not authenticated) or the user doesn't have an admin role, an appropriate error is returned.
 ///
 /// # Usage
@@ -39,7 +39,7 @@ pub const SUPER_ADMIN_ROLE: &str = "super_admin";
 /// # Errors
 ///
 /// - `ApiUsersError::Unauthorized` (401): No JWT claims in request extensions
-/// - `ApiUsersError::Forbidden` (403): User doesn't have the "admin" or "super_admin" role
+/// - `ApiUsersError::Forbidden` (403): User doesn't have the "admin" or "`super_admin`" role
 pub async fn admin_guard(request: Request<Body>, next: Next) -> Result<Response, ApiUsersError> {
     // Extract JWT claims from extensions
     let claims = request

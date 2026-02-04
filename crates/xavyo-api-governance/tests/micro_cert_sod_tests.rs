@@ -1,6 +1,6 @@
-//! Unit tests for SoD violation micro-certification (US2).
+//! Unit tests for `SoD` violation micro-certification (US2).
 //!
-//! Tests the integration between SoD violations and micro-certifications.
+//! Tests the integration between `SoD` violations and micro-certifications.
 
 use uuid::Uuid;
 
@@ -8,7 +8,7 @@ mod sod_violation_trigger {
     use super::*;
     use xavyo_db::models::MicroCertTriggerType;
 
-    /// T036: sod_violation trigger matching
+    /// T036: `sod_violation` trigger matching
     #[test]
     fn test_sod_violation_trigger_type_exists() {
         // Verify the trigger type enum variant exists
@@ -66,7 +66,7 @@ mod sod_violation_trigger {
 mod sod_approval_exemption {
     use xavyo_db::models::{MicroCertDecision, MicroCertStatus};
 
-    /// T037: SoD approval creating exemption
+    /// T037: `SoD` approval creating exemption
     #[test]
     fn test_approve_decision_variant_exists() {
         let decision = MicroCertDecision::Approve;
@@ -112,7 +112,7 @@ mod sod_rejection_revocation {
     use super::*;
     use xavyo_db::models::{MicroCertDecision, MicroCertStatus};
 
-    /// T038: SoD rejection revoking triggering assignment
+    /// T038: `SoD` rejection revoking triggering assignment
     #[test]
     fn test_revoke_decision_variant_exists() {
         let decision = MicroCertDecision::Revoke;

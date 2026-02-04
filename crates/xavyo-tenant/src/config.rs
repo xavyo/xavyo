@@ -54,7 +54,7 @@ impl TenantConfig {
     }
 }
 
-/// Builder for TenantConfig.
+/// Builder for `TenantConfig`.
 #[derive(Debug, Clone, Default)]
 pub struct TenantConfigBuilder {
     header_name: Option<String>,

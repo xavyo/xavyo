@@ -1,7 +1,7 @@
 //! Risk Assessment Service for calculating and managing user risk.
 //!
 //! This module provides services for:
-//! - Calculating composite risk scores based on entitlements and SoD violations
+//! - Calculating composite risk scores based on entitlements and `SoD` violations
 //! - Classifying risk levels using configurable thresholds
 //! - Tracking risk history for trend analysis
 //!

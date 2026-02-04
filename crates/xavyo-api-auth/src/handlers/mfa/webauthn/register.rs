@@ -1,6 +1,6 @@
-//! WebAuthn registration handlers.
+//! `WebAuthn` registration handlers.
 //!
-//! Handles the two-step WebAuthn credential registration process.
+//! Handles the two-step `WebAuthn` credential registration process.
 
 use axum::{extract::State, http::StatusCode, Extension, Json};
 use serde::{Deserialize, Serialize};
@@ -15,30 +15,30 @@ use xavyo_webhooks::{EventPublisher, WebhookEvent};
 
 use crate::{error::ApiAuthError, router::AuthState};
 
-/// Request to start WebAuthn registration.
+/// Request to start `WebAuthn` registration.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct StartRegistrationRequest {
-    /// Optional friendly name for the credential (e.g., "MacBook Touch ID").
+    /// Optional friendly name for the credential (e.g., "`MacBook` Touch ID").
     #[schema(example = "MacBook Touch ID")]
     pub name: Option<String>,
 }
 
-/// Response containing WebAuthn registration options.
+/// Response containing `WebAuthn` registration options.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct RegistrationOptionsResponse {
-    /// The registration options to pass to navigator.credentials.create().
-    /// This is the WebAuthn PublicKeyCredentialCreationOptions structure.
+    /// The registration options to pass to `navigator.credentials.create()`.
+    /// This is the `WebAuthn` `PublicKeyCredentialCreationOptions` structure.
     #[serde(flatten)]
     #[schema(value_type = Object)]
     pub options: CreationChallengeResponse,
 }
 
-/// Request to finish WebAuthn registration.
-/// Contains the authenticator's response from navigator.credentials.create().
+/// Request to finish `WebAuthn` registration.
+/// Contains the authenticator's response from `navigator.credentials.create()`.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct FinishRegistrationRequest {
     /// The credential creation response from the authenticator.
-    /// This is the WebAuthn PublicKeyCredential structure returned by navigator.credentials.create().
+    /// This is the `WebAuthn` `PublicKeyCredential` structure returned by `navigator.credentials.create()`.
     #[serde(flatten)]
     #[schema(value_type = Object)]
     pub credential: RegisterPublicKeyCredential,
@@ -55,8 +55,8 @@ pub struct RegistrationResponse {
 
 /// POST /auth/mfa/webauthn/register/start
 ///
-/// Start WebAuthn credential registration for the authenticated user.
-/// Returns challenge and options for the browser's navigator.credentials.create() call.
+/// Start `WebAuthn` credential registration for the authenticated user.
+/// Returns challenge and options for the browser's `navigator.credentials.create()` call.
 #[utoipa::path(
     post,
     path = "/auth/mfa/webauthn/register/start",
@@ -110,7 +110,7 @@ pub async fn start_webauthn_registration(
 
 /// POST /auth/mfa/webauthn/register/finish
 ///
-/// Complete WebAuthn credential registration.
+/// Complete `WebAuthn` credential registration.
 /// Verifies the authenticator response and stores the credential.
 #[utoipa::path(
     post,

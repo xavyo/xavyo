@@ -38,6 +38,7 @@ impl CredentialEncryption {
     ///
     /// # Arguments
     /// * `master_key` - 32-byte master key for deriving tenant keys.
+    #[must_use] 
     pub fn new(master_key: [u8; KEY_LENGTH]) -> Self {
         Self { master_key }
     }
@@ -45,7 +46,7 @@ impl CredentialEncryption {
     /// Create a new encryption service from a hex-encoded master key.
     pub fn from_hex(hex_key: &str) -> ConnectorResult<Self> {
         let bytes = hex::decode(hex_key).map_err(|e| ConnectorError::EncryptionFailed {
-            message: format!("invalid hex key: {}", e),
+            message: format!("invalid hex key: {e}"),
         })?;
 
         if bytes.len() != KEY_LENGTH {
@@ -66,7 +67,7 @@ impl CredentialEncryption {
         let bytes = STANDARD
             .decode(base64_key)
             .map_err(|e| ConnectorError::EncryptionFailed {
-                message: format!("invalid base64 key: {}", e),
+                message: format!("invalid base64 key: {e}"),
             })?;
 
         if bytes.len() != KEY_LENGTH {
@@ -109,7 +110,7 @@ impl CredentialEncryption {
         let key = self.derive_tenant_key(tenant_id);
         let cipher =
             Aes256Gcm::new_from_slice(&key).map_err(|e| ConnectorError::EncryptionFailed {
-                message: format!("failed to create cipher: {}", e),
+                message: format!("failed to create cipher: {e}"),
             })?;
 
         // SECURITY: Generate random nonce using OS CSPRNG
@@ -124,7 +125,7 @@ impl CredentialEncryption {
             cipher
                 .encrypt(nonce, plaintext)
                 .map_err(|e| ConnectorError::EncryptionFailed {
-                    message: format!("encryption failed: {}", e),
+                    message: format!("encryption failed: {e}"),
                 })?;
 
         // Return nonce || ciphertext (tag is appended by AES-GCM)
@@ -154,7 +155,7 @@ impl CredentialEncryption {
         let key = self.derive_tenant_key(tenant_id);
         let cipher =
             Aes256Gcm::new_from_slice(&key).map_err(|e| ConnectorError::DecryptionFailed {
-                message: format!("failed to create cipher: {}", e),
+                message: format!("failed to create cipher: {e}"),
             })?;
 
         // Extract nonce and ciphertext
@@ -166,7 +167,7 @@ impl CredentialEncryption {
             cipher
                 .decrypt(nonce, encrypted)
                 .map_err(|e| ConnectorError::DecryptionFailed {
-                    message: format!("decryption failed: {}", e),
+                    message: format!("decryption failed: {e}"),
                 })?;
 
         Ok(plaintext)
@@ -181,7 +182,7 @@ impl CredentialEncryption {
     pub fn decrypt_string(&self, tenant_id: Uuid, ciphertext: &[u8]) -> ConnectorResult<String> {
         let plaintext = self.decrypt(tenant_id, ciphertext)?;
         String::from_utf8(plaintext).map_err(|e| ConnectorError::DecryptionFailed {
-            message: format!("decrypted data is not valid UTF-8: {}", e),
+            message: format!("decrypted data is not valid UTF-8: {e}"),
         })
     }
 
@@ -192,7 +193,7 @@ impl CredentialEncryption {
         value: &T,
     ) -> ConnectorResult<Vec<u8>> {
         let json = serde_json::to_vec(value).map_err(|e| ConnectorError::Serialization {
-            message: format!("failed to serialize credentials: {}", e),
+            message: format!("failed to serialize credentials: {e}"),
         })?;
         self.encrypt(tenant_id, &json)
     }
@@ -205,7 +206,7 @@ impl CredentialEncryption {
     ) -> ConnectorResult<T> {
         let plaintext = self.decrypt(tenant_id, ciphertext)?;
         serde_json::from_slice(&plaintext).map_err(|e| ConnectorError::Serialization {
-            message: format!("failed to deserialize credentials: {}", e),
+            message: format!("failed to deserialize credentials: {e}"),
         })
     }
 }
@@ -222,7 +223,8 @@ impl std::fmt::Debug for CredentialEncryption {
 ///
 /// This should only be used for initial setup or testing.
 ///
-/// SECURITY: Uses OsRng directly from the operating system's CSPRNG.
+/// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
+#[must_use] 
 pub fn generate_master_key() -> [u8; KEY_LENGTH] {
     use rand::rngs::OsRng;
     use rand::RngCore;
@@ -232,6 +234,7 @@ pub fn generate_master_key() -> [u8; KEY_LENGTH] {
 }
 
 /// Generate a random master key as a hex string.
+#[must_use] 
 pub fn generate_master_key_hex() -> String {
     hex::encode(generate_master_key())
 }
@@ -414,7 +417,7 @@ mod tests {
     #[test]
     fn test_debug_redacts_key() {
         let service = test_encryption_service();
-        let debug_str = format!("{:?}", service);
+        let debug_str = format!("{service:?}");
         assert!(debug_str.contains("[REDACTED]"));
         assert!(!debug_str.contains("42")); // Should not show actual key bytes
     }

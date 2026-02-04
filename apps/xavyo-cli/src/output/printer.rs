@@ -8,27 +8,27 @@ fn use_color() -> bool {
 /// Print a success message (green checkmark)
 pub fn print_success(message: &str) {
     if use_color() {
-        println!("\x1b[32m✓\x1b[0m {}", message);
+        println!("\x1b[32m✓\x1b[0m {message}");
     } else {
-        println!("OK: {}", message);
+        println!("OK: {message}");
     }
 }
 
 /// Print a warning message (yellow)
 pub fn print_warning(message: &str) {
     if use_color() {
-        eprintln!("\x1b[33mWarning:\x1b[0m {}", message);
+        eprintln!("\x1b[33mWarning:\x1b[0m {message}");
     } else {
-        eprintln!("Warning: {}", message);
+        eprintln!("Warning: {message}");
     }
 }
 
 /// Print an info message (blue)
 pub fn print_info(message: &str) {
     if use_color() {
-        println!("\x1b[34mℹ\x1b[0m {}", message);
+        println!("\x1b[34mℹ\x1b[0m {message}");
     } else {
-        println!("Info: {}", message);
+        println!("Info: {message}");
     }
 }
 
@@ -36,18 +36,18 @@ pub fn print_info(message: &str) {
 pub fn print_header(title: &str) {
     let border = "═".repeat(59);
     println!();
-    println!("{}", border);
-    println!("{:^59}", title);
-    println!("{}", border);
+    println!("{border}");
+    println!("{title:^59}");
+    println!("{border}");
     println!();
 }
 
 /// Print a key-value pair with consistent formatting
 pub fn print_key_value(key: &str, value: &str) {
     if use_color() {
-        println!("  \x1b[1m{}:\x1b[0m {}", key, value);
+        println!("  \x1b[1m{key}:\x1b[0m {value}");
     } else {
-        println!("  {}: {}", key, value);
+        println!("  {key}: {value}");
     }
 }
 

@@ -101,11 +101,10 @@ async fn test_get_user_from_other_tenant_returns_not_found() {
 
     // Verify error is NotFound (not Forbidden - to avoid confirming existence)
     let err = result.unwrap_err();
-    let err_string = format!("{:?}", err);
+    let err_string = format!("{err:?}");
     assert!(
         err_string.contains("NotFound") || err_string.contains("not found"),
-        "Error should be NotFound, got: {}",
-        err_string
+        "Error should be NotFound, got: {err_string}"
     );
 
     cleanup_test_tenant(&pool, tenant_a).await;

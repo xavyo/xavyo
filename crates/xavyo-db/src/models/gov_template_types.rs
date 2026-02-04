@@ -32,7 +32,7 @@ impl std::fmt::Display for TemplateObjectType {
     }
 }
 
-/// Object template lifecycle status (named distinctly from report TemplateStatus).
+/// Object template lifecycle status (named distinctly from report `TemplateStatus`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[sqlx(type_name = "gov_object_template_status", rename_all = "lowercase")]
@@ -215,7 +215,7 @@ impl std::fmt::Display for TemplateNullHandling {
 #[sqlx(type_name = "gov_template_time_reference", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum TemplateTimeReference {
-    /// Use time_from/time_to as absolute timestamps.
+    /// Use `time_from/time_to` as absolute timestamps.
     #[default]
     Absolute,
     /// Interpret as offset from object creation time.
@@ -390,6 +390,7 @@ pub const APPLICATION_ATTRIBUTES: &[&str] = &[
 
 impl TemplateObjectType {
     /// Returns the standard attributes for this object type.
+    #[must_use] 
     pub fn standard_attributes(&self) -> &'static [&'static str] {
         match self {
             Self::User => USER_ATTRIBUTES,
@@ -400,6 +401,7 @@ impl TemplateObjectType {
     }
 
     /// Validates that an attribute is valid for this object type.
+    #[must_use] 
     pub fn is_valid_attribute(&self, attr: &str) -> bool {
         self.standard_attributes().contains(&attr)
     }
@@ -407,6 +409,7 @@ impl TemplateObjectType {
 
 impl TemplateStrength {
     /// Returns the precedence of this strength (higher = stronger).
+    #[must_use] 
     pub fn precedence(&self) -> i32 {
         match self {
             Self::Strong => 3,
@@ -416,6 +419,7 @@ impl TemplateStrength {
     }
 
     /// Returns true if this strength overrides another.
+    #[must_use] 
     pub fn overrides(&self, other: &Self) -> bool {
         self.precedence() > other.precedence()
     }

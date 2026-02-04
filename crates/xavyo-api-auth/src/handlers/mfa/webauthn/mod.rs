@@ -1,4 +1,4 @@
-//! WebAuthn MFA handlers.
+//! `WebAuthn` MFA handlers.
 //!
 //! Endpoints for WebAuthn/FIDO2 credential registration, authentication, and management.
 

@@ -35,20 +35,23 @@ pub struct RunStatistics {
 
 impl RunStatistics {
     /// Create new empty statistics.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Calculate progress percentage.
+    #[must_use] 
     pub fn progress_percentage(&self) -> f64 {
         if self.accounts_total == 0 {
             0.0
         } else {
-            (self.accounts_processed as f64 / self.accounts_total as f64) * 100.0
+            (f64::from(self.accounts_processed) / f64::from(self.accounts_total)) * 100.0
         }
     }
 
     /// Get count for a specific discrepancy type.
+    #[must_use] 
     pub fn discrepancy_count(&self, discrepancy_type: DiscrepancyType) -> u32 {
         self.discrepancies_by_type
             .get(&discrepancy_type.to_string())
@@ -57,6 +60,7 @@ impl RunStatistics {
     }
 
     /// Get count for a specific action type.
+    #[must_use] 
     pub fn action_count(&self, action_type: ActionType) -> u32 {
         self.actions_taken
             .get(&action_type.to_string())
@@ -97,6 +101,7 @@ pub struct StatisticsTracker {
 
 impl StatisticsTracker {
     /// Create a new tracker.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             accounts_total: AtomicU32::new(0),
@@ -109,6 +114,7 @@ impl StatisticsTracker {
     }
 
     /// Create tracker with initial total.
+    #[must_use] 
     pub fn with_total(total: u32) -> Self {
         let tracker = Self::new();
         tracker.accounts_total.store(total, Ordering::SeqCst);
@@ -165,7 +171,7 @@ impl StatisticsTracker {
             return 0.0;
         }
         let processed = self.accounts_processed.load(Ordering::SeqCst);
-        (processed as f64 / total as f64) * 100.0
+        (f64::from(processed) / f64::from(total)) * 100.0
     }
 
     /// Get elapsed duration in seconds.

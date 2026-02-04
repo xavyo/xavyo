@@ -23,12 +23,13 @@ const ACTIVITY_UPDATE_THROTTLE_SECONDS: u64 = 60;
 #[derive(Clone)]
 pub struct SessionService {
     pool: PgPool,
-    /// Cache for activity update throttling (session_id -> last_update_time).
+    /// Cache for activity update throttling (`session_id` -> `last_update_time`).
     activity_cache: std::sync::Arc<RwLock<HashMap<Uuid, Instant>>>,
 }
 
 impl SessionService {
     /// Create a new session service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -38,7 +39,7 @@ impl SessionService {
 
     /// Create a new session for a user.
     ///
-    /// This will also enforce max_concurrent_sessions policy if set.
+    /// This will also enforce `max_concurrent_sessions` policy if set.
     pub async fn create_session(
         &self,
         user_id: Uuid,
@@ -69,7 +70,7 @@ impl SessionService {
                 .await
                 .map_err(ApiAuthError::Database)?;
 
-            if active_count >= policy.max_concurrent_sessions as i64 {
+            if active_count >= i64::from(policy.max_concurrent_sessions) {
                 // Revoke oldest session
                 if let Some(oldest) = Session::find_oldest_active(&mut *tx, user_id)
                     .await
@@ -89,7 +90,7 @@ impl SessionService {
         }
 
         // Calculate expiry
-        let expires_at = Utc::now() + Duration::hours(policy.absolute_timeout_hours as i64);
+        let expires_at = Utc::now() + Duration::hours(i64::from(policy.absolute_timeout_hours));
 
         // Create session
         let create_data = CreateSession {
@@ -143,7 +144,7 @@ impl SessionService {
         let session_infos: Vec<SessionInfo> = sessions
             .into_iter()
             .map(|s| {
-                let is_current = current_session_id.map(|id| id == s.id).unwrap_or(false);
+                let is_current = current_session_id.is_some_and(|id| id == s.id);
                 let mut info: SessionInfo = s.into();
                 info.is_current = is_current;
                 info
@@ -241,7 +242,7 @@ impl SessionService {
     /// Update session activity timestamp (with throttling).
     ///
     /// This method throttles updates to avoid excessive database writes.
-    /// Updates are only performed if more than ACTIVITY_UPDATE_THROTTLE_SECONDS
+    /// Updates are only performed if more than `ACTIVITY_UPDATE_THROTTLE_SECONDS`
     /// have passed since the last update.
     pub async fn update_activity(
         &self,
@@ -275,8 +276,7 @@ impl SessionService {
 
             // Cleanup old entries periodically (every 1000 inserts)
             if cache.len() > 10000 {
-                let threshold = Instant::now()
-                    - std::time::Duration::from_secs(ACTIVITY_UPDATE_THROTTLE_SECONDS * 2);
+                let threshold = Instant::now().checked_sub(std::time::Duration::from_secs(ACTIVITY_UPDATE_THROTTLE_SECONDS * 2)).unwrap();
                 cache.retain(|_, v| *v > threshold);
             }
         }
@@ -302,7 +302,7 @@ impl SessionService {
 
         // Check idle timeout
         let policy = self.get_tenant_policy(tenant_id).await?;
-        if session.is_idle(policy.idle_timeout_minutes as i64) {
+        if session.is_idle(i64::from(policy.idle_timeout_minutes)) {
             // Revoke the session due to idle timeout
             warn!(
                 session_id = %session_id,

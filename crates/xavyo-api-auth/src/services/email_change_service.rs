@@ -27,13 +27,14 @@ pub struct EmailChangeService {
 
 impl EmailChangeService {
     /// Create a new email change service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Generate a secure random token.
     ///
-    /// SECURITY: Uses OsRng directly from the operating system's CSPRNG.
+    /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
     fn generate_token() -> String {
         use rand::rngs::OsRng;
         use rand::RngCore;

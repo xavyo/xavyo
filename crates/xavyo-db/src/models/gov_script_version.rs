@@ -52,14 +52,14 @@ impl GovScriptVersion {
         params: &CreateScriptVersion,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_script_versions (
                 tenant_id, script_id, version_number, script_body,
                 change_description, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(params.tenant_id)
         .bind(params.script_id)
@@ -78,10 +78,10 @@ impl GovScriptVersion {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_versions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -97,10 +97,10 @@ impl GovScriptVersion {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_versions
             WHERE script_id = $1 AND version_number = $2 AND tenant_id = $3
-            "#,
+            ",
         )
         .bind(script_id)
         .bind(version_number)
@@ -116,11 +116,11 @@ impl GovScriptVersion {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_versions
             WHERE script_id = $1 AND tenant_id = $2
             ORDER BY version_number DESC
-            "#,
+            ",
         )
         .bind(script_id)
         .bind(tenant_id)
@@ -128,19 +128,19 @@ impl GovScriptVersion {
         .await
     }
 
-    /// Get the latest version (highest version_number) for a script.
+    /// Get the latest version (highest `version_number`) for a script.
     pub async fn get_latest_by_script(
         pool: &sqlx::PgPool,
         script_id: Uuid,
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_versions
             WHERE script_id = $1 AND tenant_id = $2
             ORDER BY version_number DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(script_id)
         .bind(tenant_id)

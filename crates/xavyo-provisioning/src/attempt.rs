@@ -37,6 +37,7 @@ pub struct AttemptCompletion {
 
 impl AttemptCompletion {
     /// Create a successful completion.
+    #[must_use] 
     pub fn success() -> Self {
         Self {
             success: true,
@@ -47,6 +48,7 @@ impl AttemptCompletion {
     }
 
     /// Create a successful completion with response data.
+    #[must_use] 
     pub fn success_with_data(response_data: serde_json::Value) -> Self {
         Self {
             success: true,
@@ -90,6 +92,7 @@ pub struct AttemptService;
 
 impl AttemptService {
     /// Create a new attempt service.
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
@@ -110,13 +113,13 @@ impl AttemptService {
 
         // Create the attempt record
         let attempt_id: (Uuid,) = sqlx::query_as(
-            r#"
+            r"
             INSERT INTO operation_attempts (
                 tenant_id, operation_id, attempt_number, started_at, success
             )
             VALUES ($1, $2, $3, NOW(), false)
             RETURNING id
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(operation_id)
@@ -136,7 +139,7 @@ impl AttemptService {
         completion: &AttemptCompletion,
     ) -> AttemptResult<()> {
         sqlx::query(
-            r#"
+            r"
             UPDATE operation_attempts
             SET completed_at = NOW(),
                 success = $3,
@@ -145,7 +148,7 @@ impl AttemptService {
                 response_data = $6,
                 duration_ms = EXTRACT(EPOCH FROM (NOW() - started_at))::int * 1000
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(attempt_id)
         .bind(tenant_id)
@@ -176,14 +179,14 @@ impl AttemptService {
             .await?;
 
         let attempt_id: (Uuid,) = sqlx::query_as(
-            r#"
+            r"
             INSERT INTO operation_attempts (
                 tenant_id, operation_id, attempt_number, started_at, completed_at,
                 success, error_code, error_message, response_data, duration_ms
             )
             VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7, $8, $9)
             RETURNING id
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(operation_id)
@@ -208,10 +211,10 @@ impl AttemptService {
         operation_id: Uuid,
     ) -> AttemptResult<i64> {
         let count: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM operation_attempts
             WHERE operation_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(operation_id)
         .bind(tenant_id)
@@ -229,14 +232,14 @@ impl AttemptService {
         operation_id: Uuid,
     ) -> AttemptResult<Option<AttemptInfo>> {
         let result: Option<AttemptInfo> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, attempt_number, started_at, completed_at, success,
                    error_code, error_message, duration_ms
             FROM operation_attempts
             WHERE operation_id = $1 AND tenant_id = $2
             ORDER BY attempt_number DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(operation_id)
         .bind(tenant_id)
@@ -254,13 +257,13 @@ impl AttemptService {
         operation_id: Uuid,
     ) -> AttemptResult<Vec<AttemptInfo>> {
         let attempts: Vec<AttemptInfo> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, attempt_number, started_at, completed_at, success,
                    error_code, error_message, duration_ms
             FROM operation_attempts
             WHERE operation_id = $1 AND tenant_id = $2
             ORDER BY attempt_number ASC
-            "#,
+            ",
         )
         .bind(operation_id)
         .bind(tenant_id)

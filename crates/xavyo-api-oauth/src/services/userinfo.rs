@@ -1,4 +1,4 @@
-//! UserInfo service for OIDC userinfo endpoint.
+//! `UserInfo` service for OIDC userinfo endpoint.
 
 use crate::error::OAuthError;
 use serde::{Deserialize, Serialize};
@@ -38,6 +38,7 @@ pub struct UserClaims {
 
 impl UserClaims {
     /// Create new user claims with just the subject.
+    #[must_use] 
     pub fn new(sub: Uuid) -> Self {
         Self {
             sub: sub.to_string(),
@@ -50,6 +51,7 @@ impl UserClaims {
     }
 
     /// Add email claims.
+    #[must_use] 
     pub fn with_email(mut self, email: String, verified: bool) -> Self {
         self.email = Some(email);
         self.email_verified = Some(verified);
@@ -57,6 +59,7 @@ impl UserClaims {
     }
 
     /// Add profile claims.
+    #[must_use] 
     pub fn with_profile(mut self, name: Option<String>) -> Self {
         self.name = name;
         self
@@ -71,11 +74,13 @@ pub struct UserInfoService {
 
 impl UserInfoService {
     /// Create a new userinfo service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -119,11 +124,11 @@ impl UserInfoService {
 
         // Look up the user
         let user: DbUser = sqlx::query_as(
-            r#"
+            r"
             SELECT id, email, email_verified, is_active
             FROM users
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -164,11 +169,13 @@ impl UserInfoService {
     }
 
     /// Parse scopes from a space-separated string.
+    #[must_use] 
     pub fn parse_scopes(scope: &str) -> Vec<&str> {
         scope.split_whitespace().collect()
     }
 
     /// Check if a scope list contains a specific scope.
+    #[must_use] 
     pub fn has_scope(scopes: &[&str], scope: &str) -> bool {
         scopes.contains(&scope)
     }

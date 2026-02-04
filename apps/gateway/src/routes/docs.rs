@@ -1,4 +1,4 @@
-//! OpenAPI documentation aggregation and Swagger UI.
+//! `OpenAPI` documentation aggregation and Swagger UI.
 
 use axum::{
     extract::State,
@@ -32,7 +32,7 @@ impl DocsState {
         }
     }
 
-    /// Fetch and merge OpenAPI specs from all backends.
+    /// Fetch and merge `OpenAPI` specs from all backends.
     pub async fn refresh_specs(&self) {
         info!("Refreshing OpenAPI specs from backends");
 
@@ -164,25 +164,22 @@ async fn swagger_ui() -> impl IntoResponse {
     Html(html)
 }
 
-/// Serve merged OpenAPI spec.
+/// Serve merged `OpenAPI` spec.
 async fn openapi_spec(State(state): State<Arc<DocsState>>) -> impl IntoResponse {
     let spec = state.merged_spec.read().await;
 
-    match spec.as_ref() {
-        Some(spec) => Json(spec.clone()).into_response(),
-        None => {
-            // Return a minimal spec if not yet loaded
-            let empty_spec = serde_json::json!({
-                "openapi": "3.1.0",
-                "info": {
-                    "title": "xavyo API Gateway",
-                    "description": "Loading specifications...",
-                    "version": "1.0.0"
-                },
-                "paths": {}
-            });
-            Json(empty_spec).into_response()
-        }
+    if let Some(spec) = spec.as_ref() { Json(spec.clone()).into_response() } else {
+        // Return a minimal spec if not yet loaded
+        let empty_spec = serde_json::json!({
+            "openapi": "3.1.0",
+            "info": {
+                "title": "xavyo API Gateway",
+                "description": "Loading specifications...",
+                "version": "1.0.0"
+            },
+            "paths": {}
+        });
+        Json(empty_spec).into_response()
     }
 }
 

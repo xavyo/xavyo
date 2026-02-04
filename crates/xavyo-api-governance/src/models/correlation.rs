@@ -44,7 +44,7 @@ pub struct CreateCorrelationRuleRequest {
     /// Type of matching to perform (e.g., "exact", "fuzzy", "expression").
     pub match_type: String,
 
-    /// Matching algorithm to use (e.g., "levenshtein", "jaro_winkler").
+    /// Matching algorithm to use (e.g., "levenshtein", "`jaro_winkler`").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub algorithm: Option<String>,
 
@@ -526,7 +526,7 @@ pub struct ListCorrelationCasesQuery {
     /// Filter cases created on or before this date.
     pub end_date: Option<DateTime<Utc>>,
 
-    /// Field to sort by (e.g., "created_at", "highest_confidence").
+    /// Field to sort by (e.g., "`created_at`", "`highest_confidence`").
     pub sort_by: Option<String>,
 
     /// Sort order ("asc" or "desc").
@@ -627,7 +627,7 @@ pub struct CorrelationAuditEventResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub identity_id: Option<Uuid>,
 
-    /// Type of event (e.g., "auto_confirm", "manual_confirm", "reject", "create_identity").
+    /// Type of event (e.g., "`auto_confirm`", "`manual_confirm`", "reject", "`create_identity`").
     pub event_type: String,
 
     /// Outcome of the event (e.g., "success", "failure").

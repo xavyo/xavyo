@@ -1390,7 +1390,7 @@ impl xavyo_api_social::AuthService for SocialAuthAdapter {
                 })
             }
             Err(e) => Err(xavyo_api_social::SocialError::InternalError {
-                message: format!("Failed to issue tokens: {}", e),
+                message: format!("Failed to issue tokens: {e}"),
             }),
         }
     }
@@ -1406,10 +1406,10 @@ impl xavyo_api_social::AuthService for SocialAuthAdapter {
 
         // F116: Create user with provider's email_verified status (not always true)
         sqlx::query(
-            r#"
+            r"
             INSERT INTO users (id, tenant_id, email, display_name, email_verified, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -1457,10 +1457,10 @@ async fn shutdown_signal(shutting_down: std::sync::Arc<std::sync::atomic::Atomic
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {
+        () = ctrl_c => {
             info!("Received Ctrl+C, initiating graceful shutdown");
         }
-        _ = terminate => {
+        () = terminate => {
             info!("Received SIGTERM, initiating graceful shutdown");
         }
     }

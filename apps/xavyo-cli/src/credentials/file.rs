@@ -71,7 +71,7 @@ impl FileCredentialStore {
     fn encrypt(&self, data: &[u8]) -> CliResult<Vec<u8>> {
         let key = Self::get_encryption_key();
         let cipher = Aes256Gcm::new_from_slice(&key)
-            .map_err(|e| CliError::CredentialStorage(format!("Encryption init failed: {}", e)))?;
+            .map_err(|e| CliError::CredentialStorage(format!("Encryption init failed: {e}")))?;
 
         // Generate random nonce
         let mut nonce_bytes = [0u8; 12];
@@ -80,7 +80,7 @@ impl FileCredentialStore {
 
         let ciphertext = cipher
             .encrypt(nonce, data)
-            .map_err(|e| CliError::CredentialStorage(format!("Encryption failed: {}", e)))?;
+            .map_err(|e| CliError::CredentialStorage(format!("Encryption failed: {e}")))?;
 
         // Prepend nonce to ciphertext
         let mut result = nonce_bytes.to_vec();
@@ -98,14 +98,14 @@ impl FileCredentialStore {
 
         let key = Self::get_encryption_key();
         let cipher = Aes256Gcm::new_from_slice(&key)
-            .map_err(|e| CliError::CredentialStorage(format!("Decryption init failed: {}", e)))?;
+            .map_err(|e| CliError::CredentialStorage(format!("Decryption init failed: {e}")))?;
 
         let nonce = Nonce::from_slice(&data[..12]);
         let ciphertext = &data[12..];
 
         cipher
             .decrypt(nonce, ciphertext)
-            .map_err(|e| CliError::CredentialStorage(format!("Decryption failed: {}", e)))
+            .map_err(|e| CliError::CredentialStorage(format!("Decryption failed: {e}")))
     }
 }
 
@@ -142,10 +142,10 @@ impl CredentialStore for FileCredentialStore {
         let encoded = std::fs::read_to_string(&self.path)?;
         let encrypted = BASE64
             .decode(encoded.trim())
-            .map_err(|e| CliError::CredentialStorage(format!("Invalid credential file: {}", e)))?;
+            .map_err(|e| CliError::CredentialStorage(format!("Invalid credential file: {e}")))?;
         let decrypted = self.decrypt(&encrypted)?;
         let json = String::from_utf8(decrypted)
-            .map_err(|e| CliError::CredentialStorage(format!("Invalid credential data: {}", e)))?;
+            .map_err(|e| CliError::CredentialStorage(format!("Invalid credential data: {e}")))?;
         let credentials: Credentials = serde_json::from_str(&json)?;
 
         Ok(Some(credentials))

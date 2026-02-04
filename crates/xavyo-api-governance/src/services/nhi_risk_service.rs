@@ -69,6 +69,7 @@ pub struct NhiRiskService {
 
 impl NhiRiskService {
     /// Create a new risk service with default configuration.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -79,6 +80,7 @@ impl NhiRiskService {
     }
 
     /// Create with custom configuration.
+    #[must_use] 
     pub fn with_config(pool: PgPool, config: RiskFactorConfig) -> Self {
         Self {
             pool,
@@ -192,8 +194,7 @@ impl NhiRiskService {
         // Calculate days since last use (or since creation if never used)
         let days_inactive = nhi
             .last_used_at
-            .map(|last| (now - last).num_days())
-            .unwrap_or((now - nhi.created_at).num_days()) as i32;
+            .map_or((now - nhi.created_at).num_days(), |last| (now - last).num_days()) as i32;
 
         // Linear scaling: 0 days = 0 points, max_days = max_points
         let factor = if days_inactive >= self.config.staleness_max_days {
@@ -281,10 +282,10 @@ impl NhiRiskService {
         // Count entitlements assigned to this NHI via service account assignments
         // This queries gov_entitlement_assignments for the user_id that matches the NHI
         let entitlement_count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND user_id = $2 AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(nhi_id)

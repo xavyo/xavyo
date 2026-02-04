@@ -102,7 +102,7 @@ impl MockScimClient for OktaClient {
 
     fn build_filter(&self, attribute: &str, operator: &str, value: &str) -> String {
         // Okta uses standard filter syntax
-        format!("{} {} \"{}\"", attribute, operator, value)
+        format!("{attribute} {operator} \"{value}\"")
     }
 }
 

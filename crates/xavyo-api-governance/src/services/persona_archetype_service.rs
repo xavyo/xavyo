@@ -20,6 +20,7 @@ pub struct PersonaArchetypeService {
 
 impl PersonaArchetypeService {
     /// Create a new archetype service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -216,6 +217,7 @@ impl PersonaArchetypeService {
     }
 
     /// Get reference to the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -288,7 +290,7 @@ pub fn validate_naming_pattern(pattern: &str) -> Result<()> {
 pub fn validate_attribute_mappings(mappings: &serde_json::Value) -> Result<()> {
     // Try to parse as AttributeMappings struct
     let parsed: AttributeMappings = serde_json::from_value(mappings.clone()).map_err(|e| {
-        GovernanceError::Validation(format!("Invalid attribute_mappings structure: {}", e))
+        GovernanceError::Validation(format!("Invalid attribute_mappings structure: {e}"))
     })?;
 
     // Validate propagate mappings
@@ -341,7 +343,7 @@ pub fn validate_attribute_mappings(mappings: &serde_json::Value) -> Result<()> {
 pub fn validate_lifecycle_policy(policy: &serde_json::Value) -> Result<()> {
     // Try to parse as LifecyclePolicy struct
     let parsed: LifecyclePolicy = serde_json::from_value(policy.clone()).map_err(|e| {
-        GovernanceError::Validation(format!("Invalid lifecycle_policy structure: {}", e))
+        GovernanceError::Validation(format!("Invalid lifecycle_policy structure: {e}"))
     })?;
 
     // Validate validity days

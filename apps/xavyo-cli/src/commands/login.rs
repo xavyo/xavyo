@@ -37,7 +37,7 @@ pub async fn execute(args: LoginArgs) -> CliResult<()> {
     let client = Client::builder()
         .timeout(Duration::from_secs(config.timeout_secs))
         .build()
-        .map_err(|e| CliError::Network(format!("Failed to create HTTP client: {}", e)))?;
+        .map_err(|e| CliError::Network(format!("Failed to create HTTP client: {e}")))?;
 
     // Request device code
     print_info("Requesting device code...");

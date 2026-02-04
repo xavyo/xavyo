@@ -92,7 +92,7 @@ pub async fn execute(args: ApplyArgs) -> CliResult<()> {
             .count();
 
         let confirm = Confirm::new()
-            .with_prompt(format!("Apply {} change(s)?", changes_count))
+            .with_prompt(format!("Apply {changes_count} change(s)?"))
             .default(false)
             .interact()
             .map_err(|e| CliError::Io(e.to_string()))?;
@@ -145,7 +145,7 @@ pub fn load_config(path: &PathBuf) -> CliResult<XavyoConfig> {
         } else {
             String::new()
         };
-        CliError::Validation(format!("Invalid YAML{}: {}", location, e))
+        CliError::Validation(format!("Invalid YAML{location}: {e}"))
     })
 }
 
@@ -484,7 +484,7 @@ pub fn print_planned_changes(changes: &[ApplyChange], dry_run: bool) {
         let reset = "\x1b[0m";
         let symbol = change.action.symbol();
 
-        print!("  {}{}{} ", color, symbol, reset);
+        print!("  {color}{symbol}{reset} ");
         print!(
             "{} {}: {}",
             change.action.display(),
@@ -493,7 +493,7 @@ pub fn print_planned_changes(changes: &[ApplyChange], dry_run: bool) {
         );
 
         if let Some(ref details) = change.details {
-            print!(" ({})", details);
+            print!(" ({details})");
         }
 
         println!();
@@ -515,8 +515,7 @@ pub fn print_planned_changes(changes: &[ApplyChange], dry_run: bool) {
 
     println!();
     println!(
-        "Summary: {} to create, {} to update, {} unchanged",
-        creates, updates, unchanged
+        "Summary: {creates} to create, {updates} to update, {unchanged} unchanged"
     );
     println!();
 }
@@ -559,7 +558,7 @@ fn print_apply_results(result: &ApplyResult) {
         );
 
         if let Some(ref error) = change.error {
-            print!(" - {}", error);
+            print!(" - {error}");
         }
 
         println!();
@@ -576,7 +575,7 @@ fn print_apply_results(result: &ApplyResult) {
     } else {
         let total = result.summary.created + result.summary.updated;
         if total > 0 {
-            println!("Applied {} change(s) successfully.", total);
+            println!("Applied {total} change(s) successfully.");
         }
     }
 }

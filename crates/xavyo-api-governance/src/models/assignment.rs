@@ -20,7 +20,7 @@ pub struct CreateAssignmentRequest {
     /// The type of target (user or group).
     pub target_type: GovAssignmentTargetType,
 
-    /// The target ID (user_id or group_id).
+    /// The target ID (`user_id` or `group_id`).
     pub target_id: Uuid,
 
     /// When the assignment expires (optional).
@@ -40,7 +40,7 @@ pub struct BulkCreateAssignmentsRequest {
     /// The type of target (user or group).
     pub target_type: GovAssignmentTargetType,
 
-    /// The target IDs (user_ids or group_ids).
+    /// The target IDs (`user_ids` or `group_ids`).
     #[validate(length(min = 1, max = 100, message = "Must have between 1 and 100 targets"))]
     pub target_ids: Vec<Uuid>,
 
@@ -95,7 +95,7 @@ pub struct AssignmentResponse {
     /// The type of target (user or group).
     pub target_type: GovAssignmentTargetType,
 
-    /// The target ID (user_id or group_id).
+    /// The target ID (`user_id` or `group_id`).
     pub target_id: Uuid,
 
     /// Who assigned this entitlement.

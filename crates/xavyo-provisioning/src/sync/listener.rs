@@ -23,6 +23,7 @@ pub struct ChangeSet {
 
 impl ChangeSet {
     /// Create an empty changeset.
+    #[must_use] 
     pub fn empty() -> Self {
         Self {
             changes: vec![],
@@ -32,6 +33,7 @@ impl ChangeSet {
     }
 
     /// Create a changeset with changes.
+    #[must_use] 
     pub fn with_changes(changes: Vec<DetectedChange>) -> Self {
         Self {
             changes,
@@ -56,6 +58,7 @@ pub struct DetectedChange {
 
 impl DetectedChange {
     /// Create a new detected change.
+    #[must_use] 
     pub fn new(
         external_uid: String,
         object_class: String,
@@ -71,6 +74,7 @@ impl DetectedChange {
     }
 
     /// Convert to an inbound change.
+    #[must_use] 
     pub fn into_inbound(self, tenant_id: Uuid, connector_id: Uuid) -> InboundChange {
         InboundChange::new(
             tenant_id,

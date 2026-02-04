@@ -67,10 +67,10 @@ impl GovApprovalWorkflow {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_workflows
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -85,10 +85,10 @@ impl GovApprovalWorkflow {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_workflows
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -102,10 +102,10 @@ impl GovApprovalWorkflow {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_workflows
             WHERE tenant_id = $1 AND is_default = TRUE AND is_active = TRUE
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(pool)
@@ -121,20 +121,20 @@ impl GovApprovalWorkflow {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_approval_workflows
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.is_default.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_default = ${}", param_count));
+            query.push_str(&format!(" AND is_default = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -162,20 +162,20 @@ impl GovApprovalWorkflow {
         filter: &WorkflowFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_approval_workflows
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.is_default.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_default = ${}", param_count));
+            query.push_str(&format!(" AND is_default = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -199,11 +199,11 @@ impl GovApprovalWorkflow {
         // If this is the default, clear other defaults first
         if input.is_default {
             sqlx::query(
-                r#"
+                r"
                 UPDATE gov_approval_workflows
                 SET is_default = FALSE, updated_at = NOW()
                 WHERE tenant_id = $1 AND is_default = TRUE
-                "#,
+                ",
             )
             .bind(tenant_id)
             .execute(pool)
@@ -211,11 +211,11 @@ impl GovApprovalWorkflow {
         }
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_approval_workflows (tenant_id, name, description, is_default)
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -235,11 +235,11 @@ impl GovApprovalWorkflow {
         // If setting as default, clear other defaults first
         if input.is_default == Some(true) {
             sqlx::query(
-                r#"
+                r"
                 UPDATE gov_approval_workflows
                 SET is_default = FALSE, updated_at = NOW()
                 WHERE tenant_id = $1 AND is_default = TRUE AND id != $2
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(id)
@@ -251,19 +251,19 @@ impl GovApprovalWorkflow {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_default.is_some() {
-            updates.push(format!("is_default = ${}", param_idx));
+            updates.push(format!("is_default = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_active.is_some() {
-            updates.push(format!("is_active = ${}", param_idx));
+            updates.push(format!("is_active = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -300,11 +300,11 @@ impl GovApprovalWorkflow {
     ) -> Result<Option<Self>, sqlx::Error> {
         // Clear existing default
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_approval_workflows
             SET is_default = FALSE, updated_at = NOW()
             WHERE tenant_id = $1 AND is_default = TRUE AND id != $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -313,12 +313,12 @@ impl GovApprovalWorkflow {
 
         // Set new default
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_approval_workflows
             SET is_default = TRUE, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -333,10 +333,10 @@ impl GovApprovalWorkflow {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_approval_workflows
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -353,10 +353,10 @@ impl GovApprovalWorkflow {
         workflow_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_access_requests
             WHERE tenant_id = $1 AND workflow_id = $2 AND status IN ('pending', 'pending_approval')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(workflow_id)

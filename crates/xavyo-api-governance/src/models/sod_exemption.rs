@@ -1,4 +1,4 @@
-//! Request and response models for SoD exemption endpoints.
+//! Request and response models for `SoD` exemption endpoints.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ use uuid::Uuid;
 use validator::Validate;
 use xavyo_db::{GovExemptionStatus, GovSodExemption};
 
-/// Request to create a new SoD exemption.
+/// Request to create a new `SoD` exemption.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct CreateSodExemptionRequest {
     /// Rule to exempt.
@@ -28,7 +28,7 @@ pub struct CreateSodExemptionRequest {
     pub expires_at: DateTime<Utc>,
 }
 
-/// Query parameters for listing SoD exemptions.
+/// Query parameters for listing `SoD` exemptions.
 #[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct ListSodExemptionsQuery {
     /// Filter by rule ID.
@@ -61,7 +61,7 @@ impl Default for ListSodExemptionsQuery {
     }
 }
 
-/// SoD exemption response.
+/// `SoD` exemption response.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SodExemptionResponse {
     /// Unique identifier.
@@ -121,7 +121,7 @@ impl From<GovSodExemption> for SodExemptionResponse {
     }
 }
 
-/// Paginated list of SoD exemptions.
+/// Paginated list of `SoD` exemptions.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SodExemptionListResponse {
     /// List of exemptions.

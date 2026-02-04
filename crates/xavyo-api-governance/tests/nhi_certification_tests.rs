@@ -443,7 +443,7 @@ struct NhiTestState {
 }
 
 /// Simulate revocation effects
-fn simulate_revocation(before: NhiTestState) -> NhiTestState {
+fn simulate_revocation(_before: NhiTestState) -> NhiTestState {
     NhiTestState {
         status: "suspended".to_string(),
         has_active_credentials: false,

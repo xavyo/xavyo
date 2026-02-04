@@ -1,7 +1,7 @@
 //! API request/response models for bulk user import (F086, F-021).
 //!
 //! All models include serde and utoipa derives for JSON serialization
-//! and OpenAPI documentation.
+//! and `OpenAPI` documentation.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -28,6 +28,7 @@ pub enum CsvDelimiter {
 
 impl CsvDelimiter {
     /// Convert delimiter to byte for csv crate.
+    #[must_use] 
     pub fn as_byte(&self) -> u8 {
         match self {
             CsvDelimiter::Comma => b',',
@@ -45,8 +46,7 @@ impl CsvDelimiter {
             "\t" | "tab" | "\\t" => Ok(CsvDelimiter::Tab),
             "|" | "pipe" => Ok(CsvDelimiter::Pipe),
             _ => Err(format!(
-                "Invalid delimiter '{}'. Valid values: ',', ';', '\\t', '|'",
-                s
+                "Invalid delimiter '{s}'. Valid values: ',', ';', '\\t', '|'"
             )),
         }
     }
@@ -65,6 +65,7 @@ pub struct DuplicateCheckFields {
 
 impl DuplicateCheckFields {
     /// Create with only email check (default, backward compatible).
+    #[must_use] 
     pub fn email_only() -> Self {
         Self {
             email: true,
@@ -73,7 +74,8 @@ impl DuplicateCheckFields {
         }
     }
 
-    /// Parse from comma-separated string (e.g., "email,username,external_id").
+    /// Parse from comma-separated string (e.g., "`email,username,external_id`").
+    #[must_use] 
     pub fn parse(s: &str) -> Self {
         let mut fields = Self::default();
         for field in s.split(',').map(|f| f.trim().to_lowercase()) {
@@ -111,6 +113,7 @@ pub struct CsvParseConfig {
 
 impl CsvParseConfig {
     /// Create config with defaults (backward compatible).
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             delimiter: CsvDelimiter::Comma,
@@ -122,24 +125,28 @@ impl CsvParseConfig {
     }
 
     /// Set the delimiter.
+    #[must_use] 
     pub fn with_delimiter(mut self, delimiter: CsvDelimiter) -> Self {
         self.delimiter = delimiter;
         self
     }
 
     /// Set the maximum rows.
+    #[must_use] 
     pub fn with_max_rows(mut self, max_rows: usize) -> Self {
         self.max_rows = Some(max_rows);
         self
     }
 
     /// Set column mapping.
+    #[must_use] 
     pub fn with_column_mapping(mut self, mapping: HashMap<String, String>) -> Self {
         self.column_mapping = Some(mapping);
         self
     }
 
     /// Set duplicate check fields.
+    #[must_use] 
     pub fn with_duplicate_check_fields(mut self, fields: DuplicateCheckFields) -> Self {
         self.duplicate_check_fields = fields;
         self

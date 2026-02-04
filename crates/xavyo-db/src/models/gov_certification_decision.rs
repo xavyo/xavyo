@@ -21,6 +21,7 @@ pub enum CertDecisionType {
 
 impl CertDecisionType {
     /// Check if this is a revocation decision.
+    #[must_use] 
     pub fn is_revoked(&self) -> bool {
         matches!(self, Self::Revoked)
     }
@@ -64,10 +65,10 @@ impl GovCertificationDecision {
     /// Find a decision by ID.
     pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_certification_decisions
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .fetch_optional(pool)
@@ -80,10 +81,10 @@ impl GovCertificationDecision {
         item_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_certification_decisions
             WHERE item_id = $1
-            "#,
+            ",
         )
         .bind(item_id)
         .fetch_optional(pool)
@@ -93,10 +94,10 @@ impl GovCertificationDecision {
     /// Check if a decision exists for an item.
     pub async fn exists_for_item(pool: &sqlx::PgPool, item_id: Uuid) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_certification_decisions
             WHERE item_id = $1
-            "#,
+            ",
         )
         .bind(item_id)
         .fetch_one(pool)
@@ -114,13 +115,13 @@ impl GovCertificationDecision {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT d.* FROM gov_certification_decisions d
             JOIN gov_certification_items i ON d.item_id = i.id
             WHERE i.tenant_id = $1 AND i.campaign_id = $2
             ORDER BY d.decided_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(campaign_id)
@@ -138,12 +139,12 @@ impl GovCertificationDecision {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_certification_decisions
             WHERE decided_by = $1
             ORDER BY decided_at DESC
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(decided_by)
         .bind(limit)
@@ -159,11 +160,11 @@ impl GovCertificationDecision {
         campaign_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_certification_decisions d
             JOIN gov_certification_items i ON d.item_id = i.id
             WHERE i.tenant_id = $1 AND i.campaign_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(campaign_id)
@@ -178,11 +179,11 @@ impl GovCertificationDecision {
         campaign_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_certification_decisions d
             JOIN gov_certification_items i ON d.item_id = i.id
             WHERE i.tenant_id = $1 AND i.campaign_id = $2 AND d.decision_type = 'revoked'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(campaign_id)
@@ -196,13 +197,13 @@ impl GovCertificationDecision {
         input: CreateCertificationDecision,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_certification_decisions (
                 item_id, decision_type, justification, decided_by
             )
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.item_id)
         .bind(input.decision_type)
@@ -213,6 +214,7 @@ impl GovCertificationDecision {
     }
 
     /// Check if this is a revocation decision.
+    #[must_use] 
     pub fn is_revoked(&self) -> bool {
         self.decision_type.is_revoked()
     }

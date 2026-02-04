@@ -1,4 +1,4 @@
-//! GitHub OAuth2 provider implementation.
+//! GitHub `OAuth2` provider implementation.
 
 use super::async_trait;
 use reqwest::Client;
@@ -8,7 +8,7 @@ use tracing::warn;
 use super::{SocialProvider, SocialUserInfo, TokenResponse};
 use crate::error::{ProviderType, SocialError, SocialResult};
 
-/// GitHub OAuth2 endpoints.
+/// GitHub `OAuth2` endpoints.
 const AUTHORIZATION_ENDPOINT: &str = "https://github.com/login/oauth/authorize";
 const TOKEN_ENDPOINT: &str = "https://github.com/login/oauth/access_token";
 const USERINFO_ENDPOINT: &str = "https://api.github.com/user";
@@ -41,7 +41,7 @@ struct GithubEmail {
     verified: bool,
 }
 
-/// GitHub OAuth2 provider.
+/// GitHub `OAuth2` provider.
 #[derive(Clone)]
 pub struct GithubProvider {
     client_id: String,
@@ -51,6 +51,7 @@ pub struct GithubProvider {
 
 impl GithubProvider {
     /// Create a new GitHub provider.
+    #[must_use] 
     pub fn new(client_id: String, client_secret: String) -> Self {
         Self {
             client_id,

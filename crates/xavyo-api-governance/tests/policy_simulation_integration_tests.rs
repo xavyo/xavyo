@@ -1,13 +1,13 @@
 //! Integration tests for Policy Simulation (F060).
 //!
 //! Tests the policy simulation service including:
-//! - SoD rule violation detection
+//! - `SoD` rule violation detection
 //! - Birthright policy entitlement calculation
 //! - Impact summary aggregation
 //! - Full simulation workflow
 //!
-//! These tests require a running PostgreSQL database.
-//! Run with: cargo test -p xavyo-api-governance --test policy_simulation_integration_tests -- --ignored
+//! These tests require a running `PostgreSQL` database.
+//! Run with: cargo test -p xavyo-api-governance --test `policy_simulation_integration_tests` -- --ignored
 
 mod common;
 
@@ -529,7 +529,7 @@ async fn test_simulation_validates_name() {
     let result = service
         .create(
             tenant_id,
-            "".to_string(),
+            String::new(),
             PolicySimulationType::SodRule,
             None,
             serde_json::json!({"first_entitlement_id": "00000000-0000-0000-0000-000000000001", "second_entitlement_id": "00000000-0000-0000-0000-000000000002"}),

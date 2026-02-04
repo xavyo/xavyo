@@ -23,7 +23,7 @@ pub struct GovScriptTemplate {
     /// Optional description.
     pub description: Option<String>,
 
-    /// Template category (attribute_mapping, value_generation, etc.).
+    /// Template category (`attribute_mapping`, `value_generation`, etc.).
     pub category: TemplateCategory,
 
     /// The template script body with placeholder tokens.
@@ -83,14 +83,14 @@ impl GovScriptTemplate {
         params: CreateScriptTemplate,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_script_templates (
                 tenant_id, name, description, category, template_body,
                 placeholder_annotations, is_system, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(params.tenant_id)
         .bind(&params.name)
@@ -111,10 +111,10 @@ impl GovScriptTemplate {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_templates
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -124,7 +124,7 @@ impl GovScriptTemplate {
 
     /// List templates for a tenant with optional filtering and pagination.
     ///
-    /// Returns a tuple of (templates, total_count) for pagination support.
+    /// Returns a tuple of (templates, `total_count`) for pagination support.
     pub async fn list_by_tenant(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -133,34 +133,34 @@ impl GovScriptTemplate {
         offset: i64,
     ) -> Result<(Vec<Self>, i64), sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_script_templates
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut count_query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_script_templates
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.category.is_some() {
             param_count += 1;
-            let clause = format!(" AND category = ${}", param_count);
+            let clause = format!(" AND category = ${param_count}");
             query.push_str(&clause);
             count_query.push_str(&clause);
         }
         if filter.is_system.is_some() {
             param_count += 1;
-            let clause = format!(" AND is_system = ${}", param_count);
+            let clause = format!(" AND is_system = ${param_count}");
             query.push_str(&clause);
             count_query.push_str(&clause);
         }
         if filter.search.is_some() {
             param_count += 1;
-            let clause = format!(" AND name ILIKE ${}", param_count);
+            let clause = format!(" AND name ILIKE ${param_count}");
             query.push_str(&clause);
             count_query.push_str(&clause);
         }
@@ -183,7 +183,7 @@ impl GovScriptTemplate {
             cq = cq.bind(is_system);
         }
         if let Some(ref search) = filter.search {
-            let pattern = format!("%{}%", search);
+            let pattern = format!("%{search}%");
             q = q.bind(pattern.clone());
             cq = cq.bind(pattern);
         }
@@ -201,11 +201,11 @@ impl GovScriptTemplate {
         category: TemplateCategory,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_templates
             WHERE tenant_id = $1 AND category = $2
             ORDER BY name
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(category)
@@ -221,7 +221,7 @@ impl GovScriptTemplate {
         params: UpdateScriptTemplate,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_script_templates
             SET
                 name = COALESCE($3, name),
@@ -232,7 +232,7 @@ impl GovScriptTemplate {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -252,10 +252,10 @@ impl GovScriptTemplate {
         tenant_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_script_templates
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

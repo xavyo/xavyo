@@ -150,7 +150,7 @@ mod tests {
         let bulk_ids: Vec<&str> = ops.iter().map(|o| o["bulkId"].as_str().unwrap()).collect();
         // All bulkIds should be unique
         let mut unique = bulk_ids.clone();
-        unique.sort();
+        unique.sort_unstable();
         unique.dedup();
         assert_eq!(bulk_ids.len(), unique.len());
     }

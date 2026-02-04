@@ -53,7 +53,7 @@ pub async fn discover_realm(
     Ok(Json(response))
 }
 
-/// Initiate authorization flow with external IdP.
+/// Initiate authorization flow with external `IdP`.
 ///
 /// GET /auth/federation/authorize
 #[instrument(skip(state))]
@@ -91,7 +91,7 @@ pub async fn authorize(
     Ok(Redirect::temporary(&auth_url.url))
 }
 
-/// Handle callback from external IdP.
+/// Handle callback from external `IdP`.
 ///
 /// GET /auth/federation/callback
 #[instrument(skip(state))]

@@ -30,7 +30,7 @@ use xavyo_db::set_tenant_context;
 /// Validate CIDR notation (standalone function for testing).
 pub fn validate_cidr(cidr: &str) -> Result<(), ApiAuthError> {
     cidr.parse::<IpNetwork>()
-        .map_err(|e| ApiAuthError::InvalidCidr(format!("{}: {}", cidr, e)))?;
+        .map_err(|e| ApiAuthError::InvalidCidr(format!("{cidr}: {e}")))?;
     Ok(())
 }
 
@@ -101,6 +101,7 @@ pub struct IpRestrictionService {
 
 impl IpRestrictionService {
     /// Create a new IP restriction service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -109,6 +110,7 @@ impl IpRestrictionService {
     }
 
     /// Create with custom cache TTL.
+    #[must_use] 
     pub fn with_cache_ttl(pool: PgPool, ttl_secs: u64) -> Self {
         Self {
             pool,
@@ -364,7 +366,7 @@ impl IpRestrictionService {
         // Parse IP address
         let ip: IpAddr = ip_address
             .parse()
-            .map_err(|_| ApiAuthError::Validation(format!("Invalid IP address: {}", ip_address)))?;
+            .map_err(|_| ApiAuthError::Validation(format!("Invalid IP address: {ip_address}")))?;
 
         // Get cached or fresh data
         let (settings, rules) = self.get_cached_data(tenant_id).await?;
@@ -399,13 +401,11 @@ impl IpRestrictionService {
 
                     let reason = if applicable_rules.is_empty() {
                         format!(
-                            "Access denied: No whitelist rules configured, all IPs are blocked (your IP: {})",
-                            ip_address
+                            "Access denied: No whitelist rules configured, all IPs are blocked (your IP: {ip_address})"
                         )
                     } else {
                         format!(
-                            "Access denied: Your IP address ({}) is not allowed to access this tenant",
-                            ip_address
+                            "Access denied: Your IP address ({ip_address}) is not allowed to access this tenant"
                         )
                     };
 
@@ -431,8 +431,7 @@ impl IpRestrictionService {
                 if !matching_rules.is_empty() {
                     let rule_name = &matching_rules[0].name;
                     return Err(ApiAuthError::IpBlocked(format!(
-                        "Access denied: Your IP address ({}) is blocked by rule '{}'",
-                        ip_address, rule_name
+                        "Access denied: Your IP address ({ip_address}) is blocked by rule '{rule_name}'"
                     )));
                 }
 
@@ -451,7 +450,7 @@ impl IpRestrictionService {
         // Parse IP address
         let ip: IpAddr = ip_address
             .parse()
-            .map_err(|_| ApiAuthError::Validation(format!("Invalid IP address: {}", ip_address)))?;
+            .map_err(|_| ApiAuthError::Validation(format!("Invalid IP address: {ip_address}")))?;
 
         // Get data
         let (settings, rules) = self.get_cached_data(tenant_id).await?;
@@ -494,15 +493,15 @@ impl IpRestrictionService {
                             && r.scope_applies(&user_roles)
                     });
 
-                    if !has_any_whitelist {
+                    if has_any_whitelist {
                         (
                             "blocked".to_string(),
-                            "No whitelist rules configured, all IPs are blocked".to_string(),
+                            "IP does not match any whitelist rule".to_string(),
                         )
                     } else {
                         (
                             "blocked".to_string(),
-                            "IP does not match any whitelist rule".to_string(),
+                            "No whitelist rules configured, all IPs are blocked".to_string(),
                         )
                     }
                 } else {
@@ -522,15 +521,15 @@ impl IpRestrictionService {
                     })
                     .collect();
 
-                if !blacklist_matches.is_empty() {
-                    (
-                        "blocked".to_string(),
-                        format!("IP matches blacklist rule '{}'", blacklist_matches[0].name),
-                    )
-                } else {
+                if blacklist_matches.is_empty() {
                     (
                         "allowed".to_string(),
                         "IP does not match any blacklist rule".to_string(),
+                    )
+                } else {
+                    (
+                        "blocked".to_string(),
+                        format!("IP matches blacklist rule '{}'", blacklist_matches[0].name),
                     )
                 }
             }

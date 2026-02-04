@@ -1,4 +1,4 @@
-//! Unit tests for PersonaAuditService search and reporting (F063 - T077).
+//! Unit tests for `PersonaAuditService` search and reporting (F063 - T077).
 
 use chrono::{Duration, Utc};
 use uuid::Uuid;
@@ -19,7 +19,7 @@ fn test_audit_filter_default() {
     assert!(filter.to_date.is_none());
 }
 
-/// Test audit filter with persona_id set.
+/// Test audit filter with `persona_id` set.
 #[test]
 fn test_audit_filter_by_persona() {
     let persona_id = Uuid::new_v4();
@@ -31,7 +31,7 @@ fn test_audit_filter_by_persona() {
     assert!(filter.archetype_id.is_none());
 }
 
-/// Test audit filter with archetype_id set.
+/// Test audit filter with `archetype_id` set.
 #[test]
 fn test_audit_filter_by_archetype() {
     let archetype_id = Uuid::new_v4();
@@ -106,7 +106,7 @@ fn test_audit_filter_combined() {
     assert!(filter.to_date.is_none());
 }
 
-/// Test PersonaCreatedEventData structure.
+/// Test `PersonaCreatedEventData` structure.
 #[test]
 fn test_persona_created_event_data() {
     let persona_id = Uuid::new_v4();
@@ -129,7 +129,7 @@ fn test_persona_created_event_data() {
     assert_eq!(data.persona_name, "test-persona");
 }
 
-/// Test ArchetypeEventData structure.
+/// Test `ArchetypeEventData` structure.
 #[test]
 fn test_archetype_event_data() {
     let archetype_id = Uuid::new_v4();
@@ -145,7 +145,7 @@ fn test_archetype_event_data() {
     assert!(data.changes.is_some());
 }
 
-/// Test ContextSwitchedEventData structure.
+/// Test `ContextSwitchedEventData` structure.
 #[test]
 fn test_context_switched_event_data() {
     let session_id = Uuid::new_v4();
@@ -170,7 +170,7 @@ fn test_context_switched_event_data() {
     assert!(data.new_jwt_issued);
 }
 
-/// Test AttributesPropagatedEventData structure.
+/// Test `AttributesPropagatedEventData` structure.
 #[test]
 fn test_attributes_propagated_event_data() {
     let physical_user_id = Uuid::new_v4();
@@ -269,7 +269,7 @@ fn test_event_data_json_roundtrip() {
     assert_eq!(original.initial_attributes, roundtrip.initial_attributes);
 }
 
-/// Test ContextSwitchedEventData for switch-back scenario.
+/// Test `ContextSwitchedEventData` for switch-back scenario.
 #[test]
 fn test_context_switched_back_event_data() {
     let session_id = Uuid::new_v4();

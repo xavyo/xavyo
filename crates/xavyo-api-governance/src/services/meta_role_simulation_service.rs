@@ -48,6 +48,7 @@ pub struct MetaRoleSimulationService {
 
 impl MetaRoleSimulationService {
     /// Create a new simulation service.
+    #[must_use] 
     pub fn new(pool: Arc<PgPool>, matching_service: Arc<MetaRoleMatchingService>) -> Self {
         Self {
             pool,
@@ -434,7 +435,7 @@ impl MetaRoleSimulationService {
             .detect_potential_conflicts(
                 tenant_id,
                 meta_role_id,
-                &role_ids.iter().cloned().collect(),
+                &role_ids.iter().copied().collect(),
             )
             .await?;
 
@@ -503,7 +504,7 @@ impl MetaRoleSimulationService {
 
         // Conflicts that would be resolved when disabling
         let conflicts_to_resolve = self
-            .get_conflicts_to_resolve(tenant_id, meta_role_id, &role_ids.iter().cloned().collect())
+            .get_conflicts_to_resolve(tenant_id, meta_role_id, &role_ids.iter().copied().collect())
             .await?;
 
         let roles_to_remove = self
@@ -608,11 +609,11 @@ impl MetaRoleSimulationService {
     ) -> Result<HashSet<Uuid>> {
         // Get all role-type entitlements
         let roles: Vec<GovEntitlement> = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_entitlements
             WHERE tenant_id = $1 AND entitlement_type = 'role'
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -645,7 +646,7 @@ impl MetaRoleSimulationService {
         let to_add: Vec<Uuid> = new_matches
             .difference(current_roles)
             .take(limit as usize)
-            .cloned()
+            .copied()
             .collect();
 
         self.build_role_changes(
@@ -667,7 +668,7 @@ impl MetaRoleSimulationService {
         let to_remove: Vec<Uuid> = current_roles
             .difference(new_matches)
             .take(limit as usize)
-            .cloned()
+            .copied()
             .collect();
 
         self.build_role_changes(
@@ -690,10 +691,10 @@ impl MetaRoleSimulationService {
         }
 
         let roles: Vec<GovEntitlement> = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_entitlements
             WHERE tenant_id = $1 AND id = ANY($2)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_ids)
@@ -746,9 +747,7 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name = affected_role
-                .map(|r| r.name)
-                .unwrap_or_else(|| "Unknown".to_string());
+            let affected_role_name = affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
 
             let other_inheritances = GovMetaRoleInheritance::list_by_child_role(
                 &self.pool,
@@ -835,9 +834,7 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name = affected_role
-                .map(|r| r.name)
-                .unwrap_or_else(|| "Unknown".to_string());
+            let affected_role_name = affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
 
             let other_inheritances = GovMetaRoleInheritance::list_by_child_role(
                 &self.pool,
@@ -923,9 +920,7 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name = affected_role
-                .map(|r| r.name)
-                .unwrap_or_else(|| "Unknown".to_string());
+            let affected_role_name = affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
 
             let other_inheritances = GovMetaRoleInheritance::list_by_child_role(
                 &self.pool,
@@ -943,11 +938,11 @@ impl MetaRoleSimulationService {
 
                 // Check other meta-role's constraints
                 let other_constraints: Vec<(String, serde_json::Value)> = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT constraint_type, constraint_value
                     FROM gov_meta_role_constraints
                     WHERE tenant_id = $1 AND meta_role_id = $2
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(other_inheritance.meta_role_id)
@@ -1008,18 +1003,16 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name = affected_role
-                .map(|r| r.name)
-                .unwrap_or_else(|| "Unknown".to_string());
+            let affected_role_name = affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
 
             let conflicts: Vec<GovMetaRoleConflict> = sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_meta_role_conflicts
                 WHERE tenant_id = $1
                   AND (meta_role_a_id = $2 OR meta_role_b_id = $2)
                   AND affected_role_id = $3
                   AND resolution_status = 'unresolved'
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(meta_role_id)
@@ -1062,14 +1055,14 @@ impl MetaRoleSimulationService {
         entitlement_id: Uuid,
     ) -> Result<Vec<SimulationConflict>> {
         let conflicts: Vec<GovMetaRoleConflict> = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_conflicts
             WHERE tenant_id = $1
               AND (meta_role_a_id = $2 OR meta_role_b_id = $2)
               AND conflict_type = 'entitlement_conflict'
               AND conflicting_items->>'entitlement_id' = $3
               AND resolution_status = 'unresolved'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -1089,9 +1082,7 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name = affected_role
-                .map(|r| r.name)
-                .unwrap_or_else(|| "Unknown".to_string());
+            let affected_role_name = affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
 
             let meta_role_a =
                 GovMetaRole::find_by_id(&self.pool, tenant_id, conflict.meta_role_a_id)
@@ -1124,12 +1115,12 @@ impl MetaRoleSimulationService {
         meta_role_id: Uuid,
     ) -> Result<Vec<SimulationConflict>> {
         let conflicts: Vec<GovMetaRoleConflict> = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_conflicts
             WHERE tenant_id = $1
               AND (meta_role_a_id = $2 OR meta_role_b_id = $2)
               AND resolution_status = 'unresolved'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -1148,9 +1139,7 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name = affected_role
-                .map(|r| r.name)
-                .unwrap_or_else(|| "Unknown".to_string());
+            let affected_role_name = affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
 
             let meta_role_a =
                 GovMetaRole::find_by_id(&self.pool, tenant_id, conflict.meta_role_a_id)

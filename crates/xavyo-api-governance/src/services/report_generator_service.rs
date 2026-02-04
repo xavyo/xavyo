@@ -21,6 +21,7 @@ pub struct ReportGeneratorService {
 
 impl ReportGeneratorService {
     /// Create a new report generator service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             report_service: ReportService::new(pool.clone()),
@@ -117,7 +118,7 @@ impl ReportGeneratorService {
                     Err(e) => {
                         // Export failed
                         self.report_service
-                            .fail(tenant_id, report_id, &format!("Export failed: {}", e))
+                            .fail(tenant_id, report_id, &format!("Export failed: {e}"))
                             .await
                     }
                 }
@@ -128,7 +129,7 @@ impl ReportGeneratorService {
                     .fail(
                         tenant_id,
                         report_id,
-                        &format!("Data generation failed: {}", e),
+                        &format!("Data generation failed: {e}"),
                     )
                     .await
             }
@@ -146,6 +147,7 @@ impl ReportGeneratorService {
 // We need to expose the pool from ReportDataService
 impl ReportDataService {
     /// Get a reference to the pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

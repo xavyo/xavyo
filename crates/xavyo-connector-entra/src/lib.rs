@@ -5,7 +5,7 @@
 //!
 //! # Features
 //!
-//! - OAuth2 client credentials authentication
+//! - `OAuth2` client credentials authentication
 //! - Full and delta (incremental) user sync
 //! - Group sync with transitive membership resolution
 //! - Outbound provisioning (create/update/disable users)

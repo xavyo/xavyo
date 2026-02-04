@@ -29,7 +29,7 @@ pub async fn list_sessions(
         .await?;
 
     let session_responses: Vec<SessionInfoResponse> =
-        sessions.into_iter().map(|s| s.into()).collect();
+        sessions.into_iter().map(std::convert::Into::into).collect();
 
     let total = session_responses.len();
 

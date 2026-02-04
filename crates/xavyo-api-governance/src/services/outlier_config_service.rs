@@ -14,6 +14,7 @@ pub struct OutlierConfigService {
 }
 
 impl OutlierConfigService {
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -140,6 +141,7 @@ impl OutlierConfigService {
     }
 
     /// Get default scoring weights.
+    #[must_use] 
     pub fn default_weights() -> ScoringWeights {
         ScoringWeights::default()
     }

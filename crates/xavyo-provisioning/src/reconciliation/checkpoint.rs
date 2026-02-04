@@ -59,11 +59,13 @@ impl Default for Checkpoint {
 
 impl Checkpoint {
     /// Create a new checkpoint at initialization phase.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Create checkpoint at resource processing phase.
+    #[must_use] 
     pub fn at_resource_processing(
         last_key: Option<String>,
         accounts_processed: u32,
@@ -78,6 +80,7 @@ impl Checkpoint {
     }
 
     /// Create checkpoint at shadow processing phase.
+    #[must_use] 
     pub fn at_shadow_processing(
         last_key: Option<String>,
         accounts_processed: u32,
@@ -92,6 +95,7 @@ impl Checkpoint {
     }
 
     /// Create checkpoint at finalization phase.
+    #[must_use] 
     pub fn at_finalization(accounts_processed: u32) -> Self {
         Self {
             phase: CheckpointPhase::Finalization,
@@ -130,6 +134,7 @@ pub struct CheckpointManager {
 
 impl CheckpointManager {
     /// Create a new checkpoint manager.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -145,11 +150,11 @@ impl CheckpointManager {
             .map_err(|e| CheckpointError::Serialization(e.to_string()))?;
 
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_connector_reconciliation_runs
             SET checkpoint = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(run_id)
         .bind(tenant_id)
@@ -168,11 +173,11 @@ impl CheckpointManager {
         run_id: Uuid,
     ) -> Result<Option<Checkpoint>, CheckpointError> {
         let row: Option<(Option<serde_json::Value>,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT checkpoint
             FROM gov_connector_reconciliation_runs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(run_id)
         .bind(tenant_id)
@@ -193,11 +198,11 @@ impl CheckpointManager {
     /// Clear checkpoint for a run (on completion).
     pub async fn clear(&self, tenant_id: Uuid, run_id: Uuid) -> Result<(), CheckpointError> {
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_connector_reconciliation_runs
             SET checkpoint = NULL, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(run_id)
         .bind(tenant_id)

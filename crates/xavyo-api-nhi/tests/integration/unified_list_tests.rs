@@ -45,12 +45,12 @@ async fn test_list_all_nhis() {
 
     // Query all NHIs for this tenant
     let nhis: Vec<NhiRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
         FROM v_non_human_identities
         WHERE tenant_id = $1
         ORDER BY created_at DESC
-        "#,
+        ",
     )
     .bind(tenant_id)
     .fetch_all(&pool)
@@ -88,11 +88,11 @@ async fn test_filter_by_type() {
 
     // Filter for service accounts only
     let sa_nhis: Vec<NhiRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
         FROM v_non_human_identities
         WHERE tenant_id = $1 AND nhi_type = 'service_account'
-        "#,
+        ",
     )
     .bind(tenant_id)
     .fetch_all(&pool)
@@ -105,11 +105,11 @@ async fn test_filter_by_type() {
 
     // Filter for AI agents only
     let agent_nhis: Vec<NhiRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
         FROM v_non_human_identities
         WHERE tenant_id = $1 AND nhi_type = 'ai_agent'
-        "#,
+        ",
     )
     .bind(tenant_id)
     .fetch_all(&pool)
@@ -144,11 +144,11 @@ async fn test_pagination() {
 
     // Get total count
     let count_row: (i64,) = sqlx::query_as(
-        r#"
+        r"
         SELECT COUNT(*) as count
         FROM v_non_human_identities
         WHERE tenant_id = $1
-        "#,
+        ",
     )
     .bind(tenant_id)
     .fetch_one(&pool)
@@ -159,13 +159,13 @@ async fn test_pagination() {
 
     // Get first page (limit 2)
     let page1: Vec<NhiRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
         FROM v_non_human_identities
         WHERE tenant_id = $1
         ORDER BY created_at DESC
         LIMIT 2 OFFSET 0
-        "#,
+        ",
     )
     .bind(tenant_id)
     .fetch_all(&pool)
@@ -176,13 +176,13 @@ async fn test_pagination() {
 
     // Get second page (limit 2, offset 2)
     let page2: Vec<NhiRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
         FROM v_non_human_identities
         WHERE tenant_id = $1
         ORDER BY created_at DESC
         LIMIT 2 OFFSET 2
-        "#,
+        ",
     )
     .bind(tenant_id)
     .fetch_all(&pool)
@@ -207,11 +207,11 @@ async fn test_get_nhi_by_id() {
 
     // Fetch by ID
     let row: NhiRow = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
         FROM v_non_human_identities
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(nhi_id)
     .bind(tenant_id)

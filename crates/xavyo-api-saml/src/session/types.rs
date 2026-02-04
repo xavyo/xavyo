@@ -1,6 +1,6 @@
-//! Session types for SAML AuthnRequest tracking
+//! Session types for SAML `AuthnRequest` tracking
 //!
-//! These types are used to store and validate AuthnRequest sessions
+//! These types are used to store and validate `AuthnRequest` sessions
 //! to prevent replay attacks.
 
 use chrono::{DateTime, Duration, Utc};
@@ -8,35 +8,36 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-/// Default TTL for AuthnRequest sessions (5 minutes)
+/// Default TTL for `AuthnRequest` sessions (5 minutes)
 pub const DEFAULT_SESSION_TTL_SECONDS: i64 = 300;
 
 /// Grace period for clock skew (30 seconds)
 pub const CLOCK_SKEW_GRACE_SECONDS: i64 = 30;
 
-/// A stored AuthnRequest session for replay attack prevention
+/// A stored `AuthnRequest` session for replay attack prevention
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthnRequestSession {
     /// Unique identifier for this session record
     pub id: Uuid,
     /// Tenant ID for multi-tenant isolation
     pub tenant_id: Uuid,
-    /// The SAML AuthnRequest ID from the SP
+    /// The SAML `AuthnRequest` ID from the SP
     pub request_id: String,
     /// The Service Provider's entity ID
     pub sp_entity_id: String,
     /// When this request was received
     pub created_at: DateTime<Utc>,
-    /// When this request expires (created_at + TTL)
+    /// When this request expires (`created_at` + TTL)
     pub expires_at: DateTime<Utc>,
     /// When this request was consumed (None = unused)
     pub consumed_at: Option<DateTime<Utc>>,
-    /// RelayState to preserve across the SSO flow
+    /// `RelayState` to preserve across the SSO flow
     pub relay_state: Option<String>,
 }
 
 impl AuthnRequestSession {
     /// Create a new session with default TTL
+    #[must_use] 
     pub fn new(
         tenant_id: Uuid,
         request_id: String,
@@ -53,6 +54,7 @@ impl AuthnRequestSession {
     }
 
     /// Create a new session with custom TTL
+    #[must_use] 
     pub fn with_ttl(
         tenant_id: Uuid,
         request_id: String,
@@ -74,6 +76,7 @@ impl AuthnRequestSession {
     }
 
     /// Check if this session has expired (with grace period for clock skew)
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         let now = Utc::now();
         let grace_period = Duration::seconds(CLOCK_SKEW_GRACE_SECONDS);
@@ -81,6 +84,7 @@ impl AuthnRequestSession {
     }
 
     /// Check if this session has been consumed
+    #[must_use] 
     pub fn is_consumed(&self) -> bool {
         self.consumed_at.is_some()
     }

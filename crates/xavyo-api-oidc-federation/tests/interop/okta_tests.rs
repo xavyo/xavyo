@@ -11,9 +11,9 @@ use xavyo_api_oidc_federation::services::{TokenVerifierService, VerificationConf
 mod okta_fixtures {
     use super::*;
 
-    /// Okta issuer pattern: https://{tenant}.okta.com/oauth2/default
+    /// Okta issuer pattern: <https://{tenant}.okta.com/oauth2/default>
     pub fn issuer(base_url: &str) -> String {
-        format!("{}/oauth2/default", base_url)
+        format!("{base_url}/oauth2/default")
     }
 
     /// Okta discovery document
@@ -55,7 +55,7 @@ mod okta_fixtures {
     /// Create Okta-style test claims with groups
     pub fn claims_with_groups(sub: &str, issuer: &str, groups: Vec<&str>) -> TestClaims {
         TestClaims::new(sub, issuer, vec!["api://default".to_string()])
-            .with_email(&format!("{}@example.com", sub))
+            .with_email(&format!("{sub}@example.com"))
             .with_claim("groups", json!(groups))
     }
 }

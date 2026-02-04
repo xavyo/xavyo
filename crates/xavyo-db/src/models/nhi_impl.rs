@@ -1,4 +1,4 @@
-//! NonHumanIdentity trait implementations for database models.
+//! `NonHumanIdentity` trait implementations for database models.
 //!
 //! This module implements the unified NHI trait (F108) for service accounts
 //! and AI agents, enabling unified governance operations across all non-human
@@ -87,7 +87,7 @@ impl NonHumanIdentity for GovServiceAccount {
         // Credential age factor (30 points max)
         if let Some(last_rotation) = self.last_rotation_at {
             let days_since_rotation = (Utc::now() - last_rotation).num_days();
-            let interval = self.rotation_interval_days.unwrap_or(90) as i64;
+            let interval = i64::from(self.rotation_interval_days.unwrap_or(90));
             score += match days_since_rotation {
                 d if d >= interval * 2 => 30,
                 d if d >= interval => 15,
@@ -299,7 +299,7 @@ mod tests {
         let sa = create_test_service_account();
         let score = sa.risk_score();
         // Recently used, recently rotated, recently certified = low risk
-        assert!(score < 50, "Expected low risk score, got {}", score);
+        assert!(score < 50, "Expected low risk score, got {score}");
     }
 
     #[test]
@@ -310,7 +310,7 @@ mod tests {
         sa.last_certified_at = None; // Never certified
 
         let score = sa.risk_score();
-        assert!(score >= 70, "Expected high risk score, got {}", score);
+        assert!(score >= 70, "Expected high risk score, got {score}");
     }
 
     #[test]

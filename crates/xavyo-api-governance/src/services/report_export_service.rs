@@ -13,6 +13,7 @@ pub struct ReportExportService;
 
 impl ReportExportService {
     /// Create a new export service.
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }

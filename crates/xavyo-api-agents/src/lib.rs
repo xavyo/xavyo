@@ -9,7 +9,7 @@
 //! - **Tool Registry**: Register tools with JSON Schema validation (OWASP ASI02/ASI04)
 //! - **Permission Management**: Grant and revoke tool permissions for agents
 //! - **Real-Time Authorization**: Sub-100ms authorization decisions with rate limiting
-//! - **AgentCard Discovery**: A2A protocol compatible agent discovery endpoint
+//! - **`AgentCard` Discovery**: A2A protocol compatible agent discovery endpoint
 //! - **Audit Trail**: Query authorization decisions for compliance
 //!
 //! # Example
@@ -52,7 +52,7 @@
 //! - `GET /agents/{id}/audit` - Query agent's audit trail
 //!
 //! ## Discovery (A2A Protocol)
-//! - `GET /.well-known/agents/{id}.json` - AgentCard discovery
+//! - `GET /.well-known/agents/{id}.json` - `AgentCard` discovery
 
 pub mod error;
 pub mod handlers;

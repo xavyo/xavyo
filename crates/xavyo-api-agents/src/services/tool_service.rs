@@ -18,7 +18,8 @@ pub struct ToolService {
 }
 
 impl ToolService {
-    /// Create a new ToolService.
+    /// Create a new `ToolService`.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -96,8 +97,8 @@ impl ToolService {
             name_contains: query.name,
         };
 
-        let limit = query.limit.min(1000) as i64;
-        let offset = query.offset.max(0) as i64;
+        let limit = i64::from(query.limit.min(1000));
+        let offset = i64::from(query.offset.max(0));
 
         let tools = AiTool::list_by_tenant(&self.pool, tenant_id, &filter, limit, offset).await?;
         let total = AiTool::count_by_tenant(&self.pool, tenant_id, &filter).await?;

@@ -36,6 +36,7 @@ pub struct Provisioner {
 
 impl Provisioner {
     /// Create a new provisioner with the given database pool and retry policy.
+    #[must_use] 
     pub fn new(pool: PgPool, retry_policy: RetryPolicy) -> Self {
         Self { pool, retry_policy }
     }
@@ -231,110 +232,107 @@ impl Provisioner {
             })
             .await?;
 
-        match existing {
-            Some(found_user) => {
-                let external_resource_id =
-                    found_user.id.map(|id| id.to_string()).unwrap_or_default();
+        if let Some(found_user) = existing {
+            let external_resource_id =
+                found_user.id.map(|id| id.to_string()).unwrap_or_default();
 
-                // Link the existing resource by updating state.
-                ScimProvisioningState::update_synced(
-                    &self.pool,
-                    tenant_id,
-                    state.id,
-                    &external_resource_id,
-                )
-                .await?;
+            // Link the existing resource by updating state.
+            ScimProvisioningState::update_synced(
+                &self.pool,
+                tenant_id,
+                state.id,
+                &external_resource_id,
+            )
+            .await?;
 
-                // Build a full replacement patch to bring the remote in sync.
-                let changed_fields: Vec<(String, Option<String>)> = vec![
-                    ("email".to_string(), Some(scim_user.user_name.clone())),
-                    ("display_name".to_string(), scim_user.display_name.clone()),
-                    (
-                        "first_name".to_string(),
-                        scim_user.name.as_ref().and_then(|n| n.given_name.clone()),
-                    ),
-                    (
-                        "last_name".to_string(),
-                        scim_user.name.as_ref().and_then(|n| n.family_name.clone()),
-                    ),
-                    ("active".to_string(), Some(scim_user.active.to_string())),
-                ];
+            // Build a full replacement patch to bring the remote in sync.
+            let changed_fields: Vec<(String, Option<String>)> = vec![
+                ("email".to_string(), Some(scim_user.user_name.clone())),
+                ("display_name".to_string(), scim_user.display_name.clone()),
+                (
+                    "first_name".to_string(),
+                    scim_user.name.as_ref().and_then(|n| n.given_name.clone()),
+                ),
+                (
+                    "last_name".to_string(),
+                    scim_user.name.as_ref().and_then(|n| n.family_name.clone()),
+                ),
+                ("active".to_string(), Some(scim_user.active.to_string())),
+            ];
 
-                if let Some(patch) = AttributeMapper::build_user_patch(&changed_fields, mappings) {
-                    self.retry_policy
-                        .execute("scim_patch_user_conflict_resolve", || {
-                            let p = patch.clone();
-                            let eri = external_resource_id.clone();
-                            async move { client.patch_user(&eri, &p).await }
-                        })
-                        .await?;
-                }
-
-                info!(
-                    tenant_id = %tenant_id,
-                    user_id = %user_id,
-                    target_id = %target_id,
-                    external_resource_id = %external_resource_id,
-                    "Resolved user conflict: linked and patched existing resource"
-                );
-
-                self.log_operation(
-                    tenant_id,
-                    target_id,
-                    "create_conflict_resolved",
-                    "User",
-                    user_id,
-                    Some(external_resource_id),
-                    "PATCH",
-                    Some(200),
-                    started.elapsed(),
-                    None,
-                )
-                .await;
-
-                Ok(())
+            if let Some(patch) = AttributeMapper::build_user_patch(&changed_fields, mappings) {
+                self.retry_policy
+                    .execute("scim_patch_user_conflict_resolve", || {
+                        let p = patch.clone();
+                        let eri = external_resource_id.clone();
+                        async move { client.patch_user(&eri, &p).await }
+                    })
+                    .await?;
             }
-            None => {
-                // Could not find by externalId either -- record the error.
-                let error_msg =
-                    "409 Conflict on create, but could not find existing user by externalId"
-                        .to_string();
 
-                let new_retry_count = state.retry_count + 1;
-                ScimProvisioningState::update_error(
-                    &self.pool,
-                    tenant_id,
-                    state.id,
-                    &error_msg,
-                    new_retry_count,
-                    None,
-                )
-                .await?;
+            info!(
+                tenant_id = %tenant_id,
+                user_id = %user_id,
+                target_id = %target_id,
+                external_resource_id = %external_resource_id,
+                "Resolved user conflict: linked and patched existing resource"
+            );
 
-                self.log_operation_with_retry_count(
-                    tenant_id,
-                    target_id,
-                    "create",
-                    "User",
-                    user_id,
-                    None,
-                    "POST",
-                    Some(409),
-                    started.elapsed(),
-                    Some(error_msg.clone()),
-                    new_retry_count,
-                )
-                .await;
+            self.log_operation(
+                tenant_id,
+                target_id,
+                "create_conflict_resolved",
+                "User",
+                user_id,
+                Some(external_resource_id),
+                "PATCH",
+                Some(200),
+                started.elapsed(),
+                None,
+            )
+            .await;
 
-                error!(
-                    tenant_id = %tenant_id,
-                    user_id = %user_id,
-                    target_id = %target_id,
-                    "Cannot resolve 409 conflict: user not found by externalId"
-                );
+            Ok(())
+        } else {
+            // Could not find by externalId either -- record the error.
+            let error_msg =
+                "409 Conflict on create, but could not find existing user by externalId"
+                    .to_string();
 
-                Err(ScimClientError::Conflict(error_msg))
-            }
+            let new_retry_count = state.retry_count + 1;
+            ScimProvisioningState::update_error(
+                &self.pool,
+                tenant_id,
+                state.id,
+                &error_msg,
+                new_retry_count,
+                None,
+            )
+            .await?;
+
+            self.log_operation_with_retry_count(
+                tenant_id,
+                target_id,
+                "create",
+                "User",
+                user_id,
+                None,
+                "POST",
+                Some(409),
+                started.elapsed(),
+                Some(error_msg.clone()),
+                new_retry_count,
+            )
+            .await;
+
+            error!(
+                tenant_id = %tenant_id,
+                user_id = %user_id,
+                target_id = %target_id,
+                "Cannot resolve 409 conflict: user not found by externalId"
+            );
+
+            Err(ScimClientError::Conflict(error_msg))
         }
     }
 
@@ -373,17 +371,14 @@ impl Provisioner {
         })?;
 
         // 2. Build SCIM patch from changed fields.
-        let patch = match AttributeMapper::build_user_patch(changed_fields, mappings) {
-            Some(p) => p,
-            None => {
-                info!(
-                    tenant_id = %tenant_id,
-                    user_id = %user_id,
-                    target_id = %target_id,
-                    "No mappable fields changed, skipping PATCH"
-                );
-                return Ok(());
-            }
+        let patch = if let Some(p) = AttributeMapper::build_user_patch(changed_fields, mappings) { p } else {
+            info!(
+                tenant_id = %tenant_id,
+                user_id = %user_id,
+                target_id = %target_id,
+                "No mappable fields changed, skipping PATCH"
+            );
+            return Ok(());
         };
 
         // 3. Send PATCH (or PUT if PATCH is not supported) with retry.
@@ -446,7 +441,7 @@ impl Provisioner {
                         }
                         "displayName" => {
                             if let Some(ref v) = op.value {
-                                updated.display_name = v.as_str().map(|s| s.to_string());
+                                updated.display_name = v.as_str().map(std::string::ToString::to_string);
                             }
                         }
                         "userName" => {
@@ -459,13 +454,13 @@ impl Provisioner {
                         "name.givenName" => {
                             if let Some(ref v) = op.value {
                                 let name = updated.name.get_or_insert_with(Default::default);
-                                name.given_name = v.as_str().map(|s| s.to_string());
+                                name.given_name = v.as_str().map(std::string::ToString::to_string);
                             }
                         }
                         "name.familyName" => {
                             if let Some(ref v) = op.value {
                                 let name = updated.name.get_or_insert_with(Default::default);
-                                name.family_name = v.as_str().map(|s| s.to_string());
+                                name.family_name = v.as_str().map(std::string::ToString::to_string);
                             }
                         }
                         p if p.contains("emails") => {
@@ -606,92 +601,89 @@ impl Provisioner {
         let eri = external_resource_id.to_string();
 
         // 2. Based on strategy: DELETE or deactivate_user.
-        let (http_method, http_status) = match deprovisioning_strategy {
-            "delete" => {
-                let result = self
-                    .retry_policy
-                    .execute("scim_delete_user", || {
-                        let id = eri.clone();
-                        async move { client.delete_user(&id).await }
-                    })
+        let (http_method, http_status) = if deprovisioning_strategy == "delete" {
+            let result = self
+                .retry_policy
+                .execute("scim_delete_user", || {
+                    let id = eri.clone();
+                    async move { client.delete_user(&id).await }
+                })
+                .await;
+
+            match result {
+                Ok(()) => ("DELETE", Some(204)),
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    let new_retry_count = state.retry_count + 1;
+                    ScimProvisioningState::update_error(
+                        &self.pool,
+                        tenant_id,
+                        state.id,
+                        &error_msg,
+                        new_retry_count,
+                        None,
+                    )
+                    .await?;
+
+                    self.log_operation_with_retry_count(
+                        tenant_id,
+                        target_id,
+                        "deprovision",
+                        "User",
+                        user_id,
+                        Some(eri),
+                        "DELETE",
+                        None,
+                        started.elapsed(),
+                        Some(error_msg),
+                        new_retry_count,
+                    )
                     .await;
 
-                match result {
-                    Ok(()) => ("DELETE", Some(204)),
-                    Err(e) => {
-                        let error_msg = e.to_string();
-                        let new_retry_count = state.retry_count + 1;
-                        ScimProvisioningState::update_error(
-                            &self.pool,
-                            tenant_id,
-                            state.id,
-                            &error_msg,
-                            new_retry_count,
-                            None,
-                        )
-                        .await?;
-
-                        self.log_operation_with_retry_count(
-                            tenant_id,
-                            target_id,
-                            "deprovision",
-                            "User",
-                            user_id,
-                            Some(eri),
-                            "DELETE",
-                            None,
-                            started.elapsed(),
-                            Some(error_msg),
-                            new_retry_count,
-                        )
-                        .await;
-
-                        return Err(e);
-                    }
+                    return Err(e);
                 }
             }
-            _ => {
-                // Default to deactivate.
-                let result = self
-                    .retry_policy
-                    .execute("scim_deactivate_user", || {
-                        let id = eri.clone();
-                        async move { client.deactivate_user(&id).await }
-                    })
+        } else {
+            // Default to deactivate.
+            let result = self
+                .retry_policy
+                .execute("scim_deactivate_user", || {
+                    let id = eri.clone();
+                    async move { client.deactivate_user(&id).await }
+                })
+                .await;
+
+            match result {
+                Ok(_) => ("PATCH", Some(200)),
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    let new_retry_count = state.retry_count + 1;
+                    ScimProvisioningState::update_error(
+                        &self.pool,
+                        tenant_id,
+                        state.id,
+                        &error_msg,
+                        new_retry_count,
+                        None,
+                    )
+                    .await?;
+
+                    self.log_operation_with_retry_count(
+                        tenant_id,
+                        target_id,
+                        "deprovision",
+                        "User",
+                        user_id,
+                        Some(eri),
+                        "PATCH",
+                        None,
+                        started.elapsed(),
+                        Some(error_msg),
+                        new_retry_count,
+                    )
                     .await;
 
-                match result {
-                    Ok(_) => ("PATCH", Some(200)),
-                    Err(e) => {
-                        let error_msg = e.to_string();
-                        let new_retry_count = state.retry_count + 1;
-                        ScimProvisioningState::update_error(
-                            &self.pool,
-                            tenant_id,
-                            state.id,
-                            &error_msg,
-                            new_retry_count,
-                            None,
-                        )
-                        .await?;
-
-                        self.log_operation_with_retry_count(
-                            tenant_id,
-                            target_id,
-                            "deprovision",
-                            "User",
-                            user_id,
-                            Some(eri),
-                            "PATCH",
-                            None,
-                            started.elapsed(),
-                            Some(error_msg),
-                            new_retry_count,
-                        )
-                        .await;
-
-                        return Err(e);
-                    }
+                    return Err(e);
                 }
             }
         };
@@ -835,74 +827,71 @@ impl Provisioner {
                     })
                     .await?;
 
-                match existing {
-                    Some(found_group) => {
-                        let external_resource_id =
-                            found_group.id.map(|id| id.to_string()).unwrap_or_default();
+                if let Some(found_group) = existing {
+                    let external_resource_id =
+                        found_group.id.map(|id| id.to_string()).unwrap_or_default();
 
-                        ScimProvisioningState::update_synced(
-                            &self.pool,
-                            tenant_id,
-                            state.id,
-                            &external_resource_id,
-                        )
-                        .await?;
+                    ScimProvisioningState::update_synced(
+                        &self.pool,
+                        tenant_id,
+                        state.id,
+                        &external_resource_id,
+                    )
+                    .await?;
 
-                        info!(
-                            tenant_id = %tenant_id,
-                            group_id = %group_id,
-                            target_id = %target_id,
-                            external_resource_id = %external_resource_id,
-                            "Resolved group conflict: linked existing resource"
-                        );
+                    info!(
+                        tenant_id = %tenant_id,
+                        group_id = %group_id,
+                        target_id = %target_id,
+                        external_resource_id = %external_resource_id,
+                        "Resolved group conflict: linked existing resource"
+                    );
 
-                        self.log_operation(
-                            tenant_id,
-                            target_id,
-                            "create_conflict_resolved",
-                            "Group",
-                            group_id,
-                            Some(external_resource_id),
-                            "GET",
-                            Some(200),
-                            started.elapsed(),
-                            None,
-                        )
-                        .await;
+                    self.log_operation(
+                        tenant_id,
+                        target_id,
+                        "create_conflict_resolved",
+                        "Group",
+                        group_id,
+                        Some(external_resource_id),
+                        "GET",
+                        Some(200),
+                        started.elapsed(),
+                        None,
+                    )
+                    .await;
 
-                        Ok(())
-                    }
-                    None => {
-                        let error_msg =
-                            "409 Conflict on group create, but could not find existing group by externalId"
-                                .to_string();
+                    Ok(())
+                } else {
+                    let error_msg =
+                        "409 Conflict on group create, but could not find existing group by externalId"
+                            .to_string();
 
-                        ScimProvisioningState::update_error(
-                            &self.pool,
-                            tenant_id,
-                            state.id,
-                            &error_msg,
-                            state.retry_count + 1,
-                            None,
-                        )
-                        .await?;
+                    ScimProvisioningState::update_error(
+                        &self.pool,
+                        tenant_id,
+                        state.id,
+                        &error_msg,
+                        state.retry_count + 1,
+                        None,
+                    )
+                    .await?;
 
-                        self.log_operation(
-                            tenant_id,
-                            target_id,
-                            "create",
-                            "Group",
-                            group_id,
-                            None,
-                            "POST",
-                            Some(409),
-                            started.elapsed(),
-                            Some(error_msg.clone()),
-                        )
-                        .await;
+                    self.log_operation(
+                        tenant_id,
+                        target_id,
+                        "create",
+                        "Group",
+                        group_id,
+                        None,
+                        "POST",
+                        Some(409),
+                        started.elapsed(),
+                        Some(error_msg.clone()),
+                    )
+                    .await;
 
-                        Err(ScimClientError::Conflict(error_msg))
-                    }
+                    Err(ScimClientError::Conflict(error_msg))
                 }
             }
             Err(e) => {

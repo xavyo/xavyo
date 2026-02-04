@@ -53,7 +53,8 @@ pub enum EscalationReason {
 }
 
 impl EscalationTargetType {
-    /// Check if target_id is required for this target type.
+    /// Check if `target_id` is required for this target type.
+    #[must_use] 
     pub fn requires_target_id(&self) -> bool {
         matches!(self, Self::SpecificUser | Self::ApprovalGroup)
     }
@@ -61,11 +62,13 @@ impl EscalationTargetType {
 
 impl FinalFallbackAction {
     /// Check if this action automatically completes the request.
+    #[must_use] 
     pub fn auto_completes(&self) -> bool {
         matches!(self, Self::AutoApprove | Self::AutoReject)
     }
 
     /// Check if this action requires notification.
+    #[must_use] 
     pub fn requires_notification(&self) -> bool {
         true // All fallback actions require some form of notification
     }

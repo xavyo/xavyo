@@ -23,6 +23,7 @@ pub struct PolicyService {
 
 impl PolicyService {
     /// Create a new policy service.
+    #[must_use] 
     pub fn new(pool: PgPool, policy_cache: std::sync::Arc<PolicyCache>) -> Self {
         Self { pool, policy_cache }
     }
@@ -87,8 +88,7 @@ impl PolicyService {
                     "time_window" | "user_attribute" | "entitlement_check" => {}
                     other => {
                         return Err(ApiAuthorizationError::Validation(format!(
-                            "Invalid condition type: '{}'. Must be 'time_window', 'user_attribute', or 'entitlement_check'",
-                            other
+                            "Invalid condition type: '{other}'. Must be 'time_window', 'user_attribute', or 'entitlement_check'"
                         )));
                     }
                 }
@@ -151,7 +151,7 @@ impl PolicyService {
     pub async fn get_policy(&self, tenant_id: Uuid, id: Uuid) -> ApiResult<PolicyResponse> {
         let policy = AuthorizationPolicy::find_by_id(&self.pool, tenant_id, id)
             .await?
-            .ok_or_else(|| ApiAuthorizationError::NotFound(format!("Policy not found: {}", id)))?;
+            .ok_or_else(|| ApiAuthorizationError::NotFound(format!("Policy not found: {id}")))?;
 
         let conditions =
             PolicyConditionRecord::find_by_policy_id(&self.pool, tenant_id, id).await?;
@@ -203,7 +203,7 @@ impl PolicyService {
 
         let updated = AuthorizationPolicy::update(&self.pool, tenant_id, id, update_input)
             .await?
-            .ok_or_else(|| ApiAuthorizationError::NotFound(format!("Policy not found: {}", id)))?;
+            .ok_or_else(|| ApiAuthorizationError::NotFound(format!("Policy not found: {id}")))?;
 
         let conditions =
             PolicyConditionRecord::find_by_policy_id(&self.pool, tenant_id, id).await?;
@@ -230,7 +230,7 @@ impl PolicyService {
 
         let deactivated = AuthorizationPolicy::update(&self.pool, tenant_id, id, update_input)
             .await?
-            .ok_or_else(|| ApiAuthorizationError::NotFound(format!("Policy not found: {}", id)))?;
+            .ok_or_else(|| ApiAuthorizationError::NotFound(format!("Policy not found: {id}")))?;
 
         let conditions =
             PolicyConditionRecord::find_by_policy_id(&self.pool, tenant_id, id).await?;

@@ -43,6 +43,7 @@ pub struct ParameterValidationService;
 
 impl ParameterValidationService {
     /// Create a new validation service instance.
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
@@ -51,7 +52,8 @@ impl ParameterValidationService {
     ///
     /// # Arguments
     /// * `parameters` - The parameter definitions for the role
-    /// * `values` - Map of parameter_id -> value to validate
+    /// * `values` - Map of `parameter_id` -> value to validate
+    #[must_use] 
     pub fn validate(
         &self,
         parameters: &[GovRoleParameter],
@@ -95,6 +97,7 @@ impl ParameterValidationService {
     }
 
     /// Validate a single parameter value.
+    #[must_use] 
     pub fn validate_parameter(
         &self,
         param: &GovRoleParameter,
@@ -170,11 +173,11 @@ impl ParameterValidationService {
             match Regex::new(pattern) {
                 Ok(regex) => {
                     if !regex.is_match(&string_val) {
-                        errors.push(format!("Value does not match pattern '{}'", pattern));
+                        errors.push(format!("Value does not match pattern '{pattern}'"));
                     }
                 }
                 Err(e) => {
-                    errors.push(format!("Invalid regex pattern: {}", e));
+                    errors.push(format!("Invalid regex pattern: {e}"));
                 }
             }
         }
@@ -215,12 +218,9 @@ impl ParameterValidationService {
                     return (false, errors, None);
                 }
             }
-            Value::String(s) => match s.parse::<i64>() {
-                Ok(i) => i,
-                Err(_) => {
-                    errors.push("String value could not be parsed as integer".to_string());
-                    return (false, errors, None);
-                }
+            Value::String(s) => if let Ok(i) = s.parse::<i64>() { i } else {
+                errors.push("String value could not be parsed as integer".to_string());
+                return (false, errors, None);
             },
             _ => {
                 errors.push("Value must be an integer".to_string());
@@ -232,8 +232,7 @@ impl ParameterValidationService {
         if let Some(min_value) = constraints.min_value {
             if int_val < min_value {
                 errors.push(format!(
-                    "Value {} is less than minimum {}",
-                    int_val, min_value
+                    "Value {int_val} is less than minimum {min_value}"
                 ));
             }
         }
@@ -241,7 +240,7 @@ impl ParameterValidationService {
         // Check max value
         if let Some(max_value) = constraints.max_value {
             if int_val > max_value {
-                errors.push(format!("Value {} exceeds maximum {}", int_val, max_value));
+                errors.push(format!("Value {int_val} exceeds maximum {max_value}"));
             }
         }
 
@@ -299,24 +298,17 @@ impl ParameterValidationService {
         let mut errors = Vec::new();
 
         // Dates must be strings in YYYY-MM-DD format
-        let date_str = match value.as_str() {
-            Some(s) => s,
-            None => {
-                errors.push("Date must be a string in YYYY-MM-DD format".to_string());
-                return (false, errors, None);
-            }
+        let date_str = if let Some(s) = value.as_str() { s } else {
+            errors.push("Date must be a string in YYYY-MM-DD format".to_string());
+            return (false, errors, None);
         };
 
         // Parse the date
-        let date = match NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-            Ok(d) => d,
-            Err(_) => {
-                errors.push(format!(
-                    "Invalid date format '{}', expected YYYY-MM-DD",
-                    date_str
-                ));
-                return (false, errors, None);
-            }
+        let date = if let Ok(d) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") { d } else {
+            errors.push(format!(
+                "Invalid date format '{date_str}', expected YYYY-MM-DD"
+            ));
+            return (false, errors, None);
         };
 
         // Check min date
@@ -324,8 +316,7 @@ impl ParameterValidationService {
             if let Ok(min_date) = NaiveDate::parse_from_str(min_date_str, "%Y-%m-%d") {
                 if date < min_date {
                     errors.push(format!(
-                        "Date {} is before minimum date {}",
-                        date_str, min_date_str
+                        "Date {date_str} is before minimum date {min_date_str}"
                     ));
                 }
             }
@@ -336,8 +327,7 @@ impl ParameterValidationService {
             if let Ok(max_date) = NaiveDate::parse_from_str(max_date_str, "%Y-%m-%d") {
                 if date > max_date {
                     errors.push(format!(
-                        "Date {} is after maximum date {}",
-                        date_str, max_date_str
+                        "Date {date_str} is after maximum date {max_date_str}"
                     ));
                 }
             }
@@ -362,20 +352,16 @@ impl ParameterValidationService {
         let mut errors = Vec::new();
 
         // Enum values must be strings
-        let string_val = match value.as_str() {
-            Some(s) => s.to_string(),
-            None => {
-                errors.push("Enum value must be a string".to_string());
-                return (false, errors, None);
-            }
+        let string_val = if let Some(s) = value.as_str() { s.to_string() } else {
+            errors.push("Enum value must be a string".to_string());
+            return (false, errors, None);
         };
 
         // Check allowed values
         if let Some(ref allowed_values) = constraints.allowed_values {
             if !allowed_values.contains(&string_val) {
                 errors.push(format!(
-                    "Value '{}' is not in allowed values: {:?}",
-                    string_val, allowed_values
+                    "Value '{string_val}' is not in allowed values: {allowed_values:?}"
                 ));
             }
         } else {
@@ -397,6 +383,7 @@ impl ParameterValidationService {
     /// The hash is computed by sorting the parameters by name and hashing
     /// the concatenation of name=value pairs. This ensures that the same
     /// parameters always produce the same hash regardless of input order.
+    #[must_use] 
     pub fn compute_parameter_hash(
         parameters: &[GovRoleParameter],
         values: &HashMap<Uuid, Value>,
@@ -417,7 +404,7 @@ impl ParameterValidationService {
         // Concatenate pairs
         let input: String = pairs
             .iter()
-            .map(|(name, value)| format!("{}={}", name, value))
+            .map(|(name, value)| format!("{name}={value}"))
             .collect::<Vec<_>>()
             .join("|");
 
@@ -433,6 +420,7 @@ impl ParameterValidationService {
     /// Check if a parameter schema is compatible with existing values.
     ///
     /// Returns a list of violations if the schema has changed in incompatible ways.
+    #[must_use] 
     pub fn check_schema_compatibility(
         current_params: &[GovRoleParameter],
         existing_values: &HashMap<Uuid, Value>,
@@ -465,7 +453,8 @@ impl ParameterValidationService {
         violations
     }
 
-    /// Convert a GovernanceError for parameter validation failures.
+    /// Convert a `GovernanceError` for parameter validation failures.
+    #[must_use] 
     pub fn validation_error(param_name: &str, reason: &str) -> GovernanceError {
         GovernanceError::ParameterValidationFailed {
             parameter_name: param_name.to_string(),

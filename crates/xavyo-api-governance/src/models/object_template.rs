@@ -277,7 +277,7 @@ pub struct CreateRuleRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_to: Option<DateTime<Utc>>,
 
-    /// How to interpret time_from/time_to (absolute or relative to object creation).
+    /// How to interpret `time_from/time_to` (absolute or relative to object creation).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_reference: Option<TemplateTimeReference>,
 }
@@ -323,11 +323,11 @@ pub struct UpdateRuleRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exclusive: Option<bool>,
 
-    /// Updated time_from constraint.
+    /// Updated `time_from` constraint.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_from: Option<DateTime<Utc>>,
 
-    /// Updated time_to constraint.
+    /// Updated `time_to` constraint.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_to: Option<DateTime<Utc>>,
 
@@ -627,7 +627,7 @@ pub struct CreateMergePolicyRequest {
     /// Merge strategy.
     pub strategy: TemplateMergeStrategy,
 
-    /// Source precedence order (for source_precedence strategy).
+    /// Source precedence order (for `source_precedence` strategy).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_precedence: Option<Vec<String>>,
 

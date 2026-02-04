@@ -93,7 +93,7 @@ pub async fn list_policy_simulations(
         )
         .await?;
 
-    let items: Vec<PolicySimulationResponse> = simulations.into_iter().map(|s| s.into()).collect();
+    let items: Vec<PolicySimulationResponse> = simulations.into_iter().map(std::convert::Into::into).collect();
 
     Ok(Json(PaginatedResponse {
         items,
@@ -365,7 +365,7 @@ pub async fn get_policy_simulation_results(
         .await?;
 
     let items: Vec<PolicySimulationResultResponse> =
-        results.into_iter().map(|r| r.into()).collect();
+        results.into_iter().map(std::convert::Into::into).collect();
 
     Ok(Json(PaginatedResponse {
         items,
@@ -506,63 +506,60 @@ pub async fn export_policy_simulation(
 
     let format = query.format.as_deref().unwrap_or("json");
 
-    match format {
-        "csv" => {
-            // Generate CSV export
-            let mut csv_output = String::from("user_id,impact_type,severity,details\n");
+    if format == "csv" {
+        // Generate CSV export
+        let mut csv_output = String::from("user_id,impact_type,severity,details\n");
 
-            for result in results {
-                let details_str = serde_json::to_string(&result.details)
-                    .unwrap_or_default()
-                    .replace('"', "\"\""); // Escape quotes for CSV
+        for result in results {
+            let details_str = serde_json::to_string(&result.details)
+                .unwrap_or_default()
+                .replace('"', "\"\""); // Escape quotes for CSV
 
-                csv_output.push_str(&format!(
-                    "{},{:?},{},\"{}\"\n",
-                    result.user_id,
-                    result.impact_type,
-                    result.severity.as_deref().unwrap_or(""),
-                    details_str
-                ));
-            }
-
-            let filename = format!("simulation_{}.csv", simulation_id);
-
-            Ok((
-                [
-                    (header::CONTENT_TYPE, "text/csv"),
-                    (
-                        header::CONTENT_DISPOSITION,
-                        &format!("attachment; filename=\"{}\"", filename),
-                    ),
-                ],
-                csv_output,
-            )
-                .into_response())
+            csv_output.push_str(&format!(
+                "{},{:?},{},\"{}\"\n",
+                result.user_id,
+                result.impact_type,
+                result.severity.as_deref().unwrap_or(""),
+                details_str
+            ));
         }
-        _ => {
-            // JSON export (default)
-            let export_data = PolicySimulationExport {
-                simulation: PolicySimulationResponse::from(simulation),
-                results: results.into_iter().map(|r| r.into()).collect(),
-            };
 
-            let json = serde_json::to_string_pretty(&export_data)
-                .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?;
+        let filename = format!("simulation_{simulation_id}.csv");
 
-            let filename = format!("simulation_{}.json", simulation_id);
+        Ok((
+            [
+                (header::CONTENT_TYPE, "text/csv"),
+                (
+                    header::CONTENT_DISPOSITION,
+                    &format!("attachment; filename=\"{filename}\""),
+                ),
+            ],
+            csv_output,
+        )
+            .into_response())
+    } else {
+        // JSON export (default)
+        let export_data = PolicySimulationExport {
+            simulation: PolicySimulationResponse::from(simulation),
+            results: results.into_iter().map(std::convert::Into::into).collect(),
+        };
 
-            Ok((
-                [
-                    (header::CONTENT_TYPE, "application/json"),
-                    (
-                        header::CONTENT_DISPOSITION,
-                        &format!("attachment; filename=\"{}\"", filename),
-                    ),
-                ],
-                json,
-            )
-                .into_response())
-        }
+        let json = serde_json::to_string_pretty(&export_data)
+            .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?;
+
+        let filename = format!("simulation_{simulation_id}.json");
+
+        Ok((
+            [
+                (header::CONTENT_TYPE, "application/json"),
+                (
+                    header::CONTENT_DISPOSITION,
+                    &format!("attachment; filename=\"{filename}\""),
+                ),
+            ],
+            json,
+        )
+            .into_response())
     }
 }
 

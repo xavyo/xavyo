@@ -14,6 +14,7 @@ pub struct SiemBatchExportService {
 }
 
 impl SiemBatchExportService {
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

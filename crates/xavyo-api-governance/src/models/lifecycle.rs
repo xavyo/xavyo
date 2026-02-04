@@ -239,6 +239,7 @@ pub struct LifecycleStateResponse {
 
 impl LifecycleStateResponse {
     /// Create from database model.
+    #[must_use] 
     pub fn from_model(state: GovLifecycleState, object_count: i64) -> Self {
         Self {
             id: state.id,
@@ -275,7 +276,7 @@ pub struct CreateLifecycleTransitionRequest {
     #[serde(default)]
     pub requires_approval: bool,
 
-    /// Approval workflow ID (required if requires_approval is true).
+    /// Approval workflow ID (required if `requires_approval` is true).
     pub approval_workflow_id: Option<Uuid>,
 
     /// Grace period in hours for rollback (0-720).

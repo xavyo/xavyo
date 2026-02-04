@@ -58,7 +58,7 @@ pub struct PersonaAuditEventFilter {
     pub to_date: Option<DateTime<Utc>>,
 }
 
-/// Event data for persona_created event.
+/// Event data for `persona_created` event.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersonaCreatedEventData {
     pub persona_id: Uuid,
@@ -70,7 +70,7 @@ pub struct PersonaCreatedEventData {
     pub valid_until: Option<DateTime<Utc>>,
 }
 
-/// Event data for context_switched event.
+/// Event data for `context_switched` event.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextSwitchedEventData {
     pub session_id: Uuid,
@@ -82,7 +82,7 @@ pub struct ContextSwitchedEventData {
     pub new_jwt_issued: bool,
 }
 
-/// Event data for attributes_propagated event.
+/// Event data for `attributes_propagated` event.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributesPropagatedEventData {
     pub physical_user_id: Uuid,
@@ -107,10 +107,10 @@ impl GovPersonaAuditEvent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_audit_events
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -131,27 +131,27 @@ impl GovPersonaAuditEvent {
 
         if filter.persona_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND persona_id = ${}", param_count));
+            query.push_str(&format!(" AND persona_id = ${param_count}"));
         }
         if filter.archetype_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND archetype_id = ${}", param_count));
+            query.push_str(&format!(" AND archetype_id = ${param_count}"));
         }
         if filter.event_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_type = ${}", param_count));
+            query.push_str(&format!(" AND event_type = ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND actor_id = ${}", param_count));
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -196,27 +196,27 @@ impl GovPersonaAuditEvent {
 
         if filter.persona_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND persona_id = ${}", param_count));
+            query.push_str(&format!(" AND persona_id = ${param_count}"));
         }
         if filter.archetype_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND archetype_id = ${}", param_count));
+            query.push_str(&format!(" AND archetype_id = ${param_count}"));
         }
         if filter.event_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_type = ${}", param_count));
+            query.push_str(&format!(" AND event_type = ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND actor_id = ${}", param_count));
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -252,12 +252,12 @@ impl GovPersonaAuditEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_audit_events
             WHERE tenant_id = $1 AND persona_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(persona_id)
@@ -276,12 +276,12 @@ impl GovPersonaAuditEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_audit_events
             WHERE tenant_id = $1 AND archetype_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(archetype_id)
@@ -298,13 +298,13 @@ impl GovPersonaAuditEvent {
         input: CreatePersonaAuditEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_persona_audit_events (
                 tenant_id, persona_id, archetype_id, event_type, actor_id, event_data
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.persona_id)
@@ -318,7 +318,7 @@ impl GovPersonaAuditEvent {
 
     // Helper methods to create specific event types
 
-    /// Create a persona_created audit event.
+    /// Create a `persona_created` audit event.
     pub async fn log_persona_created(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -339,7 +339,7 @@ impl GovPersonaAuditEvent {
         .await
     }
 
-    /// Create a context_switched audit event.
+    /// Create a `context_switched` audit event.
     pub async fn log_context_switched(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -360,7 +360,7 @@ impl GovPersonaAuditEvent {
         .await
     }
 
-    /// Create a context_switched_back audit event.
+    /// Create a `context_switched_back` audit event.
     pub async fn log_context_switched_back(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -381,7 +381,7 @@ impl GovPersonaAuditEvent {
         .await
     }
 
-    /// Create an attributes_propagated audit event.
+    /// Create an `attributes_propagated` audit event.
     pub async fn log_attributes_propagated(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,

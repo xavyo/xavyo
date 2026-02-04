@@ -71,6 +71,7 @@ pub struct QuotaService {
 
 impl QuotaService {
     /// Create a new quota service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -140,7 +141,7 @@ impl QuotaService {
             .await
             .map_err(|e| TenantError::Database(e.to_string()))?
             .ok_or_else(|| {
-                TenantError::NotFoundWithMessage(format!("Tenant {} not found", tenant_id))
+                TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
             })?;
 
         let limits = Self::extract_limits(&tenant.settings);
@@ -156,11 +157,11 @@ impl QuotaService {
         let limits_obj = settings.get("limits").cloned().unwrap_or_default();
 
         TenantLimits {
-            max_mau: limits_obj.get("max_mau").and_then(|v| v.as_i64()),
-            max_api_calls: limits_obj.get("max_api_calls").and_then(|v| v.as_i64()),
+            max_mau: limits_obj.get("max_mau").and_then(serde_json::Value::as_i64),
+            max_api_calls: limits_obj.get("max_api_calls").and_then(serde_json::Value::as_i64),
             max_agent_invocations: limits_obj
                 .get("max_agent_invocations")
-                .and_then(|v| v.as_i64()),
+                .and_then(serde_json::Value::as_i64),
         }
     }
 
@@ -170,11 +171,11 @@ impl QuotaService {
         let period_start = Self::period_start_for(today);
 
         let result: Option<(i32, i64, i64, i64)> = sqlx::query_as(
-            r#"
+            r"
             SELECT mau_count, api_calls, auth_events, agent_invocations
             FROM tenant_usage_metrics
             WHERE tenant_id = $1 AND period_start = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(period_start)
@@ -185,7 +186,7 @@ impl QuotaService {
         Ok(
             result.map_or(CurrentUsage::default(), |(mau, api, auth, agent)| {
                 CurrentUsage {
-                    mau_count: mau as i64,
+                    mau_count: i64::from(mau),
                     api_calls: api,
                     auth_events: auth,
                     agent_invocations: agent,
@@ -290,7 +291,7 @@ mod tests {
     #[test]
     fn test_next_period_start_calculation() {
         let next = QuotaService::next_period_start();
-        let today = Utc::now().date_naive();
+        let _today = Utc::now().date_naive();
 
         // Should be first day of next month
         assert_eq!(next.day(), 1);

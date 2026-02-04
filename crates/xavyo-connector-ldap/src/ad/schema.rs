@@ -1,6 +1,6 @@
 //! AD-specific schema definitions with pre-built object classes.
 //!
-//! Provides default ObjectClass definitions for Active Directory user and group
+//! Provides default `ObjectClass` definitions for Active Directory user and group
 //! objects, including all standard AD attributes with correct data types,
 //! multi-value flags, and identifier designations.
 
@@ -13,6 +13,7 @@ use xavyo_connector::schema::{
 /// Includes all attributes from the AD user schema that are relevant for
 /// identity provisioning: identifiers, name attributes, contact info,
 /// organizational attributes, account control, and timestamps.
+#[must_use] 
 pub fn ad_user_object_class() -> ObjectClass {
     ObjectClass::new("user", "user")
         .with_display_name("Active Directory User")
@@ -198,6 +199,7 @@ pub fn ad_user_object_class() -> ObjectClass {
 ///
 /// Includes attributes for group identity, membership, and type classification
 /// (security vs. distribution, global vs. universal vs. domain-local).
+#[must_use] 
 pub fn ad_group_object_class() -> ObjectClass {
     ObjectClass::new("group", "group")
         .with_display_name("Active Directory Group")
@@ -304,6 +306,7 @@ pub fn ad_group_object_class() -> ObjectClass {
 ///
 /// Returns a Schema with AD-specific configuration including
 /// case-insensitive attribute matching and objectGUID as the primary identifier.
+#[must_use] 
 pub fn ad_default_schema() -> Schema {
     Schema::with_object_classes(vec![ad_user_object_class(), ad_group_object_class()]).with_config(
         SchemaConfig {
@@ -338,11 +341,13 @@ pub mod group_type {
     pub const SECURITY: i32 = -0x8000_0000_i32; // 0x80000000 as signed i32
 
     /// Check if a groupType value indicates a security group.
+    #[must_use] 
     pub fn is_security_group(group_type: i32) -> bool {
         group_type & SECURITY != 0
     }
 
     /// Get the scope name from a groupType value.
+    #[must_use] 
     pub fn scope_name(group_type: i32) -> &'static str {
         let scope_bits = group_type & 0x0000_000E;
         if scope_bits & GLOBAL != 0 {
@@ -422,8 +427,7 @@ mod tests {
         for attr_name in &expected {
             assert!(
                 oc.has_attribute(attr_name),
-                "Missing user attribute: {}",
-                attr_name
+                "Missing user attribute: {attr_name}"
             );
         }
     }
@@ -434,8 +438,8 @@ mod tests {
         let tracking = ["uSNChanged", "uSNCreated", "whenCreated", "whenChanged"];
         for attr_name in &tracking {
             let attr = oc.get_attribute(attr_name);
-            assert!(attr.is_some(), "Missing tracking attribute: {}", attr_name);
-            assert!(!attr.unwrap().writable, "{} should be read-only", attr_name);
+            assert!(attr.is_some(), "Missing tracking attribute: {attr_name}");
+            assert!(!attr.unwrap().writable, "{attr_name} should be read-only");
         }
     }
 

@@ -191,7 +191,7 @@ pub async fn link_account(
 
 /// Initiate account linking flow for an authenticated user.
 ///
-/// Redirects to the provider's authorization page with user_id in state.
+/// Redirects to the provider's authorization page with `user_id` in state.
 #[utoipa::path(
     get,
     path = "/auth/social/link/{provider}/authorize",

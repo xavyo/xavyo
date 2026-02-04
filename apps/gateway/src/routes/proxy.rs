@@ -28,22 +28,19 @@ pub async fn proxy_handler(
     request: Request<Body>,
 ) -> Response {
     let path = request.uri().path().to_string();
-    let query = request.uri().query().map(|s| s.to_string());
+    let query = request.uri().query().map(std::string::ToString::to_string);
     let method = request.method().clone();
 
     // Get request ID from extensions
     let request_id = request.extensions().get::<RequestId>().copied();
 
     // Find matching backend
-    let backend = match state.router.find_backend(&path) {
-        Some(b) => b,
-        None => {
-            warn!(path = %path, "No backend found for path");
-            return error_response(
-                GatewayError::NotFound { path: path.clone() },
-                request_id.map(|r| r.inner()),
-            );
-        }
+    let backend = if let Some(b) = state.router.find_backend(&path) { b } else {
+        warn!(path = %path, "No backend found for path");
+        return error_response(
+            GatewayError::NotFound { path: path.clone() },
+            request_id.map(|r| r.inner()),
+        );
     };
 
     // Build target URL
@@ -91,7 +88,7 @@ pub async fn proxy_handler(
         _ => {
             return error_response(
                 GatewayError::BadRequest {
-                    message: format!("Unsupported method: {}", method),
+                    message: format!("Unsupported method: {method}"),
                 },
                 request_id.map(|r| r.inner()),
             );

@@ -19,13 +19,13 @@ pub struct PolicyConditionRecord {
     /// The policy this condition belongs to.
     pub policy_id: Uuid,
 
-    /// Condition type: "time_window", "user_attribute", "entitlement_check".
+    /// Condition type: "`time_window`", "`user_attribute`", "`entitlement_check`".
     pub condition_type: String,
 
-    /// Attribute path for user_attribute conditions (e.g., "department").
+    /// Attribute path for `user_attribute` conditions (e.g., "department").
     pub attribute_path: Option<String>,
 
-    /// Comparison operator for user_attribute conditions.
+    /// Comparison operator for `user_attribute` conditions.
     pub operator: Option<String>,
 
     /// Condition value (JSON).
@@ -52,11 +52,11 @@ impl PolicyConditionRecord {
         policy_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM policy_conditions
             WHERE tenant_id = $1 AND policy_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(policy_id)
@@ -71,10 +71,10 @@ impl PolicyConditionRecord {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM policy_conditions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -90,14 +90,14 @@ impl PolicyConditionRecord {
         input: CreatePolicyCondition,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO policy_conditions (
                 tenant_id, policy_id, condition_type,
                 attribute_path, operator, value
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(policy_id)
@@ -116,10 +116,10 @@ impl PolicyConditionRecord {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM policy_conditions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -136,10 +136,10 @@ impl PolicyConditionRecord {
         policy_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM policy_conditions
             WHERE tenant_id = $1 AND policy_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(policy_id)

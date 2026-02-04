@@ -12,7 +12,7 @@ static INIT: Once = Once::new();
 
 /// RSA key pair for testing (2048-bit).
 /// Generated with openssl - These are TEST KEYS, DO NOT use in production.
-const TEST_PRIVATE_KEY: &str = r#"-----BEGIN PRIVATE KEY-----
+const TEST_PRIVATE_KEY: &str = r"-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCWvwXoegwG34YX
 q+6MmsAfjZz2OZfBwbGVZSW0tiskb9UXZ2Rdz99ayewaKcLw1xwDcmI3BZWKcgfa
 T2lnJbMeMv0SuewOAkZQ8ucZEScGHNcmBflGPUR/7ktUp55BJXFzkkqURqS3ORMp
@@ -39,10 +39,10 @@ qny16zHzKHLWJ6UzfNDfuU00T5L2+SN2lGTpycECgYEAmoV1LnfOnv7ytid8kHE8
 tOmUhF0TRxS3K/I1d0EGkM0PcR4BVSxHYz0LU0ChL4SOYuo7yKzESChwdDRvm1MN
 6vj1477kZXDY2XxVkiXZSD3kPRZ3RFTRIf4nObHi8sKMbGKkJUyDeN+n2SIvYST2
 xxU7T7aU32bKZLygCDtwsN8=
------END PRIVATE KEY-----"#;
+-----END PRIVATE KEY-----";
 
 /// Test RSA public key (matches the private key above).
-const TEST_PUBLIC_KEY: &str = r#"-----BEGIN PUBLIC KEY-----
+const TEST_PUBLIC_KEY: &str = r"-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlr8F6HoMBt+GF6vujJrA
 H42c9jmXwcGxlWUltLYrJG/VF2dkXc/fWsnsGinC8NccA3JiNwWVinIH2k9pZyWz
 HjL9ErnsDgJGUPLnGREnBhzXJgX5Rj1Ef+5LVKeeQSVxc5JKlEaktzkTKQ7PuMsf
@@ -50,7 +50,7 @@ xins+R8jrivoKdCMaaFoTDABggP+wN59zi0WyJApSvdrtbHQsbaeXPbxDNaASve6
 darD80QlEt2CwJ1wIG2PCTnj203TK7KhtmNP6F5I3RpnFx9inDLkapxapasXoD0e
 up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 3QIDAQAB
------END PUBLIC KEY-----"#;
+-----END PUBLIC KEY-----";
 
 /// Test CSRF secret (32 bytes) - DO NOT use in production.
 /// This is a secure random value for testing only.
@@ -138,7 +138,7 @@ impl OAuthTestContext {
             "INSERT INTO users (id, tenant_id, email, password_hash, is_active, email_verified)
              VALUES ($1, $2, $3, $4, true, true)",
         )
-        .bind(&id)
+        .bind(id)
         .bind(tenant_id.as_uuid())
         .bind(email)
         .bind(password_hash)

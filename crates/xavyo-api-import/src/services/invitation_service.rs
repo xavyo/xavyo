@@ -68,11 +68,11 @@ impl InvitationService {
         raw_token: &str,
         frontend_base_url: &str,
     ) -> Result<(), ImportError> {
-        let invitation_url = format!("{}/invite/{}", frontend_base_url, raw_token);
+        let invitation_url = format!("{frontend_base_url}/invite/{raw_token}");
 
         let subject = "You're invited to set up your Xavyo account";
         let body = format!(
-            r#"Hi,
+            r"Hi,
 
 You have been invited to set up your Xavyo account.
 
@@ -83,14 +83,14 @@ This link will expire in {DEFAULT_EXPIRY_DAYS} days.
 
 If you didn't expect this invitation, you can safely ignore this email.
 
-- The xavyo Team"#
+- The xavyo Team"
         );
 
         email_sender
             .send(to_email, subject, &body)
             .await
             .map_err(|e| {
-                ImportError::Internal(format!("Failed to send invitation email: {}", e))
+                ImportError::Internal(format!("Failed to send invitation email: {e}"))
             })?;
 
         Ok(())
@@ -121,7 +121,7 @@ If you didn't expect this invitation, you can safely ignore this email.
 
     /// Bulk resend invitations for all pending/sent users in an import job.
     ///
-    /// Returns (resent_count, skipped_count).
+    /// Returns (`resent_count`, `skipped_count`).
     pub async fn bulk_resend_for_job(
         pool: &PgPool,
         email_sender: &Arc<dyn EmailSender>,
@@ -138,12 +138,9 @@ If you didn't expect this invitation, you can safely ignore this email.
 
         for inv in &invitations {
             // Skip invitations without a user_id (admin invitations use email instead)
-            let user_id = match inv.user_id {
-                Some(uid) => uid,
-                None => {
-                    skipped += 1;
-                    continue;
-                }
+            let user_id = if let Some(uid) = inv.user_id { uid } else {
+                skipped += 1;
+                continue;
             };
 
             // Look up user email
@@ -154,12 +151,9 @@ If you didn't expect this invitation, you can safely ignore this email.
                     .fetch_optional(pool)
                     .await?;
 
-            let email = match user_email {
-                Some(e) => e,
-                None => {
-                    skipped += 1;
-                    continue;
-                }
+            let email = if let Some(e) = user_email { e } else {
+                skipped += 1;
+                continue;
             };
 
             match Self::resend_invitation(
@@ -192,7 +186,7 @@ If you didn't expect this invitation, you can safely ignore this email.
 ///
 /// Uses 32 bytes of random data encoded as URL-safe base64 (no padding).
 ///
-/// SECURITY: Uses OsRng (CSPRNG) for cryptographic randomness.
+/// SECURITY: Uses `OsRng` (CSPRNG) for cryptographic randomness.
 fn generate_invitation_token() -> String {
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use base64::Engine;

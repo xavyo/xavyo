@@ -1,4 +1,4 @@
-//! Governance SoD Rule model.
+//! Governance `SoD` Rule model.
 //!
 //! Represents Separation of Duties rules that define conflicting entitlement pairs.
 
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-/// Severity levels for SoD rules.
+/// Severity levels for `SoD` rules.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[sqlx(type_name = "gov_sod_severity", rename_all = "lowercase")]
@@ -23,7 +23,7 @@ pub enum GovSodSeverity {
     Critical,
 }
 
-/// Status for SoD rules.
+/// Status for `SoD` rules.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[sqlx(type_name = "gov_sod_rule_status", rename_all = "lowercase")]
@@ -35,7 +35,7 @@ pub enum GovSodRuleStatus {
     Inactive,
 }
 
-/// A governance SoD rule defining a conflicting entitlement pair.
+/// A governance `SoD` rule defining a conflicting entitlement pair.
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct GovSodRule {
     /// Unique identifier for the rule.
@@ -75,7 +75,7 @@ pub struct GovSodRule {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Request to create a new SoD rule.
+/// Request to create a new `SoD` rule.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateGovSodRule {
     pub name: String,
@@ -87,7 +87,7 @@ pub struct CreateGovSodRule {
     pub created_by: Uuid,
 }
 
-/// Request to update an SoD rule.
+/// Request to update an `SoD` rule.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpdateGovSodRule {
     pub name: Option<String>,
@@ -96,7 +96,7 @@ pub struct UpdateGovSodRule {
     pub business_rationale: Option<String>,
 }
 
-/// Filter options for listing SoD rules.
+/// Filter options for listing `SoD` rules.
 #[derive(Debug, Clone, Default)]
 pub struct SodRuleFilter {
     pub status: Option<GovSodRuleStatus>,
@@ -112,10 +112,10 @@ impl GovSodRule {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sod_rules
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -130,10 +130,10 @@ impl GovSodRule {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sod_rules
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -149,12 +149,12 @@ impl GovSodRule {
         entitlement_b: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sod_rules
             WHERE tenant_id = $1
               AND LEAST(first_entitlement_id, second_entitlement_id) = LEAST($2, $3)
               AND GREATEST(first_entitlement_id, second_entitlement_id) = GREATEST($2, $3)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_a)
@@ -172,26 +172,25 @@ impl GovSodRule {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_sod_rules
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ${}", param_count));
+            query.push_str(&format!(" AND severity = ${param_count}"));
         }
         if filter.entitlement_id.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND (first_entitlement_id = ${0} OR second_entitlement_id = ${0})",
-                param_count
+                " AND (first_entitlement_id = ${param_count} OR second_entitlement_id = ${param_count})"
             ));
         }
 
@@ -223,26 +222,25 @@ impl GovSodRule {
         filter: &SodRuleFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_sod_rules
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ${}", param_count));
+            query.push_str(&format!(" AND severity = ${param_count}"));
         }
         if filter.entitlement_id.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND (first_entitlement_id = ${0} OR second_entitlement_id = ${0})",
-                param_count
+                " AND (first_entitlement_id = ${param_count} OR second_entitlement_id = ${param_count})"
             ));
         }
 
@@ -261,21 +259,21 @@ impl GovSodRule {
         q.fetch_one(pool).await
     }
 
-    /// Create a new SoD rule.
+    /// Create a new `SoD` rule.
     pub async fn create(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         input: CreateGovSodRule,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_sod_rules (
                 tenant_id, name, description, first_entitlement_id, second_entitlement_id,
                 severity, business_rationale, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -289,7 +287,7 @@ impl GovSodRule {
         .await
     }
 
-    /// Update an SoD rule.
+    /// Update an `SoD` rule.
     pub async fn update(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -300,19 +298,19 @@ impl GovSodRule {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.severity.is_some() {
-            updates.push(format!("severity = ${}", param_idx));
+            updates.push(format!("severity = ${param_idx}"));
             param_idx += 1;
         }
         if input.business_rationale.is_some() {
-            updates.push(format!("business_rationale = ${}", param_idx));
+            updates.push(format!("business_rationale = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -348,12 +346,12 @@ impl GovSodRule {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sod_rules
             SET status = 'active', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -368,12 +366,12 @@ impl GovSodRule {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sod_rules
             SET status = 'inactive', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -388,10 +386,10 @@ impl GovSodRule {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_sod_rules
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -408,13 +406,13 @@ impl GovSodRule {
         entitlement_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sod_rules
             WHERE tenant_id = $1
               AND status = 'active'
               AND (first_entitlement_id = $2 OR second_entitlement_id = $2)
             ORDER BY severity DESC, created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_id)
@@ -428,11 +426,11 @@ impl GovSodRule {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sod_rules
             WHERE tenant_id = $1 AND status = 'active'
             ORDER BY severity DESC, created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -440,11 +438,13 @@ impl GovSodRule {
     }
 
     /// Check if rule is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self.status, GovSodRuleStatus::Active)
     }
 
     /// Get the other entitlement ID given one of the pair.
+    #[must_use] 
     pub fn get_conflicting_entitlement(&self, entitlement_id: Uuid) -> Option<Uuid> {
         if self.first_entitlement_id == entitlement_id {
             Some(self.second_entitlement_id)

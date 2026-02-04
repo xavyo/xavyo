@@ -38,7 +38,7 @@ impl std::str::FromStr for AiRiskLevel {
             "medium" => Ok(AiRiskLevel::Medium),
             "high" => Ok(AiRiskLevel::High),
             "critical" => Ok(AiRiskLevel::Critical),
-            _ => Err(format!("Invalid risk level: {}", s)),
+            _ => Err(format!("Invalid risk level: {s}")),
         }
     }
 }
@@ -71,7 +71,7 @@ impl std::str::FromStr for AiToolStatus {
             "active" => Ok(AiToolStatus::Active),
             "inactive" => Ok(AiToolStatus::Inactive),
             "deprecated" => Ok(AiToolStatus::Deprecated),
-            _ => Err(format!("Invalid tool status: {}", s)),
+            _ => Err(format!("Invalid tool status: {s}")),
         }
     }
 }
@@ -161,13 +161,13 @@ impl AiTool {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, category, input_schema, output_schema,
                    risk_level, requires_approval, max_calls_per_hour, provider, provider_verified,
                    checksum, status, created_at, updated_at
             FROM ai_tools
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -186,13 +186,13 @@ impl AiTool {
         }
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, category, input_schema, output_schema,
                    risk_level, requires_approval, max_calls_per_hour, provider, provider_verified,
                    checksum, status, created_at, updated_at
             FROM ai_tools
             WHERE tenant_id = $1 AND id = ANY($2)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(ids)
@@ -207,13 +207,13 @@ impl AiTool {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, category, input_schema, output_schema,
                    risk_level, requires_approval, max_calls_per_hour, provider, provider_verified,
                    checksum, status, created_at, updated_at
             FROM ai_tools
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -230,40 +230,40 @@ impl AiTool {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, category, input_schema, output_schema,
                    risk_level, requires_approval, max_calls_per_hour, provider, provider_verified,
                    checksum, status, created_at, updated_at
             FROM ai_tools
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
         let mut conditions = Vec::new();
 
         if filter.status.is_some() {
-            conditions.push(format!("status = ${}", param_idx));
+            conditions.push(format!("status = ${param_idx}"));
             param_idx += 1;
         }
         if filter.category.is_some() {
-            conditions.push(format!("category = ${}", param_idx));
+            conditions.push(format!("category = ${param_idx}"));
             param_idx += 1;
         }
         if filter.risk_level.is_some() {
-            conditions.push(format!("risk_level = ${}", param_idx));
+            conditions.push(format!("risk_level = ${param_idx}"));
             param_idx += 1;
         }
         if filter.requires_approval.is_some() {
-            conditions.push(format!("requires_approval = ${}", param_idx));
+            conditions.push(format!("requires_approval = ${param_idx}"));
             param_idx += 1;
         }
         if filter.provider_verified.is_some() {
-            conditions.push(format!("provider_verified = ${}", param_idx));
+            conditions.push(format!("provider_verified = ${param_idx}"));
             param_idx += 1;
         }
         if filter.name_contains.is_some() {
-            conditions.push(format!("name ILIKE ${}", param_idx));
+            conditions.push(format!("name ILIKE ${param_idx}"));
             param_idx += 1;
         }
 
@@ -296,7 +296,7 @@ impl AiTool {
             query_builder = query_builder.bind(provider_verified);
         }
         if let Some(ref name_contains) = filter.name_contains {
-            query_builder = query_builder.bind(format!("%{}%", name_contains));
+            query_builder = query_builder.bind(format!("%{name_contains}%"));
         }
 
         query_builder = query_builder.bind(limit).bind(offset);
@@ -311,38 +311,38 @@ impl AiTool {
         filter: &AiToolFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) as count
             FROM ai_tools
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
         let mut conditions = Vec::new();
 
         if filter.status.is_some() {
-            conditions.push(format!("status = ${}", param_idx));
+            conditions.push(format!("status = ${param_idx}"));
             param_idx += 1;
         }
         if filter.category.is_some() {
-            conditions.push(format!("category = ${}", param_idx));
+            conditions.push(format!("category = ${param_idx}"));
             param_idx += 1;
         }
         if filter.risk_level.is_some() {
-            conditions.push(format!("risk_level = ${}", param_idx));
+            conditions.push(format!("risk_level = ${param_idx}"));
             param_idx += 1;
         }
         if filter.requires_approval.is_some() {
-            conditions.push(format!("requires_approval = ${}", param_idx));
+            conditions.push(format!("requires_approval = ${param_idx}"));
             param_idx += 1;
         }
         if filter.provider_verified.is_some() {
-            conditions.push(format!("provider_verified = ${}", param_idx));
+            conditions.push(format!("provider_verified = ${param_idx}"));
             param_idx += 1;
         }
         if filter.name_contains.is_some() {
-            conditions.push(format!("name ILIKE ${}", param_idx));
+            conditions.push(format!("name ILIKE ${param_idx}"));
         }
 
         for condition in conditions {
@@ -368,7 +368,7 @@ impl AiTool {
             query_builder = query_builder.bind(provider_verified);
         }
         if let Some(ref name_contains) = filter.name_contains {
-            query_builder = query_builder.bind(format!("%{}%", name_contains));
+            query_builder = query_builder.bind(format!("%{name_contains}%"));
         }
 
         query_builder.fetch_one(pool).await
@@ -385,7 +385,7 @@ impl AiTool {
         let provider_verified = input.provider_verified.unwrap_or(false);
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO ai_tools (
                 tenant_id, name, description, category, input_schema, output_schema,
                 risk_level, requires_approval, max_calls_per_hour, provider, provider_verified,
@@ -395,7 +395,7 @@ impl AiTool {
             RETURNING id, tenant_id, name, description, category, input_schema, output_schema,
                       risk_level, requires_approval, max_calls_per_hour, provider, provider_verified,
                       checksum, status, created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -421,7 +421,7 @@ impl AiTool {
         input: UpdateAiTool,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE ai_tools
             SET name = COALESCE($3, name),
                 description = COALESCE($4, description),
@@ -440,7 +440,7 @@ impl AiTool {
             RETURNING id, tenant_id, name, description, category, input_schema, output_schema,
                       risk_level, requires_approval, max_calls_per_hour, provider, provider_verified,
                       checksum, status, created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -463,10 +463,10 @@ impl AiTool {
     /// Delete a tool (hard delete).
     pub async fn delete(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM ai_tools
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -483,14 +483,14 @@ impl AiTool {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE ai_tools
             SET status = 'deprecated', updated_at = NOW()
             WHERE tenant_id = $1 AND id = $2 AND status != 'deprecated'
             RETURNING id, tenant_id, name, description, category, input_schema, output_schema,
                       risk_level, requires_approval, max_calls_per_hour, provider, provider_verified,
                       checksum, status, created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -505,14 +505,14 @@ impl AiTool {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE ai_tools
             SET status = 'inactive', updated_at = NOW()
             WHERE tenant_id = $1 AND id = $2 AND status = 'active'
             RETURNING id, tenant_id, name, description, category, input_schema, output_schema,
                       risk_level, requires_approval, max_calls_per_hour, provider, provider_verified,
                       checksum, status, created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -527,14 +527,14 @@ impl AiTool {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE ai_tools
             SET status = 'active', updated_at = NOW()
             WHERE tenant_id = $1 AND id = $2 AND status = 'inactive'
             RETURNING id, tenant_id, name, description, category, input_schema, output_schema,
                       risk_level, requires_approval, max_calls_per_hour, provider, provider_verified,
                       checksum, status, created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)

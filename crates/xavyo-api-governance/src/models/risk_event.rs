@@ -24,7 +24,7 @@ pub struct CreateRiskEventRequest {
     #[validate(range(min = 0.0, message = "Value must be non-negative"))]
     pub value: Option<f64>,
 
-    /// Reference to source (e.g., login_id).
+    /// Reference to source (e.g., `login_id`).
     #[validate(length(max = 255, message = "Source ref must not exceed 255 characters"))]
     pub source_ref: Option<String>,
 

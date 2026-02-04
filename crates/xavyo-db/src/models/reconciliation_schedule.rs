@@ -33,7 +33,7 @@ impl fmt::Display for ReconciliationScheduleFrequency {
             Self::Daily => write!(f, "daily"),
             Self::Weekly => write!(f, "weekly"),
             Self::Monthly => write!(f, "monthly"),
-            Self::Cron(expr) => write!(f, "{}", expr),
+            Self::Cron(expr) => write!(f, "{expr}"),
         }
     }
 }
@@ -48,7 +48,7 @@ impl std::str::FromStr for ReconciliationScheduleFrequency {
             "weekly" => Ok(Self::Weekly),
             "monthly" => Ok(Self::Monthly),
             _ if s.contains(' ') => Ok(Self::Cron(s.to_string())),
-            _ => Err(format!("Unknown schedule frequency: {}", s)),
+            _ => Err(format!("Unknown schedule frequency: {s}")),
         }
     }
 }
@@ -80,11 +80,13 @@ pub struct ReconciliationSchedule {
 
 impl ReconciliationSchedule {
     /// Get mode enum.
+    #[must_use] 
     pub fn mode(&self) -> ConnectorReconciliationMode {
         self.mode.parse().unwrap_or_default()
     }
 
     /// Get frequency enum.
+    #[must_use] 
     pub fn frequency(&self) -> ReconciliationScheduleFrequency {
         self.frequency.parse().unwrap_or_default()
     }
@@ -97,7 +99,7 @@ impl ReconciliationSchedule {
         input: &UpsertReconciliationSchedule,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_reconciliation_schedules (
                 tenant_id, connector_id, mode, frequency,
                 day_of_week, day_of_month, hour_of_day, enabled, next_run_at
@@ -113,7 +115,7 @@ impl ReconciliationSchedule {
                 next_run_at = EXCLUDED.next_run_at,
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -135,10 +137,10 @@ impl ReconciliationSchedule {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_reconciliation_schedules
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -153,10 +155,10 @@ impl ReconciliationSchedule {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_reconciliation_schedules
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -167,11 +169,11 @@ impl ReconciliationSchedule {
     /// List all schedules for a tenant.
     pub async fn list_by_tenant(pool: &PgPool, tenant_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_reconciliation_schedules
             WHERE tenant_id = $1
             ORDER BY created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -181,11 +183,11 @@ impl ReconciliationSchedule {
     /// List enabled schedules due for execution.
     pub async fn list_due(pool: &PgPool, before: DateTime<Utc>) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_reconciliation_schedules
             WHERE enabled = true AND next_run_at <= $1
             ORDER BY next_run_at
-            "#,
+            ",
         )
         .bind(before)
         .fetch_all(pool)
@@ -199,12 +201,12 @@ impl ReconciliationSchedule {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_reconciliation_schedules
             SET enabled = true, updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -219,12 +221,12 @@ impl ReconciliationSchedule {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_reconciliation_schedules
             SET enabled = false, updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -241,12 +243,12 @@ impl ReconciliationSchedule {
         next_run_at: Option<DateTime<Utc>>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_reconciliation_schedules
             SET last_run_id = $3, next_run_at = $4, updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -263,10 +265,10 @@ impl ReconciliationSchedule {
         connector_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_reconciliation_schedules
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -340,8 +342,7 @@ impl UpsertReconciliationSchedule {
             ReconciliationScheduleFrequency::Weekly
                 if self
                     .day_of_week
-                    .map(|d| !(0..=6).contains(&d))
-                    .unwrap_or(false) =>
+                    .is_some_and(|d| !(0..=6).contains(&d)) =>
             {
                 Err("day_of_week must be between 0 (Sunday) and 6 (Saturday)".to_string())
             }
@@ -351,8 +352,7 @@ impl UpsertReconciliationSchedule {
             ReconciliationScheduleFrequency::Monthly
                 if self
                     .day_of_month
-                    .map(|d| !(1..=28).contains(&d))
-                    .unwrap_or(false) =>
+                    .is_some_and(|d| !(1..=28).contains(&d)) =>
             {
                 Err("day_of_month must be between 1 and 28".to_string())
             }

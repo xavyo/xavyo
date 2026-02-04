@@ -1,4 +1,4 @@
-//! Unit tests for NhiService.
+//! Unit tests for `NhiService`.
 //!
 //! F061 - NHI Lifecycle Management
 
@@ -59,7 +59,7 @@ fn test_create_nhi_request_validation_name_too_short() {
 
     let request = CreateNhiRequest {
         user_id: Uuid::new_v4(),
-        name: "".to_string(), // Empty name
+        name: String::new(), // Empty name
         purpose: "This is a test purpose for the NHI".to_string(),
         owner_id: Uuid::new_v4(),
         backup_owner_id: None,
@@ -144,7 +144,7 @@ fn test_update_nhi_request_validation_name_too_short() {
     use validator::Validate;
 
     let request = UpdateNhiRequest {
-        name: Some("".to_string()), // Empty name
+        name: Some(String::new()), // Empty name
         purpose: None,
         owner_id: None,
         backup_owner_id: None,
@@ -338,10 +338,10 @@ fn test_rotation_interval_validation_boundaries() {
     let below_min = 0;
     let above_max = 366;
 
-    assert!(min_valid >= 1 && min_valid <= 365);
-    assert!(max_valid >= 1 && max_valid <= 365);
-    assert!(!(below_min >= 1 && below_min <= 365));
-    assert!(!(above_max >= 1 && above_max <= 365));
+    assert!((1..=365).contains(&min_valid));
+    assert!((1..=365).contains(&max_valid));
+    assert!(!(1..=365).contains(&below_min));
+    assert!(!(1..=365).contains(&above_max));
 }
 
 #[test]
@@ -351,10 +351,10 @@ fn test_inactivity_threshold_validation_boundaries() {
     let below_min = 0;
     let above_max = 366;
 
-    assert!(min_valid >= 1 && min_valid <= 365);
-    assert!(max_valid >= 1 && max_valid <= 365);
-    assert!(!(below_min >= 1 && below_min <= 365));
-    assert!(!(above_max >= 1 && above_max <= 365));
+    assert!((1..=365).contains(&min_valid));
+    assert!((1..=365).contains(&max_valid));
+    assert!(!(1..=365).contains(&below_min));
+    assert!(!(1..=365).contains(&above_max));
 }
 
 // =============================================================================
@@ -766,8 +766,8 @@ fn test_high_volume_usage_aggregation() {
 #[test]
 fn test_emergency_suspension_bypasses_normal_flow() {
     // Edge case: Emergency suspension should be immediate, no grace period
-    let id = Uuid::new_v4();
-    let owner_id = Uuid::new_v4();
+    let _id = Uuid::new_v4();
+    let _owner_id = Uuid::new_v4();
 
     let suspend_request = SuspendNhiRequest {
         reason: NhiSuspensionReason::Emergency,

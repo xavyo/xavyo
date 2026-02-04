@@ -43,7 +43,7 @@ pub struct MfaStatusResponse {
     /// Whether TOTP is enabled.
     pub totp_enabled: bool,
 
-    /// Whether WebAuthn is enabled (F032).
+    /// Whether `WebAuthn` is enabled (F032).
     pub webauthn_enabled: bool,
 
     /// Number of unused recovery codes remaining.
@@ -92,6 +92,7 @@ pub enum MfaMethod {
 
 impl MfaRequiredResponse {
     /// Create a new MFA required response.
+    #[must_use] 
     pub fn new(partial_token: String, expires_in: i64) -> Self {
         Self {
             partial_token,
@@ -102,6 +103,7 @@ impl MfaRequiredResponse {
     }
 
     /// Create a new MFA required response with specific methods.
+    #[must_use] 
     pub fn with_methods(partial_token: String, expires_in: i64, methods: Vec<MfaMethod>) -> Self {
         Self {
             partial_token,

@@ -18,7 +18,7 @@ use xavyo_db::models::{ScheduleType, SchemaVersionSummary};
 // POST /connectors/{id}/schema/discover (T012)
 // =============================================================================
 
-/// Test: DiscoverSchemaRequest deserializes with defaults
+/// Test: `DiscoverSchemaRequest` deserializes with defaults
 #[test]
 fn test_discover_schema_request_defaults() {
     let json = json!({});
@@ -28,7 +28,7 @@ fn test_discover_schema_request_defaults() {
     assert!(!request.include_operational);
 }
 
-/// Test: DiscoverSchemaRequest deserializes with all options
+/// Test: `DiscoverSchemaRequest` deserializes with all options
 #[test]
 fn test_discover_schema_request_with_options() {
     let json = json!({
@@ -42,7 +42,7 @@ fn test_discover_schema_request_with_options() {
     assert!(request.include_operational);
 }
 
-/// Test: DiscoveryStatusResponse serializes correctly for in_progress state
+/// Test: `DiscoveryStatusResponse` serializes correctly for `in_progress` state
 #[test]
 fn test_discovery_status_response_in_progress() {
     let now = Utc::now();
@@ -70,7 +70,7 @@ fn test_discovery_status_response_in_progress() {
     assert!(json.get("version").is_none());
 }
 
-/// Test: DiscoveryStatusResponse serializes correctly for completed state
+/// Test: `DiscoveryStatusResponse` serializes correctly for completed state
 #[test]
 fn test_discovery_status_response_completed() {
     let now = Utc::now();
@@ -95,7 +95,7 @@ fn test_discovery_status_response_completed() {
     assert_eq!(json["version"], 3);
 }
 
-/// Test: DiscoveryStatusResponse serializes correctly for failed state
+/// Test: `DiscoveryStatusResponse` serializes correctly for failed state
 #[test]
 fn test_discovery_status_response_failed() {
     let now = Utc::now();
@@ -118,7 +118,7 @@ fn test_discovery_status_response_failed() {
     assert_eq!(json["error"], "Connection refused");
 }
 
-/// Test: DiscoveryStatusResponse serializes correctly for idle state
+/// Test: `DiscoveryStatusResponse` serializes correctly for idle state
 #[test]
 fn test_discovery_status_response_idle() {
     let connector_id = Uuid::new_v4();
@@ -152,7 +152,7 @@ fn test_discovery_status_response_idle() {
 // GET /connectors/{id}/schema (T026)
 // =============================================================================
 
-/// Test: GetSchemaQuery deserializes with defaults
+/// Test: `GetSchemaQuery` deserializes with defaults
 #[test]
 fn test_get_schema_query_defaults() {
     let json = json!({});
@@ -161,7 +161,7 @@ fn test_get_schema_query_defaults() {
     assert!(query.version.is_none());
 }
 
-/// Test: GetSchemaQuery deserializes with specific version
+/// Test: `GetSchemaQuery` deserializes with specific version
 #[test]
 fn test_get_schema_query_with_version() {
     let json = json!({
@@ -177,7 +177,7 @@ fn test_get_schema_query_with_version() {
 // GET /connectors/{id}/schema/versions (T027)
 // =============================================================================
 
-/// Test: ListVersionsQuery deserializes with defaults
+/// Test: `ListVersionsQuery` deserializes with defaults
 #[test]
 fn test_list_versions_query_defaults() {
     let json = json!({});
@@ -187,7 +187,7 @@ fn test_list_versions_query_defaults() {
     assert_eq!(query.offset, 0); // default
 }
 
-/// Test: ListVersionsQuery deserializes with pagination
+/// Test: `ListVersionsQuery` deserializes with pagination
 #[test]
 fn test_list_versions_query_with_pagination() {
     let json = json!({
@@ -201,7 +201,7 @@ fn test_list_versions_query_with_pagination() {
     assert_eq!(query.offset, 50);
 }
 
-/// Test: SchemaVersionListResponse serializes correctly
+/// Test: `SchemaVersionListResponse` serializes correctly
 #[test]
 fn test_schema_version_list_response() {
     let response = SchemaVersionListResponse {
@@ -244,7 +244,7 @@ fn test_schema_version_list_response() {
 // GET /connectors/{id}/schema/diff (T046)
 // =============================================================================
 
-/// Test: DiffSchemaQuery deserializes correctly
+/// Test: `DiffSchemaQuery` deserializes correctly
 #[test]
 fn test_diff_schema_query() {
     let json = json!({
@@ -258,11 +258,11 @@ fn test_diff_schema_query() {
     assert_eq!(query.to_version, 3);
 }
 
-/// Test: SchemaDiffResponse serializes correctly
+/// Test: `SchemaDiffResponse` serializes correctly
 #[test]
 fn test_schema_diff_response() {
     use std::collections::HashMap;
-    use xavyo_connector::schema::{AttributeChanges, DiffSummary, ObjectClassChanges};
+    use xavyo_connector::schema::{DiffSummary, ObjectClassChanges};
 
     let response = SchemaDiffResponse {
         from_version: 1,
@@ -298,7 +298,7 @@ fn test_schema_diff_response() {
 // GET /connectors/{id}/schema/object-classes (T036)
 // =============================================================================
 
-/// Test: ObjectClassListResponse serializes correctly
+/// Test: `ObjectClassListResponse` serializes correctly
 #[test]
 fn test_object_class_list_response() {
     let response = ObjectClassListResponse {
@@ -338,7 +338,7 @@ fn test_object_class_list_response() {
 // GET /connectors/{id}/schema/object-classes/{name}/attributes (T038)
 // =============================================================================
 
-/// Test: ListAttributesQuery deserializes with defaults
+/// Test: `ListAttributesQuery` deserializes with defaults
 #[test]
 fn test_list_attributes_query_defaults() {
     let json = json!({});
@@ -347,7 +347,7 @@ fn test_list_attributes_query_defaults() {
     assert!(query.include_inherited); // default true
 }
 
-/// Test: ListAttributesQuery with include_inherited false
+/// Test: `ListAttributesQuery` with `include_inherited` false
 #[test]
 fn test_list_attributes_query_no_inherited() {
     let json = json!({
@@ -359,7 +359,7 @@ fn test_list_attributes_query_no_inherited() {
     assert!(!query.include_inherited);
 }
 
-/// Test: AttributeListResponse serializes correctly
+/// Test: `AttributeListResponse` serializes correctly
 #[test]
 fn test_attribute_list_response() {
     let response = AttributeListResponse {
@@ -403,7 +403,7 @@ fn test_attribute_list_response() {
 // Schema Schedule Endpoints (T060-T062)
 // =============================================================================
 
-/// Test: RefreshScheduleRequest deserializes interval schedule
+/// Test: `RefreshScheduleRequest` deserializes interval schedule
 #[test]
 fn test_refresh_schedule_request_interval() {
     let json = json!({
@@ -424,7 +424,7 @@ fn test_refresh_schedule_request_interval() {
     assert_eq!(request.notify_email, Some("admin@example.com".to_string()));
 }
 
-/// Test: RefreshScheduleRequest deserializes cron schedule
+/// Test: `RefreshScheduleRequest` deserializes cron schedule
 #[test]
 fn test_refresh_schedule_request_cron() {
     let json = json!({
@@ -441,7 +441,7 @@ fn test_refresh_schedule_request_cron() {
     assert!(!request.notify_on_changes); // default false
 }
 
-/// Test: RefreshScheduleResponse serializes correctly
+/// Test: `RefreshScheduleResponse` serializes correctly
 #[test]
 fn test_refresh_schedule_response() {
     let now = Utc::now();
@@ -474,7 +474,7 @@ fn test_refresh_schedule_response() {
     assert_eq!(json["notify_email"], "admin@example.com");
 }
 
-/// Test: RefreshScheduleResponse with cron and error
+/// Test: `RefreshScheduleResponse` with cron and error
 #[test]
 fn test_refresh_schedule_response_with_error() {
     let response = RefreshScheduleResponse {

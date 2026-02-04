@@ -78,8 +78,8 @@ impl CredentialTestContext {
         let tenant_id = Uuid::new_v4();
         let slug = format!("test-{}", &tenant_id.to_string()[..8]);
         if sqlx::query("INSERT INTO tenants (id, name, slug) VALUES ($1, $2, $3)")
-            .bind(&tenant_id)
-            .bind(&format!("Test Tenant {}", &tenant_id.to_string()[..8]))
+            .bind(tenant_id)
+            .bind(format!("Test Tenant {}", &tenant_id.to_string()[..8]))
             .bind(&slug)
             .execute(&admin_pool)
             .await
@@ -103,8 +103,8 @@ impl CredentialTestContext {
             "INSERT INTO users (id, tenant_id, email, password_hash, is_active, email_verified)
              VALUES ($1, $2, $3, $4, true, true)",
         )
-        .bind(&user_id)
-        .bind(&self.tenant_id)
+        .bind(user_id)
+        .bind(self.tenant_id)
         .bind(&email)
         .bind("$argon2id$v=19$m=65536,t=3,p=4$dGVzdHNhbHQ$testhash")
         .execute(&self.admin_pool)
@@ -121,10 +121,10 @@ impl CredentialTestContext {
             "INSERT INTO ai_agents (id, tenant_id, name, agent_type, owner_id, status, risk_level)
              VALUES ($1, $2, $3, 'autonomous', $4, 'active', 'low')",
         )
-        .bind(&agent_id)
-        .bind(&self.tenant_id)
+        .bind(agent_id)
+        .bind(self.tenant_id)
         .bind(&name)
-        .bind(&owner_id)
+        .bind(owner_id)
         .execute(&self.admin_pool)
         .await?;
 
@@ -143,8 +143,8 @@ impl CredentialTestContext {
              (id, tenant_id, type_name, default_ttl_seconds, max_ttl_seconds, provider_type, rate_limit_per_hour, enabled)
              VALUES ($1, $2, $3, 300, 3600, 'internal', $4, true)",
         )
-        .bind(&config_id)
-        .bind(&self.tenant_id)
+        .bind(config_id)
+        .bind(self.tenant_id)
         .bind(type_name)
         .bind(rate_limit)
         .execute(&self.admin_pool)
@@ -166,11 +166,11 @@ impl CredentialTestContext {
              (id, tenant_id, agent_id, secret_type, granted_by)
              VALUES ($1, $2, $3, $4, $5)",
         )
-        .bind(&perm_id)
-        .bind(&self.tenant_id)
-        .bind(&agent_id)
+        .bind(perm_id)
+        .bind(self.tenant_id)
+        .bind(agent_id)
         .bind(secret_type)
-        .bind(&granted_by)
+        .bind(granted_by)
         .execute(&self.admin_pool)
         .await?;
 
@@ -181,31 +181,31 @@ impl CredentialTestContext {
     async fn cleanup(&self) {
         // Delete in reverse dependency order
         let _ = sqlx::query("DELETE FROM credential_request_audit WHERE tenant_id = $1")
-            .bind(&self.tenant_id)
+            .bind(self.tenant_id)
             .execute(&self.admin_pool)
             .await;
         let _ = sqlx::query("DELETE FROM dynamic_credentials WHERE tenant_id = $1")
-            .bind(&self.tenant_id)
+            .bind(self.tenant_id)
             .execute(&self.admin_pool)
             .await;
         let _ = sqlx::query("DELETE FROM agent_secret_permissions WHERE tenant_id = $1")
-            .bind(&self.tenant_id)
+            .bind(self.tenant_id)
             .execute(&self.admin_pool)
             .await;
         let _ = sqlx::query("DELETE FROM secret_type_configurations WHERE tenant_id = $1")
-            .bind(&self.tenant_id)
+            .bind(self.tenant_id)
             .execute(&self.admin_pool)
             .await;
         let _ = sqlx::query("DELETE FROM ai_agents WHERE tenant_id = $1")
-            .bind(&self.tenant_id)
+            .bind(self.tenant_id)
             .execute(&self.admin_pool)
             .await;
         let _ = sqlx::query("DELETE FROM users WHERE tenant_id = $1")
-            .bind(&self.tenant_id)
+            .bind(self.tenant_id)
             .execute(&self.admin_pool)
             .await;
         let _ = sqlx::query("DELETE FROM tenants WHERE id = $1")
-            .bind(&self.tenant_id)
+            .bind(self.tenant_id)
             .execute(&self.admin_pool)
             .await;
     }
@@ -218,12 +218,9 @@ impl CredentialTestContext {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration"), ignore)]
 async fn test_rate_limit_enforcement() {
-    let ctx = match CredentialTestContext::new().await {
-        Some(c) => c,
-        None => {
-            eprintln!("Skipping test: database not available");
-            return;
-        }
+    let ctx = if let Some(c) = CredentialTestContext::new().await { c } else {
+        eprintln!("Skipping test: database not available");
+        return;
     };
 
     // Setup test data
@@ -283,8 +280,7 @@ async fn test_rate_limit_enforcement() {
             err,
             xavyo_api_agents::error::ApiAgentsError::CredentialRateLimitExceeded(_, _)
         ),
-        "Error should be CredentialRateLimitExceeded, got: {:?}",
-        err
+        "Error should be CredentialRateLimitExceeded, got: {err:?}"
     );
 
     // Cleanup
@@ -298,12 +294,9 @@ async fn test_rate_limit_enforcement() {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration"), ignore)]
 async fn test_permission_denied_without_grant() {
-    let ctx = match CredentialTestContext::new().await {
-        Some(c) => c,
-        None => {
-            eprintln!("Skipping test: database not available");
-            return;
-        }
+    let ctx = if let Some(c) = CredentialTestContext::new().await { c } else {
+        eprintln!("Skipping test: database not available");
+        return;
     };
 
     // Setup test data - agent without permission
@@ -341,8 +334,7 @@ async fn test_permission_denied_without_grant() {
             err,
             xavyo_api_agents::error::ApiAgentsError::SecretPermissionDenied(_)
         ),
-        "Error should be SecretPermissionDenied, got: {:?}",
-        err
+        "Error should be SecretPermissionDenied, got: {err:?}"
     );
 
     // Cleanup
@@ -352,12 +344,9 @@ async fn test_permission_denied_without_grant() {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration"), ignore)]
 async fn test_suspended_agent_denied() {
-    let ctx = match CredentialTestContext::new().await {
-        Some(c) => c,
-        None => {
-            eprintln!("Skipping test: database not available");
-            return;
-        }
+    let ctx = if let Some(c) = CredentialTestContext::new().await { c } else {
+        eprintln!("Skipping test: database not available");
+        return;
     };
 
     // Setup test data
@@ -376,7 +365,7 @@ async fn test_suspended_agent_denied() {
 
     // Suspend the agent
     sqlx::query("UPDATE ai_agents SET status = 'suspended' WHERE id = $1")
-        .bind(&agent_id)
+        .bind(agent_id)
         .execute(&ctx.admin_pool)
         .await
         .expect("Failed to suspend agent");
@@ -401,8 +390,7 @@ async fn test_suspended_agent_denied() {
     let err = result.unwrap_err();
     assert!(
         matches!(err, xavyo_api_agents::error::ApiAgentsError::AgentNotActive),
-        "Error should be AgentNotActive, got: {:?}",
-        err
+        "Error should be AgentNotActive, got: {err:?}"
     );
 
     // Cleanup
@@ -416,12 +404,9 @@ async fn test_suspended_agent_denied() {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration"), ignore)]
 async fn test_secret_type_not_found() {
-    let ctx = match CredentialTestContext::new().await {
-        Some(c) => c,
-        None => {
-            eprintln!("Skipping test: database not available");
-            return;
-        }
+    let ctx = if let Some(c) = CredentialTestContext::new().await { c } else {
+        eprintln!("Skipping test: database not available");
+        return;
     };
 
     // Setup test data - no secret type created
@@ -454,8 +439,7 @@ async fn test_secret_type_not_found() {
             err,
             xavyo_api_agents::error::ApiAgentsError::SecretTypeNotFound(_)
         ),
-        "Error should be SecretTypeNotFound, got: {:?}",
-        err
+        "Error should be SecretTypeNotFound, got: {err:?}"
     );
 
     // Cleanup
@@ -465,12 +449,9 @@ async fn test_secret_type_not_found() {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration"), ignore)]
 async fn test_disabled_secret_type_denied() {
-    let ctx = match CredentialTestContext::new().await {
-        Some(c) => c,
-        None => {
-            eprintln!("Skipping test: database not available");
-            return;
-        }
+    let ctx = if let Some(c) = CredentialTestContext::new().await { c } else {
+        eprintln!("Skipping test: database not available");
+        return;
     };
 
     // Setup test data
@@ -487,8 +468,8 @@ async fn test_disabled_secret_type_denied() {
          (id, tenant_id, type_name, default_ttl_seconds, max_ttl_seconds, provider_type, rate_limit_per_hour, enabled)
          VALUES ($1, $2, 'test-disabled', 300, 3600, 'internal', 100, false)", // enabled = false
     )
-    .bind(&config_id)
-    .bind(&ctx.tenant_id)
+    .bind(config_id)
+    .bind(ctx.tenant_id)
     .execute(&ctx.admin_pool)
     .await
     .expect("Failed to create secret type");
@@ -520,8 +501,7 @@ async fn test_disabled_secret_type_denied() {
             err,
             xavyo_api_agents::error::ApiAgentsError::SecretTypeDisabled(_)
         ),
-        "Error should be SecretTypeDisabled, got: {:?}",
-        err
+        "Error should be SecretTypeDisabled, got: {err:?}"
     );
 
     // Cleanup
@@ -535,12 +515,9 @@ async fn test_disabled_secret_type_denied() {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration"), ignore)]
 async fn test_successful_credential_request() {
-    let ctx = match CredentialTestContext::new().await {
-        Some(c) => c,
-        None => {
-            eprintln!("Skipping test: database not available");
-            return;
-        }
+    let ctx = if let Some(c) = CredentialTestContext::new().await { c } else {
+        eprintln!("Skipping test: database not available");
+        return;
     };
 
     // Setup test data
@@ -601,8 +578,8 @@ async fn test_successful_credential_request() {
     let audit_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM credential_request_audit WHERE tenant_id = $1 AND agent_id = $2",
     )
-    .bind(&ctx.tenant_id)
-    .bind(&agent_id)
+    .bind(ctx.tenant_id)
+    .bind(agent_id)
     .fetch_one(&ctx.admin_pool)
     .await
     .expect("Failed to count audit records");
@@ -613,8 +590,8 @@ async fn test_successful_credential_request() {
     let cred_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM dynamic_credentials WHERE tenant_id = $1 AND agent_id = $2",
     )
-    .bind(&ctx.tenant_id)
-    .bind(&agent_id)
+    .bind(ctx.tenant_id)
+    .bind(agent_id)
     .fetch_one(&ctx.admin_pool)
     .await
     .expect("Failed to count credentials");

@@ -41,6 +41,7 @@ pub struct MtlsValidationResult {
 
 impl MtlsValidationResult {
     /// Create a successful validation result.
+    #[must_use] 
     pub fn success(
         tenant_id: Uuid,
         agent_id: Uuid,
@@ -81,7 +82,8 @@ pub struct MtlsService {
 }
 
 impl MtlsService {
-    /// Create a new MtlsService.
+    /// Create a new `MtlsService`.
+    #[must_use] 
     pub fn new(pool: PgPool, certificate_service: Arc<CertificateService>) -> Self {
         Self {
             pool,
@@ -113,8 +115,7 @@ impl MtlsService {
             Ok(pem) => pem,
             Err(e) => {
                 return Ok(MtlsValidationResult::failure(format!(
-                    "Failed to parse PEM: {}",
-                    e
+                    "Failed to parse PEM: {e}"
                 )));
             }
         };
@@ -124,8 +125,7 @@ impl MtlsService {
             Ok(cert) => cert,
             Err(e) => {
                 return Ok(MtlsValidationResult::failure(format!(
-                    "Failed to parse X.509: {:?}",
-                    e
+                    "Failed to parse X.509: {e:?}"
                 )));
             }
         };
@@ -155,8 +155,7 @@ impl MtlsService {
             Ok(ids) => ids,
             Err(e) => {
                 return Ok(MtlsValidationResult::failure(format!(
-                    "Failed to extract agent identity: {}",
-                    e
+                    "Failed to extract agent identity: {e}"
                 )));
             }
         };
@@ -209,8 +208,7 @@ impl MtlsService {
             .await
         {
             return Ok(MtlsValidationResult::failure(format!(
-                "Chain validation failed: {}",
-                e
+                "Chain validation failed: {e}"
             )));
         }
 
@@ -222,7 +220,7 @@ impl MtlsService {
         ))
     }
 
-    /// Extract agent identity (tenant_id, agent_id) from certificate SANs.
+    /// Extract agent identity (`tenant_id`, `agent_id`) from certificate SANs.
     ///
     /// Looks for URI SANs in the format:
     /// `xavyo:tenant:{tenant_uuid}:agent:{agent_uuid}`
@@ -290,11 +288,11 @@ impl MtlsService {
 
         // Parse CA certificate
         let ca_pem = ::pem::parse(&ca.certificate_pem).map_err(|e| {
-            ApiAgentsError::MtlsValidationFailed(format!("Failed to parse CA PEM: {}", e))
+            ApiAgentsError::MtlsValidationFailed(format!("Failed to parse CA PEM: {e}"))
         })?;
 
         let (_, ca_cert) = X509Certificate::from_der(ca_pem.contents()).map_err(|e| {
-            ApiAgentsError::MtlsValidationFailed(format!("Failed to parse CA X.509: {:?}", e))
+            ApiAgentsError::MtlsValidationFailed(format!("Failed to parse CA X.509: {e:?}"))
         })?;
 
         // 1. Verify the certificate's issuer DN matches the CA's subject DN
@@ -309,8 +307,7 @@ impl MtlsService {
         let ca_public_key = ca_cert.public_key();
         cert.verify_signature(Some(ca_public_key)).map_err(|e| {
             ApiAgentsError::MtlsValidationFailed(format!(
-                "Certificate signature verification failed: {:?}",
-                e
+                "Certificate signature verification failed: {e:?}"
             ))
         })?;
 
@@ -340,7 +337,7 @@ impl MtlsService {
     /// This is a fast path that checks our revocation database.
     /// For external verification, use CRL or OCSP endpoints.
     ///
-    /// Note: Uses any_tenant lookup since this is for mTLS validation
+    /// Note: Uses `any_tenant` lookup since this is for mTLS validation
     /// where tenant is extracted from the certificate itself.
     pub async fn is_certificate_revoked(&self, fingerprint: &str) -> Result<bool, ApiAgentsError> {
         match self
@@ -355,7 +352,7 @@ impl MtlsService {
 
     /// Get certificate details by fingerprint.
     ///
-    /// Note: Uses any_tenant lookup since this is for mTLS validation
+    /// Note: Uses `any_tenant` lookup since this is for mTLS validation
     /// where tenant is extracted from the certificate itself.
     pub async fn get_certificate_by_fingerprint(
         &self,
@@ -367,7 +364,7 @@ impl MtlsService {
     }
 }
 
-/// Parse a xavyo URI to extract tenant_id and agent_id.
+/// Parse a xavyo URI to extract `tenant_id` and `agent_id`.
 ///
 /// Format: `xavyo:tenant:{tenant_uuid}:agent:{agent_uuid}`
 fn parse_xavyo_uri(uri: &str) -> Option<(Uuid, Uuid)> {
@@ -396,7 +393,7 @@ fn calculate_fingerprint(der_bytes: &[u8]) -> String {
     let result = hasher.finalize();
     result
         .iter()
-        .map(|b| format!("{:02X}", b))
+        .map(|b| format!("{b:02X}"))
         .collect::<Vec<_>>()
         .join(":")
 }

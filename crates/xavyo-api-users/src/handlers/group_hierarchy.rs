@@ -21,7 +21,7 @@ use uuid::Uuid;
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::Group;
 
-/// Helper: extract tenant_id from JWT claims.
+/// Helper: extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiUsersError> {
     claims
         .tenant_id()
@@ -29,7 +29,7 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiUsersError> {
         .ok_or(ApiUsersError::Unauthorized)
 }
 
-/// Helper: convert a Group to GroupDetail (with ancestor path).
+/// Helper: convert a Group to `GroupDetail` (with ancestor path).
 async fn group_to_detail(
     service: &GroupHierarchyService,
     tenant_id: Uuid,
@@ -58,7 +58,7 @@ async fn group_to_detail(
 
 /// List groups with optional type filter.
 ///
-/// GET /api/v1/groups?group_type=department&limit=50&offset=0
+/// GET /`api/v1/groups?group_type=department&limit=50&offset=0`
 #[utoipa::path(
     get,
     path = "/groups",
@@ -107,7 +107,7 @@ pub async fn list_groups(
 
 /// Move group to a new parent (or make root).
 ///
-/// PUT /api/v1/groups/:group_id/parent
+/// PUT /`api/v1/groups/:group_id/parent`
 #[utoipa::path(
     put,
     path = "/groups/{group_id}/parent",
@@ -151,7 +151,7 @@ pub async fn move_group(
 
 /// List direct children of a group.
 ///
-/// GET /api/v1/groups/:group_id/children
+/// GET /`api/v1/groups/:group_id/children`
 #[utoipa::path(
     get,
     path = "/groups/{group_id}/children",
@@ -197,7 +197,7 @@ pub async fn get_children(
 
 /// Get ancestor path from root to group.
 ///
-/// GET /api/v1/groups/:group_id/ancestors
+/// GET /`api/v1/groups/:group_id/ancestors`
 #[utoipa::path(
     get,
     path = "/groups/{group_id}/ancestors",
@@ -238,7 +238,7 @@ pub async fn get_ancestors(
 
 /// Get full subtree (all descendants).
 ///
-/// GET /api/v1/groups/:group_id/subtree
+/// GET /`api/v1/groups/:group_id/subtree`
 #[utoipa::path(
     get,
     path = "/groups/{group_id}/subtree",

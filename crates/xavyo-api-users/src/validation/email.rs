@@ -71,7 +71,7 @@ pub fn validate_email(email: &str) -> Result<(), ValidationError> {
         return Err(ValidationError::with_constraints(
             "email",
             "too_short",
-            format!("Email must be at least {} characters", MIN_EMAIL_LENGTH),
+            format!("Email must be at least {MIN_EMAIL_LENGTH} characters"),
             json!({"min_length": MIN_EMAIL_LENGTH, "actual": email.len()}),
         ));
     }
@@ -81,7 +81,7 @@ pub fn validate_email(email: &str) -> Result<(), ValidationError> {
         return Err(ValidationError::with_constraints(
             "email",
             "too_long",
-            format!("Email must not exceed {} characters", MAX_EMAIL_LENGTH),
+            format!("Email must not exceed {MAX_EMAIL_LENGTH} characters"),
             json!({"max_length": MAX_EMAIL_LENGTH, "actual": email.len()}),
         ));
     }

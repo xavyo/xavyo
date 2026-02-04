@@ -40,6 +40,7 @@ pub struct UpsertCircuitBreakerState {
 
 impl WebhookCircuitBreakerState {
     /// Get the circuit state as an enum.
+    #[must_use] 
     pub fn circuit_state(&self) -> CircuitState {
         self.state.parse().unwrap_or(CircuitState::Closed)
     }
@@ -50,7 +51,7 @@ impl WebhookCircuitBreakerState {
         input: UpsertCircuitBreakerState,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO webhook_circuit_breaker_state (
                 subscription_id, tenant_id, state, failure_count,
                 last_failure_at, last_success_at, opened_at, recent_failures
@@ -65,7 +66,7 @@ impl WebhookCircuitBreakerState {
                 recent_failures = EXCLUDED.recent_failures,
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.subscription_id)
         .bind(input.tenant_id)
@@ -86,10 +87,10 @@ impl WebhookCircuitBreakerState {
         subscription_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM webhook_circuit_breaker_state
             WHERE tenant_id = $1 AND subscription_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(subscription_id)
@@ -100,11 +101,11 @@ impl WebhookCircuitBreakerState {
     /// List all circuit breaker states for a tenant.
     pub async fn list_by_tenant(pool: &PgPool, tenant_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM webhook_circuit_breaker_state
             WHERE tenant_id = $1
             ORDER BY updated_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -118,10 +119,10 @@ impl WebhookCircuitBreakerState {
         subscription_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM webhook_circuit_breaker_state
             WHERE tenant_id = $1 AND subscription_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(subscription_id)

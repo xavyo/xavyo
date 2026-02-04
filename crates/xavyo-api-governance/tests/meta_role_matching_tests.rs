@@ -1,7 +1,7 @@
 //! Unit tests for meta-role criteria matching logic (F056 - T019).
 //!
-//! Tests all criteria operators (eq, neq, in, not_in, gt, gte, lt, lte,
-//! contains, starts_with) and logic combinations (AND, OR).
+//! Tests all criteria operators (eq, neq, in, `not_in`, gt, gte, lt, lte,
+//! contains, `starts_with`) and logic combinations (AND, OR).
 
 mod common;
 

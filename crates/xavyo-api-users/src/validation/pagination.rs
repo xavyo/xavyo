@@ -2,7 +2,7 @@
 //!
 //! Validates pagination parameters with rejection (not clamping) for invalid values:
 //! - offset: must be >= 0
-//! - limit: must be between 1 and MAX_LIMIT (100)
+//! - limit: must be between 1 and `MAX_LIMIT` (100)
 
 use super::error::ValidationError;
 use serde_json::json;
@@ -21,7 +21,7 @@ pub const MIN_LIMIT: i64 = 1;
 /// # Arguments
 ///
 /// * `offset` - The offset for pagination (None defaults to 0)
-/// * `limit` - The limit for pagination (None defaults to DEFAULT_LIMIT)
+/// * `limit` - The limit for pagination (None defaults to `DEFAULT_LIMIT`)
 ///
 /// # Returns
 ///
@@ -69,7 +69,7 @@ pub fn validate_pagination(
             errors.push(ValidationError::with_constraints(
                 "limit",
                 "too_small",
-                format!("Limit must be at least {}", MIN_LIMIT),
+                format!("Limit must be at least {MIN_LIMIT}"),
                 json!({"min": MIN_LIMIT, "actual": l}),
             ));
             DEFAULT_LIMIT
@@ -78,7 +78,7 @@ pub fn validate_pagination(
             errors.push(ValidationError::with_constraints(
                 "limit",
                 "too_large",
-                format!("Limit must not exceed {}", MAX_LIMIT),
+                format!("Limit must not exceed {MAX_LIMIT}"),
                 json!({"max": MAX_LIMIT, "actual": l}),
             ));
             DEFAULT_LIMIT

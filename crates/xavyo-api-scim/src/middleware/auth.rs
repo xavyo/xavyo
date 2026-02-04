@@ -33,6 +33,7 @@ pub struct ScimAuthLayer {
 
 impl ScimAuthLayer {
     /// Create a new auth layer.
+    #[must_use] 
     pub fn new() -> Self {
         Self { _marker: () }
     }
@@ -95,14 +96,11 @@ where
             };
 
             // Get token service from extensions
-            let token_service = match req.extensions().get::<Arc<TokenService>>() {
-                Some(svc) => svc.clone(),
-                None => {
-                    tracing::error!("TokenService not found in request extensions");
-                    return Ok(
-                        ScimError::Internal("Auth service unavailable".to_string()).into_response()
-                    );
-                }
+            let token_service = if let Some(svc) = req.extensions().get::<Arc<TokenService>>() { svc.clone() } else {
+                tracing::error!("TokenService not found in request extensions");
+                return Ok(
+                    ScimError::Internal("Auth service unavailable".to_string()).into_response()
+                );
             };
 
             // Validate token

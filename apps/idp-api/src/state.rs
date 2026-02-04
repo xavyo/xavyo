@@ -82,7 +82,7 @@ impl AppState {
     ///
     /// # Arguments
     ///
-    /// * `db` - PostgreSQL connection pool
+    /// * `db` - `PostgreSQL` connection pool
     /// * `auth` - Authentication state with JWT configuration
     /// * `metrics` - Prometheus metrics registry
     /// * `health_config` - Health check timeout configuration

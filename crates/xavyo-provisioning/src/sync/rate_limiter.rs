@@ -26,6 +26,7 @@ impl TokenBucket {
     /// * `capacity` - Maximum tokens in the bucket
     /// * `refill_rate` - Tokens to add per refill
     /// * `refill_interval` - How often to refill
+    #[must_use] 
     pub fn new(capacity: u64, refill_rate: u64, refill_interval: Duration) -> Self {
         Self {
             capacity,
@@ -37,6 +38,7 @@ impl TokenBucket {
     }
 
     /// Create a rate limiter for N requests per minute.
+    #[must_use] 
     pub fn per_minute(requests_per_minute: u64) -> Self {
         // Refill every second with 1/60th of the rate
         let refill_rate = requests_per_minute.div_ceil(60);
@@ -76,7 +78,7 @@ impl TokenBucket {
 
     /// Acquire a token, waiting if necessary.
     pub async fn acquire(&self) {
-        self.acquire_many(1).await
+        self.acquire_many(1).await;
     }
 
     /// Acquire multiple tokens, waiting if necessary.
@@ -132,6 +134,7 @@ pub struct RateLimiter {
 
 impl RateLimiter {
     /// Create a new rate limiter.
+    #[must_use] 
     pub fn new(requests_per_minute: u64) -> Self {
         Self {
             default_bucket: TokenBucket::per_minute(requests_per_minute),
@@ -145,7 +148,7 @@ impl RateLimiter {
 
     /// Acquire a token, waiting if necessary.
     pub async fn acquire(&self) {
-        self.default_bucket.acquire().await
+        self.default_bucket.acquire().await;
     }
 
     /// Check if rate limited.

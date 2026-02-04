@@ -1,10 +1,10 @@
 //! Social Provider Integration Tests
 //!
-//! This module contains integration tests for all supported social OAuth2 providers:
-//! - Google OAuth2
-//! - Microsoft OAuth2 (Azure AD)
+//! This module contains integration tests for all supported social `OAuth2` providers:
+//! - Google `OAuth2`
+//! - Microsoft `OAuth2` (Azure AD)
 //! - Apple Sign In
-//! - GitHub OAuth2
+//! - GitHub `OAuth2`
 //!
 //! Tests use mock servers to simulate provider responses without external dependencies.
 

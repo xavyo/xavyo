@@ -8,7 +8,7 @@ pub struct Platform {
     /// Operating system (linux, macos, windows)
     pub os: String,
 
-    /// Architecture (x86_64, aarch64, arm64)
+    /// Architecture (`x86_64`, aarch64, arm64)
     pub arch: String,
 
     /// Corresponding asset name suffix
@@ -24,7 +24,7 @@ impl Platform {
             ("macos", "x86_64") => ("macos", "x86_64", "darwin-x86_64"),
             ("macos", "aarch64") => ("macos", "arm64", "darwin-arm64"),
             ("windows", "x86_64") => ("windows", "x86_64", "windows-x86_64.exe"),
-            (os, arch) => (os, arch, &format!("{}-{}", os, arch)[..]),
+            (os, arch) => (os, arch, &format!("{os}-{arch}")[..]),
         };
 
         Platform {
@@ -43,11 +43,8 @@ impl Platform {
     pub fn is_supported(&self) -> bool {
         matches!(
             (self.os.as_str(), self.arch.as_str()),
-            ("linux", "x86_64")
-                | ("linux", "aarch64")
-                | ("macos", "x86_64")
-                | ("macos", "arm64")
-                | ("windows", "x86_64")
+            ("linux" | "macos" | "windows", "x86_64") | ("linux", "aarch64") |
+("macos", "arm64")
         )
     }
 }

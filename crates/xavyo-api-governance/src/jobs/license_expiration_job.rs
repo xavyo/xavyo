@@ -55,6 +55,7 @@ impl LicenseExpirationStats {
     }
 
     /// Returns the total number of actions taken (expired + revoked + alerts).
+    #[must_use] 
     pub fn total_actions(&self) -> usize {
         self.pools_expired + self.assignments_revoked + self.alerts_generated
     }
@@ -74,6 +75,7 @@ pub enum LicenseExpirationJobError {
 
 impl LicenseExpirationJob {
     /// Create a new license expiration job.
+    #[must_use] 
     pub fn new(service: Arc<LicenseExpirationService>, db_pool: sqlx::PgPool) -> Self {
         Self { service, db_pool }
     }

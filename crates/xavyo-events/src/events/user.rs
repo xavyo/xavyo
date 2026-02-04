@@ -31,9 +31,9 @@ impl Event for UserCreated {
 pub struct UserUpdated {
     /// The updated user's ID.
     pub user_id: Uuid,
-    /// Map of field_name to new_value for changed fields.
+    /// Map of `field_name` to `new_value` for changed fields.
     pub changes: HashMap<String, serde_json::Value>,
-    /// Map of field_name to old_value for changed fields.
+    /// Map of `field_name` to `old_value` for changed fields.
     #[serde(default)]
     pub previous: Option<HashMap<String, serde_json::Value>>,
 }

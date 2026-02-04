@@ -6,8 +6,8 @@
 //! - Credential revocation
 //! - Credential listing
 //!
-//! This service mirrors NhiCredentialService but validates against ai_agents table
-//! instead of gov_service_accounts.
+//! This service mirrors `NhiCredentialService` but validates against `ai_agents` table
+//! instead of `gov_service_accounts`.
 
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
@@ -39,7 +39,7 @@ const DEFAULT_GRACE_PERIOD_HOURS: i64 = 24;
 const MAX_GRACE_PERIOD_HOURS: i64 = 168; // 7 days
 
 /// Minimum time between credential rotations in minutes.
-/// This prevents rapid rotation attacks (DoS).
+/// This prevents rapid rotation attacks (`DoS`).
 const MIN_ROTATION_INTERVAL_MINUTES: i64 = 60; // 1 hour
 
 /// API key prefix for easy identification.
@@ -58,6 +58,7 @@ pub struct AgentCredentialService {
 
 impl AgentCredentialService {
     /// Create a new agent credential service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -345,19 +346,19 @@ impl AgentCredentialService {
 
     /// Generate a secure API key.
     ///
-    /// SECURITY: Uses OsRng (CSPRNG) for cryptographic randomness.
+    /// SECURITY: Uses `OsRng` (CSPRNG) for cryptographic randomness.
     fn generate_api_key(&self) -> String {
         use base64::Engine as _;
         use rand::{rngs::OsRng, RngCore};
         let mut random_bytes = [0u8; 32];
         OsRng.fill_bytes(&mut random_bytes);
         let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random_bytes);
-        format!("{}{}", API_KEY_PREFIX, encoded)
+        format!("{API_KEY_PREFIX}{encoded}")
     }
 
     /// Generate a secure secret.
     ///
-    /// SECURITY: Uses OsRng (CSPRNG) for cryptographic randomness.
+    /// SECURITY: Uses `OsRng` (CSPRNG) for cryptographic randomness.
     fn generate_secret(&self) -> String {
         use base64::Engine as _;
         use rand::{rngs::OsRng, RngCore};
@@ -368,7 +369,7 @@ impl AgentCredentialService {
 
     /// Generate a certificate token (placeholder).
     ///
-    /// SECURITY: Uses OsRng (CSPRNG) for cryptographic randomness.
+    /// SECURITY: Uses `OsRng` (CSPRNG) for cryptographic randomness.
     fn generate_certificate_token(&self) -> String {
         use base64::Engine as _;
         use rand::{rngs::OsRng, RngCore};
@@ -394,7 +395,7 @@ impl AgentCredentialService {
         argon2
             .hash_password(plaintext.as_bytes(), &salt)
             .map(|h| h.to_string())
-            .map_err(|e| ApiNhiError::Internal(format!("Failed to hash credential: {}", e)))
+            .map_err(|e| ApiNhiError::Internal(format!("Failed to hash credential: {e}")))
     }
 
     // =========================================================================
@@ -403,7 +404,7 @@ impl AgentCredentialService {
 
     /// Validate a credential and return the associated NHI information.
     ///
-    /// Returns (tenant_id, nhi_id, nhi_type) if valid.
+    /// Returns (`tenant_id`, `nhi_id`, `nhi_type`) if valid.
     pub async fn validate(&self, credential: &str) -> Result<(Uuid, Uuid, NhiEntityType)> {
         // Find all active credentials
         let credentials = GovNhiCredential::find_all_active_for_auth(&self.pool)

@@ -35,7 +35,7 @@ impl std::str::FromStr for DeprovisionAction {
         match s.to_lowercase().as_str() {
             "disable" => Ok(DeprovisionAction::Disable),
             "delete" => Ok(DeprovisionAction::Delete),
-            _ => Err(format!("Unknown deprovision action: {}", s)),
+            _ => Err(format!("Unknown deprovision action: {s}")),
         }
     }
 }
@@ -61,7 +61,7 @@ pub struct AttributeMapping {
     /// Whether this is the default mapping for the object class.
     pub is_default: bool,
 
-    /// Attribute mappings (JSON object: {source_attr: target_attr}).
+    /// Attribute mappings (JSON object: {`source_attr`: `target_attr`}).
     pub mappings: serde_json::Value,
 
     /// Correlation rule for identity matching (JSON).
@@ -114,10 +114,10 @@ impl AttributeMapping {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM attribute_mappings
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -133,11 +133,11 @@ impl AttributeMapping {
         object_class: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM attribute_mappings
             WHERE connector_id = $1 AND tenant_id = $2
                 AND object_class = $3 AND is_default = true
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -155,11 +155,11 @@ impl AttributeMapping {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if let Some(oc) = object_class {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM attribute_mappings
                 WHERE connector_id = $1 AND tenant_id = $2 AND object_class = $3
                 ORDER BY is_default DESC, name
-                "#,
+                ",
             )
             .bind(connector_id)
             .bind(tenant_id)
@@ -168,11 +168,11 @@ impl AttributeMapping {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM attribute_mappings
                 WHERE connector_id = $1 AND tenant_id = $2
                 ORDER BY object_class, is_default DESC, name
-                "#,
+                ",
             )
             .bind(connector_id)
             .bind(tenant_id)
@@ -191,12 +191,12 @@ impl AttributeMapping {
         // If setting as default, first unset any existing default
         if input.is_default {
             sqlx::query(
-                r#"
+                r"
                 UPDATE attribute_mappings
                 SET is_default = false, updated_at = NOW()
                 WHERE connector_id = $1 AND tenant_id = $2
                     AND object_class = $3 AND is_default = true
-                "#,
+                ",
             )
             .bind(connector_id)
             .bind(tenant_id)
@@ -210,14 +210,14 @@ impl AttributeMapping {
             .unwrap_or(DeprovisionAction::Disable);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO attribute_mappings (
                 tenant_id, connector_id, object_class, name, is_default,
                 mappings, correlation_rule, deprovision_action
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -242,12 +242,12 @@ impl AttributeMapping {
         if input.is_default == Some(true) {
             if let Some(mapping) = Self::find_by_id(pool, tenant_id, id).await? {
                 sqlx::query(
-                    r#"
+                    r"
                     UPDATE attribute_mappings
                     SET is_default = false, updated_at = NOW()
                     WHERE connector_id = $1 AND tenant_id = $2
                         AND object_class = $3 AND is_default = true AND id != $4
-                    "#,
+                    ",
                 )
                 .bind(mapping.connector_id)
                 .bind(tenant_id)
@@ -262,23 +262,23 @@ impl AttributeMapping {
         let mut param_idx = 3; // $1 = id, $2 = tenant_id
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_default.is_some() {
-            updates.push(format!("is_default = ${}", param_idx));
+            updates.push(format!("is_default = ${param_idx}"));
             param_idx += 1;
         }
         if input.mappings.is_some() {
-            updates.push(format!("mappings = ${}", param_idx));
+            updates.push(format!("mappings = ${param_idx}"));
             param_idx += 1;
         }
         if input.correlation_rule.is_some() {
-            updates.push(format!("correlation_rule = ${}", param_idx));
+            updates.push(format!("correlation_rule = ${param_idx}"));
             param_idx += 1;
         }
         if input.deprovision_action.is_some() {
-            updates.push(format!("deprovision_action = ${}", param_idx));
+            updates.push(format!("deprovision_action = ${param_idx}"));
         }
 
         let query = format!(
@@ -316,10 +316,10 @@ impl AttributeMapping {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM attribute_mappings
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -336,10 +336,10 @@ impl AttributeMapping {
         connector_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM attribute_mappings
             WHERE connector_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)

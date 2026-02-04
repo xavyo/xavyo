@@ -74,7 +74,7 @@ pub async fn rotate_api_key_handler(
     let old_key = ApiKey::find_by_id(&state.pool, tenant_id, key_id)
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
-        .ok_or_else(|| TenantError::NotFoundWithMessage(format!("API key {} not found", key_id)))?;
+        .ok_or_else(|| TenantError::NotFoundWithMessage(format!("API key {key_id} not found")))?;
 
     if !old_key.is_active {
         return Err(TenantError::Validation(
@@ -276,7 +276,7 @@ pub async fn deactivate_api_key_handler(
     let old_key = ApiKey::find_by_id(&state.pool, tenant_id, key_id)
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
-        .ok_or_else(|| TenantError::NotFoundWithMessage(format!("API key {} not found", key_id)))?;
+        .ok_or_else(|| TenantError::NotFoundWithMessage(format!("API key {key_id} not found")))?;
 
     // Deactivate the key
     ApiKey::deactivate(&state.pool, tenant_id, key_id)

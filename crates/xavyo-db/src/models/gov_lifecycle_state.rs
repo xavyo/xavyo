@@ -94,10 +94,10 @@ impl GovLifecycleState {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_states
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -113,10 +113,10 @@ impl GovLifecycleState {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_states
             WHERE config_id = $1 AND tenant_id = $2 AND name = $3
-            "#,
+            ",
         )
         .bind(config_id)
         .bind(tenant_id)
@@ -132,10 +132,10 @@ impl GovLifecycleState {
         config_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_states
             WHERE config_id = $1 AND tenant_id = $2 AND is_initial = true
-            "#,
+            ",
         )
         .bind(config_id)
         .bind(tenant_id)
@@ -150,11 +150,11 @@ impl GovLifecycleState {
         config_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_states
             WHERE config_id = $1 AND tenant_id = $2
             ORDER BY position ASC
-            "#,
+            ",
         )
         .bind(config_id)
         .bind(tenant_id)
@@ -171,26 +171,26 @@ impl GovLifecycleState {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_states
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_num = 2;
 
         if filter.config_id.is_some() {
-            query.push_str(&format!(" AND config_id = ${}", param_num));
+            query.push_str(&format!(" AND config_id = ${param_num}"));
             param_num += 1;
         }
 
         if filter.is_initial.is_some() {
-            query.push_str(&format!(" AND is_initial = ${}", param_num));
+            query.push_str(&format!(" AND is_initial = ${param_num}"));
             param_num += 1;
         }
 
         if filter.is_terminal.is_some() {
-            query.push_str(&format!(" AND is_terminal = ${}", param_num));
+            query.push_str(&format!(" AND is_terminal = ${param_num}"));
             param_num += 1;
         }
 
@@ -224,10 +224,10 @@ impl GovLifecycleState {
         config_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_lifecycle_states
             WHERE config_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(config_id)
         .bind(tenant_id)
@@ -242,10 +242,10 @@ impl GovLifecycleState {
         state_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM users
             WHERE tenant_id = $1 AND lifecycle_state_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(state_id)
@@ -261,14 +261,14 @@ impl GovLifecycleState {
         input: &CreateGovLifecycleState,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_lifecycle_states (
                 config_id, tenant_id, name, description,
                 is_initial, is_terminal, entitlement_action, position
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(config_id)
         .bind(tenant_id)
@@ -290,7 +290,7 @@ impl GovLifecycleState {
         input: &UpdateGovLifecycleState,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_lifecycle_states
             SET
                 name = COALESCE($3, name),
@@ -301,7 +301,7 @@ impl GovLifecycleState {
                 position = COALESCE($8, position)
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -322,11 +322,11 @@ impl GovLifecycleState {
         config_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_lifecycle_states
             SET is_initial = false
             WHERE config_id = $1 AND tenant_id = $2 AND is_initial = true
-            "#,
+            ",
         )
         .bind(config_id)
         .bind(tenant_id)
@@ -343,10 +343,10 @@ impl GovLifecycleState {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_lifecycle_states
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

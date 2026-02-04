@@ -29,6 +29,7 @@ pub struct AccessRequestService {
 
 impl AccessRequestService {
     /// Create a new access request service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             sod_enforcement_service: SodEnforcementService::new(pool.clone()),
@@ -38,7 +39,7 @@ impl AccessRequestService {
 
     /// Submit a new access request.
     ///
-    /// Performs validation, SoD pre-check, and creates the request.
+    /// Performs validation, `SoD` pre-check, and creates the request.
     pub async fn create_request(
         &self,
         tenant_id: Uuid,
@@ -138,7 +139,7 @@ impl AccessRequestService {
         Ok(request)
     }
 
-    /// Convert SoD violation info to summary format for storage.
+    /// Convert `SoD` violation info to summary format for storage.
     fn convert_sod_violations(violations: &[SodViolationInfo]) -> Vec<SodViolationSummary> {
         violations
             .iter()
@@ -235,6 +236,7 @@ impl AccessRequestService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

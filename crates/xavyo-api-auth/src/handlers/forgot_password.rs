@@ -48,7 +48,7 @@ pub async fn forgot_password_handler(
             .flat_map(|errors| {
                 errors
                     .iter()
-                    .filter_map(|e| e.message.as_ref().map(|m| m.to_string()))
+                    .filter_map(|e| e.message.as_ref().map(std::string::ToString::to_string))
             })
             .collect();
         ApiAuthError::Validation(errors.join(", "))
@@ -110,16 +110,13 @@ async fn process_forgot_password(
     .fetch_optional(pool)
     .await?;
 
-    let (user_id, is_active) = match user_row {
-        Some((id, active)) => (id, active),
-        None => {
-            tracing::debug!(
-                email = %email,
-                tenant_id = %tenant_id,
-                "Password reset requested for non-existent email"
-            );
-            return Ok(()); // Don't leak that user doesn't exist
-        }
+    let (user_id, is_active) = if let Some((id, active)) = user_row { (id, active) } else {
+        tracing::debug!(
+            email = %email,
+            tenant_id = %tenant_id,
+            "Password reset requested for non-existent email"
+        );
+        return Ok(()); // Don't leak that user doesn't exist
     };
 
     // Check if user is active
@@ -152,10 +149,10 @@ async fn process_forgot_password(
 
     // Store token hash in database
     sqlx::query(
-        r#"
+        r"
         INSERT INTO password_reset_tokens (tenant_id, user_id, token_hash, expires_at, ip_address, user_agent)
         VALUES ($1, $2, $3, $4, $5, $6)
-        "#,
+        ",
     )
     .bind(tenant_id.as_uuid())
     .bind(user_id)

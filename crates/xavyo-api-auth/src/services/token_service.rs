@@ -52,6 +52,7 @@ pub struct TokenService {
 
 impl TokenService {
     /// Create a new token service.
+    #[must_use] 
     pub fn new(config: TokenConfig, pool: PgPool) -> Self {
         Self {
             config,
@@ -62,6 +63,7 @@ impl TokenService {
     }
 
     /// Create a token service with custom validity periods.
+    #[must_use] 
     pub fn with_validity(
         config: TokenConfig,
         pool: PgPool,
@@ -89,7 +91,7 @@ impl TokenService {
     ///
     /// # Returns
     ///
-    /// A tuple of (access_token, refresh_token, expires_in_seconds).
+    /// A tuple of (`access_token`, `refresh_token`, `expires_in_seconds`).
     pub async fn create_tokens(
         &self,
         user_id: UserId,
@@ -152,7 +154,7 @@ impl TokenService {
     ///
     /// # Returns
     ///
-    /// A tuple of (partial_token, expires_in_seconds).
+    /// A tuple of (`partial_token`, `expires_in_seconds`).
     pub fn create_partial_token(
         &self,
         user_id: UserId,
@@ -193,10 +195,10 @@ impl TokenService {
         let expires_at = Utc::now() + self.refresh_token_validity;
 
         // Store the hash in the database
-        let query = r#"
+        let query = r"
             INSERT INTO refresh_tokens (user_id, tenant_id, token_hash, expires_at, user_agent, ip_address)
             VALUES ($1, $2, $3, $4, $5, $6)
-        "#;
+        ";
 
         sqlx::query(query)
             .bind(user_id.as_uuid())
@@ -218,12 +220,12 @@ impl TokenService {
     ) -> Result<RefreshToken, ApiAuthError> {
         let token_hash = hash_token(opaque_token);
 
-        let query = r#"
+        let query = r"
             SELECT id, user_id, tenant_id, token_hash, expires_at, revoked_at, created_at, user_agent,
                    COALESCE(ip_address::text, '') as ip_address
             FROM refresh_tokens
             WHERE token_hash = $1
-        "#;
+        ";
 
         let token: RefreshToken = sqlx::query_as(query)
             .bind(&token_hash)
@@ -297,11 +299,11 @@ impl TokenService {
 
     /// Revoke a refresh token by its hash.
     async fn revoke_token_by_hash(&self, token_hash: &str) -> Result<(), ApiAuthError> {
-        let query = r#"
+        let query = r"
             UPDATE refresh_tokens
             SET revoked_at = NOW()
             WHERE token_hash = $1 AND revoked_at IS NULL
-        "#;
+        ";
 
         sqlx::query(query)
             .bind(token_hash)
@@ -313,11 +315,11 @@ impl TokenService {
 
     /// Revoke all refresh tokens for a user.
     pub async fn revoke_all_user_tokens(&self, user_id: UserId) -> Result<u64, ApiAuthError> {
-        let query = r#"
+        let query = r"
             UPDATE refresh_tokens
             SET revoked_at = NOW()
             WHERE user_id = $1 AND revoked_at IS NULL
-        "#;
+        ";
 
         let result = sqlx::query(query)
             .bind(user_id.as_uuid())
@@ -327,7 +329,7 @@ impl TokenService {
         Ok(result.rows_affected())
     }
 
-    /// Check if a user is active (includes tenant_id for defense-in-depth).
+    /// Check if a user is active (includes `tenant_id` for defense-in-depth).
     async fn is_user_active(
         &self,
         user_id: uuid::Uuid,
@@ -352,6 +354,7 @@ impl TokenService {
 }
 
 /// Hash a token using SHA-256.
+#[must_use] 
 pub fn hash_token(token: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(token.as_bytes());
@@ -363,8 +366,9 @@ pub fn hash_token(token: &str) -> String {
 /// Returns a URL-safe base64-encoded string of 32 random bytes (256 bits of entropy).
 /// The resulting token is 43 characters long.
 ///
-/// SECURITY: Uses OsRng directly from the operating system's CSPRNG for maximum security.
-/// This is preferred over thread_rng() for security-critical operations like token generation.
+/// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG for maximum security.
+/// This is preferred over `thread_rng()` for security-critical operations like token generation.
+#[must_use] 
 pub fn generate_secure_token() -> String {
     use rand::rngs::OsRng;
     let mut bytes = [0u8; SECURE_TOKEN_BYTES];
@@ -385,6 +389,7 @@ pub fn generate_secure_token() -> String {
 /// # Returns
 ///
 /// `true` if the token matches the hash, `false` otherwise.
+#[must_use] 
 pub fn verify_token_hash_constant_time(provided_token: &str, stored_hash: &str) -> bool {
     let provided_hash = hash_token(provided_token);
     provided_hash
@@ -395,9 +400,10 @@ pub fn verify_token_hash_constant_time(provided_token: &str, stored_hash: &str) 
 
 /// Generate a password reset token and its hash.
 ///
-/// Returns a tuple of (raw_token, token_hash).
+/// Returns a tuple of (`raw_token`, `token_hash`).
 /// The raw token should be sent to the user via email.
 /// The token hash should be stored in the database.
+#[must_use] 
 pub fn generate_password_reset_token() -> (String, String) {
     let token = generate_secure_token();
     let hash = hash_token(&token);
@@ -406,9 +412,10 @@ pub fn generate_password_reset_token() -> (String, String) {
 
 /// Generate an email verification token and its hash.
 ///
-/// Returns a tuple of (raw_token, token_hash).
+/// Returns a tuple of (`raw_token`, `token_hash`).
 /// The raw token should be sent to the user via email.
 /// The token hash should be stored in the database.
+#[must_use] 
 pub fn generate_email_verification_token() -> (String, String) {
     let token = generate_secure_token();
     let hash = hash_token(&token);

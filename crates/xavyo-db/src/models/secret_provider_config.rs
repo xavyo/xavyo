@@ -1,8 +1,8 @@
 //! Secret Provider Configuration model for dynamic secrets provisioning.
 //!
-//! Stores configuration for external secret providers (OpenBao, Infisical, AWS)
+//! Stores configuration for external secret providers (`OpenBao`, Infisical, AWS)
 //! with encrypted connection settings.
-//! Part of the SecretlessAI feature (F120).
+//! Part of the `SecretlessAI` feature (F120).
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -39,7 +39,7 @@ impl std::str::FromStr for ProviderStatus {
             "active" => Ok(ProviderStatus::Active),
             "inactive" => Ok(ProviderStatus::Inactive),
             "error" => Ok(ProviderStatus::Error),
-            _ => Err(format!("Invalid provider status: {}", s)),
+            _ => Err(format!("Invalid provider status: {s}")),
         }
     }
 }
@@ -83,33 +83,35 @@ impl SecretProviderConfig {
     }
 
     /// Check if the provider is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         self.status == "active"
     }
 
     /// Check if the provider is in error state.
+    #[must_use] 
     pub fn is_error(&self) -> bool {
         self.status == "error"
     }
 }
 
-/// OpenBao connection settings.
+/// `OpenBao` connection settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct OpenBaoSettings {
-    /// OpenBao server address.
+    /// `OpenBao` server address.
     pub addr: String,
 
     /// Authentication method (token, approle).
     pub auth_method: String,
 
-    /// Token (if auth_method is "token").
+    /// Token (if `auth_method` is "token").
     pub token: Option<String>,
 
-    /// AppRole role ID (if auth_method is "approle").
+    /// `AppRole` role ID (if `auth_method` is "approle").
     pub role_id: Option<String>,
 
-    /// AppRole secret ID (if auth_method is "approle").
+    /// `AppRole` secret ID (if `auth_method` is "approle").
     pub secret_id: Option<String>,
 
     /// Namespace (optional).
@@ -228,10 +230,10 @@ impl SecretProviderConfig {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM secret_provider_configs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -246,10 +248,10 @@ impl SecretProviderConfig {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM secret_provider_configs
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -264,11 +266,11 @@ impl SecretProviderConfig {
         provider_type: &str,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM secret_provider_configs
             WHERE tenant_id = $1 AND provider_type = $2 AND status = 'active'
             ORDER BY name
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(provider_type)
@@ -285,26 +287,26 @@ impl SecretProviderConfig {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM secret_provider_configs
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.provider_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND provider_type = ${}", param_count));
+            query.push_str(&format!(" AND provider_type = ${param_count}"));
         }
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         if filter.name_prefix.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${} || '%'", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count} || '%'"));
         }
 
         query.push_str(&format!(
@@ -335,26 +337,26 @@ impl SecretProviderConfig {
         filter: &SecretProviderConfigFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM secret_provider_configs
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.provider_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND provider_type = ${}", param_count));
+            query.push_str(&format!(" AND provider_type = ${param_count}"));
         }
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         if filter.name_prefix.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${} || '%'", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count} || '%'"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -379,13 +381,13 @@ impl SecretProviderConfig {
         input: CreateSecretProviderConfig,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO secret_provider_configs (
                 tenant_id, provider_type, name, connection_settings
             )
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.provider_type)
@@ -406,15 +408,15 @@ impl SecretProviderConfig {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.connection_settings.is_some() {
-            updates.push(format!("connection_settings = ${}", param_idx));
+            updates.push(format!("connection_settings = ${param_idx}"));
             param_idx += 1;
         }
         if input.status.is_some() {
-            updates.push(format!("status = ${}", param_idx));
+            updates.push(format!("status = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -447,10 +449,10 @@ impl SecretProviderConfig {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM secret_provider_configs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -470,12 +472,12 @@ impl SecretProviderConfig {
         let status = if success { "active" } else { "error" };
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE secret_provider_configs
             SET last_health_check = NOW(), status = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -491,12 +493,12 @@ impl SecretProviderConfig {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE secret_provider_configs
             SET status = 'error', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -511,12 +513,12 @@ impl SecretProviderConfig {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE secret_provider_configs
             SET status = 'active', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -531,12 +533,12 @@ impl SecretProviderConfig {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE secret_provider_configs
             SET status = 'inactive', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

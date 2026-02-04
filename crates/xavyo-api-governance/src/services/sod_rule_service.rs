@@ -1,4 +1,4 @@
-//! SoD rule service for governance API.
+//! `SoD` rule service for governance API.
 
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -8,18 +8,19 @@ use xavyo_db::models::{
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
-/// Service for SoD rule operations.
+/// Service for `SoD` rule operations.
 pub struct SodRuleService {
     pool: PgPool,
 }
 
 impl SodRuleService {
-    /// Create a new SoD rule service.
+    /// Create a new `SoD` rule service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
-    /// List SoD rules for a tenant with pagination and filtering.
+    /// List `SoD` rules for a tenant with pagination and filtering.
     pub async fn list_rules(
         &self,
         tenant_id: Uuid,
@@ -46,7 +47,7 @@ impl SodRuleService {
         Ok((rules, total))
     }
 
-    /// Get an SoD rule by ID.
+    /// Get an `SoD` rule by ID.
     pub async fn get_rule(&self, tenant_id: Uuid, rule_id: Uuid) -> Result<GovSodRule> {
         GovSodRule::find_by_id(&self.pool, tenant_id, rule_id)
             .await
@@ -54,7 +55,7 @@ impl SodRuleService {
             .ok_or(GovernanceError::SodRuleNotFound(rule_id))
     }
 
-    /// Create a new SoD rule.
+    /// Create a new `SoD` rule.
     ///
     /// Validates:
     /// - Rule name is not empty
@@ -110,7 +111,7 @@ impl SodRuleService {
             .map_err(GovernanceError::Database)
     }
 
-    /// Update an SoD rule.
+    /// Update an `SoD` rule.
     ///
     /// Note: Entitlement IDs cannot be changed after creation.
     pub async fn update_rule(
@@ -151,7 +152,7 @@ impl SodRuleService {
             .ok_or(GovernanceError::SodRuleNotFound(rule_id))
     }
 
-    /// Enable an SoD rule.
+    /// Enable an `SoD` rule.
     pub async fn enable_rule(&self, tenant_id: Uuid, rule_id: Uuid) -> Result<GovSodRule> {
         // Verify rule exists
         let _existing = self.get_rule(tenant_id, rule_id).await?;
@@ -161,7 +162,7 @@ impl SodRuleService {
             .ok_or(GovernanceError::SodRuleNotFound(rule_id))
     }
 
-    /// Disable an SoD rule.
+    /// Disable an `SoD` rule.
     pub async fn disable_rule(&self, tenant_id: Uuid, rule_id: Uuid) -> Result<GovSodRule> {
         // Verify rule exists
         let _existing = self.get_rule(tenant_id, rule_id).await?;
@@ -171,7 +172,7 @@ impl SodRuleService {
             .ok_or(GovernanceError::SodRuleNotFound(rule_id))
     }
 
-    /// Delete an SoD rule.
+    /// Delete an `SoD` rule.
     ///
     /// This also deletes associated violations and exemptions.
     pub async fn delete_rule(&self, tenant_id: Uuid, rule_id: Uuid) -> Result<()> {
@@ -221,6 +222,7 @@ impl SodRuleService {
     }
 
     /// Get the database pool reference for use in transactions.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

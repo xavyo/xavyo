@@ -15,6 +15,7 @@ pub struct SiemDestinationService {
 }
 
 impl SiemDestinationService {
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -96,7 +97,7 @@ impl SiemDestinationService {
     /// Test connectivity to a destination.
     /// Sends a test event and reports success/failure + latency.
     ///
-    /// The `encryption_key` is needed to decrypt the stored auth_config
+    /// The `encryption_key` is needed to decrypt the stored `auth_config`
     /// so we can pass plaintext credentials to the delivery worker.
     pub async fn test_connectivity(
         &self,
@@ -126,9 +127,7 @@ impl SiemDestinationService {
 
         let dest_type = dest_type.unwrap();
         let port = destination
-            .endpoint_port
-            .map(|p| p as u16)
-            .unwrap_or_else(|| dest_type.default_port());
+            .endpoint_port.map_or_else(|| dest_type.default_port(), |p| p as u16);
 
         // Decrypt auth_config if present
         let decrypted_auth = if let Some(ref encrypted) = destination.auth_config {
@@ -138,7 +137,7 @@ impl SiemDestinationService {
                     return Ok((
                         false,
                         None,
-                        Some(format!("Failed to decrypt auth config: {}", e)),
+                        Some(format!("Failed to decrypt auth config: {e}")),
                     ));
                 }
             }

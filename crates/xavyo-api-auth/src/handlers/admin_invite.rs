@@ -25,7 +25,7 @@ pub struct AdminInviteState {
     pub service: AdminInviteService,
 }
 
-/// Extract user_id from JWT claims.
+/// Extract `user_id` from JWT claims.
 fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ApiAuthError> {
     Uuid::parse_str(&claims.sub).map_err(|_| ApiAuthError::Unauthorized)
 }

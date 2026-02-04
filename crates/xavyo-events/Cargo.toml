@@ -28,7 +28,7 @@ thiserror = "1"
 tracing = "0.1"
 
 # Database (for idempotence)
-sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "uuid", "chrono"] }
+sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "macros", "uuid", "chrono"] }
 
 # Async trait
 async-trait = "0.1"

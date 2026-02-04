@@ -30,7 +30,7 @@ pub struct GovBatchSimulation {
     /// How users are selected.
     pub selection_mode: SelectionMode,
 
-    /// Explicit user IDs (for user_list mode).
+    /// Explicit user IDs (for `user_list` mode).
     pub user_ids: Vec<Uuid>,
 
     /// Filter criteria (for filter mode).
@@ -111,10 +111,10 @@ impl GovBatchSimulation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_batch_simulations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -131,10 +131,10 @@ impl GovBatchSimulation {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_batch_simulations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
@@ -144,15 +144,15 @@ impl GovBatchSimulation {
 
         if filter.batch_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND batch_type = ${}", param_count));
+            query.push_str(&format!(" AND batch_type = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -183,10 +183,10 @@ impl GovBatchSimulation {
         filter: &BatchSimulationFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_batch_simulations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
@@ -196,15 +196,15 @@ impl GovBatchSimulation {
 
         if filter.batch_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND batch_type = ${}", param_count));
+            query.push_str(&format!(" AND batch_type = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -234,14 +234,14 @@ impl GovBatchSimulation {
             serde_json::to_value(&input.change_spec).unwrap_or_else(|_| serde_json::json!({}));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_batch_simulations (
                 tenant_id, name, batch_type, selection_mode, user_ids,
                 filter_criteria, change_spec, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -264,12 +264,12 @@ impl GovBatchSimulation {
         processed_users: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_batch_simulations
             SET total_users = $3, processed_users = $4
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -291,7 +291,7 @@ impl GovBatchSimulation {
             serde_json::to_value(&impact_summary).unwrap_or_else(|_| serde_json::json!({}));
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_batch_simulations
             SET status = 'executed',
                 total_users = $3,
@@ -301,7 +301,7 @@ impl GovBatchSimulation {
                 data_snapshot_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'draft'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -319,12 +319,12 @@ impl GovBatchSimulation {
         applied_by: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_batch_simulations
             SET status = 'applied', applied_at = NOW(), applied_by = $3
             WHERE id = $1 AND tenant_id = $2 AND status = 'executed'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -340,12 +340,12 @@ impl GovBatchSimulation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_batch_simulations
             SET status = 'cancelled'
             WHERE id = $1 AND tenant_id = $2 AND status IN ('draft', 'executed')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -360,12 +360,12 @@ impl GovBatchSimulation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_batch_simulations
             SET is_archived = TRUE
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -380,12 +380,12 @@ impl GovBatchSimulation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_batch_simulations
             SET is_archived = FALSE
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -401,12 +401,12 @@ impl GovBatchSimulation {
         notes: Option<String>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_batch_simulations
             SET notes = $3
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -422,12 +422,12 @@ impl GovBatchSimulation {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_batch_simulations
             WHERE id = $1 AND tenant_id = $2
               AND status IN ('draft', 'cancelled')
               AND (retain_until IS NULL OR retain_until < NOW())
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -438,23 +438,27 @@ impl GovBatchSimulation {
     }
 
     /// Parse the filter criteria.
+    #[must_use] 
     pub fn parse_filter_criteria(&self) -> FilterCriteria {
         serde_json::from_value(self.filter_criteria.clone()).unwrap_or_default()
     }
 
     /// Parse the change specification.
+    #[must_use] 
     pub fn parse_change_spec(&self) -> Option<ChangeSpec> {
         serde_json::from_value(self.change_spec.clone()).ok()
     }
 
     /// Parse the impact summary.
+    #[must_use] 
     pub fn parse_impact_summary(&self) -> BatchImpactSummary {
         serde_json::from_value(self.impact_summary.clone()).unwrap_or_default()
     }
 
     /// Check if the simulation exceeds the scope warning threshold.
+    #[must_use] 
     pub fn has_scope_warning(&self) -> bool {
-        self.parse_impact_summary().affected_users > SCOPE_WARNING_THRESHOLD as i64
+        self.parse_impact_summary().affected_users > i64::from(SCOPE_WARNING_THRESHOLD)
     }
 }
 

@@ -99,7 +99,7 @@ pub async fn execute(args: StatusArgs) -> CliResult<()> {
             let name = session.tenant_name.as_deref().unwrap_or("Unknown");
             let slug = session.tenant_slug.as_deref().unwrap_or("unknown");
 
-            println!("Tenant: {} ({})", name, slug);
+            println!("Tenant: {name} ({slug})");
             print_key_value("  ID", &session.tenant_id.unwrap().to_string());
             print_key_value("  Status", "Active");
         } else {

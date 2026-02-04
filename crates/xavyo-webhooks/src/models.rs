@@ -99,6 +99,7 @@ pub enum WebhookEventType {
 
 impl WebhookEventType {
     /// Returns all supported event types.
+    #[must_use] 
     pub fn all() -> Vec<Self> {
         vec![
             Self::UserCreated,
@@ -141,6 +142,7 @@ impl WebhookEventType {
     }
 
     /// Returns the string representation used in API payloads.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::UserCreated => "user.created",
@@ -183,6 +185,7 @@ impl WebhookEventType {
     }
 
     /// Returns the category for this event type.
+    #[must_use] 
     pub fn category(&self) -> &'static str {
         match self {
             Self::UserCreated
@@ -223,6 +226,7 @@ impl WebhookEventType {
     }
 
     /// Returns a human-readable description.
+    #[must_use] 
     pub fn description(&self) -> &'static str {
         match self {
             Self::UserCreated => "A new user was created",
@@ -270,7 +274,8 @@ impl WebhookEventType {
         }
     }
 
-    /// Parse a string into a WebhookEventType. Returns None for unknown types.
+    /// Parse a string into a `WebhookEventType`. Returns None for unknown types.
+    #[must_use] 
     pub fn parse(s: &str) -> Option<Self> {
         serde_json::from_value(serde_json::Value::String(s.to_string())).ok()
     }
@@ -292,6 +297,7 @@ pub enum DeliveryStatus {
 }
 
 impl DeliveryStatus {
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -302,6 +308,7 @@ impl DeliveryStatus {
         }
     }
 
+    #[must_use] 
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "pending" => Some(Self::Pending),

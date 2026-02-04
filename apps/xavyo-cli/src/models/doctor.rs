@@ -99,7 +99,7 @@ impl DiagnosticCheck {
             display_name: display_name.to_string(),
             status: DiagnosticStatus::Warn,
             message: message.to_string(),
-            suggestion: suggestion.map(|s| s.to_string()),
+            suggestion: suggestion.map(std::string::ToString::to_string),
         }
     }
 

@@ -63,10 +63,10 @@ impl GovOutlierConfiguration {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_outlier_configurations
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(pool)
@@ -77,7 +77,7 @@ impl GovOutlierConfiguration {
     pub async fn create_default(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<Self, sqlx::Error> {
         let weights = ScoringWeights::default();
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_outlier_configurations (
                 tenant_id, confidence_threshold, frequency_threshold,
                 min_peer_group_size, scoring_weights, retention_days, is_enabled
@@ -85,7 +85,7 @@ impl GovOutlierConfiguration {
             VALUES ($1, 2.0, 0.1, 5, $2, 365, true)
             ON CONFLICT (tenant_id) DO UPDATE SET updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(sqlx::types::Json(&weights))
@@ -112,31 +112,31 @@ impl GovOutlierConfiguration {
         let mut param_idx = 2; // $1 is tenant_id
 
         if input.confidence_threshold.is_some() {
-            set_clauses.push(format!("confidence_threshold = ${}", param_idx));
+            set_clauses.push(format!("confidence_threshold = ${param_idx}"));
             param_idx += 1;
         }
         if input.frequency_threshold.is_some() {
-            set_clauses.push(format!("frequency_threshold = ${}", param_idx));
+            set_clauses.push(format!("frequency_threshold = ${param_idx}"));
             param_idx += 1;
         }
         if input.min_peer_group_size.is_some() {
-            set_clauses.push(format!("min_peer_group_size = ${}", param_idx));
+            set_clauses.push(format!("min_peer_group_size = ${param_idx}"));
             param_idx += 1;
         }
         if input.scoring_weights.is_some() {
-            set_clauses.push(format!("scoring_weights = ${}", param_idx));
+            set_clauses.push(format!("scoring_weights = ${param_idx}"));
             param_idx += 1;
         }
         if input.schedule_cron.is_some() {
-            set_clauses.push(format!("schedule_cron = ${}", param_idx));
+            set_clauses.push(format!("schedule_cron = ${param_idx}"));
             param_idx += 1;
         }
         if input.retention_days.is_some() {
-            set_clauses.push(format!("retention_days = ${}", param_idx));
+            set_clauses.push(format!("retention_days = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_enabled.is_some() {
-            set_clauses.push(format!("is_enabled = ${}", param_idx));
+            set_clauses.push(format!("is_enabled = ${param_idx}"));
         }
 
         let query = format!(
@@ -177,12 +177,12 @@ impl GovOutlierConfiguration {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_outlier_configurations
             SET schedule_cron = NULL, updated_at = NOW()
             WHERE tenant_id = $1
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(pool)
@@ -196,12 +196,12 @@ impl GovOutlierConfiguration {
         is_enabled: bool,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_outlier_configurations
             SET is_enabled = $2, updated_at = NOW()
             WHERE tenant_id = $1
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(is_enabled)
@@ -210,6 +210,7 @@ impl GovOutlierConfiguration {
     }
 
     /// Get the scoring weights as a struct.
+    #[must_use] 
     pub fn get_weights(&self) -> &ScoringWeights {
         &self.scoring_weights.0
     }

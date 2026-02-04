@@ -8,7 +8,7 @@ use xavyo_api_tenants::models::{
     ApiKeyInfo, ApiKeyListResponse, RotateApiKeyRequest, RotateApiKeyResponse,
 };
 
-/// Test that the RotateApiKeyRequest validation works correctly.
+/// Test that the `RotateApiKeyRequest` validation works correctly.
 #[test]
 fn test_rotate_request_validation_valid_defaults() {
     let request = RotateApiKeyRequest {
@@ -83,7 +83,7 @@ fn test_rotate_request_with_expiration() {
     assert!(request.validate().is_none());
 }
 
-/// Test response serialization for RotateApiKeyResponse.
+/// Test response serialization for `RotateApiKeyResponse`.
 #[test]
 fn test_rotate_response_serialization() {
     let response = RotateApiKeyResponse {
@@ -103,7 +103,7 @@ fn test_rotate_response_serialization() {
     assert!(json.contains("grace period"));
 }
 
-/// Test response serialization for ApiKeyInfo.
+/// Test response serialization for `ApiKeyInfo`.
 #[test]
 fn test_api_key_info_serialization() {
     let info = ApiKeyInfo {
@@ -145,7 +145,7 @@ fn test_api_key_info_serialization_with_expiration() {
     assert!(!json.contains("last_used_at"));
 }
 
-/// Test response serialization for ApiKeyListResponse.
+/// Test response serialization for `ApiKeyListResponse`.
 #[test]
 fn test_api_key_list_response_serialization() {
     let response = ApiKeyListResponse {

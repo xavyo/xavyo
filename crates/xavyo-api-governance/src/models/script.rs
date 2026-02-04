@@ -186,7 +186,7 @@ pub struct CreateBindingRequest {
     /// The connector to bind to.
     pub connector_id: Uuid,
 
-    /// The provisioning lifecycle phase (e.g., pre_create, post_create).
+    /// The provisioning lifecycle phase (e.g., `pre_create`, `post_create`).
     pub hook_phase: String,
 
     /// The operation type (e.g., create, update, delete).
@@ -363,7 +363,7 @@ pub struct CreateTemplateRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
-    /// Template category (e.g., ldap, rest_api, database).
+    /// Template category (e.g., ldap, `rest_api`, database).
     pub category: String,
 
     /// The template body content with placeholders.

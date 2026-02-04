@@ -162,12 +162,12 @@ async fn test_detect_constraint_value_conflict() {
 
     // Verify both constraints exist
     let constraint_values: Vec<(serde_json::Value,)> = sqlx::query_as(
-        r#"
+        r"
         SELECT c.constraint_value
         FROM gov_meta_role_constraints c
         JOIN gov_meta_role_inheritances i ON i.meta_role_id = c.meta_role_id
         WHERE i.tenant_id = $1 AND i.child_role_id = $2 AND c.constraint_type = 'max_session_duration'
-        "#,
+        ",
     )
     .bind(tenant_id)
     .bind(role_id)
@@ -249,12 +249,12 @@ async fn test_detect_boolean_policy_conflict() {
 
     // Verify conflicting boolean values exist
     let mfa_values: Vec<(serde_json::Value,)> = sqlx::query_as(
-        r#"
+        r"
         SELECT c.constraint_value
         FROM gov_meta_role_constraints c
         JOIN gov_meta_role_inheritances i ON i.meta_role_id = c.meta_role_id
         WHERE i.tenant_id = $1 AND i.child_role_id = $2 AND c.constraint_type = 'require_mfa'
-        "#,
+        ",
     )
     .bind(tenant_id)
     .bind(role_id)
@@ -442,13 +442,13 @@ async fn test_conflict_resolution_updates_status() {
 
     // Resolve by priority
     sqlx::query(
-        r#"
+        r"
         UPDATE gov_meta_role_conflicts
         SET resolution_status = 'resolved_priority'::gov_meta_role_resolution_status,
             resolved_by = $1,
             resolved_at = NOW()
         WHERE id = $2
-        "#,
+        ",
     )
     .bind(user_id)
     .bind(conflict_id)
@@ -670,8 +670,8 @@ async fn test_list_unresolved_conflicts() {
         sqlx::query(&format!(
             r#"
             INSERT INTO gov_meta_role_conflicts (id, tenant_id, meta_role_a_id, meta_role_b_id, affected_role_id, conflict_type, conflicting_items, resolution_status, detected_at)
-            VALUES ($1, $2, $3, $4, $5, 'constraint_conflict'::gov_meta_role_conflict_type, '{{"iteration": {}}}'::jsonb, '{}'::gov_meta_role_resolution_status, NOW())
-            "#, i, status
+            VALUES ($1, $2, $3, $4, $5, 'constraint_conflict'::gov_meta_role_conflict_type, '{{"iteration": {i}}}'::jsonb, '{status}'::gov_meta_role_resolution_status, NOW())
+            "#
         ))
         .bind(Uuid::new_v4())
         .bind(tenant_id)
@@ -808,13 +808,13 @@ async fn test_three_way_conflict() {
 
     // Should have 3 different constraint values
     let constraints: Vec<(serde_json::Value,)> = sqlx::query_as(
-        r#"
+        r"
         SELECT c.constraint_value
         FROM gov_meta_role_constraints c
         JOIN gov_meta_role_inheritances i ON i.meta_role_id = c.meta_role_id
         WHERE i.tenant_id = $1 AND i.child_role_id = $2 AND c.constraint_type = 'max_session_duration'
         ORDER BY c.constraint_value
-        "#,
+        ",
     )
     .bind(tenant_id)
     .bind(role_id)
@@ -878,10 +878,10 @@ async fn test_disabled_meta_role_no_new_conflicts() {
 
     // Insert inheritance for disabled meta-role with suspended status
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_meta_role_inheritances (id, tenant_id, meta_role_id, child_role_id, status, match_reason)
         VALUES ($1, $2, $3, $4, 'suspended'::gov_meta_role_inheritance_status, 'manual')
-        "#,
+        ",
     )
     .bind(Uuid::new_v4())
     .bind(tenant_id)
@@ -930,10 +930,10 @@ async fn test_conflict_deduplication() {
     // Insert same conflict twice (should fail on second due to unique constraint)
     let conflict_id_1 = Uuid::new_v4();
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_meta_role_conflicts (id, tenant_id, meta_role_a_id, meta_role_b_id, affected_role_id, conflict_type, conflicting_items, resolution_status, detected_at)
         VALUES ($1, $2, $3, $4, $5, 'entitlement_conflict'::gov_meta_role_conflict_type, '{}'::jsonb, 'unresolved'::gov_meta_role_resolution_status, NOW())
-        "#,
+        ",
     )
     .bind(conflict_id_1)
     .bind(tenant_id)
@@ -991,10 +991,10 @@ async fn test_independent_conflict_resolution() {
     let conflict_2 = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_meta_role_conflicts (id, tenant_id, meta_role_a_id, meta_role_b_id, affected_role_id, conflict_type, conflicting_items, resolution_status, detected_at)
         VALUES ($1, $2, $3, $4, $5, 'constraint_conflict'::gov_meta_role_conflict_type, '{}'::jsonb, 'unresolved'::gov_meta_role_resolution_status, NOW())
-        "#,
+        ",
     )
     .bind(conflict_1)
     .bind(tenant_id)
@@ -1006,10 +1006,10 @@ async fn test_independent_conflict_resolution() {
     .unwrap();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_meta_role_conflicts (id, tenant_id, meta_role_a_id, meta_role_b_id, affected_role_id, conflict_type, conflicting_items, resolution_status, detected_at)
         VALUES ($1, $2, $3, $4, $5, 'policy_conflict'::gov_meta_role_conflict_type, '{}'::jsonb, 'unresolved'::gov_meta_role_resolution_status, NOW())
-        "#,
+        ",
     )
     .bind(conflict_2)
     .bind(tenant_id)

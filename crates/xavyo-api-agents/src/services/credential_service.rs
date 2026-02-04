@@ -1,12 +1,12 @@
-//! Dynamic Credential Service for SecretlessAI (F120).
+//! Dynamic Credential Service for `SecretlessAI` (F120).
 //!
 //! Provides just-in-time credential generation with:
-//! - Permission checking against agent_secret_permissions
-//! - Rate limiting using DashMap (same pattern as authorization_service)
+//! - Permission checking against `agent_secret_permissions`
+//! - Rate limiting using `DashMap` (same pattern as `authorization_service`)
 //! - Audit logging for every request
 //! - TTL validation against secret type configuration
 //! - Kafka event emission for credential lifecycle events
-//! - Real provider integration (OpenBao, Infisical, AWS, internal)
+//! - Real provider integration (`OpenBao`, Infisical, AWS, internal)
 
 use chrono::{Duration, Timelike, Utc};
 use dashmap::DashMap;
@@ -54,7 +54,7 @@ pub struct DynamicCredentialService {
     pool: PgPool,
     /// Provider registry for real secret provider integration.
     provider_registry: Arc<ProviderRegistry>,
-    /// In-memory rate limit tracking: (tenant_id, agent_id, secret_type) -> RateLimitEntry
+    /// In-memory rate limit tracking: (`tenant_id`, `agent_id`, `secret_type`) -> `RateLimitEntry`
     rate_limits: Arc<DashMap<(Uuid, Uuid, String), CredentialRateLimitEntry>>,
     /// Kafka event producer for credential lifecycle events.
     #[cfg(feature = "kafka")]
@@ -62,7 +62,8 @@ pub struct DynamicCredentialService {
 }
 
 impl DynamicCredentialService {
-    /// Create a new DynamicCredentialService with provider registry.
+    /// Create a new `DynamicCredentialService` with provider registry.
+    #[must_use] 
     pub fn new(pool: PgPool, encryption_service: Arc<EncryptionService>) -> Self {
         let provider_registry = Arc::new(ProviderRegistry::new(pool.clone(), encryption_service));
         Self {
@@ -191,12 +192,12 @@ impl DynamicCredentialService {
         // 7. Encrypt credential value for storage
         let encrypted_value =
             encrypt_credential_value(&serde_json::to_string(&credentials).map_err(|e| {
-                ApiAgentsError::Internal(format!("JSON serialization failed: {}", e))
+                ApiAgentsError::Internal(format!("JSON serialization failed: {e}"))
             })?)
             .map_err(|e| ApiAgentsError::EncryptionError(e.to_string()))?;
 
         // 8. Store the dynamic credential
-        let expires_at = now + Duration::seconds(effective_ttl as i64);
+        let expires_at = now + Duration::seconds(i64::from(effective_ttl));
         let create_input = CreateDynamicCredential {
             agent_id,
             secret_type: request.secret_type.clone(),
@@ -221,7 +222,7 @@ impl DynamicCredentialService {
             outcome: CredentialRequestOutcome::Success,
             ttl_granted: Some(effective_ttl),
             error_code: None,
-            source_ip: source_ip.map(|s| s.to_string()),
+            source_ip: source_ip.map(std::string::ToString::to_string),
             user_agent: None,
             latency_ms: 0.0, // TODO: measure actual latency
             context: Some(audit_context),
@@ -428,8 +429,7 @@ impl DynamicCredentialService {
 
         if configs.is_empty() {
             return Err(ApiAgentsError::SecretProviderNotFound(format!(
-                "No active {} provider configured for tenant",
-                provider_type
+                "No active {provider_type} provider configured for tenant"
             )));
         }
 
@@ -574,7 +574,7 @@ impl DynamicCredentialService {
             outcome,
             ttl_granted: None,
             error_code: Some(error_code),
-            source_ip: source_ip.map(|s| s.to_string()),
+            source_ip: source_ip.map(std::string::ToString::to_string),
             user_agent: None,
             latency_ms: 0.0,
             context: Some(audit_context),

@@ -143,10 +143,10 @@ impl GovApplication {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_applications
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -161,10 +161,10 @@ impl GovApplication {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_applications
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -182,20 +182,20 @@ impl GovApplication {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_applications
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if app_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND app_type = ${}", param_count));
+            query.push_str(&format!(" AND app_type = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -224,20 +224,20 @@ impl GovApplication {
         app_type: Option<GovAppType>,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_applications
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if app_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND app_type = ${}", param_count));
+            query.push_str(&format!(" AND app_type = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -259,7 +259,7 @@ impl GovApplication {
         input: CreateGovApplication,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_applications (
                 tenant_id, name, app_type, description, owner_id, external_id, metadata,
                 is_delegable, is_semi_manual, ticketing_config_id, sla_policy_id,
@@ -267,7 +267,7 @@ impl GovApplication {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -302,49 +302,49 @@ impl GovApplication {
         let mut param_idx = 3;
 
         if let Some(ref name) = input.name {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             params.push(Box::new(name.clone()));
             param_idx += 1;
         }
         if let Some(status) = input.status {
-            updates.push(format!("status = ${}", param_idx));
+            updates.push(format!("status = ${param_idx}"));
             params.push(Box::new(status));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.owner_id.is_some() {
-            updates.push(format!("owner_id = ${}", param_idx));
+            updates.push(format!("owner_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.external_id.is_some() {
-            updates.push(format!("external_id = ${}", param_idx));
+            updates.push(format!("external_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.metadata.is_some() {
-            updates.push(format!("metadata = ${}", param_idx));
+            updates.push(format!("metadata = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_delegable.is_some() {
-            updates.push(format!("is_delegable = ${}", param_idx));
+            updates.push(format!("is_delegable = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_semi_manual.is_some() {
-            updates.push(format!("is_semi_manual = ${}", param_idx));
+            updates.push(format!("is_semi_manual = ${param_idx}"));
             param_idx += 1;
         }
         if input.ticketing_config_id.is_some() {
-            updates.push(format!("ticketing_config_id = ${}", param_idx));
+            updates.push(format!("ticketing_config_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.sla_policy_id.is_some() {
-            updates.push(format!("sla_policy_id = ${}", param_idx));
+            updates.push(format!("sla_policy_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.requires_approval_before_ticket.is_some() {
-            updates.push(format!("requires_approval_before_ticket = ${}", param_idx));
+            updates.push(format!("requires_approval_before_ticket = ${param_idx}"));
             // param_idx += 1; // unused after this
         }
 
@@ -401,10 +401,10 @@ impl GovApplication {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_applications
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -421,10 +421,10 @@ impl GovApplication {
         application_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_entitlements
             WHERE application_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(application_id)
         .bind(tenant_id)
@@ -433,11 +433,13 @@ impl GovApplication {
     }
 
     /// Check if application is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self.status, GovAppStatus::Active)
     }
 
     /// Check if application requires semi-manual provisioning (F064).
+    #[must_use] 
     pub fn requires_manual_provisioning(&self) -> bool {
         self.is_semi_manual
     }
@@ -450,12 +452,12 @@ impl GovApplication {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_applications
             WHERE tenant_id = $1 AND is_semi_manual = true AND status = 'active'
             ORDER BY name
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)

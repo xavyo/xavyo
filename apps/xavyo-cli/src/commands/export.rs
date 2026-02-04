@@ -39,7 +39,7 @@ pub async fn execute(args: ExportArgs) -> CliResult<()> {
         write_to_file(output_path, &yaml)?;
         println!("Configuration exported to {}", output_path.display());
     } else {
-        print!("{}", yaml);
+        print!("{yaml}");
     }
 
     Ok(())
@@ -111,7 +111,7 @@ fn generate_yaml_output(config: &XavyoConfig) -> CliResult<String> {
 
     // Generate YAML
     let yaml = serde_yaml::to_string(config)
-        .map_err(|e| CliError::Validation(format!("Failed to serialize YAML: {}", e)))?;
+        .map_err(|e| CliError::Validation(format!("Failed to serialize YAML: {e}")))?;
 
     output.push_str(&yaml);
 

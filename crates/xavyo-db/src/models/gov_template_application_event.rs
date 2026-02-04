@@ -84,10 +84,10 @@ impl GovTemplateApplicationEvent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_application_events
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -103,11 +103,11 @@ impl GovTemplateApplicationEvent {
         object_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_application_events
             WHERE tenant_id = $1 AND object_type = $2 AND object_id = $3
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(object_type)
@@ -123,11 +123,11 @@ impl GovTemplateApplicationEvent {
         template_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_application_events
             WHERE tenant_id = $1 AND template_id = $2
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -149,31 +149,31 @@ impl GovTemplateApplicationEvent {
 
         if filter.template_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND template_id = ${}", param_count));
+            query.push_str(&format!(" AND template_id = ${param_count}"));
         }
         if filter.object_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND object_type = ${}", param_count));
+            query.push_str(&format!(" AND object_type = ${param_count}"));
         }
         if filter.object_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND object_id = ${}", param_count));
+            query.push_str(&format!(" AND object_id = ${param_count}"));
         }
         if filter.operation.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND operation = ${}", param_count));
+            query.push_str(&format!(" AND operation = ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND actor_id = ${}", param_count));
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
         if let Some(has_errors) = filter.has_validation_errors {
             if has_errors {
@@ -223,12 +223,12 @@ impl GovTemplateApplicationEvent {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_application_events
             WHERE tenant_id = $1
             ORDER BY created_at DESC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -243,12 +243,12 @@ impl GovTemplateApplicationEvent {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_application_events
             WHERE tenant_id = $1 AND validation_errors IS NOT NULL
             ORDER BY created_at DESC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -263,14 +263,14 @@ impl GovTemplateApplicationEvent {
         input: CreateGovTemplateApplicationEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_template_application_events (
                 tenant_id, template_id, template_version_id, object_type, object_id,
                 operation, rules_applied, changes_made, validation_errors, actor_id
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.template_id)
@@ -293,10 +293,10 @@ impl GovTemplateApplicationEvent {
         template_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_template_application_events
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -311,10 +311,10 @@ impl GovTemplateApplicationEvent {
         template_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_template_application_events
             WHERE tenant_id = $1 AND template_id = $2 AND validation_errors IS NOT NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -323,11 +323,13 @@ impl GovTemplateApplicationEvent {
     }
 
     /// Check if this event had validation errors.
+    #[must_use] 
     pub fn has_validation_errors(&self) -> bool {
         self.validation_errors.is_some()
     }
 
     /// Get the rules applied as a Vec of UUIDs.
+    #[must_use] 
     pub fn get_rules_applied(&self) -> Option<Vec<Uuid>> {
         serde_json::from_value(self.rules_applied.clone()).ok()
     }

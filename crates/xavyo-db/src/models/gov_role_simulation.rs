@@ -43,16 +43,19 @@ pub enum SimulationStatus {
 
 impl SimulationStatus {
     /// Check if simulation can be executed.
+    #[must_use] 
     pub fn can_execute(&self) -> bool {
         matches!(self, Self::Draft)
     }
 
     /// Check if simulation can be applied.
+    #[must_use] 
     pub fn can_apply(&self) -> bool {
         matches!(self, Self::Executed)
     }
 
     /// Check if simulation can be cancelled.
+    #[must_use] 
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Draft | Self::Executed)
     }
@@ -87,9 +90,9 @@ pub struct SimulationChanges {
     pub entitlement_ids: Option<Vec<Uuid>>,
     /// Users to assign to new role.
     pub user_ids: Option<Vec<Uuid>>,
-    /// New role name (for add_role).
+    /// New role name (for `add_role`).
     pub role_name: Option<String>,
-    /// New role description (for add_role).
+    /// New role description (for `add_role`).
     pub role_description: Option<String>,
 }
 
@@ -166,10 +169,10 @@ impl GovRoleSimulation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_simulations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -186,28 +189,28 @@ impl GovRoleSimulation {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_role_simulations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.scenario_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND scenario_type = ${}", param_count));
+            query.push_str(&format!(" AND scenario_type = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.target_role_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND target_role_id = ${}", param_count));
+            query.push_str(&format!(" AND target_role_id = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -241,28 +244,28 @@ impl GovRoleSimulation {
         filter: &RoleSimulationFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_simulations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.scenario_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND scenario_type = ${}", param_count));
+            query.push_str(&format!(" AND scenario_type = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.target_role_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND target_role_id = ${}", param_count));
+            query.push_str(&format!(" AND target_role_id = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -293,13 +296,13 @@ impl GovRoleSimulation {
             serde_json::to_value(&input.changes).unwrap_or_else(|_| serde_json::json!({}));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_role_simulations (
                 tenant_id, name, scenario_type, target_role_id, changes, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -321,13 +324,13 @@ impl GovRoleSimulation {
         access_lost: serde_json::Value,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_role_simulations
             SET status = 'executed', affected_users = $3,
                 access_gained = $4, access_lost = $5
             WHERE id = $1 AND tenant_id = $2 AND status = 'draft'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -346,12 +349,12 @@ impl GovRoleSimulation {
         applied_by: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_role_simulations
             SET status = 'applied', applied_at = NOW(), applied_by = $3
             WHERE id = $1 AND tenant_id = $2 AND status = 'executed'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -367,12 +370,12 @@ impl GovRoleSimulation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_role_simulations
             SET status = 'cancelled'
             WHERE id = $1 AND tenant_id = $2 AND status IN ('draft', 'executed')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -387,10 +390,10 @@ impl GovRoleSimulation {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_simulations
             WHERE id = $1 AND tenant_id = $2 AND status IN ('draft', 'cancelled')
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -401,16 +404,19 @@ impl GovRoleSimulation {
     }
 
     /// Parse the simulation changes.
+    #[must_use] 
     pub fn parse_changes(&self) -> SimulationChanges {
         serde_json::from_value(self.changes.clone()).unwrap_or_default()
     }
 
     /// Parse access gained.
+    #[must_use] 
     pub fn parse_access_gained(&self) -> Vec<AccessChange> {
         serde_json::from_value(self.access_gained.clone()).unwrap_or_default()
     }
 
     /// Parse access lost.
+    #[must_use] 
     pub fn parse_access_lost(&self) -> Vec<AccessChange> {
         serde_json::from_value(self.access_lost.clone()).unwrap_or_default()
     }

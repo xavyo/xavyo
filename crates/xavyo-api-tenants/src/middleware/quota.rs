@@ -39,12 +39,12 @@ pub struct QuotaDetails {
 /// Middleware function that checks API call quota before processing requests.
 ///
 /// This middleware should be applied to tenant-scoped routes after JWT authentication.
-/// It extracts the tenant_id from JWT claims and checks the API call quota.
+/// It extracts the `tenant_id` from JWT claims and checks the API call quota.
 ///
 /// ## Behavior
 ///
 /// - If no JWT claims present: passes through (let auth middleware handle it)
-/// - If tenant_id missing in claims: passes through (let other middleware handle it)
+/// - If `tenant_id` missing in claims: passes through (let other middleware handle it)
 /// - If tenant is system tenant: always passes through (system tenant is unlimited)
 /// - If tenant has no limit configured: passes through
 /// - If quota not exceeded: passes through

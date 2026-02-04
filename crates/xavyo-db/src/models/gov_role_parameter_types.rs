@@ -17,7 +17,7 @@ pub enum ParameterType {
     Boolean,
     /// Date parameter type (YYYY-MM-DD format).
     Date,
-    /// Enum parameter type (value must be in allowed_values).
+    /// Enum parameter type (value must be in `allowed_values`).
     Enum,
 }
 
@@ -104,11 +104,13 @@ pub struct ParameterConstraints {
 
 impl ParameterConstraints {
     /// Create empty constraints.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Create integer constraints with min/max values.
+    #[must_use] 
     pub fn integer(min: Option<i64>, max: Option<i64>) -> Self {
         Self {
             min_value: min,
@@ -118,6 +120,7 @@ impl ParameterConstraints {
     }
 
     /// Create string constraints with length and pattern.
+    #[must_use] 
     pub fn string(
         min_length: Option<usize>,
         max_length: Option<usize>,
@@ -132,6 +135,7 @@ impl ParameterConstraints {
     }
 
     /// Create enum constraints with allowed values.
+    #[must_use] 
     pub fn enumeration(allowed_values: Vec<String>) -> Self {
         Self {
             allowed_values: Some(allowed_values),
@@ -140,6 +144,7 @@ impl ParameterConstraints {
     }
 
     /// Create date constraints with min/max dates.
+    #[must_use] 
     pub fn date(min_date: Option<String>, max_date: Option<String>) -> Self {
         Self {
             min_date,

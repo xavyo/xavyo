@@ -190,6 +190,7 @@ pub struct InMemoryEntitlementStore {
 
 impl InMemoryEntitlementStore {
     /// Create a new in-memory store.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             entitlements: Arc::new(RwLock::new(HashMap::new())),
@@ -388,8 +389,7 @@ impl EntitlementStore for InMemoryEntitlementStore {
         let assignments = self.assignments.read().await;
         Ok(assignments
             .get(&entitlement_id)
-            .map(|a| a.len() as i64)
-            .unwrap_or(0))
+            .map_or(0, |a| a.len() as i64))
     }
 }
 

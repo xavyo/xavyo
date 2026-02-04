@@ -25,6 +25,7 @@ pub struct SemiManualProvisioningService {
 
 impl SemiManualProvisioningService {
     /// Create a new semi-manual provisioning service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         let ticketing_service = TicketingService::new(pool.clone());
         Self {
@@ -34,6 +35,7 @@ impl SemiManualProvisioningService {
     }
 
     /// Get the database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -170,7 +172,7 @@ impl SemiManualProvisioningService {
         let sla_deadline = if let Some(policy_id) = application.sla_policy_id {
             if let Some(policy) = GovSlaPolicy::find_by_id(&self.pool, tenant_id, policy_id).await?
             {
-                Some(Utc::now() + Duration::seconds(policy.target_duration_seconds as i64))
+                Some(Utc::now() + Duration::seconds(i64::from(policy.target_duration_seconds)))
             } else {
                 None
             }
@@ -255,7 +257,7 @@ impl SemiManualProvisioningService {
         let sla_deadline = if let Some(policy_id) = application.sla_policy_id {
             if let Some(policy) = GovSlaPolicy::find_by_id(&self.pool, tenant_id, policy_id).await?
             {
-                Some(Utc::now() + Duration::seconds(policy.target_duration_seconds as i64))
+                Some(Utc::now() + Duration::seconds(i64::from(policy.target_duration_seconds)))
             } else {
                 None
             }

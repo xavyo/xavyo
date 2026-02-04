@@ -53,6 +53,7 @@ pub struct DiscrepancyInfo {
 
 impl DiscrepancyInfo {
     /// Create a new discrepancy info.
+    #[must_use] 
     pub fn new(
         run_id: Uuid,
         tenant_id: Uuid,
@@ -79,34 +80,40 @@ impl DiscrepancyInfo {
     }
 
     /// Set identity ID.
+    #[must_use] 
     pub fn with_identity(mut self, identity_id: Uuid) -> Self {
         self.identity_id = Some(identity_id);
         self
     }
 
     /// Set identity display name.
+    #[must_use] 
     pub fn with_identity_name(mut self, name: String) -> Self {
         self.identity_display_name = Some(name);
         self
     }
 
     /// Set mismatched attributes.
+    #[must_use] 
     pub fn with_mismatches(mut self, mismatches: MismatchedAttributes) -> Self {
         self.mismatched_attributes = Some(mismatches);
         self
     }
 
     /// Check if this discrepancy is pending.
+    #[must_use] 
     pub fn is_pending(&self) -> bool {
         self.resolution_status == ResolutionStatus::Pending
     }
 
     /// Check if this discrepancy is resolved.
+    #[must_use] 
     pub fn is_resolved(&self) -> bool {
         self.resolution_status == ResolutionStatus::Resolved
     }
 
     /// Check if this discrepancy is ignored.
+    #[must_use] 
     pub fn is_ignored(&self) -> bool {
         self.resolution_status == ResolutionStatus::Ignored
     }
@@ -137,11 +144,13 @@ pub struct DiscrepancyDetector {
 
 impl DiscrepancyDetector {
     /// Create a new discrepancy detector.
+    #[must_use] 
     pub fn new(tenant_id: Uuid, run_id: Uuid) -> Self {
         Self { tenant_id, run_id }
     }
 
     /// Detect missing discrepancy (identity exists, no account).
+    #[must_use] 
     pub fn detect_missing(&self, identity_id: Uuid, external_uid: String) -> DiscrepancyInfo {
         DiscrepancyInfo::new(
             self.run_id,
@@ -153,6 +162,7 @@ impl DiscrepancyDetector {
     }
 
     /// Detect orphan discrepancy (account exists, no identity).
+    #[must_use] 
     pub fn detect_orphan(&self, external_uid: String) -> DiscrepancyInfo {
         DiscrepancyInfo::new(
             self.run_id,
@@ -163,6 +173,7 @@ impl DiscrepancyDetector {
     }
 
     /// Detect mismatch discrepancy (linked but attributes differ).
+    #[must_use] 
     pub fn detect_mismatch(
         &self,
         identity_id: Uuid,
@@ -180,6 +191,7 @@ impl DiscrepancyDetector {
     }
 
     /// Detect collision discrepancy (multiple identities match one account).
+    #[must_use] 
     pub fn detect_collision(
         &self,
         external_uid: String,
@@ -198,7 +210,7 @@ impl DiscrepancyDetector {
             let mut attrs = MismatchedAttributes::new();
             for (i, m) in matches.iter().enumerate() {
                 attrs.add(
-                    format!("collision_match_{}", i),
+                    format!("collision_match_{i}"),
                     Some(m.identity_id.to_string()),
                     Some(format!("confidence: {:.2}", m.confidence)),
                 );
@@ -210,6 +222,7 @@ impl DiscrepancyDetector {
     }
 
     /// Detect unlinked discrepancy (account exists, owner found, no shadow).
+    #[must_use] 
     pub fn detect_unlinked(&self, identity_id: Uuid, external_uid: String) -> DiscrepancyInfo {
         DiscrepancyInfo::new(
             self.run_id,
@@ -221,6 +234,7 @@ impl DiscrepancyDetector {
     }
 
     /// Detect deleted discrepancy (shadow exists, account removed).
+    #[must_use] 
     pub fn detect_deleted(&self, identity_id: Uuid, external_uid: String) -> DiscrepancyInfo {
         DiscrepancyInfo::new(
             self.run_id,
@@ -249,34 +263,40 @@ pub struct DiscrepancyFilter {
 
 impl DiscrepancyFilter {
     /// Create a new filter.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Filter by run.
+    #[must_use] 
     pub fn for_run(mut self, run_id: Uuid) -> Self {
         self.run_id = Some(run_id);
         self
     }
 
     /// Filter by type.
+    #[must_use] 
     pub fn with_type(mut self, discrepancy_type: DiscrepancyType) -> Self {
         self.discrepancy_type = Some(discrepancy_type);
         self
     }
 
     /// Filter by status.
+    #[must_use] 
     pub fn with_status(mut self, status: ResolutionStatus) -> Self {
         self.resolution_status = Some(status);
         self
     }
 
     /// Filter pending only.
+    #[must_use] 
     pub fn pending_only(self) -> Self {
         self.with_status(ResolutionStatus::Pending)
     }
 
     /// Filter by identity.
+    #[must_use] 
     pub fn for_identity(mut self, identity_id: Uuid) -> Self {
         self.identity_id = Some(identity_id);
         self

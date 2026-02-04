@@ -12,7 +12,7 @@ use tower::ServiceExt;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 
 /// Create a test router with request ID middleware.
-/// Note: PropagateRequestIdLayer must be outermost to propagate the ID to response.
+/// Note: `PropagateRequestIdLayer` must be outermost to propagate the ID to response.
 fn test_router_with_request_id() -> Router {
     Router::new()
         .route("/test", get(|| async { "ok" }))
@@ -42,8 +42,7 @@ async fn test_request_id_generated_when_not_provided() {
     let id_str = request_id.unwrap().to_str().unwrap();
     assert!(
         uuid::Uuid::parse_str(id_str).is_ok(),
-        "Expected valid UUID, got: {}",
-        id_str
+        "Expected valid UUID, got: {id_str}"
     );
 }
 

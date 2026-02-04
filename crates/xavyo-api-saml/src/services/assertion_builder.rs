@@ -19,6 +19,7 @@ pub struct AssertionBuilder {
 
 impl AssertionBuilder {
     /// Create a new assertion builder
+    #[must_use] 
     pub fn new(idp_entity_id: String, credentials: SigningCredentials) -> Self {
         Self {
             idp_entity_id,
@@ -38,7 +39,7 @@ impl AssertionBuilder {
         let assertion_id = format!("_assert_{}", Uuid::new_v4());
         let now = Utc::now();
         let not_before = now - Duration::minutes(2);
-        let not_on_or_after = now + Duration::seconds(sp.assertion_validity_seconds as i64);
+        let not_on_or_after = now + Duration::seconds(i64::from(sp.assertion_validity_seconds));
 
         let attr_mapping = sp.get_attribute_mapping();
         let name_id_value = get_nameid_for_format(user, &sp.name_id_format, session_id)
@@ -216,7 +217,7 @@ impl AssertionBuilder {
 
     fn sign_response(&self, response_xml: &str, assertion_id: &str) -> SamlResult<String> {
         // Find insertion point
-        let find_pattern = format!("ID=\"{}\"", assertion_id);
+        let find_pattern = format!("ID=\"{assertion_id}\"");
         let assertion_start = response_xml.find(&find_pattern).ok_or_else(|| {
             SamlError::AssertionGenerationFailed("Cannot find Assertion".to_string())
         })?;
@@ -247,7 +248,7 @@ impl AssertionBuilder {
             openssl::hash::MessageDigest::sha256(),
             canonicalized_assertion.as_bytes(),
         )
-        .map_err(|e| SamlError::AssertionGenerationFailed(format!("Digest failed: {}", e)))?;
+        .map_err(|e| SamlError::AssertionGenerationFailed(format!("Digest failed: {e}")))?;
         let digest_b64 = STANDARD.encode(digest);
 
         // Build SignedInfo - must be canonicalized before signing
@@ -312,11 +313,11 @@ fn canonicalize_xml(xml: &str) -> SamlResult<String> {
         .write_to_writer(&mut output)
         .canonicalize(false) // false = exclude comments (Exclusive C14N without comments)
         .map_err(|e| {
-            SamlError::AssertionGenerationFailed(format!("XML canonicalization failed: {}", e))
+            SamlError::AssertionGenerationFailed(format!("XML canonicalization failed: {e}"))
         })?;
 
     String::from_utf8(output).map_err(|e| {
-        SamlError::AssertionGenerationFailed(format!("Canonicalized XML is not valid UTF-8: {}", e))
+        SamlError::AssertionGenerationFailed(format!("Canonicalized XML is not valid UTF-8: {e}"))
     })
 }
 

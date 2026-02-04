@@ -394,11 +394,13 @@ pub struct GovernanceState {
 
 impl GovernanceState {
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
 
-    /// Get the SIEM encryption key for auth_config encryption.
+    /// Get the SIEM encryption key for `auth_config` encryption.
+    #[must_use] 
     pub fn siem_encryption_key(&self) -> &[u8] {
         &self.siem_encryption_key
     }
@@ -410,12 +412,10 @@ impl GovernanceState {
             let key_bytes = base64::engine::general_purpose::STANDARD
                 .decode(&key_b64)
                 .expect("XAVYO_SIEM_ENCRYPTION_KEY must be valid base64");
-            if key_bytes.len() != 32 {
-                panic!(
-                    "XAVYO_SIEM_ENCRYPTION_KEY must decode to 32 bytes, got {}",
-                    key_bytes.len()
-                );
-            }
+            assert!(key_bytes.len() == 32, 
+                "XAVYO_SIEM_ENCRYPTION_KEY must decode to 32 bytes, got {}",
+                key_bytes.len()
+            );
             let mut key = [0u8; 32];
             key.copy_from_slice(&key_bytes);
             key
@@ -433,6 +433,7 @@ impl GovernanceState {
     }
 
     /// Create a new governance state with all services.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         let sod_enforcement_service = Arc::new(SodEnforcementService::new(pool.clone()));
         let matching_service = Arc::new(MetaRoleMatchingService::new(pool.clone()));

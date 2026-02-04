@@ -1,8 +1,8 @@
 //! Salesforce SP Interoperability Tests
 //!
 //! Tests SAML assertion compatibility with Salesforce requirements:
-//! - NameID in emailAddress format
-//! - FederationIdentifier attribute
+//! - `NameID` in emailAddress format
+//! - `FederationIdentifier` attribute
 //! - User.Email attribute
 //! - RSA-SHA256 signature algorithm
 //! - Exclusive C14N canonicalization
@@ -43,8 +43,7 @@ fn test_salesforce_basic_assertion_structure() {
 
     assert!(
         errors.is_empty(),
-        "Salesforce assertion structure validation failed: {:?}",
-        errors
+        "Salesforce assertion structure validation failed: {errors:?}"
     );
 
     // Verify required elements

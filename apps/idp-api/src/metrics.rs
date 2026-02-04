@@ -98,9 +98,7 @@ pub async fn metrics_middleware(
 ) -> Response {
     let method = request.method().to_string();
     let route = matched_path
-        .as_ref()
-        .map(|m| m.as_str().to_string())
-        .unwrap_or_else(|| "unmatched".to_string());
+        .as_ref().map_or_else(|| "unmatched".to_string(), |m| m.as_str().to_string());
 
     let start = std::time::Instant::now();
     let response = next.run(request).await;
@@ -143,7 +141,7 @@ pub async fn metrics_handler(State(state): State<crate::state::AppState>) -> imp
 
     // Append database pool gauges (collected on-demand)
     let pool = &state.db;
-    let pool_size = pool.size() as i64;
+    let pool_size = i64::from(pool.size());
     let pool_idle = pool.num_idle() as i64;
     let pool_active = pool_size - pool_idle;
 

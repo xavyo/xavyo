@@ -12,10 +12,10 @@ use xavyo_db::set_tenant_context;
 /// Default trust duration in days.
 pub const DEFAULT_TRUST_DURATION_DAYS: i32 = 30;
 
-/// Device policy key in tenant_policies JSONB.
+/// Device policy key in `tenant_policies` JSONB.
 const DEVICE_POLICY_KEY: &str = "device_policy";
 
-/// Device policy settings stored in tenant_policies JSONB.
+/// Device policy settings stored in `tenant_policies` JSONB.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DevicePolicy {
     /// Allow trusted devices to bypass MFA.
@@ -51,6 +51,7 @@ pub struct DevicePolicyService {
 
 impl DevicePolicyService {
     /// Create a new device policy service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -64,11 +65,11 @@ impl DevicePolicyService {
 
         // Query tenant_policies for device policy
         let result: Option<(serde_json::Value,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT policies
             FROM tenant_policies
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(&mut *conn)
@@ -117,17 +118,17 @@ impl DevicePolicyService {
 
         // Upsert into tenant_policies
         let policy_value = serde_json::to_value(&current).map_err(|e| {
-            ApiAuthError::Internal(format!("Failed to serialize device policy: {}", e))
+            ApiAuthError::Internal(format!("Failed to serialize device policy: {e}"))
         })?;
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO tenant_policies (tenant_id, policies)
             VALUES ($1, jsonb_build_object($2, $3))
             ON CONFLICT (tenant_id) DO UPDATE
             SET policies = tenant_policies.policies || jsonb_build_object($2, $3),
                 updated_at = NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(DEVICE_POLICY_KEY)

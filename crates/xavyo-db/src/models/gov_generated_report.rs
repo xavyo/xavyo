@@ -25,21 +25,25 @@ pub enum ReportStatus {
 
 impl ReportStatus {
     /// Check if the report is complete.
+    #[must_use] 
     pub fn is_completed(&self) -> bool {
         matches!(self, Self::Completed)
     }
 
     /// Check if the report is in progress.
+    #[must_use] 
     pub fn is_in_progress(&self) -> bool {
         matches!(self, Self::Pending | Self::Generating)
     }
 
     /// Check if the report failed.
+    #[must_use] 
     pub fn is_failed(&self) -> bool {
         matches!(self, Self::Failed)
     }
 
     /// Check if the report is final (no more changes expected).
+    #[must_use] 
     pub fn is_final(&self) -> bool {
         matches!(self, Self::Completed | Self::Failed)
     }
@@ -59,6 +63,7 @@ pub enum OutputFormat {
 
 impl OutputFormat {
     /// Get the MIME type for this format.
+    #[must_use] 
     pub fn mime_type(&self) -> &'static str {
         match self {
             Self::Json => "application/json",
@@ -67,6 +72,7 @@ impl OutputFormat {
     }
 
     /// Get the file extension for this format.
+    #[must_use] 
     pub fn extension(&self) -> &'static str {
         match self {
             Self::Json => "json",
@@ -172,10 +178,10 @@ impl GovGeneratedReport {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_generated_reports
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -192,36 +198,36 @@ impl GovGeneratedReport {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_generated_reports
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.template_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND template_id = ${}", param_count));
+            query.push_str(&format!(" AND template_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
         if filter.generated_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND generated_by = ${}", param_count));
+            query.push_str(&format!(" AND generated_by = ${param_count}"));
         }
         if filter.schedule_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND schedule_id = ${}", param_count));
+            query.push_str(&format!(" AND schedule_id = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -261,36 +267,36 @@ impl GovGeneratedReport {
         filter: &GeneratedReportFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_generated_reports
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.template_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND template_id = ${}", param_count));
+            query.push_str(&format!(" AND template_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
         if filter.generated_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND generated_by = ${}", param_count));
+            query.push_str(&format!(" AND generated_by = ${param_count}"));
         }
         if filter.schedule_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND schedule_id = ${}", param_count));
+            query.push_str(&format!(" AND schedule_id = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -329,17 +335,17 @@ impl GovGeneratedReport {
             .unwrap_or_else(|| format!("Report {}", Utc::now().format("%Y-%m-%d %H:%M:%S")));
         let parameters = input.parameters.unwrap_or_else(|| serde_json::json!({}));
         let retention_until =
-            Utc::now() + chrono::Duration::days(365 * DEFAULT_RETENTION_YEARS as i64);
+            Utc::now() + chrono::Duration::days(365 * i64::from(DEFAULT_RETENTION_YEARS));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_generated_reports (
                 tenant_id, template_id, template_snapshot, name, status,
                 parameters, output_format, generated_by, schedule_id, retention_until
             )
             VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.template_id)
@@ -361,12 +367,12 @@ impl GovGeneratedReport {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_generated_reports
             SET status = 'generating', started_at = NOW(), progress_percent = 0
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -382,12 +388,12 @@ impl GovGeneratedReport {
         progress_percent: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_generated_reports
             SET progress_percent = $3
             WHERE id = $1 AND tenant_id = $2 AND status = 'generating'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -409,13 +415,13 @@ impl GovGeneratedReport {
             .unwrap_or(0);
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_generated_reports
             SET status = 'completed', completed_at = NOW(), progress_percent = 100,
                 output_data = $3, record_count = $4, file_size_bytes = $5
             WHERE id = $1 AND tenant_id = $2 AND status = 'generating'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -436,13 +442,13 @@ impl GovGeneratedReport {
         file_size_bytes: i64,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_generated_reports
             SET status = 'completed', completed_at = NOW(), progress_percent = 100,
                 output_file_path = $3, record_count = $4, file_size_bytes = $5
             WHERE id = $1 AND tenant_id = $2 AND status = 'generating'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -461,12 +467,12 @@ impl GovGeneratedReport {
         error_message: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_generated_reports
             SET status = 'failed', completed_at = NOW(), error_message = $3
             WHERE id = $1 AND tenant_id = $2 AND status IN ('pending', 'generating')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -478,10 +484,10 @@ impl GovGeneratedReport {
     /// Delete expired reports.
     pub async fn delete_expired(pool: &sqlx::PgPool) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_generated_reports
             WHERE retention_until < NOW() AND status = 'completed'
-            "#,
+            ",
         )
         .execute(pool)
         .await?;
@@ -490,12 +496,14 @@ impl GovGeneratedReport {
     }
 
     /// Check if the report can be downloaded.
+    #[must_use] 
     pub fn can_download(&self) -> bool {
         self.status.is_completed()
             && (self.output_data.is_some() || self.output_file_path.is_some())
     }
 
     /// Get the generation duration in seconds.
+    #[must_use] 
     pub fn generation_duration_secs(&self) -> Option<i64> {
         match (self.started_at, self.completed_at) {
             (Some(started), Some(completed)) => Some((completed - started).num_seconds()),

@@ -17,7 +17,7 @@ use crate::{
 /// POST /auth/mfa/totp/verify
 ///
 /// Verify TOTP code during login to complete MFA authentication.
-/// Requires a partial_token from the initial login response.
+/// Requires a `partial_token` from the initial login response.
 pub async fn verify_totp(
     State(state): State<AuthState>,
     Extension(claims): Extension<JwtClaims>,

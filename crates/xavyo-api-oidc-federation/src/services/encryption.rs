@@ -25,6 +25,7 @@ impl EncryptionService {
     /// Create a new encryption service with a master key.
     ///
     /// The master key should be loaded from environment or a secrets manager.
+    #[must_use] 
     pub fn new(master_key: [u8; 32]) -> Self {
         Self { master_key }
     }
@@ -33,7 +34,7 @@ impl EncryptionService {
     pub fn from_base64(master_key_base64: &str) -> FederationResult<Self> {
         let key_bytes = BASE64
             .decode(master_key_base64)
-            .map_err(|e| FederationError::EncryptionFailed(format!("Invalid base64 key: {}", e)))?;
+            .map_err(|e| FederationError::EncryptionFailed(format!("Invalid base64 key: {e}")))?;
 
         if key_bytes.len() != 32 {
             return Err(FederationError::EncryptionFailed(format!(
@@ -55,7 +56,7 @@ impl EncryptionService {
     /// Uses HKDF-SHA256 (RFC 5869) for cryptographically secure key derivation:
     /// - IKM (Input Key Material): master key
     /// - Salt: static domain separator for this application
-    /// - Info: tenant_id for per-tenant key isolation
+    /// - Info: `tenant_id` for per-tenant key isolation
     fn derive_tenant_key(&self, tenant_id: Uuid) -> [u8; 32] {
         // SECURITY: Use HKDF-SHA256 for proper cryptographic key derivation.
         // The salt provides domain separation between different usages.
@@ -128,7 +129,8 @@ impl EncryptionService {
 
 /// Generate a random master key for testing/initialization.
 ///
-/// SECURITY: Uses OsRng (CSPRNG) for cryptographic key generation.
+/// SECURITY: Uses `OsRng` (CSPRNG) for cryptographic key generation.
+#[must_use] 
 pub fn generate_master_key() -> [u8; 32] {
     let mut key = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut key);
@@ -136,6 +138,7 @@ pub fn generate_master_key() -> [u8; 32] {
 }
 
 /// Generate a random master key as base64 string.
+#[must_use] 
 pub fn generate_master_key_base64() -> String {
     BASE64.encode(generate_master_key())
 }

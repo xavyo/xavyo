@@ -86,7 +86,7 @@ impl ScimProvisioningLog {
         data: CreateScimProvisioningLog,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO scim_provisioning_log (
                 tenant_id, target_id, sync_run_id, operation_type, resource_type,
                 internal_resource_id, external_resource_id, http_method, http_status,
@@ -94,7 +94,7 @@ impl ScimProvisioningLog {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(data.target_id)
@@ -121,10 +121,10 @@ impl ScimProvisioningLog {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_provisioning_log
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -132,7 +132,7 @@ impl ScimProvisioningLog {
         .await
     }
 
-    /// List log entries for a target with optional resource_type and operation_type filters.
+    /// List log entries for a target with optional `resource_type` and `operation_type` filters.
     ///
     /// Returns `(items, total_count)` for pagination support.
     pub async fn list_by_target(
@@ -148,13 +148,13 @@ impl ScimProvisioningLog {
             // Both filters provided
             (Some(rt), Some(ot)) => {
                 let items: Vec<Self> = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM scim_provisioning_log
                     WHERE tenant_id = $1 AND target_id = $2
                       AND resource_type = $3 AND operation_type = $4
                     ORDER BY created_at DESC
                     LIMIT $5 OFFSET $6
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -166,11 +166,11 @@ impl ScimProvisioningLog {
                 .await?;
 
                 let count: (i64,) = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM scim_provisioning_log
                     WHERE tenant_id = $1 AND target_id = $2
                       AND resource_type = $3 AND operation_type = $4
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -185,13 +185,13 @@ impl ScimProvisioningLog {
             // Only resource_type filter
             (Some(rt), None) => {
                 let items: Vec<Self> = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM scim_provisioning_log
                     WHERE tenant_id = $1 AND target_id = $2
                       AND resource_type = $3
                     ORDER BY created_at DESC
                     LIMIT $4 OFFSET $5
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -202,11 +202,11 @@ impl ScimProvisioningLog {
                 .await?;
 
                 let count: (i64,) = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM scim_provisioning_log
                     WHERE tenant_id = $1 AND target_id = $2
                       AND resource_type = $3
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -220,13 +220,13 @@ impl ScimProvisioningLog {
             // Only operation_type filter
             (None, Some(ot)) => {
                 let items: Vec<Self> = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM scim_provisioning_log
                     WHERE tenant_id = $1 AND target_id = $2
                       AND operation_type = $3
                     ORDER BY created_at DESC
                     LIMIT $4 OFFSET $5
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -237,11 +237,11 @@ impl ScimProvisioningLog {
                 .await?;
 
                 let count: (i64,) = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM scim_provisioning_log
                     WHERE tenant_id = $1 AND target_id = $2
                       AND operation_type = $3
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -255,12 +255,12 @@ impl ScimProvisioningLog {
             // No optional filters
             (None, None) => {
                 let items: Vec<Self> = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM scim_provisioning_log
                     WHERE tenant_id = $1 AND target_id = $2
                     ORDER BY created_at DESC
                     LIMIT $3 OFFSET $4
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -270,10 +270,10 @@ impl ScimProvisioningLog {
                 .await?;
 
                 let count: (i64,) = sqlx::query_as(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM scim_provisioning_log
                     WHERE tenant_id = $1 AND target_id = $2
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(target_id)
@@ -296,12 +296,12 @@ impl ScimProvisioningLog {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_provisioning_log
             WHERE tenant_id = $1 AND sync_run_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(sync_run_id)
@@ -320,10 +320,10 @@ impl ScimProvisioningLog {
         before: DateTime<Utc>,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM scim_provisioning_log
             WHERE tenant_id = $1 AND created_at < $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(before)

@@ -2,7 +2,7 @@
 //!
 //! Provides business logic for managing license incompatibility rules.
 //! These rules define pairs of license pools that cannot be assigned
-//! to the same user (similar to SoD rules for entitlements).
+//! to the same user (similar to `SoD` rules for entitlements).
 
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -74,7 +74,7 @@ pub(crate) fn format_violation_message(violations: &[IncompatibilityViolation]) 
             )
         }
         n => {
-            let mut msg = format!("{} incompatibility violations found:", n);
+            let mut msg = format!("{n} incompatibility violations found:");
             for (i, v) in violations.iter().enumerate() {
                 msg.push_str(&format!(
                     "\n  {}. pool '{}' conflicts with existing pool '{}' (reason: {})",
@@ -97,6 +97,7 @@ pub struct LicenseIncompatibilityService {
 
 impl LicenseIncompatibilityService {
     /// Create a new incompatibility service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: LicenseAuditService::new(pool.clone()),
@@ -263,12 +264,10 @@ impl LicenseIncompatibilityService {
                     rule.pool_b_id,
                     pool_a
                         .as_ref()
-                        .map(|p| p.name.as_str())
-                        .unwrap_or("unknown"),
+                        .map_or("unknown", |p| p.name.as_str()),
                     pool_b
                         .as_ref()
-                        .map(|p| p.name.as_str())
-                        .unwrap_or("unknown"),
+                        .map_or("unknown", |p| p.name.as_str()),
                     actor_id,
                 )
                 .await?;
@@ -308,6 +307,7 @@ impl LicenseIncompatibilityService {
     }
 
     /// Get the underlying database pool reference.
+    #[must_use] 
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }
