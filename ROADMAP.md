@@ -7,8 +7,8 @@ This document defines the functional requirements to enhance the `xavyo-cli` to 
 | Metric | Value |
 |--------|-------|
 | **Version** | 0.1.0 (alpha) |
-| **Commands** | 17 implemented |
-| **Test Coverage** | 595 tests (354 unit + 79 integration + 53 MFA + 73 WebAuthn + 23 Sessions + 16 Credential Rotation + 29 Offline Mode + 23 Batch + 18 CLI help) ✅ |
+| **Commands** | 18 implemented |
+| **Test Coverage** | 611 tests (354 unit + 79 integration + 53 MFA + 73 WebAuthn + 23 Sessions + 16 Credential Rotation + 29 Offline Mode + 23 Batch + 16 REPL + 18 CLI help) ✅ |
 | **Documentation** | CRATE.md ✅ |
 
 ### Implemented Commands
@@ -32,6 +32,7 @@ This document defines the functional requirements to enhance the `xavyo-cli` to 
 | `watch` | Watch and auto-apply changes | ✅ Implemented |
 | `templates` | Pre-configured templates | ✅ Implemented |
 | `upgrade` | Check for updates | ✅ Implemented |
+| `shell` | Interactive REPL mode | ✅ Implemented |
 
 ### Identified Gaps
 
@@ -356,10 +357,10 @@ Add batch operation support for bulk create, update, and delete operations.
 
 ---
 
-### C-010: xavyo-cli - Add Interactive Mode (REPL)
+### C-010: xavyo-cli - Add Interactive Mode (REPL) ✅
 
 **Crate:** `apps/xavyo-cli`
-**Current Status:** Beta
+**Current Status:** Beta ✅
 **Target Status:** Beta
 **Estimated Effort:** 2 weeks
 **Dependencies:** C-003
@@ -368,19 +369,32 @@ Add batch operation support for bulk create, update, and delete operations.
 Add interactive REPL mode for exploratory use with tab completion and command history.
 
 **Acceptance Criteria:**
-- [ ] Add `xavyo shell` command to enter REPL
-- [ ] Tab completion for commands and arguments
-- [ ] Command history with arrow keys
-- [ ] Context-aware prompts (show current tenant)
-- [ ] Support `exit` and `quit` commands
-- [ ] Add 15+ tests for REPL mode
+- [x] Add `xavyo shell` command to enter REPL
+- [x] Tab completion for commands and arguments
+- [x] Command history with arrow keys (persistent across sessions)
+- [x] Context-aware prompts (show current tenant)
+- [x] Support `exit` and `quit` commands
+- [x] Add 15+ tests for REPL mode (16 tests added)
 
-**Files to Create:**
-- `apps/xavyo-cli/src/commands/shell.rs`
-- `apps/xavyo-cli/src/repl/mod.rs`
+**Files Created:**
+- `apps/xavyo-cli/src/commands/shell.rs` - Shell command entry point
+- `apps/xavyo-cli/src/repl/mod.rs` - REPL module exports
+- `apps/xavyo-cli/src/repl/session.rs` - ShellSession state management
+- `apps/xavyo-cli/src/repl/prompt.rs` - Dynamic prompt generation
+- `apps/xavyo-cli/src/repl/executor.rs` - Command execution and help
+- `apps/xavyo-cli/src/repl/completer.rs` - Tab completion
+- `apps/xavyo-cli/tests/shell_tests.rs` - 16 integration tests
+
+**Files Modified:**
+- `apps/xavyo-cli/Cargo.toml` - Added rustyline 14.x
+- `apps/xavyo-cli/src/main.rs` - Added Shell command
+- `apps/xavyo-cli/src/commands/mod.rs` - Added shell module
+- `apps/xavyo-cli/src/config/paths.rs` - Added history_file path
+- `apps/xavyo-cli/src/error.rs` - Added rustyline error conversion
+- `apps/xavyo-cli/src/lib.rs` - Export repl types for testing
 
 **New Dependencies:**
-- `rustyline` or similar
+- `rustyline = "14"` - Readline, history, and completion
 
 ---
 
@@ -707,8 +721,8 @@ Update this document as requirements are completed:
 - [x] C-006 - Add Session Management (23 tests, exceeds 10+ target)
 - [x] C-007 - Improve Credential Rotation UX (16 tests, exceeds 10+ target)
 - [x] C-008 - Add Offline Mode (29 tests, exceeds 15+ target)
-- [ ] C-009 - Add Batch Operations
-- [ ] C-010 - Add Interactive Mode (REPL)
+- [x] C-009 - Add Batch Operations (23 integration tests + 40 unit tests)
+- [x] C-010 - Add Interactive Mode (REPL) (16 tests, meets 15+ target)
 - [ ] C-011 - Improve Error Messages
 - [ ] C-012 - Add Verbose/Debug Output
 - [ ] C-013 - Add Audit Log Viewer
