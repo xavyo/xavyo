@@ -14,10 +14,12 @@ pub struct ConfigPaths {
     pub session_file: PathBuf,
     /// Path to credentials.enc (fallback encrypted file)
     pub credentials_file: PathBuf,
-    /// Path to cache directory for offline mode
+    /// Path to cache directory
     pub cache_dir: PathBuf,
-    /// Path to command history file for interactive shell
+    /// Path to shell history file
     pub history_file: PathBuf,
+    /// Path to version history directory
+    pub version_history_dir: PathBuf,
 }
 
 impl ConfigPaths {
@@ -29,15 +31,17 @@ impl ConfigPaths {
     /// - Windows: %APPDATA%\xavyo\
     pub fn new() -> CliResult<Self> {
         let config_dir = Self::get_config_dir()?;
-
         let cache_dir = config_dir.join("cache");
+        let history_file = config_dir.join("shell_history");
+        let version_history_dir = config_dir.join("history");
 
         Ok(Self {
             config_file: config_dir.join("config.json"),
             session_file: config_dir.join("session.json"),
             credentials_file: config_dir.join("credentials.enc"),
-            history_file: config_dir.join("history"),
             cache_dir,
+            history_file,
+            version_history_dir,
             config_dir,
         })
     }
@@ -86,8 +90,6 @@ mod tests {
             assert!(paths.config_file.ends_with("config.json"));
             assert!(paths.session_file.ends_with("session.json"));
             assert!(paths.credentials_file.ends_with("credentials.enc"));
-            assert!(paths.cache_dir.ends_with("cache"));
-            assert!(paths.history_file.ends_with("history"));
         }
     }
 

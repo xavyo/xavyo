@@ -94,31 +94,4 @@ impl ApiClient {
             })
         }
     }
-
-    /// Update an existing tool
-    pub async fn update_tool(
-        &self,
-        id: Uuid,
-        request: CreateToolRequest,
-    ) -> CliResult<ToolResponse> {
-        let url = format!("{}/nhi/tools/{}", self.config().api_url, id);
-
-        let response = self.put_json(&url, &request).await?;
-
-        if response.status().is_success() {
-            response.json().await.map_err(Into::into)
-        } else if response.status() == reqwest::StatusCode::NOT_FOUND {
-            Err(CliError::NotFound(format!("Tool not found: {}", id)))
-        } else if response.status() == reqwest::StatusCode::BAD_REQUEST {
-            let body = response.text().await.unwrap_or_default();
-            Err(CliError::Validation(body))
-        } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            Err(CliError::Api {
-                status: status.as_u16(),
-                message: body,
-            })
-        }
-    }
 }

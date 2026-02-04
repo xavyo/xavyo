@@ -13,6 +13,7 @@ pub const CACHE_KEY_AGENTS: &str = "agents";
 pub const CACHE_KEY_TOOLS: &str = "tools";
 pub const CACHE_KEY_STATUS: &str = "status";
 pub const CACHE_KEY_WHOAMI: &str = "whoami";
+pub const CACHE_KEY_TENANTS: &str = "tenants";
 
 /// Trait for cache storage backends
 pub trait CacheStore: Send + Sync {
@@ -294,7 +295,8 @@ mod tests {
             session_file: temp_dir.path().join("session.json"),
             credentials_file: temp_dir.path().join("credentials.enc"),
             cache_dir: temp_dir.path().join("cache"),
-            history_file: temp_dir.path().join("history"),
+            history_file: temp_dir.path().join("shell_history"),
+            version_history_dir: temp_dir.path().join("history"),
         };
         (temp_dir, paths)
     }

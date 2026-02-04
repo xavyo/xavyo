@@ -13,10 +13,6 @@ categories = ["command-line-utilities", "authentication"]
 name = "xavyo"
 path = "src/main.rs"
 
-[lib]
-name = "xavyo_cli"
-path = "src/lib.rs"
-
 [dependencies]
 # CLI framework
 clap = { version = "4", features = ["derive", "env"] }
@@ -65,12 +61,6 @@ indicatif = "0.17"
 # Interactive prompts
 dialoguer = "0.11"
 
-# Interactive REPL/readline support
-rustyline = "14"
-
-# Signal handling for Ctrl+C
-ctrlc = "3.4"
-
 # TTY detection
 atty = "0.2"
 
@@ -84,17 +74,23 @@ anyhow = "1"
 # JWT decoding (for extracting claims without validation - server validates)
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 
-# WebAuthn/Passkey hardware key support (FIDO2/CTAP2)
-# Optional - requires libudev-dev on Linux
-ctap-hid-fido2 = { version = "3.5", optional = true }
+# Regex for redaction patterns
+regex = "1"
+
+# Archive extraction for plugins
+flate2 = "1"
+tar = "0.4"
+
+# TOML parsing for plugin manifests
+toml = "0.8"
+
+# URL encoding
+urlencoding = "2"
 
 [dev-dependencies]
 tempfile = "3"
 wiremock = "0.6"
-mockall = "0.13"
-tokio-test = "0.4"
+csv = "1"
 
 [features]
 default = []
-# Enable hardware security key support (requires libudev-dev on Linux)
-hardware-keys = ["ctap-hid-fido2"]

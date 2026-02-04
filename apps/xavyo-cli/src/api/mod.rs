@@ -11,4 +11,4 @@ mod tools;
 pub use auth::{poll_device_token, request_device_code, signup};
 pub use client::ApiClient;
 pub use health::check_health_display;
-pub use tenants::provision_tenant;
+pub use tenants::{list_tenants, provision_tenant, switch_tenant};

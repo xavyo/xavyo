@@ -93,6 +93,7 @@ mod tests {
             tenant_id: Some(Uuid::new_v4()),
             tenant_name: Some("Test Org".to_string()),
             tenant_slug: Some("test-org".to_string()),
+            tenant_role: None,
         };
 
         let output = WhoamiOutput::from(&session);
@@ -110,6 +111,7 @@ mod tests {
             tenant_id: None,
             tenant_name: None,
             tenant_slug: None,
+            tenant_role: None,
         };
 
         let output = WhoamiOutput::from(&session);

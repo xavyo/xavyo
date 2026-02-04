@@ -9,6 +9,64 @@ pub mod error;
 // Re-export config module for testing
 pub mod config;
 
+// Re-export logging module for testing
+pub mod logging;
+
+// Re-export format types for testing
+pub mod formats {
+    use clap::ValueEnum;
+
+    /// Export format for the export command
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
+    pub enum ExportFormat {
+        /// YAML format (default)
+        #[default]
+        Yaml,
+        /// JSON format
+        Json,
+        /// CSV format (requires --resource)
+        Csv,
+    }
+
+    /// Import format for the apply command
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+    pub enum ImportFormat {
+        /// YAML configuration file
+        Yaml,
+        /// JSON configuration file
+        Json,
+        /// CSV file (requires --resource)
+        Csv,
+    }
+
+    /// Resource type for CSV operations
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+    pub enum ResourceType {
+        /// Agent configurations
+        Agents,
+        /// Tool configurations
+        Tools,
+    }
+
+    /// Detect import format based on file extension
+    pub fn detect_format(path: &std::path::Path) -> Result<ImportFormat, String> {
+        match path.extension().and_then(|e| e.to_str()) {
+            Some("json") => Ok(ImportFormat::Json),
+            Some("csv") => Ok(ImportFormat::Csv),
+            Some("yaml") | Some("yml") => Ok(ImportFormat::Yaml),
+            Some(ext) => Err(format!(
+                "Unknown file format '.{}' for '{}'. Use --format to specify.",
+                ext,
+                path.display()
+            )),
+            None => Err(format!(
+                "Cannot determine format for '{}' (no file extension). Use --format to specify.",
+                path.display()
+            )),
+        }
+    }
+}
+
 /// REPL exports for testing
 /// These are standalone types that don't require the full module tree
 pub mod repl {
@@ -134,6 +192,9 @@ pub mod batch {
 pub mod models {
     pub mod agent;
     pub mod api_session;
+    pub mod audit;
+    pub mod session;
+    pub mod tenant;
 
     // Re-export types at models level for convenience
     pub use agent::{
@@ -141,4 +202,185 @@ pub mod models {
         PlannedRotationChanges,
     };
     pub use api_session::{ApiSession, DeviceType, Location, RevokeResponse, SessionListResponse};
+    pub use audit::{AuditAction, AuditEntry, AuditFilter, AuditListResponse, AuditUser};
+    pub use session::Session;
+    pub use tenant::{
+        TenantCurrentOutput, TenantInfo, TenantListResponse, TenantRole, TenantSwitchOutput,
+        TenantSwitchRequest, TenantSwitchResponse,
+    };
+}
+
+// Re-export command argument types for testing
+// Note: We define a simplified version to avoid internal dependencies
+pub mod commands {
+    pub mod audit {
+        use clap::ValueEnum;
+
+        /// Output format options (matching the internal definition)
+        #[derive(Debug, Clone, Copy, ValueEnum, Default)]
+        pub enum OutputFormat {
+            /// Display as formatted table (default)
+            #[default]
+            Table,
+            /// Output as JSON array
+            Json,
+            /// Output as CSV
+            Csv,
+        }
+    }
+    pub use audit::OutputFormat;
+}
+
+// Re-export diff module types for testing
+pub mod diff {
+    pub use serde::{Deserialize, Serialize};
+
+    /// Type of resource being compared
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(rename_all = "lowercase")]
+    pub enum ResourceType {
+        /// AI agent configuration
+        Agent,
+        /// Tool configuration
+        Tool,
+    }
+
+    /// Type of change detected
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(rename_all = "lowercase")]
+    pub enum ChangeType {
+        /// Resource exists in target but not in source
+        Added,
+        /// Resource exists in both with differences
+        Modified,
+        /// Resource exists in source but not in target
+        Removed,
+    }
+
+    /// Represents a single field-level change within a resource
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct FieldChange {
+        /// Dot-notation path to field
+        pub path: String,
+        /// Previous value (None if field was added)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub old_value: Option<serde_json::Value>,
+        /// New value (None if field was removed)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub new_value: Option<serde_json::Value>,
+    }
+
+    /// Represents a single resource difference
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct DiffItem {
+        /// Type of resource (Agent, Tool)
+        pub resource_type: ResourceType,
+        /// Resource name/identifier
+        pub name: String,
+        /// Type of change (Added, Modified, Removed)
+        pub change_type: ChangeType,
+        /// For modifications, list of changed fields
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub field_changes: Option<Vec<FieldChange>>,
+    }
+
+    /// Represents the complete result of a configuration comparison
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct DiffResult {
+        /// Resources present in target but not in source
+        pub added: Vec<DiffItem>,
+        /// Resources present in both with different values
+        pub modified: Vec<DiffItem>,
+        /// Resources present in source but not in target
+        pub removed: Vec<DiffItem>,
+        /// Count of resources that are identical
+        #[serde(skip_serializing_if = "is_zero")]
+        pub unchanged_count: usize,
+        /// Label for source (e.g., "local", "config.yaml")
+        pub source_label: String,
+        /// Label for target (e.g., "remote", "server")
+        pub target_label: String,
+    }
+
+    fn is_zero(value: &usize) -> bool {
+        *value == 0
+    }
+
+    impl DiffResult {
+        /// Returns true if any additions, modifications, or removals exist
+        pub fn has_changes(&self) -> bool {
+            !self.added.is_empty() || !self.modified.is_empty() || !self.removed.is_empty()
+        }
+
+        /// Returns count of all changes (added + modified + removed)
+        pub fn total_changes(&self) -> usize {
+            self.added.len() + self.modified.len() + self.removed.len()
+        }
+    }
+
+    /// Summary of diff result
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct DiffSummary {
+        /// Number of added resources
+        pub added: usize,
+        /// Number of modified resources
+        pub modified: usize,
+        /// Number of removed resources
+        pub removed: usize,
+    }
+
+    /// Output format for diff results
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub enum OutputFormat {
+        /// Colored table format (default, human-readable)
+        #[default]
+        Table,
+        /// JSON format (machine-readable)
+        Json,
+        /// YAML format (for config-as-code workflows)
+        Yaml,
+    }
+
+    /// Exit codes for diff command
+    pub const EXIT_NO_CHANGES: i32 = 0;
+    pub const EXIT_CHANGES_FOUND: i32 = 1;
+    pub const EXIT_ERROR: i32 = 2;
+}
+
+// Re-export plugin module for testing
+pub mod plugin;
+
+// Re-export proxy module for testing
+pub mod proxy;
+
+// Re-export SSO module for testing
+pub mod sso;
+
+// Re-export history types for testing
+pub mod history {
+    pub use chrono::{DateTime, Utc};
+    pub use serde::{Deserialize, Serialize};
+
+    /// Summary metadata for quick display without loading full config
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+    pub struct VersionSummary {
+        /// Number of agents in this version
+        pub agent_count: usize,
+        /// Number of tools in this version
+        pub tool_count: usize,
+        /// Optional description (e.g., source file name)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub source: Option<String>,
+    }
+
+    /// A saved configuration version (simplified for testing)
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct ConfigVersion {
+        /// Sequential version number (1, 2, 3, ...)
+        pub version: u32,
+        /// When this version was saved (UTC)
+        pub timestamp: DateTime<Utc>,
+        /// Summary metadata for display
+        pub summary: VersionSummary,
+    }
 }
