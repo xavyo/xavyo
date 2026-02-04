@@ -14,6 +14,12 @@ pub struct ConfigPaths {
     pub session_file: PathBuf,
     /// Path to credentials.enc (fallback encrypted file)
     pub credentials_file: PathBuf,
+    /// Path to cache directory
+    pub cache_dir: PathBuf,
+    /// Path to shell history file
+    pub history_file: PathBuf,
+    /// Path to version history directory
+    pub version_history_dir: PathBuf,
 }
 
 impl ConfigPaths {
@@ -25,11 +31,17 @@ impl ConfigPaths {
     /// - Windows: %APPDATA%\xavyo\
     pub fn new() -> CliResult<Self> {
         let config_dir = Self::get_config_dir()?;
+        let cache_dir = config_dir.join("cache");
+        let history_file = config_dir.join("shell_history");
+        let version_history_dir = config_dir.join("history");
 
         Ok(Self {
             config_file: config_dir.join("config.json"),
             session_file: config_dir.join("session.json"),
             credentials_file: config_dir.join("credentials.enc"),
+            cache_dir,
+            history_file,
+            version_history_dir,
             config_dir,
         })
     }
@@ -53,6 +65,14 @@ impl ConfigPaths {
     pub fn ensure_dir_exists(&self) -> CliResult<()> {
         if !self.config_dir.exists() {
             std::fs::create_dir_all(&self.config_dir)?;
+        }
+        Ok(())
+    }
+
+    /// Ensure the cache directory exists
+    pub fn ensure_cache_dir_exists(&self) -> CliResult<()> {
+        if !self.cache_dir.exists() {
+            std::fs::create_dir_all(&self.cache_dir)?;
         }
         Ok(())
     }

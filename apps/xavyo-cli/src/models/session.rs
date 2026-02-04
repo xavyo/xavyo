@@ -2,6 +2,7 @@
 
 use crate::config::ConfigPaths;
 use crate::error::{CliError, CliResult};
+use crate::models::tenant::TenantRole;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -22,6 +23,10 @@ pub struct Session {
 
     /// Current tenant slug (if any)
     pub tenant_slug: Option<String>,
+
+    /// User's role in the current tenant (if any)
+    #[serde(default)]
+    pub tenant_role: Option<TenantRole>,
 }
 
 impl Session {
@@ -51,6 +56,7 @@ impl Session {
             tenant_id: claims.tid,
             tenant_name: None,
             tenant_slug: None,
+            tenant_role: None,
         })
     }
 
@@ -82,10 +88,11 @@ impl Session {
     }
 
     /// Update tenant context
-    pub fn set_tenant(&mut self, id: Uuid, name: String, slug: String) {
+    pub fn set_tenant(&mut self, id: Uuid, name: String, slug: String, role: TenantRole) {
         self.tenant_id = Some(id);
         self.tenant_name = Some(name);
         self.tenant_slug = Some(slug);
+        self.tenant_role = Some(role);
     }
 
     /// Check if user has a tenant context
@@ -112,6 +119,7 @@ use base64::Engine;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::tenant::TenantRole;
     use tempfile::TempDir;
 
     fn create_test_session() -> Session {
@@ -121,6 +129,7 @@ mod tests {
             tenant_id: None,
             tenant_name: None,
             tenant_slug: None,
+            tenant_role: None,
         }
     }
 
@@ -132,6 +141,9 @@ mod tests {
             config_file: temp_dir.path().join("config.json"),
             session_file: temp_dir.path().join("session.json"),
             credentials_file: temp_dir.path().join("credentials.enc"),
+            cache_dir: temp_dir.path().join("cache"),
+            history_file: temp_dir.path().join("shell_history"),
+            version_history_dir: temp_dir.path().join("history"),
         };
 
         let session = create_test_session();
@@ -150,6 +162,9 @@ mod tests {
             config_file: temp_dir.path().join("config.json"),
             session_file: temp_dir.path().join("session.json"),
             credentials_file: temp_dir.path().join("credentials.enc"),
+            cache_dir: temp_dir.path().join("cache"),
+            history_file: temp_dir.path().join("shell_history"),
+            version_history_dir: temp_dir.path().join("history"),
         };
 
         let result = Session::load(&paths).unwrap();
@@ -164,6 +179,9 @@ mod tests {
             config_file: temp_dir.path().join("config.json"),
             session_file: temp_dir.path().join("session.json"),
             credentials_file: temp_dir.path().join("credentials.enc"),
+            cache_dir: temp_dir.path().join("cache"),
+            history_file: temp_dir.path().join("shell_history"),
+            version_history_dir: temp_dir.path().join("history"),
         };
 
         let session = create_test_session();
@@ -183,10 +201,12 @@ mod tests {
             Uuid::new_v4(),
             "Acme Corp".to_string(),
             "acme-corp".to_string(),
+            TenantRole::Admin,
         );
 
         assert!(session.has_tenant());
         assert_eq!(session.tenant_name.as_deref(), Some("Acme Corp"));
         assert_eq!(session.tenant_slug.as_deref(), Some("acme-corp"));
+        assert_eq!(session.tenant_role, Some(TenantRole::Admin));
     }
 }

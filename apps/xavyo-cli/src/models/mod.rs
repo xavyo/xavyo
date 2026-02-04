@@ -12,6 +12,7 @@ mod provision;
 pub mod release;
 mod session;
 mod signup;
+pub mod tenant;
 pub mod token;
 pub mod tool;
 pub mod upgrade;
@@ -37,6 +38,11 @@ pub use provision::{ProvisionRequest, ProvisionResponse};
 pub use release::{Asset, GitHubAsset, GitHubRelease, Release};
 pub use session::Session;
 pub use signup::SignupResponse;
+#[allow(unused_imports)]
+pub use tenant::{
+    TenantCurrentOutput, TenantInfo, TenantListResponse, TenantRole, TenantSwitchOutput,
+    TenantSwitchRequest, TenantSwitchResponse,
+};
 pub use token::TokenResponse;
 #[allow(unused_imports)]
 pub use tool::{CreateToolRequest, ToolListResponse, ToolResponse};

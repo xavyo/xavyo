@@ -7,9 +7,14 @@
 //! - Check tenant health and status
 //! - Diagnose connection and configuration issues
 
+// Allow dead code and deprecated warnings for features in development
+#![allow(dead_code)]
+#![allow(deprecated)]
+
 use clap::{Parser, Subcommand};
 
 mod api;
+mod cache;
 mod commands;
 mod config;
 mod credentials;
@@ -79,6 +84,9 @@ enum Commands {
     /// Pre-configured templates for quick setup
     Templates(commands::templates::TemplatesArgs),
 
+    /// Manage tenant contexts (list, switch, current)
+    Tenant(commands::tenant::TenantArgs),
+
     /// Check for updates and upgrade the CLI
     Upgrade(commands::upgrade::UpgradeArgs),
 }
@@ -116,6 +124,7 @@ async fn run(cli: Cli) -> CliResult<()> {
         Commands::Completions(args) => commands::completions::execute(args),
         Commands::Watch(args) => commands::watch::execute(args).await,
         Commands::Templates(args) => commands::templates::execute(args).await,
+        Commands::Tenant(args) => commands::tenant::execute(args).await,
         Commands::Upgrade(args) => commands::upgrade::execute(args).await,
     }
 }

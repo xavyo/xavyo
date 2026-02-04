@@ -37,6 +37,9 @@ pub enum CliError {
     #[error("Configuration error: {0}")]
     Config(String),
 
+    #[error("Cache error: {0}")]
+    Cache(String),
+
     #[error("Credential storage error: {0}")]
     CredentialStorage(String),
 
@@ -48,6 +51,12 @@ pub enum CliError {
 
     #[error("Tenant already exists with slug: {0}")]
     TenantExists(String),
+
+    #[error("Tenant '{0}' not found or you don't have access")]
+    TenantNotFound(String),
+
+    #[error("Access denied to tenant '{0}'")]
+    TenantAccessDenied(String),
 
     #[error("Not found: {0}")]
     NotFound(String),
@@ -81,6 +90,33 @@ pub enum CliError {
 
     #[error("Input error: {0}")]
     InputError(String),
+
+    // Plugin errors
+    #[error("Plugin registry unavailable ({url}): {details}")]
+    RegistryUnavailable { url: String, details: String },
+
+    #[error("Plugin '{name}' not found")]
+    PluginNotFound { name: String },
+
+    #[error("Plugin '{name}' is invalid: {reason}")]
+    PluginInvalid { name: String, reason: String },
+
+    #[error("Failed to parse plugin manifest at {path}: {details}")]
+    ManifestParseError { path: String, details: String },
+
+    #[error("Plugin command '{command}' not found in plugin '{plugin}'")]
+    PluginCommandNotFound { plugin: String, command: String },
+
+    #[error("Plugin '{plugin}' command '{command}' failed: {details}")]
+    PluginExecutionError {
+        plugin: String,
+        command: String,
+        details: String,
+    },
+
+    // Proxy errors
+    #[error("Invalid proxy URL '{url}': {reason}")]
+    InvalidProxyUrl { url: String, reason: String },
 }
 
 impl CliError {
@@ -95,6 +131,8 @@ impl CliError {
             | CliError::DeviceCodeExpired
             | CliError::AuthorizationDenied => 2,
             CliError::TenantExists(_) | CliError::Conflict(_) => 4,
+            CliError::TenantNotFound(_) => 2, // Exit code 2: Tenant not found
+            CliError::TenantAccessDenied(_) => 3, // Exit code 3: Access denied
             CliError::NotFound(_) => 4,
             CliError::Api { status, .. } => {
                 if *status >= 500 {
@@ -107,6 +145,7 @@ impl CliError {
             }
             CliError::Io(_) => 1,
             CliError::Config(_) => 1,
+            CliError::Cache(_) => 1,
             CliError::CredentialStorage(_) => 1,
             CliError::ChecksumMismatch { .. } => 1,
             CliError::PermissionDenied(_) => 1,
@@ -115,6 +154,15 @@ impl CliError {
             CliError::InvalidVersion(_) => 4,
             CliError::UpgradeAborted => 0, // User chose to abort, not an error
             CliError::InputError(_) => 1,
+            // Plugin errors
+            CliError::RegistryUnavailable { .. } => 3,
+            CliError::PluginNotFound { .. } => 4,
+            CliError::PluginInvalid { .. } => 4,
+            CliError::ManifestParseError { .. } => 4,
+            CliError::PluginCommandNotFound { .. } => 4,
+            CliError::PluginExecutionError { .. } => 1,
+            // Proxy errors
+            CliError::InvalidProxyUrl { .. } => 4,
         }
     }
 
@@ -149,6 +197,12 @@ impl CliError {
             CliError::ConnectionFailed(_) => Some("Check your network connection and try again."),
             CliError::AuthorizationDenied => {
                 Some("Make sure you complete the authentication in the browser.")
+            }
+            CliError::TenantNotFound(_) => {
+                Some("Run 'xavyo tenant list' to see available tenants.")
+            }
+            CliError::TenantAccessDenied(_) => {
+                Some("Contact the tenant administrator to request access.")
             }
             _ => None,
         }

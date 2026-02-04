@@ -13,6 +13,7 @@ pub mod setup;
 pub mod signup;
 pub mod status;
 pub mod templates;
+pub mod tenant;
 pub mod tools;
 pub mod upgrade;
 pub mod watch;

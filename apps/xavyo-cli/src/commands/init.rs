@@ -4,6 +4,7 @@ use crate::api::{provision_tenant, ApiClient};
 use crate::config::{Config, ConfigPaths};
 use crate::credentials::get_credential_store;
 use crate::error::{CliError, CliResult};
+use crate::models::tenant::TenantRole;
 use crate::models::{ProvisionRequest, Session};
 use crate::output::{
     print_header, print_info, print_key_value, print_next_steps, print_success, print_warning,
@@ -99,11 +100,13 @@ pub async fn execute(args: InitArgs) -> CliResult<()> {
     let response = provision_tenant(&client, &request).await?;
 
     // Update session with new tenant context
+    // User who provisions a tenant is automatically the owner
     if let Some(mut session) = Session::load(&paths)? {
         session.set_tenant(
             response.tenant.id,
             response.tenant.name.clone(),
             response.tenant.slug.clone(),
+            TenantRole::Owner,
         );
         session.save(&paths)?;
     }

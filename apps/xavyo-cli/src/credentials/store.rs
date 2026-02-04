@@ -52,6 +52,9 @@ mod tests {
             config_file: temp_dir.path().join("config.json"),
             session_file: temp_dir.path().join("session.json"),
             credentials_file: temp_dir.path().join("credentials.enc"),
+            cache_dir: temp_dir.path().join("cache"),
+            history_file: temp_dir.path().join("shell_history"),
+            version_history_dir: temp_dir.path().join("history"),
         };
 
         // Should return some store (either keyring or file)
