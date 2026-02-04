@@ -117,11 +117,13 @@ pub enum NhiType {
 
 impl NhiType {
     /// Returns all known NHI types.
+    #[must_use] 
     pub fn all() -> &'static [NhiType] {
         &[NhiType::ServiceAccount, NhiType::AiAgent]
     }
 
     /// Returns the string representation used in database queries.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             NhiType::ServiceAccount => "service_account",
@@ -276,6 +278,7 @@ pub enum NhiStatus {
 
 impl NhiStatus {
     /// Returns the string representation used in database queries.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             NhiStatus::Active => "active",
@@ -288,11 +291,13 @@ impl NhiStatus {
     }
 
     /// Returns true if this status allows the identity to be used.
+    #[must_use] 
     pub fn is_usable(&self) -> bool {
         matches!(self, NhiStatus::Active)
     }
 
     /// Returns true if this status requires attention from administrators.
+    #[must_use] 
     pub fn requires_attention(&self) -> bool {
         matches!(
             self,
@@ -446,6 +451,7 @@ pub enum NhiRiskLevel {
 
 impl NhiRiskLevel {
     /// Returns the minimum score for this risk level.
+    #[must_use] 
     pub fn min_score(&self) -> u32 {
         match self {
             NhiRiskLevel::Low => 0,
@@ -456,6 +462,7 @@ impl NhiRiskLevel {
     }
 
     /// Returns the maximum score for this risk level.
+    #[must_use] 
     pub fn max_score(&self) -> u32 {
         match self {
             NhiRiskLevel::Low => 25,
@@ -466,6 +473,7 @@ impl NhiRiskLevel {
     }
 
     /// Returns the string representation.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             NhiRiskLevel::Low => "low",
@@ -476,6 +484,7 @@ impl NhiRiskLevel {
     }
 
     /// Returns true if this risk level should trigger alerts.
+    #[must_use] 
     pub fn should_alert(&self) -> bool {
         matches!(self, NhiRiskLevel::High | NhiRiskLevel::Critical)
     }
@@ -618,8 +627,7 @@ mod tests {
             let deserialized: NhiType = serde_json::from_str(&json).unwrap();
             assert_eq!(
                 *nhi_type, deserialized,
-                "NhiType round-trip failed for {:?}",
-                nhi_type
+                "NhiType round-trip failed for {nhi_type:?}"
             );
         }
 
@@ -637,8 +645,7 @@ mod tests {
             let deserialized: NhiStatus = serde_json::from_str(&json).unwrap();
             assert_eq!(
                 *status, deserialized,
-                "NhiStatus round-trip failed for {:?}",
-                status
+                "NhiStatus round-trip failed for {status:?}"
             );
         }
 
@@ -654,8 +661,7 @@ mod tests {
             let deserialized: NhiRiskLevel = serde_json::from_str(&json).unwrap();
             assert_eq!(
                 *level, deserialized,
-                "NhiRiskLevel round-trip failed for {:?}",
-                level
+                "NhiRiskLevel round-trip failed for {level:?}"
             );
         }
     }

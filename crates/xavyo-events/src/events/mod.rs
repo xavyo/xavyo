@@ -10,11 +10,11 @@
 //! - Delegation events (created, activated, expiring, expired, revoked) - F053
 //! - Escalation events (warning, occurred, cancelled, reset, exhausted) - F054
 //! - Micro-certification events (created, reminder, decided, auto-revoked) - F055
-//! - Governance events (assignments, SoD violations) - F055 triggers
+//! - Governance events (assignments, `SoD` violations) - F055 triggers
 //! - NHI events (lifecycle, credentials, risk, suspension, requests) - F061
 //! - License events (assigned, reclaimed, expired, expiring, bulk, capacity) - F065
 //! - User attribute events (definition created/updated/deactivated, custom attributes updated) - F081
-//! - Credential events (requested, issued, denied, revoked, expired, rate_limited) - F120
+//! - Credential events (requested, issued, denied, revoked, expired, `rate_limited`) - F120
 
 pub mod auth;
 pub mod credentials;

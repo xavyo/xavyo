@@ -70,6 +70,7 @@ pub struct NhiRiskScoreFilter {
 
 impl GovNhiRiskScore {
     /// Determine risk level from score.
+    #[must_use] 
     pub fn level_from_score(score: i32) -> RiskLevel {
         match score {
             0..=25 => RiskLevel::Low,
@@ -80,6 +81,7 @@ impl GovNhiRiskScore {
     }
 
     /// Check if recalculation is needed.
+    #[must_use] 
     pub fn needs_recalculation(&self) -> bool {
         match self.next_calculation_at {
             Some(next) => next <= Utc::now(),
@@ -94,10 +96,10 @@ impl GovNhiRiskScore {
         nhi_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_nhi_risk_scores
             WHERE tenant_id = $1 AND nhi_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(nhi_id)
@@ -114,26 +116,26 @@ impl GovNhiRiskScore {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_nhi_risk_scores
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.risk_level.is_some() {
-            query.push_str(&format!(" AND risk_level = ${}", param_idx));
+            query.push_str(&format!(" AND risk_level = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.min_score.is_some() {
-            query.push_str(&format!(" AND total_score >= ${}", param_idx));
+            query.push_str(&format!(" AND total_score >= ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.max_score.is_some() {
-            query.push_str(&format!(" AND total_score <= ${}", param_idx));
+            query.push_str(&format!(" AND total_score <= ${param_idx}"));
             param_idx += 1;
         }
 
@@ -173,26 +175,26 @@ impl GovNhiRiskScore {
         filter: &NhiRiskScoreFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_nhi_risk_scores
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.risk_level.is_some() {
-            query.push_str(&format!(" AND risk_level = ${}", param_idx));
+            query.push_str(&format!(" AND risk_level = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.min_score.is_some() {
-            query.push_str(&format!(" AND total_score >= ${}", param_idx));
+            query.push_str(&format!(" AND total_score >= ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.max_score.is_some() {
-            query.push_str(&format!(" AND total_score <= ${}", param_idx));
+            query.push_str(&format!(" AND total_score <= ${param_idx}"));
         }
 
         if filter.needs_recalculation == Some(true) {
@@ -223,7 +225,7 @@ impl GovNhiRiskScore {
         data: UpsertGovNhiRiskScore,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_nhi_risk_scores (
                 tenant_id, nhi_id, total_score, risk_level,
                 staleness_factor, credential_age_factor, access_scope_factor,
@@ -241,7 +243,7 @@ impl GovNhiRiskScore {
                 calculated_at = NOW(),
                 next_calculation_at = EXCLUDED.next_calculation_at
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.nhi_id)
@@ -263,10 +265,10 @@ impl GovNhiRiskScore {
         nhi_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_nhi_risk_scores
             WHERE tenant_id = $1 AND nhi_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(nhi_id)
@@ -283,14 +285,14 @@ impl GovNhiRiskScore {
         limit: i64,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT nhi_id FROM gov_nhi_risk_scores
             WHERE tenant_id = $1
                 AND next_calculation_at IS NOT NULL
                 AND next_calculation_at <= NOW()
             ORDER BY next_calculation_at ASC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -304,13 +306,13 @@ impl GovNhiRiskScore {
         tenant_id: Uuid,
     ) -> Result<Vec<(RiskLevel, i64)>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT risk_level, COUNT(*) as count
             FROM gov_nhi_risk_scores
             WHERE tenant_id = $1
             GROUP BY risk_level
             ORDER BY risk_level
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)

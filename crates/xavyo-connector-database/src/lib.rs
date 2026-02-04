@@ -3,12 +3,12 @@
 //! Database connector for xavyo provisioning.
 //!
 //! This crate provides the ability to connect to databases for user and
-//! group provisioning. Supports PostgreSQL, MySQL, MS SQL Server, and Oracle.
+//! group provisioning. Supports `PostgreSQL`, `MySQL`, MS SQL Server, and Oracle.
 //!
 //! ## Features
 //!
-//! - Multiple database support (PostgreSQL, MySQL, MSSQL, Oracle)
-//! - Schema discovery from INFORMATION_SCHEMA
+//! - Multiple database support (`PostgreSQL`, `MySQL`, MSSQL, Oracle)
+//! - Schema discovery from `INFORMATION_SCHEMA`
 //! - Connection pooling
 //! - SSL/TLS support
 //! - Parameterized queries for security

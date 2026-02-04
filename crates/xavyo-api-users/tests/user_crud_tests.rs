@@ -120,7 +120,7 @@ async fn test_create_user_validation_errors() {
 
     // Test with empty email
     let request = CreateUserRequest {
-        email: "".to_string(),
+        email: String::new(),
         password: "SecurePassword123!".to_string(),
         roles: vec![],
         username: None,

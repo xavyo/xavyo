@@ -35,7 +35,7 @@ pub struct BootstrapResult {
 // ============================================================================
 
 /// Advisory lock key for bootstrap operations.
-/// This is a unique 64-bit integer used with pg_advisory_lock.
+/// This is a unique 64-bit integer used with `pg_advisory_lock`.
 const BOOTSTRAP_LOCK_KEY: i64 = 0x5841_5659_4F5F_4944; // "XAVYO_ID" in ASCII
 
 /// Acquires the bootstrap advisory lock.
@@ -180,7 +180,7 @@ pub async fn create_cli_oauth_client(pool: &PgPool) -> Result<bool, BootstrapErr
 
     // T029-T032: INSERT with proper configuration
     let result = sqlx::query(
-        r#"
+        r"
         INSERT INTO oauth_clients (
             id,
             tenant_id,
@@ -210,7 +210,7 @@ pub async fn create_cli_oauth_client(pool: &PgPool) -> Result<bool, BootstrapErr
             NOW()
         )
         ON CONFLICT (client_id) DO NOTHING
-        "#,
+        ",
     )
     .bind(CLI_OAUTH_CLIENT_UUID)
     .bind(SYSTEM_TENANT_ID)

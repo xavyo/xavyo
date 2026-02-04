@@ -1,6 +1,6 @@
-//! OpenAPI documentation and Swagger UI configuration.
+//! `OpenAPI` documentation and Swagger UI configuration.
 //!
-//! This module sets up utoipa for OpenAPI spec generation and
+//! This module sets up utoipa for `OpenAPI` spec generation and
 //! configures Swagger UI for interactive API documentation.
 
 use axum::Router;
@@ -32,7 +32,7 @@ impl Modify for SecurityAddon {
     }
 }
 
-/// OpenAPI documentation for the IDP API.
+/// `OpenAPI` documentation for the IDP API.
 #[derive(OpenApi)]
 #[openapi(
     info(
@@ -2547,8 +2547,7 @@ mod tests {
         for tag_name in expected_tags {
             assert!(
                 tags.iter().any(|t| t.name == tag_name),
-                "Missing tag: {}",
-                tag_name
+                "Missing tag: {tag_name}"
             );
         }
     }
@@ -2635,8 +2634,7 @@ mod tests {
         // We should have at least 300 endpoints documented (includes all governance features F033-F067)
         assert!(
             path_count >= 300,
-            "Expected at least 300 endpoints, got {}",
-            path_count
+            "Expected at least 300 endpoints, got {path_count}"
         );
     }
 
@@ -2679,14 +2677,13 @@ mod tests {
         for tag_name in governance_tags {
             assert!(
                 tags.iter().any(|t| t.name == tag_name),
-                "Missing governance tag: {}",
-                tag_name
+                "Missing governance tag: {tag_name}"
             );
         }
     }
 
-    /// Export OpenAPI spec to docs/api/openapi.json at workspace root.
-    /// Run with: cargo test -p idp-api export_openapi -- --ignored
+    /// Export `OpenAPI` spec to docs/api/openapi.json at workspace root.
+    /// Run with: cargo test -p idp-api `export_openapi` -- --ignored
     #[test]
     #[ignore]
     fn export_openapi_to_file() {

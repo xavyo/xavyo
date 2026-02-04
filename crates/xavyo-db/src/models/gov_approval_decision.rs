@@ -70,10 +70,10 @@ impl GovApprovalDecision {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_decisions
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -88,11 +88,11 @@ impl GovApprovalDecision {
         request_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_decisions
             WHERE tenant_id = $1 AND request_id = $2
             ORDER BY step_order ASC, decided_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(request_id)
@@ -108,12 +108,12 @@ impl GovApprovalDecision {
         step_order: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_decisions
             WHERE tenant_id = $1 AND request_id = $2 AND step_order = $3
             ORDER BY decided_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(request_id)
@@ -131,12 +131,12 @@ impl GovApprovalDecision {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_decisions
             WHERE tenant_id = $1 AND approver_id = $2
             ORDER BY decided_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(approver_id)
@@ -152,13 +152,13 @@ impl GovApprovalDecision {
         input: CreateGovApprovalDecision,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_approval_decisions (
                 tenant_id, request_id, step_order, approver_id, delegate_id, decision, comments
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(input.request_id)
@@ -178,10 +178,10 @@ impl GovApprovalDecision {
         request_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_approval_decisions
             WHERE tenant_id = $1 AND request_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(request_id)
@@ -190,16 +190,19 @@ impl GovApprovalDecision {
     }
 
     /// Check if decision is an approval.
+    #[must_use] 
     pub fn is_approved(&self) -> bool {
         matches!(self.decision, GovDecisionType::Approved)
     }
 
     /// Check if decision is a rejection.
+    #[must_use] 
     pub fn is_rejected(&self) -> bool {
         matches!(self.decision, GovDecisionType::Rejected)
     }
 
     /// Check if this decision was made by a delegate.
+    #[must_use] 
     pub fn is_delegated(&self) -> bool {
         self.delegate_id.is_some()
     }

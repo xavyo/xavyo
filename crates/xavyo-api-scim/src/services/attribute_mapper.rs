@@ -14,6 +14,7 @@ pub struct AttributeMapperService {
 
 impl AttributeMapperService {
     /// Create a mapper from a list of mappings.
+    #[must_use] 
     pub fn new(mappings: Vec<ScimAttributeMapping>) -> Self {
         let map = mappings
             .into_iter()
@@ -27,6 +28,7 @@ impl AttributeMapperService {
     /// Maps standard SCIM Enterprise User extension attributes to well-known
     /// custom attribute slugs, enabling out-of-the-box SCIM provisioning
     /// without explicit tenant-level mapping configuration.
+    #[must_use] 
     pub fn with_defaults() -> Self {
         let enterprise_uri = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User";
         let defaults = [
@@ -40,7 +42,7 @@ impl AttributeMapperService {
         let mappings = defaults
             .into_iter()
             .map(|(scim_field, xavyo_field)| {
-                let scim_path = format!("{}.{}", enterprise_uri, scim_field);
+                let scim_path = format!("{enterprise_uri}.{scim_field}");
                 let mapping = ScimAttributeMapping {
                     id: Uuid::nil(),
                     tenant_id: Uuid::nil(),
@@ -77,8 +79,7 @@ impl AttributeMapperService {
     fn is_required(&self, scim_path: &str) -> bool {
         self.mappings
             .get(scim_path)
-            .map(|m| m.required)
-            .unwrap_or(false)
+            .is_some_and(|m| m.required)
     }
 
     /// Extract user data from a SCIM user request.
@@ -137,9 +138,7 @@ impl AttributeMapperService {
                 {
                     let transformed = mapping.apply_transform(
                         &value
-                            .as_str()
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| value.to_string()),
+                            .as_str().map_or_else(|| value.to_string(), std::string::ToString::to_string),
                     );
                     custom_attributes.insert(
                         custom_attr_name.to_string(),
@@ -172,6 +171,7 @@ impl AttributeMapperService {
     }
 
     /// Convert a Xavyo User to a SCIM User response.
+    #[must_use] 
     pub fn to_scim_user(
         &self,
         user: &User,
@@ -191,7 +191,7 @@ impl AttributeMapperService {
                 given_name: user.first_name.clone(),
                 family_name: user.last_name.clone(),
                 formatted: match (&user.first_name, &user.last_name) {
-                    (Some(f), Some(l)) => Some(format!("{} {}", f, l)),
+                    (Some(f), Some(l)) => Some(format!("{f} {l}")),
                     (Some(f), None) => Some(f.clone()),
                     (None, Some(l)) => Some(l.clone()),
                     (None, None) => None,

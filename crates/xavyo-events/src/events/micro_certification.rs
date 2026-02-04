@@ -5,10 +5,10 @@
 //! - Reminder (notification before deadline)
 //! - Escalated (escalated to backup reviewer)
 //! - Decided (reviewer made decision)
-//! - AutoRevoked (system revoked due to timeout)
+//! - `AutoRevoked` (system revoked due to timeout)
 //! - Expired (deadline passed without auto-revoke)
 //! - Skipped (assignment deleted before decision)
-//! - AssignmentRevoked (entitlement assignment was revoked)
+//! - `AssignmentRevoked` (entitlement assignment was revoked)
 
 use crate::event::Event;
 use chrono::{DateTime, Utc};
@@ -19,9 +19,9 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MicroCertTriggerType {
-    /// Entitlement with risk_level = high/critical assigned.
+    /// Entitlement with `risk_level` = high/critical assigned.
     HighRiskAssignment,
-    /// SoD rule violation detected.
+    /// `SoD` rule violation detected.
     SodViolation,
     /// User's manager changed.
     ManagerChange,
@@ -160,7 +160,7 @@ pub struct MicroCertificationDecided {
     pub decision: MicroCertDecision,
     /// Optional comment from reviewer.
     pub comment: Option<String>,
-    /// For SoD: which assignment was revoked (if any).
+    /// For `SoD`: which assignment was revoked (if any).
     pub revoked_assignment_id: Option<Uuid>,
 }
 

@@ -15,6 +15,7 @@ pub struct SyslogUdpWorker {
 }
 
 impl SyslogUdpWorker {
+    #[must_use] 
     pub fn new(host: String, port: u16) -> Self {
         Self { host, port }
     }
@@ -34,14 +35,14 @@ impl DeliveryWorker for SyslogUdpWorker {
 
         let socket = UdpSocket::bind("0.0.0.0:0")
             .await
-            .map_err(|e| DeliveryError::ConnectionFailed(format!("UDP bind failed: {}", e)))?;
+            .map_err(|e| DeliveryError::ConnectionFailed(format!("UDP bind failed: {e}")))?;
 
         let addr = format!("{}:{}", self.host, self.port);
         socket
             .send_to(payload.as_bytes(), &addr)
             .await
             .map_err(|e| {
-                DeliveryError::SendFailed(format!("UDP send to {} failed: {}", addr, e))
+                DeliveryError::SendFailed(format!("UDP send to {addr} failed: {e}"))
             })?;
 
         let latency = start.elapsed().as_millis() as u64;

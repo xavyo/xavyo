@@ -93,12 +93,12 @@ impl ValidationConfig {
 /// ```
 pub fn encode_token(claims: &JwtClaims, private_key_pem: &[u8]) -> Result<String, AuthError> {
     let key = EncodingKey::from_rsa_pem(private_key_pem)
-        .map_err(|e| AuthError::InvalidKey(format!("Invalid private key: {}", e)))?;
+        .map_err(|e| AuthError::InvalidKey(format!("Invalid private key: {e}")))?;
 
     let header = Header::new(Algorithm::RS256);
 
     encode(&header, claims, &key)
-        .map_err(|e| AuthError::InvalidToken(format!("Encoding failed: {}", e)))
+        .map_err(|e| AuthError::InvalidToken(format!("Encoding failed: {e}")))
 }
 
 /// Encode JWT claims with a custom key ID (kid) header.
@@ -120,13 +120,13 @@ pub fn encode_token_with_kid(
     kid: &str,
 ) -> Result<String, AuthError> {
     let key = EncodingKey::from_rsa_pem(private_key_pem)
-        .map_err(|e| AuthError::InvalidKey(format!("Invalid private key: {}", e)))?;
+        .map_err(|e| AuthError::InvalidKey(format!("Invalid private key: {e}")))?;
 
     let mut header = Header::new(Algorithm::RS256);
     header.kid = Some(kid.to_string());
 
     encode(&header, claims, &key)
-        .map_err(|e| AuthError::InvalidToken(format!("Encoding failed: {}", e)))
+        .map_err(|e| AuthError::InvalidToken(format!("Encoding failed: {e}")))
 }
 
 /// Decode and validate a JWT token.
@@ -177,7 +177,7 @@ pub fn decode_token_with_config(
     config: &ValidationConfig,
 ) -> Result<JwtClaims, AuthError> {
     let key = DecodingKey::from_rsa_pem(public_key_pem)
-        .map_err(|e| AuthError::InvalidKey(format!("Invalid public key: {}", e)))?;
+        .map_err(|e| AuthError::InvalidKey(format!("Invalid public key: {e}")))?;
 
     let mut validation = Validation::new(Algorithm::RS256);
     validation.leeway = config.leeway;
@@ -217,12 +217,12 @@ pub fn decode_token_with_config(
 /// The kid from the token header, if present.
 pub fn extract_kid(token: &str) -> Result<Option<String>, AuthError> {
     let header = jsonwebtoken::decode_header(token)
-        .map_err(|e| AuthError::InvalidToken(format!("Invalid token header: {}", e)))?;
+        .map_err(|e| AuthError::InvalidToken(format!("Invalid token header: {e}")))?;
 
     Ok(header.kid)
 }
 
-/// Map jsonwebtoken errors to AuthError.
+/// Map jsonwebtoken errors to `AuthError`.
 fn map_jwt_error(err: jsonwebtoken::errors::Error) -> AuthError {
     use jsonwebtoken::errors::ErrorKind;
 
@@ -233,8 +233,8 @@ fn map_jwt_error(err: jsonwebtoken::errors::Error) -> AuthError {
         ErrorKind::InvalidToken => AuthError::InvalidToken("Malformed token".to_string()),
         ErrorKind::Base64(_) => AuthError::InvalidToken("Invalid base64 encoding".to_string()),
         ErrorKind::Json(_) => AuthError::InvalidToken("Invalid JSON in claims".to_string()),
-        ErrorKind::MissingRequiredClaim(claim) => AuthError::MissingClaim(claim.to_string()),
-        _ => AuthError::InvalidToken(format!("Token validation failed: {}", err)),
+        ErrorKind::MissingRequiredClaim(claim) => AuthError::MissingClaim(claim.clone()),
+        _ => AuthError::InvalidToken(format!("Token validation failed: {err}")),
     }
 }
 

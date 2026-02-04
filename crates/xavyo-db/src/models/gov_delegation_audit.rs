@@ -132,10 +132,10 @@ impl GovDelegationAudit {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_delegation_audit
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -152,12 +152,12 @@ impl GovDelegationAudit {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_delegation_audit
             WHERE tenant_id = $1 AND delegation_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(delegation_id)
@@ -176,12 +176,12 @@ impl GovDelegationAudit {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_delegation_audit
             WHERE tenant_id = $1 AND deputy_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(deputy_id)
@@ -200,12 +200,12 @@ impl GovDelegationAudit {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_delegation_audit
             WHERE tenant_id = $1 AND delegator_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(delegator_id)
@@ -224,40 +224,40 @@ impl GovDelegationAudit {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_delegation_audit
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.delegation_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND delegation_id = ${}", param_count));
+            query.push_str(&format!(" AND delegation_id = ${param_count}"));
         }
         if filter.deputy_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND deputy_id = ${}", param_count));
+            query.push_str(&format!(" AND deputy_id = ${param_count}"));
         }
         if filter.delegator_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND delegator_id = ${}", param_count));
+            query.push_str(&format!(" AND delegator_id = ${param_count}"));
         }
         if filter.action_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND action_type = ${}", param_count));
+            query.push_str(&format!(" AND action_type = ${param_count}"));
         }
         if filter.work_item_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND work_item_type = ${}", param_count));
+            query.push_str(&format!(" AND work_item_type = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -300,40 +300,40 @@ impl GovDelegationAudit {
         filter: &DelegationAuditFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_delegation_audit
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.delegation_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND delegation_id = ${}", param_count));
+            query.push_str(&format!(" AND delegation_id = ${param_count}"));
         }
         if filter.deputy_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND deputy_id = ${}", param_count));
+            query.push_str(&format!(" AND deputy_id = ${param_count}"));
         }
         if filter.delegator_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND delegator_id = ${}", param_count));
+            query.push_str(&format!(" AND delegator_id = ${param_count}"));
         }
         if filter.action_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND action_type = ${}", param_count));
+            query.push_str(&format!(" AND action_type = ${param_count}"));
         }
         if filter.work_item_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND work_item_type = ${}", param_count));
+            query.push_str(&format!(" AND work_item_type = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -370,14 +370,14 @@ impl GovDelegationAudit {
         input: CreateGovDelegationAudit,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_delegation_audit (
                 tenant_id, delegation_id, deputy_id, delegator_id,
                 action_type, work_item_id, work_item_type, metadata
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.delegation_id)

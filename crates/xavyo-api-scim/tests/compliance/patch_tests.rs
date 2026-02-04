@@ -5,7 +5,7 @@
 
 #[cfg(test)]
 mod tests {
-    use serde_json::{json, Value};
+    use serde_json::json;
 
     // ============================================================
     // PATCH Operation Structure
@@ -232,14 +232,14 @@ mod tests {
     #[test]
     fn test_patch_path_simple() {
         let op = json!({ "op": "replace", "path": "userName", "value": "x" });
-        assert!(!op["path"].as_str().unwrap().contains("."));
-        assert!(!op["path"].as_str().unwrap().contains("["));
+        assert!(!op["path"].as_str().unwrap().contains('.'));
+        assert!(!op["path"].as_str().unwrap().contains('['));
     }
 
     #[test]
     fn test_patch_path_nested_one_level() {
         let op = json!({ "op": "replace", "path": "name.givenName", "value": "x" });
-        assert!(op["path"].as_str().unwrap().contains("."));
+        assert!(op["path"].as_str().unwrap().contains('.'));
     }
 
     #[test]
@@ -258,7 +258,7 @@ mod tests {
     fn test_patch_path_array_filter_and_subattr() {
         let op = json!({ "op": "replace", "path": "emails[type eq \"work\"].value", "value": "x" });
         let path = op["path"].as_str().unwrap();
-        assert!(path.contains("["));
+        assert!(path.contains('['));
         assert!(path.contains("]."));
     }
 

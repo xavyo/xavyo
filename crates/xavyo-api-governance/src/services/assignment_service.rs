@@ -22,6 +22,7 @@ pub struct AssignmentService {
 
 impl AssignmentService {
     /// Create a new assignment service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             effective_access_service: EffectiveAccessService::new(pool.clone()),
@@ -210,9 +211,9 @@ impl AssignmentService {
         Ok(Some(task))
     }
 
-    /// Check SoD rules for a user assignment.
+    /// Check `SoD` rules for a user assignment.
     ///
-    /// Returns an error if the assignment would violate an SoD rule without exemption.
+    /// Returns an error if the assignment would violate an `SoD` rule without exemption.
     async fn check_sod_for_user(
         &self,
         tenant_id: Uuid,

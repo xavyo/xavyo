@@ -26,11 +26,13 @@ pub struct CorrelationRuleService {
 
 impl CorrelationRuleService {
     /// Create a new correlation rule service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -356,8 +358,7 @@ impl CorrelationRuleService {
             return Ok(ValidateExpressionResponse {
                 valid: true,
                 result: Some(format!(
-                    "Expression evaluated successfully. Source: '{}', Target: '{}', Match score: {:.4}",
-                    source, target, score
+                    "Expression evaluated successfully. Source: '{source}', Target: '{target}', Match score: {score:.4}"
                 )),
                 error: None,
             });
@@ -413,8 +414,7 @@ fn parse_match_type(s: &str) -> Result<GovMatchType> {
         "phonetic" => Ok(GovMatchType::Phonetic),
         "expression" => Ok(GovMatchType::Expression),
         other => Err(GovernanceError::Validation(format!(
-            "Invalid match type '{}'. Must be one of: exact, fuzzy, phonetic, expression",
-            other
+            "Invalid match type '{other}'. Must be one of: exact, fuzzy, phonetic, expression"
         ))),
     }
 }
@@ -447,8 +447,7 @@ fn parse_algorithm_string(s: &str) -> Result<Option<GovFuzzyAlgorithm>> {
         "jaro_winkler" => Ok(Some(GovFuzzyAlgorithm::JaroWinkler)),
         "soundex" => Ok(Some(GovFuzzyAlgorithm::Soundex)),
         other => Err(GovernanceError::Validation(format!(
-            "Invalid algorithm '{}'. Must be one of: levenshtein, jaro_winkler, soundex",
-            other
+            "Invalid algorithm '{other}'. Must be one of: levenshtein, jaro_winkler, soundex"
         ))),
     }
 }
@@ -466,19 +465,18 @@ fn validate_expression_syntax(expression: &str) -> std::result::Result<(), Strin
             ')' => {
                 if stack.pop() != Some('(') {
                     return Err(format!(
-                        "Unmatched closing parenthesis ')' at position {}",
-                        i
+                        "Unmatched closing parenthesis ')' at position {i}"
                     ));
                 }
             }
             ']' => {
                 if stack.pop() != Some('[') {
-                    return Err(format!("Unmatched closing bracket ']' at position {}", i));
+                    return Err(format!("Unmatched closing bracket ']' at position {i}"));
                 }
             }
             '}' => {
                 if stack.pop() != Some('{') {
-                    return Err(format!("Unmatched closing brace '}}' at position {}", i));
+                    return Err(format!("Unmatched closing brace '}}' at position {i}"));
                 }
             }
             _ => {}
@@ -487,7 +485,7 @@ fn validate_expression_syntax(expression: &str) -> std::result::Result<(), Strin
 
     if !stack.is_empty() {
         let unclosed: String = stack.into_iter().collect();
-        return Err(format!("Unclosed delimiters: {}", unclosed));
+        return Err(format!("Unclosed delimiters: {unclosed}"));
     }
 
     // Check for obvious structural issues: expression ending with an operator.

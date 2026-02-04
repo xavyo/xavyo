@@ -21,8 +21,7 @@ fn validate_fingerprint(fingerprint: &str) -> Result<(), ApiAuthError> {
     let len = fingerprint.len();
     if !(MIN_FINGERPRINT_LENGTH..=MAX_FINGERPRINT_LENGTH).contains(&len) {
         return Err(ApiAuthError::Validation(format!(
-            "device_fingerprint must be between {} and {} characters",
-            MIN_FINGERPRINT_LENGTH, MAX_FINGERPRINT_LENGTH
+            "device_fingerprint must be between {MIN_FINGERPRINT_LENGTH} and {MAX_FINGERPRINT_LENGTH} characters"
         )));
     }
     if !fingerprint.chars().all(|c| c.is_ascii_hexdigit()) {
@@ -41,6 +40,7 @@ pub struct DeviceService {
 
 impl DeviceService {
     /// Create a new device service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -215,7 +215,7 @@ impl DeviceService {
         let trust_expires_at = if days <= 0 {
             None // Permanent trust
         } else {
-            Some(Utc::now() + Duration::days(days as i64))
+            Some(Utc::now() + Duration::days(i64::from(days)))
         };
 
         // Trust the device

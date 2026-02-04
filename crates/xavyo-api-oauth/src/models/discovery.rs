@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// OpenID Connect Discovery document.
+/// `OpenID` Connect Discovery document.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OpenIdConfiguration {
     /// Issuer identifier.
@@ -12,7 +12,7 @@ pub struct OpenIdConfiguration {
     pub authorization_endpoint: String,
     /// Token endpoint URL.
     pub token_endpoint: String,
-    /// UserInfo endpoint URL.
+    /// `UserInfo` endpoint URL.
     pub userinfo_endpoint: String,
     /// JWKS URI.
     pub jwks_uri: String,
@@ -41,15 +41,16 @@ use super::token::DEVICE_CODE_GRANT_TYPE;
 
 impl OpenIdConfiguration {
     /// Create a new discovery document for the given issuer.
+    #[must_use] 
     pub fn new(issuer: &str) -> Self {
         Self {
             issuer: issuer.to_string(),
-            authorization_endpoint: format!("{}/oauth/authorize", issuer),
-            token_endpoint: format!("{}/oauth/token", issuer),
-            userinfo_endpoint: format!("{}/oauth/userinfo", issuer),
-            jwks_uri: format!("{}/.well-known/jwks.json", issuer),
+            authorization_endpoint: format!("{issuer}/oauth/authorize"),
+            token_endpoint: format!("{issuer}/oauth/token"),
+            userinfo_endpoint: format!("{issuer}/oauth/userinfo"),
+            jwks_uri: format!("{issuer}/.well-known/jwks.json"),
             // RFC 8628: Device Authorization endpoint
-            device_authorization_endpoint: Some(format!("{}/oauth/device/code", issuer)),
+            device_authorization_endpoint: Some(format!("{issuer}/oauth/device/code")),
             response_types_supported: vec!["code".to_string()],
             grant_types_supported: vec![
                 "authorization_code".to_string(),
@@ -116,11 +117,13 @@ pub struct JwkSet {
 
 impl JwkSet {
     /// Create a new empty JWKS.
+    #[must_use] 
     pub fn new() -> Self {
         Self { keys: Vec::new() }
     }
 
     /// Add a key to the set.
+    #[must_use] 
     pub fn add_key(mut self, key: Jwk) -> Self {
         self.keys.push(key);
         self

@@ -4,8 +4,8 @@
 //! - Password policy management (GET/PUT /admin/tenants/:tenant_id/password-policy)
 //! - Lockout policy management (GET/PUT /admin/tenants/:tenant_id/lockout-policy)
 //! - MFA policy management (GET/PUT /admin/tenants/:tenant_id/mfa-policy)
-//! - WebAuthn policy management (GET/PUT /admin/tenants/:tenant_id/webauthn-policy) (F032)
-//! - User unlock (POST /admin/users/:user_id/unlock)
+//! - `WebAuthn` policy management (GET/PUT /admin/tenants/:tenant_id/webauthn-policy) (F032)
+//! - User unlock (POST /`admin/users/:user_id/unlock`)
 
 pub mod lockout_policy;
 pub mod mfa_policy;

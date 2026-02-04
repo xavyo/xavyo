@@ -20,14 +20,14 @@ use crate::rate_limit::{LogVerbosity, RateLimitConfig, RetryConfig};
 ///
 /// This function blocks requests to:
 /// - Private IPv4 ranges (10.x.x.x, 172.16-31.x.x, 192.168.x.x)
-/// - Loopback addresses (127.x.x.x, ::1)
-/// - Link-local addresses (169.254.x.x, fe80::/10)
+/// - Loopback addresses (127.x.x.x, `::1`)
+/// - Link-local addresses (169.254.x.x, `fe80::/10`)
 /// - Metadata service endpoints
 fn validate_url_ssrf(url: &url::Url) -> Result<(), String> {
     // Only allow HTTPS for production connectors
     let scheme = url.scheme();
     if scheme != "https" && scheme != "http" {
-        return Err(format!("Unsupported scheme: {}", scheme));
+        return Err(format!("Unsupported scheme: {scheme}"));
     }
 
     let host = url
@@ -38,14 +38,13 @@ fn validate_url_ssrf(url: &url::Url) -> Result<(), String> {
     if let Ok(ip) = host.parse::<IpAddr>() {
         if is_private_ip(&ip) {
             return Err(format!(
-                "Private/internal IP addresses are not allowed: {}",
-                ip
+                "Private/internal IP addresses are not allowed: {ip}"
             ));
         }
     } else {
         // It's a hostname - resolve it and check all IPs
         let port = url.port().unwrap_or(443);
-        let addr_str = format!("{}:{}", host, port);
+        let addr_str = format!("{host}:{port}");
 
         if let Ok(addrs) = addr_str.to_socket_addrs() {
             for addr in addrs {
@@ -73,8 +72,8 @@ fn validate_url_ssrf(url: &url::Url) -> Result<(), String> {
     ];
 
     for blocked in blocked_hosts {
-        if lower_host == blocked || lower_host.ends_with(&format!(".{}", blocked)) {
-            return Err(format!("Blocked internal hostname: {}", host));
+        if lower_host == blocked || lower_host.ends_with(&format!(".{blocked}")) {
+            return Err(format!("Blocked internal hostname: {host}"));
         }
     }
 
@@ -134,6 +133,7 @@ pub enum HttpMethod {
 
 impl HttpMethod {
     /// Get the string representation.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             HttpMethod::Get => "GET",
@@ -148,7 +148,7 @@ impl HttpMethod {
 /// Configuration for REST connector.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RestConfig {
-    /// Base URL for API requests (e.g., "https://api.example.com/v1").
+    /// Base URL for API requests (e.g., "<https://api.example.com/v1>").
     pub base_url: String,
 
     /// Authentication configuration.
@@ -187,8 +187,8 @@ pub struct RestConfig {
     #[serde(default)]
     pub response: ResponseConfig,
 
-    /// Optional OpenAPI specification URL for schema discovery.
-    /// If provided, schema will be discovered from the OpenAPI spec.
+    /// Optional `OpenAPI` specification URL for schema discovery.
+    /// If provided, schema will be discovered from the `OpenAPI` spec.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub openapi_url: Option<String>,
 
@@ -240,13 +240,14 @@ impl RestConfig {
         }
     }
 
-    /// Set OpenAPI specification URL for schema discovery.
+    /// Set `OpenAPI` specification URL for schema discovery.
     pub fn with_openapi_url(mut self, url: impl Into<String>) -> Self {
         self.openapi_url = Some(url.into());
         self
     }
 
     /// Set authentication.
+    #[must_use] 
     pub fn with_auth(mut self, auth: AuthConfig) -> Self {
         self.auth = auth;
         self
@@ -267,7 +268,7 @@ impl RestConfig {
         self.with_auth(AuthConfig::api_key(key))
     }
 
-    /// Set OAuth2 client credentials authentication.
+    /// Set `OAuth2` client credentials authentication.
     pub fn with_oauth2(
         self,
         token_url: impl Into<String>,
@@ -284,37 +285,43 @@ impl RestConfig {
     }
 
     /// Build the full URL for an endpoint.
+    #[must_use] 
     pub fn url(&self, path: &str) -> String {
         let base = self.base_url.trim_end_matches('/');
         let path = path.trim_start_matches('/');
-        format!("{}/{}", base, path)
+        format!("{base}/{path}")
     }
 
     /// Set rate limiting configuration.
+    #[must_use] 
     pub fn with_rate_limit(mut self, config: RateLimitConfig) -> Self {
         self.rate_limit = config;
         self
     }
 
     /// Set retry configuration.
+    #[must_use] 
     pub fn with_retry(mut self, config: RetryConfig) -> Self {
         self.retry = config;
         self
     }
 
     /// Set logging verbosity.
+    #[must_use] 
     pub fn with_log_verbosity(mut self, verbosity: LogVerbosity) -> Self {
         self.log_verbosity = verbosity;
         self
     }
 
     /// Disable rate limiting.
+    #[must_use] 
     pub fn without_rate_limit(mut self) -> Self {
         self.rate_limit = RateLimitConfig::disabled();
         self
     }
 
     /// Disable retries.
+    #[must_use] 
     pub fn without_retry(mut self) -> Self {
         self.retry = RetryConfig::disabled();
         self
@@ -334,6 +341,7 @@ impl RestConfig {
     /// let config = RestConfig::new(&mock_server.uri())
     ///     .with_allow_localhost();
     /// ```
+    #[must_use] 
     pub fn with_allow_localhost(mut self) -> Self {
         self.allow_localhost = true;
         self
@@ -355,26 +363,26 @@ impl ConnectorConfig for RestConfig {
         // Validate URL format
         let url =
             url::Url::parse(&self.base_url).map_err(|e| ConnectorError::InvalidConfiguration {
-                message: format!("invalid base_url: {}", e),
+                message: format!("invalid base_url: {e}"),
             })?;
 
         // SSRF protection: validate the URL is not targeting internal services
         // Skip this check if allow_localhost is true (for testing only!)
         if !self.allow_localhost {
             validate_url_ssrf(&url).map_err(|e| ConnectorError::InvalidConfiguration {
-                message: format!("SSRF protection: {}", e),
+                message: format!("SSRF protection: {e}"),
             })?;
 
             // Also validate OAuth2 token URL if present
             if let AuthConfig::OAuth2 { token_url, .. } = &self.auth {
                 let oauth_url = url::Url::parse(token_url).map_err(|e| {
                     ConnectorError::InvalidConfiguration {
-                        message: format!("invalid OAuth2 token_url: {}", e),
+                        message: format!("invalid OAuth2 token_url: {e}"),
                     }
                 })?;
                 validate_url_ssrf(&oauth_url).map_err(|e| {
                     ConnectorError::InvalidConfiguration {
-                        message: format!("SSRF protection for OAuth2 token_url: {}", e),
+                        message: format!("SSRF protection for OAuth2 token_url: {e}"),
                     }
                 })?;
             }
@@ -476,6 +484,7 @@ impl Default for EndpointConfig {
 
 impl EndpointConfig {
     /// Get the endpoint for an object by ID, replacing the placeholder.
+    #[must_use] 
     pub fn endpoint_for_id(&self, template: &str, id: &str) -> String {
         template.replace(&self.id_placeholder, id)
     }

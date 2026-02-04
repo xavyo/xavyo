@@ -1,4 +1,4 @@
-//! IdP Certificate admin handlers
+//! `IdP` Certificate admin handlers
 
 use crate::error::SamlResult;
 use crate::handlers::metadata::SamlState;
@@ -14,7 +14,7 @@ use uuid::Uuid;
 use xavyo_core::TenantId;
 use xavyo_db::models::{CertificateInfo, UploadCertificateRequest};
 
-/// List all IdP certificates
+/// List all `IdP` certificates
 #[utoipa::path(
     get,
     path = "/admin/saml/certificates",
@@ -48,7 +48,7 @@ async fn list_certificates_inner(
     })
 }
 
-/// Upload a new IdP certificate
+/// Upload a new `IdP` certificate
 #[utoipa::path(
     post,
     path = "/admin/saml/certificates",

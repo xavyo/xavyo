@@ -20,6 +20,7 @@ pub struct MergeAuditService {
 
 impl MergeAuditService {
     /// Create a new merge audit service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -28,7 +29,7 @@ impl MergeAuditService {
     ///
     /// # Arguments
     /// * `tenant_id` - Tenant ID for isolation
-    /// * `filter` - Filter criteria (identity_id, operator_id, date range)
+    /// * `filter` - Filter criteria (`identity_id`, `operator_id`, date range)
     /// * `limit` - Maximum number of records to return
     /// * `offset` - Number of records to skip
     pub async fn list(

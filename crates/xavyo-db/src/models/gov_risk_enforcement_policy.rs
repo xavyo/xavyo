@@ -17,17 +17,19 @@ pub enum EnforcementMode {
     Disabled,
     /// Risk evaluation runs and alerts are generated, but no enforcement actions applied.
     Monitor,
-    /// Risk evaluation runs and enforcement actions are applied (RequireMfa or Block).
+    /// Risk evaluation runs and enforcement actions are applied (`RequireMfa` or Block).
     Enforce,
 }
 
 impl EnforcementMode {
     /// Returns true if risk evaluation should run.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         !matches!(self, Self::Disabled)
     }
 
     /// Returns true if enforcement actions should be applied.
+    #[must_use] 
     pub fn is_enforcing(&self) -> bool {
         matches!(self, Self::Enforce)
     }

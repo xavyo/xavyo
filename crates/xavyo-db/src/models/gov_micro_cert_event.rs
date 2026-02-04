@@ -77,10 +77,10 @@ impl GovMicroCertEvent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_cert_events
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -95,11 +95,11 @@ impl GovMicroCertEvent {
         micro_certification_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_cert_events
             WHERE tenant_id = $1 AND micro_certification_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(micro_certification_id)
@@ -120,23 +120,23 @@ impl GovMicroCertEvent {
 
         if filter.micro_certification_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND micro_certification_id = ${}", param_count));
+            query.push_str(&format!(" AND micro_certification_id = ${param_count}"));
         }
         if filter.event_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_type = ${}", param_count));
+            query.push_str(&format!(" AND event_type = ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND actor_id = ${}", param_count));
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -178,23 +178,23 @@ impl GovMicroCertEvent {
 
         if filter.micro_certification_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND micro_certification_id = ${}", param_count));
+            query.push_str(&format!(" AND micro_certification_id = ${param_count}"));
         }
         if filter.event_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_type = ${}", param_count));
+            query.push_str(&format!(" AND event_type = ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND actor_id = ${}", param_count));
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -226,7 +226,7 @@ impl GovMicroCertEvent {
         to_date: DateTime<Utc>,
     ) -> Result<MicroCertEventStats, sqlx::Error> {
         let row: (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE event_type = 'created') as created,
@@ -241,7 +241,7 @@ impl GovMicroCertEvent {
                 COUNT(*) FILTER (WHERE event_type = 'skipped') as skipped
             FROM gov_micro_cert_events
             WHERE tenant_id = $1 AND created_at >= $2 AND created_at <= $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(from_date)
@@ -271,13 +271,13 @@ impl GovMicroCertEvent {
         input: CreateMicroCertEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_micro_cert_events (
                 tenant_id, micro_certification_id, event_type, actor_id, details
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.micro_certification_id)
@@ -312,7 +312,7 @@ impl GovMicroCertEvent {
         .await
     }
 
-    /// Create a "reminder_sent" event.
+    /// Create a "`reminder_sent`" event.
     pub async fn record_reminder_sent(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -408,7 +408,7 @@ impl GovMicroCertEvent {
         .await
     }
 
-    /// Create a "flagged_for_review" event (Reduce decision).
+    /// Create a "`flagged_for_review`" event (Reduce decision).
     pub async fn record_flagged_for_review(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -454,7 +454,7 @@ impl GovMicroCertEvent {
         .await
     }
 
-    /// Create an "auto_revoked" event.
+    /// Create an "`auto_revoked`" event.
     pub async fn record_auto_revoked(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -518,7 +518,7 @@ impl GovMicroCertEvent {
         .await
     }
 
-    /// Create an "assignment_revoked" event.
+    /// Create an "`assignment_revoked`" event.
     pub async fn record_assignment_revoked(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,

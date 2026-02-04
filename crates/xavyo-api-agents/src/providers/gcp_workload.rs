@@ -189,7 +189,7 @@ impl GcpWorkloadProvider {
         }
 
         serde_json::from_str(&body).map_err(|e| {
-            CloudProviderError::ProviderError(format!("Failed to parse STS response: {}", e))
+            CloudProviderError::ProviderError(format!("Failed to parse STS response: {e}"))
         })
     }
 
@@ -215,7 +215,7 @@ impl GcpWorkloadProvider {
         // GCP allows lifetime up to 3600 seconds (1 hour) by default,
         // or up to 12 hours if the service account has the right constraint lifted
         let lifetime_seconds = ttl_seconds.clamp(300, 3600);
-        let lifetime = format!("{}s", lifetime_seconds);
+        let lifetime = format!("{lifetime_seconds}s");
 
         let request = GenerateAccessTokenRequest {
             scope: effective_scopes,
@@ -259,8 +259,7 @@ impl GcpWorkloadProvider {
 
         serde_json::from_str(&body).map_err(|e| {
             CloudProviderError::ProviderError(format!(
-                "Failed to parse impersonation response: {}",
-                e
+                "Failed to parse impersonation response: {e}"
             ))
         })
     }
@@ -285,7 +284,7 @@ impl GcpWorkloadProvider {
                 }
             }
             404 => {
-                CloudProviderError::InvalidConfiguration(format!("Resource not found: {}", message))
+                CloudProviderError::InvalidConfiguration(format!("Resource not found: {message}"))
             }
             429 => CloudProviderError::RateLimitExceeded,
             503 | 504 => CloudProviderError::NotAvailable(message.to_string()),
@@ -298,7 +297,7 @@ impl GcpWorkloadProvider {
         chrono::DateTime::parse_from_rfc3339(expire_time)
             .map(|dt| dt.timestamp())
             .map_err(|e| {
-                CloudProviderError::ProviderError(format!("Failed to parse expiry time: {}", e))
+                CloudProviderError::ProviderError(format!("Failed to parse expiry time: {e}"))
             })
     }
 }
@@ -321,7 +320,7 @@ impl CloudIdentityProvider for GcpWorkloadProvider {
             .await
             .map_err(|e| {
                 warn!(error = %e, "GCP STS health check failed");
-                CloudProviderError::NotAvailable(format!("GCP STS not reachable: {}", e))
+                CloudProviderError::NotAvailable(format!("GCP STS not reachable: {e}"))
             })?;
 
         // GCP STS endpoint should respond with an HTTP status (even if error for HEAD)
@@ -432,6 +431,7 @@ impl GcpWorkloadIdentityConfigBuilder {
     }
 
     /// Build the configuration.
+    #[must_use] 
     pub fn build(self) -> GcpWorkloadIdentityConfig {
         GcpWorkloadIdentityConfig {
             project_id: self.project_id,

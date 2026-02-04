@@ -1,6 +1,6 @@
-//! HashiCorp Vault KV v2 secret provider.
+//! `HashiCorp` Vault KV v2 secret provider.
 //!
-//! Supports AppRole and token authentication with automatic token renewal.
+//! Supports `AppRole` and token authentication with automatic token renewal.
 
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -20,7 +20,7 @@ struct VaultToken {
     ttl_seconds: Option<u64>,
 }
 
-/// Secret provider that reads from HashiCorp Vault KV v2.
+/// Secret provider that reads from `HashiCorp` Vault KV v2.
 pub struct VaultSecretProvider {
     client: reqwest::Client,
     address: String,
@@ -41,7 +41,7 @@ impl std::fmt::Debug for VaultSecretProvider {
 }
 
 impl VaultSecretProvider {
-    /// Create a new VaultSecretProvider from configuration.
+    /// Create a new `VaultSecretProvider` from configuration.
     ///
     /// Authenticates to Vault immediately and starts background token renewal.
     pub async fn new(config: &SecretProviderConfig) -> Result<Self, SecretError> {
@@ -107,7 +107,7 @@ impl VaultSecretProvider {
         })
     }
 
-    /// Authenticate via AppRole.
+    /// Authenticate via `AppRole`.
     async fn approle_login(
         client: &reqwest::Client,
         address: &str,
@@ -351,7 +351,7 @@ impl SecretProvider for VaultSecretProvider {
             .get("data")
             .and_then(|d| d.get("metadata"))
             .and_then(|m| m.get("version"))
-            .and_then(|v| v.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .map(|v| v.to_string());
 
         tracing::info!(

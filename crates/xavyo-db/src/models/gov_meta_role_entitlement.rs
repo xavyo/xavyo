@@ -46,10 +46,10 @@ impl GovMetaRoleEntitlement {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_entitlements
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -65,10 +65,10 @@ impl GovMetaRoleEntitlement {
         entitlement_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_entitlements
             WHERE tenant_id = $1 AND meta_role_id = $2 AND entitlement_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -84,11 +84,11 @@ impl GovMetaRoleEntitlement {
         meta_role_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_entitlements
             WHERE tenant_id = $1 AND meta_role_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -106,13 +106,13 @@ impl GovMetaRoleEntitlement {
         let permission_type = input.permission_type.unwrap_or_default();
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_meta_role_entitlements (
                 tenant_id, meta_role_id, entitlement_id, permission_type
             )
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -129,10 +129,10 @@ impl GovMetaRoleEntitlement {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_meta_role_entitlements
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -149,10 +149,10 @@ impl GovMetaRoleEntitlement {
         meta_role_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_meta_role_entitlements
             WHERE tenant_id = $1 AND meta_role_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)

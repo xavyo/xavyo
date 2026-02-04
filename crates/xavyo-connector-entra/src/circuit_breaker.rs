@@ -54,10 +54,10 @@ impl Default for CircuitState {
 /// Circuit breaker implementation.
 ///
 /// State machine transitions:
-/// - Closed -> Open: failure_count >= threshold within window
-/// - Open -> HalfOpen: elapsed time >= open_duration
-/// - HalfOpen -> Closed: Successful probe request
-/// - HalfOpen -> Open: Failed probe request
+/// - Closed -> Open: `failure_count` >= threshold within window
+/// - Open -> `HalfOpen`: elapsed time >= `open_duration`
+/// - `HalfOpen` -> Closed: Successful probe request
+/// - `HalfOpen` -> Open: Failed probe request
 #[derive(Debug)]
 pub struct CircuitBreaker {
     /// Internal state.
@@ -72,6 +72,7 @@ pub struct CircuitBreaker {
 
 impl CircuitBreaker {
     /// Creates a new circuit breaker with the given configuration.
+    #[must_use] 
     pub fn new(failure_threshold: u32, failure_window: Duration, open_duration: Duration) -> Self {
         Self {
             state: CircuitState::default(),
@@ -82,6 +83,7 @@ impl CircuitBreaker {
     }
 
     /// Creates a circuit breaker with default settings (10 failures in 5 min, 30 sec open).
+    #[must_use] 
     pub fn with_defaults() -> Self {
         Self::new(
             10,
@@ -91,11 +93,13 @@ impl CircuitBreaker {
     }
 
     /// Returns the current state.
+    #[must_use] 
     pub fn state(&self) -> CircuitBreakerState {
         self.state.state
     }
 
     /// Returns the current failure count.
+    #[must_use] 
     pub fn failure_count(&self) -> u32 {
         self.state.failure_count
     }
@@ -114,7 +118,7 @@ impl CircuitBreaker {
                 } else {
                     debug!(
                         "Circuit open, {:?} until half-open",
-                        self.open_duration - elapsed
+                        self.open_duration.checked_sub(elapsed).unwrap()
                     );
                     false
                 }

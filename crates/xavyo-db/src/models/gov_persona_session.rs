@@ -54,10 +54,10 @@ impl GovPersonaSession {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_sessions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -72,12 +72,12 @@ impl GovPersonaSession {
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_sessions
             WHERE tenant_id = $1 AND user_id = $2 AND expires_at > NOW()
             ORDER BY switched_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -94,12 +94,12 @@ impl GovPersonaSession {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_sessions
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY switched_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -118,12 +118,12 @@ impl GovPersonaSession {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_sessions
             WHERE tenant_id = $1 AND active_persona_id = $2
             ORDER BY switched_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(persona_id)
@@ -145,14 +145,14 @@ impl GovPersonaSession {
         let previous_persona_id = current.and_then(|s| s.active_persona_id);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_persona_sessions (
                 tenant_id, user_id, active_persona_id, previous_persona_id,
                 switch_reason, switched_at, expires_at
             )
             VALUES ($1, $2, $3, $4, $5, NOW(), $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -171,11 +171,11 @@ impl GovPersonaSession {
         persona_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_persona_sessions
             SET expires_at = NOW()
             WHERE tenant_id = $1 AND active_persona_id = $2 AND expires_at > NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(persona_id)
@@ -192,11 +192,11 @@ impl GovPersonaSession {
         user_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_persona_sessions
             SET expires_at = NOW()
             WHERE tenant_id = $1 AND user_id = $2 AND expires_at > NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -212,12 +212,12 @@ impl GovPersonaSession {
         older_than_days: i32,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_persona_sessions
             WHERE expires_at < NOW() - $1::interval
-            "#,
+            ",
         )
-        .bind(format!("{} days", older_than_days))
+        .bind(format!("{older_than_days} days"))
         .execute(pool)
         .await?;
 
@@ -225,16 +225,19 @@ impl GovPersonaSession {
     }
 
     /// Check if session is still valid.
+    #[must_use] 
     pub fn is_valid(&self) -> bool {
         Utc::now() < self.expires_at
     }
 
     /// Check if user is operating as a persona.
+    #[must_use] 
     pub fn is_persona_active(&self) -> bool {
         self.active_persona_id.is_some() && self.is_valid()
     }
 
     /// Get remaining time until expiration.
+    #[must_use] 
     pub fn time_until_expiration(&self) -> chrono::Duration {
         self.expires_at - Utc::now()
     }
@@ -246,13 +249,13 @@ impl GovPersonaSession {
         persona_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_persona_sessions
             SET active_persona_id = NULL,
                 switch_reason = CONCAT(switch_reason, ' [Invalidated: persona expired]'),
                 updated_at = NOW()
             WHERE tenant_id = $1 AND active_persona_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(persona_id)

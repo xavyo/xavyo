@@ -24,7 +24,7 @@ pub struct ImportState {
 }
 
 impl ImportState {
-    /// Create a new ImportState.
+    /// Create a new `ImportState`.
     pub fn new(pool: PgPool, email_sender: Arc<dyn EmailSender>) -> Self {
         Self { pool, email_sender }
     }
@@ -35,11 +35,11 @@ impl ImportState {
 /// Admin routes (require JWT auth):
 /// - POST   /admin/users/import                              — Upload CSV
 /// - GET    /admin/users/imports                             — List jobs
-/// - GET    /admin/users/imports/:job_id                     — Get job
-/// - GET    /admin/users/imports/:job_id/errors              — List errors
-/// - GET    /admin/users/imports/:job_id/errors/download     — Download error CSV
+/// - GET    /`admin/users/imports/:job_id`                     — Get job
+/// - GET    /`admin/users/imports/:job_id/errors`              — List errors
+/// - GET    /`admin/users/imports/:job_id/errors/download`     — Download error CSV
 /// - POST   /admin/users/imports/:job_id/resend-invitations  — Bulk resend
-/// - POST   /admin/users/:user_id/invite                    — Resend single invite
+/// - POST   /`admin/users/:user_id/invite`                    — Resend single invite
 ///
 /// Public routes (no auth required):
 /// - GET    /invite/:token                                   — Validate token

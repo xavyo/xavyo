@@ -28,6 +28,7 @@ pub struct BatchJobRunner {
 
 impl BatchJobRunner {
     /// Create a new runner with the given DB pool and config.
+    #[must_use] 
     pub fn new(pool: PgPool, config: BatchExporterConfig) -> Self {
         Self {
             pool,
@@ -37,6 +38,7 @@ impl BatchJobRunner {
     }
 
     /// Override the poll interval (default: 10 seconds).
+    #[must_use] 
     pub fn with_poll_interval(mut self, interval: Duration) -> Self {
         self.poll_interval = interval;
         self
@@ -47,7 +49,7 @@ impl BatchJobRunner {
     ///
     /// The loop:
     /// 1. Claims a pending job (atomic `FOR UPDATE SKIP LOCKED`).
-    /// 2. Processes it (queries audit_logs by date range, writes to file).
+    /// 2. Processes it (queries `audit_logs` by date range, writes to file).
     /// 3. Updates the job as completed or failed.
     /// 4. Cleans up expired exports.
     /// 5. Sleeps for `poll_interval` before polling again.
@@ -129,7 +131,7 @@ impl BatchJobRunner {
                 );
             }
             Err(e) => {
-                let error_msg = format!("{}", e);
+                let error_msg = format!("{e}");
                 error!(export_id = %job.id, error = %error_msg, "Batch export failed");
                 SiemBatchExport::mark_failed(&self.pool, job.tenant_id, job.id, &error_msg).await?;
             }
@@ -139,7 +141,7 @@ impl BatchJobRunner {
     }
 
     /// Process a single batch export job.
-    /// Returns (total_events, file_path, file_size_bytes).
+    /// Returns (`total_events`, `file_path`, `file_size_bytes`).
     async fn process_job(
         &self,
         job: &SiemBatchExport,

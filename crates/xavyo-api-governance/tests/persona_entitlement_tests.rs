@@ -1,4 +1,4 @@
-//! Unit tests for PersonaEntitlementService (US4).
+//! Unit tests for `PersonaEntitlementService` (US4).
 //!
 //! Tests persona-specific entitlement precedence and access policies.
 
@@ -14,15 +14,13 @@ mod persona_entitlement_service_tests {
     /// T057: Unit test for persona entitlement precedence
     #[test]
     fn test_entitlement_precedence_persona_over_user() {
-        let tenant_id = Uuid::new_v4();
-        let user_id = Uuid::new_v4();
-        let persona_id = Uuid::new_v4();
+        let _tenant_id = Uuid::new_v4();
+        let _user_id = Uuid::new_v4();
+        let _persona_id = Uuid::new_v4();
 
         // User has entitlements: [E1, E2]
-        let user_entitlements = vec![
-            Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap(),
-            Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap(),
-        ];
+        let _user_entitlements = [Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap(),
+            Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap()];
 
         // Persona has entitlements: [E2, E3]
         let persona_entitlements = vec![
@@ -84,7 +82,7 @@ mod persona_entitlement_service_tests {
 
     #[test]
     fn test_deactivated_persona_entitlement_denial() {
-        let persona_id = Uuid::new_v4();
+        let _persona_id = Uuid::new_v4();
 
         // Persona status scenarios
         #[derive(Debug, PartialEq)]
@@ -112,8 +110,8 @@ mod persona_entitlement_service_tests {
 
     #[test]
     fn test_entitlement_check_with_persona_context() {
-        let user_id = Uuid::new_v4();
-        let persona_id = Uuid::new_v4();
+        let _user_id = Uuid::new_v4();
+        let _persona_id = Uuid::new_v4();
         let entitlement_id = Uuid::parse_str("33333333-3333-3333-3333-333333333333").unwrap();
 
         // Persona's entitlements
@@ -144,7 +142,7 @@ mod persona_entitlement_service_tests {
 
     #[test]
     fn test_persona_entitlement_result_structure() {
-        let user_id = Uuid::new_v4();
+        let _user_id = Uuid::new_v4();
         let persona_id = Uuid::new_v4();
         let archetype_id = Uuid::new_v4();
 
@@ -272,13 +270,12 @@ mod persona_entitlement_service_tests {
         ];
 
         // Filter by application
-        let app_entitlements: Vec<_> = all_entitlements
+        let _app_entitlements: Vec<_> = all_entitlements
             .iter()
             .filter(|e| {
                 e.get("application_id")
                     .and_then(|v| v.as_str())
-                    .map(|s| Uuid::parse_str(s).ok())
-                    .flatten()
+                    .and_then(|s| Uuid::parse_str(s).ok())
                     == Some(application_id)
             })
             .collect();

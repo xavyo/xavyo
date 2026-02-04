@@ -51,11 +51,13 @@ pub struct CorrelationCaseService {
 
 impl CorrelationCaseService {
     /// Create a new correlation case service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -361,8 +363,7 @@ fn parse_case_status(s: &str) -> Result<GovCorrelationCaseStatus> {
         "new_identity" => Ok(GovCorrelationCaseStatus::NewIdentity),
         "collision" => Ok(GovCorrelationCaseStatus::Collision),
         other => Err(GovernanceError::Validation(format!(
-            "Invalid case status '{}'. Must be one of: pending, confirmed, rejected, no_match, new_identity, collision",
-            other
+            "Invalid case status '{other}'. Must be one of: pending, confirmed, rejected, no_match, new_identity, collision"
         ))),
     }
 }
@@ -374,8 +375,7 @@ fn parse_trigger_type(s: &str) -> Result<GovCorrelationTrigger> {
         "live_sync" => Ok(GovCorrelationTrigger::LiveSync),
         "manual" => Ok(GovCorrelationTrigger::Manual),
         other => Err(GovernanceError::Validation(format!(
-            "Invalid trigger type '{}'. Must be one of: reconciliation, live_sync, manual",
-            other
+            "Invalid trigger type '{other}'. Must be one of: reconciliation, live_sync, manual"
         ))),
     }
 }

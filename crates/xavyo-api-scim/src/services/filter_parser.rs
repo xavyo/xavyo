@@ -59,40 +59,40 @@ impl CompareOp {
 
         match self {
             CompareOp::Eq => (
-                format!("{} = ${}", quoted_col, param_num),
+                format!("{quoted_col} = ${param_num}"),
                 Some(value.to_string()),
             ),
             CompareOp::Ne => (
-                format!("{} <> ${}", quoted_col, param_num),
+                format!("{quoted_col} <> ${param_num}"),
                 Some(value.to_string()),
             ),
             CompareOp::Co => (
-                format!("{} ILIKE ${}", quoted_col, param_num),
-                Some(format!("%{}%", value)),
+                format!("{quoted_col} ILIKE ${param_num}"),
+                Some(format!("%{value}%")),
             ),
             CompareOp::Sw => (
-                format!("{} ILIKE ${}", quoted_col, param_num),
-                Some(format!("{}%", value)),
+                format!("{quoted_col} ILIKE ${param_num}"),
+                Some(format!("{value}%")),
             ),
             CompareOp::Ew => (
-                format!("{} ILIKE ${}", quoted_col, param_num),
-                Some(format!("%{}", value)),
+                format!("{quoted_col} ILIKE ${param_num}"),
+                Some(format!("%{value}")),
             ),
-            CompareOp::Pr => (format!("{} IS NOT NULL", quoted_col), None),
+            CompareOp::Pr => (format!("{quoted_col} IS NOT NULL"), None),
             CompareOp::Gt => (
-                format!("{} > ${}", quoted_col, param_num),
+                format!("{quoted_col} > ${param_num}"),
                 Some(value.to_string()),
             ),
             CompareOp::Ge => (
-                format!("{} >= ${}", quoted_col, param_num),
+                format!("{quoted_col} >= ${param_num}"),
                 Some(value.to_string()),
             ),
             CompareOp::Lt => (
-                format!("{} < ${}", quoted_col, param_num),
+                format!("{quoted_col} < ${param_num}"),
                 Some(value.to_string()),
             ),
             CompareOp::Le => (
-                format!("{} <= ${}", quoted_col, param_num),
+                format!("{quoted_col} <= ${param_num}"),
                 Some(value.to_string()),
             ),
         }
@@ -135,6 +135,7 @@ pub struct FilterParser<'a> {
 
 impl<'a> FilterParser<'a> {
     /// Create a new parser.
+    #[must_use] 
     pub fn new(input: &'a str) -> Self {
         Self { input, pos: 0 }
     }
@@ -244,7 +245,7 @@ impl<'a> FilterParser<'a> {
 
         let op_str = self.parse_operator()?;
         let op = CompareOp::from_str(&op_str)
-            .ok_or_else(|| ScimError::InvalidFilter(format!("Unknown operator: {}", op_str)))?;
+            .ok_or_else(|| ScimError::InvalidFilter(format!("Unknown operator: {op_str}")))?;
 
         // 'pr' operator has no value
         if op == CompareOp::Pr {
@@ -387,6 +388,7 @@ pub struct AttributeMapper {
 
 impl AttributeMapper {
     /// Create a new mapper with default user mappings.
+    #[must_use] 
     pub fn for_users() -> Self {
         Self {
             mappings: vec![
@@ -402,6 +404,7 @@ impl AttributeMapper {
     }
 
     /// Create a new mapper with default group mappings.
+    #[must_use] 
     pub fn for_groups() -> Self {
         Self {
             mappings: vec![
@@ -412,6 +415,7 @@ impl AttributeMapper {
     }
 
     /// Map a SCIM attribute to a SQL column.
+    #[must_use] 
     pub fn map(&self, scim_attr: &str) -> Option<&str> {
         self.mappings
             .iter()
@@ -454,7 +458,7 @@ impl SqlFilter {
                 value,
             } => {
                 let column = mapper.map(attribute).ok_or_else(|| {
-                    ScimError::InvalidFilter(format!("Unknown attribute: {}", attribute))
+                    ScimError::InvalidFilter(format!("Unknown attribute: {attribute}"))
                 })?;
 
                 let param_num = start_param + params.len();
@@ -473,15 +477,15 @@ impl SqlFilter {
                     LogicalOp::And => "AND",
                     LogicalOp::Or => "OR",
                 };
-                Ok(format!("({} {} {})", left_sql, op_sql, right_sql))
+                Ok(format!("({left_sql} {op_sql} {right_sql})"))
             }
             FilterExpr::Not(inner) => {
                 let inner_sql = Self::expr_to_sql(inner, mapper, start_param, params)?;
-                Ok(format!("NOT ({})", inner_sql))
+                Ok(format!("NOT ({inner_sql})"))
             }
             FilterExpr::Group(inner) => {
                 let inner_sql = Self::expr_to_sql(inner, mapper, start_param, params)?;
-                Ok(format!("({})", inner_sql))
+                Ok(format!("({inner_sql})"))
             }
         }
     }

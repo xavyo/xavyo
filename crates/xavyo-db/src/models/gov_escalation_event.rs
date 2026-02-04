@@ -86,10 +86,10 @@ impl GovEscalationEvent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_escalation_events
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -104,11 +104,11 @@ impl GovEscalationEvent {
         request_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_escalation_events
             WHERE tenant_id = $1 AND request_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(request_id)
@@ -129,30 +129,29 @@ impl GovEscalationEvent {
 
         if filter.request_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND request_id = ${}", param_count));
+            query.push_str(&format!(" AND request_id = ${param_count}"));
         }
         if filter.original_approver_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND original_approver_id = ${}", param_count));
+            query.push_str(&format!(" AND original_approver_id = ${param_count}"));
         }
         if filter.escalation_target_id.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND ${} = ANY(escalation_target_ids)",
-                param_count
+                " AND ${param_count} = ANY(escalation_target_ids)"
             ));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
         if filter.reason.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND reason = ${}", param_count));
+            query.push_str(&format!(" AND reason = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -197,30 +196,29 @@ impl GovEscalationEvent {
 
         if filter.request_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND request_id = ${}", param_count));
+            query.push_str(&format!(" AND request_id = ${param_count}"));
         }
         if filter.original_approver_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND original_approver_id = ${}", param_count));
+            query.push_str(&format!(" AND original_approver_id = ${param_count}"));
         }
         if filter.escalation_target_id.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND ${} = ANY(escalation_target_ids)",
-                param_count
+                " AND ${param_count} = ANY(escalation_target_ids)"
             ));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
         if filter.reason.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND reason = ${}", param_count));
+            query.push_str(&format!(" AND reason = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -254,7 +252,7 @@ impl GovEscalationEvent {
         input: CreateEscalationEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_escalation_events (
                 tenant_id, request_id, step_order, escalation_level,
                 original_approver_id, escalation_target_type, escalation_target_ids,
@@ -262,7 +260,7 @@ impl GovEscalationEvent {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.request_id)
@@ -287,7 +285,7 @@ impl GovEscalationEvent {
         to_date: DateTime<Utc>,
     ) -> Result<EscalationStats, sqlx::Error> {
         let row: (i64, i64, i64, i64) = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE reason = 'timeout') as timeout_count,
@@ -295,7 +293,7 @@ impl GovEscalationEvent {
                 COUNT(*) FILTER (WHERE reason = 'target_unavailable') as unavailable_count
             FROM gov_escalation_events
             WHERE tenant_id = $1 AND created_at >= $2 AND created_at <= $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(from_date)
@@ -319,7 +317,7 @@ impl GovEscalationEvent {
         limit: i64,
     ) -> Result<Vec<(Uuid, i64)>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT original_approver_id, COUNT(*) as count
             FROM gov_escalation_events
             WHERE tenant_id = $1
@@ -328,7 +326,7 @@ impl GovEscalationEvent {
             GROUP BY original_approver_id
             ORDER BY count DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(from_date)

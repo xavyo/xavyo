@@ -79,7 +79,7 @@ fn test_large_group_count_performance() {
     let groups: Vec<GroupInfo> = (0..500)
         .map(|i| GroupInfo {
             id: Uuid::new_v4(),
-            display_name: format!("Group-{}", i),
+            display_name: format!("Group-{i}"),
         })
         .collect();
 
@@ -314,7 +314,7 @@ fn test_tenant_isolation_separate_groups() {
 #[test]
 fn test_include_groups_false_disables_groups() {
     // T035: Test include_groups=false disables groups
-    let groups = test_groups();
+    let _groups = test_groups();
     let config = GroupAttributeConfig {
         include_groups: false,
         ..Default::default()

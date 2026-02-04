@@ -68,10 +68,10 @@ impl OperationAttempt {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM operation_attempts
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -86,11 +86,11 @@ impl OperationAttempt {
         operation_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM operation_attempts
             WHERE operation_id = $1 AND tenant_id = $2
             ORDER BY attempt_number ASC
-            "#,
+            ",
         )
         .bind(operation_id)
         .bind(tenant_id)
@@ -105,12 +105,12 @@ impl OperationAttempt {
         operation_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM operation_attempts
             WHERE operation_id = $1 AND tenant_id = $2
             ORDER BY attempt_number DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(operation_id)
         .bind(tenant_id)
@@ -125,10 +125,10 @@ impl OperationAttempt {
         operation_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM operation_attempts
             WHERE operation_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(operation_id)
         .bind(tenant_id)
@@ -136,7 +136,7 @@ impl OperationAttempt {
         .await
     }
 
-    /// Start a new attempt (creates record with started_at = now).
+    /// Start a new attempt (creates record with `started_at` = now).
     pub async fn start(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -144,13 +144,13 @@ impl OperationAttempt {
         attempt_number: i32,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO operation_attempts (
                 tenant_id, operation_id, attempt_number, started_at, success
             )
             VALUES ($1, $2, $3, NOW(), false)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(operation_id)
@@ -167,7 +167,7 @@ impl OperationAttempt {
         input: &CompleteOperationAttempt,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE operation_attempts
             SET completed_at = NOW(),
                 success = $3,
@@ -177,7 +177,7 @@ impl OperationAttempt {
                 duration_ms = EXTRACT(EPOCH FROM (NOW() - started_at))::int * 1000
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -204,14 +204,14 @@ impl OperationAttempt {
         duration_ms: Option<i32>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO operation_attempts (
                 tenant_id, operation_id, attempt_number, started_at, completed_at,
                 success, error_code, error_message, response_data, duration_ms
             )
             VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(operation_id)
@@ -229,10 +229,10 @@ impl OperationAttempt {
     /// Delete attempts older than a given number of days (retention policy).
     pub async fn delete_older_than(pool: &sqlx::PgPool, days: i32) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM operation_attempts
             WHERE started_at < NOW() - ($1 || ' days')::interval
-            "#,
+            ",
         )
         .bind(days.to_string())
         .execute(pool)

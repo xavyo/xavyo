@@ -54,10 +54,10 @@ mod tests {
         let json = serde_json::to_value(&filter).unwrap();
         let parsed: FilterCriteria = serde_json::from_value(json).unwrap();
 
-        assert_eq!(parsed.department.as_ref().map(|d| d.len()), Some(2));
+        assert_eq!(parsed.department.as_ref().map(std::vec::Vec::len), Some(2));
         assert_eq!(parsed.status, Some("active".to_string()));
         assert!(parsed.role_ids.is_some());
-        assert_eq!(parsed.entitlement_ids.as_ref().map(|e| e.len()), Some(2));
+        assert_eq!(parsed.entitlement_ids.as_ref().map(std::vec::Vec::len), Some(2));
     }
 
     /// Test change spec validation for role operations

@@ -24,7 +24,7 @@ pub struct HrdCacheEntry {
 #[derive(Clone)]
 pub struct HrdService {
     pool: PgPool,
-    /// Cache: tenant_id -> (domain -> cache_entry)
+    /// Cache: `tenant_id` -> (domain -> `cache_entry`)
     cache: Arc<RwLock<HashMap<Uuid, HashMap<String, HrdCacheEntry>>>>,
     /// Cache TTL in seconds.
     cache_ttl_secs: i64,
@@ -32,6 +32,7 @@ pub struct HrdService {
 
 impl HrdService {
     /// Create a new HRD service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -41,6 +42,7 @@ impl HrdService {
     }
 
     /// Create a new HRD service with custom cache TTL.
+    #[must_use] 
     pub fn with_cache_ttl(pool: PgPool, cache_ttl_secs: i64) -> Self {
         Self {
             pool,
@@ -207,7 +209,7 @@ pub struct HrdResult {
     pub idp_id: Uuid,
     /// Identity provider name.
     pub idp_name: String,
-    /// Issuer URL for the IdP.
+    /// Issuer URL for the `IdP`.
     pub issuer_url: String,
     /// Domain that matched.
     pub domain: String,

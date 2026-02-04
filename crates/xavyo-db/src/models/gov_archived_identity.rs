@@ -73,10 +73,10 @@ impl GovArchivedIdentity {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_archived_identities
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -91,10 +91,10 @@ impl GovArchivedIdentity {
         original_user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_archived_identities
             WHERE tenant_id = $1 AND original_user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(original_user_id)
@@ -109,10 +109,10 @@ impl GovArchivedIdentity {
         merge_operation_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_archived_identities
             WHERE tenant_id = $1 AND merge_operation_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(merge_operation_id)
@@ -129,28 +129,28 @@ impl GovArchivedIdentity {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_archived_identities
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.original_user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND original_user_id = ${}", param_count));
+            query.push_str(&format!(" AND original_user_id = ${param_count}"));
         }
         if filter.merge_operation_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND merge_operation_id = ${}", param_count));
+            query.push_str(&format!(" AND merge_operation_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND archived_at >= ${}", param_count));
+            query.push_str(&format!(" AND archived_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND archived_at <= ${}", param_count));
+            query.push_str(&format!(" AND archived_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -184,28 +184,28 @@ impl GovArchivedIdentity {
         filter: &ArchivedIdentityFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_archived_identities
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.original_user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND original_user_id = ${}", param_count));
+            query.push_str(&format!(" AND original_user_id = ${param_count}"));
         }
         if filter.merge_operation_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND merge_operation_id = ${}", param_count));
+            query.push_str(&format!(" AND merge_operation_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND archived_at >= ${}", param_count));
+            query.push_str(&format!(" AND archived_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND archived_at <= ${}", param_count));
+            query.push_str(&format!(" AND archived_at <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -236,13 +236,13 @@ impl GovArchivedIdentity {
             .unwrap_or_else(|_| serde_json::json!({}));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_archived_identities (
                 tenant_id, original_user_id, merge_operation_id, snapshot, external_references
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.original_user_id)
@@ -266,13 +266,13 @@ impl GovArchivedIdentity {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_archived_identities (
                 tenant_id, original_user_id, merge_operation_id, snapshot, external_references
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(original_user_id)
@@ -291,11 +291,11 @@ impl GovArchivedIdentity {
         reference_value: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_archived_identities
             WHERE tenant_id = $1
               AND external_references ->> $2 = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(reference_key)

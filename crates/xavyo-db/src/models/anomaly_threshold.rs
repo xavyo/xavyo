@@ -69,14 +69,14 @@ impl AnomalyThreshold {
     ) -> Result<Option<Self>, sqlx::Error> {
         // First try agent-specific
         let agent_threshold = sqlx::query_as::<_, AnomalyThreshold>(
-            r#"
+            r"
             SELECT
                 id, tenant_id, agent_id, anomaly_type, threshold_value,
                 enabled, alert_enabled, aggregation_window_secs,
                 created_at, updated_at, created_by
             FROM anomaly_thresholds
             WHERE tenant_id = $1 AND agent_id = $2 AND anomaly_type = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -90,14 +90,14 @@ impl AnomalyThreshold {
 
         // Fall back to tenant default
         sqlx::query_as::<_, AnomalyThreshold>(
-            r#"
+            r"
             SELECT
                 id, tenant_id, agent_id, anomaly_type, threshold_value,
                 enabled, alert_enabled, aggregation_window_secs,
                 created_at, updated_at, created_by
             FROM anomaly_thresholds
             WHERE tenant_id = $1 AND agent_id IS NULL AND anomaly_type = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(anomaly_type)
@@ -112,7 +112,7 @@ impl AnomalyThreshold {
         agent_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as::<_, AnomalyThreshold>(
-            r#"
+            r"
             SELECT DISTINCT ON (anomaly_type)
                 id, tenant_id, agent_id, anomaly_type, threshold_value,
                 enabled, alert_enabled, aggregation_window_secs,
@@ -120,7 +120,7 @@ impl AnomalyThreshold {
             FROM anomaly_thresholds
             WHERE tenant_id = $1 AND (agent_id = $2 OR agent_id IS NULL)
             ORDER BY anomaly_type, agent_id NULLS LAST
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -134,7 +134,7 @@ impl AnomalyThreshold {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as::<_, AnomalyThreshold>(
-            r#"
+            r"
             SELECT
                 id, tenant_id, agent_id, anomaly_type, threshold_value,
                 enabled, alert_enabled, aggregation_window_secs,
@@ -142,7 +142,7 @@ impl AnomalyThreshold {
             FROM anomaly_thresholds
             WHERE tenant_id = $1 AND agent_id IS NULL
             ORDER BY anomaly_type
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -152,7 +152,7 @@ impl AnomalyThreshold {
     /// Create or update a threshold (upsert).
     pub async fn upsert(pool: &PgPool, data: UpsertAnomalyThreshold) -> Result<Self, sqlx::Error> {
         sqlx::query_as::<_, AnomalyThreshold>(
-            r#"
+            r"
             INSERT INTO anomaly_thresholds (
                 tenant_id, agent_id, anomaly_type, threshold_value,
                 enabled, alert_enabled, aggregation_window_secs, created_by
@@ -169,7 +169,7 @@ impl AnomalyThreshold {
                 id, tenant_id, agent_id, anomaly_type, threshold_value,
                 enabled, alert_enabled, aggregation_window_secs,
                 created_at, updated_at, created_by
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(data.agent_id)
@@ -190,10 +190,10 @@ impl AnomalyThreshold {
         agent_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM anomaly_thresholds
             WHERE tenant_id = $1 AND agent_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -210,12 +210,12 @@ impl AnomalyThreshold {
         agent_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let row = sqlx::query(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM anomaly_thresholds
                 WHERE tenant_id = $1 AND agent_id = $2
             ) as exists
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)

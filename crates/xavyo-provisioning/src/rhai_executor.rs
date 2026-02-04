@@ -68,6 +68,7 @@ pub struct RhaiScriptExecutor {
 
 impl RhaiScriptExecutor {
     /// Create a new Rhai script executor with default configuration.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             config: RhaiExecutorConfig::default(),
@@ -75,6 +76,7 @@ impl RhaiScriptExecutor {
     }
 
     /// Create a new Rhai script executor with custom configuration.
+    #[must_use] 
     pub fn with_config(config: RhaiExecutorConfig) -> Self {
         Self { config }
     }
@@ -115,10 +117,11 @@ impl RhaiScriptExecutor {
         let engine = self.create_engine();
         engine
             .compile(script_body)
-            .map_err(|e| format!("Compilation error: {}", e))
+            .map_err(|e| format!("Compilation error: {e}"))
     }
 
     /// Validate a Rhai script for syntax errors.
+    #[must_use] 
     pub fn validate_script(&self, script_body: &str) -> Vec<ScriptValidationError> {
         let engine = self.create_engine();
         match engine.compile(script_body) {
@@ -134,6 +137,7 @@ impl RhaiScriptExecutor {
     }
 
     /// Execute a script in dry-run mode with sample context.
+    #[must_use] 
     pub fn dry_run(
         &self,
         script_body: &str,
@@ -156,7 +160,7 @@ impl RhaiScriptExecutor {
                     output: None,
                     modified_attributes: None,
                     output_variables: HashMap::new(),
-                    error: Some(format!("Compilation error: {}", e)),
+                    error: Some(format!("Compilation error: {e}")),
                     duration_ms: start.elapsed().as_millis() as u64,
                 };
             }
@@ -194,13 +198,13 @@ impl RhaiScriptExecutor {
                 output: None,
                 modified_attributes: None,
                 output_variables: HashMap::new(),
-                error: Some(format!("Runtime error: {}", e)),
+                error: Some(format!("Runtime error: {e}")),
                 duration_ms,
             },
         }
     }
 
-    /// Build a Rhai scope from a HookContext.
+    /// Build a Rhai scope from a `HookContext`.
     fn build_scope(context: &HookContext) -> Scope<'static> {
         let mut scope = Scope::new();
 
@@ -298,7 +302,7 @@ impl HookExecutor for RhaiScriptExecutor {
             .map_err(|e| {
                 error!(hook_id = %definition.id, error = %e, "Script compilation failed");
                 HookError::ExecutionFailed {
-                    message: format!("Compilation error: {}", e),
+                    message: format!("Compilation error: {e}"),
                 }
             })?;
 

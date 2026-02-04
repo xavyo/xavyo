@@ -317,11 +317,11 @@ impl ReconciliationEngine {
 
         // Update total_resources on the sync run now that we know the count.
         let _ = sqlx::query(
-            r#"
+            r"
             UPDATE scim_sync_runs
             SET total_resources = $3
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(run_id)
         .bind(tenant_id)
@@ -411,7 +411,11 @@ impl ReconciliationEngine {
                 None => continue, // Skip resources without an ID.
             };
 
-            if !local_by_external_id.contains_key(external_id.as_str()) {
+            if local_by_external_id.contains_key(external_id.as_str()) {
+                // Resource exists on both sides -- check for attribute drift.
+                let local_state = local_by_external_id[external_id.as_str()];
+                Self::detect_user_drift(user, &external_id, local_state, stats);
+            } else {
                 stats.orphan_count += 1;
                 stats.discrepancies.push(ReconciliationDiscrepancy {
                     kind: DiscrepancyKind::Orphan,
@@ -424,10 +428,6 @@ impl ReconciliationEngine {
                         external_id,
                     ),
                 });
-            } else {
-                // Resource exists on both sides -- check for attribute drift.
-                let local_state = local_by_external_id[external_id.as_str()];
-                Self::detect_user_drift(user, &external_id, local_state, stats);
             }
         }
 
@@ -481,7 +481,11 @@ impl ReconciliationEngine {
                 None => continue,
             };
 
-            if !local_by_external_id.contains_key(external_id.as_str()) {
+            if local_by_external_id.contains_key(external_id.as_str()) {
+                // Resource exists on both sides -- check for display_name drift.
+                let local_state = local_by_external_id[external_id.as_str()];
+                Self::detect_group_drift(group, &external_id, local_state, stats);
+            } else {
                 stats.orphan_count += 1;
                 stats.discrepancies.push(ReconciliationDiscrepancy {
                     kind: DiscrepancyKind::Orphan,
@@ -493,10 +497,6 @@ impl ReconciliationEngine {
                         group.display_name, external_id,
                     ),
                 });
-            } else {
-                // Resource exists on both sides -- check for display_name drift.
-                let local_state = local_by_external_id[external_id.as_str()];
-                Self::detect_group_drift(group, &external_id, local_state, stats);
             }
         }
 
@@ -524,7 +524,7 @@ impl ReconciliationEngine {
     /// Detect attribute drift for a User resource that exists on both sides.
     ///
     /// Currently checks:
-    /// - display_name
+    /// - `display_name`
     /// - active status
     /// - primary email
     ///
@@ -556,8 +556,7 @@ impl ReconciliationEngine {
             if let Some(ref local_ext_id) = local_state.external_id {
                 if remote_ext_id != local_ext_id {
                     drift_details.push(format!(
-                        "externalId: local={}, remote={}",
-                        local_ext_id, remote_ext_id,
+                        "externalId: local={local_ext_id}, remote={remote_ext_id}",
                     ));
                 }
             }
@@ -605,8 +604,7 @@ impl ReconciliationEngine {
             if let Some(ref local_ext_id) = local_state.external_id {
                 if remote_ext_id != local_ext_id {
                     drift_details.push(format!(
-                        "externalId: local={}, remote={}",
-                        local_ext_id, remote_ext_id,
+                        "externalId: local={local_ext_id}, remote={remote_ext_id}",
                     ));
                 }
             }
@@ -661,8 +659,8 @@ mod tests {
             target_id: Uuid::new_v4(),
             resource_type: resource_type.to_string(),
             internal_resource_id: internal_id,
-            external_resource_id: external_resource_id.map(|s| s.to_string()),
-            external_id: external_id.map(|s| s.to_string()),
+            external_resource_id: external_resource_id.map(std::string::ToString::to_string),
+            external_id: external_id.map(std::string::ToString::to_string),
             status: status.to_string(),
             last_synced_at: None,
             last_error: None,
@@ -682,7 +680,7 @@ mod tests {
         let mut user = ScimUser::new(user_name);
         user.id = Some(id);
         user.active = active;
-        user.external_id = external_id.map(|s| s.to_string());
+        user.external_id = external_id.map(std::string::ToString::to_string);
         user.display_name = Some(user_name.to_string());
         user
     }
@@ -690,7 +688,7 @@ mod tests {
     fn make_scim_group(id: Uuid, display_name: &str, external_id: Option<&str>) -> ScimGroup {
         let mut group = ScimGroup::new(display_name);
         group.id = Some(id);
-        group.external_id = external_id.map(|s| s.to_string());
+        group.external_id = external_id.map(std::string::ToString::to_string);
         group
     }
 

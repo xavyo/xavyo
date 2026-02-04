@@ -14,7 +14,7 @@ pub struct IntrospectionRequest {
     /// The token to introspect.
     pub token: String,
 
-    /// Hint about the token type: "access_token" or "refresh_token".
+    /// Hint about the token type: "`access_token`" or "`refresh_token`".
     pub token_type_hint: Option<String>,
 
     /// Client ID (alternative to HTTP Basic Auth).
@@ -34,11 +34,11 @@ pub struct IntrospectionResponse {
     /// Whether the token is currently active (valid, not expired, not revoked).
     pub active: bool,
 
-    /// Subject (user_id or client_id).
+    /// Subject (`user_id` or `client_id`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sub: Option<String>,
 
-    /// OAuth2 client that requested the token.
+    /// `OAuth2` client that requested the token.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_id: Option<String>,
 
@@ -79,6 +79,7 @@ impl IntrospectionResponse {
     /// Create an inactive response (token is invalid, expired, or revoked).
     ///
     /// Per RFC 7662: inactive tokens return only `{ "active": false }`.
+    #[must_use] 
     pub fn inactive() -> Self {
         Self {
             active: false,

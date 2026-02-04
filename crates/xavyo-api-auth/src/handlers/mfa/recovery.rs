@@ -19,7 +19,7 @@ use crate::{
 /// POST /auth/mfa/recovery/verify
 ///
 /// Verify a recovery code during login to complete MFA authentication.
-/// Requires a partial_token from the initial login response.
+/// Requires a `partial_token` from the initial login response.
 pub async fn verify_recovery_code(
     State(state): State<AuthState>,
     Extension(claims): Extension<JwtClaims>,

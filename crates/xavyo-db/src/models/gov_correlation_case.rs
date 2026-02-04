@@ -134,10 +134,10 @@ impl GovCorrelationCase {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_correlation_cases
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -154,36 +154,36 @@ impl GovCorrelationCase {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_correlation_cases
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.connector_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND connector_id = ${}", param_count));
+            query.push_str(&format!(" AND connector_id = ${param_count}"));
         }
         if filter.assigned_to.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND assigned_to = ${}", param_count));
+            query.push_str(&format!(" AND assigned_to = ${param_count}"));
         }
         if filter.trigger_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND trigger_type = ${}", param_count));
+            query.push_str(&format!(" AND trigger_type = ${param_count}"));
         }
         if filter.start_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.end_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         // Determine sort column (whitelist to prevent SQL injection)
@@ -192,7 +192,7 @@ impl GovCorrelationCase {
             _ => "created_at",
         };
         let sort_dir = match filter.sort_order.as_deref() {
-            Some("desc") | Some("DESC") => "DESC",
+            Some("desc" | "DESC") => "DESC",
             _ => "ASC",
         };
 
@@ -235,36 +235,36 @@ impl GovCorrelationCase {
         filter: &CorrelationCaseFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_correlation_cases
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.connector_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND connector_id = ${}", param_count));
+            query.push_str(&format!(" AND connector_id = ${param_count}"));
         }
         if filter.assigned_to.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND assigned_to = ${}", param_count));
+            query.push_str(&format!(" AND assigned_to = ${param_count}"));
         }
         if filter.trigger_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND trigger_type = ${}", param_count));
+            query.push_str(&format!(" AND trigger_type = ${param_count}"));
         }
         if filter.start_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.end_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -298,7 +298,7 @@ impl GovCorrelationCase {
         input: CreateGovCorrelationCase,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_correlation_cases (
                 tenant_id, connector_id, account_id, account_identifier,
                 account_attributes, trigger_type, highest_confidence,
@@ -306,7 +306,7 @@ impl GovCorrelationCase {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.connector_id)
@@ -332,7 +332,7 @@ impl GovCorrelationCase {
         candidate_id: Option<Uuid>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_correlation_cases
             SET status = $3,
                 resolved_by = $4,
@@ -342,7 +342,7 @@ impl GovCorrelationCase {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -362,13 +362,13 @@ impl GovCorrelationCase {
         assigned_to: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_correlation_cases
             SET assigned_to = $3,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -384,10 +384,10 @@ impl GovCorrelationCase {
         account_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_correlation_cases
             WHERE tenant_id = $1 AND account_id = $2 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(account_id)
@@ -402,10 +402,10 @@ impl GovCorrelationCase {
         connector_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_correlation_cases
             WHERE tenant_id = $1 AND connector_id = $2 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)

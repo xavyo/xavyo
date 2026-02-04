@@ -17,6 +17,7 @@ pub struct MockUser {
 }
 
 impl MockUser {
+    #[must_use] 
     pub fn google() -> Self {
         Self {
             id: "google-test-user".to_string(),
@@ -31,6 +32,7 @@ impl MockUser {
         }
     }
 
+    #[must_use] 
     pub fn microsoft() -> Self {
         Self {
             id: "microsoft-test-user".to_string(),
@@ -45,6 +47,7 @@ impl MockUser {
         }
     }
 
+    #[must_use] 
     pub fn apple() -> Self {
         Self {
             id: "apple-test-user".to_string(),
@@ -59,6 +62,7 @@ impl MockUser {
         }
     }
 
+    #[must_use] 
     pub fn apple_real_email() -> Self {
         Self {
             id: "apple-test-user-real".to_string(),
@@ -73,6 +77,7 @@ impl MockUser {
         }
     }
 
+    #[must_use] 
     pub fn github() -> Self {
         Self {
             id: "github-test-user".to_string(),
@@ -87,6 +92,7 @@ impl MockUser {
         }
     }
 
+    #[must_use] 
     pub fn github_private_email() -> Self {
         Self {
             id: "github-test-user-private".to_string(),
@@ -102,7 +108,7 @@ impl MockUser {
     }
 }
 
-/// Mock OAuth2 tokens returned by providers
+/// Mock `OAuth2` tokens returned by providers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MockToken {
     pub access_token: String,
@@ -114,6 +120,7 @@ pub struct MockToken {
 }
 
 impl MockToken {
+    #[must_use] 
     pub fn google() -> Self {
         Self {
             access_token: "ya29.mock_google_access_token".to_string(),
@@ -125,6 +132,7 @@ impl MockToken {
         }
     }
 
+    #[must_use] 
     pub fn microsoft() -> Self {
         Self {
             access_token: "eyJ0mock_ms_access_token".to_string(),
@@ -137,6 +145,7 @@ impl MockToken {
         }
     }
 
+    #[must_use] 
     pub fn apple() -> Self {
         Self {
             access_token: "mock_apple_access_token".to_string(),
@@ -148,6 +157,7 @@ impl MockToken {
         }
     }
 
+    #[must_use] 
     pub fn github() -> Self {
         Self {
             access_token: "gho_mock_github_token".to_string(),
@@ -182,6 +192,7 @@ pub struct ProviderTestFixture {
 }
 
 impl ProviderTestFixture {
+    #[must_use] 
     pub fn google() -> Self {
         Self {
             provider_type: ProviderType::Google,
@@ -198,6 +209,7 @@ impl ProviderTestFixture {
         }
     }
 
+    #[must_use] 
     pub fn microsoft() -> Self {
         Self {
             provider_type: ProviderType::Microsoft,
@@ -215,6 +227,7 @@ impl ProviderTestFixture {
         }
     }
 
+    #[must_use] 
     pub fn apple() -> Self {
         Self {
             provider_type: ProviderType::Apple,
@@ -227,6 +240,7 @@ impl ProviderTestFixture {
         }
     }
 
+    #[must_use] 
     pub fn github() -> Self {
         Self {
             provider_type: ProviderType::GitHub,

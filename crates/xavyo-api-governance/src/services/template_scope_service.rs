@@ -24,6 +24,7 @@ pub struct TemplateScopeService {
 
 impl TemplateScopeService {
     /// Create a new template scope service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -354,8 +355,7 @@ impl TemplateScopeService {
                 if let Some(condition) = &input.condition {
                     self.expression_service.validate(condition).map_err(|e| {
                         GovernanceError::TemplateScopeInvalid(format!(
-                            "Invalid condition expression: {}",
-                            e
+                            "Invalid condition expression: {e}"
                         ))
                     })?;
                 }

@@ -17,7 +17,7 @@ pub enum PersonaStatus {
     Active,
     /// Within notification window of expiration.
     Expiring,
-    /// Past valid_until, auto-deactivated.
+    /// Past `valid_until`, auto-deactivated.
     Expired,
     /// Manually suspended.
     Suspended,
@@ -76,31 +76,37 @@ pub enum PersonaAuditEventType {
 
 impl PersonaStatus {
     /// Check if this status represents a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Archived)
     }
 
     /// Check if this status allows context switching.
+    #[must_use] 
     pub fn can_switch_to(&self) -> bool {
         matches!(self, Self::Active)
     }
 
     /// Check if this status can be activated.
+    #[must_use] 
     pub fn can_activate(&self) -> bool {
         matches!(self, Self::Draft | Self::Suspended | Self::Expired)
     }
 
     /// Check if this status can be deactivated.
+    #[must_use] 
     pub fn can_deactivate(&self) -> bool {
         matches!(self, Self::Active | Self::Expiring)
     }
 
     /// Check if this status can be archived.
+    #[must_use] 
     pub fn can_archive(&self) -> bool {
         !matches!(self, Self::Archived)
     }
 
     /// Check if this is an active operational status.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self, Self::Active | Self::Expiring)
     }
@@ -108,6 +114,7 @@ impl PersonaStatus {
 
 impl PersonaLinkType {
     /// Check if this link type grants full control.
+    #[must_use] 
     pub fn has_full_control(&self) -> bool {
         matches!(self, Self::Owner)
     }
@@ -115,6 +122,7 @@ impl PersonaLinkType {
 
 impl PersonaAuditEventType {
     /// Check if this event type relates to archetypes.
+    #[must_use] 
     pub fn is_archetype_event(&self) -> bool {
         matches!(
             self,
@@ -123,6 +131,7 @@ impl PersonaAuditEventType {
     }
 
     /// Check if this event type relates to personas.
+    #[must_use] 
     pub fn is_persona_event(&self) -> bool {
         matches!(
             self,
@@ -136,11 +145,13 @@ impl PersonaAuditEventType {
     }
 
     /// Check if this event type relates to context switching.
+    #[must_use] 
     pub fn is_context_event(&self) -> bool {
         matches!(self, Self::ContextSwitched | Self::ContextSwitchedBack)
     }
 
     /// Check if this event type relates to entitlements.
+    #[must_use] 
     pub fn is_entitlement_event(&self) -> bool {
         matches!(self, Self::EntitlementAdded | Self::EntitlementRemoved)
     }

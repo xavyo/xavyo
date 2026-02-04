@@ -42,6 +42,7 @@ pub struct ProcessedChange {
 
 impl ProcessedChange {
     /// Create a successful result.
+    #[must_use] 
     pub fn success(change: &InboundChange, linked_identity_id: Option<Uuid>) -> Self {
         Self {
             change_id: change.id,
@@ -55,6 +56,7 @@ impl ProcessedChange {
     }
 
     /// Create a conflict result.
+    #[must_use] 
     pub fn conflict(change: &InboundChange, conflict_id: Uuid) -> Self {
         Self {
             change_id: change.id,
@@ -68,6 +70,7 @@ impl ProcessedChange {
     }
 
     /// Create a failed result.
+    #[must_use] 
     pub fn failed(change: &InboundChange, error: String) -> Self {
         Self {
             change_id: change.id,
@@ -98,6 +101,7 @@ pub struct BatchSummary {
 
 impl BatchSummary {
     /// Create a new empty summary.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             processed: 0,
@@ -150,6 +154,7 @@ pub struct SyncPipeline {
 
 impl SyncPipeline {
     /// Create a new sync pipeline.
+    #[must_use] 
     pub fn new(pool: PgPool, config: SyncConfig) -> Self {
         let rate_limiter = if config.rate_limit_per_minute > 0 {
             Some(RateLimiter::new(config.rate_limit_per_minute as u64))
@@ -196,6 +201,7 @@ impl SyncPipeline {
     }
 
     /// Create a builder for more complex configuration.
+    #[must_use] 
     pub fn builder(pool: PgPool, config: SyncConfig) -> SyncPipelineBuilder {
         SyncPipelineBuilder::new(pool, config)
     }
@@ -496,7 +502,7 @@ impl SyncPipeline {
         results
     }
 
-    /// Execute AddFocus action - create new identity.
+    /// Execute `AddFocus` action - create new identity.
     ///
     /// NOTE: This is a placeholder. In a full implementation, this would
     /// call the identity service to create a new user based on the change attributes.
@@ -520,7 +526,7 @@ impl SyncPipeline {
         ActionResult::success(SyncAction::AddFocus)
     }
 
-    /// Execute DeleteFocus action - delete identity.
+    /// Execute `DeleteFocus` action - delete identity.
     async fn execute_delete_focus(&self, change: &InboundChange) -> ActionResult {
         if self.dry_run {
             info!(
@@ -542,7 +548,7 @@ impl SyncPipeline {
         ActionResult::success(SyncAction::DeleteFocus)
     }
 
-    /// Execute InactivateFocus action - disable identity.
+    /// Execute `InactivateFocus` action - disable identity.
     async fn execute_inactivate_focus(&self, change: &InboundChange) -> ActionResult {
         if self.dry_run {
             info!(
@@ -580,14 +586,14 @@ impl SyncPipeline {
             .shadow_repo
             .find_by_target_uid(change.tenant_id, change.connector_id, &change.external_uid)
             .await
-            .map_err(|e| SyncError::internal(format!("Failed to find shadow: {}", e)))?
+            .map_err(|e| SyncError::internal(format!("Failed to find shadow: {e}")))?
         {
             shadow.user_id = None;
             shadow.sync_situation = SyncSituation::Unmatched;
             self.shadow_repo
                 .upsert(&shadow)
                 .await
-                .map_err(|e| SyncError::internal(format!("Failed to unlink shadow: {}", e)))?;
+                .map_err(|e| SyncError::internal(format!("Failed to unlink shadow: {e}")))?;
         }
 
         Ok(())
@@ -655,18 +661,15 @@ impl SyncPipeline {
     }
 
     /// Attempt to correlate an inbound change to an internal user.
-    /// Returns the determined SyncSituation based on correlation results.
+    /// Returns the determined `SyncSituation` based on correlation results.
     async fn attempt_correlation(&self, change: &mut InboundChange) -> SyncSituation {
         // Skip correlation if no correlator is configured
-        let correlator = match &self.correlator {
-            Some(c) => c,
-            None => {
-                info!(
-                    change_id = %change.id,
-                    "No correlator configured, returning Unmatched"
-                );
-                return SyncSituation::Unmatched;
-            }
+        let correlator = if let Some(c) = &self.correlator { c } else {
+            info!(
+                change_id = %change.id,
+                "No correlator configured, returning Unmatched"
+            );
+            return SyncSituation::Unmatched;
         };
 
         // Skip if no correlation rules defined
@@ -775,13 +778,13 @@ impl SyncPipeline {
         self.shadow_repo
             .upsert(&shadow)
             .await
-            .map_err(|e| SyncError::internal(format!("Failed to update shadow: {}", e)))?;
+            .map_err(|e| SyncError::internal(format!("Failed to update shadow: {e}")))?;
 
         Ok(())
     }
 }
 
-/// Builder for SyncPipeline.
+/// Builder for `SyncPipeline`.
 pub struct SyncPipelineBuilder {
     pool: PgPool,
     config: SyncConfig,
@@ -794,6 +797,7 @@ pub struct SyncPipelineBuilder {
 
 impl SyncPipelineBuilder {
     /// Create a new builder.
+    #[must_use] 
     pub fn new(pool: PgPool, config: SyncConfig) -> Self {
         Self {
             pool,
@@ -807,6 +811,7 @@ impl SyncPipelineBuilder {
     }
 
     /// Set the inbound mapper.
+    #[must_use] 
     pub fn mapper(mut self, mapper: InboundMapper) -> Self {
         self.mapper = Some(mapper);
         self
@@ -819,12 +824,14 @@ impl SyncPipelineBuilder {
     }
 
     /// Set correlation rules.
+    #[must_use] 
     pub fn correlation_rules(mut self, rules: Vec<InboundCorrelationRule>) -> Self {
         self.correlation_rules = rules;
         self
     }
 
     /// Set custom reaction configuration.
+    #[must_use] 
     pub fn reaction_config(mut self, config: SyncReactionConfig) -> Self {
         self.reaction_config = Some(config);
         self
@@ -834,12 +841,14 @@ impl SyncPipelineBuilder {
     ///
     /// In dry-run mode, the pipeline processes changes but does not
     /// persist any updates (tokens, shadows, status).
+    #[must_use] 
     pub fn dry_run(mut self, enabled: bool) -> Self {
         self.dry_run = enabled;
         self
     }
 
     /// Build the pipeline.
+    #[must_use] 
     pub fn build(self) -> SyncPipeline {
         let mut pipeline = SyncPipeline::new(self.pool, self.config);
         pipeline.mapper = self.mapper;

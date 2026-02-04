@@ -129,10 +129,10 @@ impl GovBulkStateOperation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_bulk_state_operations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -146,12 +146,12 @@ impl GovBulkStateOperation {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_bulk_state_operations
             WHERE status IN ('pending', 'running')
             ORDER BY created_at ASC
             LIMIT $1
-            "#,
+            ",
         )
         .bind(limit)
         .fetch_all(pool)
@@ -167,26 +167,26 @@ impl GovBulkStateOperation {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_bulk_state_operations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_num = 2;
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_num));
+            query.push_str(&format!(" AND status = ${param_num}"));
             param_num += 1;
         }
 
         if filter.transition_id.is_some() {
-            query.push_str(&format!(" AND transition_id = ${}", param_num));
+            query.push_str(&format!(" AND transition_id = ${param_num}"));
             param_num += 1;
         }
 
         if filter.requested_by.is_some() {
-            query.push_str(&format!(" AND requested_by = ${}", param_num));
+            query.push_str(&format!(" AND requested_by = ${param_num}"));
             param_num += 1;
         }
 
@@ -220,26 +220,26 @@ impl GovBulkStateOperation {
         filter: &BulkOperationFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_bulk_state_operations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_num = 2;
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_num));
+            query.push_str(&format!(" AND status = ${param_num}"));
             param_num += 1;
         }
 
         if filter.transition_id.is_some() {
-            query.push_str(&format!(" AND transition_id = ${}", param_num));
+            query.push_str(&format!(" AND transition_id = ${param_num}"));
             param_num += 1;
         }
 
         if filter.requested_by.is_some() {
-            query.push_str(&format!(" AND requested_by = ${}", param_num));
+            query.push_str(&format!(" AND requested_by = ${param_num}"));
         }
 
         let mut db_query = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -262,10 +262,10 @@ impl GovBulkStateOperation {
     /// Count active (pending or running) operations for a tenant.
     pub async fn count_active(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_bulk_state_operations
             WHERE tenant_id = $1 AND status IN ('pending', 'running')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -280,13 +280,13 @@ impl GovBulkStateOperation {
     ) -> Result<Self, sqlx::Error> {
         let total_count = input.object_ids.len() as i32;
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_bulk_state_operations (
                 tenant_id, transition_id, object_ids, total_count, requested_by
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.transition_id)
@@ -305,7 +305,7 @@ impl GovBulkStateOperation {
         input: &UpdateGovBulkStateOperation,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_bulk_state_operations
             SET
                 status = COALESCE($3, status),
@@ -317,7 +317,7 @@ impl GovBulkStateOperation {
                 completed_at = COALESCE($9, completed_at)
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -335,11 +335,11 @@ impl GovBulkStateOperation {
     /// Mark operation as running.
     pub async fn mark_running(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_bulk_state_operations
             SET status = 'running', started_at = NOW()
             WHERE id = $1 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(id)
         .execute(pool)
@@ -357,11 +357,11 @@ impl GovBulkStateOperation {
         failure_count: i32,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_bulk_state_operations
             SET processed_count = $2, success_count = $3, failure_count = $4
             WHERE id = $1 AND status = 'running'
-            "#,
+            ",
         )
         .bind(id)
         .bind(processed_count)
@@ -380,11 +380,11 @@ impl GovBulkStateOperation {
         results: JsonValue,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_bulk_state_operations
             SET status = 'completed', results = $2, completed_at = NOW()
             WHERE id = $1 AND status = 'running'
-            "#,
+            ",
         )
         .bind(id)
         .bind(&results)
@@ -401,11 +401,11 @@ impl GovBulkStateOperation {
         results: JsonValue,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_bulk_state_operations
             SET status = 'failed', results = $2, completed_at = NOW()
             WHERE id = $1 AND status IN ('pending', 'running')
-            "#,
+            ",
         )
         .bind(id)
         .bind(&results)
@@ -422,12 +422,12 @@ impl GovBulkStateOperation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_bulk_state_operations
             SET status = 'cancelled', completed_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -436,9 +436,10 @@ impl GovBulkStateOperation {
     }
 
     /// Get the progress of an operation.
+    #[must_use] 
     pub fn get_progress(&self) -> BulkOperationProgress {
         let progress_percent = if self.total_count > 0 {
-            ((self.processed_count as f64 / self.total_count as f64) * 100.0) as u8
+            ((f64::from(self.processed_count) / f64::from(self.total_count)) * 100.0) as u8
         } else {
             0
         };
@@ -458,10 +459,10 @@ impl GovBulkStateOperation {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_bulk_state_operations
             WHERE id = $1 AND tenant_id = $2 AND status IN ('cancelled', 'completed', 'failed')
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

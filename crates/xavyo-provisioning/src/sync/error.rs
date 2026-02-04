@@ -116,6 +116,7 @@ impl SyncError {
     }
 
     /// Create a disabled error.
+    #[must_use] 
     pub fn disabled(connector_id: Uuid) -> Self {
         Self::Disabled { connector_id }
     }
@@ -144,6 +145,7 @@ impl SyncError {
     }
 
     /// Check if this error is retryable.
+    #[must_use] 
     pub fn is_retryable(&self) -> bool {
         matches!(
             self,
@@ -155,6 +157,7 @@ impl SyncError {
     }
 
     /// Check if this error indicates a conflict.
+    #[must_use] 
     pub fn is_conflict(&self) -> bool {
         matches!(self, SyncError::Conflict { .. })
     }

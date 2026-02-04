@@ -43,6 +43,7 @@ pub struct PrivilegeDetector {
 
 impl PrivilegeDetector {
     /// Create a new privilege detector.
+    #[must_use] 
     pub fn new(params: MiningJobParameters) -> Self {
         Self { params }
     }
@@ -76,12 +77,12 @@ impl PrivilegeDetector {
 
             let sum: i32 = group_counts.iter().sum();
             let count = group_counts.len() as f64;
-            let average = sum as f64 / count;
+            let average = f64::from(sum) / count;
 
             // Calculate standard deviation
             let variance: f64 = group_counts
                 .iter()
-                .map(|&c| (c as f64 - average).powi(2))
+                .map(|&c| (f64::from(c) - average).powi(2))
                 .sum::<f64>()
                 / count;
             let std_dev = variance.sqrt();
@@ -102,11 +103,11 @@ impl PrivilegeDetector {
             let all_counts: Vec<i32> = user_counts.values().copied().collect();
             let sum: i32 = all_counts.iter().sum();
             let count = all_counts.len() as f64;
-            let average = sum as f64 / count;
+            let average = f64::from(sum) / count;
 
             let variance: f64 = all_counts
                 .iter()
-                .map(|&c| (c as f64 - average).powi(2))
+                .map(|&c| (f64::from(c) - average).powi(2))
                 .sum::<f64>()
                 / count;
             let std_dev = variance.sqrt();
@@ -158,7 +159,7 @@ impl PrivilegeDetector {
             };
 
             // Calculate deviation
-            let deviation = ((user_count as f64 - avg.average) / avg.average) * 100.0;
+            let deviation = ((f64::from(user_count) - avg.average) / avg.average) * 100.0;
 
             // Check if deviation exceeds threshold
             if deviation > self.params.deviation_threshold {
@@ -223,7 +224,7 @@ impl PrivilegeDetector {
             let mut ent_counts: HashMap<Uuid, usize> = HashMap::new();
             for user_id in &group.user_ids {
                 if let Some(ents) = user_ents.get(user_id) {
-                    for ent_id in ents.iter() {
+                    for ent_id in *ents {
                         *ent_counts.entry(*ent_id).or_insert(0) += 1;
                     }
                 }
@@ -263,6 +264,7 @@ impl PrivilegeDetector {
     }
 
     /// Convert detections to database creation requests.
+    #[must_use] 
     pub fn detections_to_create_requests(
         &self,
         job_id: Uuid,

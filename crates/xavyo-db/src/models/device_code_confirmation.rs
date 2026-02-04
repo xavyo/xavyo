@@ -109,14 +109,14 @@ impl DeviceCodeConfirmation {
             .await?;
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO device_code_confirmations (
                 tenant_id, device_code_id, user_id, confirmation_token_hash,
                 requested_from_ip, expires_at
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(new.tenant_id)
         .bind(new.device_code_id)
@@ -143,10 +143,10 @@ impl DeviceCodeConfirmation {
             .await?;
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM device_code_confirmations
             WHERE tenant_id = $1 AND confirmation_token_hash = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(token_hash)
@@ -169,7 +169,7 @@ impl DeviceCodeConfirmation {
             .await?;
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM device_code_confirmations
             WHERE tenant_id = $1
               AND device_code_id = $2
@@ -177,7 +177,7 @@ impl DeviceCodeConfirmation {
               AND expires_at > NOW()
             ORDER BY created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(device_code_id)
@@ -200,12 +200,12 @@ impl DeviceCodeConfirmation {
             .await?;
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE device_code_confirmations
             SET confirmed_at = NOW()
             WHERE tenant_id = $1 AND id = $2 AND confirmed_at IS NULL AND expires_at > NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -213,7 +213,7 @@ impl DeviceCodeConfirmation {
         .await
     }
 
-    /// Increment send count and update last_sent_at (for resend).
+    /// Increment send count and update `last_sent_at` (for resend).
     pub async fn record_resend(
         pool: &PgPool,
         tenant_id: Uuid,
@@ -228,12 +228,12 @@ impl DeviceCodeConfirmation {
             .await?;
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE device_code_confirmations
             SET send_count = send_count + 1, last_sent_at = NOW()
             WHERE tenant_id = $1 AND id = $2 AND send_count < $3
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -253,10 +253,10 @@ impl DeviceCodeConfirmation {
             .await?;
 
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM device_code_confirmations
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -269,10 +269,10 @@ impl DeviceCodeConfirmation {
     /// Delete all expired confirmations (cleanup job).
     pub async fn cleanup_expired(pool: &PgPool) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM device_code_confirmations
             WHERE expires_at < NOW()
-            "#,
+            ",
         )
         .execute(pool)
         .await?;
@@ -297,12 +297,12 @@ impl DeviceCodeConfirmation {
             .await?;
 
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM device_code_confirmations
             WHERE tenant_id = $1
               AND device_code_id = $2
               AND confirmed_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(device_code_id)

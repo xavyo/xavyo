@@ -53,10 +53,10 @@ impl GovRoleAssignmentParameter {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_assignment_parameters
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -72,10 +72,10 @@ impl GovRoleAssignmentParameter {
         parameter_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_assignment_parameters
             WHERE tenant_id = $1 AND assignment_id = $2 AND parameter_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)
@@ -91,11 +91,11 @@ impl GovRoleAssignmentParameter {
         assignment_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_assignment_parameters
             WHERE tenant_id = $1 AND assignment_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)
@@ -103,7 +103,7 @@ impl GovRoleAssignmentParameter {
         .await
     }
 
-    /// Get parameter values as a map (parameter_id -> value).
+    /// Get parameter values as a map (`parameter_id` -> value).
     pub async fn get_values_map(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -125,13 +125,13 @@ impl GovRoleAssignmentParameter {
         value: serde_json::Value,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_role_assignment_parameters (
                 tenant_id, assignment_id, parameter_id, value
             )
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)
@@ -171,12 +171,12 @@ impl GovRoleAssignmentParameter {
         value: serde_json::Value,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_role_assignment_parameters
             SET value = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -194,12 +194,12 @@ impl GovRoleAssignmentParameter {
         value: serde_json::Value,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_role_assignment_parameters
             SET value = $4, updated_at = NOW()
             WHERE tenant_id = $1 AND assignment_id = $2 AND parameter_id = $3
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)
@@ -216,10 +216,10 @@ impl GovRoleAssignmentParameter {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_assignment_parameters
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -236,10 +236,10 @@ impl GovRoleAssignmentParameter {
         assignment_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_assignment_parameters
             WHERE tenant_id = $1 AND assignment_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)
@@ -256,10 +256,10 @@ impl GovRoleAssignmentParameter {
         parameter_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_assignment_parameters
             WHERE tenant_id = $1 AND parameter_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(parameter_id)
@@ -274,10 +274,10 @@ impl GovRoleAssignmentParameter {
         assignment_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_assignment_parameters
             WHERE tenant_id = $1 AND assignment_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)
@@ -321,7 +321,7 @@ impl AssignmentParameterWithDefinition {
                 DateTime<Utc>,
             ),
         >(
-            r#"
+            r"
             SELECT
                 ap.id,
                 ap.parameter_id,
@@ -335,7 +335,7 @@ impl AssignmentParameterWithDefinition {
             JOIN gov_role_parameters p ON ap.parameter_id = p.id
             WHERE ap.tenant_id = $1 AND ap.assignment_id = $2
             ORDER BY p.display_order ASC, p.name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)

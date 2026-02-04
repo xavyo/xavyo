@@ -41,11 +41,11 @@ async fn test_tenant_cannot_list_others_nhis() {
 
     // Query from tenant B's perspective (filtering by tenant_b)
     let nhis_b: Vec<NhiRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
         FROM v_non_human_identities
         WHERE tenant_id = $1
-        "#,
+        ",
     )
     .bind(tenant_b)
     .fetch_all(&pool)
@@ -61,11 +61,11 @@ async fn test_tenant_cannot_list_others_nhis() {
 
     // Also verify tenant A can see its own NHI
     let nhis_a: Vec<NhiRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
         FROM v_non_human_identities
         WHERE tenant_id = $1
-        "#,
+        ",
     )
     .bind(tenant_a)
     .fetch_all(&pool)
@@ -92,11 +92,11 @@ async fn test_tenant_cannot_access_others_by_id() {
 
     // Try to access from tenant B's perspective
     let result: Option<NhiRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, name, nhi_type, owner_id, status, risk_score
         FROM v_non_human_identities
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id_a)
     .bind(tenant_b)
@@ -124,15 +124,15 @@ async fn test_tenant_cannot_update_others() {
     let sa_name = unique_service_account_name();
     let sa_id_a = create_test_nhi(&pool, tenant_a, owner_a, &sa_name, "service_account").await;
 
-    let original_desc = format!("Test NHI: {}", sa_name);
+    let original_desc = format!("Test NHI: {sa_name}");
 
     // Try to update from tenant B's perspective (using underlying table)
     let result = sqlx::query(
-        r#"
+        r"
         UPDATE gov_service_accounts
         SET purpose = 'Hacked by tenant B'
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id_a)
     .bind(tenant_b)
@@ -148,11 +148,11 @@ async fn test_tenant_cannot_update_others() {
 
     // Verify the original purpose is unchanged
     let row = sqlx::query(
-        r#"
+        r"
         SELECT purpose
         FROM gov_service_accounts
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id_a)
     .bind(tenant_a)
@@ -183,10 +183,10 @@ async fn test_tenant_cannot_delete_others() {
 
     // Try to delete from tenant B's perspective (using underlying table)
     let result = sqlx::query(
-        r#"
+        r"
         DELETE FROM gov_service_accounts
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id_a)
     .bind(tenant_b)
@@ -202,11 +202,11 @@ async fn test_tenant_cannot_delete_others() {
 
     // Verify the NHI still exists for tenant A
     let count_row: (i64,) = sqlx::query_as(
-        r#"
+        r"
         SELECT COUNT(*) as count
         FROM v_non_human_identities
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id_a)
     .bind(tenant_a)

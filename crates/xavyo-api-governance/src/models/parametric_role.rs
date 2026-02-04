@@ -3,7 +3,7 @@
 //! Parametric roles allow roles to have customizable parameters that can be
 //! bound at assignment time. This enables a single role definition to be used
 //! with different parameter values (e.g., "Database Access" role with a
-//! "database_name" parameter).
+//! "`database_name`" parameter).
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -244,7 +244,7 @@ pub struct CreateParametricAssignmentRequest {
     /// Target type (user or group).
     pub target_type: String,
 
-    /// Target ID (user_id or group_id).
+    /// Target ID (`user_id` or `group_id`).
     pub target_id: Uuid,
 
     /// Justification for the assignment (min 20 characters).

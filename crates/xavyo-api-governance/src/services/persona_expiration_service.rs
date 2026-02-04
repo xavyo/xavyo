@@ -62,9 +62,9 @@ pub struct BatchExpirationResult {
 pub struct ExtensionResult {
     /// Persona ID.
     pub persona_id: Uuid,
-    /// Previous valid_until date.
+    /// Previous `valid_until` date.
     pub previous_valid_until: Option<DateTime<Utc>>,
-    /// New valid_until date.
+    /// New `valid_until` date.
     pub new_valid_until: DateTime<Utc>,
     /// Extension in days.
     pub extension_days: i32,
@@ -116,6 +116,7 @@ pub struct PersonaExpirationService {
 
 impl PersonaExpirationService {
     /// Create a new persona expiration service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: PersonaAuditService::new(pool.clone()),
@@ -132,7 +133,7 @@ impl PersonaExpirationService {
     /// This should be called periodically (e.g., every 5 minutes) to:
     /// 1. Find active personas entering the expiration warning period
     /// 2. Transition them to "expiring" status
-    /// 3. Find expiring/active personas past their valid_until
+    /// 3. Find expiring/active personas past their `valid_until`
     /// 4. Transition them to "expired" status and invalidate sessions
     pub async fn process_expirations(
         &self,
@@ -235,7 +236,7 @@ impl PersonaExpirationService {
     // T070: Status transition: expiring/active → expired
     // =========================================================================
 
-    /// Find and transition personas that have passed their valid_until date.
+    /// Find and transition personas that have passed their `valid_until` date.
     async fn transition_to_expired(
         &self,
         tenant_id: Uuid,
@@ -354,7 +355,7 @@ impl PersonaExpirationService {
 
     /// Extend the validity period of a persona.
     ///
-    /// T074: If the archetype's lifecycle_policy has extension_requires_approval = true,
+    /// T074: If the archetype's `lifecycle_policy` has `extension_requires_approval` = true,
     /// the extension is only allowed if the actor is the physical user who owns the persona.
     /// For non-owner extensions when approval is required, an error is returned.
     pub async fn extend_validity(
@@ -411,16 +412,16 @@ impl PersonaExpirationService {
         let current_valid_until = persona.valid_until.unwrap_or_else(Utc::now);
         let new_valid_until = if current_valid_until < Utc::now() {
             // If already expired, extend from now
-            Utc::now() + Duration::days(extension_days as i64)
+            Utc::now() + Duration::days(i64::from(extension_days))
         } else {
             // Extend from current valid_until
-            current_valid_until + Duration::days(extension_days as i64)
+            current_valid_until + Duration::days(i64::from(extension_days))
         };
 
         // Check max_validity_days constraint from lifecycle_policy
         if let Some(ref arch) = archetype {
             if let Ok(policy) = arch.parse_lifecycle_policy() {
-                let max_duration = Duration::days(policy.max_validity_days as i64);
+                let max_duration = Duration::days(i64::from(policy.max_validity_days));
                 let persona_created_at = persona.created_at;
                 let max_valid_until = persona_created_at + max_duration;
                 if new_valid_until > max_valid_until {
@@ -502,8 +503,7 @@ impl PersonaExpirationService {
             .iter()
             .filter(|p| {
                 p.valid_until
-                    .map(|v| v.date_naive() == today_start)
-                    .unwrap_or(false)
+                    .is_some_and(|v| v.date_naive() == today_start)
             })
             .count() as i64;
 
@@ -515,7 +515,7 @@ impl PersonaExpirationService {
         let personas: Vec<ExpiringPersonaSummary> = expiring
             .iter()
             .map(|p| {
-                let days_remaining = p.valid_until.map(|v| (v - now).num_days()).unwrap_or(0);
+                let days_remaining = p.valid_until.map_or(0, |v| (v - now).num_days());
 
                 ExpiringPersonaSummary {
                     persona_id: p.id,

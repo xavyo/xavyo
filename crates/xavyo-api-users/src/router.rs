@@ -54,6 +54,7 @@ pub struct UsersState {
 
 impl UsersState {
     /// Create a new users state.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         let user_service = Arc::new(UserService::new(pool.clone()));
         let attribute_definition_service = Arc::new(AttributeDefinitionService::new(pool.clone()));

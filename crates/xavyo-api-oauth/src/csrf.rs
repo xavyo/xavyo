@@ -21,7 +21,8 @@ const CSRF_EXPIRY_SECONDS: i64 = 600;
 /// - `token` = `{unix_timestamp}:{random_hex}`
 /// - `signature` = hex-encoded HMAC-SHA256 of the token
 ///
-/// SECURITY: Uses OsRng directly from the operating system's CSPRNG for the random component.
+/// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG for the random component.
+#[must_use] 
 pub fn generate_csrf_token(secret: &[u8]) -> (String, String) {
     use rand::rngs::OsRng;
     use rand::RngCore;
@@ -44,6 +45,7 @@ pub fn generate_csrf_token(secret: &[u8]) -> (String, String) {
 /// 2. Token is not expired (10-minute window)
 ///
 /// Returns `true` if valid.
+#[must_use] 
 pub fn validate_csrf_token(token: &str, signature: &str, secret: &[u8]) -> bool {
     // Verify HMAC signature
     let expected_sig = compute_hmac(secret, token);

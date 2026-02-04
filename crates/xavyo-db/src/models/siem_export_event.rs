@@ -45,14 +45,14 @@ impl SiemExportEvent {
         input: CreateSiemExportEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO siem_export_events (
                 tenant_id, destination_id, source_event_id, source_event_type,
                 event_timestamp, formatted_payload
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.destination_id)
@@ -72,14 +72,14 @@ impl SiemExportEvent {
         latency_ms: i32,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE siem_export_events
             SET delivery_status = 'delivered',
                 delivered_at = NOW(),
                 last_attempt_at = NOW(),
                 delivery_latency_ms = $3
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -99,7 +99,7 @@ impl SiemExportEvent {
         next_retry_at: Option<DateTime<Utc>>,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE siem_export_events
             SET delivery_status = 'failed',
                 last_attempt_at = NOW(),
@@ -107,7 +107,7 @@ impl SiemExportEvent {
                 error_detail = $3,
                 next_retry_at = $4
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -127,14 +127,14 @@ impl SiemExportEvent {
         error: &str,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE siem_export_events
             SET delivery_status = 'dead_letter',
                 last_attempt_at = NOW(),
                 error_detail = $3,
                 next_retry_at = NULL
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -153,12 +153,12 @@ impl SiemExportEvent {
         reason: &str,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE siem_export_events
             SET delivery_status = 'dropped',
                 error_detail = $3
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -176,14 +176,14 @@ impl SiemExportEvent {
         destination_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE siem_export_events
             SET delivery_status = 'pending',
                 retry_count = 0,
                 next_retry_at = NULL,
                 error_detail = NULL
             WHERE tenant_id = $1 AND destination_id = $2 AND delivery_status = 'dead_letter'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(destination_id)
@@ -193,21 +193,21 @@ impl SiemExportEvent {
         Ok(result.rows_affected())
     }
 
-    /// List events needing retry (failed with next_retry_at in the past).
+    /// List events needing retry (failed with `next_retry_at` in the past).
     pub async fn list_pending_retries(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM siem_export_events
             WHERE tenant_id = $1
               AND delivery_status = 'failed'
               AND next_retry_at <= NOW()
             ORDER BY next_retry_at
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -225,16 +225,16 @@ impl SiemExportEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM siem_export_events
             WHERE tenant_id = $1 AND destination_id = $2
-            "#,
+            ",
         );
         let mut param_count = 2;
 
         if status_filter.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND delivery_status = ${}", param_count));
+            query.push_str(&format!(" AND delivery_status = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -263,12 +263,12 @@ impl SiemExportEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM siem_export_events
             WHERE tenant_id = $1 AND destination_id = $2 AND delivery_status = 'dead_letter'
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(destination_id)
@@ -286,10 +286,10 @@ impl SiemExportEvent {
         status: &str,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM siem_export_events
             WHERE tenant_id = $1 AND destination_id = $2 AND delivery_status = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(destination_id)
@@ -306,10 +306,10 @@ impl SiemExportEvent {
         source_event_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM siem_export_events
             WHERE tenant_id = $1 AND destination_id = $2 AND source_event_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(destination_id)

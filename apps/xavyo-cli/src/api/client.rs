@@ -22,7 +22,7 @@ impl ApiClient {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_secs))
             .build()
-            .map_err(|e| CliError::Network(format!("Failed to create HTTP client: {}", e)))?;
+            .map_err(|e| CliError::Network(format!("Failed to create HTTP client: {e}")))?;
 
         Ok(Self {
             client,

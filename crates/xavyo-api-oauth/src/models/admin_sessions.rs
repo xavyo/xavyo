@@ -46,10 +46,10 @@ pub struct SessionInfo {
     /// Refresh token record ID.
     pub id: Uuid,
 
-    /// OAuth2 client internal ID.
+    /// `OAuth2` client internal ID.
     pub client_id: Uuid,
 
-    /// OAuth2 client display name.
+    /// `OAuth2` client display name.
     pub client_name: String,
 
     /// Granted scopes.

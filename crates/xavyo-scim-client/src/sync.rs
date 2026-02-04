@@ -62,6 +62,7 @@ impl SyncProgress {
 
 impl SyncEngine {
     /// Create a new sync engine backed by the given database pool.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -540,12 +541,12 @@ async fn fetch_users_page(
     offset: i64,
 ) -> Result<Vec<User>, sqlx::Error> {
     sqlx::query_as(
-        r#"
+        r"
         SELECT * FROM users
         WHERE tenant_id = $1
         ORDER BY id
         LIMIT $2 OFFSET $3
-        "#,
+        ",
     )
     .bind(tenant_id)
     .bind(limit)

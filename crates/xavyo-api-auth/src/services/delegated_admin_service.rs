@@ -41,12 +41,13 @@ struct CachedPermissions {
 #[derive(Clone)]
 pub struct DelegatedAdminService {
     pool: PgPool,
-    /// Permission cache: (tenant_id, user_id) -> CachedPermissions
+    /// Permission cache: (`tenant_id`, `user_id`) -> `CachedPermissions`
     cache: Arc<DashMap<(Uuid, Uuid), CachedPermissions>>,
 }
 
 impl DelegatedAdminService {
     /// Create a new delegated admin service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -132,8 +133,7 @@ impl DelegatedAdminService {
         for code in &expanded {
             if !found_codes.contains(code) {
                 return Err(ApiAuthError::InvalidPermission(format!(
-                    "Permission '{}' does not exist",
-                    code
+                    "Permission '{code}' does not exist"
                 )));
             }
         }

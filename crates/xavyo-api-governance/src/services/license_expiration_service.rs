@@ -4,7 +4,7 @@
 //! and expiration policy enforcement. Supports:
 //! - Finding pools expiring within a configurable window
 //! - Automatically expiring pools past their expiration date
-//! - Enforcing expiration policies (BlockNew, RevokeAll, WarnOnly)
+//! - Enforcing expiration policies (`BlockNew`, `RevokeAll`, `WarnOnly`)
 //! - Generating renewal alert information for pools approaching expiration
 
 use chrono::{DateTime, Utc};
@@ -45,7 +45,7 @@ pub struct PolicyApplicationSummary {
     pub pool_name: String,
     /// The policy that was enforced.
     pub policy: LicenseExpirationPolicy,
-    /// Number of assignments revoked (only non-zero for RevokeAll).
+    /// Number of assignments revoked (only non-zero for `RevokeAll`).
     pub assignments_revoked: i64,
 }
 
@@ -56,7 +56,7 @@ pub struct PolicyApplicationResult {
     pub pool_id: Uuid,
     /// The policy that was enforced.
     pub policy: LicenseExpirationPolicy,
-    /// Number of assignments revoked (only non-zero for RevokeAll).
+    /// Number of assignments revoked (only non-zero for `RevokeAll`).
     pub assignments_revoked: i64,
 }
 
@@ -199,6 +199,7 @@ pub struct LicenseExpirationService {
 
 impl LicenseExpirationService {
     /// Create a new license expiration service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: LicenseAuditService::new(pool.clone()),
@@ -308,11 +309,11 @@ impl LicenseExpirationService {
     ///
     /// Loads the pool, checks its `expiration_policy`, and takes action:
     ///
-    /// - **BlockNew**: No additional action needed. The pool's expired status
+    /// - **`BlockNew`**: No additional action needed. The pool's expired status
     ///   already blocks new assignments via `is_allocation_blocked()`.
-    /// - **RevokeAll**: Revokes all active assignments for this pool and
+    /// - **`RevokeAll`**: Revokes all active assignments for this pool and
     ///   resets the `allocated_count` to 0.
-    /// - **WarnOnly**: No action needed beyond the status change. Existing
+    /// - **`WarnOnly`**: No action needed beyond the status change. Existing
     ///   assignments remain active.
     pub async fn apply_expiration_policy(
         &self,
@@ -347,11 +348,11 @@ impl LicenseExpirationService {
                 // We do this by setting status to expired which already happened,
                 // but we also need to zero out allocated_count.
                 sqlx::query(
-                    r#"
+                    r"
                     UPDATE gov_license_pools
                     SET allocated_count = 0, updated_at = NOW()
                     WHERE id = $1 AND tenant_id = $2
-                    "#,
+                    ",
                 )
                 .bind(pool_id)
                 .bind(tenant_id)
@@ -420,7 +421,7 @@ impl LicenseExpirationService {
             // Use the extracted pure function for warning check
             if should_send_warning(
                 pool_record.expiration_date,
-                pool_record.warning_days as i64,
+                i64::from(pool_record.warning_days),
                 now,
             ) {
                 if let Some(exp_date) = pool_record.expiration_date {
@@ -455,11 +456,13 @@ impl LicenseExpirationService {
     }
 
     /// Get the underlying database pool reference.
+    #[must_use] 
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get the audit service reference.
+    #[must_use] 
     pub fn audit_service(&self) -> &LicenseAuditService {
         &self.audit_service
     }

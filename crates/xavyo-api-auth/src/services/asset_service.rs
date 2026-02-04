@@ -130,8 +130,7 @@ impl AssetService {
 
         if is_referenced {
             return Err(ApiAuthError::AssetInUse(format!(
-                "Asset {} is currently in use in branding configuration",
-                asset_id
+                "Asset {asset_id} is currently in use in branding configuration"
             )));
         }
 
@@ -209,7 +208,7 @@ impl AssetService {
     // Helper Methods
     // ========================================================================
 
-    /// Convert a BrandingAsset to AssetResponse with the public URL.
+    /// Convert a `BrandingAsset` to `AssetResponse` with the public URL.
     fn asset_to_response(&self, asset: &BrandingAsset) -> AssetResponse {
         AssetResponse {
             id: asset.id,

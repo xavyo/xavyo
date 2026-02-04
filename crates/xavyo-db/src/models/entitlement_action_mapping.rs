@@ -49,10 +49,10 @@ impl EntitlementActionMapping {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM entitlement_action_mappings
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -66,11 +66,11 @@ impl EntitlementActionMapping {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM entitlement_action_mappings
             WHERE tenant_id = $1
             ORDER BY resource_type, action
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -84,11 +84,11 @@ impl EntitlementActionMapping {
         entitlement_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM entitlement_action_mappings
             WHERE tenant_id = $1 AND entitlement_id = $2
             ORDER BY resource_type, action
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_id)
@@ -104,12 +104,12 @@ impl EntitlementActionMapping {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM entitlement_action_mappings
             WHERE tenant_id = $1
             ORDER BY resource_type, action
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -121,10 +121,10 @@ impl EntitlementActionMapping {
     /// Count mappings for a tenant.
     pub async fn count_by_tenant(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM entitlement_action_mappings
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -140,13 +140,13 @@ impl EntitlementActionMapping {
         input: CreateEntitlementActionMapping,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO entitlement_action_mappings (
                 tenant_id, entitlement_id, action, resource_type, created_by
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.entitlement_id)
@@ -164,10 +164,10 @@ impl EntitlementActionMapping {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM entitlement_action_mappings
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -185,11 +185,11 @@ impl EntitlementActionMapping {
         entitlement_ids: &[Uuid],
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM entitlement_action_mappings
             WHERE tenant_id = $1 AND entitlement_id = ANY($2)
             ORDER BY resource_type, action
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_ids)
@@ -204,10 +204,10 @@ impl EntitlementActionMapping {
         entitlement_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM entitlement_action_mappings
             WHERE tenant_id = $1 AND entitlement_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_id)

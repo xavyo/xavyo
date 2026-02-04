@@ -1,4 +1,4 @@
-//! Common test utilities for IdP interoperability tests.
+//! Common test utilities for `IdP` interoperability tests.
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 // Test RSA key pair (2048-bit) for signing test tokens
 // This is the same key used in token_verifier.rs tests
-pub const TEST_PRIVATE_KEY: &[u8] = br#"-----BEGIN PRIVATE KEY-----
+pub const TEST_PRIVATE_KEY: &[u8] = br"-----BEGIN PRIVATE KEY-----
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC46zZuOStUrVWL
 q5KtkAaPL9hNCULR4zPhgskdUOB1c+bxRiOicEHKTBsqb4LSnizIb3fIEN5XuUL5
 TzOBKT3hAc/gKKU71VKE5EMcbfuLLVxTqj08K2j7PzCChzzydZGjAWfisndASeQP
@@ -36,9 +36,9 @@ z+e5L4xaXAKxYDuI3tWOnRqOpvOmy27XqdESlfjr0QKBgDpS1FtG9JN1Bg01GoOp
 Hzl/YpRraobBYDOtv70uNx9QyKAeFmvhDkwmgbOA1efFMgcPG7bdvL5ld7/N6d7D
 RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
 6iYwOxn6PHzksnM+GSuHzWGz
------END PRIVATE KEY-----"#;
+-----END PRIVATE KEY-----";
 
-/// JWK representation of TEST_PRIVATE_KEY's public key
+/// JWK representation of `TEST_PRIVATE_KEY`'s public key
 pub fn test_public_key_jwk(kid: &str) -> Value {
     json!({
         "kty": "RSA",
@@ -135,7 +135,7 @@ pub fn create_test_token(claims: &TestClaims, kid: &str) -> String {
 }
 
 /// Create a test token with custom claims embedded
-/// Note: This creates a token that may not fully deserialize into JwtClaims
+/// Note: This creates a token that may not fully deserialize into `JwtClaims`
 /// but will pass signature verification. Use for testing IdP-specific claims
 /// that are embedded but not extracted by the verifier.
 pub fn create_test_token_with_custom_claims(claims: &TestClaims, kid: &str) -> String {
@@ -167,7 +167,7 @@ pub fn create_invalid_signature_token(claims: &TestClaims, kid: &str) -> String 
     }
 }
 
-/// Mock server setup for IdP testing
+/// Mock server setup for `IdP` testing
 pub struct IdpMockServer {
     pub server: MockServer,
     #[allow(dead_code)]
@@ -178,14 +178,14 @@ pub struct IdpMockServer {
 }
 
 impl IdpMockServer {
-    /// Create a new mock server for an IdP
+    /// Create a new mock server for an `IdP`
     pub async fn new() -> Self {
         let server = MockServer::start().await;
         let base_url = server.uri();
         Self {
             issuer: base_url.clone(),
-            jwks_uri: format!("{}/.well-known/jwks.json", base_url),
-            discovery_uri: format!("{}/.well-known/openid-configuration", base_url),
+            jwks_uri: format!("{base_url}/.well-known/jwks.json"),
+            discovery_uri: format!("{base_url}/.well-known/openid-configuration"),
             server,
         }
     }
@@ -196,9 +196,9 @@ impl IdpMockServer {
         let server = MockServer::start().await;
         let base_url = server.uri();
         Self {
-            issuer: format!("{}{}", base_url, issuer_path),
-            jwks_uri: format!("{}/.well-known/jwks.json", base_url),
-            discovery_uri: format!("{}/.well-known/openid-configuration", base_url),
+            issuer: format!("{base_url}{issuer_path}"),
+            jwks_uri: format!("{base_url}/.well-known/jwks.json"),
+            discovery_uri: format!("{base_url}/.well-known/openid-configuration"),
             server,
         }
     }

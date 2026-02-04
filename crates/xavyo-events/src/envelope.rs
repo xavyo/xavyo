@@ -64,7 +64,7 @@ impl<T: Event> EventEnvelope<T> {
         T::TOPIC
     }
 
-    /// Get the partition key (tenant_id as string).
+    /// Get the partition key (`tenant_id` as string).
     pub fn partition_key(&self) -> String {
         self.tenant_id.to_string()
     }

@@ -54,6 +54,7 @@ pub enum HookPhase {
 }
 
 impl HookPhase {
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             HookPhase::Before => "before",
@@ -104,7 +105,7 @@ pub struct HookContext {
     #[serde(default)]
     pub variables: HashMap<String, serde_json::Value>,
 
-    /// Error message (for OnError phase).
+    /// Error message (for `OnError` phase).
     #[serde(default)]
     pub error: Option<String>,
 }
@@ -192,6 +193,7 @@ pub trait HookExecutor: Send + Sync {
 pub struct ExpressionHookExecutor;
 
 impl ExpressionHookExecutor {
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
@@ -409,11 +411,10 @@ fn evaluate_expression(expression: &str, context: &HookContext) -> HookResult<Ex
                 let attr = validate_expr.replace("!=null", "").trim().to_string();
                 let exists = modified_attrs
                     .get(&attr)
-                    .map(|v| !v.is_null())
-                    .unwrap_or(false);
+                    .is_some_and(|v| !v.is_null());
                 if !exists {
                     return Err(HookError::HookReturnedError {
-                        message: format!("Validation failed: {} is null or missing", attr),
+                        message: format!("Validation failed: {attr} is null or missing"),
                     });
                 }
             }
@@ -491,6 +492,7 @@ impl HookManager {
     }
 
     /// Get hooks for a specific phase and operation type.
+    #[must_use] 
     pub fn get_hooks(
         &self,
         phase: HookPhase,
@@ -531,7 +533,7 @@ impl HookManager {
 
             let executor = self.executors.get(executor_type).ok_or_else(|| {
                 HookError::InvalidConfiguration {
-                    message: format!("Unknown executor type: {}", executor_type),
+                    message: format!("Unknown executor type: {executor_type}"),
                 }
             })?;
 

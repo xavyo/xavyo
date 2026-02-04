@@ -2,7 +2,7 @@
 //!
 //! Processes retry queue for failed ticket creation attempts.
 //! Uses exponential backoff: 30s, 2m, 10m, 1h, 4h, 24h.
-//! After 7 retries, tasks are marked as failed_permanent.
+//! After 7 retries, tasks are marked as `failed_permanent`.
 
 use std::sync::Arc;
 
@@ -17,7 +17,7 @@ pub const DEFAULT_POLL_INTERVAL_SECS: u64 = 30;
 /// Default batch size for processing.
 pub const DEFAULT_BATCH_SIZE: i64 = 50;
 
-/// Maximum number of retry attempts before marking as failed_permanent.
+/// Maximum number of retry attempts before marking as `failed_permanent`.
 pub const MAX_RETRY_ATTEMPTS: i32 = 7;
 
 /// Retry schedule in seconds: 30s, 2m, 10m, 1h, 4h, 24h, 24h.
@@ -33,7 +33,7 @@ pub const RETRY_SCHEDULE_SECS: [i64; 7] = [
 
 /// Job for processing ticket creation retries with exponential backoff.
 ///
-/// This job polls for tasks in retry_pending state and attempts
+/// This job polls for tasks in `retry_pending` state and attempts
 /// to create tickets in external systems.
 pub struct TicketRetryJob {
     task_service: Arc<ManualTaskService>,
@@ -78,6 +78,7 @@ pub enum TicketRetryJobError {
 
 impl TicketRetryJob {
     /// Create a new ticket retry job.
+    #[must_use] 
     pub fn new(task_service: ManualTaskService) -> Self {
         Self {
             task_service: Arc::new(task_service),
@@ -93,6 +94,7 @@ impl TicketRetryJob {
     }
 
     /// Calculate next retry time based on retry count.
+    #[must_use] 
     pub fn calculate_next_retry(retry_count: i32) -> Option<chrono::DateTime<Utc>> {
         if retry_count >= MAX_RETRY_ATTEMPTS {
             return None; // Exhausted retries

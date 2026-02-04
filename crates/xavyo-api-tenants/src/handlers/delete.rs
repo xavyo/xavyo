@@ -86,7 +86,7 @@ pub async fn delete_tenant_handler(
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
         .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {} not found", tenant_id))
+            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
         })?;
 
     if target_tenant.is_system() {
@@ -97,8 +97,7 @@ pub async fn delete_tenant_handler(
 
     if target_tenant.is_deleted() {
         return Err(TenantError::Conflict(format!(
-            "Tenant {} is already deleted",
-            tenant_id
+            "Tenant {tenant_id} is already deleted"
         )));
     }
 
@@ -207,13 +206,12 @@ pub async fn restore_tenant_handler(
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
         .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {} not found", tenant_id))
+            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
         })?;
 
     if !target_tenant.is_deleted() {
         return Err(TenantError::Conflict(format!(
-            "Tenant {} is not deleted",
-            tenant_id
+            "Tenant {tenant_id} is not deleted"
         )));
     }
 

@@ -36,10 +36,11 @@ pub struct ProblemDetails {
 }
 
 impl ProblemDetails {
-    /// Create a new ProblemDetails instance.
+    /// Create a new `ProblemDetails` instance.
+    #[must_use] 
     pub fn new(error_type: &str, title: &str, status: StatusCode) -> Self {
         Self {
-            error_type: format!("{}/{}", ERROR_BASE_URL, error_type),
+            error_type: format!("{ERROR_BASE_URL}/{error_type}"),
             title: title.to_string(),
             status: status.as_u16(),
             detail: None,
@@ -120,7 +121,7 @@ pub enum ImportError {
 }
 
 impl ImportError {
-    /// Convert to ProblemDetails.
+    /// Convert to `ProblemDetails`.
     pub fn to_problem_details(&self) -> ProblemDetails {
         match self {
             ImportError::FileTooLarge(msg) => ProblemDetails::new(
@@ -229,6 +230,7 @@ impl ImportError {
     }
 
     /// Get the HTTP status code for this error.
+    #[must_use] 
     pub fn status_code(&self) -> StatusCode {
         match self {
             ImportError::FileTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,

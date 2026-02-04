@@ -19,6 +19,7 @@ pub struct UpdateSettingsRequest {
 
 impl UpdateSettingsRequest {
     /// Validate the request.
+    #[must_use] 
     pub fn validate(&self) -> Option<String> {
         // Settings must be an object
         if !self.settings.is_object() {
@@ -35,11 +36,11 @@ impl UpdateSettingsRequest {
             if let Some(obj) = limits.as_object() {
                 for (key, value) in obj {
                     if !value.is_null() && !value.is_i64() && !value.is_u64() {
-                        return Some(format!("limits.{} must be a positive integer or null", key));
+                        return Some(format!("limits.{key} must be a positive integer or null"));
                     }
                     if let Some(v) = value.as_i64() {
                         if v < 0 {
-                            return Some(format!("limits.{} must be a positive integer", key));
+                            return Some(format!("limits.{key} must be a positive integer"));
                         }
                     }
                 }

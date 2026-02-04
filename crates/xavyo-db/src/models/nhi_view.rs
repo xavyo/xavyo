@@ -27,7 +27,7 @@ pub struct NonHumanIdentityView {
     /// Description or purpose statement
     pub description: Option<String>,
 
-    /// Type discriminator: "service_account" or "ai_agent"
+    /// Type discriminator: "`service_account`" or "`ai_agent`"
     pub nhi_type: String,
 
     /// Primary owner user ID
@@ -60,21 +60,25 @@ pub struct NonHumanIdentityView {
 
 impl NonHumanIdentityView {
     /// Check if this is a service account.
+    #[must_use] 
     pub fn is_service_account(&self) -> bool {
         self.nhi_type == "service_account"
     }
 
     /// Check if this is an AI agent.
+    #[must_use] 
     pub fn is_ai_agent(&self) -> bool {
         self.nhi_type == "ai_agent"
     }
 
     /// Check if the identity is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         self.status == "active" || self.status == "Active"
     }
 
     /// Check if the identity has expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         if let Some(expires) = self.expires_at {
             expires < Utc::now()
@@ -84,6 +88,7 @@ impl NonHumanIdentityView {
     }
 
     /// Check if certification is due within the given days.
+    #[must_use] 
     pub fn certification_due_within_days(&self, days: i64) -> bool {
         if let Some(next_cert) = self.next_certification_at {
             let threshold = Utc::now() + chrono::Duration::days(days);
@@ -94,6 +99,7 @@ impl NonHumanIdentityView {
     }
 
     /// Get the risk level category.
+    #[must_use] 
     pub fn risk_level(&self) -> &'static str {
         match self.risk_score {
             0..=25 => "low",
@@ -104,6 +110,7 @@ impl NonHumanIdentityView {
     }
 
     /// Check if the identity has been inactive for the given days.
+    #[must_use] 
     pub fn inactive_for_days(&self, days: i64) -> bool {
         if let Some(last_activity) = self.last_activity_at {
             let threshold = Utc::now() - chrono::Duration::days(days);
@@ -122,34 +129,34 @@ impl NonHumanIdentityView {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, nhi_type, owner_id, backup_owner_id,
                    status, created_at, expires_at, last_activity_at, risk_score,
                    next_certification_at, last_certified_at
             FROM v_non_human_identities
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.nhi_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND nhi_type = ${}", param_count));
+            query.push_str(&format!(" AND nhi_type = ${param_count}"));
         }
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         if filter.owner_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND owner_id = ${}", param_count));
+            query.push_str(&format!(" AND owner_id = ${param_count}"));
         }
 
         if let Some(risk_min) = filter.risk_min {
             param_count += 1;
-            query.push_str(&format!(" AND risk_score >= ${}", param_count));
+            query.push_str(&format!(" AND risk_score >= ${param_count}"));
             let _ = risk_min; // Used below
         }
 
@@ -188,32 +195,32 @@ impl NonHumanIdentityView {
         filter: &NhiViewFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM v_non_human_identities
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.nhi_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND nhi_type = ${}", param_count));
+            query.push_str(&format!(" AND nhi_type = ${param_count}"));
         }
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         if filter.owner_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND owner_id = ${}", param_count));
+            query.push_str(&format!(" AND owner_id = ${param_count}"));
         }
 
         if let Some(risk_min) = filter.risk_min {
             param_count += 1;
-            query.push_str(&format!(" AND risk_score >= ${}", param_count));
+            query.push_str(&format!(" AND risk_score >= ${param_count}"));
             let _ = risk_min;
         }
 
@@ -246,13 +253,13 @@ impl NonHumanIdentityView {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, nhi_type, owner_id, backup_owner_id,
                    status, created_at, expires_at, last_activity_at, risk_score,
                    next_certification_at, last_certified_at
             FROM v_non_human_identities
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -266,7 +273,7 @@ impl NonHumanIdentityView {
         tenant_id: Uuid,
     ) -> Result<NhiRiskSummary, sqlx::Error> {
         let row = sqlx::query_as::<_, RiskSummaryRow>(
-            r#"
+            r"
             SELECT
                 COUNT(*)::integer AS total_count,
                 COUNT(*) FILTER (WHERE nhi_type = 'service_account')::integer AS service_account_count,
@@ -280,7 +287,7 @@ impl NonHumanIdentityView {
                 COUNT(*) FILTER (WHERE expires_at <= NOW() + INTERVAL '7 days')::integer AS expiring_7_days
             FROM v_non_human_identities
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -323,7 +330,7 @@ struct RiskSummaryRow {
 /// Filter options for listing NHIs from the unified view.
 #[derive(Debug, Clone, Default)]
 pub struct NhiViewFilter {
-    /// Filter by NHI type ("service_account", "ai_agent", or None for all)
+    /// Filter by NHI type ("`service_account`", "`ai_agent`", or None for all)
     pub nhi_type: Option<String>,
 
     /// Filter by status

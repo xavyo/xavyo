@@ -92,8 +92,7 @@ pub fn sanitize_css(css: &str) -> Result<String, ApiAuthError> {
     for pattern in DISALLOWED_PATTERNS {
         if css_lower.contains(pattern) {
             return Err(ApiAuthError::InvalidCss(format!(
-                "CSS contains disallowed pattern: {}",
-                pattern
+                "CSS contains disallowed pattern: {pattern}"
             )));
         }
     }
@@ -139,8 +138,7 @@ pub fn sanitize_css(css: &str) -> Result<String, ApiAuthError> {
 
                 if !allowed.contains(without_prefix) {
                     return Err(ApiAuthError::InvalidCss(format!(
-                        "CSS property '{}' is not allowed",
-                        property
+                        "CSS property '{property}' is not allowed"
                     )));
                 }
             }

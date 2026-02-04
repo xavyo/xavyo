@@ -36,7 +36,7 @@
 //! - PUT /admin/tenants/:id/lockout-policy
 //! - GET /admin/tenants/:id/mfa-policy (F022)
 //! - PUT /admin/tenants/:id/mfa-policy (F022)
-//! - GET /admin/users/:user_id/mfa/status (F022)
+//! - GET /`admin/users/:user_id/mfa/status` (F022)
 //! - POST /admin/users/:id/unlock
 //! - GET /audit/login-history (F025)
 //! - GET /security-alerts (F025)
@@ -73,7 +73,7 @@
 //! - PUT /admin/branding/email-templates/:type (F030)
 //! - POST /admin/branding/email-templates/:type/preview (F030)
 //! - POST /admin/branding/email-templates/:type/reset (F030)
-//! - GET /public/branding/:tenant_slug (F030)
+//! - GET /`public/branding/:tenant_slug` (F030)
 //! - POST /auth/passwordless/magic-link (F079)
 //! - POST /auth/passwordless/magic-link/verify (F079)
 //! - POST /auth/passwordless/email-otp (F079)
@@ -277,7 +277,7 @@ pub struct AuthState {
     pub asset_service: Arc<AssetService>,
     /// Email template service for email customization (F030).
     pub email_template_service: Arc<EmailTemplateService>,
-    /// WebAuthn service for FIDO2/WebAuthn MFA (F032).
+    /// `WebAuthn` service for FIDO2/WebAuthn MFA (F032).
     pub webauthn_service: Arc<WebAuthnService>,
     /// Risk enforcement service for adaptive authentication (F073).
     pub risk_enforcement_service: Arc<RiskEnforcementService>,
@@ -296,7 +296,7 @@ impl AuthState {
     ///
     /// # Errors
     ///
-    /// Returns an error if WebAuthn service creation fails (e.g., invalid configuration).
+    /// Returns an error if `WebAuthn` service creation fails (e.g., invalid configuration).
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         pool: PgPool,
@@ -479,8 +479,8 @@ pub fn auth_router(state: AuthState) -> Router {
         .layer(Extension(state.risk_enforcement_service))
 }
 
-/// Create the MFA router for TOTP and WebAuthn authentication (F022, F032).
-/// These routes require JWT authentication and should have jwt_auth_middleware applied.
+/// Create the MFA router for TOTP and `WebAuthn` authentication (F022, F032).
+/// These routes require JWT authentication and should have `jwt_auth_middleware` applied.
 pub fn mfa_router(state: AuthState) -> Router {
     Router::new()
         // TOTP routes (F022)
@@ -753,7 +753,7 @@ pub fn delegation_router(state: AuthState) -> Router {
 
 /// Create the branding router for tenant branding management (F030).
 ///
-/// Requires super_admin role for all endpoints.
+/// Requires `super_admin` role for all endpoints.
 ///
 /// # Endpoints
 ///
@@ -807,7 +807,7 @@ pub fn branding_router(state: AuthState) -> Router {
 /// Create the passwordless authentication router (F079).
 ///
 /// Provides two groups of routes:
-/// - **Public routes** (TenantLayer only, no JWT): request/verify magic link and email OTP,
+/// - **Public routes** (`TenantLayer` only, no JWT): request/verify magic link and email OTP,
 ///   plus GET /methods for login UI.
 /// - **Admin routes** (JWT + admin role): GET/PUT /policy for tenant policy management.
 ///

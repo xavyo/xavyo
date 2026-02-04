@@ -19,6 +19,7 @@ pub struct MappingService {
 
 impl MappingService {
     /// Create a new mapping service.
+    #[must_use] 
     pub fn new(pool: PgPool, mapping_cache: std::sync::Arc<MappingCache>) -> Self {
         Self {
             pool,
@@ -122,7 +123,7 @@ impl MappingService {
     pub async fn get_mapping(&self, tenant_id: Uuid, id: Uuid) -> ApiResult<MappingResponse> {
         let mapping = EntitlementActionMapping::find_by_id(&self.pool, tenant_id, id)
             .await?
-            .ok_or_else(|| ApiAuthorizationError::NotFound(format!("Mapping not found: {}", id)))?;
+            .ok_or_else(|| ApiAuthorizationError::NotFound(format!("Mapping not found: {id}")))?;
 
         Ok(MappingResponse::from(mapping))
     }
@@ -133,8 +134,7 @@ impl MappingService {
 
         if !deleted {
             return Err(ApiAuthorizationError::NotFound(format!(
-                "Mapping not found: {}",
-                id
+                "Mapping not found: {id}"
             )));
         }
 

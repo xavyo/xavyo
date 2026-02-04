@@ -36,10 +36,11 @@ pub struct ProblemDetails {
 }
 
 impl ProblemDetails {
-    /// Create a new ProblemDetails instance.
+    /// Create a new `ProblemDetails` instance.
+    #[must_use] 
     pub fn new(error_type: &str, title: &str, status: StatusCode) -> Self {
         Self {
-            error_type: format!("{}/{}", ERROR_BASE_URL, error_type),
+            error_type: format!("{ERROR_BASE_URL}/{error_type}"),
             title: title.to_string(),
             status: status.as_u16(),
             detail: None,
@@ -383,7 +384,7 @@ pub enum ApiAgentsError {
     #[error("Certificate has expired")]
     CertificateExpired,
 
-    /// Certificate is not valid yet (not_before is in the future).
+    /// Certificate is not valid yet (`not_before` is in the future).
     #[error("Certificate is not valid yet")]
     CertificateNotYetValid,
 
@@ -485,7 +486,8 @@ pub enum ApiAgentsError {
 }
 
 impl ApiAgentsError {
-    /// Convert to ProblemDetails.
+    /// Convert to `ProblemDetails`.
+    #[must_use] 
     pub fn to_problem_details(&self) -> ProblemDetails {
         match self {
             // Agent errors
@@ -580,15 +582,14 @@ impl ApiAgentsError {
                 "No Permission",
                 StatusCode::FORBIDDEN,
             )
-            .with_detail(format!("Agent does not have permission for tool '{}'.", tool_name)),
+            .with_detail(format!("Agent does not have permission for tool '{tool_name}'.")),
             ApiAgentsError::RateLimitExceeded(current, max) => ProblemDetails::new(
                 "rate-limit-exceeded",
                 "Rate Limit Exceeded",
                 StatusCode::TOO_MANY_REQUESTS,
             )
             .with_detail(format!(
-                "Rate limit exceeded: {}/{} calls in current hour.",
-                current, max
+                "Rate limit exceeded: {current}/{max} calls in current hour."
             )),
             ApiAgentsError::ApprovalRequired => ProblemDetails::new(
                 "approval-required",
@@ -637,19 +638,19 @@ impl ApiAgentsError {
                 "Invalid Risk Level",
                 StatusCode::BAD_REQUEST,
             )
-            .with_detail(format!("Invalid risk level: {}. Must be one of: low, medium, high, critical.", level)),
+            .with_detail(format!("Invalid risk level: {level}. Must be one of: low, medium, high, critical.")),
             ApiAgentsError::InvalidAgentType(agent_type) => ProblemDetails::new(
                 "invalid-agent-type",
                 "Invalid Agent Type",
                 StatusCode::BAD_REQUEST,
             )
-            .with_detail(format!("Invalid agent type: {}. Must be one of: autonomous, copilot, workflow, orchestrator.", agent_type)),
+            .with_detail(format!("Invalid agent type: {agent_type}. Must be one of: autonomous, copilot, workflow, orchestrator.")),
             ApiAgentsError::InvalidStatus(status) => ProblemDetails::new(
                 "invalid-status",
                 "Invalid Status",
                 StatusCode::BAD_REQUEST,
             )
-            .with_detail(format!("Invalid status: {}.", status)),
+            .with_detail(format!("Invalid status: {status}.")),
 
             // F092: Human-in-the-Loop Approval errors
             ApiAgentsError::ApprovalNotFound => ProblemDetails::new(
@@ -721,25 +722,25 @@ impl ApiAgentsError {
                 "Secret Type Not Found",
                 StatusCode::NOT_FOUND,
             )
-            .with_detail(format!("Secret type '{}' not found.", type_name)),
+            .with_detail(format!("Secret type '{type_name}' not found.")),
             ApiAgentsError::SecretTypeExists(type_name) => ProblemDetails::new(
                 "secret-type-exists",
                 "Secret Type Exists",
                 StatusCode::CONFLICT,
             )
-            .with_detail(format!("Secret type '{}' already exists for this tenant.", type_name)),
+            .with_detail(format!("Secret type '{type_name}' already exists for this tenant.")),
             ApiAgentsError::SecretTypeDisabled(type_name) => ProblemDetails::new(
                 "secret-type-disabled",
                 "Secret Type Disabled",
                 StatusCode::FORBIDDEN,
             )
-            .with_detail(format!("Secret type '{}' is not enabled.", type_name)),
+            .with_detail(format!("Secret type '{type_name}' is not enabled.")),
             ApiAgentsError::SecretPermissionDenied(type_name) => ProblemDetails::new(
                 "secret-permission-denied",
                 "Secret Permission Denied",
                 StatusCode::FORBIDDEN,
             )
-            .with_detail(format!("Agent does not have permission for secret type '{}'.", type_name)),
+            .with_detail(format!("Agent does not have permission for secret type '{type_name}'.")),
             ApiAgentsError::SecretPermissionNotFound => ProblemDetails::new(
                 "secret-permission-not-found",
                 "Secret Permission Not Found",
@@ -757,7 +758,7 @@ impl ApiAgentsError {
                 "Secret Provider Not Found",
                 StatusCode::NOT_FOUND,
             )
-            .with_detail(format!("Secret provider '{}' not found.", provider)),
+            .with_detail(format!("Secret provider '{provider}' not found.")),
             ApiAgentsError::SecretProviderUnavailable(msg) => ProblemDetails::new(
                 "secret-provider-unavailable",
                 "Secret Provider Unavailable",
@@ -776,8 +777,7 @@ impl ApiAgentsError {
                 StatusCode::TOO_MANY_REQUESTS,
             )
             .with_detail(format!(
-                "Credential request rate limit exceeded: {}/{} requests in current hour.",
-                current, max
+                "Credential request rate limit exceeded: {current}/{max} requests in current hour."
             )),
             ApiAgentsError::InvalidTtl(msg) => ProblemDetails::new(
                 "invalid-ttl",
@@ -846,7 +846,7 @@ impl ApiAgentsError {
                 "Duplicate Provider Name",
                 StatusCode::CONFLICT,
             )
-            .with_detail(format!("An identity provider named '{}' already exists for this tenant.", name)),
+            .with_detail(format!("An identity provider named '{name}' already exists for this tenant.")),
             ApiAgentsError::IdentityProviderNotActive => ProblemDetails::new(
                 "identity-provider-not-active",
                 "Identity Provider Not Active",
@@ -882,7 +882,7 @@ impl ApiAgentsError {
                 "No Role Mapping",
                 StatusCode::FORBIDDEN,
             )
-            .with_detail(format!("No role mapping found for agent type '{}'.", agent_type)),
+            .with_detail(format!("No role mapping found for agent type '{agent_type}'.")),
             ApiAgentsError::CloudCredentialDenied(reason) => ProblemDetails::new(
                 "cloud-credential-denied",
                 "Cloud Credential Denied",
@@ -895,8 +895,7 @@ impl ApiAgentsError {
                 StatusCode::TOO_MANY_REQUESTS,
             )
             .with_detail(format!(
-                "Cloud credential request rate limit exceeded: {}/{} requests in current hour.",
-                current, max
+                "Cloud credential request rate limit exceeded: {current}/{max} requests in current hour."
             )),
             ApiAgentsError::CloudProviderError(msg) => ProblemDetails::new(
                 "cloud-provider-error",
@@ -909,15 +908,14 @@ impl ApiAgentsError {
                 "Invalid Cloud Provider Type",
                 StatusCode::BAD_REQUEST,
             )
-            .with_detail(format!("Invalid cloud provider type: '{}'.", provider_type)),
+            .with_detail(format!("Invalid cloud provider type: '{provider_type}'.")),
             ApiAgentsError::IdentityProviderHasRoleMappings(id) => ProblemDetails::new(
                 "identity-provider-has-mappings",
                 "Identity Provider Has Role Mappings",
                 StatusCode::CONFLICT,
             )
             .with_detail(format!(
-                "Cannot delete identity provider '{}': it has active role mappings.",
-                id
+                "Cannot delete identity provider '{id}': it has active role mappings."
             )),
             ApiAgentsError::MissingToken => ProblemDetails::new(
                 "missing-token",
@@ -987,8 +985,7 @@ impl ApiAgentsError {
                 StatusCode::BAD_REQUEST,
             )
             .with_detail(format!(
-                "Requested validity of {} days exceeds maximum of {} days.",
-                requested, max
+                "Requested validity of {requested} days exceeds maximum of {max} days."
             )),
             ApiAgentsError::InvalidCertificateFormat(msg) => ProblemDetails::new(
                 "invalid-certificate-format",
@@ -1001,13 +998,13 @@ impl ApiAgentsError {
                 "Invalid Key Algorithm",
                 StatusCode::BAD_REQUEST,
             )
-            .with_detail(format!("Invalid key algorithm: {}. Use rsa2048, rsa4096, ecdsa_p256, or ecdsa_p384.", alg)),
+            .with_detail(format!("Invalid key algorithm: {alg}. Use rsa2048, rsa4096, ecdsa_p256, or ecdsa_p384.")),
             ApiAgentsError::InvalidRevocationReason(reason) => ProblemDetails::new(
                 "invalid-revocation-reason",
                 "Invalid Revocation Reason",
                 StatusCode::BAD_REQUEST,
             )
-            .with_detail(format!("Invalid revocation reason: {}.", reason)),
+            .with_detail(format!("Invalid revocation reason: {reason}.")),
             ApiAgentsError::CaPrivateKeyUnavailable => ProblemDetails::new(
                 "ca-private-key-unavailable",
                 "CA Private Key Unavailable",
@@ -1055,13 +1052,13 @@ impl ApiAgentsError {
                 "CA Already Exists",
                 StatusCode::CONFLICT,
             )
-            .with_detail(format!("A Certificate Authority named '{}' already exists.", name)),
+            .with_detail(format!("A Certificate Authority named '{name}' already exists.")),
             ApiAgentsError::InvalidCaType(ca_type) => ProblemDetails::new(
                 "invalid-ca-type",
                 "Invalid CA Type",
                 StatusCode::BAD_REQUEST,
             )
-            .with_detail(format!("Invalid CA type: '{}'. Use 'internal', 'step_ca', or 'vault_pki'.", ca_type)),
+            .with_detail(format!("Invalid CA type: '{ca_type}'. Use 'internal', 'step_ca', or 'vault_pki'.")),
             ApiAgentsError::CaCreationFailed(msg) => ProblemDetails::new(
                 "ca-creation-failed",
                 "CA Creation Failed",
@@ -1073,7 +1070,7 @@ impl ApiAgentsError {
                 "CA Disabled",
                 StatusCode::FORBIDDEN,
             )
-            .with_detail(format!("Certificate Authority '{}' is disabled.", id)),
+            .with_detail(format!("Certificate Authority '{id}' is disabled.")),
             ApiAgentsError::CannotDeleteDefaultCa => ProblemDetails::new(
                 "cannot-delete-default-ca",
                 "Cannot Delete Default CA",
@@ -1086,49 +1083,49 @@ impl ApiAgentsError {
                 StatusCode::CONFLICT,
             )
             .with_detail(format!(
-                "Certificate Authority '{}' has {} active certificate(s). Revoke or let them expire before deleting the CA.",
-                ca_id, count
+                "Certificate Authority '{ca_id}' has {count} active certificate(s). Revoke or let them expire before deleting the CA."
             )),
             ApiAgentsError::CaProviderNotImplemented(provider) => ProblemDetails::new(
                 "ca-provider-not-implemented",
                 "CA Provider Not Implemented",
                 StatusCode::NOT_IMPLEMENTED,
             )
-            .with_detail(format!("CA provider '{}' is not yet implemented.", provider)),
+            .with_detail(format!("CA provider '{provider}' is not yet implemented.")),
             ApiAgentsError::CaNotFoundId(id) => ProblemDetails::new(
                 "ca-not-found",
                 "Certificate Authority Not Found",
                 StatusCode::NOT_FOUND,
             )
-            .with_detail(format!("Certificate Authority '{}' was not found.", id)),
+            .with_detail(format!("Certificate Authority '{id}' was not found.")),
             ApiAgentsError::CertificateNotFoundId(id) => ProblemDetails::new(
                 "certificate-not-found",
                 "Certificate Not Found",
                 StatusCode::NOT_FOUND,
             )
-            .with_detail(format!("Certificate '{}' was not found.", id)),
+            .with_detail(format!("Certificate '{id}' was not found.")),
             ApiAgentsError::CertificateIssueFailed(msg) => ProblemDetails::new(
                 "certificate-issue-failed",
                 "Certificate Issuance Failed",
                 StatusCode::INTERNAL_SERVER_ERROR,
             )
-            .with_detail(format!("Certificate issuance failed: {}", msg)),
+            .with_detail(format!("Certificate issuance failed: {msg}")),
             ApiAgentsError::AgentNotFoundId(id) => ProblemDetails::new(
                 "agent-not-found",
                 "Agent Not Found",
                 StatusCode::NOT_FOUND,
             )
-            .with_detail(format!("Agent '{}' was not found.", id)),
+            .with_detail(format!("Agent '{id}' was not found.")),
             ApiAgentsError::AgentNotActiveId(id) => ProblemDetails::new(
                 "agent-not-active",
                 "Agent Not Active",
                 StatusCode::FORBIDDEN,
             )
-            .with_detail(format!("Agent '{}' is not active.", id)),
+            .with_detail(format!("Agent '{id}' is not active.")),
         }
     }
 
     /// Get the HTTP status code for this error.
+    #[must_use] 
     pub fn status_code(&self) -> StatusCode {
         match self {
             // Not Found

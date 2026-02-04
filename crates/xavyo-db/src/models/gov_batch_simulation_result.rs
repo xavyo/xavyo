@@ -78,13 +78,13 @@ impl GovBatchSimulationResult {
             serde_json::to_value(&input.warnings).unwrap_or_else(|_| serde_json::json!([]));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_batch_simulation_results (
                 simulation_id, user_id, access_gained, access_lost, warnings
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.simulation_id)
         .bind(input.user_id)
@@ -153,16 +153,16 @@ impl GovBatchSimulationResult {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_batch_simulation_results
             WHERE simulation_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.has_warnings == Some(true) {
             query.push_str(" AND warnings != '[]'::jsonb");
@@ -192,16 +192,16 @@ impl GovBatchSimulationResult {
         filter: &BatchSimulationResultFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_batch_simulation_results
             WHERE simulation_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.has_warnings == Some(true) {
             query.push_str(" AND warnings != '[]'::jsonb");
@@ -224,10 +224,10 @@ impl GovBatchSimulationResult {
         simulation_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_batch_simulation_results
             WHERE simulation_id = $1
-            "#,
+            ",
         )
         .bind(simulation_id)
         .execute(pool)
@@ -237,26 +237,31 @@ impl GovBatchSimulationResult {
     }
 
     /// Parse access gained.
+    #[must_use] 
     pub fn parse_access_gained(&self) -> Vec<AccessItem> {
         serde_json::from_value(self.access_gained.clone()).unwrap_or_default()
     }
 
     /// Parse access lost.
+    #[must_use] 
     pub fn parse_access_lost(&self) -> Vec<AccessItem> {
         serde_json::from_value(self.access_lost.clone()).unwrap_or_default()
     }
 
     /// Parse warnings.
+    #[must_use] 
     pub fn parse_warnings(&self) -> Vec<String> {
         serde_json::from_value(self.warnings.clone()).unwrap_or_default()
     }
 
     /// Check if this result has any warnings.
+    #[must_use] 
     pub fn has_warnings(&self) -> bool {
         !self.parse_warnings().is_empty()
     }
 
     /// Check if this result has any access changes.
+    #[must_use] 
     pub fn has_changes(&self) -> bool {
         !self.parse_access_gained().is_empty() || !self.parse_access_lost().is_empty()
     }

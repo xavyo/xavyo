@@ -36,10 +36,11 @@ pub struct ProblemDetails {
 }
 
 impl ProblemDetails {
-    /// Create a new ProblemDetails instance.
+    /// Create a new `ProblemDetails` instance.
+    #[must_use] 
     pub fn new(error_type: &str, title: &str, status: StatusCode) -> Self {
         Self {
-            error_type: format!("{}/{}", ERROR_BASE_URL, error_type),
+            error_type: format!("{ERROR_BASE_URL}/{error_type}"),
             title: title.to_string(),
             status: status.as_u16(),
             detail: None,
@@ -113,11 +114,11 @@ pub enum ApiAuthError {
     #[error("Internal server error: {0}")]
     Internal(String),
 
-    /// Database error (SQLx).
+    /// Database error (`SQLx`).
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 
-    /// Database error (DbError wrapper).
+    /// Database error (`DbError` wrapper).
     #[error("Database error: {0}")]
     DatabaseInternal(#[from] xavyo_db::DbError),
 
@@ -347,55 +348,55 @@ pub enum ApiAuthError {
     AssetNotFound,
 
     // WebAuthn errors (F032)
-    /// WebAuthn is disabled for this tenant.
+    /// `WebAuthn` is disabled for this tenant.
     #[error("WebAuthn is disabled")]
     WebAuthnDisabled,
 
-    /// Maximum number of WebAuthn credentials reached.
+    /// Maximum number of `WebAuthn` credentials reached.
     #[error("Maximum WebAuthn credentials reached")]
     MaxWebAuthnCredentials,
 
-    /// WebAuthn challenge not found or expired.
+    /// `WebAuthn` challenge not found or expired.
     #[error("WebAuthn challenge not found")]
     WebAuthnChallengeNotFound,
 
-    /// WebAuthn challenge has expired.
+    /// `WebAuthn` challenge has expired.
     #[error("WebAuthn challenge expired")]
     WebAuthnChallengeExpired,
 
-    /// WebAuthn credential verification failed.
+    /// `WebAuthn` credential verification failed.
     #[error("WebAuthn verification failed: {0}")]
     WebAuthnVerificationFailed(String),
 
-    /// WebAuthn credential already exists.
+    /// `WebAuthn` credential already exists.
     #[error("WebAuthn credential already exists")]
     WebAuthnCredentialExists,
 
-    /// WebAuthn credential not found.
+    /// `WebAuthn` credential not found.
     #[error("WebAuthn credential not found")]
     WebAuthnCredentialNotFound,
 
-    /// No WebAuthn credentials registered.
+    /// No `WebAuthn` credentials registered.
     #[error("No WebAuthn credentials registered")]
     WebAuthnNoCredentials,
 
-    /// WebAuthn rate limit exceeded.
+    /// `WebAuthn` rate limit exceeded.
     #[error("WebAuthn rate limit exceeded")]
     WebAuthnRateLimited,
 
-    /// WebAuthn counter anomaly detected (possible cloned credential).
+    /// `WebAuthn` counter anomaly detected (possible cloned credential).
     #[error("WebAuthn counter anomaly detected")]
     WebAuthnCounterAnomaly,
 
-    /// WebAuthn attestation is required by tenant policy.
+    /// `WebAuthn` attestation is required by tenant policy.
     #[error("WebAuthn attestation required")]
     WebAuthnAttestationRequired,
 
-    /// WebAuthn authenticator type is not allowed by tenant policy.
+    /// `WebAuthn` authenticator type is not allowed by tenant policy.
     #[error("WebAuthn authenticator type not allowed: {0}")]
     WebAuthnAuthenticatorTypeNotAllowed(String),
 
-    /// WebAuthn user verification is required by tenant policy.
+    /// `WebAuthn` user verification is required by tenant policy.
     #[error("WebAuthn user verification required")]
     WebAuthnUserVerificationRequired,
 
@@ -443,7 +444,8 @@ pub enum ApiAuthError {
 }
 
 impl ApiAuthError {
-    /// Convert to ProblemDetails.
+    /// Convert to `ProblemDetails`.
+    #[must_use] 
     pub fn to_problem_details(&self) -> ProblemDetails {
         match self {
             ApiAuthError::InvalidCredentials => ProblemDetails::new(
@@ -655,7 +657,7 @@ impl ApiAuthError {
                 "Account Locked",
                 StatusCode::UNAUTHORIZED,
             )
-            .with_detail(format!("Your account has been locked until {}. Please try again later or contact an administrator.", until)),
+            .with_detail(format!("Your account has been locked until {until}. Please try again later or contact an administrator.")),
             ApiAuthError::PasswordExpired => ProblemDetails::new(
                 "password-expired",
                 "Password Expired",
@@ -829,7 +831,7 @@ impl ApiAuthError {
                 "Asset In Use",
                 StatusCode::BAD_REQUEST,
             )
-            .with_detail(format!("Cannot delete asset: referenced in {}", fields)),
+            .with_detail(format!("Cannot delete asset: referenced in {fields}")),
             ApiAuthError::InvalidCss(msg) => ProblemDetails::new(
                 "invalid-css",
                 "Invalid CSS",
@@ -891,7 +893,7 @@ impl ApiAuthError {
                 "Verification Failed",
                 StatusCode::BAD_REQUEST,
             )
-            .with_detail(format!("WebAuthn verification failed: {}", msg)),
+            .with_detail(format!("WebAuthn verification failed: {msg}")),
             ApiAuthError::WebAuthnCredentialExists => ProblemDetails::new(
                 "webauthn-credential-exists",
                 "Credential Already Registered",
@@ -933,7 +935,7 @@ impl ApiAuthError {
                 "Authenticator Type Not Allowed",
                 StatusCode::BAD_REQUEST,
             )
-            .with_detail(format!("Authenticator type '{}' is not allowed by tenant policy.", auth_type)),
+            .with_detail(format!("Authenticator type '{auth_type}' is not allowed by tenant policy.")),
             ApiAuthError::WebAuthnUserVerificationRequired => ProblemDetails::new(
                 "webauthn-user-verification-required",
                 "User Verification Required",
@@ -1008,6 +1010,7 @@ impl ApiAuthError {
     }
 
     /// Get the HTTP status code for this error.
+    #[must_use] 
     pub fn status_code(&self) -> StatusCode {
         match self {
             ApiAuthError::InvalidCredentials => StatusCode::UNAUTHORIZED,

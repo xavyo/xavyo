@@ -35,6 +35,7 @@ pub struct MiningService {
 
 impl MiningService {
     /// Create a new mining service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -328,7 +329,7 @@ impl MiningService {
     ///
     /// If `peer_group_attribute` is specified, groups users by that attribute (e.g., "department", "team").
     /// Supported attributes: "department", "group", "role".
-    /// Falls back to a single "all_users" group if attribute is not specified or has no data.
+    /// Falls back to a single "`all_users`" group if attribute is not specified or has no data.
     async fn build_peer_groups(
         &self,
         tenant_id: Uuid,
@@ -351,7 +352,7 @@ impl MiningService {
                     Ok(groups)
                 }
             }
-            Some("group") | Some("role") => {
+            Some("group" | "role") => {
                 // Group users by their group memberships
                 let groups = self.group_users_by_group(tenant_id, &user_ids).await?;
                 if groups.is_empty() {
@@ -384,11 +385,11 @@ impl MiningService {
     ) -> Result<Vec<PeerGroupData>> {
         // Query user departments from metadata or a department field
         let rows: Vec<(Uuid, Option<String>)> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, metadata->>'department' as department
             FROM users
             WHERE tenant_id = $1 AND id = ANY($2)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_ids)
@@ -424,12 +425,12 @@ impl MiningService {
     ) -> Result<Vec<PeerGroupData>> {
         // Query user group memberships
         let rows: Vec<(Uuid, Uuid, String)> = sqlx::query_as(
-            r#"
+            r"
             SELECT ug.user_id, ug.group_id, g.name
             FROM user_groups ug
             INNER JOIN groups g ON g.id = ug.group_id AND g.tenant_id = ug.tenant_id
             WHERE ug.tenant_id = $1 AND ug.user_id = ANY($2)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_ids)
@@ -501,7 +502,7 @@ impl MiningService {
         // Query group-based role entitlements
         // Groups with entitlement assignments are treated as roles
         let rows: Vec<(Uuid, String, Vec<Uuid>)> = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 g.id as role_id,
                 g.name,
@@ -513,7 +514,7 @@ impl MiningService {
             WHERE g.tenant_id = $1
             GROUP BY g.id, g.name
             HAVING COUNT(ea.entitlement_id) > 0
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -748,12 +749,12 @@ impl MiningService {
 
         // Update candidate status to promoted
         let candidate = sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_role_candidates
             SET promotion_status = 'promoted', promoted_role_id = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND promotion_status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(candidate_id)
         .bind(tenant_id)
@@ -786,7 +787,7 @@ impl MiningService {
     ) -> Result<Uuid> {
         // Check if a group with this name already exists
         let existing: Option<Uuid> =
-            sqlx::query_scalar(r#"SELECT id FROM groups WHERE tenant_id = $1 AND name = $2"#)
+            sqlx::query_scalar(r"SELECT id FROM groups WHERE tenant_id = $1 AND name = $2")
                 .bind(tenant_id)
                 .bind(name)
                 .fetch_optional(tx.as_mut())
@@ -800,11 +801,11 @@ impl MiningService {
 
         // Create a new group
         let group_id: Uuid = sqlx::query_scalar(
-            r#"
+            r"
             INSERT INTO groups (tenant_id, name, description, created_at, updated_at)
             VALUES ($1, $2, $3, NOW(), NOW())
             RETURNING id
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -826,10 +827,10 @@ impl MiningService {
     ) -> Result<()> {
         // Check if assignment already exists
         let existing: Option<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT id FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND entitlement_id = $2 AND target_type = 'group' AND target_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_id)
@@ -843,11 +844,11 @@ impl MiningService {
 
         // Create the assignment
         sqlx::query(
-            r#"
+            r"
             INSERT INTO gov_entitlement_assignments
             (tenant_id, entitlement_id, target_type, target_id, assigned_by, status, justification, created_at, updated_at)
             VALUES ($1, $2, 'group', $3, $4, 'active', 'Assigned from promoted role candidate', NOW(), NOW())
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_id)
@@ -923,8 +924,7 @@ impl MiningService {
         GovAccessPattern::find_by_id(&self.pool, tenant_id, pattern_id)
             .await?
             .ok_or(GovernanceError::Validation(format!(
-                "Access pattern {} not found",
-                pattern_id
+                "Access pattern {pattern_id} not found"
             )))
     }
 

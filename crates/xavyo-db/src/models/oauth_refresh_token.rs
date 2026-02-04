@@ -1,4 +1,4 @@
-//! OAuth2 refresh token entity model.
+//! `OAuth2` refresh token entity model.
 //!
 //! Represents a long-lived token for obtaining new access tokens,
 //! with support for token rotation and family-based revocation.
@@ -10,10 +10,10 @@ use xavyo_core::{TenantId, UserId};
 /// Default refresh token expiration time in days.
 pub const REFRESH_TOKEN_EXPIRY_DAYS: i64 = 7;
 
-/// An OAuth2 refresh token with rotation support.
+/// An `OAuth2` refresh token with rotation support.
 ///
 /// Refresh tokens are organized in families for replay detection.
-/// When a token is used, a new token is issued with the same family_id
+/// When a token is used, a new token is issued with the same `family_id`
 /// and the old one is revoked. If a revoked token is used, the entire
 /// family is revoked as a security measure.
 #[derive(Debug, Clone, FromRow)]
@@ -24,7 +24,7 @@ pub struct OAuthRefreshToken {
     /// SHA-256 hash of the refresh token.
     pub token_hash: String,
 
-    /// Reference to the OAuth2 client.
+    /// Reference to the `OAuth2` client.
     pub client_id: uuid::Uuid,
 
     /// Reference to the token owner.
@@ -33,7 +33,7 @@ pub struct OAuthRefreshToken {
     /// Reference to the tenant.
     pub tenant_id: uuid::Uuid,
 
-    /// Granted OAuth2 scopes (space-separated).
+    /// Granted `OAuth2` scopes (space-separated).
     pub scope: String,
 
     /// Token family ID for rotation tracking.
@@ -111,7 +111,7 @@ impl OAuthRefreshTokenBuilder {
     /// Create a new builder with required fields.
     ///
     /// The expiration is automatically set to 7 days from now.
-    /// A new family_id is generated for new token chains.
+    /// A new `family_id` is generated for new token chains.
     #[must_use]
     pub fn new(
         token_hash: String,

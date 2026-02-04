@@ -1,9 +1,8 @@
-//! Unit tests for PersonaArchetypeService (US1).
+//! Unit tests for `PersonaArchetypeService` (US1).
 //!
 //! Tests the management of persona archetypes including creation, validation,
 //! attribute mappings, and lifecycle policies.
 
-use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -175,7 +174,7 @@ mod persona_archetype_crud {
 }
 
 mod naming_pattern_validation {
-    use super::*;
+    
 
     #[test]
     fn test_naming_pattern_with_username() {

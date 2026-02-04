@@ -21,6 +21,7 @@ pub struct MicroCertTriggerService {
 
 impl MicroCertTriggerService {
     /// Create a new trigger service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -34,7 +35,7 @@ impl MicroCertTriggerService {
     /// Validates:
     /// - Name uniqueness within tenant and trigger type
     /// - Scope ID exists (if application or entitlement scope)
-    /// - Specific reviewer exists (if specific_user type)
+    /// - Specific reviewer exists (if `specific_user` type)
     pub async fn create(
         &self,
         tenant_id: Uuid,
@@ -371,6 +372,7 @@ impl MicroCertTriggerService {
     }
 
     /// Get reference to the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

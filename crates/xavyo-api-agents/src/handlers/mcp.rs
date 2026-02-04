@@ -20,7 +20,7 @@ use crate::models::{
 };
 use crate::router::AgentsState;
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()
@@ -28,8 +28,8 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
         .ok_or(ApiAgentsError::MissingTenantId)
 }
 
-/// Extract agent_id from JWT claims.
-/// For MCP endpoints, the agent_id should be in the subject claim.
+/// Extract `agent_id` from JWT claims.
+/// For MCP endpoints, the `agent_id` should be in the subject claim.
 fn extract_agent_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     Uuid::parse_str(&claims.sub).map_err(|_| ApiAgentsError::MissingAgentId)
 }
@@ -123,8 +123,8 @@ pub async fn call_tool(
     Path(tool_name): Path<String>,
     Json(request): Json<McpCallRequest>,
 ) -> Result<Json<McpCallResponse>, Response> {
-    let tenant_id = extract_tenant_id(&claims).map_err(|e| e.into_response())?;
-    let agent_id = extract_agent_id(&claims).map_err(|e| e.into_response())?;
+    let tenant_id = extract_tenant_id(&claims).map_err(axum::response::IntoResponse::into_response)?;
+    let agent_id = extract_agent_id(&claims).map_err(axum::response::IntoResponse::into_response)?;
 
     debug!(
         tenant_id = %tenant_id,
@@ -138,11 +138,11 @@ pub async fn call_tool(
         .mcp_service
         .get_tool_by_name(tenant_id, &tool_name)
         .await
-        .map_err(|e| e.into_response())?
+        .map_err(axum::response::IntoResponse::into_response)?
         .ok_or_else(|| {
             mcp_error_response(McpErrorResponse::new(
                 McpErrorCode::NotFound,
-                format!("Tool '{}' not found", tool_name),
+                format!("Tool '{tool_name}' not found"),
             ))
         })?;
 
@@ -161,7 +161,7 @@ pub async fn call_tool(
             request.context.as_ref().and_then(|c| c.session_id.clone()),
         )
         .await
-        .map_err(|e| e.into_response())?;
+        .map_err(axum::response::IntoResponse::into_response)?;
 
     if auth_result.decision != "allow" {
         warn!(
@@ -203,7 +203,7 @@ pub async fn call_tool(
             request.context,
         )
         .await
-        .map_err(|e| e.into_response())?;
+        .map_err(axum::response::IntoResponse::into_response)?;
 
     Ok(Json(result))
 }

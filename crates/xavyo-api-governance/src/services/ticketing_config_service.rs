@@ -1,6 +1,6 @@
 //! Ticketing Configuration Service for semi-manual resources (F064).
 //!
-//! Manages external ticketing system configurations (ServiceNow, Jira, webhooks).
+//! Manages external ticketing system configurations (`ServiceNow`, Jira, webhooks).
 
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -24,11 +24,13 @@ pub struct TicketingConfigService {
 
 impl TicketingConfigService {
     /// Create a new ticketing configuration service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -83,10 +85,10 @@ impl TicketingConfigService {
     ) -> Result<TicketingConfigurationResponse> {
         // Parse and encrypt credentials
         let credentials_json: serde_json::Value = serde_json::from_str(&request.credentials)
-            .map_err(|e| GovernanceError::Validation(format!("Invalid credentials JSON: {}", e)))?;
+            .map_err(|e| GovernanceError::Validation(format!("Invalid credentials JSON: {e}")))?;
 
         let encrypted_credentials = encrypt_credentials(&credentials_json).map_err(|e| {
-            GovernanceError::Validation(format!("Failed to encrypt credentials: {}", e))
+            GovernanceError::Validation(format!("Failed to encrypt credentials: {e}"))
         })?;
 
         let input = CreateTicketingConfiguration {
@@ -128,11 +130,11 @@ impl TicketingConfigService {
             Some(ref creds) => {
                 let credentials_json: serde_json::Value =
                     serde_json::from_str(creds).map_err(|e| {
-                        GovernanceError::Validation(format!("Invalid credentials JSON: {}", e))
+                        GovernanceError::Validation(format!("Invalid credentials JSON: {e}"))
                     })?;
 
                 let encrypted = encrypt_credentials(&credentials_json).map_err(|e| {
-                    GovernanceError::Validation(format!("Failed to encrypt credentials: {}", e))
+                    GovernanceError::Validation(format!("Failed to encrypt credentials: {e}"))
                 })?;
 
                 Some(encrypted.into_bytes())
@@ -209,7 +211,7 @@ impl TicketingConfigService {
             .map_err(|_| GovernanceError::Validation("Invalid credentials encoding".to_string()))?;
 
         let credentials = decrypt_credentials(&credentials_encrypted).map_err(|e| {
-            GovernanceError::Validation(format!("Failed to decrypt credentials: {}", e))
+            GovernanceError::Validation(format!("Failed to decrypt credentials: {e}"))
         })?;
 
         // Create provider and test connectivity
@@ -276,11 +278,11 @@ impl TicketingConfigService {
             .map_err(|_| GovernanceError::Validation("Invalid credentials encoding".to_string()))?;
 
         let credentials = decrypt_credentials(&credentials_encrypted).map_err(|e| {
-            GovernanceError::Validation(format!("Failed to decrypt credentials: {}", e))
+            GovernanceError::Validation(format!("Failed to decrypt credentials: {e}"))
         })?;
 
         create_provider(&config, &credentials)
-            .map_err(|e| GovernanceError::Validation(format!("Failed to create provider: {}", e)))
+            .map_err(|e| GovernanceError::Validation(format!("Failed to create provider: {e}")))
     }
 }
 

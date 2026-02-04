@@ -49,7 +49,7 @@ pub async fn verify_email_handler(
             .flat_map(|errors| {
                 errors
                     .iter()
-                    .filter_map(|e| e.message.as_ref().map(|m| m.to_string()))
+                    .filter_map(|e| e.message.as_ref().map(std::string::ToString::to_string))
             })
             .collect();
         ApiAuthError::Validation(errors.join(", "))
@@ -60,11 +60,11 @@ pub async fn verify_email_handler(
 
     // Look up the token
     let token_row: Option<EmailVerificationTokenRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, user_id, token_hash, expires_at, verified_at
         FROM email_verification_tokens
         WHERE token_hash = $1
-        "#,
+        ",
     )
     .bind(&token_hash)
     .fetch_optional(&pool)

@@ -1,9 +1,9 @@
-//! SAML AuthnRequest session management
+//! SAML `AuthnRequest` session management
 //!
-//! This module provides session tracking for SAML AuthnRequest IDs
-//! to prevent replay attacks. When an SP sends an AuthnRequest, the
+//! This module provides session tracking for SAML `AuthnRequest` IDs
+//! to prevent replay attacks. When an SP sends an `AuthnRequest`, the
 //! request ID is stored. When processing the response, we validate
-//! that the InResponseTo matches a known, valid, unused request ID.
+//! that the `InResponseTo` matches a known, valid, unused request ID.
 //!
 //! # Security Features
 //!

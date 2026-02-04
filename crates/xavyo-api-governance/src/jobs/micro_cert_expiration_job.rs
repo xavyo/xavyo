@@ -24,7 +24,7 @@ pub const DEFAULT_BATCH_SIZE: i64 = 50;
 
 /// Job for processing micro-certification expirations, reminders, and escalations.
 ///
-/// This job polls the gov_micro_certifications table for:
+/// This job polls the `gov_micro_certifications` table for:
 /// 1. Certifications approaching deadline (need reminder)
 /// 2. Certifications past escalation deadline (need escalation)
 /// 3. Certifications past final deadline (need expiration/auto-revoke)
@@ -64,6 +64,7 @@ impl MicroCertExpirationStats {
 
 impl MicroCertExpirationJob {
     /// Create a new micro-certification expiration job.
+    #[must_use] 
     pub fn new(service: MicroCertificationService) -> Self {
         Self {
             service: Arc::new(service),
@@ -72,6 +73,7 @@ impl MicroCertExpirationJob {
     }
 
     /// Create with existing Arc service.
+    #[must_use] 
     pub fn with_arc_service(service: Arc<MicroCertificationService>) -> Self {
         Self {
             service,

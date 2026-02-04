@@ -28,7 +28,7 @@ pub struct PolicyConditionRequest {
     pub operator: ConditionOperator,
 
     /// Value to compare against.
-    /// For "in" and "not_in" operators, this should be a JSON array.
+    /// For "in" and "`not_in`" operators, this should be a JSON array.
     pub value: serde_json::Value,
 }
 
@@ -96,8 +96,8 @@ pub struct CreateBirthrightPolicyRequest {
     #[validate(length(min = 1, message = "At least one entitlement is required"))]
     pub entitlement_ids: Vec<Uuid>,
 
-    /// Evaluation mode: first_match (stop at first match) or all_match (apply all matches).
-    /// Default: all_match.
+    /// Evaluation mode: `first_match` (stop at first match) or `all_match` (apply all matches).
+    /// Default: `all_match`.
     #[serde(default)]
     pub evaluation_mode: Option<EvaluationMode>,
 
@@ -139,7 +139,7 @@ pub struct UpdateBirthrightPolicyRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entitlement_ids: Option<Vec<Uuid>>,
 
-    /// Evaluation mode: first_match or all_match.
+    /// Evaluation mode: `first_match` or `all_match`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub evaluation_mode: Option<EvaluationMode>,
 
@@ -221,7 +221,7 @@ pub struct BirthrightPolicyResponse {
     /// Policy status.
     pub status: BirthrightPolicyStatus,
 
-    /// Evaluation mode (first_match or all_match).
+    /// Evaluation mode (`first_match` or `all_match`).
     pub evaluation_mode: EvaluationMode,
 
     /// Grace period in days for revocation.
@@ -393,10 +393,10 @@ pub struct ImpactAnalysisResponse {
     /// Entitlement impact details.
     pub entitlement_impacts: Vec<EntitlementImpact>,
 
-    /// Sample of affected users (limited by max_affected_users).
+    /// Sample of affected users (limited by `max_affected_users`).
     pub affected_users: Vec<AffectedUser>,
 
-    /// Whether the result was truncated due to max_affected_users limit.
+    /// Whether the result was truncated due to `max_affected_users` limit.
     pub is_truncated: bool,
 }
 

@@ -31,7 +31,7 @@ pub struct GovLifecycleTransition {
     /// Whether this transition requires approval.
     pub requires_approval: bool,
 
-    /// Linked approval workflow ID (required if requires_approval is true).
+    /// Linked approval workflow ID (required if `requires_approval` is true).
     pub approval_workflow_id: Option<Uuid>,
 
     /// Grace period in hours for rollback (0-720).
@@ -95,10 +95,10 @@ impl GovLifecycleTransition {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_transitions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -114,10 +114,10 @@ impl GovLifecycleTransition {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_transitions
             WHERE config_id = $1 AND tenant_id = $2 AND name = $3
-            "#,
+            ",
         )
         .bind(config_id)
         .bind(tenant_id)
@@ -134,10 +134,10 @@ impl GovLifecycleTransition {
         to_state_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_transitions
             WHERE from_state_id = $1 AND to_state_id = $2 AND tenant_id = $3
-            "#,
+            ",
         )
         .bind(from_state_id)
         .bind(to_state_id)
@@ -153,11 +153,11 @@ impl GovLifecycleTransition {
         from_state_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_transitions
             WHERE from_state_id = $1 AND tenant_id = $2
             ORDER BY name ASC
-            "#,
+            ",
         )
         .bind(from_state_id)
         .bind(tenant_id)
@@ -172,11 +172,11 @@ impl GovLifecycleTransition {
         config_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_transitions
             WHERE config_id = $1 AND tenant_id = $2
             ORDER BY name ASC
-            "#,
+            ",
         )
         .bind(config_id)
         .bind(tenant_id)
@@ -191,7 +191,7 @@ impl GovLifecycleTransition {
         config_id: Uuid,
     ) -> Result<Vec<GovLifecycleTransitionWithStates>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT
                 t.id, t.config_id, t.tenant_id, t.name,
                 t.from_state_id, fs.name as from_state_name,
@@ -203,7 +203,7 @@ impl GovLifecycleTransition {
             JOIN gov_lifecycle_states ts ON t.to_state_id = ts.id
             WHERE t.config_id = $1 AND t.tenant_id = $2
             ORDER BY t.name ASC
-            "#,
+            ",
         )
         .bind(config_id)
         .bind(tenant_id)
@@ -218,7 +218,7 @@ impl GovLifecycleTransition {
         from_state_id: Uuid,
     ) -> Result<Vec<GovLifecycleTransitionWithStates>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT
                 t.id, t.config_id, t.tenant_id, t.name,
                 t.from_state_id, fs.name as from_state_name,
@@ -230,7 +230,7 @@ impl GovLifecycleTransition {
             JOIN gov_lifecycle_states ts ON t.to_state_id = ts.id
             WHERE t.from_state_id = $1 AND t.tenant_id = $2
             ORDER BY t.name ASC
-            "#,
+            ",
         )
         .bind(from_state_id)
         .bind(tenant_id)
@@ -247,31 +247,31 @@ impl GovLifecycleTransition {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_lifecycle_transitions
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_num = 2;
 
         if filter.config_id.is_some() {
-            query.push_str(&format!(" AND config_id = ${}", param_num));
+            query.push_str(&format!(" AND config_id = ${param_num}"));
             param_num += 1;
         }
 
         if filter.from_state_id.is_some() {
-            query.push_str(&format!(" AND from_state_id = ${}", param_num));
+            query.push_str(&format!(" AND from_state_id = ${param_num}"));
             param_num += 1;
         }
 
         if filter.to_state_id.is_some() {
-            query.push_str(&format!(" AND to_state_id = ${}", param_num));
+            query.push_str(&format!(" AND to_state_id = ${param_num}"));
             param_num += 1;
         }
 
         if filter.requires_approval.is_some() {
-            query.push_str(&format!(" AND requires_approval = ${}", param_num));
+            query.push_str(&format!(" AND requires_approval = ${param_num}"));
             param_num += 1;
         }
 
@@ -309,10 +309,10 @@ impl GovLifecycleTransition {
         config_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_lifecycle_transitions
             WHERE config_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(config_id)
         .bind(tenant_id)
@@ -327,10 +327,10 @@ impl GovLifecycleTransition {
         state_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_lifecycle_transitions
             WHERE tenant_id = $1 AND (from_state_id = $2 OR to_state_id = $2)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(state_id)
@@ -346,14 +346,14 @@ impl GovLifecycleTransition {
         input: &CreateGovLifecycleTransition,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_lifecycle_transitions (
                 config_id, tenant_id, name, from_state_id, to_state_id,
                 requires_approval, approval_workflow_id, grace_period_hours
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(config_id)
         .bind(tenant_id)
@@ -375,7 +375,7 @@ impl GovLifecycleTransition {
         input: &UpdateGovLifecycleTransition,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_lifecycle_transitions
             SET
                 name = COALESCE($3, name),
@@ -384,7 +384,7 @@ impl GovLifecycleTransition {
                 grace_period_hours = COALESCE($6, grace_period_hours)
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -403,10 +403,10 @@ impl GovLifecycleTransition {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_lifecycle_transitions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -423,10 +423,10 @@ impl GovLifecycleTransition {
         config_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_lifecycle_transitions
             WHERE config_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(config_id)
         .bind(tenant_id)

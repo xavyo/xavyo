@@ -16,12 +16,14 @@ use uuid::Uuid;
 pub struct ApplicationId(pub Uuid);
 
 impl ApplicationId {
-    /// Create a new random ApplicationId.
+    /// Create a new random `ApplicationId`.
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
+    #[must_use] 
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -57,12 +59,14 @@ impl From<ApplicationId> for Uuid {
 pub struct EntitlementId(pub Uuid);
 
 impl EntitlementId {
-    /// Create a new random EntitlementId.
+    /// Create a new random `EntitlementId`.
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
+    #[must_use] 
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -98,12 +102,14 @@ impl From<EntitlementId> for Uuid {
 pub struct AssignmentId(pub Uuid);
 
 impl AssignmentId {
-    /// Create a new random AssignmentId.
+    /// Create a new random `AssignmentId`.
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
+    #[must_use] 
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -462,12 +468,14 @@ impl fmt::Display for AuditActionType {
 pub struct LifecycleConfigId(pub Uuid);
 
 impl LifecycleConfigId {
-    /// Create a new random LifecycleConfigId.
+    /// Create a new random `LifecycleConfigId`.
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
+    #[must_use] 
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -503,12 +511,14 @@ impl From<LifecycleConfigId> for Uuid {
 pub struct LifecycleStateId(pub Uuid);
 
 impl LifecycleStateId {
-    /// Create a new random LifecycleStateId.
+    /// Create a new random `LifecycleStateId`.
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
+    #[must_use] 
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -544,12 +554,14 @@ impl From<LifecycleStateId> for Uuid {
 pub struct LifecycleTransitionId(pub Uuid);
 
 impl LifecycleTransitionId {
-    /// Create a new random LifecycleTransitionId.
+    /// Create a new random `LifecycleTransitionId`.
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
+    #[must_use] 
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -585,12 +597,14 @@ impl From<LifecycleTransitionId> for Uuid {
 pub struct TransitionRequestId(pub Uuid);
 
 impl TransitionRequestId {
-    /// Create a new random TransitionRequestId.
+    /// Create a new random `TransitionRequestId`.
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
+    #[must_use] 
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -626,12 +640,14 @@ impl From<TransitionRequestId> for Uuid {
 pub struct BulkOperationId(pub Uuid);
 
 impl BulkOperationId {
-    /// Create a new random BulkOperationId.
+    /// Create a new random `BulkOperationId`.
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
+    #[must_use] 
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -665,18 +681,20 @@ impl From<BulkOperationId> for Uuid {
 // SoD (Separation of Duties) Types (F-005)
 // ============================================================================
 
-/// Unique identifier for an SoD rule.
+/// Unique identifier for an `SoD` rule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SodRuleId(pub Uuid);
 
 impl SodRuleId {
-    /// Create a new random SodRuleId.
+    /// Create a new random `SodRuleId`.
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
+    #[must_use] 
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -706,18 +724,20 @@ impl From<SodRuleId> for Uuid {
     }
 }
 
-/// Unique identifier for an SoD violation.
+/// Unique identifier for an `SoD` violation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SodViolationId(pub Uuid);
 
 impl SodViolationId {
-    /// Create a new random SodViolationId.
+    /// Create a new random `SodViolationId`.
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
+    #[must_use] 
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -747,18 +767,20 @@ impl From<SodViolationId> for Uuid {
     }
 }
 
-/// Unique identifier for an SoD exemption.
+/// Unique identifier for an `SoD` exemption.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SodExemptionId(pub Uuid);
 
 impl SodExemptionId {
-    /// Create a new random SodExemptionId.
+    /// Create a new random `SodExemptionId`.
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
+    #[must_use] 
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -788,7 +810,7 @@ impl From<SodExemptionId> for Uuid {
     }
 }
 
-/// SoD conflict type - how entitlements conflict.
+/// `SoD` conflict type - how entitlements conflict.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SodConflictType {
@@ -810,7 +832,7 @@ impl fmt::Display for SodConflictType {
     }
 }
 
-/// SoD rule severity level.
+/// `SoD` rule severity level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SodSeverity {
@@ -836,7 +858,7 @@ impl fmt::Display for SodSeverity {
     }
 }
 
-/// SoD rule status.
+/// `SoD` rule status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SodRuleStatus {
@@ -856,7 +878,7 @@ impl fmt::Display for SodRuleStatus {
     }
 }
 
-/// SoD violation status.
+/// `SoD` violation status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SodViolationStatus {
@@ -886,12 +908,14 @@ impl fmt::Display for SodViolationStatus {
 pub struct RiskHistoryId(pub Uuid);
 
 impl RiskHistoryId {
-    /// Create a new random RiskHistoryId.
+    /// Create a new random `RiskHistoryId`.
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
+    #[must_use] 
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -924,7 +948,7 @@ impl From<RiskHistoryId> for Uuid {
 /// Represents the contribution of a single factor to the risk score.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RiskFactorResult {
-    /// Factor identifier (e.g., "entitlements", "sod_violations").
+    /// Factor identifier (e.g., "entitlements", "`sod_violations`").
     pub name: String,
     /// Configured weight for this factor (0.0-1.0).
     pub weight: f64,
@@ -975,6 +999,7 @@ pub struct RiskScore {
 
 impl RiskScore {
     /// Create a new risk score.
+    #[must_use] 
     pub fn new(
         tenant_id: Uuid,
         user_id: Uuid,
@@ -1012,6 +1037,7 @@ pub struct RiskThresholds {
 
 impl RiskThresholds {
     /// Create new thresholds with custom values.
+    #[must_use] 
     pub fn new(
         tenant_id: Uuid,
         low_max: u8,
@@ -1030,6 +1056,7 @@ impl RiskThresholds {
     }
 
     /// Create default thresholds for a tenant.
+    #[must_use] 
     pub fn default_for_tenant(tenant_id: Uuid, updated_by: Uuid) -> Self {
         Self {
             tenant_id,
@@ -1070,6 +1097,7 @@ impl RiskThresholds {
     }
 
     /// Get the risk level for a given score.
+    #[must_use] 
     pub fn get_level(&self, score: u8) -> RiskLevel {
         if score <= self.low_max {
             RiskLevel::Low
@@ -1115,6 +1143,7 @@ pub struct RiskHistory {
 
 impl RiskHistory {
     /// Create a new risk history record.
+    #[must_use] 
     pub fn new(tenant_id: Uuid, user_id: Uuid, score: u8, level: RiskLevel) -> Self {
         Self {
             id: RiskHistoryId::new(),
@@ -1126,7 +1155,8 @@ impl RiskHistory {
         }
     }
 
-    /// Create from a RiskScore.
+    /// Create from a `RiskScore`.
+    #[must_use] 
     pub fn from_score(score: &RiskScore) -> Self {
         Self {
             id: RiskHistoryId::new(),

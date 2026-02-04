@@ -1098,7 +1098,7 @@ mod unit_tests {
         assert!(!verify_token_hash_constant_time("wrong_token", &hash));
 
         // Modified token should not verify
-        let modified = format!("{}x", token);
+        let modified = format!("{token}x");
         assert!(!verify_token_hash_constant_time(&modified, &hash));
     }
 

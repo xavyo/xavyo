@@ -14,6 +14,7 @@ pub struct AttributeAuditService {
 
 impl AttributeAuditService {
     /// Create a new attribute audit service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -118,10 +119,10 @@ impl AttributeAuditService {
 
             // Fetch custom_attributes for all matched users
             let attr_rows: Vec<(Uuid, serde_json::Value)> = sqlx::query_as(
-                r#"
+                r"
                 SELECT id, custom_attributes FROM users
                 WHERE tenant_id = $1 AND id = ANY($2)
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(&user_ids)
@@ -142,8 +143,7 @@ impl AttributeAuditService {
                 for name in &required_names {
                     let has_value = obj
                         .and_then(|o| o.get(*name))
-                        .map(|v| !v.is_null())
-                        .unwrap_or(false);
+                        .is_some_and(|v| !v.is_null());
                     if !has_value {
                         missing.push(name.to_string());
                     }

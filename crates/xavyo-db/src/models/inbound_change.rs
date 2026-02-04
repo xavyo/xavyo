@@ -37,7 +37,7 @@ impl std::str::FromStr for InboundChangeType {
             "create" => Ok(InboundChangeType::Create),
             "update" => Ok(InboundChangeType::Update),
             "delete" => Ok(InboundChangeType::Delete),
-            _ => Err(format!("Unknown change type: {}", s)),
+            _ => Err(format!("Unknown change type: {s}")),
         }
     }
 }
@@ -85,7 +85,7 @@ impl std::str::FromStr for SyncSituation {
             "disputed" => Ok(SyncSituation::Disputed),
             "deleted" => Ok(SyncSituation::Deleted),
             "collision" => Ok(SyncSituation::Collision),
-            _ => Err(format!("Unknown sync situation: {}", s)),
+            _ => Err(format!("Unknown sync situation: {s}")),
         }
     }
 }
@@ -129,7 +129,7 @@ impl std::str::FromStr for InboundProcessingStatus {
             "completed" => Ok(InboundProcessingStatus::Completed),
             "failed" => Ok(InboundProcessingStatus::Failed),
             "conflict" => Ok(InboundProcessingStatus::Conflict),
-            _ => Err(format!("Unknown processing status: {}", s)),
+            _ => Err(format!("Unknown processing status: {s}")),
         }
     }
 }
@@ -156,6 +156,7 @@ pub struct InboundChange {
 
 impl InboundChange {
     /// Get the change type enum.
+    #[must_use] 
     pub fn change_type(&self) -> InboundChangeType {
         self.change_type
             .parse()
@@ -163,6 +164,7 @@ impl InboundChange {
     }
 
     /// Get the sync situation enum.
+    #[must_use] 
     pub fn sync_situation(&self) -> SyncSituation {
         self.sync_situation
             .parse()
@@ -170,6 +172,7 @@ impl InboundChange {
     }
 
     /// Get the processing status enum.
+    #[must_use] 
     pub fn processing_status(&self) -> InboundProcessingStatus {
         self.processing_status
             .parse()
@@ -183,7 +186,7 @@ impl InboundChange {
         input: &CreateInboundChange,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_inbound_changes (
                 tenant_id, connector_id, change_type, external_uid,
                 object_class, attributes, sync_situation, correlation_result,
@@ -191,7 +194,7 @@ impl InboundChange {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.connector_id)
@@ -214,10 +217,10 @@ impl InboundChange {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_inbound_changes
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -241,15 +244,15 @@ impl InboundChange {
 
         if filter.processing_status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND processing_status = ${}", param_count));
+            query.push_str(&format!(" AND processing_status = ${param_count}"));
         }
         if filter.sync_situation.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND sync_situation = ${}", param_count));
+            query.push_str(&format!(" AND sync_situation = ${param_count}"));
         }
         if filter.change_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND change_type = ${}", param_count));
+            query.push_str(&format!(" AND change_type = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -289,15 +292,15 @@ impl InboundChange {
 
         if filter.processing_status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND processing_status = ${}", param_count));
+            query.push_str(&format!(" AND processing_status = ${param_count}"));
         }
         if filter.sync_situation.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND sync_situation = ${}", param_count));
+            query.push_str(&format!(" AND sync_situation = ${param_count}"));
         }
         if filter.change_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND change_type = ${}", param_count));
+            query.push_str(&format!(" AND change_type = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query)
@@ -325,7 +328,7 @@ impl InboundChange {
         batch_size: i32,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_inbound_changes
             WHERE tenant_id = $1
                 AND connector_id = $2
@@ -333,7 +336,7 @@ impl InboundChange {
             ORDER BY created_at ASC
             LIMIT $3
             FOR UPDATE SKIP LOCKED
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -349,12 +352,12 @@ impl InboundChange {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_inbound_changes
             SET processing_status = 'processing'
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -370,14 +373,14 @@ impl InboundChange {
         linked_identity_id: Option<Uuid>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_inbound_changes
             SET processing_status = 'completed',
                 linked_identity_id = COALESCE($3, linked_identity_id),
                 processed_at = NOW()
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -394,14 +397,14 @@ impl InboundChange {
         error_message: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_inbound_changes
             SET processing_status = 'failed',
                 error_message = $3,
                 processed_at = NOW()
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -418,13 +421,13 @@ impl InboundChange {
         conflict_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_inbound_changes
             SET processing_status = 'conflict',
                 conflict_id = $3
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -443,14 +446,14 @@ impl InboundChange {
         correlation_result: Option<serde_json::Value>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_inbound_changes
             SET sync_situation = $3,
                 linked_identity_id = $4,
                 correlation_result = COALESCE($5, correlation_result)
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -468,14 +471,14 @@ impl InboundChange {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_inbound_changes
             SET processing_status = 'pending',
                 error_message = NULL,
                 processed_at = NULL
             WHERE tenant_id = $1 AND id = $2 AND processing_status = 'failed'
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)

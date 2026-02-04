@@ -21,7 +21,7 @@ pub struct McpToolsResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(ToSchema))]
 pub struct McpTool {
-    /// Unique tool name (e.g., "send_email").
+    /// Unique tool name (e.g., "`send_email`").
     pub name: String,
 
     /// Human-readable description of what the tool does.
@@ -108,6 +108,7 @@ impl McpErrorResponse {
     }
 
     /// Add details to the error response.
+    #[must_use] 
     pub fn with_details(mut self, details: serde_json::Value) -> Self {
         self.details = Some(details);
         self
@@ -143,6 +144,7 @@ pub enum McpErrorCode {
 
 impl McpErrorCode {
     /// Get the HTTP status code for this error.
+    #[must_use] 
     pub fn status_code(&self) -> u16 {
         match self {
             Self::InvalidParameters => 400,

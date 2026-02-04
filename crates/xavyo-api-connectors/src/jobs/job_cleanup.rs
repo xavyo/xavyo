@@ -30,6 +30,7 @@ pub struct JobCleanupJob {
 
 impl JobCleanupJob {
     /// Create a new job cleanup job with default retention periods.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self::with_retention(
             pool,
@@ -39,6 +40,7 @@ impl JobCleanupJob {
     }
 
     /// Create a new job cleanup job with custom retention periods.
+    #[must_use] 
     pub fn with_retention(
         pool: PgPool,
         completed_retention_days: i64,
@@ -86,9 +88,9 @@ impl JobCleanupJob {
     pub async fn cleanup_all_tenants(&self) -> Result<u64, sqlx::Error> {
         // Get distinct tenant IDs from provisioning operations
         let tenant_ids: Vec<(Uuid,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT DISTINCT tenant_id FROM provisioning_operations
-            "#,
+            ",
         )
         .fetch_all(self.pool.as_ref())
         .await?;
@@ -129,11 +131,13 @@ impl JobCleanupJob {
     }
 
     /// Get the completed jobs retention period in days.
+    #[must_use] 
     pub fn completed_retention_days(&self) -> i64 {
         self.completed_retention_days
     }
 
     /// Get the failed jobs retention period in days.
+    #[must_use] 
     pub fn failed_retention_days(&self) -> i64 {
         self.failed_retention_days
     }

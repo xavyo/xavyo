@@ -12,7 +12,7 @@ pub struct ValidationError {
     pub code: String,
     /// Human-readable error message.
     pub message: String,
-    /// Optional constraint details (e.g., max_length, pattern).
+    /// Optional constraint details (e.g., `max_length`, pattern).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub constraints: Option<serde_json::Value>,
 }

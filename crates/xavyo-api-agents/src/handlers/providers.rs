@@ -1,6 +1,6 @@
 //! HTTP handlers for secret provider configuration management (F120).
 //!
-//! Endpoints for managing external secret providers (OpenBao, Infisical, AWS)
+//! Endpoints for managing external secret providers (`OpenBao`, Infisical, AWS)
 //! including CRUD operations and health checks.
 
 use axum::{
@@ -17,7 +17,7 @@ use crate::error::ApiAgentsError;
 use crate::router::AgentsState;
 use crate::services::secret_provider_service::{CreateProviderRequest, UpdateProviderRequest};
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()

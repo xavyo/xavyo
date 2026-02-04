@@ -1,11 +1,11 @@
-//! Tenant IdP Certificate model
+//! Tenant `IdP` Certificate model
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-/// Represents a tenant's IdP signing certificate
+/// Represents a tenant's `IdP` signing certificate
 #[derive(Debug, Clone, Serialize, FromRow)]
 pub struct TenantIdpCertificate {
     pub id: Uuid,
@@ -61,12 +61,14 @@ impl From<TenantIdpCertificate> for CertificateInfo {
 
 impl TenantIdpCertificate {
     /// Check if certificate is currently valid
+    #[must_use] 
     pub fn is_valid(&self) -> bool {
         let now = Utc::now();
         now >= self.not_before && now <= self.not_after
     }
 
     /// Check if certificate is expiring soon (within 30 days)
+    #[must_use] 
     pub fn is_expiring_soon(&self) -> bool {
         let thirty_days = chrono::Duration::days(30);
         let expiry_threshold = Utc::now() + thirty_days;

@@ -44,7 +44,7 @@ pub struct IpRestrictionRule {
     pub scope: String,
 
     /// IP address or range in CIDR notation.
-    /// Stored as text since SQLx doesn't have native CIDR support.
+    /// Stored as text since `SQLx` doesn't have native CIDR support.
     #[sqlx(rename = "ip_cidr")]
     pub ip_cidr: String,
 
@@ -111,13 +111,13 @@ impl IpRestrictionRule {
         let is_active = input.is_active.unwrap_or(true);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO ip_restriction_rules (
                 tenant_id, rule_type, scope, ip_cidr, name, description, is_active, created_by
             )
             VALUES ($1, $2, $3, $4::cidr, $5, $6, $7, $8)
             RETURNING id, tenant_id, rule_type, scope, ip_cidr::text as ip_cidr, name, description, is_active, created_by, created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.rule_type)
@@ -141,11 +141,11 @@ impl IpRestrictionRule {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT id, tenant_id, rule_type, scope, ip_cidr::text as ip_cidr, name, description, is_active, created_by, created_at, updated_at
             FROM ip_restriction_rules
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_id)
@@ -163,14 +163,14 @@ impl IpRestrictionRule {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT id, tenant_id, rule_type, scope, ip_cidr::text as ip_cidr, name, description, is_active, created_by, created_at, updated_at
             FROM ip_restriction_rules
             WHERE tenant_id = $1
               AND ($2::boolean IS NULL OR is_active = $2)
               AND ($3::ip_rule_type IS NULL OR rule_type = $3)
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(filter.is_active)
@@ -189,12 +189,12 @@ impl IpRestrictionRule {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT id, tenant_id, rule_type, scope, ip_cidr::text as ip_cidr, name, description, is_active, created_by, created_at, updated_at
             FROM ip_restriction_rules
             WHERE tenant_id = $1 AND is_active = TRUE AND rule_type = $2
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_type)
@@ -213,7 +213,7 @@ impl IpRestrictionRule {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE ip_restriction_rules
             SET
                 rule_type = COALESCE($3, rule_type),
@@ -225,7 +225,7 @@ impl IpRestrictionRule {
                 updated_at = NOW()
             WHERE tenant_id = $1 AND id = $2
             RETURNING id, tenant_id, rule_type, scope, ip_cidr::text as ip_cidr, name, description, is_active, created_by, created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_id)
@@ -269,11 +269,11 @@ impl IpRestrictionRule {
         E: PgExecutor<'e>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM ip_restriction_rules
             WHERE tenant_id = $1 AND LOWER(name) = LOWER($2)
               AND ($3::uuid IS NULL OR id != $3)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -290,6 +290,7 @@ impl IpRestrictionRule {
     /// - scope is "all"
     /// - scope is "admin" and roles contains "admin"
     /// - scope is "role:X" and roles contains "X"
+    #[must_use] 
     pub fn scope_applies(&self, roles: &[String]) -> bool {
         match self.scope.as_str() {
             "all" => true,

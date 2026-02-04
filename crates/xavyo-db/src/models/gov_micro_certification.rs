@@ -72,7 +72,7 @@ pub struct GovMicroCertification {
     /// When decision was made.
     pub decided_at: Option<DateTime<Utc>>,
 
-    /// Which assignment was revoked (for SoD).
+    /// Which assignment was revoked (for `SoD`).
     pub revoked_assignment_id: Option<Uuid>,
 
     /// User who delegated to current reviewer (for Delegate decision chain).
@@ -153,10 +153,10 @@ impl GovMicroCertification {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_certifications
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -172,11 +172,11 @@ impl GovMicroCertification {
         trigger_rule_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_certifications
             WHERE tenant_id = $1 AND assignment_id = $2 AND trigger_rule_id = $3
               AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)
@@ -194,12 +194,12 @@ impl GovMicroCertification {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_certifications
             WHERE tenant_id = $1 AND reviewer_id = $2 AND status = 'pending'
             ORDER BY deadline ASC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(reviewer_id)
@@ -218,13 +218,13 @@ impl GovMicroCertification {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_certifications
             WHERE tenant_id = $1 AND backup_reviewer_id = $2
               AND status = 'pending' AND escalated = true
             ORDER BY deadline ASC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(backup_reviewer_id)
@@ -241,12 +241,12 @@ impl GovMicroCertification {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_certifications
             WHERE tenant_id = $1 AND status = 'pending' AND deadline < NOW()
             ORDER BY deadline ASC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -261,7 +261,7 @@ impl GovMicroCertification {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_certifications
             WHERE tenant_id = $1 AND status = 'pending'
               AND escalated = false
@@ -270,7 +270,7 @@ impl GovMicroCertification {
               AND escalation_deadline < NOW()
             ORDER BY escalation_deadline ASC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -286,14 +286,14 @@ impl GovMicroCertification {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_certifications
             WHERE tenant_id = $1 AND status = 'pending'
               AND reminder_sent = false
               AND deadline <= $2
             ORDER BY deadline ASC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(reminder_time)
@@ -315,39 +315,39 @@ impl GovMicroCertification {
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.reviewer_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND reviewer_id = ${}", param_count));
+            query.push_str(&format!(" AND reviewer_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.entitlement_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND entitlement_id = ${}", param_count));
+            query.push_str(&format!(" AND entitlement_id = ${param_count}"));
         }
         if filter.assignment_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND assignment_id = ${}", param_count));
+            query.push_str(&format!(" AND assignment_id = ${param_count}"));
         }
         if filter.trigger_rule_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND trigger_rule_id = ${}", param_count));
+            query.push_str(&format!(" AND trigger_rule_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
         if filter.escalated.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND escalated = ${}", param_count));
+            query.push_str(&format!(" AND escalated = ${param_count}"));
         }
         if filter.past_deadline == Some(true) {
             query.push_str(" AND status = 'pending' AND deadline < NOW()");
@@ -404,39 +404,39 @@ impl GovMicroCertification {
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.reviewer_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND reviewer_id = ${}", param_count));
+            query.push_str(&format!(" AND reviewer_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.entitlement_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND entitlement_id = ${}", param_count));
+            query.push_str(&format!(" AND entitlement_id = ${param_count}"));
         }
         if filter.assignment_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND assignment_id = ${}", param_count));
+            query.push_str(&format!(" AND assignment_id = ${param_count}"));
         }
         if filter.trigger_rule_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND trigger_rule_id = ${}", param_count));
+            query.push_str(&format!(" AND trigger_rule_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
         if filter.escalated.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND escalated = ${}", param_count));
+            query.push_str(&format!(" AND escalated = ${param_count}"));
         }
         if filter.past_deadline == Some(true) {
             query.push_str(" AND status = 'pending' AND deadline < NOW()");
@@ -481,7 +481,7 @@ impl GovMicroCertification {
         tenant_id: Uuid,
     ) -> Result<MicroCertificationStats, sqlx::Error> {
         let row: (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE status = 'pending') as pending,
@@ -495,7 +495,7 @@ impl GovMicroCertification {
                 COUNT(*) FILTER (WHERE status = 'pending' AND deadline < NOW()) as past_deadline
             FROM gov_micro_certifications
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -522,7 +522,7 @@ impl GovMicroCertification {
         input: CreateMicroCertification,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_micro_certifications (
                 tenant_id, trigger_rule_id, assignment_id, user_id, entitlement_id,
                 reviewer_id, backup_reviewer_id, triggering_event_type,
@@ -530,7 +530,7 @@ impl GovMicroCertification {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.trigger_rule_id)
@@ -558,7 +558,7 @@ impl GovMicroCertification {
     ) -> Result<Option<Self>, sqlx::Error> {
         let status = input.decision.to_status();
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_micro_certifications
             SET status = $3,
                 decision = $4,
@@ -568,7 +568,7 @@ impl GovMicroCertification {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -587,12 +587,12 @@ impl GovMicroCertification {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_micro_certifications
             SET status = 'expired', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -608,7 +608,7 @@ impl GovMicroCertification {
         revoked_assignment_id: Option<Uuid>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_micro_certifications
             SET status = 'revoked',
                 decision = 'revoke',
@@ -616,7 +616,7 @@ impl GovMicroCertification {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -632,12 +632,12 @@ impl GovMicroCertification {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_micro_certifications
             SET status = 'skipped', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -652,12 +652,12 @@ impl GovMicroCertification {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_micro_certifications
             SET escalated = true, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -672,11 +672,11 @@ impl GovMicroCertification {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_micro_certifications
             SET reminder_sent = true, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -694,11 +694,11 @@ impl GovMicroCertification {
         revoked_assignment_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_micro_certifications
             SET revoked_assignment_id = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -722,7 +722,7 @@ impl GovMicroCertification {
         delegation_comment: Option<String>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_micro_certifications
             SET reviewer_id = $3,
                 delegated_by_id = $4,
@@ -731,7 +731,7 @@ impl GovMicroCertification {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -750,11 +750,11 @@ impl GovMicroCertification {
         assignment_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_micro_certifications
             SET status = 'skipped', updated_at = NOW()
             WHERE tenant_id = $1 AND assignment_id = $2 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)
@@ -778,13 +778,13 @@ impl GovMicroCertification {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_certifications
             WHERE status = 'pending' AND deadline < $1
             ORDER BY deadline ASC
             LIMIT $2
             FOR UPDATE SKIP LOCKED
-            "#,
+            ",
         )
         .bind(now)
         .bind(limit)
@@ -801,7 +801,7 @@ impl GovMicroCertification {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_certifications
             WHERE status = 'pending'
               AND escalated = false
@@ -811,7 +811,7 @@ impl GovMicroCertification {
             ORDER BY escalation_deadline ASC
             LIMIT $2
             FOR UPDATE SKIP LOCKED
-            "#,
+            ",
         )
         .bind(now)
         .bind(limit)
@@ -830,7 +830,7 @@ impl GovMicroCertification {
         // Certifications where reminder not yet sent and deadline is within 6 hours
         let reminder_threshold = now + chrono::Duration::hours(6);
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_certifications
             WHERE status = 'pending'
               AND reminder_sent = false
@@ -839,7 +839,7 @@ impl GovMicroCertification {
             ORDER BY deadline ASC
             LIMIT $3
             FOR UPDATE SKIP LOCKED
-            "#,
+            ",
         )
         .bind(reminder_threshold)
         .bind(now)
@@ -849,6 +849,7 @@ impl GovMicroCertification {
     }
 
     /// Check if the user can decide on this certification.
+    #[must_use] 
     pub fn can_decide(&self, user_id: Uuid) -> bool {
         if self.status != MicroCertStatus::Pending {
             return false;
@@ -872,11 +873,13 @@ impl GovMicroCertification {
     }
 
     /// Check if past deadline.
+    #[must_use] 
     pub fn is_past_deadline(&self) -> bool {
         self.status == MicroCertStatus::Pending && Utc::now() > self.deadline
     }
 
     /// Check if needing escalation.
+    #[must_use] 
     pub fn needs_escalation(&self) -> bool {
         if self.status != MicroCertStatus::Pending || self.escalated {
             return false;
@@ -891,6 +894,7 @@ impl GovMicroCertification {
     }
 
     /// Get remaining time until deadline.
+    #[must_use] 
     pub fn time_until_deadline(&self) -> chrono::Duration {
         self.deadline - Utc::now()
     }

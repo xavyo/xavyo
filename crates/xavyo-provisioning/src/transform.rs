@@ -149,11 +149,13 @@ pub struct TransformEngine {
 
 impl TransformEngine {
     /// Create a new transformation engine with default configuration.
+    #[must_use] 
     pub fn new() -> Self {
         Self::with_config(TransformConfig::default())
     }
 
     /// Create a new transformation engine with custom configuration.
+    #[must_use] 
     pub fn with_config(config: TransformConfig) -> Self {
         Self { config }
     }
@@ -179,12 +181,12 @@ impl TransformEngine {
     /// Register all built-in transformation functions.
     fn register_builtin_functions(engine: &mut Engine) {
         // String concatenation
-        engine.register_fn("concat2", |a: &str, b: &str| format!("{}{}", a, b));
+        engine.register_fn("concat2", |a: &str, b: &str| format!("{a}{b}"));
         engine.register_fn("concat3", |a: &str, b: &str, c: &str| {
-            format!("{}{}{}", a, b, c)
+            format!("{a}{b}{c}")
         });
         engine.register_fn("concat4", |a: &str, b: &str, c: &str, d: &str| {
-            format!("{}{}{}{}", a, b, c, d)
+            format!("{a}{b}{c}{d}")
         });
 
         // String splitting and joining
@@ -194,7 +196,7 @@ impl TransformEngine {
 
         engine.register_fn("join", |arr: rhai::Array, sep: &str| -> String {
             arr.iter()
-                .map(|v| v.to_string())
+                .map(std::string::ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(sep)
         });
@@ -265,7 +267,7 @@ impl TransformEngine {
             } else {
                 let pad_char = pad.chars().next().unwrap();
                 let padding: String = std::iter::repeat_n(pad_char, len - current_len).collect();
-                format!("{}{}", padding, s)
+                format!("{padding}{s}")
             }
         });
 
@@ -277,7 +279,7 @@ impl TransformEngine {
             } else {
                 let pad_char = pad.chars().next().unwrap();
                 let padding: String = std::iter::repeat_n(pad_char, len - current_len).collect();
-                format!("{}{}", s, padding)
+                format!("{s}{padding}")
             }
         });
 
@@ -335,10 +337,10 @@ impl TransformEngine {
 
         // Coalesce (first non-empty value)
         engine.register_fn("coalesce2", |a: Dynamic, b: Dynamic| -> Dynamic {
-            if !is_empty_value(&a) {
-                a
-            } else {
+            if is_empty_value(&a) {
                 b
+            } else {
+                a
             }
         });
 
@@ -415,6 +417,7 @@ impl TransformEngine {
     }
 
     /// Validate a transformation expression.
+    #[must_use] 
     pub fn validate_expression(&self, expression: &str) -> Vec<ValidationError> {
         let engine = self.create_engine();
 
@@ -437,6 +440,7 @@ impl TransformEngine {
     }
 
     /// Validate a mapping configuration.
+    #[must_use] 
     pub fn validate_mapping(&self, mapping: &MappingConfig) -> Vec<ValidationError> {
         let mut errors = vec![];
 
@@ -490,17 +494,18 @@ impl TransformEngine {
         // Compile and execute
         let ast = engine
             .compile_with_scope(&scope, expression)
-            .map_err(|e| format!("Compilation error: {}", e))?;
+            .map_err(|e| format!("Compilation error: {e}"))?;
 
         let result: Dynamic = engine
             .eval_ast_with_scope(&mut scope, &ast)
-            .map_err(|e| format!("Runtime error: {}", e))?;
+            .map_err(|e| format!("Runtime error: {e}"))?;
 
         // Convert result back to JSON
-        rhai::serde::from_dynamic(&result).map_err(|e| format!("Conversion error: {}", e))
+        rhai::serde::from_dynamic(&result).map_err(|e| format!("Conversion error: {e}"))
     }
 
     /// Apply attribute mappings to transform source attributes.
+    #[must_use] 
     pub fn apply_mappings(
         &self,
         source: &serde_json::Value,
@@ -644,13 +649,13 @@ impl TransformEngine {
         // Compile and execute
         let ast = engine
             .compile_with_scope(&scope, expression)
-            .map_err(|e| format!("Compilation error: {}", e))?;
+            .map_err(|e| format!("Compilation error: {e}"))?;
 
         let result: Dynamic = engine
             .eval_ast_with_scope(&mut scope, &ast)
-            .map_err(|e| format!("Runtime error: {}", e))?;
+            .map_err(|e| format!("Runtime error: {e}"))?;
 
-        rhai::serde::from_dynamic(&result).map_err(|e| format!("Conversion error: {}", e))
+        rhai::serde::from_dynamic(&result).map_err(|e| format!("Conversion error: {e}"))
     }
 
     /// Apply post-transform script to the entire target object.
@@ -670,11 +675,11 @@ impl TransformEngine {
         // Compile and execute
         let ast = engine
             .compile_with_scope(&scope, script)
-            .map_err(|e| format!("Compilation error: {}", e))?;
+            .map_err(|e| format!("Compilation error: {e}"))?;
 
         let _ = engine
             .eval_ast_with_scope::<Dynamic>(&mut scope, &ast)
-            .map_err(|e| format!("Runtime error: {}", e))?;
+            .map_err(|e| format!("Runtime error: {e}"))?;
 
         // Extract modified target
         scope

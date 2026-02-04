@@ -74,7 +74,7 @@ pub async fn update_settings_handler(
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
         .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {} not found", tenant_id))
+            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
         })?;
 
     if target_tenant.is_system() {
@@ -163,7 +163,7 @@ pub async fn get_settings_handler(
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
         .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {} not found", tenant_id))
+            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
         })?;
 
     Ok(Json(GetSettingsResponse {

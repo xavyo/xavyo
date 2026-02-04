@@ -91,7 +91,7 @@ pub async fn create_destination(
     let auth_config = if let Some(ref b64) = request.auth_config_b64 {
         let key = state.siem_encryption_key();
         let encrypted = xavyo_siem::crypto::encrypt_auth_config(b64, key)
-            .map_err(|e| ApiGovernanceError::Internal(format!("Encryption failed: {}", e)))?;
+            .map_err(|e| ApiGovernanceError::Internal(format!("Encryption failed: {e}")))?;
         Some(encrypted)
     } else {
         None
@@ -190,7 +190,7 @@ pub async fn update_destination(
     let auth_config = if let Some(ref b64) = request.auth_config_b64 {
         let key = state.siem_encryption_key();
         let encrypted = xavyo_siem::crypto::encrypt_auth_config(b64, key)
-            .map_err(|e| ApiGovernanceError::Internal(format!("Encryption failed: {}", e)))?;
+            .map_err(|e| ApiGovernanceError::Internal(format!("Encryption failed: {e}")))?;
         Some(encrypted)
     } else {
         None

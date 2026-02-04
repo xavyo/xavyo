@@ -36,7 +36,7 @@ pub struct GovApprovalStep {
     /// Type of approver for this step.
     pub approver_type: GovApproverType,
 
-    /// Specific approver user IDs (only for SpecificUsers type).
+    /// Specific approver user IDs (only for `SpecificUsers` type).
     pub specific_approvers: Option<Vec<Uuid>>,
 
     /// When the step was created.
@@ -65,27 +65,27 @@ impl GovApprovalStep {
     /// Find a step by ID.
     pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_steps
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .fetch_optional(pool)
         .await
     }
 
-    /// Find all steps for a workflow, ordered by step_order.
+    /// Find all steps for a workflow, ordered by `step_order`.
     pub async fn find_by_workflow(
         pool: &sqlx::PgPool,
         workflow_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_steps
             WHERE workflow_id = $1
             ORDER BY step_order ASC
-            "#,
+            ",
         )
         .bind(workflow_id)
         .fetch_all(pool)
@@ -99,10 +99,10 @@ impl GovApprovalStep {
         step_order: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_approval_steps
             WHERE workflow_id = $1 AND step_order = $2
-            "#,
+            ",
         )
         .bind(workflow_id)
         .bind(step_order)
@@ -116,10 +116,10 @@ impl GovApprovalStep {
         workflow_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_approval_steps
             WHERE workflow_id = $1
-            "#,
+            ",
         )
         .bind(workflow_id)
         .fetch_one(pool)
@@ -133,11 +133,11 @@ impl GovApprovalStep {
         input: CreateGovApprovalStep,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_approval_steps (workflow_id, step_order, approver_type, specific_approvers, escalation_enabled)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(workflow_id)
         .bind(input.step_order)
@@ -168,10 +168,10 @@ impl GovApprovalStep {
         workflow_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_approval_steps
             WHERE workflow_id = $1
-            "#,
+            ",
         )
         .bind(workflow_id)
         .execute(pool)
@@ -183,10 +183,10 @@ impl GovApprovalStep {
     /// Delete a specific step.
     pub async fn delete(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_approval_steps
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .execute(pool)
@@ -202,10 +202,10 @@ impl GovApprovalStep {
         step_order: i32,
     ) -> Result<bool, sqlx::Error> {
         let max_order: Option<i32> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT MAX(step_order) FROM gov_approval_steps
             WHERE workflow_id = $1
-            "#,
+            ",
         )
         .bind(workflow_id)
         .fetch_one(pool)
@@ -214,7 +214,8 @@ impl GovApprovalStep {
         Ok(max_order.is_none_or(|max| step_order >= max))
     }
 
-    /// Validate that specific_approvers is properly set based on approver_type.
+    /// Validate that `specific_approvers` is properly set based on `approver_type`.
+    #[must_use] 
     pub fn validate(&self) -> bool {
         match self.approver_type {
             GovApproverType::SpecificUsers => self

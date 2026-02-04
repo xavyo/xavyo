@@ -45,7 +45,7 @@ impl std::str::FromStr for SyncState {
             "paused" => Ok(SyncState::Paused),
             "error" => Ok(SyncState::Error),
             "throttled" => Ok(SyncState::Throttled),
-            _ => Err(format!("Unknown sync state: {}", s)),
+            _ => Err(format!("Unknown sync state: {s}")),
         }
     }
 }
@@ -69,11 +69,13 @@ pub struct SyncStatus {
 
 impl SyncStatus {
     /// Get the current state enum.
+    #[must_use] 
     pub fn current_state(&self) -> SyncState {
         self.current_state.parse().unwrap_or(SyncState::Idle)
     }
 
     /// Get current rate as f64.
+    #[must_use] 
     pub fn current_rate_f64(&self) -> f64 {
         self.current_rate
     }
@@ -86,7 +88,7 @@ impl SyncStatus {
         input: &UpsertSyncStatus,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_sync_status (
                 connector_id, tenant_id, current_state, last_sync_started_at,
                 last_sync_completed_at, last_sync_error, changes_processed,
@@ -105,7 +107,7 @@ impl SyncStatus {
                 is_throttled = EXCLUDED.is_throttled,
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -129,10 +131,10 @@ impl SyncStatus {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sync_status
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -143,11 +145,11 @@ impl SyncStatus {
     /// List all sync statuses for a tenant.
     pub async fn list_by_tenant(pool: &PgPool, tenant_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sync_status
             WHERE tenant_id = $1
             ORDER BY updated_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -161,7 +163,7 @@ impl SyncStatus {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sync_status
             SET current_state = 'syncing',
                 last_sync_started_at = NOW(),
@@ -169,7 +171,7 @@ impl SyncStatus {
                 updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -185,7 +187,7 @@ impl SyncStatus {
         changes_processed: i64,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sync_status
             SET current_state = 'idle',
                 last_sync_completed_at = NOW(),
@@ -193,7 +195,7 @@ impl SyncStatus {
                 updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -210,14 +212,14 @@ impl SyncStatus {
         error: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sync_status
             SET current_state = 'error',
                 last_sync_error = $3,
                 updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -235,14 +237,14 @@ impl SyncStatus {
     ) -> Result<Option<Self>, sqlx::Error> {
         let state = if is_throttled { "throttled" } else { "syncing" };
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sync_status
             SET current_state = $3,
                 is_throttled = $4,
                 updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -261,14 +263,14 @@ impl SyncStatus {
         conflicts_pending: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sync_status
             SET changes_pending = $3,
                 conflicts_pending = $4,
                 updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -286,13 +288,13 @@ impl SyncStatus {
         rate: f64,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sync_status
             SET current_rate = $3,
                 updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -318,10 +320,10 @@ impl SyncStatus {
         connector_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_sync_status
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)

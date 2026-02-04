@@ -34,12 +34,12 @@ pub fn encode_ad_password(password: &str) -> ConnectorResult<Vec<u8>> {
     }
 
     // Surround with double quotes as required by AD
-    let quoted = format!("\"{}\"", password);
+    let quoted = format!("\"{password}\"");
 
     // Encode as UTF-16LE
     let encoded: Vec<u8> = quoted
         .encode_utf16()
-        .flat_map(|c| c.to_le_bytes())
+        .flat_map(u16::to_le_bytes)
         .collect();
 
     Ok(encoded)
@@ -100,8 +100,9 @@ pub fn build_password_change(
 
 /// Compute the userAccountControl value for a newly created AD user.
 ///
-/// New accounts are created with NORMAL_ACCOUNT (0x200) flag.
+/// New accounts are created with `NORMAL_ACCOUNT` (0x200) flag.
 /// Optionally, the account can be created in disabled state (ACCOUNTDISABLE 0x2).
+#[must_use] 
 pub fn new_account_uac(disabled: bool) -> u32 {
     let mut uac: u32 = 0x200; // NORMAL_ACCOUNT
     if disabled {
@@ -132,7 +133,7 @@ pub fn build_user_dn(display_name: &str, target_ou: &str) -> ConnectorResult<Str
 
     // Escape special DN characters in the CN
     let escaped_cn = escape_dn_value(display_name);
-    let dn = format!("CN={},{}", escaped_cn, target_ou);
+    let dn = format!("CN={escaped_cn},{target_ou}");
     debug!(dn = %dn, "Built user DN for outbound provisioning");
 
     Ok(dn)
@@ -164,7 +165,7 @@ fn escape_dn_value(value: &str) -> String {
 /// Map platform user attributes to AD LDAP attributes for outbound provisioning.
 ///
 /// This is the reverse of the inbound mapping defined in sync.rs.
-/// Returns a list of (attribute_name, value) pairs for an LDAP add operation.
+/// Returns a list of (`attribute_name`, value) pairs for an LDAP add operation.
 #[instrument(skip(attrs))]
 pub fn map_platform_to_ad_attributes(
     attrs: &std::collections::HashMap<String, serde_json::Value>,
@@ -224,7 +225,7 @@ mod tests {
         let expected_str = "\"Test123!\"";
         let expected: Vec<u8> = expected_str
             .encode_utf16()
-            .flat_map(|c| c.to_le_bytes())
+            .flat_map(u16::to_le_bytes)
             .collect();
 
         assert_eq!(encoded, expected);

@@ -1,7 +1,7 @@
 //! License Incompatibility model (F065).
 //!
 //! Defines rules for license pools that cannot be assigned to the same user
-//! (similar to SoD rules for entitlements).
+//! (similar to `SoD` rules for entitlements).
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,7 @@ pub struct CreateGovLicenseIncompatibility {
 /// Filter options for querying incompatibility rules.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct LicenseIncompatibilityFilter {
-    /// Filter by pool (matches either pool_a or pool_b).
+    /// Filter by pool (matches either `pool_a` or `pool_b`).
     pub pool_id: Option<Uuid>,
 }
 

@@ -42,7 +42,7 @@ pub enum EncryptionError {
 
 /// Get the encryption key from environment.
 ///
-/// SECURITY: This function requires the XAVYO_SECRETS_ENCRYPTION_KEY environment
+/// SECURITY: This function requires the `XAVYO_SECRETS_ENCRYPTION_KEY` environment
 /// variable to be set. There is no fallback to a hardcoded key to prevent
 /// accidental use of weak encryption in production.
 ///
@@ -58,7 +58,7 @@ fn get_encryption_key() -> Result<[u8; KEY_LENGTH], EncryptionError> {
 
     let key_bytes = BASE64
         .decode(&key_b64)
-        .map_err(|e| EncryptionError::InvalidKey(format!("Invalid base64 key: {}", e)))?;
+        .map_err(|e| EncryptionError::InvalidKey(format!("Invalid base64 key: {e}")))?;
 
     if key_bytes.len() != KEY_LENGTH {
         return Err(EncryptionError::InvalidKey(format!(
@@ -80,7 +80,7 @@ fn get_encryption_key() -> Result<[u8; KEY_LENGTH], EncryptionError> {
 pub fn encrypt_credential_value(plaintext: &str) -> Result<String, EncryptionError> {
     let key = get_encryption_key()?;
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| {
-        EncryptionError::EncryptionFailed(format!("Failed to create cipher: {}", e))
+        EncryptionError::EncryptionFailed(format!("Failed to create cipher: {e}"))
     })?;
 
     // Generate random nonce
@@ -91,7 +91,7 @@ pub fn encrypt_credential_value(plaintext: &str) -> Result<String, EncryptionErr
     // Encrypt
     let ciphertext = cipher
         .encrypt(nonce, plaintext.as_bytes())
-        .map_err(|e| EncryptionError::EncryptionFailed(format!("Encryption failed: {}", e)))?;
+        .map_err(|e| EncryptionError::EncryptionFailed(format!("Encryption failed: {e}")))?;
 
     // Combine nonce + ciphertext and encode as base64
     let mut combined = Vec::with_capacity(NONCE_LENGTH + ciphertext.len());
@@ -108,13 +108,13 @@ pub fn encrypt_credential_value(plaintext: &str) -> Result<String, EncryptionErr
 pub fn decrypt_credential_value(encrypted: &str) -> Result<String, EncryptionError> {
     let key = get_encryption_key()?;
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| {
-        EncryptionError::DecryptionFailed(format!("Failed to create cipher: {}", e))
+        EncryptionError::DecryptionFailed(format!("Failed to create cipher: {e}"))
     })?;
 
     // Decode from base64
     let combined = BASE64
         .decode(encrypted)
-        .map_err(|e| EncryptionError::DecryptionFailed(format!("Invalid base64: {}", e)))?;
+        .map_err(|e| EncryptionError::DecryptionFailed(format!("Invalid base64: {e}")))?;
 
     if combined.len() < NONCE_LENGTH {
         return Err(EncryptionError::DecryptionFailed(
@@ -129,10 +129,10 @@ pub fn decrypt_credential_value(encrypted: &str) -> Result<String, EncryptionErr
     // Decrypt
     let plaintext_bytes = cipher
         .decrypt(nonce, ciphertext)
-        .map_err(|e| EncryptionError::DecryptionFailed(format!("Decryption failed: {}", e)))?;
+        .map_err(|e| EncryptionError::DecryptionFailed(format!("Decryption failed: {e}")))?;
 
     String::from_utf8(plaintext_bytes)
-        .map_err(|e| EncryptionError::DecryptionFailed(format!("Invalid UTF-8: {}", e)))
+        .map_err(|e| EncryptionError::DecryptionFailed(format!("Invalid UTF-8: {e}")))
 }
 
 /// Encrypt a JSON credential object using AES-256-GCM.
@@ -141,7 +141,7 @@ pub fn decrypt_credential_value(encrypted: &str) -> Result<String, EncryptionErr
 /// Use this for encrypting structured credential objects.
 pub fn encrypt_credentials_json(plaintext: &serde_json::Value) -> Result<String, EncryptionError> {
     let json_str = serde_json::to_string(plaintext).map_err(|e| {
-        EncryptionError::SerializationError(format!("JSON serialization failed: {}", e))
+        EncryptionError::SerializationError(format!("JSON serialization failed: {e}"))
     })?;
     encrypt_credential_value(&json_str)
 }
@@ -153,7 +153,7 @@ pub fn encrypt_credentials_json(plaintext: &serde_json::Value) -> Result<String,
 pub fn decrypt_credentials_json(encrypted: &str) -> Result<serde_json::Value, EncryptionError> {
     let json_str = decrypt_credential_value(encrypted)?;
     serde_json::from_str(&json_str).map_err(|e| {
-        EncryptionError::SerializationError(format!("JSON deserialization failed: {}", e))
+        EncryptionError::SerializationError(format!("JSON deserialization failed: {e}"))
     })
 }
 
@@ -166,9 +166,9 @@ pub struct EncryptionService {
 }
 
 impl EncryptionService {
-    /// Create an EncryptionService from environment or generate a key.
+    /// Create an `EncryptionService` from environment or generate a key.
     ///
-    /// In production, expects XAVYO_SECRETS_ENCRYPTION_KEY to be set.
+    /// In production, expects `XAVYO_SECRETS_ENCRYPTION_KEY` to be set.
     /// In development, generates a temporary key if not set.
     pub fn from_env_or_generate() -> Result<Self, crate::error::ApiAgentsError> {
         let key = match get_encryption_key() {
@@ -191,7 +191,7 @@ impl EncryptionService {
     /// Encrypt a credential value.
     pub fn encrypt(&self, plaintext: &str) -> Result<String, crate::error::ApiAgentsError> {
         let cipher = Aes256Gcm::new_from_slice(&self.key).map_err(|e| {
-            crate::error::ApiAgentsError::EncryptionError(format!("Failed to create cipher: {}", e))
+            crate::error::ApiAgentsError::EncryptionError(format!("Failed to create cipher: {e}"))
         })?;
 
         let mut nonce_bytes = [0u8; NONCE_LENGTH];
@@ -199,7 +199,7 @@ impl EncryptionService {
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes()).map_err(|e| {
-            crate::error::ApiAgentsError::EncryptionError(format!("Encryption failed: {}", e))
+            crate::error::ApiAgentsError::EncryptionError(format!("Encryption failed: {e}"))
         })?;
 
         let mut combined = Vec::with_capacity(NONCE_LENGTH + ciphertext.len());
@@ -212,11 +212,11 @@ impl EncryptionService {
     /// Decrypt a credential value.
     pub fn decrypt(&self, encrypted: &str) -> Result<String, crate::error::ApiAgentsError> {
         let cipher = Aes256Gcm::new_from_slice(&self.key).map_err(|e| {
-            crate::error::ApiAgentsError::EncryptionError(format!("Failed to create cipher: {}", e))
+            crate::error::ApiAgentsError::EncryptionError(format!("Failed to create cipher: {e}"))
         })?;
 
         let combined = BASE64.decode(encrypted).map_err(|e| {
-            crate::error::ApiAgentsError::EncryptionError(format!("Invalid base64: {}", e))
+            crate::error::ApiAgentsError::EncryptionError(format!("Invalid base64: {e}"))
         })?;
 
         if combined.len() < NONCE_LENGTH {
@@ -229,11 +229,11 @@ impl EncryptionService {
         let nonce = Nonce::from_slice(nonce_bytes);
 
         let plaintext_bytes = cipher.decrypt(nonce, ciphertext).map_err(|e| {
-            crate::error::ApiAgentsError::EncryptionError(format!("Decryption failed: {}", e))
+            crate::error::ApiAgentsError::EncryptionError(format!("Decryption failed: {e}"))
         })?;
 
         String::from_utf8(plaintext_bytes).map_err(|e| {
-            crate::error::ApiAgentsError::EncryptionError(format!("Invalid UTF-8: {}", e))
+            crate::error::ApiAgentsError::EncryptionError(format!("Invalid UTF-8: {e}"))
         })
     }
 }

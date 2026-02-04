@@ -11,10 +11,10 @@
 //! - Role-to-entitlement mappings
 //! - Effective access consolidation
 //! - Audit logging for all governance changes
-//! - Separation of Duties (SoD) rule management
-//! - SoD violation detection (preventive and detective)
-//! - SoD exemption handling with time-bound approvals
-//! - Risk assessment and scoring based on entitlements and SoD violations
+//! - Separation of Duties (`SoD`) rule management
+//! - `SoD` violation detection (preventive and detective)
+//! - `SoD` exemption handling with time-bound approvals
+//! - Risk assessment and scoring based on entitlements and `SoD` violations
 //!
 //! # Services
 //!
@@ -22,9 +22,9 @@
 //! - [`services::EntitlementService`] - CRUD operations for entitlements
 //! - [`services::AssignmentService`] - Assign/revoke entitlements for users
 //! - [`services::ValidationService`] - Validate assignments against business rules
-//! - [`services::SodService`] - Manage SoD rules (exclusive, cardinality, inclusive)
-//! - [`services::SodValidationService`] - Validate assignments against SoD rules
-//! - [`services::SodExemptionService`] - Manage SoD exemptions for approved violations
+//! - [`services::SodService`] - Manage `SoD` rules (exclusive, cardinality, inclusive)
+//! - [`services::SodValidationService`] - Validate assignments against `SoD` rules
+//! - [`services::SodExemptionService`] - Manage `SoD` exemptions for approved violations
 //! - [`services::RiskAssessmentService`] - Calculate user risk scores and manage thresholds
 //!
 //! # Audit

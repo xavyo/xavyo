@@ -11,9 +11,9 @@
 //! - Pending access request handling (edge case from IGA standards)
 //! - Ownership transfer for resources (edge case from IGA standards)
 //!
-//! SoD integration (User Story 4):
-//! - SoD violation detection during merge preview
-//! - SoD blocking/override during merge execution
+//! `SoD` integration (User Story 4):
+//! - `SoD` violation detection during merge preview
+//! - `SoD` blocking/override during merge execution
 
 use serde_json::json;
 use sqlx::PgPool;
@@ -47,7 +47,7 @@ pub struct MergeResult {
     pub entitlements_added: usize,
     /// Number of entitlements removed from source.
     pub entitlements_removed: usize,
-    /// Whether any SoD violations were overridden.
+    /// Whether any `SoD` violations were overridden.
     pub sod_overridden: bool,
     /// Number of group memberships transferred.
     pub groups_transferred: usize,
@@ -67,6 +67,7 @@ pub struct IdentityMergeService {
 
 impl IdentityMergeService {
     /// Create a new identity merge service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             sod_enforcement_service: Arc::new(SodEnforcementService::new(pool.clone())),
@@ -74,7 +75,8 @@ impl IdentityMergeService {
         }
     }
 
-    /// Create a new identity merge service with a custom SoD service.
+    /// Create a new identity merge service with a custom `SoD` service.
+    #[must_use] 
     pub fn with_sod_service(pool: PgPool, sod_service: Arc<SodEnforcementService>) -> Self {
         Self {
             pool,
@@ -83,6 +85,7 @@ impl IdentityMergeService {
     }
 
     /// Get the database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -559,11 +562,11 @@ impl IdentityMergeService {
             Option<String>,
             Option<serde_json::Value>,
         )> = sqlx::query_as(
-            r#"
+            r"
             SELECT email, display_name, department, attributes
             FROM users
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -675,10 +678,10 @@ impl IdentityMergeService {
         comparisons
     }
 
-    /// Check for SoD violations that would occur if source entitlements are transferred to target.
+    /// Check for `SoD` violations that would occur if source entitlements are transferred to target.
     ///
     /// This method checks each entitlement being transferred against the target's existing
-    /// entitlements to detect any SoD rule violations.
+    /// entitlements to detect any `SoD` rule violations.
     async fn check_merge_sod_violations(
         &self,
         tenant_id: Uuid,
@@ -747,7 +750,7 @@ impl IdentityMergeService {
         })
     }
 
-    /// Check if a SoD rule exists between two entitlements.
+    /// Check if a `SoD` rule exists between two entitlements.
     async fn check_sod_rule_exists(
         &self,
         tenant_id: Uuid,
@@ -755,7 +758,7 @@ impl IdentityMergeService {
         entitlement_b_id: Uuid,
     ) -> Result<bool> {
         let result = sqlx::query_scalar::<_, bool>(
-            r#"
+            r"
             SELECT EXISTS (
                 SELECT 1 FROM gov_sod_rules
                 WHERE tenant_id = $1
@@ -765,7 +768,7 @@ impl IdentityMergeService {
                     OR (entitlement_a_id = $3 AND entitlement_b_id = $2)
                 )
             )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_a_id)
@@ -787,13 +790,13 @@ impl IdentityMergeService {
         // Fetch entitlements for both identities (simplified query)
         let source_entitlements: Vec<MergeEntitlementSummary> =
             sqlx::query_as::<_, (Uuid, String, Option<String>)>(
-                r#"
+                r"
             SELECT e.id, e.name, a.name as application
             FROM gov_entitlement_assignments ea
             JOIN gov_entitlements e ON e.id = ea.entitlement_id
             LEFT JOIN gov_applications a ON a.id = e.application_id
             WHERE ea.user_id = $1 AND ea.tenant_id = $2 AND ea.is_active = true
-            "#,
+            ",
             )
             .bind(source_id)
             .bind(tenant_id)
@@ -810,13 +813,13 @@ impl IdentityMergeService {
 
         let target_entitlements: Vec<MergeEntitlementSummary> =
             sqlx::query_as::<_, (Uuid, String, Option<String>)>(
-                r#"
+                r"
             SELECT e.id, e.name, a.name as application
             FROM gov_entitlement_assignments ea
             JOIN gov_entitlements e ON e.id = ea.entitlement_id
             LEFT JOIN gov_applications a ON a.id = e.application_id
             WHERE ea.user_id = $1 AND ea.tenant_id = $2 AND ea.is_active = true
-            "#,
+            ",
             )
             .bind(target_id)
             .bind(tenant_id)
@@ -1000,11 +1003,11 @@ impl IdentityMergeService {
         // Invalidate all sessions for the archived identity
         // This ensures the user cannot access the system with the old identity
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE sessions
             SET is_valid = false, invalidated_at = NOW()
             WHERE user_id = $1 AND tenant_id = $2 AND is_valid = true
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -1048,7 +1051,7 @@ impl IdentityMergeService {
         // Transfer memberships from source to target where target is not already a member
         // Uses INSERT ... ON CONFLICT to handle duplicates gracefully
         let result = sqlx::query(
-            r#"
+            r"
             INSERT INTO group_memberships (id, tenant_id, group_id, user_id, created_at)
             SELECT gen_random_uuid(), gm.tenant_id, gm.group_id, $3, NOW()
             FROM group_memberships gm
@@ -1060,7 +1063,7 @@ impl IdentityMergeService {
                 AND gm2.tenant_id = $2
             )
             ON CONFLICT DO NOTHING
-            "#,
+            ",
         )
         .bind(source_id)
         .bind(tenant_id)
@@ -1112,7 +1115,7 @@ impl IdentityMergeService {
     {
         // Cancel requests where source is the beneficiary (they're being archived)
         let cancel_result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_access_requests
             SET status = 'cancelled',
                 updated_at = NOW(),
@@ -1121,7 +1124,7 @@ impl IdentityMergeService {
                                        'merged_into', $3::text)
             WHERE user_id = $1 AND tenant_id = $2
             AND status IN ('pending', 'pending_approval')
-            "#,
+            ",
         )
         .bind(source_id)
         .bind(tenant_id)
@@ -1169,11 +1172,11 @@ impl IdentityMergeService {
         // Transfer application ownership
         let app_result: std::result::Result<sqlx::postgres::PgQueryResult, sqlx::Error> =
             sqlx::query(
-                r#"
+                r"
             UPDATE gov_applications
             SET owner_id = $3, updated_at = NOW()
             WHERE owner_id = $1 AND tenant_id = $2
-            "#,
+            ",
             )
             .bind(source_id)
             .bind(tenant_id)
@@ -1188,11 +1191,11 @@ impl IdentityMergeService {
         // Transfer entitlement ownership
         let ent_result: std::result::Result<sqlx::postgres::PgQueryResult, sqlx::Error> =
             sqlx::query(
-                r#"
+                r"
             UPDATE gov_entitlements
             SET owner_id = $3, updated_at = NOW()
             WHERE owner_id = $1 AND tenant_id = $2
-            "#,
+            ",
             )
             .bind(source_id)
             .bind(tenant_id)
@@ -1230,11 +1233,11 @@ impl IdentityMergeService {
 
         // Collect SCIM external IDs
         let scim_result: std::result::Result<Vec<(String, String)>, sqlx::Error> = sqlx::query_as(
-            r#"
+            r"
             SELECT resource_type, external_id
             FROM scim_resources
             WHERE user_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -1252,11 +1255,11 @@ impl IdentityMergeService {
 
         // Collect LDAP DNs (if connector framework is available)
         let ldap_result: std::result::Result<Vec<(String, String)>, sqlx::Error> = sqlx::query_as(
-            r#"
+            r"
             SELECT connector_id::text, external_uid
             FROM gov_connector_accounts
             WHERE identity_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -1275,11 +1278,11 @@ impl IdentityMergeService {
         // Collect social login identities
         let social_result: std::result::Result<Vec<(String, String)>, sqlx::Error> =
             sqlx::query_as(
-                r#"
+                r"
             SELECT provider, provider_user_id
             FROM social_identities
             WHERE user_id = $1 AND tenant_id = $2
-            "#,
+            ",
             )
             .bind(user_id)
             .bind(tenant_id)
@@ -1317,7 +1320,7 @@ impl IdentityMergeService {
             GovEntitlementStrategy::Union => {
                 // Transfer all source entitlements that target doesn't have
                 let result = sqlx::query(
-                    r#"
+                    r"
                     INSERT INTO gov_entitlement_assignments
                         (id, tenant_id, entitlement_id, user_id, assigned_by, justification, is_active, created_at)
                     SELECT gen_random_uuid(), ea.tenant_id, ea.entitlement_id, $3,
@@ -1332,7 +1335,7 @@ impl IdentityMergeService {
                         AND ea2.is_active = true
                     )
                     ON CONFLICT DO NOTHING
-                    "#,
+                    ",
                 )
                 .bind(source_id)
                 .bind(tenant_id)
@@ -1355,7 +1358,7 @@ impl IdentityMergeService {
                     }
 
                     let result = sqlx::query(
-                        r#"
+                        r"
                         INSERT INTO gov_entitlement_assignments
                             (id, tenant_id, entitlement_id, user_id, assigned_by, justification, is_active, created_at)
                         SELECT gen_random_uuid(), ea.tenant_id, ea.entitlement_id, $3,
@@ -1371,7 +1374,7 @@ impl IdentityMergeService {
                             AND ea2.is_active = true
                         )
                         ON CONFLICT DO NOTHING
-                        "#,
+                        ",
                     )
                     .bind(source_id)
                     .bind(tenant_id)

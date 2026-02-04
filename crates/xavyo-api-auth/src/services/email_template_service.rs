@@ -26,6 +26,7 @@ pub struct EmailTemplateService {
 
 impl EmailTemplateService {
     /// Create a new email template service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         let mut handlebars = Handlebars::new();
         // SECURITY: Enable strict mode to catch missing variables and prevent
@@ -291,19 +292,19 @@ impl EmailTemplateService {
             .handlebars
             .render_template(&template.subject, &data)
             .map_err(|e| {
-                ApiAuthError::InvalidTemplateSyntax(format!("Error rendering subject: {}", e))
+                ApiAuthError::InvalidTemplateSyntax(format!("Error rendering subject: {e}"))
             })?;
 
         let body_html = self
             .handlebars
             .render_template(&template.body_html, &data)
             .map_err(|e| {
-                ApiAuthError::InvalidTemplateSyntax(format!("Error rendering HTML body: {}", e))
+                ApiAuthError::InvalidTemplateSyntax(format!("Error rendering HTML body: {e}"))
             })?;
 
         let body_text = if let Some(ref text) = template.body_text {
             Some(self.handlebars.render_template(text, &data).map_err(|e| {
-                ApiAuthError::InvalidTemplateSyntax(format!("Error rendering text body: {}", e))
+                ApiAuthError::InvalidTemplateSyntax(format!("Error rendering text body: {e}"))
             })?)
         } else {
             None

@@ -5,7 +5,7 @@
 //! - CRL generation for a CA (with actual X.509 DER/PEM output)
 //! - OCSP response handling
 //!
-//! The actual certificate revocation is handled by CertificateService.
+//! The actual certificate revocation is handled by `CertificateService`.
 
 use chrono::{DateTime, Duration, Utc};
 use sqlx::PgPool;
@@ -88,7 +88,7 @@ pub struct OcspRequest {
 #[derive(Debug, Clone, serde::Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct OcspResponse {
-    /// Status of the response (successful, malformed_request, internal_error, etc.).
+    /// Status of the response (successful, `malformed_request`, `internal_error`, etc.).
     pub response_status: String,
     /// Certificate status (good, revoked, unknown).
     pub cert_status: String,
@@ -110,7 +110,8 @@ pub struct OcspResponse {
 }
 
 impl RevocationService {
-    /// Create a new RevocationService.
+    /// Create a new `RevocationService`.
+    #[must_use] 
     pub fn new(pool: PgPool, certificate_service: Arc<CertificateService>) -> Self {
         Self {
             pool,
@@ -119,7 +120,8 @@ impl RevocationService {
         }
     }
 
-    /// Create a new RevocationService with CA service for CRL generation.
+    /// Create a new `RevocationService` with CA service for CRL generation.
+    #[must_use] 
     pub fn with_ca_service(
         pool: PgPool,
         certificate_service: Arc<CertificateService>,
@@ -350,7 +352,7 @@ impl RevocationService {
             .await
             .map_err(ApiAgentsError::Database)?;
 
-        Ok(cert.map(|c| c.is_revoked()).unwrap_or(false))
+        Ok(cert.is_some_and(|c| c.is_revoked()))
     }
 }
 

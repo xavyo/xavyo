@@ -18,6 +18,7 @@ pub struct ScriptBindingService {
 
 impl ScriptBindingService {
     /// Create a new script binding service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -57,7 +58,7 @@ impl ScriptBindingService {
         )
         .await?;
 
-        if count >= MAX_BINDINGS_PER_HOOK as i64 {
+        if count >= i64::from(MAX_BINDINGS_PER_HOOK) {
             return Err(GovernanceError::MaxBindingsExceeded(MAX_BINDINGS_PER_HOOK));
         }
 
@@ -102,7 +103,7 @@ impl ScriptBindingService {
 
     /// List bindings with filters and pagination.
     ///
-    /// Returns a tuple of (bindings, total_count).
+    /// Returns a tuple of (bindings, `total_count`).
     pub async fn list_bindings(
         &self,
         tenant_id: Uuid,
@@ -116,8 +117,8 @@ impl ScriptBindingService {
         Ok(result)
     }
 
-    /// List all bindings for a connector, ordered by hook_phase, operation_type,
-    /// and execution_order.
+    /// List all bindings for a connector, ordered by `hook_phase`, `operation_type`,
+    /// and `execution_order`.
     pub async fn list_by_connector(
         &self,
         tenant_id: Uuid,
@@ -131,7 +132,7 @@ impl ScriptBindingService {
     /// Get bindings for execution (hot path).
     ///
     /// Returns only enabled bindings for the given connector, hook phase, and
-    /// operation type, ordered by execution_order for sequential execution.
+    /// operation type, ordered by `execution_order` for sequential execution.
     pub async fn get_execution_bindings(
         &self,
         tenant_id: Uuid,

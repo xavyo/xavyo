@@ -30,7 +30,7 @@ pub struct GovSimulationComparison {
     /// Type of first simulation ("policy" or "batch").
     pub simulation_a_type: Option<String>,
 
-    /// Second simulation ID (nullable for vs_current).
+    /// Second simulation ID (nullable for `vs_current`).
     pub simulation_b_id: Option<Uuid>,
 
     /// Type of second simulation.
@@ -109,10 +109,10 @@ impl GovSimulationComparison {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_simulation_comparisons
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -129,20 +129,20 @@ impl GovSimulationComparison {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_simulation_comparisons
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.comparison_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND comparison_type = ${}", param_count));
+            query.push_str(&format!(" AND comparison_type = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -170,20 +170,20 @@ impl GovSimulationComparison {
         filter: &SimulationComparisonFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_simulation_comparisons
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.comparison_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND comparison_type = ${}", param_count));
+            query.push_str(&format!(" AND comparison_type = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -212,14 +212,14 @@ impl GovSimulationComparison {
             serde_json::to_value(&delta_results).unwrap_or_else(|_| serde_json::json!({}));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_simulation_comparisons (
                 tenant_id, name, comparison_type, simulation_a_id, simulation_a_type,
                 simulation_b_id, simulation_b_type, summary_stats, delta_results, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -242,12 +242,12 @@ impl GovSimulationComparison {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_simulation_comparisons
             SET is_stale = TRUE
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -262,10 +262,10 @@ impl GovSimulationComparison {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_simulation_comparisons
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -276,16 +276,19 @@ impl GovSimulationComparison {
     }
 
     /// Parse summary statistics.
+    #[must_use] 
     pub fn parse_summary_stats(&self) -> ComparisonSummary {
         serde_json::from_value(self.summary_stats.clone()).unwrap_or_default()
     }
 
     /// Parse delta results.
+    #[must_use] 
     pub fn parse_delta_results(&self) -> DeltaResults {
         serde_json::from_value(self.delta_results.clone()).unwrap_or_default()
     }
 
     /// Check if comparison references a specific simulation.
+    #[must_use] 
     pub fn references_simulation(&self, simulation_id: Uuid) -> bool {
         self.simulation_a_id == Some(simulation_id) || self.simulation_b_id == Some(simulation_id)
     }
@@ -297,13 +300,13 @@ impl GovSimulationComparison {
         simulation_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_simulation_comparisons
             SET is_stale = TRUE
             WHERE tenant_id = $1
               AND (simulation_a_id = $2 OR simulation_b_id = $2)
               AND is_stale = FALSE
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(simulation_id)

@@ -23,11 +23,13 @@ pub enum CandidatePromotionStatus {
 
 impl CandidatePromotionStatus {
     /// Check if candidate can be promoted.
+    #[must_use] 
     pub fn can_promote(&self) -> bool {
         matches!(self, Self::Pending)
     }
 
     /// Check if candidate can be dismissed.
+    #[must_use] 
     pub fn can_dismiss(&self) -> bool {
         matches!(self, Self::Pending)
     }
@@ -101,10 +103,10 @@ impl GovRoleCandidate {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_candidates
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -122,24 +124,24 @@ impl GovRoleCandidate {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_role_candidates
             WHERE tenant_id = $1 AND job_id = $2
-            "#,
+            ",
         );
         let mut param_count = 2;
 
         if filter.promotion_status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND promotion_status = ${}", param_count));
+            query.push_str(&format!(" AND promotion_status = ${param_count}"));
         }
         if filter.min_confidence.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND confidence_score >= ${}", param_count));
+            query.push_str(&format!(" AND confidence_score >= ${param_count}"));
         }
         if filter.min_members.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND member_count >= ${}", param_count));
+            query.push_str(&format!(" AND member_count >= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -173,24 +175,24 @@ impl GovRoleCandidate {
         filter: &RoleCandidateFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_candidates
             WHERE tenant_id = $1 AND job_id = $2
-            "#,
+            ",
         );
         let mut param_count = 2;
 
         if filter.promotion_status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND promotion_status = ${}", param_count));
+            query.push_str(&format!(" AND promotion_status = ${param_count}"));
         }
         if filter.min_confidence.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND confidence_score >= ${}", param_count));
+            query.push_str(&format!(" AND confidence_score >= ${param_count}"));
         }
         if filter.min_members.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND member_count >= ${}", param_count));
+            query.push_str(&format!(" AND member_count >= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query)
@@ -217,14 +219,14 @@ impl GovRoleCandidate {
         input: CreateRoleCandidate,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_role_candidates (
                 tenant_id, job_id, proposed_name, confidence_score,
                 member_count, entitlement_ids, user_ids
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.job_id)
@@ -259,12 +261,12 @@ impl GovRoleCandidate {
         role_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_role_candidates
             SET promotion_status = 'promoted', promoted_role_id = $3
             WHERE id = $1 AND tenant_id = $2 AND promotion_status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -281,12 +283,12 @@ impl GovRoleCandidate {
         reason: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_role_candidates
             SET promotion_status = 'dismissed', dismissed_reason = $3
             WHERE id = $1 AND tenant_id = $2 AND promotion_status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

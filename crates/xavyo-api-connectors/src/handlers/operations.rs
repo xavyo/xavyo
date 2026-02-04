@@ -578,7 +578,7 @@ pub async fn resolve_conflict(
                 id: id.to_string(),
             },
             xavyo_provisioning::ConflictError::AlreadyResolved { id } => {
-                ConnectorApiError::Conflict(format!("Conflict {} already resolved", id))
+                ConnectorApiError::Conflict(format!("Conflict {id} already resolved"))
             }
             other => ConnectorApiError::Conflict(other.to_string()),
         })?;

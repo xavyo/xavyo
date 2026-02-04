@@ -18,7 +18,7 @@ const NONCE_LENGTH: usize = 12;
 
 /// Get the encryption key from environment.
 ///
-/// SECURITY: This function requires the XAVYO_TICKETING_ENCRYPTION_KEY environment
+/// SECURITY: This function requires the `XAVYO_TICKETING_ENCRYPTION_KEY` environment
 /// variable to be set. There is no fallback to a hardcoded key to prevent
 /// accidental use of weak encryption in production.
 ///
@@ -34,7 +34,7 @@ fn get_encryption_key() -> Result<[u8; KEY_LENGTH], TicketingError> {
 
     let key_bytes = BASE64
         .decode(&key_b64)
-        .map_err(|e| TicketingError::EncryptionError(format!("Invalid base64 key: {}", e)))?;
+        .map_err(|e| TicketingError::EncryptionError(format!("Invalid base64 key: {e}")))?;
 
     if key_bytes.len() != KEY_LENGTH {
         return Err(TicketingError::EncryptionError(format!(
@@ -55,7 +55,7 @@ fn get_encryption_key() -> Result<[u8; KEY_LENGTH], TicketingError> {
 pub fn encrypt_credentials(plaintext: &serde_json::Value) -> Result<String, TicketingError> {
     let key = get_encryption_key()?;
     let cipher = Aes256Gcm::new_from_slice(&key)
-        .map_err(|e| TicketingError::EncryptionError(format!("Failed to create cipher: {}", e)))?;
+        .map_err(|e| TicketingError::EncryptionError(format!("Failed to create cipher: {e}")))?;
 
     // Generate random nonce
     let mut nonce_bytes = [0u8; NONCE_LENGTH];
@@ -64,12 +64,12 @@ pub fn encrypt_credentials(plaintext: &serde_json::Value) -> Result<String, Tick
 
     // Serialize and encrypt
     let plaintext_bytes = serde_json::to_vec(plaintext).map_err(|e| {
-        TicketingError::EncryptionError(format!("JSON serialization failed: {}", e))
+        TicketingError::EncryptionError(format!("JSON serialization failed: {e}"))
     })?;
 
     let ciphertext = cipher
         .encrypt(nonce, plaintext_bytes.as_slice())
-        .map_err(|e| TicketingError::EncryptionError(format!("Encryption failed: {}", e)))?;
+        .map_err(|e| TicketingError::EncryptionError(format!("Encryption failed: {e}")))?;
 
     // Combine nonce + ciphertext and encode as base64
     let mut combined = Vec::with_capacity(NONCE_LENGTH + ciphertext.len());
@@ -85,12 +85,12 @@ pub fn encrypt_credentials(plaintext: &serde_json::Value) -> Result<String, Tick
 pub fn decrypt_credentials(encrypted: &str) -> Result<serde_json::Value, TicketingError> {
     let key = get_encryption_key()?;
     let cipher = Aes256Gcm::new_from_slice(&key)
-        .map_err(|e| TicketingError::EncryptionError(format!("Failed to create cipher: {}", e)))?;
+        .map_err(|e| TicketingError::EncryptionError(format!("Failed to create cipher: {e}")))?;
 
     // Decode from base64
     let combined = BASE64
         .decode(encrypted)
-        .map_err(|e| TicketingError::EncryptionError(format!("Invalid base64: {}", e)))?;
+        .map_err(|e| TicketingError::EncryptionError(format!("Invalid base64: {e}")))?;
 
     if combined.len() < NONCE_LENGTH {
         return Err(TicketingError::EncryptionError(
@@ -105,11 +105,11 @@ pub fn decrypt_credentials(encrypted: &str) -> Result<serde_json::Value, Ticketi
     // Decrypt
     let plaintext_bytes = cipher
         .decrypt(nonce, ciphertext)
-        .map_err(|e| TicketingError::EncryptionError(format!("Decryption failed: {}", e)))?;
+        .map_err(|e| TicketingError::EncryptionError(format!("Decryption failed: {e}")))?;
 
     // Deserialize
     serde_json::from_slice(&plaintext_bytes)
-        .map_err(|e| TicketingError::EncryptionError(format!("JSON deserialization failed: {}", e)))
+        .map_err(|e| TicketingError::EncryptionError(format!("JSON deserialization failed: {e}")))
 }
 
 #[cfg(test)]

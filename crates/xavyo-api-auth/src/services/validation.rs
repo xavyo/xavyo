@@ -18,8 +18,8 @@ pub const MAX_EMAIL_LENGTH: usize = 255;
 pub const SPECIAL_CHARS: &str = "!@#$%^&*()_+-=[]{}|;:,.<>?";
 
 /// Email validation regex (simplified RFC 5322).
-/// Uses LazyLock for compile-once initialization. The regex pattern is a constant,
-/// so the expect() here is acceptable - if this fails, it's a programming error.
+/// Uses `LazyLock` for compile-once initialization. The regex pattern is a constant,
+/// so the `expect()` here is acceptable - if this fails, it's a programming error.
 static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
         .expect("EMAIL_REGEX is a valid regex pattern")

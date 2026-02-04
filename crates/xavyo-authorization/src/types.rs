@@ -70,6 +70,7 @@ pub enum PolicyEffect {
 
 impl PolicyEffect {
     /// Parse from a string value (case-insensitive).
+    #[must_use] 
     pub fn from_effect_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "allow" => PolicyEffect::Allow,
@@ -158,13 +159,13 @@ pub struct ConditionData {
     /// Condition ID.
     pub id: Uuid,
 
-    /// Condition type: "time_window", "user_attribute", "entitlement_check".
+    /// Condition type: "`time_window`", "`user_attribute`", "`entitlement_check`".
     pub condition_type: String,
 
-    /// Attribute path for user_attribute conditions.
+    /// Attribute path for `user_attribute` conditions.
     pub attribute_path: Option<String>,
 
-    /// Comparison operator for user_attribute conditions.
+    /// Comparison operator for `user_attribute` conditions.
     pub operator: Option<String>,
 
     /// Condition value (JSON).
@@ -234,7 +235,7 @@ impl FromStr for ComparisonOperator {
             "in_list" => Ok(ComparisonOperator::InList),
             "greater_than" => Ok(ComparisonOperator::GreaterThan),
             "less_than" => Ok(ComparisonOperator::LessThan),
-            other => Err(format!("Unknown comparison operator: {}", other)),
+            other => Err(format!("Unknown comparison operator: {other}")),
         }
     }
 }

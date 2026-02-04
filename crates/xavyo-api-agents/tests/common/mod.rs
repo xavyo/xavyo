@@ -18,7 +18,7 @@ pub fn test_user_id() -> Uuid {
 
 /// Sets up the tenant context in the database connection.
 pub async fn setup_tenant_context(pool: &PgPool, tenant_id: Uuid) -> Result<(), sqlx::Error> {
-    sqlx::query(&format!("SET LOCAL app.current_tenant = '{}'", tenant_id))
+    sqlx::query(&format!("SET LOCAL app.current_tenant = '{tenant_id}'"))
         .execute(pool)
         .await?;
     Ok(())

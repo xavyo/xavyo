@@ -22,7 +22,8 @@ pub struct IdpConfigService {
 }
 
 impl IdpConfigService {
-    /// Create a new IdP configuration service.
+    /// Create a new `IdP` configuration service.
+    #[must_use] 
     pub fn new(pool: PgPool, encryption: EncryptionService) -> Self {
         Self {
             pool,

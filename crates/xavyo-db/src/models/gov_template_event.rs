@@ -61,10 +61,10 @@ impl GovTemplateEvent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_events
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -79,11 +79,11 @@ impl GovTemplateEvent {
         template_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_events
             WHERE tenant_id = $1 AND template_id = $2
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -104,23 +104,23 @@ impl GovTemplateEvent {
 
         if filter.template_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND template_id = ${}", param_count));
+            query.push_str(&format!(" AND template_id = ${param_count}"));
         }
         if filter.event_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_type = ${}", param_count));
+            query.push_str(&format!(" AND event_type = ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND actor_id = ${}", param_count));
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -157,12 +157,12 @@ impl GovTemplateEvent {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_events
             WHERE tenant_id = $1
             ORDER BY created_at DESC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -177,13 +177,13 @@ impl GovTemplateEvent {
         input: CreateGovTemplateEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_template_events (
                 tenant_id, template_id, event_type, actor_id, changes
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.template_id)
@@ -277,7 +277,7 @@ impl GovTemplateEvent {
         Self::create(pool, tenant_id, input).await
     }
 
-    /// Helper to create a "version_created" event.
+    /// Helper to create a "`version_created`" event.
     pub async fn record_version_created(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -294,7 +294,7 @@ impl GovTemplateEvent {
         Self::create(pool, tenant_id, input).await
     }
 
-    /// Helper to create a "rule_added" event.
+    /// Helper to create a "`rule_added`" event.
     pub async fn record_rule_added(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -315,7 +315,7 @@ impl GovTemplateEvent {
         Self::create(pool, tenant_id, input).await
     }
 
-    /// Helper to create a "rule_removed" event.
+    /// Helper to create a "`rule_removed`" event.
     pub async fn record_rule_removed(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -339,10 +339,10 @@ impl GovTemplateEvent {
         template_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_template_events
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)

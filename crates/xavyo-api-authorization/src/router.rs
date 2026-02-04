@@ -33,7 +33,7 @@ pub struct AuthorizationState {
     /// Service for managing authorization policies.
     pub policy_service: Arc<PolicyService>,
 
-    /// Audit verbosity: "all" or "deny_only".
+    /// Audit verbosity: "all" or "`deny_only`".
     pub audit_verbosity: String,
 }
 

@@ -106,6 +106,7 @@ pub struct ReconciliationRunInfo {
 
 impl ReconciliationRunInfo {
     /// Calculate progress percentage.
+    #[must_use] 
     pub fn calculate_progress(&self) -> f64 {
         self.statistics.progress_percentage()
     }
@@ -120,6 +121,7 @@ pub struct ReconciliationEngine {
 
 impl ReconciliationEngine {
     /// Create a new reconciliation engine.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             checkpoint_manager: CheckpointManager::new(pool.clone()),
@@ -129,6 +131,7 @@ impl ReconciliationEngine {
     }
 
     /// Create with custom configuration.
+    #[must_use] 
     pub fn with_config(pool: PgPool, config: ReconciliationConfig) -> Self {
         Self {
             checkpoint_manager: CheckpointManager::new(pool.clone()),
@@ -246,7 +249,7 @@ impl ReconciliationEngine {
         run_id: Uuid,
     ) -> ReconciliationResult<Option<ReconciliationRunInfo>> {
         let row: Option<ReconciliationRunRow> = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 r.id, r.tenant_id, r.connector_id, r.mode, r.status,
                 r.triggered_by, r.checkpoint, r.statistics, r.error_message,
@@ -257,7 +260,7 @@ impl ReconciliationEngine {
             LEFT JOIN gov_connectors c ON c.id = r.connector_id
             LEFT JOIN users u ON u.id = r.triggered_by
             WHERE r.id = $1 AND r.tenant_id = $2
-            "#,
+            ",
         )
         .bind(run_id)
         .bind(tenant_id)
@@ -265,7 +268,7 @@ impl ReconciliationEngine {
         .await
         .map_err(|e| ReconciliationError::Database(e.to_string()))?;
 
-        Ok(row.map(|r| r.into_info()))
+        Ok(row.map(ReconciliationRunRow::into_info))
     }
 
     /// Find a running reconciliation for a connector.
@@ -275,7 +278,7 @@ impl ReconciliationEngine {
         connector_id: Uuid,
     ) -> ReconciliationResult<Option<ReconciliationRunInfo>> {
         let row: Option<ReconciliationRunRow> = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 r.id, r.tenant_id, r.connector_id, r.mode, r.status,
                 r.triggered_by, r.checkpoint, r.statistics, r.error_message,
@@ -285,7 +288,7 @@ impl ReconciliationEngine {
             FROM gov_connector_reconciliation_runs r
             WHERE r.tenant_id = $1 AND r.connector_id = $2 AND r.status = 'running'
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -293,7 +296,7 @@ impl ReconciliationEngine {
         .await
         .map_err(|e| ReconciliationError::Database(e.to_string()))?;
 
-        Ok(row.map(|r| r.into_info()))
+        Ok(row.map(ReconciliationRunRow::into_info))
     }
 
     /// Create a new run record.
@@ -305,7 +308,7 @@ impl ReconciliationEngine {
         triggered_by: Option<Uuid>,
     ) -> ReconciliationResult<ReconciliationRunInfo> {
         let row: ReconciliationRunRow = sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_connector_reconciliation_runs
                 (tenant_id, connector_id, mode, status, triggered_by, started_at)
             VALUES ($1, $2, $3, 'running', $4, NOW())
@@ -315,7 +318,7 @@ impl ReconciliationEngine {
                 started_at, completed_at, created_at, updated_at,
                 NULL as connector_name,
                 NULL as triggered_by_name
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -343,7 +346,7 @@ impl ReconciliationEngine {
         };
 
         let row: ReconciliationRunRow = sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_connector_reconciliation_runs
             SET
                 status = $3,
@@ -357,7 +360,7 @@ impl ReconciliationEngine {
                 started_at, completed_at, created_at, updated_at,
                 NULL as connector_name,
                 NULL as triggered_by_name
-            "#,
+            ",
         )
         .bind(run_id)
         .bind(tenant_id)
@@ -382,11 +385,11 @@ impl ReconciliationEngine {
             .map_err(|e| ReconciliationError::Serialization(e.to_string()))?;
 
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_connector_reconciliation_runs
             SET statistics = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(run_id)
         .bind(tenant_id)
@@ -451,6 +454,7 @@ impl ReconciliationEngine {
     }
 
     /// Get configuration.
+    #[must_use] 
     pub fn config(&self) -> &ReconciliationConfig {
         &self.config
     }

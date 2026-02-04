@@ -90,7 +90,7 @@ impl TenantLockoutPolicy {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_lockout_policies (
                 tenant_id, max_failed_attempts, lockout_duration_minutes, notify_on_lockout
             )
@@ -101,7 +101,7 @@ impl TenantLockoutPolicy {
                 notify_on_lockout = EXCLUDED.notify_on_lockout,
                 updated_at = now()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.max_failed_attempts.unwrap_or(5))
@@ -123,7 +123,7 @@ impl TenantLockoutPolicy {
         self.lockout_duration_minutes == 0
     }
 
-    /// Get the lockout duration as a chrono::Duration.
+    /// Get the lockout duration as a `chrono::Duration`.
     #[must_use]
     pub fn lockout_duration(&self) -> chrono::Duration {
         chrono::Duration::minutes(i64::from(self.lockout_duration_minutes))

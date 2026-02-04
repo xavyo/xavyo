@@ -5,7 +5,7 @@
 //! - Delivery workers (syslog TCP/TLS, syslog UDP, webhook, Splunk HEC)
 //! - Pipeline orchestration (circuit breaker, retry, rate limiting)
 //! - Batch export capabilities
-//! - Credential encryption for auth_config
+//! - Credential encryption for `auth_config`
 //! - SSRF protection for webhook/endpoint validation
 
 pub mod batch;

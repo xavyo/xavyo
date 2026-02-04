@@ -11,7 +11,7 @@ const USERNAME: &str = "credentials";
 /// Credential store using the OS keyring
 ///
 /// - macOS: Keychain
-/// - Linux: Secret Service (GNOME Keyring, KWallet)
+/// - Linux: Secret Service (GNOME Keyring, `KWallet`)
 /// - Windows: Credential Manager
 pub struct KeyringCredentialStore {
     entry: Entry,
@@ -21,7 +21,7 @@ impl KeyringCredentialStore {
     /// Create a new keyring credential store
     pub fn new() -> CliResult<Self> {
         let entry = Entry::new(SERVICE_NAME, USERNAME)
-            .map_err(|e| CliError::CredentialStorage(format!("Failed to access keyring: {}", e)))?;
+            .map_err(|e| CliError::CredentialStorage(format!("Failed to access keyring: {e}")))?;
         Ok(Self { entry })
     }
 
@@ -42,7 +42,7 @@ impl CredentialStore for KeyringCredentialStore {
         let json = serde_json::to_string(credentials)?;
         self.entry
             .set_password(&json)
-            .map_err(|e| CliError::CredentialStorage(format!("Failed to store credentials: {}", e)))
+            .map_err(|e| CliError::CredentialStorage(format!("Failed to store credentials: {e}")))
     }
 
     fn load(&self) -> CliResult<Option<Credentials>> {
@@ -53,8 +53,7 @@ impl CredentialStore for KeyringCredentialStore {
             }
             Err(keyring::Error::NoEntry) => Ok(None),
             Err(e) => Err(CliError::CredentialStorage(format!(
-                "Failed to load credentials: {}",
-                e
+                "Failed to load credentials: {e}"
             ))),
         }
     }
@@ -64,8 +63,7 @@ impl CredentialStore for KeyringCredentialStore {
             Ok(()) => Ok(()),
             Err(keyring::Error::NoEntry) => Ok(()), // Already deleted
             Err(e) => Err(CliError::CredentialStorage(format!(
-                "Failed to delete credentials: {}",
-                e
+                "Failed to delete credentials: {e}"
             ))),
         }
     }

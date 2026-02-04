@@ -27,7 +27,7 @@ pub enum RevocationReasonCode {
     CertificateHold = 6,
     /// Reserved (not used).
     Reserved7 = 7,
-    /// Removed from CRL (for CertificateHold).
+    /// Removed from CRL (for `CertificateHold`).
     RemoveFromCrl = 8,
     /// Privilege withdrawn.
     PrivilegeWithdrawn = 9,
@@ -36,7 +36,8 @@ pub enum RevocationReasonCode {
 }
 
 impl RevocationReasonCode {
-    /// Convert from i16 to RevocationReasonCode.
+    /// Convert from i16 to `RevocationReasonCode`.
+    #[must_use] 
     pub fn from_i16(value: i16) -> Option<Self> {
         match value {
             0 => Some(RevocationReasonCode::Unspecified),
@@ -55,6 +56,7 @@ impl RevocationReasonCode {
     }
 
     /// Get a human-readable description of the reason.
+    #[must_use] 
     pub fn description(&self) -> &'static str {
         match self {
             RevocationReasonCode::Unspecified => "Unspecified",
@@ -112,13 +114,15 @@ pub struct CertificateRevocation {
 
 impl CertificateRevocation {
     /// Get the revocation reason as an enum.
+    #[must_use] 
     pub fn reason(&self) -> Option<RevocationReasonCode> {
         RevocationReasonCode::from_i16(self.reason_code)
     }
 
     /// Get a human-readable reason description.
+    #[must_use] 
     pub fn reason_description(&self) -> &'static str {
-        self.reason().map(|r| r.description()).unwrap_or("Unknown")
+        self.reason().map_or("Unknown", |r| r.description())
     }
 }
 
@@ -144,7 +148,7 @@ pub struct CertificateRevocationFilter {
     /// Filter by reason code.
     pub reason_code: Option<i16>,
 
-    /// Filter by revoked_by user.
+    /// Filter by `revoked_by` user.
     pub revoked_by: Option<Uuid>,
 
     /// Filter revocations after this date.
@@ -162,10 +166,10 @@ impl CertificateRevocation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM certificate_revocations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -180,10 +184,10 @@ impl CertificateRevocation {
         certificate_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM certificate_revocations
             WHERE tenant_id = $1 AND certificate_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(certificate_id)
@@ -197,10 +201,10 @@ impl CertificateRevocation {
         serial_number: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM certificate_revocations
             WHERE serial_number = $1
-            "#,
+            ",
         )
         .bind(serial_number)
         .fetch_optional(pool)
@@ -216,36 +220,36 @@ impl CertificateRevocation {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM certificate_revocations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.certificate_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND certificate_id = ${}", param_count));
+            query.push_str(&format!(" AND certificate_id = ${param_count}"));
         }
 
         if filter.reason_code.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND reason_code = ${}", param_count));
+            query.push_str(&format!(" AND reason_code = ${param_count}"));
         }
 
         if filter.revoked_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND revoked_by = ${}", param_count));
+            query.push_str(&format!(" AND revoked_by = ${param_count}"));
         }
 
         if filter.revoked_after.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND revoked_at >= ${}", param_count));
+            query.push_str(&format!(" AND revoked_at >= ${param_count}"));
         }
 
         if filter.revoked_before.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND revoked_at <= ${}", param_count));
+            query.push_str(&format!(" AND revoked_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -281,11 +285,11 @@ impl CertificateRevocation {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM certificate_revocations
             WHERE tenant_id = $1
             ORDER BY revoked_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -299,11 +303,11 @@ impl CertificateRevocation {
         since: DateTime<Utc>,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM certificate_revocations
             WHERE tenant_id = $1 AND revoked_at > $2
             ORDER BY revoked_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(since)
@@ -314,10 +318,10 @@ impl CertificateRevocation {
     /// Count revocations for a tenant.
     pub async fn count_by_tenant(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM certificate_revocations
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -335,14 +339,14 @@ impl CertificateRevocation {
         notes: Option<&str>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO certificate_revocations (
                 tenant_id, certificate_id, serial_number, reason_code,
                 revoked_at, revoked_by, notes
             )
             VALUES ($1, $2, $3, $4, NOW(), $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(certificate_id)
@@ -361,10 +365,10 @@ impl CertificateRevocation {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM certificate_revocations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

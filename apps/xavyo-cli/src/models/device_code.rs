@@ -27,7 +27,7 @@ pub struct DeviceCodeResponse {
 impl DeviceCodeResponse {
     /// Get the URL to display to the user
     ///
-    /// Prefers verification_uri_complete if available
+    /// Prefers `verification_uri_complete` if available
     pub fn display_url(&self) -> &str {
         self.verification_uri_complete
             .as_deref()

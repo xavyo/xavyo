@@ -206,7 +206,7 @@ async fn test_group_hierarchy_max_depth_enforced() {
         current_parent = create_test_group_with_parent(
             &pool,
             tenant_id,
-            &format!("Level {}", i),
+            &format!("Level {i}"),
             current_parent,
         )
         .await;

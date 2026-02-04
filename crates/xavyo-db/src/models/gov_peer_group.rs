@@ -136,10 +136,10 @@ impl GovPeerGroup {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_peer_groups
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -155,10 +155,10 @@ impl GovPeerGroup {
         attribute_value: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_peer_groups
             WHERE tenant_id = $1 AND group_type = $2 AND attribute_value = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_type)
@@ -174,11 +174,11 @@ impl GovPeerGroup {
         group_type: PeerGroupType,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_peer_groups
             WHERE tenant_id = $1 AND group_type = $2
             ORDER BY name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_type)
@@ -193,11 +193,11 @@ impl GovPeerGroup {
         min_user_count: i32,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_peer_groups
             WHERE tenant_id = $1 AND user_count >= $2
             ORDER BY group_type, name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(min_user_count)
@@ -214,24 +214,24 @@ impl GovPeerGroup {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_peer_groups
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.group_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND group_type = ${}", param_count));
+            query.push_str(&format!(" AND group_type = ${param_count}"));
         }
         if filter.attribute_key.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND attribute_key = ${}", param_count));
+            query.push_str(&format!(" AND attribute_key = ${param_count}"));
         }
         if filter.min_user_count.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_count >= ${}", param_count));
+            query.push_str(&format!(" AND user_count >= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -262,24 +262,24 @@ impl GovPeerGroup {
         filter: &PeerGroupFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_peer_groups
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.group_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND group_type = ${}", param_count));
+            query.push_str(&format!(" AND group_type = ${param_count}"));
         }
         if filter.attribute_key.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND attribute_key = ${}", param_count));
+            query.push_str(&format!(" AND attribute_key = ${param_count}"));
         }
         if filter.min_user_count.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_count >= ${}", param_count));
+            query.push_str(&format!(" AND user_count >= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -304,13 +304,13 @@ impl GovPeerGroup {
         input: CreateGovPeerGroup,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_peer_groups (
                 tenant_id, name, group_type, attribute_key, attribute_value
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -328,7 +328,7 @@ impl GovPeerGroup {
         input: CreateGovPeerGroup,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_peer_groups (
                 tenant_id, name, group_type, attribute_key, attribute_value
             )
@@ -338,7 +338,7 @@ impl GovPeerGroup {
                 attribute_key = EXCLUDED.attribute_key,
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -357,12 +357,12 @@ impl GovPeerGroup {
         stats: UpdateGovPeerGroupStats,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_peer_groups
             SET user_count = $3, avg_entitlements = $4, stddev_entitlements = $5, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -380,10 +380,10 @@ impl GovPeerGroup {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_peer_groups
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -394,6 +394,7 @@ impl GovPeerGroup {
     }
 
     /// Check if a user count is an outlier compared to group statistics.
+    #[must_use] 
     pub fn check_outlier(
         &self,
         user_entitlement_count: i32,
@@ -406,7 +407,7 @@ impl GovPeerGroup {
             return None;
         }
 
-        let user_count = user_entitlement_count as f64;
+        let user_count = f64::from(user_entitlement_count);
         let deviation = (user_count - avg) / stddev;
         let is_outlier = deviation.abs() >= threshold_stddev;
 
@@ -442,10 +443,10 @@ impl GovPeerGroupMember {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_peer_group_members
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -461,12 +462,12 @@ impl GovPeerGroupMember {
         user_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let exists: bool = sqlx::query_scalar(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM gov_peer_group_members
                 WHERE tenant_id = $1 AND group_id = $2 AND user_id = $3
             )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -484,10 +485,10 @@ impl GovPeerGroupMember {
         user_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT group_id FROM gov_peer_group_members
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -502,10 +503,10 @@ impl GovPeerGroupMember {
         group_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT user_id FROM gov_peer_group_members
             WHERE tenant_id = $1 AND group_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -520,10 +521,10 @@ impl GovPeerGroupMember {
         group_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_peer_group_members
             WHERE tenant_id = $1 AND group_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -539,12 +540,12 @@ impl GovPeerGroupMember {
         user_id: Uuid,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_peer_group_members (tenant_id, group_id, user_id)
             VALUES ($1, $2, $3)
             ON CONFLICT (tenant_id, group_id, user_id) DO NOTHING
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -561,10 +562,10 @@ impl GovPeerGroupMember {
         user_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_peer_group_members
             WHERE tenant_id = $1 AND group_id = $2 AND user_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -582,10 +583,10 @@ impl GovPeerGroupMember {
         group_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_peer_group_members
             WHERE tenant_id = $1 AND group_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -602,10 +603,10 @@ impl GovPeerGroupMember {
         user_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_peer_group_members
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

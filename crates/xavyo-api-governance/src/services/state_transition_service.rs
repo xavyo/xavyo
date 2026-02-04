@@ -50,6 +50,7 @@ pub struct StateTransitionService {
 
 impl StateTransitionService {
     /// Create a new state transition service.
+    #[must_use] 
     pub fn new(pool: PgPool, access_rule_service: Arc<StateAccessRuleService>) -> Self {
         Self {
             pool,
@@ -61,6 +62,7 @@ impl StateTransitionService {
     }
 
     /// Create a new state transition service with failed operation retry support.
+    #[must_use] 
     pub fn with_retry_support(
         pool: PgPool,
         access_rule_service: Arc<StateAccessRuleService>,
@@ -147,13 +149,10 @@ impl StateTransitionService {
         if current_state_id != Some(transition.from_state_id) {
             let from_state =
                 GovLifecycleState::find_by_id(&self.pool, tenant_id, transition.from_state_id)
-                    .await?
-                    .map(|s| s.name)
-                    .unwrap_or_else(|| "unknown".to_string());
+                    .await?.map_or_else(|| "unknown".to_string(), |s| s.name);
 
             return Err(GovernanceError::InvalidTransition(format!(
-                "Object is not in the required '{}' state for this transition",
-                from_state
+                "Object is not in the required '{from_state}' state for this transition"
             )));
         }
 
@@ -300,7 +299,7 @@ impl StateTransitionService {
 
         // Calculate grace period end time
         let grace_period_ends_at = if transition.grace_period_hours > 0 {
-            Some(now + Duration::hours(transition.grace_period_hours as i64))
+            Some(now + Duration::hours(i64::from(transition.grace_period_hours)))
         } else {
             None
         };
@@ -595,8 +594,7 @@ impl StateTransitionService {
                 User::update_lifecycle_state(&self.pool, tenant_id, object_id, Some(state_id))
                     .await?
                     .ok_or(GovernanceError::Validation(format!(
-                        "User not found: {}",
-                        object_id
+                        "User not found: {object_id}"
                     )))?;
                 Ok(())
             }
@@ -623,8 +621,7 @@ impl StateTransitionService {
             "role" => LifecycleObjectType::Role,
             _ => {
                 return Err(GovernanceError::Validation(format!(
-                    "Invalid object type: {}",
-                    object_type
+                    "Invalid object type: {object_type}"
                 )))
             }
         };
@@ -633,8 +630,7 @@ impl StateTransitionService {
         let config = GovLifecycleConfig::find_by_object_type(&self.pool, tenant_id, obj_type)
             .await?
             .ok_or(GovernanceError::Validation(format!(
-                "No lifecycle configuration exists for {:?}",
-                obj_type
+                "No lifecycle configuration exists for {obj_type:?}"
             )))?;
 
         // Get object's current state
@@ -972,8 +968,7 @@ impl StateTransitionService {
             entitlements_after,
             metadata: if audit_metadata
                 .as_object()
-                .map(|m| m.is_empty())
-                .unwrap_or(true)
+                .is_none_or(serde_json::Map::is_empty)
             {
                 None
             } else {
@@ -1286,7 +1281,7 @@ impl StateTransitionService {
         let expired = GovStateTransitionRequest::expire_grace_periods(
             &self.pool,
             tenant_id,
-            batch_size as i64,
+            i64::from(batch_size),
         )
         .await?;
 

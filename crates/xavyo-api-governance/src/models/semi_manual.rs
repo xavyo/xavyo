@@ -47,7 +47,7 @@ pub struct CreateTicketingConfigurationRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_assignee: Option<String>,
 
-    /// ServiceNow assignment group.
+    /// `ServiceNow` assignment group.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_assignment_group: Option<String>,
 
@@ -585,10 +585,10 @@ pub struct ListManualTasksQuery {
 }
 
 // Alias types for handlers (simplified naming)
-/// Alias for ManualProvisioningTaskResponse.
+/// Alias for `ManualProvisioningTaskResponse`.
 pub type ManualTaskResponse = ManualProvisioningTaskResponse;
 
-/// Alias for ManualProvisioningTaskListResponse.
+/// Alias for `ManualProvisioningTaskListResponse`.
 pub type ManualTaskListResponse = ManualProvisioningTaskListResponse;
 
 /// Dashboard response for manual tasks.
@@ -644,7 +644,7 @@ impl From<DashboardMetrics> for DashboardMetricsResponse {
     fn from(metrics: DashboardMetrics) -> Self {
         let avg_completion_time_human = metrics.average_completion_time_seconds.map(|secs| {
             if secs < 60.0 {
-                format!("{:.0} seconds", secs)
+                format!("{secs:.0} seconds")
             } else if secs < 3600.0 {
                 format!("{:.1} minutes", secs / 60.0)
             } else if secs < 86400.0 {

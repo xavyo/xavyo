@@ -25,6 +25,7 @@ pub enum PrivilegeFlagStatus {
 
 impl PrivilegeFlagStatus {
     /// Check if flag can be updated.
+    #[must_use] 
     pub fn can_update(&self) -> bool {
         matches!(self, Self::Pending)
     }
@@ -113,10 +114,10 @@ impl GovExcessivePrivilege {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_excessive_privileges
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -134,24 +135,24 @@ impl GovExcessivePrivilege {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_excessive_privileges
             WHERE tenant_id = $1 AND job_id = $2
-            "#,
+            ",
         );
         let mut param_count = 2;
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.min_deviation.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND deviation_percent >= ${}", param_count));
+            query.push_str(&format!(" AND deviation_percent >= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -185,24 +186,24 @@ impl GovExcessivePrivilege {
         filter: &ExcessivePrivilegeFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_excessive_privileges
             WHERE tenant_id = $1 AND job_id = $2
-            "#,
+            ",
         );
         let mut param_count = 2;
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.min_deviation.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND deviation_percent >= ${}", param_count));
+            query.push_str(&format!(" AND deviation_percent >= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query)
@@ -231,12 +232,12 @@ impl GovExcessivePrivilege {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_excessive_privileges
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -253,14 +254,14 @@ impl GovExcessivePrivilege {
         input: CreateExcessivePrivilege,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_excessive_privileges (
                 tenant_id, job_id, user_id, peer_group_id,
                 deviation_percent, excess_entitlements, peer_average, user_count
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.job_id)
@@ -296,12 +297,12 @@ impl GovExcessivePrivilege {
         input: UpdateExcessivePrivilegeStatus,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_excessive_privileges
             SET status = $3, reviewed_at = NOW(), reviewed_by = $4, notes = $5
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

@@ -116,14 +116,14 @@ impl TenantPasswordPolicy {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_password_policies (
                 tenant_id, min_length, max_length, require_uppercase, require_lowercase,
                 require_digit, require_special, expiration_days, history_count, min_age_hours
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(12i32) // NIST recommends longer minimums
@@ -149,7 +149,7 @@ impl TenantPasswordPolicy {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_password_policies (
                 tenant_id, min_length, max_length, require_uppercase, require_lowercase,
                 require_digit, require_special, expiration_days, history_count, min_age_hours
@@ -167,7 +167,7 @@ impl TenantPasswordPolicy {
                 min_age_hours = EXCLUDED.min_age_hours,
                 updated_at = now()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.min_length.unwrap_or(8))

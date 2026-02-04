@@ -2,7 +2,7 @@
 //!
 //! - POST /admin/oauth/revoke-user — revoke all tokens for a user
 //! - GET /admin/oauth/active-sessions — list active sessions for a user
-//! - DELETE /admin/oauth/sessions/:token_id — revoke a specific session
+//! - DELETE /`admin/oauth/sessions/:token_id` — revoke a specific session
 
 use crate::error::OAuthError;
 use crate::models::{
@@ -63,11 +63,11 @@ pub async fn admin_revoke_user_handler(
 
     // 1. Revoke all refresh tokens for the user
     let revoke_result = sqlx::query(
-        r#"
+        r"
         UPDATE oauth_refresh_tokens
         SET revoked = TRUE, revoked_at = now()
         WHERE user_id = $1 AND tenant_id = $2 AND revoked = FALSE
-        "#,
+        ",
     )
     .bind(request.user_id)
     .bind(tenant_id)
@@ -153,7 +153,7 @@ pub async fn list_active_sessions_handler(
 
     // Query active (non-revoked, non-expired) refresh tokens with client info
     let rows: Vec<SessionRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT
             rt.id,
             rt.client_id,
@@ -168,7 +168,7 @@ pub async fn list_active_sessions_handler(
           AND rt.revoked = FALSE
           AND rt.expires_at > now()
         ORDER BY rt.created_at DESC
-        "#,
+        ",
     )
     .bind(query.user_id)
     .bind(tenant_id)
@@ -205,7 +205,7 @@ pub async fn list_active_sessions_handler(
     Ok(Json(ActiveSessionsResponse { sessions, total }))
 }
 
-/// DELETE /admin/oauth/sessions/:token_id — revoke a specific session.
+/// DELETE /`admin/oauth/sessions/:token_id` — revoke a specific session.
 ///
 /// Revokes a single refresh token by its ID.
 pub async fn delete_session_handler(
@@ -227,10 +227,10 @@ pub async fn delete_session_handler(
 
     // Verify the session exists and belongs to this tenant
     let exists: Option<(bool,)> = sqlx::query_as(
-        r#"
+        r"
         SELECT revoked FROM oauth_refresh_tokens
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(token_id)
     .bind(tenant_id)
@@ -244,14 +244,12 @@ pub async fn delete_session_handler(
     match exists {
         None => {
             return Err(OAuthError::InvalidRequest(format!(
-                "Session {} not found",
-                token_id
+                "Session {token_id} not found"
             )));
         }
         Some((true,)) => {
             return Err(OAuthError::InvalidRequest(format!(
-                "Session {} is already revoked",
-                token_id
+                "Session {token_id} is already revoked"
             )));
         }
         Some((false,)) => {} // Valid, proceed with revocation
@@ -259,11 +257,11 @@ pub async fn delete_session_handler(
 
     // Revoke the specific session
     sqlx::query(
-        r#"
+        r"
         UPDATE oauth_refresh_tokens
         SET revoked = TRUE, revoked_at = now()
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(token_id)
     .bind(tenant_id)
@@ -285,11 +283,11 @@ pub async fn delete_session_handler(
     Ok(Json(SessionRevokedResponse {
         token_id,
         revoked_at: Utc::now(),
-        message: format!("Session {} has been revoked", token_id),
+        message: format!("Session {token_id} has been revoked"),
     }))
 }
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, OAuthError> {
     claims
         .tid

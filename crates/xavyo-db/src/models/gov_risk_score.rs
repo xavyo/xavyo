@@ -25,6 +25,7 @@ pub enum RiskLevel {
 
 impl RiskLevel {
     /// Determine risk level from a score (0-100).
+    #[must_use] 
     pub fn from_score(score: i32) -> Self {
         match score {
             0..=25 => Self::Low,
@@ -35,16 +36,19 @@ impl RiskLevel {
     }
 
     /// Check if this is a high or critical risk level.
+    #[must_use] 
     pub fn is_elevated(&self) -> bool {
         matches!(self, Self::High | Self::Critical)
     }
 
     /// Check if this is critical risk.
+    #[must_use] 
     pub fn is_critical(&self) -> bool {
         matches!(self, Self::Critical)
     }
 
     /// Get the minimum score for this level.
+    #[must_use] 
     pub fn min_score(&self) -> i32 {
         match self {
             Self::Low => 0,
@@ -55,6 +59,7 @@ impl RiskLevel {
     }
 
     /// Get the maximum score for this level.
+    #[must_use] 
     pub fn max_score(&self) -> i32 {
         match self {
             Self::Low => 25,
@@ -153,10 +158,10 @@ impl GovRiskScore {
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_scores
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -171,10 +176,10 @@ impl GovRiskScore {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_scores
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -191,12 +196,12 @@ impl GovRiskScore {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_scores
             WHERE tenant_id = $1 AND risk_level = $2
             ORDER BY total_score DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(level)
@@ -216,24 +221,24 @@ impl GovRiskScore {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_risk_scores
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.risk_level.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND risk_level = ${}", param_count));
+            query.push_str(&format!(" AND risk_level = ${param_count}"));
         }
         if filter.min_score.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND total_score >= ${}", param_count));
+            query.push_str(&format!(" AND total_score >= ${param_count}"));
         }
         if filter.max_score.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND total_score <= ${}", param_count));
+            query.push_str(&format!(" AND total_score <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -265,24 +270,24 @@ impl GovRiskScore {
         filter: &RiskScoreFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_risk_scores
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.risk_level.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND risk_level = ${}", param_count));
+            query.push_str(&format!(" AND risk_level = ${param_count}"));
         }
         if filter.min_score.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND total_score >= ${}", param_count));
+            query.push_str(&format!(" AND total_score >= ${param_count}"));
         }
         if filter.max_score.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND total_score <= ${}", param_count));
+            query.push_str(&format!(" AND total_score <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -306,13 +311,13 @@ impl GovRiskScore {
         tenant_id: Uuid,
     ) -> Result<Vec<(RiskLevel, i64)>, sqlx::Error> {
         let rows: Vec<(RiskLevel, i64)> = sqlx::query_as(
-            r#"
+            r"
             SELECT risk_level, COUNT(*) as count
             FROM gov_risk_scores
             WHERE tenant_id = $1
             GROUP BY risk_level
             ORDER BY risk_level
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -330,7 +335,7 @@ impl GovRiskScore {
         let risk_level = RiskLevel::from_score(input.total_score);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_risk_scores (
                 tenant_id, user_id, total_score, risk_level, static_score, dynamic_score,
                 factor_breakdown, peer_comparison, calculated_at
@@ -346,7 +351,7 @@ impl GovRiskScore {
                 calculated_at = NOW(),
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.user_id)
@@ -367,10 +372,10 @@ impl GovRiskScore {
         user_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_risk_scores
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -388,12 +393,12 @@ impl GovRiskScore {
         limit: i64,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT user_id FROM gov_risk_scores
             WHERE tenant_id = $1 AND calculated_at < $2
             ORDER BY calculated_at ASC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(older_than)

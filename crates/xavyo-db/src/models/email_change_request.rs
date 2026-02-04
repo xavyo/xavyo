@@ -85,12 +85,12 @@ impl EmailChangeRequest {
         token_hash: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM email_change_requests
             WHERE token_hash = $1
             AND verified_at IS NULL
             AND cancelled_at IS NULL
-            "#,
+            ",
         )
         .bind(token_hash)
         .fetch_optional(pool)
@@ -104,14 +104,14 @@ impl EmailChangeRequest {
         user_id: uuid::Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM email_change_requests
             WHERE tenant_id = $1
             AND user_id = $2
             AND verified_at IS NULL
             AND cancelled_at IS NULL
             AND expires_at > NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -126,14 +126,14 @@ impl EmailChangeRequest {
         new_email: &str,
     ) -> Result<bool, sqlx::Error> {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM email_change_requests
             WHERE tenant_id = $1
             AND new_email = $2
             AND verified_at IS NULL
             AND cancelled_at IS NULL
             AND expires_at > NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(new_email)
@@ -153,11 +153,11 @@ impl EmailChangeRequest {
         expires_at: DateTime<Utc>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO email_change_requests (tenant_id, user_id, new_email, token_hash, expires_at)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -171,12 +171,12 @@ impl EmailChangeRequest {
     /// Mark the request as verified.
     pub async fn mark_verified(pool: &sqlx::PgPool, id: uuid::Uuid) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE email_change_requests
             SET verified_at = NOW()
             WHERE id = $1
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .fetch_one(pool)
@@ -190,14 +190,14 @@ impl EmailChangeRequest {
         user_id: uuid::Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE email_change_requests
             SET cancelled_at = NOW()
             WHERE tenant_id = $1
             AND user_id = $2
             AND verified_at IS NULL
             AND cancelled_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

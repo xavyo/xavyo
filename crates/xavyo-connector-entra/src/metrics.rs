@@ -48,6 +48,7 @@ impl Default for RateLimitMetrics {
 
 impl RateLimitMetrics {
     /// Creates new metrics with default values.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
@@ -94,6 +95,7 @@ impl RateLimitMetrics {
     }
 
     /// Returns the average retry delay in milliseconds.
+    #[must_use] 
     pub fn average_retry_delay_ms(&self) -> f64 {
         if self.retry_count == 0 {
             0.0
@@ -102,7 +104,8 @@ impl RateLimitMetrics {
         }
     }
 
-    /// Returns the rate limit ratio (rate_limited / total).
+    /// Returns the rate limit ratio (`rate_limited` / total).
+    #[must_use] 
     pub fn rate_limit_ratio(&self) -> f64 {
         if self.total_requests == 0 {
             0.0
@@ -112,6 +115,7 @@ impl RateLimitMetrics {
     }
 
     /// Returns time since last rate limit, if any.
+    #[must_use] 
     pub fn time_since_last_rate_limit(&self) -> Option<std::time::Duration> {
         self.last_rate_limit_time.map(|t| t.elapsed())
     }

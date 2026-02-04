@@ -208,6 +208,7 @@ pub struct SmtpEmailSender {
 
 impl SmtpEmailSender {
     /// Create a new SMTP email sender.
+    #[must_use] 
     pub fn new(config: EmailConfig) -> Self {
         Self { config }
     }
@@ -242,7 +243,7 @@ impl SmtpEmailSender {
     fn password_reset_body(&self, token: &str) -> String {
         let url = self.config.password_reset_url(token);
         format!(
-            r#"Hi,
+            r"Hi,
 
 We received a request to reset your password for your Xavyo account.
 
@@ -253,7 +254,7 @@ This link will expire in 1 hour.
 
 If you didn't request this, you can safely ignore this email.
 
-- The xavyo Team"#
+- The xavyo Team"
         )
     }
 
@@ -261,7 +262,7 @@ If you didn't request this, you can safely ignore this email.
     fn magic_link_body(&self, token: &str) -> String {
         let url = self.config.magic_link_url(token);
         format!(
-            r#"Hi,
+            r"Hi,
 
 You requested to sign in to your Xavyo account using a magic link.
 
@@ -272,14 +273,14 @@ This link will expire in 15 minutes and can only be used once.
 
 If you didn't request this, you can safely ignore this email.
 
-- The xavyo Team"#
+- The xavyo Team"
         )
     }
 
     /// Build the email OTP email body.
     fn email_otp_body(&self, code: &str) -> String {
         format!(
-            r#"Hi,
+            r"Hi,
 
 You requested to sign in to your Xavyo account using a one-time code.
 
@@ -289,7 +290,7 @@ This code will expire in 10 minutes. You have 5 attempts to enter it correctly.
 
 If you didn't request this, you can safely ignore this email.
 
-- The xavyo Team"#
+- The xavyo Team"
         )
     }
 
@@ -297,7 +298,7 @@ If you didn't request this, you can safely ignore this email.
     fn verification_body(&self, token: &str) -> String {
         let url = self.config.email_verify_url(token);
         format!(
-            r#"Hi,
+            r"Hi,
 
 Welcome to Xavyo! Please verify your email address by clicking the link below:
 
@@ -307,7 +308,7 @@ This link will expire in 24 hours.
 
 If you didn't create an account, you can safely ignore this email.
 
-- The xavyo Team"#
+- The xavyo Team"
         )
     }
 }
@@ -503,13 +504,13 @@ impl EmailSender for SmtpEmailSender {
 /// Records all sent emails for verification in tests.
 #[derive(Debug, Clone, Default)]
 pub struct MockEmailSender {
-    /// Sent password reset emails: (to, token, tenant_id)
+    /// Sent password reset emails: (to, token, `tenant_id`)
     pub password_resets: Arc<Mutex<Vec<(String, String, TenantId)>>>,
-    /// Sent verification emails: (to, token, tenant_id)
+    /// Sent verification emails: (to, token, `tenant_id`)
     pub verifications: Arc<Mutex<Vec<(String, String, TenantId)>>>,
-    /// Sent magic link emails: (to, token, tenant_id)
+    /// Sent magic link emails: (to, token, `tenant_id`)
     pub magic_links: Arc<Mutex<Vec<(String, String, TenantId)>>>,
-    /// Sent email OTP emails: (to, code, tenant_id)
+    /// Sent email OTP emails: (to, code, `tenant_id`)
     pub email_otps: Arc<Mutex<Vec<(String, String, TenantId)>>>,
     /// Whether to simulate sending failures.
     pub should_fail: Arc<Mutex<bool>>,
@@ -517,6 +518,7 @@ pub struct MockEmailSender {
 
 impl MockEmailSender {
     /// Create a new mock email sender.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
@@ -527,21 +529,25 @@ impl MockEmailSender {
     }
 
     /// Get all password reset emails sent.
+    #[must_use] 
     pub fn get_password_resets(&self) -> Vec<(String, String, TenantId)> {
         self.password_resets.lock().clone()
     }
 
     /// Get all verification emails sent.
+    #[must_use] 
     pub fn get_verifications(&self) -> Vec<(String, String, TenantId)> {
         self.verifications.lock().clone()
     }
 
     /// Get all magic link emails sent.
+    #[must_use] 
     pub fn get_magic_links(&self) -> Vec<(String, String, TenantId)> {
         self.magic_links.lock().clone()
     }
 
     /// Get all email OTP emails sent.
+    #[must_use] 
     pub fn get_email_otps(&self) -> Vec<(String, String, TenantId)> {
         self.email_otps.lock().clone()
     }
@@ -555,6 +561,7 @@ impl MockEmailSender {
     }
 
     /// Get the last password reset token sent to a specific email.
+    #[must_use] 
     pub fn get_last_reset_token(&self, email: &str) -> Option<String> {
         self.password_resets
             .lock()
@@ -565,6 +572,7 @@ impl MockEmailSender {
     }
 
     /// Get the last verification token sent to a specific email.
+    #[must_use] 
     pub fn get_last_verification_token(&self, email: &str) -> Option<String> {
         self.verifications
             .lock()
@@ -685,7 +693,7 @@ impl EmailSender for MockEmailSender {
 }
 
 /// Blanket implementation for Arc<dyn EmailSender> to allow using Arc-wrapped
-/// trait objects as EmailSender.
+/// trait objects as `EmailSender`.
 #[async_trait]
 impl EmailSender for Arc<dyn EmailSender> {
     async fn send_password_reset(

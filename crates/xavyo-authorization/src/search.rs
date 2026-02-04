@@ -71,13 +71,14 @@ impl FilterOp {
     /// Convert operator to SQL fragment.
     ///
     /// Returns the SQL operator and whether it needs special handling.
+    #[must_use] 
     pub fn to_sql_fragment(&self, param_index: usize) -> String {
         match self {
-            FilterOp::Eq => format!("= ${}", param_index),
-            FilterOp::Ne => format!("!= ${}", param_index),
-            FilterOp::Contains => format!("ILIKE '%' || ${} || '%'", param_index),
-            FilterOp::StartsWith => format!("ILIKE ${} || '%'", param_index),
-            FilterOp::In => format!("= ANY(${})", param_index),
+            FilterOp::Eq => format!("= ${param_index}"),
+            FilterOp::Ne => format!("!= ${param_index}"),
+            FilterOp::Contains => format!("ILIKE '%' || ${param_index} || '%'"),
+            FilterOp::StartsWith => format!("ILIKE ${param_index} || '%'"),
+            FilterOp::In => format!("= ANY(${param_index})"),
         }
     }
 }
@@ -142,7 +143,7 @@ impl SearchFilter {
         }
     }
 
-    /// Create a new starts_with filter.
+    /// Create a new `starts_with` filter.
     pub fn starts_with(field: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
             field: field.into(),
@@ -219,11 +220,13 @@ pub struct SearchQuery {
 
 impl SearchQuery {
     /// Create a new empty search query.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Add a filter to the query.
+    #[must_use] 
     pub fn with_filter(mut self, filter: SearchFilter) -> Self {
         self.filters.push(filter);
         self
@@ -237,6 +240,7 @@ impl SearchQuery {
     }
 
     /// Set pagination parameters.
+    #[must_use] 
     pub fn with_pagination(mut self, limit: i64, offset: i64) -> Self {
         self.limit = Some(limit);
         self.offset = Some(offset);
@@ -246,7 +250,7 @@ impl SearchQuery {
     /// Build the WHERE clause from filters.
     ///
     /// Returns the SQL WHERE clause (without "WHERE") and the parameter values.
-    /// Always includes tenant_id as the first condition.
+    /// Always includes `tenant_id` as the first condition.
     ///
     /// # Arguments
     ///
@@ -318,6 +322,7 @@ impl SearchQuery {
     }
 
     /// Build the LIMIT/OFFSET clause.
+    #[must_use] 
     pub fn build_pagination_clause(&self) -> String {
         let mut clause = String::new();
 
@@ -354,6 +359,7 @@ pub struct SearchResult<T> {
 
 impl<T> SearchResult<T> {
     /// Create a new search result.
+    #[must_use] 
     pub fn new(items: Vec<T>, total: i64, limit: Option<i64>, offset: Option<i64>) -> Self {
         Self {
             items,
@@ -364,6 +370,7 @@ impl<T> SearchResult<T> {
     }
 
     /// Check if there are more results available.
+    #[must_use] 
     pub fn has_more(&self) -> bool {
         let offset = self.offset.unwrap_or(0);
         let limit = self.limit.unwrap_or(i64::MAX);
@@ -371,6 +378,7 @@ impl<T> SearchResult<T> {
     }
 
     /// Get the number of items returned.
+    #[must_use] 
     pub fn count(&self) -> usize {
         self.items.len()
     }
@@ -394,11 +402,11 @@ pub enum SearchError {
 impl fmt::Display for SearchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SearchError::InvalidField(field) => write!(f, "invalid search field: {}", field),
+            SearchError::InvalidField(field) => write!(f, "invalid search field: {field}"),
             SearchError::InvalidValue(field) => {
-                write!(f, "invalid filter value for field: {}", field)
+                write!(f, "invalid filter value for field: {field}")
             }
-            SearchError::InvalidPagination(msg) => write!(f, "invalid pagination: {}", msg),
+            SearchError::InvalidPagination(msg) => write!(f, "invalid pagination: {msg}"),
         }
     }
 }

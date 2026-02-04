@@ -1,4 +1,4 @@
-//! OIDC IdP Interoperability Tests
+//! OIDC `IdP` Interoperability Tests
 //!
 //! This module contains interoperability tests for major Identity Providers:
 //! - Okta

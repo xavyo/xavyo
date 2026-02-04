@@ -1,6 +1,6 @@
-//! OpenBao dynamic secret provider for just-in-time credential generation (F120).
+//! `OpenBao` dynamic secret provider for just-in-time credential generation (F120).
 //!
-//! OpenBao is API-compatible with HashiCorp Vault, supporting the database
+//! `OpenBao` is API-compatible with `HashiCorp` Vault, supporting the database
 //! secrets engine for generating ephemeral database credentials.
 
 use async_trait::async_trait;
@@ -10,19 +10,19 @@ use tokio::sync::RwLock;
 use crate::dynamic::{DynamicCredential, DynamicCredentialRequest, DynamicSecretProvider};
 use crate::SecretError;
 
-/// Authentication method for OpenBao.
+/// Authentication method for `OpenBao`.
 #[derive(Debug, Clone)]
 pub enum OpenBaoAuthMethod {
-    /// AppRole authentication (recommended for automation).
+    /// `AppRole` authentication (recommended for automation).
     AppRole { role_id: String, secret_id: String },
     /// Direct token authentication.
     Token { token: String },
 }
 
-/// Configuration for OpenBao provider.
+/// Configuration for `OpenBao` provider.
 #[derive(Debug, Clone)]
 pub struct OpenBaoConfig {
-    /// OpenBao server address (e.g., "https://openbao.example.com:8200").
+    /// `OpenBao` server address (e.g., "<https://openbao.example.com:8200>").
     pub address: String,
     /// Optional namespace for enterprise features.
     pub namespace: Option<String>,
@@ -45,16 +45,16 @@ impl Default for OpenBaoConfig {
     }
 }
 
-/// Token state for OpenBao authentication.
+/// Token state for `OpenBao` authentication.
 #[derive(Debug, Clone)]
 struct OpenBaoToken {
     token: String,
     ttl_seconds: Option<u64>,
 }
 
-/// Dynamic secret provider using OpenBao database secrets engine.
+/// Dynamic secret provider using `OpenBao` database secrets engine.
 ///
-/// OpenBao (a Vault fork) generates ephemeral database credentials on demand.
+/// `OpenBao` (a Vault fork) generates ephemeral database credentials on demand.
 /// Credentials are automatically revoked when their lease expires.
 pub struct OpenBaoSecretProvider {
     client: reqwest::Client,
@@ -76,7 +76,7 @@ impl std::fmt::Debug for OpenBaoSecretProvider {
 }
 
 impl OpenBaoSecretProvider {
-    /// Create a new OpenBaoSecretProvider from configuration.
+    /// Create a new `OpenBaoSecretProvider` from configuration.
     ///
     /// Authenticates immediately and starts background token renewal.
     pub async fn new(config: &OpenBaoConfig) -> Result<Self, SecretError> {
@@ -139,7 +139,7 @@ impl OpenBaoSecretProvider {
         })
     }
 
-    /// Authenticate via AppRole.
+    /// Authenticate via `AppRole`.
     async fn approle_login(
         client: &reqwest::Client,
         address: &str,
@@ -201,7 +201,7 @@ impl OpenBaoSecretProvider {
         Ok(OpenBaoToken { token, ttl_seconds })
     }
 
-    /// Spawn a background task to renew the OpenBao token at 75% of TTL.
+    /// Spawn a background task to renew the `OpenBao` token at 75% of TTL.
     fn spawn_renewal_task(
         client: reqwest::Client,
         address: String,
@@ -352,14 +352,13 @@ impl DynamicSecretProvider for OpenBaoSecretProvider {
             .map_err(|e| SecretError::ProviderUnavailable {
                 provider: "openbao".to_string(),
                 detail: format!(
-                    "Failed to generate credentials for role '{}': {}",
-                    role_name, e
+                    "Failed to generate credentials for role '{role_name}': {e}"
                 ),
             })?;
 
         if resp.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(SecretError::NotFound {
-                name: format!("database role: {}", role_name),
+                name: format!("database role: {role_name}"),
             });
         }
 
@@ -369,8 +368,7 @@ impl DynamicSecretProvider for OpenBaoSecretProvider {
             return Err(SecretError::ProviderUnavailable {
                 provider: "openbao".to_string(),
                 detail: format!(
-                    "OpenBao returned HTTP {} for credential generation: {}",
-                    status, body_text
+                    "OpenBao returned HTTP {status} for credential generation: {body_text}"
                 ),
             });
         }
@@ -393,12 +391,12 @@ impl DynamicSecretProvider for OpenBaoSecretProvider {
         let lease_id = json
             .get("lease_id")
             .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
+            .map(std::string::ToString::to_string);
 
         let lease_duration = json
             .get("lease_duration")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(request.ttl_seconds as i64);
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(i64::from(request.ttl_seconds));
 
         tracing::info!(
             role = %role_name,
@@ -439,10 +437,12 @@ impl DynamicSecretProvider for OpenBaoSecretProvider {
             .await
             .map_err(|e| SecretError::ProviderUnavailable {
                 provider: "openbao".to_string(),
-                detail: format!("Failed to revoke lease '{}': {}", lease_id, e),
+                detail: format!("Failed to revoke lease '{lease_id}': {e}"),
             })?;
 
-        if !resp.status().is_success() {
+        if resp.status().is_success() {
+            tracing::info!(lease_id = lease_id, "OpenBao: Successfully revoked lease");
+        } else {
             let status = resp.status();
             let body_text = resp.text().await.unwrap_or_default();
             tracing::warn!(
@@ -452,8 +452,6 @@ impl DynamicSecretProvider for OpenBaoSecretProvider {
                 "OpenBao: Lease revocation returned non-success status"
             );
             // Don't fail on revocation errors - the lease may have already expired
-        } else {
-            tracing::info!(lease_id = lease_id, "OpenBao: Successfully revoked lease");
         }
 
         Ok(())

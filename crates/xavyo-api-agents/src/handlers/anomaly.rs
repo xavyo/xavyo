@@ -25,7 +25,7 @@ pub struct AnomalyState {
     pub baseline_service: BaselineService,
 }
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()
@@ -33,7 +33,7 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
         .ok_or(ApiAgentsError::MissingTenantId)
 }
 
-/// GET /agents/{agent_id}/anomalies
+/// GET /`agents/{agent_id}/anomalies`
 ///
 /// List detected anomalies for an agent.
 #[cfg_attr(feature = "openapi", utoipa::path(
@@ -69,7 +69,7 @@ pub async fn list_agent_anomalies(
     Ok(Json(response))
 }
 
-/// GET /agents/{agent_id}/baseline
+/// GET /`agents/{agent_id}/baseline`
 ///
 /// Get the current behavioral baseline for an agent.
 #[cfg_attr(feature = "openapi", utoipa::path(
@@ -99,7 +99,7 @@ pub async fn get_agent_baseline(
     Ok(Json(response))
 }
 
-/// GET /agents/{agent_id}/thresholds
+/// GET /`agents/{agent_id}/thresholds`
 ///
 /// Get anomaly detection thresholds for an agent.
 #[cfg_attr(feature = "openapi", utoipa::path(
@@ -129,7 +129,7 @@ pub async fn get_agent_thresholds(
     Ok(Json(response))
 }
 
-/// PUT /agents/{agent_id}/thresholds
+/// PUT /`agents/{agent_id}/thresholds`
 ///
 /// Set anomaly detection thresholds for an agent.
 #[cfg_attr(feature = "openapi", utoipa::path(
@@ -161,7 +161,7 @@ pub async fn set_agent_thresholds(
     Ok(Json(response))
 }
 
-/// DELETE /agents/{agent_id}/thresholds
+/// DELETE /`agents/{agent_id}/thresholds`
 ///
 /// Reset agent thresholds to tenant defaults.
 #[cfg_attr(feature = "openapi", utoipa::path(

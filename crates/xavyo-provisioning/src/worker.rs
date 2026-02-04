@@ -125,6 +125,7 @@ impl<P: OperationProcessor + Send + Sync + 'static> ProvisioningWorker<P> {
     }
 
     /// Check if shutdown was requested.
+    #[must_use] 
     pub fn is_shutdown(&self) -> bool {
         self.shutdown.load(Ordering::Relaxed)
     }
@@ -151,12 +152,9 @@ impl<P: OperationProcessor + Send + Sync + 'static> ProvisioningWorker<P> {
 
         for operation in operations {
             // Try to acquire a permit
-            let permit = match semaphore.clone().try_acquire_owned() {
-                Ok(p) => p,
-                Err(_) => {
-                    debug!("All worker slots busy, skipping remaining operations");
-                    return;
-                }
+            let permit = if let Ok(p) = semaphore.clone().try_acquire_owned() { p } else {
+                debug!("All worker slots busy, skipping remaining operations");
+                return;
             };
 
             let queue = self.queue.clone();
@@ -255,7 +253,7 @@ async fn process_operation<P: OperationProcessor>(
             // Update or create shadow
             let uid = result_uid
                 .or(target_uid)
-                .unwrap_or_else(|| format!("unknown-{}", operation_id));
+                .unwrap_or_else(|| format!("unknown-{operation_id}"));
             update_shadow_success(
                 &shadow_repo,
                 tenant_id,

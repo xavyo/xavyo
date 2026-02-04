@@ -35,7 +35,7 @@ pub struct EntitlementSnapshot {
     pub application: Option<String>,
 }
 
-/// SoD violation record for audit.
+/// `SoD` violation record for audit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditSodViolation {
     pub rule_id: Uuid,
@@ -85,7 +85,7 @@ pub struct GovMergeAudit {
     /// Record of entitlement consolidation.
     pub entitlement_decisions: serde_json::Value,
 
-    /// SoD violations detected/overridden.
+    /// `SoD` violations detected/overridden.
     pub sod_violations: Option<serde_json::Value>,
 
     /// When the record was created.
@@ -122,10 +122,10 @@ impl GovMergeAudit {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_merge_audits
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -140,10 +140,10 @@ impl GovMergeAudit {
         operation_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_merge_audits
             WHERE operation_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(operation_id)
         .bind(tenant_id)
@@ -160,9 +160,9 @@ impl GovMergeAudit {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT a.* FROM gov_merge_audits a
-            "#,
+            ",
         );
         let mut joins = Vec::new();
         let mut conditions = vec!["a.tenant_id = $1".to_string()];
@@ -170,7 +170,7 @@ impl GovMergeAudit {
 
         if filter.operation_id.is_some() {
             param_count += 1;
-            conditions.push(format!("a.operation_id = ${}", param_count));
+            conditions.push(format!("a.operation_id = ${param_count}"));
         }
 
         if filter.operator_id.is_some() || filter.identity_id.is_some() {
@@ -178,24 +178,23 @@ impl GovMergeAudit {
 
             if filter.operator_id.is_some() {
                 param_count += 1;
-                conditions.push(format!("o.operator_id = ${}", param_count));
+                conditions.push(format!("o.operator_id = ${param_count}"));
             }
             if filter.identity_id.is_some() {
                 param_count += 1;
                 conditions.push(format!(
-                    "(o.source_identity_id = ${0} OR o.target_identity_id = ${0})",
-                    param_count
+                    "(o.source_identity_id = ${param_count} OR o.target_identity_id = ${param_count})"
                 ));
             }
         }
 
         if filter.from_date.is_some() {
             param_count += 1;
-            conditions.push(format!("a.created_at >= ${}", param_count));
+            conditions.push(format!("a.created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            conditions.push(format!("a.created_at <= ${}", param_count));
+            conditions.push(format!("a.created_at <= ${param_count}"));
         }
 
         if !joins.is_empty() {
@@ -239,9 +238,9 @@ impl GovMergeAudit {
         filter: &MergeAuditFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_merge_audits a
-            "#,
+            ",
         );
         let mut joins = Vec::new();
         let mut conditions = vec!["a.tenant_id = $1".to_string()];
@@ -249,7 +248,7 @@ impl GovMergeAudit {
 
         if filter.operation_id.is_some() {
             param_count += 1;
-            conditions.push(format!("a.operation_id = ${}", param_count));
+            conditions.push(format!("a.operation_id = ${param_count}"));
         }
 
         if filter.operator_id.is_some() || filter.identity_id.is_some() {
@@ -257,24 +256,23 @@ impl GovMergeAudit {
 
             if filter.operator_id.is_some() {
                 param_count += 1;
-                conditions.push(format!("o.operator_id = ${}", param_count));
+                conditions.push(format!("o.operator_id = ${param_count}"));
             }
             if filter.identity_id.is_some() {
                 param_count += 1;
                 conditions.push(format!(
-                    "(o.source_identity_id = ${0} OR o.target_identity_id = ${0})",
-                    param_count
+                    "(o.source_identity_id = ${param_count} OR o.target_identity_id = ${param_count})"
                 ));
             }
         }
 
         if filter.from_date.is_some() {
             param_count += 1;
-            conditions.push(format!("a.created_at >= ${}", param_count));
+            conditions.push(format!("a.created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            conditions.push(format!("a.created_at <= ${}", param_count));
+            conditions.push(format!("a.created_at <= ${param_count}"));
         }
 
         if !joins.is_empty() {
@@ -326,14 +324,14 @@ impl GovMergeAudit {
             .map(|v| serde_json::to_value(v).unwrap_or_else(|_| serde_json::json!([])));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_merge_audits (
                 tenant_id, operation_id, source_snapshot, target_snapshot,
                 merged_snapshot, attribute_decisions, entitlement_decisions, sod_violations
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.operation_id)
@@ -364,14 +362,14 @@ impl GovMergeAudit {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_merge_audits (
                 tenant_id, operation_id, source_snapshot, target_snapshot,
                 merged_snapshot, attribute_decisions, entitlement_decisions, sod_violations
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(operation_id)
@@ -393,14 +391,14 @@ impl GovMergeAudit {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT a.* FROM gov_merge_audits a
             JOIN gov_merge_operations o ON a.operation_id = o.id
             WHERE a.tenant_id = $1
               AND (o.source_identity_id = $2 OR o.target_identity_id = $2)
             ORDER BY a.created_at DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(identity_id)

@@ -8,7 +8,7 @@ use xavyo_api_tenants::models::{
     UsageHistoryQuery, UsageHistoryResponse, UsageLimits, UsageMetrics, UsagePeriod, UsageResponse,
 };
 
-/// Test UsageMetrics serialization.
+/// Test `UsageMetrics` serialization.
 #[test]
 fn test_usage_metrics_serialization() {
     let metrics = UsageMetrics {
@@ -25,7 +25,7 @@ fn test_usage_metrics_serialization() {
     assert!(json.contains("\"agent_invocations\":500"));
 }
 
-/// Test UsageLimits serialization with values.
+/// Test `UsageLimits` serialization with values.
 #[test]
 fn test_usage_limits_serialization_with_values() {
     let limits = UsageLimits {
@@ -41,7 +41,7 @@ fn test_usage_limits_serialization_with_values() {
     assert!(json.contains("\"max_agent_invocations\":10000"));
 }
 
-/// Test UsageLimits default.
+/// Test `UsageLimits` default.
 #[test]
 fn test_usage_limits_default() {
     let limits = UsageLimits::default();
@@ -50,7 +50,7 @@ fn test_usage_limits_default() {
     assert!(limits.max_agent_invocations.is_none());
 }
 
-/// Test UsageResponse serialization.
+/// Test `UsageResponse` serialization.
 #[test]
 fn test_usage_response_serialization() {
     let response = UsageResponse {
@@ -75,7 +75,7 @@ fn test_usage_response_serialization() {
     assert!(json.contains("\"mau_count\":100"));
 }
 
-/// Test UsagePeriod serialization.
+/// Test `UsagePeriod` serialization.
 #[test]
 fn test_usage_period_serialization() {
     let period = UsagePeriod {
@@ -94,7 +94,7 @@ fn test_usage_period_serialization() {
     assert!(json.contains("\"api_calls\":5000"));
 }
 
-/// Test UsageHistoryResponse serialization.
+/// Test `UsageHistoryResponse` serialization.
 #[test]
 fn test_usage_history_response_serialization() {
     let response = UsageHistoryResponse {
@@ -126,7 +126,7 @@ fn test_usage_history_response_serialization() {
     assert!(json.contains("\"mau_count\":95"));
 }
 
-/// Test UsageHistoryResponse empty periods.
+/// Test `UsageHistoryResponse` empty periods.
 #[test]
 fn test_usage_history_response_empty() {
     let response = UsageHistoryResponse {
@@ -139,7 +139,7 @@ fn test_usage_history_response_empty() {
     assert!(json.contains("\"periods\":[]"));
 }
 
-/// Test UsageHistoryQuery validation - valid default.
+/// Test `UsageHistoryQuery` validation - valid default.
 #[test]
 fn test_usage_history_query_validation_valid_default() {
     let query = UsageHistoryQuery::default();
@@ -147,7 +147,7 @@ fn test_usage_history_query_validation_valid_default() {
     assert_eq!(query.periods, 6);
 }
 
-/// Test UsageHistoryQuery validation - zero periods.
+/// Test `UsageHistoryQuery` validation - zero periods.
 #[test]
 fn test_usage_history_query_validation_zero_periods() {
     let query = UsageHistoryQuery { periods: 0 };
@@ -156,7 +156,7 @@ fn test_usage_history_query_validation_zero_periods() {
     assert!(error.unwrap().contains("at least 1"));
 }
 
-/// Test UsageHistoryQuery validation - too many periods.
+/// Test `UsageHistoryQuery` validation - too many periods.
 #[test]
 fn test_usage_history_query_validation_too_many_periods() {
     let query = UsageHistoryQuery { periods: 25 };
@@ -165,21 +165,21 @@ fn test_usage_history_query_validation_too_many_periods() {
     assert!(error.unwrap().contains("at most 24"));
 }
 
-/// Test UsageHistoryQuery validation - max periods.
+/// Test `UsageHistoryQuery` validation - max periods.
 #[test]
 fn test_usage_history_query_validation_max_periods() {
     let query = UsageHistoryQuery { periods: 24 };
     assert!(query.validate().is_none());
 }
 
-/// Test UsageHistoryQuery validation - single period.
+/// Test `UsageHistoryQuery` validation - single period.
 #[test]
 fn test_usage_history_query_validation_single_period() {
     let query = UsageHistoryQuery { periods: 1 };
     assert!(query.validate().is_none());
 }
 
-/// Test UsageHistoryQuery deserialization with default.
+/// Test `UsageHistoryQuery` deserialization with default.
 #[test]
 fn test_usage_history_query_deserialization_default() {
     let json = "{}";
@@ -187,7 +187,7 @@ fn test_usage_history_query_deserialization_default() {
     assert_eq!(query.periods, 6);
 }
 
-/// Test UsageHistoryQuery deserialization with value.
+/// Test `UsageHistoryQuery` deserialization with value.
 #[test]
 fn test_usage_history_query_deserialization_with_value() {
     let json = r#"{"periods": 12}"#;
@@ -195,7 +195,7 @@ fn test_usage_history_query_deserialization_with_value() {
     assert_eq!(query.periods, 12);
 }
 
-/// Test UsageLimits full serialization (all values).
+/// Test `UsageLimits` full serialization (all values).
 #[test]
 fn test_usage_limits_full_serialization() {
     let limits = UsageLimits {

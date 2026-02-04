@@ -32,10 +32,10 @@ pub struct PepConfig {
 /// Also requires `Extension<Arc<PolicyDecisionPoint>>` and `Extension<sqlx::PgPool>`.
 ///
 /// Behavior:
-/// 1. Extract PepConfig, JwtClaims from extensions
+/// 1. Extract `PepConfig`, `JwtClaims` from extensions
 /// 2. Map HTTP method to action (GET->read, POST->create, etc.)
-/// 3. Build AuthorizationRequest
-/// 4. Call PDP.evaluate()
+/// 3. Build `AuthorizationRequest`
+/// 4. Call `PDP.evaluate()`
 /// 5. If denied, return 403 JSON response
 /// 6. If allowed, pass through to next handler
 /// 7. On error, fail-closed (403)
@@ -129,7 +129,7 @@ fn method_to_action(method: &Method) -> &'static str {
     }
 }
 
-/// Extract a potential resource_id from the last path segment.
+/// Extract a potential `resource_id` from the last path segment.
 ///
 /// Returns None if the last segment doesn't look like a UUID or specific ID.
 fn extract_resource_id(path: &str) -> Option<String> {
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn test_extract_resource_id_uuid() {
         let id = Uuid::new_v4();
-        let path = format!("/api/resources/{}", id);
+        let path = format!("/api/resources/{id}");
         assert_eq!(extract_resource_id(&path), Some(id.to_string()));
     }
 

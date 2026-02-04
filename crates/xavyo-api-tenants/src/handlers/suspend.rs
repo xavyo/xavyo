@@ -76,7 +76,7 @@ pub async fn suspend_tenant_handler(
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
         .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {} not found", tenant_id))
+            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
         })?;
 
     if target_tenant.is_system() {
@@ -188,7 +188,7 @@ pub async fn reactivate_tenant_handler(
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
         .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {} not found", tenant_id))
+            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
         })?;
 
     // FR-010: Idempotent operation - if not suspended, return success
@@ -289,7 +289,7 @@ pub async fn get_tenant_status_handler(
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
         .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {} not found", tenant_id))
+            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
         })?;
 
     let is_suspended = tenant.is_suspended();

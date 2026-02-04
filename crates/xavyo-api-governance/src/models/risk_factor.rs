@@ -13,7 +13,7 @@ use xavyo_db::{GovRiskFactor, RiskFactorCategory};
 pub enum StaticFactorType {
     /// Count of sensitive entitlements assigned.
     SensitiveEntitlementCount,
-    /// Count of active SoD violations.
+    /// Count of active `SoD` violations.
     SodViolationCount,
     /// Total entitlement count.
     TotalEntitlementCount,

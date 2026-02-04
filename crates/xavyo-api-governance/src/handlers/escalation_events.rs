@@ -25,11 +25,11 @@ use crate::router::GovernanceState;
 /// List escalation events with optional filters.
 ///
 /// Supports filtering by:
-/// - request_id: Events for a specific access request
-/// - original_approver_id: Events where a specific user was the original approver
-/// - escalation_target_id: Events where a specific user received an escalation
-/// - reason: Filter by escalation reason (timeout, manual_escalation, target_unavailable)
-/// - from_date/to_date: Date range filtering
+/// - `request_id`: Events for a specific access request
+/// - `original_approver_id`: Events where a specific user was the original approver
+/// - `escalation_target_id`: Events where a specific user received an escalation
+/// - reason: Filter by escalation reason (timeout, `manual_escalation`, `target_unavailable`)
+/// - `from_date/to_date`: Date range filtering
 #[utoipa::path(
     get,
     path = "/governance/escalation-events",
@@ -119,7 +119,7 @@ pub async fn get_request_escalation_history(
     let request = GovAccessRequest::find_by_id(pool, tenant_id, request_id)
         .await?
         .ok_or_else(|| {
-            ApiGovernanceError::NotFound(format!("Access request {} not found", request_id))
+            ApiGovernanceError::NotFound(format!("Access request {request_id} not found"))
         })?;
 
     // Get all escalation events for this request
@@ -136,7 +136,7 @@ pub async fn get_request_escalation_history(
         e.metadata
             .as_ref()
             .and_then(|m| m.get("levels_exhausted"))
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(false)
     });
 

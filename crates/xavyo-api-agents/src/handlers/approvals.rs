@@ -19,7 +19,7 @@ use crate::models::{
 use crate::router::AgentsState;
 use xavyo_auth::JwtClaims;
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()
@@ -27,7 +27,7 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
         .ok_or(ApiAgentsError::MissingTenant)
 }
 
-/// Extract user_id from JWT claims.
+/// Extract `user_id` from JWT claims.
 fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims.sub.parse().map_err(|_| ApiAgentsError::MissingUser)
 }
@@ -35,7 +35,7 @@ fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
 /// GET /approvals - List approval requests.
 ///
 /// Returns a paginated list of approval requests with optional filtering.
-/// Supports filtering by status (pending, approved, denied, expired) and agent_id.
+/// Supports filtering by status (pending, approved, denied, expired) and `agent_id`.
 #[cfg_attr(feature = "openapi", utoipa::path(
     get,
     path = "/approvals",

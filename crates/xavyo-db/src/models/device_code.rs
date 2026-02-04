@@ -26,7 +26,7 @@ pub enum DeviceCodeStatus {
     Authorized,
     /// User denied the authorization request.
     Denied,
-    /// Device code exceeded expires_at.
+    /// Device code exceeded `expires_at`.
     Expired,
 }
 
@@ -34,10 +34,10 @@ pub enum DeviceCodeStatus {
 ///
 /// Device codes allow CLI/headless clients to authenticate users via a secondary
 /// device (browser). The flow:
-/// 1. Client requests device_code and user_code
-/// 2. User visits verification_uri and enters user_code
+/// 1. Client requests `device_code` and `user_code`
+/// 2. User visits `verification_uri` and enters `user_code`
 /// 3. User authenticates and approves/denies
-/// 4. Client polls for tokens using device_code
+/// 4. Client polls for tokens using `device_code`
 #[derive(Debug, Clone, FromRow)]
 pub struct DeviceCode {
     /// Internal unique identifier.
@@ -148,7 +148,7 @@ impl DeviceCode {
     /// Create a new device code.
     pub async fn create(pool: &PgPool, new: &NewDeviceCode) -> Result<Self, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO device_codes (
                 tenant_id, client_id, device_code, user_code, scopes,
                 status, expires_at, interval_seconds,
@@ -156,7 +156,7 @@ impl DeviceCode {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
-            "#,
+            ",
         )
         .bind(new.tenant_id)
         .bind(&new.client_id)
@@ -186,17 +186,17 @@ impl DeviceCode {
         self.age_minutes() >= 5
     }
 
-    /// Find a device code by its device_code value.
+    /// Find a device code by its `device_code` value.
     pub async fn find_by_device_code(
         pool: &PgPool,
         tenant_id: Uuid,
         device_code: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM device_codes
             WHERE tenant_id = $1 AND device_code = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(device_code)
@@ -204,17 +204,17 @@ impl DeviceCode {
         .await
     }
 
-    /// Find a device code by its user_code value.
+    /// Find a device code by its `user_code` value.
     pub async fn find_by_user_code(
         pool: &PgPool,
         tenant_id: Uuid,
         user_code: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM device_codes
             WHERE tenant_id = $1 AND user_code = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_code)
@@ -222,20 +222,20 @@ impl DeviceCode {
         .await
     }
 
-    /// Find a pending device code by its user_code value.
+    /// Find a pending device code by its `user_code` value.
     pub async fn find_pending_by_user_code(
         pool: &PgPool,
         tenant_id: Uuid,
         user_code: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM device_codes
             WHERE tenant_id = $1
               AND user_code = $2
               AND status = 'pending'
               AND expires_at > NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_code)
@@ -258,12 +258,12 @@ impl DeviceCode {
         };
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE device_codes
             SET status = $3, user_id = $4, authorized_at = $5
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -281,11 +281,11 @@ impl DeviceCode {
         id: Uuid,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE device_codes
             SET last_poll_at = NOW()
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -297,11 +297,11 @@ impl DeviceCode {
     /// Mark a device code as expired.
     pub async fn mark_expired(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE device_codes
             SET status = 'expired'
             WHERE tenant_id = $1 AND id = $2 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -313,10 +313,10 @@ impl DeviceCode {
     /// Delete a device code (after successful token exchange).
     pub async fn delete(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM device_codes
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -329,10 +329,10 @@ impl DeviceCode {
     /// Delete all expired device codes (for cleanup job).
     pub async fn cleanup_expired(pool: &PgPool) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM device_codes
             WHERE expires_at < NOW()
-            "#,
+            ",
         )
         .execute(pool)
         .await?;

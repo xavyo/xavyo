@@ -1,4 +1,4 @@
-//! Unit tests for PersonaExpirationService (US5).
+//! Unit tests for `PersonaExpirationService` (US5).
 //!
 //! Tests persona expiration handling and automatic status transitions.
 
@@ -95,7 +95,7 @@ mod persona_expiration_service_tests {
 
     #[test]
     fn test_expiration_check_result() {
-        let tenant_id = Uuid::new_v4();
+        let _tenant_id = Uuid::new_v4();
         let persona_id = Uuid::new_v4();
 
         // Expiration check result structure
@@ -305,8 +305,7 @@ mod persona_expiration_service_tests {
             let should_notify = notification_schedule.contains(&notify_day);
             assert!(
                 should_notify,
-                "Should notify at {} days before expiration",
-                notify_day
+                "Should notify at {notify_day} days before expiration"
             );
         }
 
@@ -324,7 +323,7 @@ mod persona_expiration_service_tests {
         // Personas with no valid_until never expire
         let valid_until: Option<chrono::DateTime<Utc>> = None;
 
-        let should_expire = valid_until.map_or(false, |v| v < Utc::now());
+        let should_expire = valid_until.is_some_and(|v| v < Utc::now());
         assert!(
             !should_expire,
             "Persona with no valid_until should never expire"

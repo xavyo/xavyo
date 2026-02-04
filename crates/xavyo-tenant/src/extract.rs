@@ -7,7 +7,7 @@ use crate::error::TenantError;
 use http::Request;
 use xavyo_core::TenantId;
 
-/// Wrapper around TenantId for request extensions.
+/// Wrapper around `TenantId` for request extensions.
 ///
 /// This struct is inserted into Axum request extensions when a valid
 /// tenant context is extracted. It can be accessed in handlers via
@@ -118,7 +118,7 @@ pub fn extract_from_header<B>(
 
     trimmed
         .parse::<TenantId>()
-        .map_err(|_| TenantError::InvalidFormat(format!("'{}' is not a valid UUID", trimmed)))
+        .map_err(|_| TenantError::InvalidFormat(format!("'{trimmed}' is not a valid UUID")))
 }
 
 #[cfg(test)]

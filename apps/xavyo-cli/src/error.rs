@@ -123,17 +123,17 @@ impl CliError {
         let use_color = std::env::var("NO_COLOR").is_err();
 
         if use_color {
-            eprintln!("\x1b[31mError:\x1b[0m {}", self);
+            eprintln!("\x1b[31mError:\x1b[0m {self}");
         } else {
-            eprintln!("Error: {}", self);
+            eprintln!("Error: {self}");
         }
 
         // Print suggested action if available
         if let Some(suggestion) = self.suggestion() {
             if use_color {
-                eprintln!("\n\x1b[33mSuggestion:\x1b[0m {}", suggestion);
+                eprintln!("\n\x1b[33mSuggestion:\x1b[0m {suggestion}");
             } else {
-                eprintln!("\nSuggestion: {}", suggestion);
+                eprintln!("\nSuggestion: {suggestion}");
             }
         }
     }
@@ -169,13 +169,13 @@ impl From<reqwest::Error> for CliError {
 
 impl From<std::io::Error> for CliError {
     fn from(e: std::io::Error) -> Self {
-        CliError::Config(format!("I/O error: {}", e))
+        CliError::Config(format!("I/O error: {e}"))
     }
 }
 
 impl From<serde_json::Error> for CliError {
     fn from(e: serde_json::Error) -> Self {
-        CliError::Config(format!("JSON error: {}", e))
+        CliError::Config(format!("JSON error: {e}"))
     }
 }
 
@@ -187,6 +187,6 @@ impl From<keyring::Error> for CliError {
 
 impl From<serde_yaml::Error> for CliError {
     fn from(e: serde_yaml::Error) -> Self {
-        CliError::Config(format!("YAML error: {}", e))
+        CliError::Config(format!("YAML error: {e}"))
     }
 }

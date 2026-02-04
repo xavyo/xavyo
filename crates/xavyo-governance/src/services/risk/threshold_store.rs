@@ -23,7 +23,7 @@ pub trait RiskThresholdStore: Send + Sync {
     async fn delete(&self, tenant_id: Uuid) -> Result<(), GovernanceError>;
 }
 
-/// In-memory implementation of RiskThresholdStore for testing.
+/// In-memory implementation of `RiskThresholdStore` for testing.
 #[derive(Debug, Default)]
 pub struct InMemoryRiskThresholdStore {
     thresholds: RwLock<HashMap<Uuid, RiskThresholds>>,
@@ -31,6 +31,7 @@ pub struct InMemoryRiskThresholdStore {
 
 impl InMemoryRiskThresholdStore {
     /// Create a new in-memory threshold store.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             thresholds: RwLock::new(HashMap::new()),

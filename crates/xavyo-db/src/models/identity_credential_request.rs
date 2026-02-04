@@ -2,8 +2,8 @@
 //!
 //! Tracks credential requests for audit and rate limiting.
 //!
-//! Note: IP addresses are stored as String in PostgreSQL INET columns
-//! because sqlx maps INET to String. Use source_ip_addr() helper for parsing.
+//! Note: IP addresses are stored as String in `PostgreSQL` INET columns
+//! because sqlx maps INET to String. Use `source_ip_addr()` helper for parsing.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -113,7 +113,8 @@ pub struct IdentityCredentialRequestFilter {
 }
 
 impl IdentityCredentialRequest {
-    /// Get the source IP as parsed IpAddr (if present and valid).
+    /// Get the source IP as parsed `IpAddr` (if present and valid).
+    #[must_use] 
     pub fn source_ip_addr(&self) -> Option<IpAddr> {
         self.source_ip.as_ref().and_then(|s| s.parse().ok())
     }
@@ -125,7 +126,7 @@ impl IdentityCredentialRequest {
         request: &CreateIdentityCredentialRequest,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO identity_credential_requests (
                 tenant_id, agent_id, provider_config_id, role_mapping_id,
                 requested_ttl_seconds, granted_ttl_seconds, outcome,
@@ -136,7 +137,7 @@ impl IdentityCredentialRequest {
                 id, tenant_id, agent_id, provider_config_id, role_mapping_id,
                 requested_ttl_seconds, granted_ttl_seconds, outcome,
                 error_code, error_message, duration_ms, source_ip::text, created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(request.agent_id)

@@ -55,7 +55,7 @@ pub struct GovTemplateRule {
     /// Rule only applies before this timestamp.
     pub time_to: Option<DateTime<Utc>>,
 
-    /// How to interpret time_from/time_to.
+    /// How to interpret `time_from/time_to`.
     pub time_reference: Option<TemplateTimeReference>,
 
     /// When the rule was created.
@@ -123,10 +123,10 @@ impl GovTemplateRule {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_rules
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -141,11 +141,11 @@ impl GovTemplateRule {
         template_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_rules
             WHERE tenant_id = $1 AND template_id = $2
             ORDER BY priority ASC, target_attribute ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -161,11 +161,11 @@ impl GovTemplateRule {
         rule_type: TemplateRuleType,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_rules
             WHERE tenant_id = $1 AND template_id = $2 AND rule_type = $3
             ORDER BY priority ASC, target_attribute ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -181,11 +181,11 @@ impl GovTemplateRule {
         target_attribute: &str,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_rules
             WHERE tenant_id = $1 AND target_attribute = $2
             ORDER BY priority ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(target_attribute)
@@ -206,19 +206,19 @@ impl GovTemplateRule {
 
         if filter.template_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND template_id = ${}", param_count));
+            query.push_str(&format!(" AND template_id = ${param_count}"));
         }
         if filter.rule_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND rule_type = ${}", param_count));
+            query.push_str(&format!(" AND rule_type = ${param_count}"));
         }
         if filter.target_attribute.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND target_attribute = ${}", param_count));
+            query.push_str(&format!(" AND target_attribute = ${param_count}"));
         }
         if filter.strength.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND strength = ${}", param_count));
+            query.push_str(&format!(" AND strength = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -258,7 +258,7 @@ impl GovTemplateRule {
         let exclusive = input.exclusive.unwrap_or(false);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_template_rules (
                 tenant_id, template_id, rule_type, target_attribute, expression,
                 strength, authoritative, priority, condition, error_message,
@@ -266,7 +266,7 @@ impl GovTemplateRule {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -298,43 +298,43 @@ impl GovTemplateRule {
 
         if input.expression.is_some() {
             param_count += 1;
-            updates.push(format!("expression = ${}", param_count));
+            updates.push(format!("expression = ${param_count}"));
         }
         if input.strength.is_some() {
             param_count += 1;
-            updates.push(format!("strength = ${}", param_count));
+            updates.push(format!("strength = ${param_count}"));
         }
         if input.authoritative.is_some() {
             param_count += 1;
-            updates.push(format!("authoritative = ${}", param_count));
+            updates.push(format!("authoritative = ${param_count}"));
         }
         if input.priority.is_some() {
             param_count += 1;
-            updates.push(format!("priority = ${}", param_count));
+            updates.push(format!("priority = ${param_count}"));
         }
         if input.condition.is_some() {
             param_count += 1;
-            updates.push(format!("condition = ${}", param_count));
+            updates.push(format!("condition = ${param_count}"));
         }
         if input.error_message.is_some() {
             param_count += 1;
-            updates.push(format!("error_message = ${}", param_count));
+            updates.push(format!("error_message = ${param_count}"));
         }
         if input.exclusive.is_some() {
             param_count += 1;
-            updates.push(format!("exclusive = ${}", param_count));
+            updates.push(format!("exclusive = ${param_count}"));
         }
         if input.time_from.is_some() {
             param_count += 1;
-            updates.push(format!("time_from = ${}", param_count));
+            updates.push(format!("time_from = ${param_count}"));
         }
         if input.time_to.is_some() {
             param_count += 1;
-            updates.push(format!("time_to = ${}", param_count));
+            updates.push(format!("time_to = ${param_count}"));
         }
         if input.time_reference.is_some() {
             param_count += 1;
-            updates.push(format!("time_reference = ${}", param_count));
+            updates.push(format!("time_reference = ${param_count}"));
         }
 
         if updates.is_empty() {
@@ -390,10 +390,10 @@ impl GovTemplateRule {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_template_rules
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -410,10 +410,10 @@ impl GovTemplateRule {
         template_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_template_rules
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -430,10 +430,10 @@ impl GovTemplateRule {
         template_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_template_rules
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -442,31 +442,37 @@ impl GovTemplateRule {
     }
 
     /// Check if rule is for validation.
+    #[must_use] 
     pub fn is_validation(&self) -> bool {
         self.rule_type == TemplateRuleType::Validation
     }
 
     /// Check if rule is for computed values.
+    #[must_use] 
     pub fn is_computed(&self) -> bool {
         self.rule_type == TemplateRuleType::Computed
     }
 
     /// Check if rule is for defaults.
+    #[must_use] 
     pub fn is_default(&self) -> bool {
         self.rule_type == TemplateRuleType::Default
     }
 
     /// Check if rule is for normalization.
+    #[must_use] 
     pub fn is_normalization(&self) -> bool {
         self.rule_type == TemplateRuleType::Normalization
     }
 
     /// Check if rule has strong strength.
+    #[must_use] 
     pub fn is_strong(&self) -> bool {
         self.strength == TemplateStrength::Strong
     }
 
     /// Check if rule has weak strength.
+    #[must_use] 
     pub fn is_weak(&self) -> bool {
         self.strength == TemplateStrength::Weak
     }

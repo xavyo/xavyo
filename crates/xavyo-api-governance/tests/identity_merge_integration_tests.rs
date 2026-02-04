@@ -2,8 +2,8 @@
 //!
 //! Tests for User Story 1: Review and Merge Duplicate Identities (P1 - MVP)
 //!
-//! These tests require a running PostgreSQL database.
-//! Run with: cargo test --package xavyo-api-governance --test identity_merge_integration_tests --features integration
+//! These tests require a running `PostgreSQL` database.
+//! Run with: cargo test --package xavyo-api-governance --test `identity_merge_integration_tests` --features integration
 
 #![cfg(feature = "integration")]
 

@@ -104,11 +104,11 @@ impl FailedLoginAttempt {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO failed_login_attempts (tenant_id, user_id, email, ip_address, failure_reason)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -135,12 +135,12 @@ impl FailedLoginAttempt {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM failed_login_attempts
             WHERE tenant_id = $1
             ORDER BY created_at DESC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -159,12 +159,12 @@ impl FailedLoginAttempt {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM failed_login_attempts
             WHERE tenant_id = $1 AND email = $2
             ORDER BY created_at DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(email)
@@ -184,12 +184,12 @@ impl FailedLoginAttempt {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM failed_login_attempts
             WHERE tenant_id = $1 AND ip_address = $2
             ORDER BY created_at DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(ip_address)
@@ -209,10 +209,10 @@ impl FailedLoginAttempt {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM failed_login_attempts
             WHERE tenant_id = $1 AND email = $2 AND created_at >= $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(email)
@@ -233,10 +233,10 @@ impl FailedLoginAttempt {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM failed_login_attempts
             WHERE tenant_id = $1 AND created_at < $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(older_than)

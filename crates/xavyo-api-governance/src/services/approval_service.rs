@@ -23,6 +23,7 @@ pub struct ApprovalService {
 
 impl ApprovalService {
     /// Create a new approval service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -51,12 +52,12 @@ impl ApprovalService {
         // Find pending requests and check if user can approve
         // This is a simplified implementation - in production, you'd want a more efficient query
         let pending_requests: Vec<GovAccessRequest> = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_access_requests
             WHERE tenant_id = $1 AND status IN ('pending', 'pending_approval')
             ORDER BY created_at ASC
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -78,10 +79,10 @@ impl ApprovalService {
 
         // Count total (simplified - would need optimization for production)
         let total_count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_access_requests
             WHERE tenant_id = $1 AND status IN ('pending', 'pending_approval')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -562,6 +563,7 @@ impl ApprovalService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

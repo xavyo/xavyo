@@ -1,11 +1,11 @@
-//! SAML AuthnRequest parsing service
+//! SAML `AuthnRequest` parsing service
 
 use crate::error::{SamlError, SamlResult};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use flate2::read::DeflateDecoder;
 use std::io::Read;
 
-/// Parsed SAML AuthnRequest
+/// Parsed SAML `AuthnRequest`
 #[derive(Debug, Clone)]
 pub struct ParsedAuthnRequest {
     pub id: String,
@@ -16,41 +16,41 @@ pub struct ParsedAuthnRequest {
     pub force_authn: bool,
 }
 
-/// Service for parsing SAML AuthnRequest messages
+/// Service for parsing SAML `AuthnRequest` messages
 pub struct RequestParser;
 
 impl RequestParser {
-    /// Parse an AuthnRequest from HTTP-Redirect binding (deflate + base64)
+    /// Parse an `AuthnRequest` from HTTP-Redirect binding (deflate + base64)
     pub fn parse_redirect(encoded_request: &str) -> SamlResult<ParsedAuthnRequest> {
         // Decode base64
         let decoded = STANDARD
             .decode(encoded_request)
-            .map_err(|e| SamlError::InvalidAuthnRequest(format!("Base64 decode failed: {}", e)))?;
+            .map_err(|e| SamlError::InvalidAuthnRequest(format!("Base64 decode failed: {e}")))?;
 
         // Inflate (decompress)
         let mut decoder = DeflateDecoder::new(&decoded[..]);
         let mut xml = String::new();
         decoder
             .read_to_string(&mut xml)
-            .map_err(|e| SamlError::InvalidAuthnRequest(format!("Deflate decode failed: {}", e)))?;
+            .map_err(|e| SamlError::InvalidAuthnRequest(format!("Deflate decode failed: {e}")))?;
 
         Self::parse_xml(&xml)
     }
 
-    /// Parse an AuthnRequest from HTTP-POST binding (base64 only)
+    /// Parse an `AuthnRequest` from HTTP-POST binding (base64 only)
     pub fn parse_post(encoded_request: &str) -> SamlResult<ParsedAuthnRequest> {
         // Decode base64
         let decoded = STANDARD
             .decode(encoded_request)
-            .map_err(|e| SamlError::InvalidAuthnRequest(format!("Base64 decode failed: {}", e)))?;
+            .map_err(|e| SamlError::InvalidAuthnRequest(format!("Base64 decode failed: {e}")))?;
 
         let xml = String::from_utf8(decoded)
-            .map_err(|e| SamlError::InvalidAuthnRequest(format!("Invalid UTF-8: {}", e)))?;
+            .map_err(|e| SamlError::InvalidAuthnRequest(format!("Invalid UTF-8: {e}")))?;
 
         Self::parse_xml(&xml)
     }
 
-    /// Parse AuthnRequest XML
+    /// Parse `AuthnRequest` XML
     fn parse_xml(xml: &str) -> SamlResult<ParsedAuthnRequest> {
         use quick_xml::events::Event;
         use quick_xml::Reader;
@@ -68,7 +68,7 @@ impl RequestParser {
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                Ok(Event::Start(e) | Event::Empty(e)) => {
                     let name = e.local_name();
                     let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
 
@@ -81,7 +81,7 @@ impl RequestParser {
                                 match key {
                                     "ID" => id = Some(value.to_string()),
                                     "AssertionConsumerServiceURL" => {
-                                        acs_url = Some(value.to_string())
+                                        acs_url = Some(value.to_string());
                                     }
                                     "IsPassive" => is_passive = value == "true",
                                     "ForceAuthn" => force_authn = value == "true",
@@ -119,8 +119,7 @@ impl RequestParser {
                 Ok(Event::Eof) => break,
                 Err(e) => {
                     return Err(SamlError::InvalidAuthnRequest(format!(
-                        "XML parse error: {}",
-                        e
+                        "XML parse error: {e}"
                     )));
                 }
                 _ => {}

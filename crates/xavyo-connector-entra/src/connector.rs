@@ -46,11 +46,13 @@ impl EntraConnector {
     }
 
     /// Returns the connector configuration.
+    #[must_use] 
     pub fn config(&self) -> &EntraConfig {
         &self.config
     }
 
     /// Returns a reference to the Graph client.
+    #[must_use] 
     pub fn graph_client(&self) -> &GraphClient {
         &self.graph_client
     }
@@ -72,7 +74,7 @@ impl Connector for EntraConnector {
         ConnectorType::Rest
     }
 
-    fn display_name(&self) -> &str {
+    fn display_name(&self) -> &'static str {
         "Microsoft Entra ID"
     }
 
@@ -95,7 +97,7 @@ impl Connector for EntraConnector {
                 .get(&url)
                 .await
                 .map_err(|e| ConnectorError::ConnectionFailed {
-                    message: format!("Failed to fetch organization: {}", e),
+                    message: format!("Failed to fetch organization: {e}"),
                     source: None,
                 })?;
 

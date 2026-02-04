@@ -21,7 +21,7 @@ pub struct GovMetaRoleCriteria {
     /// The meta-role this criteria belongs to.
     pub meta_role_id: Uuid,
 
-    /// The field to match (risk_level, application_id, etc.).
+    /// The field to match (`risk_level`, `application_id`, etc.).
     pub field: String,
 
     /// The comparison operator.
@@ -50,10 +50,10 @@ impl GovMetaRoleCriteria {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_criteria
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -68,11 +68,11 @@ impl GovMetaRoleCriteria {
         meta_role_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_criteria
             WHERE tenant_id = $1 AND meta_role_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -88,13 +88,13 @@ impl GovMetaRoleCriteria {
         input: CreateGovMetaRoleCriteria,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_meta_role_criteria (
                 tenant_id, meta_role_id, field, operator, value
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -112,10 +112,10 @@ impl GovMetaRoleCriteria {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_meta_role_criteria
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -132,10 +132,10 @@ impl GovMetaRoleCriteria {
         meta_role_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_meta_role_criteria
             WHERE tenant_id = $1 AND meta_role_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)

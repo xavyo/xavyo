@@ -5,7 +5,7 @@
 use xavyo_api_tenants::middleware::{QuotaDetails, QuotaExceededError};
 use xavyo_api_tenants::services::{QuotaCheck, QuotaType, TenantLimits};
 
-/// Test QuotaType display implementation.
+/// Test `QuotaType` display implementation.
 #[test]
 fn test_quota_type_display() {
     assert_eq!(QuotaType::Mau.to_string(), "mau");
@@ -13,7 +13,7 @@ fn test_quota_type_display() {
     assert_eq!(QuotaType::AgentInvocations.to_string(), "agent_invocations");
 }
 
-/// Test QuotaType serialization.
+/// Test `QuotaType` serialization.
 #[test]
 fn test_quota_type_serialization() {
     let quota = QuotaType::ApiCalls;
@@ -29,7 +29,7 @@ fn test_quota_type_serialization() {
     assert_eq!(json, "\"agent_invocations\"");
 }
 
-/// Test QuotaType deserialization.
+/// Test `QuotaType` deserialization.
 #[test]
 fn test_quota_type_deserialization() {
     let quota: QuotaType = serde_json::from_str("\"api_calls\"").unwrap();
@@ -42,7 +42,7 @@ fn test_quota_type_deserialization() {
     assert_eq!(quota, QuotaType::AgentInvocations);
 }
 
-/// Test QuotaCheck serialization.
+/// Test `QuotaCheck` serialization.
 #[test]
 fn test_quota_check_serialization() {
     let check = QuotaCheck {
@@ -61,7 +61,7 @@ fn test_quota_check_serialization() {
     assert!(json.contains("\"reset_at\""));
 }
 
-/// Test QuotaCheck with no limit.
+/// Test `QuotaCheck` with no limit.
 #[test]
 fn test_quota_check_no_limit() {
     let check = QuotaCheck {
@@ -77,7 +77,7 @@ fn test_quota_check_no_limit() {
     assert!(json.contains("\"limit\":null"));
 }
 
-/// Test TenantLimits default.
+/// Test `TenantLimits` default.
 #[test]
 fn test_tenant_limits_default() {
     let limits = TenantLimits::default();
@@ -86,7 +86,7 @@ fn test_tenant_limits_default() {
     assert!(limits.max_agent_invocations.is_none());
 }
 
-/// Test QuotaDetails serialization.
+/// Test `QuotaDetails` serialization.
 #[test]
 fn test_quota_details_serialization() {
     let details = QuotaDetails {
@@ -103,7 +103,7 @@ fn test_quota_details_serialization() {
     assert!(json.contains("\"reset_at\":\"2024-02-01T00:00:00Z\""));
 }
 
-/// Test QuotaExceededError serialization.
+/// Test `QuotaExceededError` serialization.
 #[test]
 fn test_quota_exceeded_error_serialization() {
     let error = QuotaExceededError {
@@ -124,7 +124,7 @@ fn test_quota_exceeded_error_serialization() {
     assert!(json.contains("\"quota_type\":\"api_calls\""));
 }
 
-/// Test QuotaExceededError for MAU.
+/// Test `QuotaExceededError` for MAU.
 #[test]
 fn test_quota_exceeded_error_mau() {
     let error = QuotaExceededError {
@@ -144,7 +144,7 @@ fn test_quota_exceeded_error_mau() {
     assert!(json.contains("\"limit\":500"));
 }
 
-/// Test QuotaExceededError for agent invocations.
+/// Test `QuotaExceededError` for agent invocations.
 #[test]
 fn test_quota_exceeded_error_agent_invocations() {
     let error = QuotaExceededError {
@@ -164,7 +164,7 @@ fn test_quota_exceeded_error_agent_invocations() {
     assert!(json.contains("\"limit\":10000"));
 }
 
-/// Test QuotaCheck exceeded state.
+/// Test `QuotaCheck` exceeded state.
 #[test]
 fn test_quota_check_exceeded_state() {
     let exceeded_check = QuotaCheck {
@@ -190,7 +190,7 @@ fn test_quota_check_exceeded_state() {
     assert!(within_limit_check.current < within_limit_check.limit.unwrap());
 }
 
-/// Test QuotaType equality.
+/// Test `QuotaType` equality.
 #[test]
 fn test_quota_type_equality() {
     assert_eq!(QuotaType::Mau, QuotaType::Mau);

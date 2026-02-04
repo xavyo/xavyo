@@ -59,7 +59,7 @@ impl SiemDeliveryHealth {
         failure_at: Option<DateTime<Utc>>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO siem_delivery_health (
                 tenant_id, destination_id, window_start, window_end,
                 events_sent, events_delivered, events_failed, events_dropped,
@@ -76,7 +76,7 @@ impl SiemDeliveryHealth {
                 last_success_at = GREATEST(siem_delivery_health.last_success_at, EXCLUDED.last_success_at),
                 last_failure_at = GREATEST(siem_delivery_health.last_failure_at, EXCLUDED.last_failure_at)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(destination_id)
@@ -111,7 +111,7 @@ impl SiemDeliveryHealth {
                 Option<DateTime<Utc>>,
             ),
         >(
-            r#"
+            r"
             SELECT
                 COALESCE(SUM(events_sent), 0) as total_sent,
                 COALESCE(SUM(events_delivered), 0) as total_delivered,
@@ -123,7 +123,7 @@ impl SiemDeliveryHealth {
             FROM siem_delivery_health
             WHERE tenant_id = $1 AND destination_id = $2
               AND window_start >= NOW() - INTERVAL '24 hours'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(destination_id)
@@ -160,13 +160,13 @@ impl SiemDeliveryHealth {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM siem_delivery_health
             WHERE tenant_id = $1 AND destination_id = $2
               AND window_start >= $3 AND window_end <= $4
             ORDER BY window_start DESC
             LIMIT $5 OFFSET $6
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(destination_id)
@@ -187,11 +187,11 @@ impl SiemDeliveryHealth {
         to: DateTime<Utc>,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM siem_delivery_health
             WHERE tenant_id = $1 AND destination_id = $2
               AND window_start >= $3 AND window_end <= $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(destination_id)

@@ -2,7 +2,7 @@
 //!
 //! - POST /admin/users/import — CSV upload and job creation
 //! - GET  /admin/users/imports — List import jobs
-//! - GET  /admin/users/imports/:job_id — Get import job details
+//! - GET  /`admin/users/imports/:job_id` — Get import job details
 
 use axum::{
     extract::{Path, Query},
@@ -104,24 +104,24 @@ pub async fn create_import_job(
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|e| ImportError::Internal(format!("Multipart read error: {}", e)))?
+        .map_err(|e| ImportError::Internal(format!("Multipart read error: {e}")))?
     {
         let name = field.name().unwrap_or("").to_string();
 
         match name.as_str() {
             "file" => {
-                file_name = field.file_name().map(|s| s.to_string());
+                file_name = field.file_name().map(std::string::ToString::to_string);
                 let bytes = field
                     .bytes()
                     .await
-                    .map_err(|e| ImportError::Internal(format!("Failed to read file: {}", e)))?;
+                    .map_err(|e| ImportError::Internal(format!("Failed to read file: {e}")))?;
                 file_data = Some(bytes.to_vec());
             }
             "send_invitations" => {
                 let text = field
                     .text()
                     .await
-                    .map_err(|e| ImportError::Internal(format!("Failed to read field: {}", e)))?;
+                    .map_err(|e| ImportError::Internal(format!("Failed to read field: {e}")))?;
                 send_invitations = matches!(text.to_lowercase().as_str(), "true" | "1" | "yes");
             }
             _ => {
@@ -214,7 +214,7 @@ pub async fn list_import_jobs(
     }))
 }
 
-/// GET /admin/users/imports/:job_id
+/// GET /`admin/users/imports/:job_id`
 ///
 /// Get detailed import job status.
 pub async fn get_import_job(
@@ -229,7 +229,7 @@ pub async fn get_import_job(
     Ok(Json(ImportJobResponse::from(job)))
 }
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ImportError> {
     claims
         .tenant_id()
@@ -237,7 +237,7 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ImportError> {
         .ok_or(ImportError::Unauthorized)
 }
 
-/// Extract user_id from JWT claims (optional, for audit).
+/// Extract `user_id` from JWT claims (optional, for audit).
 fn extract_user_id(claims: &JwtClaims) -> Option<Uuid> {
     Uuid::parse_str(&claims.sub).ok()
 }

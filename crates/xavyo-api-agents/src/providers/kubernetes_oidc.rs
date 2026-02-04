@@ -40,7 +40,7 @@ impl KubernetesOidcProvider {
     /// Returns an error if the JWKS client cannot be created.
     pub fn new(config: KubernetesOidcConfig) -> ProviderResult<Self> {
         let jwks_client = JwksClient::new(&config.jwks_url).map_err(|e| {
-            CloudProviderError::InvalidConfiguration(format!("Failed to create JWKS client: {}", e))
+            CloudProviderError::InvalidConfiguration(format!("Failed to create JWKS client: {e}"))
         })?;
 
         Ok(Self {
@@ -61,7 +61,7 @@ impl KubernetesOidcProvider {
     /// Extract the key ID (kid) from a JWT header.
     fn extract_kid(token: &str) -> ProviderResult<String> {
         let header = decode_header(token).map_err(|e| {
-            CloudProviderError::AuthenticationFailed(format!("Invalid token header: {}", e))
+            CloudProviderError::AuthenticationFailed(format!("Invalid token header: {e}"))
         })?;
 
         header.kid.ok_or_else(|| {
@@ -72,11 +72,11 @@ impl KubernetesOidcProvider {
     /// Get the decoding key for a token.
     async fn get_decoding_key(&self, kid: &str) -> ProviderResult<DecodingKey> {
         let pem = self.jwks_client.get_key_pem(kid).await.map_err(|e| {
-            CloudProviderError::AuthenticationFailed(format!("Failed to get key: {}", e))
+            CloudProviderError::AuthenticationFailed(format!("Failed to get key: {e}"))
         })?;
 
         DecodingKey::from_rsa_pem(&pem).map_err(|e| {
-            CloudProviderError::AuthenticationFailed(format!("Invalid RSA key: {}", e))
+            CloudProviderError::AuthenticationFailed(format!("Invalid RSA key: {e}"))
         })
     }
 }
@@ -158,6 +158,7 @@ pub enum Audience {
 
 impl Audience {
     /// Get the audience as a vector of strings.
+    #[must_use] 
     pub fn as_vec(&self) -> Vec<String> {
         match self {
             Audience::Single(s) => vec![s.clone()],
@@ -166,6 +167,7 @@ impl Audience {
     }
 
     /// Check if the audience contains a specific value.
+    #[must_use] 
     pub fn contains(&self, value: &str) -> bool {
         match self {
             Audience::Single(s) => s == value,
@@ -195,8 +197,7 @@ impl CloudIdentityProvider for KubernetesOidcProvider {
             Err(err) => {
                 error!(error = %err, "Kubernetes OIDC health check failed");
                 Err(CloudProviderError::NotAvailable(format!(
-                    "Cannot fetch JWKS: {}",
-                    err
+                    "Cannot fetch JWKS: {err}"
                 )))
             }
         }
@@ -436,6 +437,7 @@ impl KubernetesOidcConfigBuilder {
     }
 
     /// Build the configuration.
+    #[must_use] 
     pub fn build(self) -> KubernetesOidcConfig {
         KubernetesOidcConfig {
             api_server_url: self.api_server_url,

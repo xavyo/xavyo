@@ -75,7 +75,7 @@ pub struct AgentsState {
 }
 
 impl AgentsState {
-    /// Create a new AgentsState with the given database pool.
+    /// Create a new `AgentsState` with the given database pool.
     ///
     /// # Errors
     ///
@@ -197,6 +197,7 @@ impl AgentsState {
     }
 
     /// Get the anomaly state for F094 handlers.
+    #[must_use] 
     pub fn anomaly_state(&self) -> AnomalyState {
         AnomalyState {
             anomaly_service: AnomalyService::new(self.pool.clone()),
@@ -205,6 +206,7 @@ impl AgentsState {
     }
 
     /// Get optional reference to credential service for error logging.
+    #[must_use] 
     pub fn credential_service_opt(&self) -> Option<&DynamicCredentialService> {
         Some(&self.credential_service)
     }
@@ -451,8 +453,8 @@ pub fn agents_router(state: AgentsState) -> Router {
 
 /// Create the A2A discovery router.
 ///
-/// Mounts the AgentCard discovery endpoint:
-/// - /.well-known/agents/{id}.json - A2A AgentCard endpoint
+/// Mounts the `AgentCard` discovery endpoint:
+/// - /.well-known/agents/{id}.json - A2A `AgentCard` endpoint
 pub fn discovery_router(state: AgentsState) -> Router {
     Router::new()
         // Support both patterns for A2A AgentCard discovery

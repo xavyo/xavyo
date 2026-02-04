@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_provision_request_validation_empty() {
-        let request = ProvisionRequest::new("".to_string());
+        let request = ProvisionRequest::new(String::new());
         assert_eq!(request.validate(), Err("Organization name cannot be empty"));
     }
 

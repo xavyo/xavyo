@@ -21,6 +21,7 @@ pub struct RiskThresholdService {
 
 impl RiskThresholdService {
     /// Create a new risk threshold service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -66,8 +67,7 @@ impl RiskThresholdService {
         let threshold = GovRiskThreshold::find_by_id(&self.pool, tenant_id, threshold_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk threshold not found: {}",
-                threshold_id
+                "Risk threshold not found: {threshold_id}"
             )))?;
 
         Ok(RiskThresholdResponse::from(threshold))
@@ -116,8 +116,7 @@ impl RiskThresholdService {
         GovRiskThreshold::find_by_id(&self.pool, tenant_id, threshold_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk threshold not found: {}",
-                threshold_id
+                "Risk threshold not found: {threshold_id}"
             )))?;
 
         // Check for duplicate name if changing
@@ -127,8 +126,7 @@ impl RiskThresholdService {
             {
                 if existing.id != threshold_id {
                     return Err(ApiGovernanceError::Validation(format!(
-                        "Threshold with name '{}' already exists",
-                        name
+                        "Threshold with name '{name}' already exists"
                     )));
                 }
             }
@@ -146,8 +144,7 @@ impl RiskThresholdService {
         let threshold = GovRiskThreshold::update(&self.pool, tenant_id, threshold_id, input)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk threshold not found: {}",
-                threshold_id
+                "Risk threshold not found: {threshold_id}"
             )))?;
 
         Ok(RiskThresholdResponse::from(threshold))
@@ -159,8 +156,7 @@ impl RiskThresholdService {
 
         if !deleted {
             return Err(ApiGovernanceError::NotFound(format!(
-                "Risk threshold not found: {}",
-                threshold_id
+                "Risk threshold not found: {threshold_id}"
             )));
         }
 
@@ -176,8 +172,7 @@ impl RiskThresholdService {
         let threshold = GovRiskThreshold::enable(&self.pool, tenant_id, threshold_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk threshold not found or already enabled: {}",
-                threshold_id
+                "Risk threshold not found or already enabled: {threshold_id}"
             )))?;
 
         Ok(RiskThresholdResponse::from(threshold))
@@ -192,8 +187,7 @@ impl RiskThresholdService {
         let threshold = GovRiskThreshold::disable(&self.pool, tenant_id, threshold_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk threshold not found or already disabled: {}",
-                threshold_id
+                "Risk threshold not found or already disabled: {threshold_id}"
             )))?;
 
         Ok(RiskThresholdResponse::from(threshold))

@@ -18,7 +18,7 @@ use xavyo_db::models::{
     IdentityProviderConfigFilter, IdpHealthStatus, UpdateIdentityProviderConfig,
 };
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()
@@ -26,7 +26,7 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
         .ok_or(ApiAgentsError::MissingTenant)
 }
 
-/// Extract user_id from JWT claims (uses sub field).
+/// Extract `user_id` from JWT claims (uses sub field).
 fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     Uuid::parse_str(&claims.sub).map_err(|_| ApiAgentsError::MissingUser)
 }

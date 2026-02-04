@@ -23,7 +23,7 @@ pub struct CreateAttributeDefinitionRequest {
     #[serde(default)]
     pub required: bool,
 
-    /// Type-specific validation constraints (max_length, min_length, pattern, allowed_values, min, max).
+    /// Type-specific validation constraints (`max_length`, `min_length`, pattern, `allowed_values`, min, max).
     #[serde(default)]
     pub validation_rules: Option<serde_json::Value>,
 
@@ -302,7 +302,7 @@ pub struct SeededAttribute {
     /// The new definition ID.
     pub id: Uuid,
 
-    /// Well-known slug (e.g., "department", "hire_date").
+    /// Well-known slug (e.g., "department", "`hire_date`").
     pub slug: String,
 
     /// Display label.
@@ -361,6 +361,7 @@ pub struct CustomAttributeFilter {
 ///
 /// Supported operator suffixes: `.lt`, `.gt`, `.lte`, `.gte`
 /// No suffix means equality (`.eq`).
+#[must_use] 
 pub fn parse_custom_attr_filters(query: &str) -> Vec<CustomAttributeFilter> {
     let mut filters = Vec::new();
     let prefix = "custom_attr.";

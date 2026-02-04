@@ -1,6 +1,6 @@
-//! WebAuthn service unit tests.
+//! `WebAuthn` service unit tests.
 //!
-//! Tests for WebAuthn registration, authentication, and credential management.
+//! Tests for `WebAuthn` registration, authentication, and credential management.
 //! These tests verify the logic and types without requiring a real authenticator.
 
 use chrono::{Duration, Utc};
@@ -469,8 +469,7 @@ mod policy_validation_tests {
         for value in &valid_values {
             assert!(
                 *value == "discouraged" || *value == "preferred" || *value == "required",
-                "Invalid user_verification value: {}",
-                value
+                "Invalid user_verification value: {value}"
             );
         }
     }
@@ -486,20 +485,20 @@ mod policy_validation_tests {
     #[test]
     fn test_max_credentials_valid_range() {
         for max in [1, 5, 10, 50, 100] {
-            assert!((1..=100).contains(&max), "Invalid max_credentials: {}", max);
+            assert!((1..=100).contains(&max), "Invalid max_credentials: {max}");
         }
     }
 
     #[test]
     fn test_max_credentials_invalid_range() {
         for max in [0, -1, 101, 200] {
-            assert!(!(1..=100).contains(&max), "Should be invalid: {}", max);
+            assert!(!(1..=100).contains(&max), "Should be invalid: {max}");
         }
     }
 
     #[test]
     fn test_allowed_authenticator_types_platform() {
-        let allowed = vec!["platform".to_string()];
+        let allowed = ["platform".to_string()];
         let auth_type = "platform";
 
         assert!(allowed.contains(&auth_type.to_string()));
@@ -507,7 +506,7 @@ mod policy_validation_tests {
 
     #[test]
     fn test_allowed_authenticator_types_cross_platform() {
-        let allowed = vec!["cross-platform".to_string()];
+        let allowed = ["cross-platform".to_string()];
         let auth_type = "cross-platform";
 
         assert!(allowed.contains(&auth_type.to_string()));
@@ -515,7 +514,7 @@ mod policy_validation_tests {
 
     #[test]
     fn test_allowed_authenticator_types_both() {
-        let allowed = vec!["platform".to_string(), "cross-platform".to_string()];
+        let allowed = ["platform".to_string(), "cross-platform".to_string()];
 
         assert!(allowed.contains(&"platform".to_string()));
         assert!(allowed.contains(&"cross-platform".to_string()));
@@ -523,7 +522,7 @@ mod policy_validation_tests {
 
     #[test]
     fn test_allowed_authenticator_types_rejected() {
-        let allowed = vec!["platform".to_string()];
+        let allowed = ["platform".to_string()];
         let auth_type = "cross-platform";
 
         assert!(!allowed.contains(&auth_type.to_string()));
@@ -605,12 +604,11 @@ mod audit_log_tests {
         ];
 
         for action in &actions {
-            assert!(!action.contains('-'), "Action {} contains hyphen", action);
-            assert!(!action.contains(' '), "Action {} contains space", action);
+            assert!(!action.contains('-'), "Action {action} contains hyphen");
+            assert!(!action.contains(' '), "Action {action} contains space");
             assert!(
                 action.chars().all(|c| c.is_lowercase() || c == '_'),
-                "Action {} is not snake_case",
-                action
+                "Action {action} is not snake_case"
             );
         }
     }

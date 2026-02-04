@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[sqlx(type_name = "gov_ticketing_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum TicketingType {
-    /// ServiceNow ITSM integration.
+    /// `ServiceNow` ITSM integration.
     ServiceNow,
     /// Atlassian Jira integration.
     Jira,
@@ -80,6 +80,7 @@ pub enum ManualTaskStatus {
 
 impl ManualTaskStatus {
     /// Check if the task is in a pending/active state.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(
             self,
@@ -93,6 +94,7 @@ impl ManualTaskStatus {
     }
 
     /// Check if the task is in a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
@@ -101,6 +103,7 @@ impl ManualTaskStatus {
     }
 
     /// Check if the task can be confirmed (manual fulfillment).
+    #[must_use] 
     pub fn can_confirm(&self) -> bool {
         matches!(
             self,
@@ -109,6 +112,7 @@ impl ManualTaskStatus {
     }
 
     /// Check if the task can be retried.
+    #[must_use] 
     pub fn can_retry(&self) -> bool {
         matches!(self, Self::TicketFailed | Self::FailedPermanent)
     }
@@ -136,16 +140,19 @@ pub enum TicketStatusCategory {
 
 impl TicketStatusCategory {
     /// Check if this is a completion category.
+    #[must_use] 
     pub fn is_completed(&self) -> bool {
         matches!(self, Self::Resolved | Self::Closed)
     }
 
     /// Check if this is a rejection/cancellation category.
+    #[must_use] 
     pub fn is_rejected(&self) -> bool {
         matches!(self, Self::Rejected)
     }
 
-    /// Map from ServiceNow state.
+    /// Map from `ServiceNow` state.
+    #[must_use] 
     pub fn from_servicenow_state(state: i32) -> Self {
         match state {
             1 => Self::Open,       // New
@@ -159,6 +166,7 @@ impl TicketStatusCategory {
     }
 
     /// Map from Jira status category.
+    #[must_use] 
     pub fn from_jira_category(category: &str) -> Self {
         match category.to_lowercase().as_str() {
             "new" | "to do" | "todo" => Self::Open,

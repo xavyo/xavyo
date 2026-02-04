@@ -48,7 +48,7 @@ pub enum Shell {
 }
 
 impl Shell {
-    /// Convert to clap_complete Shell type
+    /// Convert to `clap_complete` Shell type
     fn to_clap_shell(self) -> ClapShell {
         match self {
             Shell::Bash => ClapShell::Bash,
@@ -241,8 +241,7 @@ mod tests {
         for cmd_name in expected_commands {
             assert!(
                 script.contains(cmd_name),
-                "Completion script should include '{}' command",
-                cmd_name
+                "Completion script should include '{cmd_name}' command"
             );
         }
     }

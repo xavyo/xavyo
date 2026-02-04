@@ -30,6 +30,7 @@ pub enum ConnectionResult {
 
 impl ConnectionService {
     /// Create a new connection service.
+    #[must_use] 
     pub fn new(pool: PgPool, encryption: EncryptionService) -> Self {
         Self { pool, encryption }
     }
@@ -42,11 +43,11 @@ impl ConnectionService {
         provider_user_id: &str,
     ) -> SocialResult<Option<ConnectionInfo>> {
         let row: Option<ConnectionRow> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, user_id, provider, email, display_name, is_private_email, created_at
             FROM social_connections
             WHERE tenant_id = $1 AND provider = $2 AND provider_user_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(provider.to_string())
@@ -132,7 +133,7 @@ impl ConnectionService {
         let raw_claims = serde_json::to_value(&user_info.raw_claims).ok();
 
         let (id,): (Uuid,) = sqlx::query_as(
-            r#"
+            r"
             INSERT INTO social_connections (
                 tenant_id, user_id, provider, provider_user_id, email, display_name,
                 access_token_encrypted, refresh_token_encrypted, token_expires_at,
@@ -140,7 +141,7 @@ impl ConnectionService {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING id
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -183,7 +184,7 @@ impl ConnectionService {
         let token_expires_at = expires_in.map(|secs| Utc::now() + Duration::seconds(secs));
 
         sqlx::query(
-            r#"
+            r"
             UPDATE social_connections
             SET
                 access_token_encrypted = COALESCE($3, access_token_encrypted),
@@ -191,7 +192,7 @@ impl ConnectionService {
                 token_expires_at = COALESCE($5, token_expires_at),
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connection_id)
         .bind(tenant_id)
@@ -256,12 +257,12 @@ impl ConnectionService {
         user_id: Uuid,
     ) -> SocialResult<Vec<ConnectionInfo>> {
         let rows: Vec<ConnectionRow> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, user_id, provider, email, display_name, is_private_email, created_at
             FROM social_connections
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

@@ -46,7 +46,7 @@ pub struct TotpEncryption {
 }
 
 impl TotpEncryption {
-    /// Create a new instance from the MFA_ENCRYPTION_KEY environment variable.
+    /// Create a new instance from the `MFA_ENCRYPTION_KEY` environment variable.
     ///
     /// The key must be exactly 32 bytes (256 bits), provided as a hex-encoded string.
     pub fn from_env() -> Result<Self, TotpEncryptionError> {

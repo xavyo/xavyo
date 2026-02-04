@@ -67,6 +67,7 @@ pub struct MfaService {
 
 impl MfaService {
     /// Create a new MFA service.
+    #[must_use] 
     pub fn new(pool: PgPool, encryption: TotpEncryption, issuer: String) -> Self {
         Self {
             pool,
@@ -84,7 +85,7 @@ impl MfaService {
 
     /// Generate a new TOTP secret.
     ///
-    /// SECURITY: Uses OsRng directly from the operating system's CSPRNG for maximum security.
+    /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG for maximum security.
     fn generate_secret() -> Vec<u8> {
         use rand::rngs::OsRng;
         use rand::RngCore;
@@ -133,7 +134,7 @@ impl MfaService {
         // SECURITY: Properly handle potential secret conversion failure instead of panicking
         let secret_for_totp = Secret::Raw(secret_bytes.clone())
             .to_bytes()
-            .map_err(|e| ApiAuthError::Internal(format!("TOTP secret conversion failed: {}", e)))?;
+            .map_err(|e| ApiAuthError::Internal(format!("TOTP secret conversion failed: {e}")))?;
 
         let totp = TOTP::new(
             Algorithm::SHA1,
@@ -144,7 +145,7 @@ impl MfaService {
             Some(self.issuer.clone()),
             email.to_string(),
         )
-        .map_err(|e| ApiAuthError::Internal(format!("TOTP creation failed: {}", e)))?;
+        .map_err(|e| ApiAuthError::Internal(format!("TOTP creation failed: {e}")))?;
 
         let otpauth_uri = totp.get_url();
 
@@ -155,7 +156,7 @@ impl MfaService {
         let (encrypted, iv) = self
             .encryption
             .encrypt(&secret_bytes)
-            .map_err(|e| ApiAuthError::Internal(format!("Encryption failed: {}", e)))?;
+            .map_err(|e| ApiAuthError::Internal(format!("Encryption failed: {e}")))?;
 
         UserTotpSecret::create(
             &mut *tx,
@@ -196,7 +197,7 @@ impl MfaService {
     /// Generate a QR code as base64-encoded PNG.
     fn generate_qr_code(&self, content: &str) -> Result<String, ApiAuthError> {
         let code = QrCode::new(content.as_bytes())
-            .map_err(|e| ApiAuthError::Internal(format!("QR code generation failed: {}", e)))?;
+            .map_err(|e| ApiAuthError::Internal(format!("QR code generation failed: {e}")))?;
 
         let image = code.render::<Luma<u8>>().build();
 
@@ -204,7 +205,7 @@ impl MfaService {
         let mut cursor = Cursor::new(&mut png_bytes);
         image
             .write_to(&mut cursor, image::ImageFormat::Png)
-            .map_err(|e| ApiAuthError::Internal(format!("PNG encoding failed: {}", e)))?;
+            .map_err(|e| ApiAuthError::Internal(format!("PNG encoding failed: {e}")))?;
 
         Ok(base64::Engine::encode(
             &base64::engine::general_purpose::STANDARD,
@@ -250,7 +251,7 @@ impl MfaService {
         let secret_bytes = self
             .encryption
             .decrypt(&secret.secret_encrypted, &secret.iv)
-            .map_err(|e| ApiAuthError::Internal(format!("Decryption failed: {}", e)))?;
+            .map_err(|e| ApiAuthError::Internal(format!("Decryption failed: {e}")))?;
 
         if !self.verify_totp_code(&secret_bytes, code)? {
             return Err(ApiAuthError::InvalidTotpCode);
@@ -347,7 +348,7 @@ impl MfaService {
         let secret_bytes = self
             .encryption
             .decrypt(&secret.secret_encrypted, &secret.iv)
-            .map_err(|e| ApiAuthError::Internal(format!("Decryption failed: {}", e)))?;
+            .map_err(|e| ApiAuthError::Internal(format!("Decryption failed: {e}")))?;
 
         if self.verify_totp_code(&secret_bytes, code)? {
             // Success - record and return
@@ -422,7 +423,7 @@ impl MfaService {
             None,          // No issuer needed for verification
             String::new(), // No account name needed for verification
         )
-        .map_err(|e| ApiAuthError::Internal(format!("TOTP creation failed: {}", e)))?;
+        .map_err(|e| ApiAuthError::Internal(format!("TOTP creation failed: {e}")))?;
 
         Ok(totp.check_current(code).unwrap_or(false))
     }
@@ -547,9 +548,9 @@ impl MfaService {
 
     /// Generate recovery codes.
     ///
-    /// Returns (plaintext_codes, hashed_codes).
+    /// Returns (`plaintext_codes`, `hashed_codes`).
     ///
-    /// SECURITY: Uses OsRng directly from the operating system's CSPRNG for maximum security.
+    /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG for maximum security.
     fn generate_recovery_codes(&self) -> (Vec<String>, Vec<String>) {
         use rand::distributions::Alphanumeric;
         use rand::rngs::OsRng;
@@ -606,7 +607,7 @@ impl MfaService {
         let secret_bytes = self
             .encryption
             .decrypt(&secret.secret_encrypted, &secret.iv)
-            .map_err(|e| ApiAuthError::Internal(format!("Decryption failed: {}", e)))?;
+            .map_err(|e| ApiAuthError::Internal(format!("Decryption failed: {e}")))?;
 
         if !self.verify_totp_code(&secret_bytes, totp_code)? {
             return Err(ApiAuthError::InvalidTotpCode);
@@ -693,7 +694,7 @@ impl MfaService {
             .await
             .map_err(ApiAuthError::Database)?;
 
-        Ok(secret.map(|s| s.is_enabled).unwrap_or(false))
+        Ok(secret.is_some_and(|s| s.is_enabled))
     }
 }
 

@@ -1,7 +1,7 @@
 //! Unit tests for micro-certification reviewer resolution (T015).
 //!
 //! Tests the logic that determines who should review a micro-certification
-//! based on the trigger rule's reviewer_type setting.
+//! based on the trigger rule's `reviewer_type` setting.
 
 use uuid::Uuid;
 use xavyo_db::MicroCertReviewerType;

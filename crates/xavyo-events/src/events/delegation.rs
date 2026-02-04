@@ -138,11 +138,11 @@ pub struct DeputyActionPerformed {
     pub deputy_id: Uuid,
     /// The delegator on whose behalf the action was taken.
     pub delegator_id: Uuid,
-    /// Type of action (approve_request, reject_request, certify_access, etc.).
+    /// Type of action (`approve_request`, `reject_request`, `certify_access`, etc.).
     pub action_type: String,
     /// The work item that was actioned.
     pub work_item_id: Uuid,
-    /// Type of work item (access_request, certification, state_transition).
+    /// Type of work item (`access_request`, certification, `state_transition`).
     pub work_item_type: String,
 }
 

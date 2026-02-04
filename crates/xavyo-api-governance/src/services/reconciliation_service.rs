@@ -39,6 +39,7 @@ pub struct ReconciliationService {
 
 impl ReconciliationService {
     /// Create a new reconciliation service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -47,6 +48,7 @@ impl ReconciliationService {
     }
 
     /// Create with custom batch size.
+    #[must_use] 
     pub fn with_batch_size(pool: PgPool, batch_size: i64) -> Self {
         Self { pool, batch_size }
     }
@@ -133,13 +135,13 @@ impl ReconciliationService {
         // Process users in batches
         loop {
             let users: Vec<UserInfo> = sqlx::query_as(
-                r#"
+                r"
                 SELECT id, manager_id, created_at
                 FROM users
                 WHERE tenant_id = $1
                 ORDER BY id
                 LIMIT $2 OFFSET $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(batch_size)
@@ -208,7 +210,7 @@ impl ReconciliationService {
 
             // Update progress
             let progress =
-                ((offset + batch_count as i64) * 100 / (offset + batch_size).max(1)).min(99) as i32;
+                ((offset + i64::from(batch_count)) * 100 / (offset + batch_size).max(1)).min(99) as i32;
 
             GovReconciliationRun::update_progress(
                 &pool,
@@ -269,7 +271,7 @@ impl ReconciliationService {
                 let days_threshold = rule
                     .parameters
                     .get("days_threshold")
-                    .and_then(|v| v.as_i64())
+                    .and_then(serde_json::Value::as_i64)
                     .unwrap_or(90) as i32;
                 Self::check_inactive_rule(pool, tenant_id, user, days_threshold).await
             }
@@ -307,10 +309,10 @@ impl ReconciliationService {
             .await
             .map_err(GovernanceError::Database)?;
 
-        if !events.is_empty() {
-            Ok(Some(DetectionReason::TerminatedEmployee))
-        } else {
+        if events.is_empty() {
             Ok(None)
+        } else {
+            Ok(Some(DetectionReason::TerminatedEmployee))
         }
     }
 
@@ -323,7 +325,7 @@ impl ReconciliationService {
     ) -> Result<Option<DetectionReason>> {
         let days_inactive = Self::calculate_days_inactive(pool, tenant_id, user.id).await?;
 
-        if days_inactive >= days_threshold as i64 {
+        if days_inactive >= i64::from(days_threshold) {
             Ok(Some(DetectionReason::Inactive))
         } else {
             Ok(None)
@@ -379,9 +381,7 @@ impl ReconciliationService {
         .map_err(GovernanceError::Database)?;
 
         Ok(last_logins
-            .first()
-            .map(|l| l.created_at)
-            .unwrap_or_else(Utc::now))
+            .first().map_or_else(Utc::now, |l| l.created_at))
     }
 
     /// Check for orphans that have been resolved.
@@ -410,11 +410,11 @@ impl ReconciliationService {
 
             // Re-check if user is still an orphan - fetch user info directly
             let user: Option<UserInfo> = sqlx::query_as(
-                r#"
+                r"
                 SELECT id, manager_id, created_at
                 FROM users
                 WHERE tenant_id = $1 AND id = $2
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(detection.user_id)
@@ -557,12 +557,12 @@ impl ReconciliationService {
         }
 
         let row: Option<ScheduleRow> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, frequency, day_of_week, day_of_month, hour_of_day,
                    is_enabled, last_run_at, next_run_at, created_at, updated_at
             FROM gov_reconciliation_schedules
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(&self.pool)
@@ -625,7 +625,7 @@ impl ReconciliationService {
         }
 
         let row: ScheduleRow = sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_reconciliation_schedules (
                 tenant_id, frequency, day_of_week, day_of_month, hour_of_day, is_enabled, next_run_at
             )
@@ -640,7 +640,7 @@ impl ReconciliationService {
                 updated_at = NOW()
             RETURNING id, frequency, day_of_week, day_of_month, hour_of_day,
                       is_enabled, last_run_at, next_run_at, created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(frequency_str)
@@ -677,10 +677,10 @@ impl ReconciliationService {
     /// Delete the reconciliation schedule for a tenant.
     pub async fn delete_schedule(&self, tenant_id: Uuid) -> Result<bool> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_reconciliation_schedules
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(&self.pool)
@@ -710,12 +710,12 @@ impl ReconciliationService {
         }
 
         let due: Vec<DueSchedule> = sqlx::query_as(
-            r#"
+            r"
             SELECT tenant_id
             FROM gov_reconciliation_schedules
             WHERE is_enabled = true
                 AND (next_run_at IS NULL OR next_run_at <= NOW())
-            "#,
+            ",
         )
         .fetch_all(&self.pool)
         .await
@@ -841,7 +841,7 @@ impl ReconciliationService {
                     }
                 };
 
-                (now + Duration::days(days_until as i64))
+                (now + Duration::days(i64::from(days_until)))
                     .with_hour(target_hour)
                     .unwrap()
                     .with_minute(0)
@@ -902,11 +902,11 @@ impl ReconciliationService {
             );
 
             sqlx::query(
-                r#"
+                r"
                 UPDATE gov_reconciliation_schedules
                 SET last_run_at = NOW(), next_run_at = $2
                 WHERE tenant_id = $1
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(next_run_at)

@@ -1,6 +1,6 @@
-//! RFC 7644 ETag and Version Handling Compliance Tests
+//! RFC 7644 `ETag` and Version Handling Compliance Tests
 //!
-//! These tests verify that SCIM ETag versioning follows
+//! These tests verify that SCIM `ETag` versioning follows
 //! RFC 7644 Section 3.14 requirements.
 
 #[cfg(test)]
@@ -32,7 +32,7 @@ mod tests {
         // RFC 7644: Versions are weak ETags
         let version = "W/\"a330bc54f0671c9\"";
         assert!(version.starts_with("W/\""));
-        assert!(version.ends_with("\""));
+        assert!(version.ends_with('"'));
     }
 
     #[test]
@@ -52,7 +52,7 @@ mod tests {
         ];
         for v in versions {
             assert!(v.starts_with("W/\""));
-            assert!(v.ends_with("\""));
+            assert!(v.ends_with('"'));
         }
     }
 
@@ -175,7 +175,7 @@ mod tests {
     fn test_etag_header_on_get() {
         // GET response should include ETag header
         let etag = "W/\"a330bc54f0671c9\"";
-        assert!(etag.len() > 0);
+        assert!(!etag.is_empty());
     }
 
     #[test]

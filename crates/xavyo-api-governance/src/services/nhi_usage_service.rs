@@ -37,6 +37,7 @@ pub struct NhiUsageService {
 
 impl NhiUsageService {
     /// Create a new usage service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -262,16 +263,12 @@ impl NhiUsageService {
         for nhi in nhis {
             let days_inactive = nhi
                 .last_used_at
-                .map(|last| (now - last).num_days())
-                .unwrap_or(
-                    // If never used, calculate from creation date
-                    (now - nhi.created_at).num_days(),
-                );
+                .map_or((now - nhi.created_at).num_days(), |last| (now - last).num_days());
 
             let individual_threshold = nhi.inactivity_threshold_days.unwrap_or(90);
 
             // Only include if truly stale (beyond individual threshold)
-            if days_inactive >= individual_threshold as i64 {
+            if days_inactive >= i64::from(individual_threshold) {
                 stale_nhis.push(StaleNhiInfo {
                     nhi_id: nhi.id,
                     name: nhi.name.clone(),

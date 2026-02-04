@@ -16,6 +16,7 @@ pub struct DestinationRateLimiter {
 impl DestinationRateLimiter {
     /// Create a new rate limiter with the specified events per second.
     /// Burst capacity is 2x the rate.
+    #[must_use] 
     pub fn new(rate_per_second: u32) -> Self {
         let rate = NonZeroU32::new(rate_per_second).unwrap_or(NonZeroU32::new(1000).unwrap());
         let burst = NonZeroU32::new(rate_per_second.saturating_mul(2).max(1))

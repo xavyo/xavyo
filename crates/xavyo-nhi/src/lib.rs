@@ -43,7 +43,7 @@
 //!
 //! | Flag | Description | Dependencies Added |
 //! |------|-------------|-------------------|
-//! | `sqlx` | Enable SQLx derives for database types | sqlx |
+//! | `sqlx` | Enable `SQLx` derives for database types | sqlx |
 //!
 //! # Modules
 //!

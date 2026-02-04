@@ -1,4 +1,4 @@
-//! Request and response models for SoD violation endpoints.
+//! Request and response models for `SoD` violation endpoints.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ use uuid::Uuid;
 use validator::Validate;
 use xavyo_db::{GovSodViolation, GovViolationStatus};
 
-/// Query parameters for listing SoD violations.
+/// Query parameters for listing `SoD` violations.
 #[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct ListSodViolationsQuery {
     /// Filter by rule ID.
@@ -48,7 +48,7 @@ impl Default for ListSodViolationsQuery {
     }
 }
 
-/// SoD violation response.
+/// `SoD` violation response.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SodViolationResponse {
     /// Unique identifier.
@@ -107,7 +107,7 @@ impl From<GovSodViolation> for SodViolationResponse {
     }
 }
 
-/// Paginated list of SoD violations.
+/// Paginated list of `SoD` violations.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SodViolationListResponse {
     /// List of violations.

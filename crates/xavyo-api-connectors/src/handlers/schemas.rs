@@ -370,7 +370,7 @@ pub async fn get_object_class(
         .await?
         .ok_or_else(|| crate::error::ConnectorApiError::NotFound {
             resource: "object_class".to_string(),
-            id: format!("{}/{}", id, object_class),
+            id: format!("{id}/{object_class}"),
         })?;
 
     Ok(Json(oc))
@@ -537,7 +537,7 @@ pub async fn get_cached_schema(
             .await?
             .ok_or_else(|| crate::error::ConnectorApiError::NotFound {
                 resource: "schema_version".to_string(),
-                id: format!("{}/v{}", id, version),
+                id: format!("{id}/v{version}"),
             })?;
 
         // Convert versioned schema to response
@@ -661,16 +661,14 @@ pub async fn diff_schema_versions(
     let from_schema: xavyo_connector::schema::Schema =
         serde_json::from_value(from_version.schema_data.clone()).map_err(|e| {
             crate::error::ConnectorApiError::InvalidConfiguration(format!(
-                "Failed to parse from_version schema: {}",
-                e
+                "Failed to parse from_version schema: {e}"
             ))
         })?;
 
     let to_schema: xavyo_connector::schema::Schema =
         serde_json::from_value(to_version.schema_data.clone()).map_err(|e| {
             crate::error::ConnectorApiError::InvalidConfiguration(format!(
-                "Failed to parse to_version schema: {}",
-                e
+                "Failed to parse to_version schema: {e}"
             ))
         })?;
 
@@ -742,7 +740,7 @@ pub async fn list_object_classes(
             name: oc.name.clone(),
             native_name: oc.native_name.clone(),
             display_name: oc.display_name.clone(),
-            object_class_type: oc.object_class_type.as_ref().map(|t| t.to_string()),
+            object_class_type: oc.object_class_type.clone(),
             attribute_count: oc.attributes.len() + oc.inherited_attributes.len(),
             parent_classes: oc.parent_classes.clone(),
         })
@@ -788,7 +786,7 @@ pub async fn get_object_class_details(
         .await?
         .ok_or_else(|| crate::error::ConnectorApiError::NotFound {
             resource: "object_class".to_string(),
-            id: format!("{}/{}", id, name),
+            id: format!("{id}/{name}"),
         })?;
 
     Ok(Json(oc))
@@ -828,7 +826,7 @@ pub async fn list_object_class_attributes(
         .await?
         .ok_or_else(|| crate::error::ConnectorApiError::NotFound {
             resource: "object_class".to_string(),
-            id: format!("{}/{}", id, name),
+            id: format!("{id}/{name}"),
         })?;
 
     let mut attributes: Vec<AttributeWithSource> = Vec::new();
@@ -966,8 +964,7 @@ pub async fn set_refresh_schedule(
         .map_err(|e| match e {
             crate::services::ScheduleError::InvalidCronExpression(msg) => {
                 crate::error::ConnectorApiError::InvalidConfiguration(format!(
-                    "Invalid cron expression: {}",
-                    msg
+                    "Invalid cron expression: {msg}"
                 ))
             }
             crate::services::ScheduleError::InvalidInterval => {

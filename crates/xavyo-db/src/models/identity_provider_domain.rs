@@ -27,6 +27,7 @@ pub struct CreateDomain {
 
 impl IdentityProviderDomain {
     /// Validate domain format.
+    #[must_use] 
     pub fn validate_domain(domain: &str) -> bool {
         // Domain must start and end with alphanumeric, contain only alphanumeric, dots, and hyphens
         let domain = domain.to_lowercase();
@@ -65,13 +66,13 @@ impl IdentityProviderDomain {
     pub async fn create(pool: &sqlx::PgPool, input: CreateDomain) -> Result<Self, sqlx::Error> {
         let domain = input.domain.to_lowercase();
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO identity_provider_domains (
                 tenant_id, identity_provider_id, domain, priority
             )
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(input.identity_provider_id)
@@ -95,11 +96,11 @@ impl IdentityProviderDomain {
         identity_provider_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM identity_provider_domains
             WHERE identity_provider_id = $1
             ORDER BY priority DESC, domain ASC
-            "#,
+            ",
         )
         .bind(identity_provider_id)
         .fetch_all(pool)
@@ -107,7 +108,7 @@ impl IdentityProviderDomain {
     }
 
     /// Find identity provider for a domain (Home Realm Discovery).
-    /// Returns the IdP with highest priority for the given domain.
+    /// Returns the `IdP` with highest priority for the given domain.
     pub async fn find_idp_for_domain(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -115,7 +116,7 @@ impl IdentityProviderDomain {
     ) -> Result<Option<Uuid>, sqlx::Error> {
         let domain = domain.to_lowercase();
         let result: Option<(Uuid,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT ipd.identity_provider_id
             FROM identity_provider_domains ipd
             JOIN tenant_identity_providers tip ON ipd.identity_provider_id = tip.id
@@ -124,7 +125,7 @@ impl IdentityProviderDomain {
               AND tip.is_enabled = true
             ORDER BY ipd.priority DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&domain)
@@ -143,12 +144,12 @@ impl IdentityProviderDomain {
     ) -> Result<Option<Self>, sqlx::Error> {
         let domain = domain.to_lowercase();
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM identity_provider_domains
             WHERE tenant_id = $1 AND domain = $2
             ORDER BY priority DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&domain)
@@ -156,7 +157,7 @@ impl IdentityProviderDomain {
         .await
     }
 
-    /// Check if domain exists for this IdP.
+    /// Check if domain exists for this `IdP`.
     pub async fn domain_exists_for_idp(
         pool: &sqlx::PgPool,
         identity_provider_id: Uuid,
@@ -164,12 +165,12 @@ impl IdentityProviderDomain {
     ) -> Result<bool, sqlx::Error> {
         let domain = domain.to_lowercase();
         let result: (bool,) = sqlx::query_as(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM identity_provider_domains
                 WHERE identity_provider_id = $1 AND domain = $2
             )
-            "#,
+            ",
         )
         .bind(identity_provider_id)
         .bind(&domain)
@@ -187,7 +188,7 @@ impl IdentityProviderDomain {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Delete all domains for an IdP.
+    /// Delete all domains for an `IdP`.
     pub async fn delete_by_idp(
         pool: &sqlx::PgPool,
         identity_provider_id: Uuid,

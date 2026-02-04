@@ -25,11 +25,13 @@ pub enum ReconciliationStatus {
 
 impl ReconciliationStatus {
     /// Check if this status indicates the run is finished.
+    #[must_use] 
     pub fn is_finished(&self) -> bool {
         !matches!(self, Self::Running)
     }
 
     /// Check if this status indicates success.
+    #[must_use] 
     pub fn is_success(&self) -> bool {
         matches!(self, Self::Completed)
     }
@@ -116,10 +118,10 @@ impl GovReconciliationRun {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_reconciliation_runs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -133,12 +135,12 @@ impl GovReconciliationRun {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_reconciliation_runs
             WHERE tenant_id = $1 AND status = 'running'
             ORDER BY started_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(pool)
@@ -154,26 +156,26 @@ impl GovReconciliationRun {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_reconciliation_runs
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_idx));
+            query.push_str(&format!(" AND status = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.triggered_by.is_some() {
-            query.push_str(&format!(" AND triggered_by = ${}", param_idx));
+            query.push_str(&format!(" AND triggered_by = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.since.is_some() {
-            query.push_str(&format!(" AND started_at >= ${}", param_idx));
+            query.push_str(&format!(" AND started_at >= ${param_idx}"));
             param_idx += 1;
         }
 
@@ -209,26 +211,26 @@ impl GovReconciliationRun {
         filter: &ReconciliationRunFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) as count FROM gov_reconciliation_runs
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_idx));
+            query.push_str(&format!(" AND status = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.triggered_by.is_some() {
-            query.push_str(&format!(" AND triggered_by = ${}", param_idx));
+            query.push_str(&format!(" AND triggered_by = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.since.is_some() {
-            query.push_str(&format!(" AND started_at >= ${}", param_idx));
+            query.push_str(&format!(" AND started_at >= ${param_idx}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -255,11 +257,11 @@ impl GovReconciliationRun {
         data: CreateGovReconciliationRun,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_reconciliation_runs (tenant_id, triggered_by)
             VALUES ($1, $2)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.triggered_by)
@@ -275,7 +277,7 @@ impl GovReconciliationRun {
         data: UpdateGovReconciliationRun,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_reconciliation_runs
             SET
                 status = COALESCE($3, status),
@@ -288,7 +290,7 @@ impl GovReconciliationRun {
                 progress_percent = COALESCE($10, progress_percent)
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -315,7 +317,7 @@ impl GovReconciliationRun {
         resolved_orphans: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_reconciliation_runs
             SET
                 status = 'completed',
@@ -327,7 +329,7 @@ impl GovReconciliationRun {
                 progress_percent = 100
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -347,7 +349,7 @@ impl GovReconciliationRun {
         error_message: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_reconciliation_runs
             SET
                 status = 'failed',
@@ -355,7 +357,7 @@ impl GovReconciliationRun {
                 error_message = $3
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -371,14 +373,14 @@ impl GovReconciliationRun {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_reconciliation_runs
             SET
                 status = 'partial',
                 completed_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'running'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -396,7 +398,7 @@ impl GovReconciliationRun {
         orphans_found: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_reconciliation_runs
             SET
                 progress_percent = $3,
@@ -404,7 +406,7 @@ impl GovReconciliationRun {
                 orphans_found = $5
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -422,10 +424,10 @@ impl GovReconciliationRun {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_reconciliation_runs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

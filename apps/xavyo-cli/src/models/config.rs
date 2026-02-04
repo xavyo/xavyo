@@ -313,13 +313,13 @@ version: "1"
 
     #[test]
     fn test_agent_config_deserialization() {
-        let yaml = r#"
+        let yaml = r"
 name: my-agent
 agent_type: copilot
 model_provider: openai
 model_name: gpt-4
 risk_level: low
-"#;
+";
         let agent: AgentConfig = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(agent.name, "my-agent");
         assert_eq!(agent.agent_type, "copilot");
@@ -329,13 +329,13 @@ risk_level: low
 
     #[test]
     fn test_tool_config_deserialization() {
-        let yaml = r#"
+        let yaml = r"
 name: my-tool
 description: A useful tool
 risk_level: medium
 input_schema:
   type: object
-"#;
+";
         let tool: ToolConfig = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(tool.name, "my-tool");
         assert_eq!(tool.description, "A useful tool");

@@ -40,7 +40,7 @@ pub(crate) fn validate_pool_status_for_assignment(
 
 /// Format incompatibility violations into a human-readable string.
 ///
-/// Each violation is formatted as "Incompatible with '<pool_name>': <reason>"
+/// Each violation is formatted as "Incompatible with '<`pool_name`>': <reason>"
 /// and multiple violations are joined with "; ".
 pub(crate) fn format_violation_message(violations: &[IncompatibilityViolation]) -> String {
     violations
@@ -96,6 +96,7 @@ pub struct LicenseAssignmentService {
 
 impl LicenseAssignmentService {
     /// Create a new license assignment service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: LicenseAuditService::new(pool.clone()),
@@ -354,7 +355,7 @@ impl LicenseAssignmentService {
                     Ok(None) => {
                         failures.push(BulkOperationFailure {
                             item_id: *assignment_id,
-                            error: format!("Assignment {} not found", assignment_id),
+                            error: format!("Assignment {assignment_id} not found"),
                         });
                         continue;
                     }
@@ -416,8 +417,7 @@ impl LicenseAssignmentService {
                     failures.push(BulkOperationFailure {
                         item_id: *assignment_id,
                         error: format!(
-                            "Failed to reclaim assignment {} (may not be active)",
-                            assignment_id
+                            "Failed to reclaim assignment {assignment_id} (may not be active)"
                         ),
                     });
                 }
@@ -447,11 +447,13 @@ impl LicenseAssignmentService {
     }
 
     /// Get the underlying database pool reference.
+    #[must_use] 
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get the audit service reference.
+    #[must_use] 
     pub fn audit_service(&self) -> &LicenseAuditService {
         &self.audit_service
     }

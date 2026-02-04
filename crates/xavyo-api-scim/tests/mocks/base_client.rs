@@ -9,6 +9,7 @@ use crate::common::TestApp;
 
 /// Configuration for mock client behavior.
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct MockClientConfig {
     /// Simulated network delay.
     pub delay: Option<Duration>,
@@ -16,14 +17,6 @@ pub struct MockClientConfig {
     pub enabled_quirks: Vec<String>,
 }
 
-impl Default for MockClientConfig {
-    fn default() -> Self {
-        Self {
-            delay: None,
-            enabled_quirks: vec![],
-        }
-    }
-}
 
 impl MockClientConfig {
     /// Create config with all quirks enabled.
@@ -46,16 +39,16 @@ impl MockClientConfig {
     }
 }
 
-/// Trait for mock SCIM clients that simulate IdP behavior.
+/// Trait for mock SCIM clients that simulate `IdP` behavior.
 #[allow(async_fn_in_trait)]
 pub trait MockScimClient {
-    /// Get the IdP name (e.g., "Okta", "Azure AD", "OneLogin").
+    /// Get the `IdP` name (e.g., "Okta", "Azure AD", "`OneLogin`").
     fn idp_name(&self) -> &'static str;
 
-    /// Get the User-Agent header value for this IdP.
+    /// Get the User-Agent header value for this `IdP`.
     fn user_agent(&self) -> &'static str;
 
-    /// Get all quirks defined for this IdP.
+    /// Get all quirks defined for this `IdP`.
     fn get_quirks(&self) -> Vec<QuirkDefinition>;
 
     /// Get the client configuration.
@@ -101,7 +94,7 @@ pub trait MockScimClient {
         self.apply_delay().await;
         app.request_with_headers(
             Method::GET,
-            &format!("/scim/v2/Users/{}", user_id),
+            &format!("/scim/v2/Users/{user_id}"),
             None,
             self.build_headers()
                 .iter()
@@ -132,13 +125,13 @@ pub trait MockScimClient {
                     _ => c.to_string(),
                 })
                 .collect();
-            params.push(format!("filter={}", encoded));
+            params.push(format!("filter={encoded}"));
         }
         if let Some(idx) = start_index {
-            params.push(format!("startIndex={}", idx));
+            params.push(format!("startIndex={idx}"));
         }
         if let Some(c) = count {
-            params.push(format!("count={}", c));
+            params.push(format!("count={c}"));
         }
 
         if !params.is_empty() {
@@ -169,7 +162,7 @@ pub trait MockScimClient {
         self.apply_delay().await;
         app.request_with_headers(
             Method::PATCH,
-            &format!("/scim/v2/Users/{}", user_id),
+            &format!("/scim/v2/Users/{user_id}"),
             Some(payload),
             self.build_headers()
                 .iter()
@@ -184,7 +177,7 @@ pub trait MockScimClient {
         self.apply_delay().await;
         app.request_with_headers(
             Method::DELETE,
-            &format!("/scim/v2/Users/{}", user_id),
+            &format!("/scim/v2/Users/{user_id}"),
             None,
             self.build_headers()
                 .iter()

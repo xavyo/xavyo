@@ -14,7 +14,8 @@ pub struct SpService {
 }
 
 impl SpService {
-    /// Create a new SpService
+    /// Create a new `SpService`
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -22,14 +23,14 @@ impl SpService {
     /// Get SP by ID
     pub async fn get_sp(&self, tenant_id: Uuid, sp_id: Uuid) -> SamlResult<SamlServiceProvider> {
         sqlx::query_as::<_, SamlServiceProvider>(
-            r#"
+            r"
             SELECT id, tenant_id, entity_id, name, acs_urls, certificate,
                    attribute_mapping, name_id_format, sign_assertions,
                    validate_signatures, assertion_validity_seconds, enabled,
                    metadata_url, created_at, updated_at
             FROM saml_service_providers
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(sp_id)
         .bind(tenant_id)
@@ -45,14 +46,14 @@ impl SpService {
         entity_id: &str,
     ) -> SamlResult<SamlServiceProvider> {
         sqlx::query_as::<_, SamlServiceProvider>(
-            r#"
+            r"
             SELECT id, tenant_id, entity_id, name, acs_urls, certificate,
                    attribute_mapping, name_id_format, sign_assertions,
                    validate_signatures, assertion_validity_seconds, enabled,
                    metadata_url, created_at, updated_at
             FROM saml_service_providers
             WHERE entity_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(entity_id)
         .bind(tenant_id)
@@ -71,7 +72,7 @@ impl SpService {
     ) -> SamlResult<(Vec<SamlServiceProvider>, i64)> {
         let sps = if let Some(enabled_filter) = enabled {
             sqlx::query_as::<_, SamlServiceProvider>(
-                r#"
+                r"
                 SELECT id, tenant_id, entity_id, name, acs_urls, certificate,
                        attribute_mapping, name_id_format, sign_assertions,
                        validate_signatures, assertion_validity_seconds, enabled,
@@ -80,17 +81,17 @@ impl SpService {
                 WHERE tenant_id = $1 AND enabled = $2
                 ORDER BY name ASC
                 LIMIT $3 OFFSET $4
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(enabled_filter)
-            .bind(limit as i64)
-            .bind(offset as i64)
+            .bind(i64::from(limit))
+            .bind(i64::from(offset))
             .fetch_all(&self.pool)
             .await?
         } else {
             sqlx::query_as::<_, SamlServiceProvider>(
-                r#"
+                r"
                 SELECT id, tenant_id, entity_id, name, acs_urls, certificate,
                        attribute_mapping, name_id_format, sign_assertions,
                        validate_signatures, assertion_validity_seconds, enabled,
@@ -99,18 +100,18 @@ impl SpService {
                 WHERE tenant_id = $1
                 ORDER BY name ASC
                 LIMIT $2 OFFSET $3
-                "#,
+                ",
             )
             .bind(tenant_id)
-            .bind(limit as i64)
-            .bind(offset as i64)
+            .bind(i64::from(limit))
+            .bind(i64::from(offset))
             .fetch_all(&self.pool)
             .await?
         };
 
         let total: i64 = if let Some(enabled_filter) = enabled {
             sqlx::query_scalar(
-                r#"SELECT COUNT(*) FROM saml_service_providers WHERE tenant_id = $1 AND enabled = $2"#,
+                r"SELECT COUNT(*) FROM saml_service_providers WHERE tenant_id = $1 AND enabled = $2",
             )
             .bind(tenant_id)
             .bind(enabled_filter)
@@ -118,7 +119,7 @@ impl SpService {
             .await?
         } else {
             sqlx::query_scalar(
-                r#"SELECT COUNT(*) FROM saml_service_providers WHERE tenant_id = $1"#,
+                r"SELECT COUNT(*) FROM saml_service_providers WHERE tenant_id = $1",
             )
             .bind(tenant_id)
             .fetch_one(&self.pool)
@@ -136,7 +137,7 @@ impl SpService {
     ) -> SamlResult<SamlServiceProvider> {
         // Check for duplicate entity_id
         let existing: Option<Uuid> = sqlx::query_scalar(
-            r#"SELECT id FROM saml_service_providers WHERE tenant_id = $1 AND entity_id = $2"#,
+            r"SELECT id FROM saml_service_providers WHERE tenant_id = $1 AND entity_id = $2",
         )
         .bind(tenant_id)
         .bind(&req.entity_id)
@@ -157,7 +158,7 @@ impl SpService {
         let attribute_mapping = req.attribute_mapping.unwrap_or(serde_json::json!({}));
 
         let sp = sqlx::query_as::<_, SamlServiceProvider>(
-            r#"
+            r"
             INSERT INTO saml_service_providers
                 (tenant_id, entity_id, name, acs_urls, certificate, attribute_mapping,
                  name_id_format, sign_assertions, validate_signatures,
@@ -167,7 +168,7 @@ impl SpService {
                       attribute_mapping, name_id_format, sign_assertions,
                       validate_signatures, assertion_validity_seconds, enabled,
                       metadata_url, created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&req.entity_id)
@@ -219,7 +220,7 @@ impl SpService {
         let metadata_url = req.metadata_url.or(existing.metadata_url);
 
         let sp = sqlx::query_as::<_, SamlServiceProvider>(
-            r#"
+            r"
             UPDATE saml_service_providers
             SET name = $3, acs_urls = $4, certificate = $5, attribute_mapping = $6,
                 name_id_format = $7, sign_assertions = $8, validate_signatures = $9,
@@ -229,7 +230,7 @@ impl SpService {
                       attribute_mapping, name_id_format, sign_assertions,
                       validate_signatures, assertion_validity_seconds, enabled,
                       metadata_url, created_at, updated_at
-            "#,
+            ",
         )
         .bind(sp_id)
         .bind(tenant_id)
@@ -258,7 +259,7 @@ impl SpService {
     /// Delete an SP
     pub async fn delete_sp(&self, tenant_id: Uuid, sp_id: Uuid) -> SamlResult<()> {
         let result =
-            sqlx::query(r#"DELETE FROM saml_service_providers WHERE id = $1 AND tenant_id = $2"#)
+            sqlx::query(r"DELETE FROM saml_service_providers WHERE id = $1 AND tenant_id = $2")
                 .bind(sp_id)
                 .bind(tenant_id)
                 .execute(&self.pool)
@@ -285,13 +286,13 @@ impl SpService {
         tenant_id: Uuid,
     ) -> SamlResult<TenantIdpCertificate> {
         sqlx::query_as::<_, TenantIdpCertificate>(
-            r#"
+            r"
             SELECT id, tenant_id, certificate, private_key_encrypted,
                    key_id, subject_dn, issuer_dn, not_before, not_after,
                    is_active, created_at
             FROM tenant_idp_certificates
             WHERE tenant_id = $1 AND is_active = TRUE
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(&self.pool)
@@ -305,14 +306,14 @@ impl SpService {
         tenant_id: Uuid,
     ) -> SamlResult<Vec<TenantIdpCertificate>> {
         let certs = sqlx::query_as::<_, TenantIdpCertificate>(
-            r#"
+            r"
             SELECT id, tenant_id, certificate, private_key_encrypted,
                    key_id, subject_dn, issuer_dn, not_before, not_after,
                    is_active, created_at
             FROM tenant_idp_certificates
             WHERE tenant_id = $1
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -337,7 +338,7 @@ impl SpService {
         let encrypted_key = encrypt_private_key(req.private_key.as_bytes(), encryption_key)?;
 
         let cert = sqlx::query_as::<_, TenantIdpCertificate>(
-            r#"
+            r"
             INSERT INTO tenant_idp_certificates
                 (tenant_id, certificate, private_key_encrypted, key_id,
                  subject_dn, issuer_dn, not_before, not_after, is_active)
@@ -345,7 +346,7 @@ impl SpService {
             RETURNING id, tenant_id, certificate, private_key_encrypted,
                       key_id, subject_dn, issuer_dn, not_before, not_after,
                       is_active, created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&req.certificate)
@@ -375,14 +376,14 @@ impl SpService {
         cert_id: Uuid,
     ) -> SamlResult<TenantIdpCertificate> {
         let cert = sqlx::query_as::<_, TenantIdpCertificate>(
-            r#"
+            r"
             UPDATE tenant_idp_certificates
             SET is_active = TRUE
             WHERE id = $1 AND tenant_id = $2
             RETURNING id, tenant_id, certificate, private_key_encrypted,
                       key_id, subject_dn, issuer_dn, not_before, not_after,
                       is_active, created_at
-            "#,
+            ",
         )
         .bind(cert_id)
         .bind(tenant_id)
@@ -418,12 +419,12 @@ fn encrypt_private_key(key_pem: &[u8], encryption_key: &[u8]) -> SamlResult<Vec<
     // Generate random IV
     let mut iv = vec![0u8; 12];
     openssl::rand::rand_bytes(&mut iv)
-        .map_err(|e| SamlError::InternalError(format!("Failed to generate IV: {}", e)))?;
+        .map_err(|e| SamlError::InternalError(format!("Failed to generate IV: {e}")))?;
 
     let mut tag = vec![0u8; 16];
 
     let ciphertext = encrypt_aead(cipher, encryption_key, Some(&iv), &[], key_pem, &mut tag)
-        .map_err(|e| SamlError::InternalError(format!("Encryption failed: {}", e)))?;
+        .map_err(|e| SamlError::InternalError(format!("Encryption failed: {e}")))?;
 
     // Format: IV (12 bytes) + tag (16 bytes) + ciphertext
     let mut result = iv;
@@ -450,8 +451,8 @@ fn decrypt_private_key(encrypted: &[u8], encryption_key: &[u8]) -> SamlResult<St
     let cipher = Cipher::aes_256_gcm();
 
     let plaintext = decrypt_aead(cipher, encryption_key, Some(iv), &[], ciphertext, tag)
-        .map_err(|e| SamlError::PrivateKeyError(format!("Decryption failed: {}", e)))?;
+        .map_err(|e| SamlError::PrivateKeyError(format!("Decryption failed: {e}")))?;
 
     String::from_utf8(plaintext)
-        .map_err(|e| SamlError::PrivateKeyError(format!("Invalid UTF-8: {}", e)))
+        .map_err(|e| SamlError::PrivateKeyError(format!("Invalid UTF-8: {e}")))
 }

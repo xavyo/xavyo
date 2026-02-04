@@ -1,4 +1,4 @@
-//! Governance SoD Exemption model.
+//! Governance `SoD` Exemption model.
 //!
 //! Represents approved exceptions allowing users to hold conflicting entitlements.
 
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-/// Status for SoD exemptions.
+/// Status for `SoD` exemptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[sqlx(type_name = "gov_exemption_status", rename_all = "lowercase")]
@@ -21,7 +21,7 @@ pub enum GovExemptionStatus {
     Revoked,
 }
 
-/// An SoD exemption allowing a user to bypass a rule.
+/// An `SoD` exemption allowing a user to bypass a rule.
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct GovSodExemption {
     /// Unique identifier for the exemption.
@@ -61,7 +61,7 @@ pub struct GovSodExemption {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Request to create a new SoD exemption.
+/// Request to create a new `SoD` exemption.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateGovSodExemption {
     pub rule_id: Uuid,
@@ -71,7 +71,7 @@ pub struct CreateGovSodExemption {
     pub expires_at: DateTime<Utc>,
 }
 
-/// Filter options for listing SoD exemptions.
+/// Filter options for listing `SoD` exemptions.
 #[derive(Debug, Clone, Default)]
 pub struct SodExemptionFilter {
     pub rule_id: Option<Uuid>,
@@ -87,10 +87,10 @@ impl GovSodExemption {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sod_exemptions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -106,12 +106,12 @@ impl GovSodExemption {
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sod_exemptions
             WHERE tenant_id = $1 AND rule_id = $2 AND user_id = $3
               AND status = 'active'
               AND expires_at > NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_id)
@@ -128,12 +128,12 @@ impl GovSodExemption {
         user_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_sod_exemptions
             WHERE tenant_id = $1 AND rule_id = $2 AND user_id = $3
               AND status = 'active'
               AND expires_at > NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_id)
@@ -153,24 +153,24 @@ impl GovSodExemption {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_sod_exemptions
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.rule_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND rule_id = ${}", param_count));
+            query.push_str(&format!(" AND rule_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -201,24 +201,24 @@ impl GovSodExemption {
         filter: &SodExemptionFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_sod_exemptions
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.rule_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND rule_id = ${}", param_count));
+            query.push_str(&format!(" AND rule_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -236,20 +236,20 @@ impl GovSodExemption {
         q.fetch_one(pool).await
     }
 
-    /// Create a new SoD exemption.
+    /// Create a new `SoD` exemption.
     pub async fn create(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         input: CreateGovSodExemption,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_sod_exemptions (
                 tenant_id, rule_id, user_id, approver_id, justification, expires_at
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.rule_id)
@@ -269,7 +269,7 @@ impl GovSodExemption {
         revoked_by: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sod_exemptions
             SET status = 'revoked',
                 revoked_at = NOW(),
@@ -277,7 +277,7 @@ impl GovSodExemption {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -289,11 +289,11 @@ impl GovSodExemption {
     /// Expire exemptions past their expiration date.
     pub async fn expire_past_due(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_sod_exemptions
             SET status = 'expired', updated_at = NOW()
             WHERE tenant_id = $1 AND status = 'active' AND expires_at <= NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(pool)
@@ -309,14 +309,14 @@ impl GovSodExemption {
         within_hours: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sod_exemptions
             WHERE tenant_id = $1
               AND status = 'active'
               AND expires_at > NOW()
               AND expires_at <= NOW() + ($2 || ' hours')::interval
             ORDER BY expires_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(within_hours)
@@ -331,10 +331,10 @@ impl GovSodExemption {
         rule_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_sod_exemptions
             WHERE tenant_id = $1 AND rule_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_id)
@@ -345,11 +345,13 @@ impl GovSodExemption {
     }
 
     /// Check if exemption is active (status and not expired).
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self.status, GovExemptionStatus::Active) && self.expires_at > Utc::now()
     }
 
     /// Check if exemption is expired (by time, not status).
+    #[must_use] 
     pub fn is_expired_by_time(&self) -> bool {
         self.expires_at <= Utc::now()
     }

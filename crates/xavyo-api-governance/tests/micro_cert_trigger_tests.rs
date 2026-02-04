@@ -3,7 +3,7 @@
 //! Tests the trigger rule selection algorithm that determines which rule
 //! applies to a given event based on scope hierarchy and priority.
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use uuid::Uuid;
 use xavyo_db::{
     GovMicroCertTrigger, MicroCertReviewerType, MicroCertScopeType, MicroCertTriggerType,
@@ -21,7 +21,7 @@ fn create_trigger(
     GovMicroCertTrigger {
         id: Uuid::new_v4(),
         tenant_id: Uuid::new_v4(),
-        name: format!("Test Rule {:?} {:?}", trigger_type, scope_type),
+        name: format!("Test Rule {trigger_type:?} {scope_type:?}"),
         trigger_type,
         scope_type,
         scope_id,
@@ -47,7 +47,7 @@ mod trigger_matching {
     #[test]
     fn test_exact_entitlement_scope_matches_first() {
         // Given: Multiple rules with different scopes
-        let tenant_id = Uuid::new_v4();
+        let _tenant_id = Uuid::new_v4();
         let app_id = Uuid::new_v4();
         let entitlement_id = Uuid::new_v4();
 

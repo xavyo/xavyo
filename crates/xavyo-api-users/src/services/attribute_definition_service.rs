@@ -125,6 +125,7 @@ pub struct AttributeDefinitionService {
 
 impl AttributeDefinitionService {
     /// Create a new attribute definition service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -157,12 +158,11 @@ impl AttributeDefinitionService {
     ) -> Result<AttributeDefinitionResponse, ApiUsersError> {
         // Validate name pattern
         let name_re = regex::Regex::new(NAME_PATTERN)
-            .map_err(|e| ApiUsersError::Internal(format!("Regex error: {}", e)))?;
+            .map_err(|e| ApiUsersError::Internal(format!("Regex error: {e}")))?;
         let name = request.name.to_lowercase();
         if !name_re.is_match(&name) {
             return Err(ApiUsersError::Validation(format!(
-                "Attribute name '{}' is invalid. Must match pattern: lowercase letter followed by lowercase letters, digits, or underscores (1-64 chars)",
-                name
+                "Attribute name '{name}' is invalid. Must match pattern: lowercase letter followed by lowercase letters, digits, or underscores (1-64 chars)"
             )));
         }
 
@@ -182,8 +182,7 @@ impl AttributeDefinitionService {
                 .as_ref()
                 .and_then(|r| r.get("allowed_values"))
                 .and_then(|v| v.as_array())
-                .map(|arr| !arr.is_empty())
-                .unwrap_or(false);
+                .is_some_and(|arr| !arr.is_empty());
             if !has_valid_allowed_values {
                 return Err(ApiUsersError::Validation(
                     "Enum data type requires 'validation_rules' with a non-empty 'allowed_values' array".to_string(),
@@ -270,7 +269,7 @@ impl AttributeDefinitionService {
 
         let total_count = definitions.len() as i64;
         let definitions: Vec<AttributeDefinitionResponse> =
-            definitions.into_iter().map(|d| d.into()).collect();
+            definitions.into_iter().map(std::convert::Into::into).collect();
 
         Ok(AttributeDefinitionListResponse {
             definitions,

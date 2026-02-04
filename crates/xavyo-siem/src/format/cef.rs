@@ -8,6 +8,7 @@ use crate::models::{SiemEvent, PRODUCT_NAME, PRODUCT_VENDOR, PRODUCT_VERSION};
 pub struct CefFormatter;
 
 impl CefFormatter {
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }

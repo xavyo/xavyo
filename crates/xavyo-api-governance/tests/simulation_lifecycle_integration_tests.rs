@@ -66,12 +66,10 @@ mod tests {
     #[test]
     fn test_include_archived_in_listing() {
         // When include_archived is true, all simulations should be returned
-        let simulations = vec![
-            ("sim1", false),
+        let simulations = [("sim1", false),
             ("sim2", true),
             ("sim3", false),
-            ("sim4", true),
-        ];
+            ("sim4", true)];
 
         let include_archived = true;
         let visible: Vec<_> = simulations
@@ -134,7 +132,7 @@ mod tests {
         let now = Utc::now();
         let expired: Vec<_> = simulations
             .iter()
-            .filter(|(_, retain_until)| retain_until.map_or(false, |rt| rt <= now))
+            .filter(|(_, retain_until)| retain_until.is_some_and(|rt| rt <= now))
             .collect();
 
         assert_eq!(expired.len(), 2);
@@ -246,7 +244,7 @@ mod tests {
         let now = Utc::now();
         let to_cleanup: Vec<_> = simulations
             .iter()
-            .filter(|s| s.is_archived && s.retain_until.map_or(true, |rt| rt <= now))
+            .filter(|s| s.is_archived && s.retain_until.is_none_or(|rt| rt <= now))
             .collect();
 
         // Only archived simulations with expired retention should be cleaned up
@@ -259,11 +257,9 @@ mod tests {
         // This is enforced by ON DELETE CASCADE in the database
 
         let simulation_id = Uuid::new_v4();
-        let results = vec![
+        let results = [(Uuid::new_v4(), simulation_id),
             (Uuid::new_v4(), simulation_id),
-            (Uuid::new_v4(), simulation_id),
-            (Uuid::new_v4(), simulation_id),
-        ];
+            (Uuid::new_v4(), simulation_id)];
 
         // All results reference the simulation
         assert!(results.iter().all(|(_, sim_id)| *sim_id == simulation_id));

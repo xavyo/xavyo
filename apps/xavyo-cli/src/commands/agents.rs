@@ -154,7 +154,7 @@ pub struct CredentialsRotateArgs {
     /// Agent ID (UUID)
     pub agent_id: String,
 
-    /// Credential type: api_key, secret, certificate
+    /// Credential type: `api_key`, secret, certificate
     #[arg(long, short = 't', default_value = "api_key")]
     pub credential_type: String,
 
@@ -371,11 +371,10 @@ async fn execute_credentials_list(args: CredentialsListArgs) -> CliResult<()> {
     if args.json {
         println!("{}", serde_json::to_string_pretty(&response)?);
     } else if response.items.is_empty() {
-        println!("No credentials found for agent {}.", agent_id);
+        println!("No credentials found for agent {agent_id}.");
         println!();
         println!(
-            "Generate credentials with: xavyo agents credentials rotate {}",
-            agent_id
+            "Generate credentials with: xavyo agents credentials rotate {agent_id}"
         );
     } else {
         print_credentials_table(&response.items);
@@ -501,8 +500,7 @@ async fn execute_credentials_revoke(args: CredentialsRevokeArgs) -> CliResult<()
 
         let confirm = Confirm::new()
             .with_prompt(format!(
-                "Revoke credential {}? This action cannot be undone.",
-                credential_id
+                "Revoke credential {credential_id}? This action cannot be undone."
             ))
             .default(false)
             .interact()
@@ -542,8 +540,7 @@ fn validate_credential_type(cred_type: &str) -> CliResult<()> {
     match cred_type {
         "api_key" | "secret" | "certificate" => Ok(()),
         _ => Err(CliError::Validation(format!(
-            "Invalid credential type '{}'. Must be one of: api_key, secret, certificate",
-            cred_type
+            "Invalid credential type '{cred_type}'. Must be one of: api_key, secret, certificate"
         ))),
     }
 }
@@ -552,8 +549,7 @@ fn validate_credential_type(cred_type: &str) -> CliResult<()> {
 fn parse_credential_id(id_str: &str) -> CliResult<Uuid> {
     Uuid::parse_str(id_str).map_err(|_| {
         CliError::Validation(format!(
-            "Invalid credential ID '{}'. Must be a valid UUID.",
-            id_str
+            "Invalid credential ID '{id_str}'. Must be a valid UUID."
         ))
     })
 }
@@ -639,8 +635,7 @@ fn validate_agent_type(agent_type: &str) -> CliResult<()> {
     match agent_type {
         "copilot" | "autonomous" | "workflow" | "orchestrator" => Ok(()),
         _ => Err(CliError::Validation(format!(
-            "Invalid agent type '{}'. Must be one of: copilot, autonomous, workflow, orchestrator",
-            agent_type
+            "Invalid agent type '{agent_type}'. Must be one of: copilot, autonomous, workflow, orchestrator"
         ))),
     }
 }
@@ -650,8 +645,7 @@ fn validate_risk_level(risk_level: &str) -> CliResult<()> {
     match risk_level {
         "low" | "medium" | "high" | "critical" => Ok(()),
         _ => Err(CliError::Validation(format!(
-            "Invalid risk level '{}'. Must be one of: low, medium, high, critical",
-            risk_level
+            "Invalid risk level '{risk_level}'. Must be one of: low, medium, high, critical"
         ))),
     }
 }
@@ -660,8 +654,7 @@ fn validate_risk_level(risk_level: &str) -> CliResult<()> {
 fn parse_agent_id(id_str: &str) -> CliResult<Uuid> {
     Uuid::parse_str(id_str).map_err(|_| {
         CliError::Validation(format!(
-            "Invalid agent ID '{}'. Must be a valid UUID.",
-            id_str
+            "Invalid agent ID '{id_str}'. Must be a valid UUID."
         ))
     })
 }
@@ -770,15 +763,15 @@ fn print_agent_details(agent: &AgentResponse) {
     println!("Risk Level:  {}", agent.risk_level);
 
     if let Some(ref desc) = agent.description {
-        println!("Description: {}", desc);
+        println!("Description: {desc}");
     }
 
     if let (Some(ref provider), Some(ref model)) = (&agent.model_provider, &agent.model_name) {
-        println!("Model:       {}/{}", provider, model);
+        println!("Model:       {provider}/{model}");
     } else if let Some(ref provider) = agent.model_provider {
-        println!("Model:       {}", provider);
+        println!("Model:       {provider}");
     } else if let Some(ref model) = agent.model_name {
-        println!("Model:       {}", model);
+        println!("Model:       {model}");
     }
 
     println!(

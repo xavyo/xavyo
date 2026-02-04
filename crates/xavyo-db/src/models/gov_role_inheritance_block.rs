@@ -70,10 +70,10 @@ impl GovRoleInheritanceBlock {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_inheritance_blocks
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -89,10 +89,10 @@ impl GovRoleInheritanceBlock {
         entitlement_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_inheritance_blocks
             WHERE role_id = $1 AND tenant_id = $2 AND entitlement_id = $3
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -108,11 +108,11 @@ impl GovRoleInheritanceBlock {
         role_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_inheritance_blocks
             WHERE role_id = $1 AND tenant_id = $2
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -127,7 +127,7 @@ impl GovRoleInheritanceBlock {
         role_id: Uuid,
     ) -> Result<Vec<InheritanceBlockDetails>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT
                 b.id,
                 b.entitlement_id,
@@ -140,7 +140,7 @@ impl GovRoleInheritanceBlock {
             LEFT JOIN gov_applications a ON e.application_id = a.id
             WHERE b.role_id = $1 AND b.tenant_id = $2
             ORDER BY e.name
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -155,10 +155,10 @@ impl GovRoleInheritanceBlock {
         role_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT entitlement_id FROM gov_role_inheritance_blocks
             WHERE role_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -175,11 +175,11 @@ impl GovRoleInheritanceBlock {
         created_by: Uuid,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_role_inheritance_blocks (tenant_id, role_id, entitlement_id, created_by)
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -196,10 +196,10 @@ impl GovRoleInheritanceBlock {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_inheritance_blocks
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -217,10 +217,10 @@ impl GovRoleInheritanceBlock {
         entitlement_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_inheritance_blocks
             WHERE role_id = $1 AND tenant_id = $2 AND entitlement_id = $3
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -238,10 +238,10 @@ impl GovRoleInheritanceBlock {
         role_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_inheritance_blocks
             WHERE role_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -258,10 +258,10 @@ impl GovRoleInheritanceBlock {
         role_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_inheritance_blocks
             WHERE role_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -277,12 +277,12 @@ impl GovRoleInheritanceBlock {
         entitlement_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let exists: bool = sqlx::query_scalar(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM gov_role_inheritance_blocks
                 WHERE role_id = $1 AND tenant_id = $2 AND entitlement_id = $3
             )
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)

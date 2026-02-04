@@ -1,4 +1,4 @@
-//! IdempotentRequest model for HTTP-level idempotency.
+//! `IdempotentRequest` model for HTTP-level idempotency.
 //!
 //! Stores request/response pairs keyed by client-provided idempotency keys
 //! to enable safe request retries.
@@ -28,6 +28,7 @@ pub enum IdempotentState {
 
 impl IdempotentState {
     /// Convert from database string representation.
+    #[must_use] 
     pub fn from_db(s: &str) -> Option<Self> {
         match s {
             "processing" => Some(Self::Processing),
@@ -38,6 +39,7 @@ impl IdempotentState {
     }
 
     /// Convert to database string representation.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Processing => "processing",
@@ -80,11 +82,13 @@ pub struct IdempotentRequest {
 
 impl IdempotentRequest {
     /// Get the typed state.
+    #[must_use] 
     pub fn state(&self) -> IdempotentState {
         IdempotentState::from_db(&self.state).unwrap_or(IdempotentState::Processing)
     }
 
     /// Check if this request has timed out while processing.
+    #[must_use] 
     pub fn is_processing_timed_out(&self) -> bool {
         if self.state() != IdempotentState::Processing {
             return false;
@@ -126,14 +130,14 @@ impl IdempotentRequest {
 
         // Try to insert, returning nothing on conflict
         let inserted: Option<IdempotentRequest> = sqlx::query_as(
-            r#"
+            r"
             INSERT INTO idempotent_requests (
                 tenant_id, idempotency_key, request_hash, endpoint, http_method, expires_at
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (tenant_id, idempotency_key) DO NOTHING
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(&data.idempotency_key)
@@ -144,15 +148,12 @@ impl IdempotentRequest {
         .fetch_optional(pool)
         .await?;
 
-        match inserted {
-            Some(record) => Ok(InsertResult::Inserted(record)),
-            None => {
-                // Conflict - fetch the existing record
-                let existing = Self::find_by_key(pool, data.tenant_id, &data.idempotency_key)
-                    .await?
-                    .expect("Record must exist after conflict");
-                Ok(InsertResult::Conflict(existing))
-            }
+        if let Some(record) = inserted { Ok(InsertResult::Inserted(record)) } else {
+            // Conflict - fetch the existing record
+            let existing = Self::find_by_key(pool, data.tenant_id, &data.idempotency_key)
+                .await?
+                .expect("Record must exist after conflict");
+            Ok(InsertResult::Conflict(existing))
         }
     }
 
@@ -163,10 +164,10 @@ impl IdempotentRequest {
         idempotency_key: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM idempotent_requests
             WHERE tenant_id = $1 AND idempotency_key = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(idempotency_key)
@@ -183,7 +184,7 @@ impl IdempotentRequest {
         headers: serde_json::Value,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE idempotent_requests
             SET state = 'completed',
                 response_status = $2,
@@ -191,7 +192,7 @@ impl IdempotentRequest {
                 response_headers = $4,
                 completed_at = NOW()
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .bind(status)
@@ -211,14 +212,14 @@ impl IdempotentRequest {
         body: &[u8],
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE idempotent_requests
             SET state = 'failed',
                 response_status = $2,
                 response_body = $3,
                 completed_at = NOW()
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .bind(status)
@@ -234,10 +235,10 @@ impl IdempotentRequest {
         let timeout_threshold = Utc::now() - Duration::seconds(PROCESSING_TIMEOUT_SECONDS);
 
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM idempotent_requests
             WHERE id = $1 AND state = 'processing' AND created_at < $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(timeout_threshold)
@@ -252,10 +253,10 @@ impl IdempotentRequest {
     /// Returns the number of deleted records.
     pub async fn cleanup_expired(pool: &PgPool) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM idempotent_requests
             WHERE expires_at < NOW() AND state IN ('completed', 'failed')
-            "#,
+            ",
         )
         .execute(pool)
         .await?;

@@ -13,7 +13,7 @@ use crate::models::{GrantPermissionRequest, ListPermissionsQuery, PermissionList
 use crate::router::AgentsState;
 use xavyo_auth::JwtClaims;
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()
@@ -21,7 +21,7 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
         .ok_or(ApiAgentsError::MissingTenant)
 }
 
-/// Extract user_id from JWT claims.
+/// Extract `user_id` from JWT claims.
 fn extract_user_id(claims: &JwtClaims) -> Option<Uuid> {
     claims.sub.parse().ok()
 }
@@ -95,7 +95,7 @@ pub async fn list_permissions(
     Ok(Json(response))
 }
 
-/// DELETE /agents/{id}/permissions/{tool_id} - Revoke permission.
+/// DELETE /`agents/{id}/permissions/{tool_id`} - Revoke permission.
 #[cfg_attr(feature = "openapi", utoipa::path(
     delete,
     path = "/agents/{id}/permissions/{tool_id}",

@@ -1,4 +1,4 @@
-//! Governance SoD Violation model.
+//! Governance `SoD` Violation model.
 //!
 //! Represents detected instances where users have conflicting entitlements.
 
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-/// Status for SoD violations.
+/// Status for `SoD` violations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[sqlx(type_name = "gov_violation_status", rename_all = "lowercase")]
@@ -21,7 +21,7 @@ pub enum GovViolationStatus {
     Remediated,
 }
 
-/// A detected SoD violation.
+/// A detected `SoD` violation.
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct GovSodViolation {
     /// Unique identifier for the violation.
@@ -64,7 +64,7 @@ pub struct GovSodViolation {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Request to create a new SoD violation.
+/// Request to create a new `SoD` violation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateGovSodViolation {
     pub rule_id: Uuid,
@@ -73,7 +73,7 @@ pub struct CreateGovSodViolation {
     pub second_assignment_id: Option<Uuid>,
 }
 
-/// Filter options for listing SoD violations.
+/// Filter options for listing `SoD` violations.
 #[derive(Debug, Clone, Default)]
 pub struct SodViolationFilter {
     pub rule_id: Option<Uuid>,
@@ -91,10 +91,10 @@ impl GovSodViolation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sod_violations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -110,11 +110,11 @@ impl GovSodViolation {
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sod_violations
             WHERE tenant_id = $1 AND rule_id = $2 AND user_id = $3
               AND status IN ('active', 'exempted')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_id)
@@ -132,32 +132,32 @@ impl GovSodViolation {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_sod_violations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.rule_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND rule_id = ${}", param_count));
+            query.push_str(&format!(" AND rule_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.detected_after.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND detected_at >= ${}", param_count));
+            query.push_str(&format!(" AND detected_at >= ${param_count}"));
         }
         if filter.detected_before.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND detected_at <= ${}", param_count));
+            query.push_str(&format!(" AND detected_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -194,32 +194,32 @@ impl GovSodViolation {
         filter: &SodViolationFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_sod_violations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.rule_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND rule_id = ${}", param_count));
+            query.push_str(&format!(" AND rule_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.detected_after.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND detected_at >= ${}", param_count));
+            query.push_str(&format!(" AND detected_at >= ${param_count}"));
         }
         if filter.detected_before.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND detected_at <= ${}", param_count));
+            query.push_str(&format!(" AND detected_at <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -250,10 +250,10 @@ impl GovSodViolation {
         rule_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_sod_violations
             WHERE tenant_id = $1 AND rule_id = $2 AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_id)
@@ -261,20 +261,20 @@ impl GovSodViolation {
         .await
     }
 
-    /// Create a new SoD violation.
+    /// Create a new `SoD` violation.
     pub async fn create(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         input: CreateGovSodViolation,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_sod_violations (
                 tenant_id, rule_id, user_id, first_assignment_id, second_assignment_id
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.rule_id)
@@ -311,7 +311,7 @@ impl GovSodViolation {
         notes: Option<String>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sod_violations
             SET status = 'remediated',
                 remediated_at = NOW(),
@@ -320,7 +320,7 @@ impl GovSodViolation {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status IN ('active', 'exempted')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -337,12 +337,12 @@ impl GovSodViolation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sod_violations
             SET status = 'exempted', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -357,12 +357,12 @@ impl GovSodViolation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sod_violations
             SET status = 'active', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'exempted'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -377,10 +377,10 @@ impl GovSodViolation {
         rule_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_sod_violations
             WHERE tenant_id = $1 AND rule_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_id)
@@ -398,7 +398,7 @@ impl GovSodViolation {
         second_entitlement_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT ea1.target_id as user_id
             FROM gov_entitlement_assignments ea1
             JOIN gov_entitlement_assignments ea2
@@ -411,7 +411,7 @@ impl GovSodViolation {
               AND ea2.status = 'active'
               AND ea1.entitlement_id = $2
               AND ea2.entitlement_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(first_entitlement_id)
@@ -421,16 +421,19 @@ impl GovSodViolation {
     }
 
     /// Check if a violation is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self.status, GovViolationStatus::Active)
     }
 
     /// Check if a violation is exempted.
+    #[must_use] 
     pub fn is_exempted(&self) -> bool {
         matches!(self.status, GovViolationStatus::Exempted)
     }
 
     /// Check if a violation is remediated.
+    #[must_use] 
     pub fn is_remediated(&self) -> bool {
         matches!(self.status, GovViolationStatus::Remediated)
     }

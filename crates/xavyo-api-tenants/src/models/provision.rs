@@ -118,6 +118,7 @@ impl ProvisionTenantRequest {
     /// Validate the organization name.
     ///
     /// Returns an error message if validation fails, None if valid.
+    #[must_use] 
     pub fn validate(&self) -> Option<String> {
         let name = self.organization_name.trim();
 
@@ -159,7 +160,7 @@ mod tests {
     #[test]
     fn test_validate_empty_name() {
         let req = ProvisionTenantRequest {
-            organization_name: "".to_string(),
+            organization_name: String::new(),
         };
         assert!(req.validate().is_some());
         assert!(req.validate().unwrap().contains("required"));

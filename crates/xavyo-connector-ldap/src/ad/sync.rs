@@ -38,11 +38,13 @@ impl UsnCheckpoint {
     }
 
     /// Serialize to JSON string for storage as sync token.
+    #[must_use] 
     pub fn to_token(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
     }
 
     /// Parse from a sync token string.
+    #[must_use] 
     pub fn from_token(token: &str) -> Option<Self> {
         serde_json::from_str(token).ok()
     }
@@ -52,14 +54,14 @@ impl UsnCheckpoint {
     /// Combines with the base user or group filter using AND.
     ///
     /// SECURITY: The USN value is escaped to prevent LDAP injection attacks.
+    #[must_use] 
     pub fn incremental_filter(&self, base_filter: &str, attribute: &str) -> String {
         // SECURITY: Escape the USN value to prevent LDAP injection.
         // While USN values from AD should be numeric, we escape them anyway
         // to protect against any potential manipulation of stored sync tokens.
         let escaped_usn = Self::escape_ldap_value(&self.usn);
         format!(
-            "(&{}({}>={})(!({}={})))",
-            base_filter, attribute, escaped_usn, attribute, escaped_usn
+            "(&{base_filter}({attribute}>={escaped_usn})(!({attribute}={escaped_usn})))"
         )
     }
 
@@ -93,23 +95,23 @@ pub struct MappedUser {
     pub usn_changed: Option<String>,
 }
 
-/// Map an AD user LDAP entry (as AttributeSet) to a platform-compatible MappedUser.
+/// Map an AD user LDAP entry (as `AttributeSet`) to a platform-compatible `MappedUser`.
 ///
 /// Attribute mapping follows the data-model.md reference:
-/// - objectGUID -> external_id (binary to base64)
+/// - objectGUID -> `external_id` (binary to base64)
 /// - sAMAccountName -> username
 /// - userPrincipalName -> upn
 /// - mail -> email
-/// - displayName -> display_name
-/// - givenName -> first_name
-/// - sn -> last_name
+/// - displayName -> `display_name`
+/// - givenName -> `first_name`
+/// - sn -> `last_name`
 /// - department -> department
-/// - title -> job_title
-/// - employeeID -> employee_id
-/// - manager -> manager_dn (raw DN, resolved in post-processing)
-/// - userAccountControl -> is_active (bit 0x2 = disabled)
-/// - whenCreated -> ad_when_created
-/// - whenChanged -> ad_when_changed
+/// - title -> `job_title`
+/// - employeeID -> `employee_id`
+/// - manager -> `manager_dn` (raw DN, resolved in post-processing)
+/// - userAccountControl -> `is_active` (bit 0x2 = disabled)
+/// - whenCreated -> `ad_when_created`
+/// - whenChanged -> `ad_when_changed`
 pub fn map_ad_user(entry: &AttributeSet) -> Option<MappedUser> {
     // Extract objectGUID (required for unique identification)
     let external_id = extract_object_guid(entry)?;
@@ -197,7 +199,7 @@ pub fn map_ad_user(entry: &AttributeSet) -> Option<MappedUser> {
     );
 
     // uSNChanged for checkpoint tracking
-    let usn_changed = entry.get_string("uSNChanged").map(|s| s.to_string());
+    let usn_changed = entry.get_string("uSNChanged").map(std::string::ToString::to_string);
 
     Some(MappedUser {
         external_id,
@@ -209,7 +211,8 @@ pub fn map_ad_user(entry: &AttributeSet) -> Option<MappedUser> {
     })
 }
 
-/// Build a SyncChange from a MappedUser.
+/// Build a `SyncChange` from a `MappedUser`.
+#[must_use] 
 pub fn mapped_user_to_sync_change(user: &MappedUser, change_type: SyncChangeType) -> SyncChange {
     let mut attrs = AttributeSet::new();
 
@@ -253,7 +256,7 @@ pub fn mapped_user_to_sync_change(user: &MappedUser, change_type: SyncChangeType
     }
 }
 
-/// Build a SyncResult from a batch of mapped users.
+/// Build a `SyncResult` from a batch of mapped users.
 #[instrument(skip(users), fields(user_count = users.len(), has_more))]
 pub fn build_sync_result(
     users: Vec<MappedUser>,
@@ -285,6 +288,7 @@ pub fn build_sync_result(
 }
 
 /// Compute the highest uSNChanged value from a batch of mapped users.
+#[must_use] 
 pub fn highest_usn(users: &[MappedUser]) -> Option<String> {
     users
         .iter()
@@ -297,7 +301,7 @@ pub fn highest_usn(users: &[MappedUser]) -> Option<String> {
 /// Extract objectGUID from an LDAP entry as base64-encoded string.
 ///
 /// objectGUID is a 16-byte binary attribute in AD. We encode it as standard
-/// base64 for storage as the external_id / unique identifier.
+/// base64 for storage as the `external_id` / unique identifier.
 fn extract_object_guid(entry: &AttributeSet) -> Option<String> {
     match entry.get("objectGUID") {
         Some(AttributeValue::Binary(bytes)) => {
@@ -305,17 +309,17 @@ fn extract_object_guid(entry: &AttributeSet) -> Option<String> {
         }
         Some(AttributeValue::String(s)) => {
             // Already a string (e.g., from deserialization) — use as-is
-            if !s.is_empty() {
-                Some(s.clone())
-            } else {
+            if s.is_empty() {
                 None
+            } else {
+                Some(s.clone())
             }
         }
         _ => None,
     }
 }
 
-/// Parse userAccountControl from an entry and return (is_active, raw_value).
+/// Parse userAccountControl from an entry and return (`is_active`, `raw_value`).
 fn parse_uac(entry: &AttributeSet) -> (bool, Option<u32>) {
     match entry.get("userAccountControl") {
         Some(AttributeValue::Integer(i)) => {
@@ -346,6 +350,7 @@ fn set_if_present(attrs: &mut HashMap<String, serde_json::Value>, key: &str, val
 /// Build the LDAP attribute list for AD user sync queries.
 ///
 /// Returns the list of LDAP attributes to request when searching for users.
+#[must_use] 
 pub fn user_sync_attributes() -> Vec<&'static str> {
     vec![
         "objectGUID",
@@ -375,11 +380,11 @@ pub fn user_sync_attributes() -> Vec<&'static str> {
 /// Result of manager resolution post-processing.
 #[derive(Debug, Clone)]
 pub struct ManagerResolutionResult {
-    /// Number of users that had a manager_dn.
+    /// Number of users that had a `manager_dn`.
     pub total_with_manager: usize,
-    /// Number of manager_dn values successfully resolved to external_id.
+    /// Number of `manager_dn` values successfully resolved to `external_id`.
     pub resolved: usize,
-    /// Number of manager_dn values that could not be resolved (manager not in sync set).
+    /// Number of `manager_dn` values that could not be resolved (manager not in sync set).
     pub unresolved: usize,
     /// DNs of unresolved managers (for logging/diagnostics).
     pub unresolved_dns: Vec<String>,
@@ -389,15 +394,15 @@ pub struct ManagerResolutionResult {
 ///
 /// After importing all users, each user's `manager_dn` attribute contains the
 /// Distinguished Name of their manager. This function resolves those DNs to the
-/// manager's `external_id` (objectGUID) using a DN→external_id lookup built
+/// manager's `external_id` (objectGUID) using a `DN→external_id` lookup built
 /// from the same batch.
 ///
 /// For managers not found in the batch (e.g., in a different OU or not yet
-/// imported), the manager_dn is left in place and logged as unresolved.
+/// imported), the `manager_dn` is left in place and logged as unresolved.
 ///
 /// # Arguments
 /// * `users` — mutable slice of mapped users to resolve
-/// * `dn_to_external_id` — lookup map from DN (case-insensitive key) to external_id
+/// * `dn_to_external_id` — lookup map from DN (case-insensitive key) to `external_id`
 #[instrument(skip(users, dn_to_external_id), fields(user_count = users.len(), lookup_size = dn_to_external_id.len()))]
 pub fn resolve_manager_references(
     users: &mut [MappedUser],
@@ -437,9 +442,10 @@ pub fn resolve_manager_references(
     }
 }
 
-/// Build a DN→external_id lookup map from a batch of mapped users.
+/// Build a `DN→external_id` lookup map from a batch of mapped users.
 ///
 /// Keys are lowercased for case-insensitive matching.
+#[must_use] 
 pub fn build_dn_lookup(users: &[MappedUser]) -> HashMap<String, String> {
     users
         .iter()
@@ -494,6 +500,7 @@ pub struct SyncRecordError {
 
 impl AdSyncStatistics {
     /// Create a new statistics tracker for a sync run.
+    #[must_use] 
     pub fn new(sync_type: &str) -> Self {
         Self {
             sync_type: sync_type.to_string(),
@@ -528,11 +535,13 @@ impl AdSyncStatistics {
     }
 
     /// Whether the run completed at least partially (some records succeeded).
+    #[must_use] 
     pub fn has_successes(&self) -> bool {
         self.processed > 0
     }
 
-    /// Convert to a serde_json::Value for storage in reconciliation_runs.statistics.
+    /// Convert to a `serde_json::Value` for storage in `reconciliation_runs.statistics`.
+    #[must_use] 
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or(serde_json::json!({}))
     }
@@ -549,7 +558,7 @@ impl AdSyncStatistics {
 /// * `stats` — mutable statistics accumulator
 ///
 /// # Returns
-/// Successfully mapped users (failures are recorded in stats.error_details).
+/// Successfully mapped users (failures are recorded in `stats.error_details`).
 #[instrument(skip(entries, stats), fields(batch_size = entries.len()))]
 pub fn process_user_batch_resilient(
     entries: &[AttributeSet],
@@ -566,15 +575,12 @@ pub fn process_user_batch_resilient(
             .unwrap_or("<unknown>")
             .to_string();
 
-        match map_ad_user(entry) {
-            Some(user) => {
-                users.push(user);
-            }
-            None => {
-                // No objectGUID → skip (not an error, just unmappable)
-                stats.record_skip();
-                debug!(dn = %dn, "Skipping AD entry: no objectGUID");
-            }
+        if let Some(user) = map_ad_user(entry) {
+            users.push(user);
+        } else {
+            // No objectGUID → skip (not an error, just unmappable)
+            stats.record_skip();
+            debug!(dn = %dn, "Skipping AD entry: no objectGUID");
         }
     }
 
@@ -583,7 +589,7 @@ pub fn process_user_batch_resilient(
 
 /// Retry configuration specific to AD sync operations.
 ///
-/// Uses the existing RetryConfig from xavyo-connector but provides
+/// Uses the existing `RetryConfig` from xavyo-connector but provides
 /// AD-specific defaults for sync operations.
 #[derive(Debug, Clone)]
 pub struct AdRetryConfig {
@@ -612,7 +618,8 @@ impl AdRetryConfig {
     /// Calculate the delay for a given attempt number.
     ///
     /// Uses exponential backoff: delay = initial * multiplier^attempt
-    /// Capped at max_delay.
+    /// Capped at `max_delay`.
+    #[must_use] 
     pub fn delay_for_attempt(&self, attempt: u32) -> std::time::Duration {
         let delay_secs =
             (self.initial_delay_secs as f64) * self.backoff_multiplier.powi(attempt as i32);
@@ -621,6 +628,7 @@ impl AdRetryConfig {
     }
 
     /// Check if a retry should be attempted.
+    #[must_use] 
     pub fn should_retry(&self, attempt: u32) -> bool {
         attempt < self.max_retries
     }
@@ -914,7 +922,7 @@ mod tests {
         let users = vec![
             MappedUser {
                 external_id: "a".to_string(),
-                dn: "".to_string(),
+                dn: String::new(),
                 attributes: HashMap::new(),
                 is_active: true,
                 uac_value: None,
@@ -922,7 +930,7 @@ mod tests {
             },
             MappedUser {
                 external_id: "b".to_string(),
-                dn: "".to_string(),
+                dn: String::new(),
                 attributes: HashMap::new(),
                 is_active: true,
                 uac_value: None,
@@ -930,7 +938,7 @@ mod tests {
             },
             MappedUser {
                 external_id: "c".to_string(),
-                dn: "".to_string(),
+                dn: String::new(),
                 attributes: HashMap::new(),
                 is_active: true,
                 uac_value: None,
@@ -951,7 +959,7 @@ mod tests {
     fn test_highest_usn_no_usn_values() {
         let users = vec![MappedUser {
             external_id: "a".to_string(),
-            dn: "".to_string(),
+            dn: String::new(),
             attributes: HashMap::new(),
             is_active: true,
             uac_value: None,
@@ -1034,7 +1042,7 @@ mod tests {
     fn test_mapped_user_to_sync_change_delete() {
         let user = MappedUser {
             external_id: "guid-456".to_string(),
-            dn: "".to_string(),
+            dn: String::new(),
             attributes: HashMap::new(),
             is_active: false,
             uac_value: None,

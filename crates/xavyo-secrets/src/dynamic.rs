@@ -17,7 +17,7 @@ pub struct DynamicCredential {
     pub credentials: serde_json::Value,
 
     /// Provider-specific lease ID for tracking/revocation.
-    /// For OpenBao/Vault, this is the lease_id.
+    /// For OpenBao/Vault, this is the `lease_id`.
     /// For internal provider, this is the credential record ID.
     pub lease_id: Option<String>,
 
@@ -56,7 +56,7 @@ pub trait DynamicSecretProvider: Send + Sync {
     /// Generate new dynamic credentials.
     ///
     /// The credentials are created on demand with the specified TTL.
-    /// For external providers (OpenBao, Infisical), this creates
+    /// For external providers (`OpenBao`, Infisical), this creates
     /// temporary database users or API keys.
     async fn generate_credentials(
         &self,
@@ -85,7 +85,7 @@ pub trait DynamicSecretProvider: Send + Sync {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DynamicProviderType {
-    /// OpenBao (Vault API compatible, open source).
+    /// `OpenBao` (Vault API compatible, open source).
     OpenBao,
     /// Infisical (open source secrets manager).
     Infisical,
@@ -111,7 +111,7 @@ impl std::str::FromStr for DynamicProviderType {
             "openbao" => Ok(DynamicProviderType::OpenBao),
             "infisical" => Ok(DynamicProviderType::Infisical),
             "internal" => Ok(DynamicProviderType::Internal),
-            _ => Err(format!("Unknown dynamic provider type: {}", s)),
+            _ => Err(format!("Unknown dynamic provider type: {s}")),
         }
     }
 }

@@ -63,6 +63,7 @@ pub struct EffectiveAccessService {
 
 impl EffectiveAccessService {
     /// Create a new effective access service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -199,14 +200,14 @@ impl EffectiveAccessService {
         })
     }
 
-    /// Get user's roles from the user_role table.
+    /// Get user's roles from the `user_role` table.
     async fn get_user_roles(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Vec<String>> {
         // Query the user_role table for the user's roles
         let roles: Vec<String> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT role_name FROM user_roles
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -219,7 +220,7 @@ impl EffectiveAccessService {
 
     /// Get user's governance roles (F088 role hierarchy).
     ///
-    /// Returns a list of (role_id, role_name) tuples for roles the user is assigned to.
+    /// Returns a list of (`role_id`, `role_name`) tuples for roles the user is assigned to.
     /// Only returns non-abstract roles (abstract roles cannot be directly assigned).
     async fn get_user_gov_roles(
         &self,
@@ -230,12 +231,12 @@ impl EffectiveAccessService {
         // Note: This table would need to exist for role assignments
         // For now, check if there's a gov_user_role_assignments or similar table
         let roles: Vec<(Uuid, String)> = sqlx::query_as(
-            r#"
+            r"
             SELECT r.id, r.name
             FROM gov_roles r
             JOIN gov_user_role_assignments ura ON r.id = ura.role_id
             WHERE ura.tenant_id = $1 AND ura.user_id = $2 AND r.is_abstract = false
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

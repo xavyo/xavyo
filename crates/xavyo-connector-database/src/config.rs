@@ -1,6 +1,6 @@
 //! Database Connector configuration
 //!
-//! Configuration types for database connections (PostgreSQL, MySQL, etc.).
+//! Configuration types for database connections (`PostgreSQL`, `MySQL`, etc.).
 
 use serde::{Deserialize, Serialize};
 use xavyo_connector::config::{ConnectionSettings, ConnectorConfig, TlsConfig};
@@ -9,17 +9,18 @@ use xavyo_connector::types::ConnectorType;
 
 /// Database driver type.
 ///
-/// Per Constitution Principle XI (Single Technology Per Layer), only PostgreSQL is supported.
+/// Per Constitution Principle XI (Single Technology Per Layer), only `PostgreSQL` is supported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DatabaseDriver {
-    /// PostgreSQL - the only supported database driver
+    /// `PostgreSQL` - the only supported database driver
     #[default]
     PostgreSQL,
 }
 
 impl DatabaseDriver {
     /// Get the default port for this driver.
+    #[must_use] 
     pub fn default_port(&self) -> u16 {
         match self {
             DatabaseDriver::PostgreSQL => 5432,
@@ -27,6 +28,7 @@ impl DatabaseDriver {
     }
 
     /// Get the driver identifier string.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             DatabaseDriver::PostgreSQL => "postgresql",
@@ -53,6 +55,7 @@ pub enum SslMode {
 
 impl SslMode {
     /// Get the string representation for connection strings.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             SslMode::Disable => "disable",
@@ -80,7 +83,7 @@ pub struct DatabaseConfig {
     /// Database name.
     pub database: String,
 
-    /// Database schema (for PostgreSQL, defaults to "public").
+    /// Database schema (for `PostgreSQL`, defaults to "public").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schema: Option<String>,
 
@@ -170,6 +173,7 @@ impl DatabaseConfig {
     }
 
     /// Set port.
+    #[must_use] 
     pub fn with_port(mut self, port: u16) -> Self {
         self.port = Some(port);
         self
@@ -182,6 +186,7 @@ impl DatabaseConfig {
     }
 
     /// Set SSL mode.
+    #[must_use] 
     pub fn with_ssl_mode(mut self, mode: SslMode) -> Self {
         self.ssl_mode = mode;
         self
@@ -200,19 +205,22 @@ impl DatabaseConfig {
     }
 
     /// Get the effective port (default if not specified).
+    #[must_use] 
     pub fn effective_port(&self) -> u16 {
         self.port.unwrap_or_else(|| self.driver.default_port())
     }
 
     /// Get the effective schema (default if not specified).
+    #[must_use] 
     pub fn effective_schema(&self) -> &str {
         self.schema.as_deref().unwrap_or("public")
     }
 
-    /// Build a connection string for PostgreSQL.
+    /// Build a connection string for `PostgreSQL`.
     ///
     /// Note: This excludes the password for security. The password
     /// should be passed separately to the connection library.
+    #[must_use] 
     pub fn connection_string(&self) -> String {
         // Only PostgreSQL is supported per Constitution Principle XI
         format!(

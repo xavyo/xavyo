@@ -44,11 +44,11 @@ pub struct CreatePolicySimulationResult {
     pub severity: Option<String>,
 }
 
-/// SoD violation details.
+/// `SoD` violation details.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SodViolationDetails {
-    /// The SoD rule that would be violated.
+    /// The `SoD` rule that would be violated.
     pub rule_id: Uuid,
     /// Rule name.
     pub rule_name: String,
@@ -116,13 +116,13 @@ impl GovPolicySimulationResult {
         input: CreatePolicySimulationResult,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_policy_simulation_results (
                 simulation_id, user_id, impact_type, details, severity
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.simulation_id)
         .bind(input.user_id)
@@ -184,24 +184,24 @@ impl GovPolicySimulationResult {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_policy_simulation_results
             WHERE simulation_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.impact_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND impact_type = ${}", param_count));
+            query.push_str(&format!(" AND impact_type = ${param_count}"));
         }
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ${}", param_count));
+            query.push_str(&format!(" AND severity = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -232,24 +232,24 @@ impl GovPolicySimulationResult {
         filter: &PolicySimulationResultFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_policy_simulation_results
             WHERE simulation_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.impact_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND impact_type = ${}", param_count));
+            query.push_str(&format!(" AND impact_type = ${param_count}"));
         }
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ${}", param_count));
+            query.push_str(&format!(" AND severity = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(simulation_id);
@@ -273,10 +273,10 @@ impl GovPolicySimulationResult {
         simulation_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_policy_simulation_results
             WHERE simulation_id = $1
-            "#,
+            ",
         )
         .bind(simulation_id)
         .execute(pool)
@@ -285,12 +285,14 @@ impl GovPolicySimulationResult {
         Ok(result.rows_affected())
     }
 
-    /// Parse SoD violation details.
+    /// Parse `SoD` violation details.
+    #[must_use] 
     pub fn parse_sod_details(&self) -> Option<SodViolationDetails> {
         serde_json::from_value(self.details.clone()).ok()
     }
 
     /// Parse birthright change details.
+    #[must_use] 
     pub fn parse_birthright_details(&self) -> Option<BirthrightChangeDetails> {
         serde_json::from_value(self.details.clone()).ok()
     }

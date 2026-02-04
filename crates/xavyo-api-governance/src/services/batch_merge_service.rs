@@ -31,7 +31,7 @@ pub struct BatchMergeItemResult {
     pub success: bool,
     /// Error message if failed.
     pub error: Option<String>,
-    /// Whether it was skipped (e.g., SoD violation).
+    /// Whether it was skipped (e.g., `SoD` violation).
     pub skipped: bool,
     /// The merge operation ID if successful.
     pub merge_operation_id: Option<Uuid>,
@@ -71,6 +71,7 @@ pub struct BatchMergeService {
 
 impl BatchMergeService {
     /// Create a new batch merge service.
+    #[must_use] 
     pub fn new(pool: PgPool, identity_merge_service: Arc<IdentityMergeService>) -> Self {
         Self {
             pool,
@@ -279,7 +280,7 @@ impl BatchMergeService {
 
     /// Determine merge direction based on attribute rule.
     ///
-    /// Returns (source_id, target_id) where source will be archived.
+    /// Returns (`source_id`, `target_id`) where source will be archived.
     async fn determine_merge_direction(
         &self,
         tenant_id: Uuid,

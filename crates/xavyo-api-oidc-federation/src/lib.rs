@@ -1,15 +1,15 @@
 //! OIDC Federation API for xavyo.
 //!
 //! This crate provides external Identity Provider federation via OIDC,
-//! enabling tenants to connect their existing IdPs (Azure AD, Okta, Google Workspace, etc.)
+//! enabling tenants to connect their existing `IdPs` (Azure AD, Okta, Google Workspace, etc.)
 //! for federated single sign-on.
 //!
 //! # Features
 //!
-//! - **Multi-provider support**: Azure AD, Okta, Google Workspace, any OIDC-compliant IdP
-//! - **Home Realm Discovery**: Automatic IdP routing based on email domain
-//! - **Just-In-Time provisioning**: Automatic user creation from IdP claims
-//! - **Claim mapping**: Configurable mapping from IdP claims to Xavyo attributes
+//! - **Multi-provider support**: Azure AD, Okta, Google Workspace, any OIDC-compliant `IdP`
+//! - **Home Realm Discovery**: Automatic `IdP` routing based on email domain
+//! - **Just-In-Time provisioning**: Automatic user creation from `IdP` claims
+//! - **Claim mapping**: Configurable mapping from `IdP` claims to Xavyo attributes
 //! - **Secure by design**: PKCE, encrypted secrets, signed state, audit logging
 //!
 //! # Example

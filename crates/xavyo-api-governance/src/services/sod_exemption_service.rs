@@ -1,6 +1,6 @@
-//! SoD exemption service for governance API.
+//! `SoD` exemption service for governance API.
 //!
-//! Provides management of SoD exemptions (approved exceptions to rules).
+//! Provides management of `SoD` exemptions (approved exceptions to rules).
 
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
@@ -14,13 +14,14 @@ use xavyo_governance::error::{GovernanceError, Result};
 
 use crate::models::SodExemptionResponse;
 
-/// Service for SoD exemption operations.
+/// Service for `SoD` exemption operations.
 pub struct SodExemptionService {
     pool: PgPool,
 }
 
 impl SodExemptionService {
-    /// Create a new SoD exemption service.
+    /// Create a new `SoD` exemption service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -232,6 +233,7 @@ impl SodExemptionService {
     }
 
     /// Convert database model to API response format.
+    #[must_use] 
     pub fn to_api_response(exemption: &GovSodExemption) -> SodExemptionResponse {
         SodExemptionResponse {
             id: exemption.id,
@@ -250,6 +252,7 @@ impl SodExemptionService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

@@ -66,7 +66,7 @@ pub struct AuthorizationDecisionResponse {
     /// Human-readable reason for the decision.
     pub reason: String,
 
-    /// The source of the decision (e.g., "policy", "entitlement", "default_deny").
+    /// The source of the decision (e.g., "policy", "entitlement", "`default_deny`").
     pub source: String,
 
     /// The policy ID that made the decision (if applicable).

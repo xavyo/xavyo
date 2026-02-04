@@ -91,7 +91,7 @@ pub async fn list_simulation_comparisons(
         .await?;
 
     let items: Vec<SimulationComparisonResponse> =
-        comparisons.into_iter().map(|c| c.into()).collect();
+        comparisons.into_iter().map(std::convert::Into::into).collect();
 
     Ok(Json(PaginatedResponse {
         items,
@@ -229,89 +229,86 @@ pub async fn export_simulation_comparison(
 
     let format = query.format.as_deref().unwrap_or("json");
 
-    match format {
-        "csv" => {
-            // Generate CSV export
-            let mut csv_output = String::from("type,user_id,impact_a,impact_b,diff\n");
+    if format == "csv" {
+        // Generate CSV export
+        let mut csv_output = String::from("type,user_id,impact_a,impact_b,diff\n");
 
-            // Parse delta results
-            let delta: xavyo_db::DeltaResults =
-                serde_json::from_value(comparison.delta_results.clone()).unwrap_or_default();
+        // Parse delta results
+        let delta: xavyo_db::DeltaResults =
+            serde_json::from_value(comparison.delta_results.clone()).unwrap_or_default();
 
-            // Add entries
-            for entry in delta.added {
-                let impact_str = serde_json::to_string(&entry.impact)
-                    .unwrap_or_default()
-                    .replace('"', "\"\"");
-                csv_output.push_str(&format!(
-                    "added,{},\"{}\",\"\",\"\"\n",
-                    entry.user_id, impact_str
-                ));
-            }
-
-            for entry in delta.removed {
-                let impact_str = serde_json::to_string(&entry.impact)
-                    .unwrap_or_default()
-                    .replace('"', "\"\"");
-                csv_output.push_str(&format!(
-                    "removed,{},\"{}\",\"\",\"\"\n",
-                    entry.user_id, impact_str
-                ));
-            }
-
-            for entry in delta.modified {
-                let impact_a_str = serde_json::to_string(&entry.impact_a)
-                    .unwrap_or_default()
-                    .replace('"', "\"\"");
-                let impact_b_str = serde_json::to_string(&entry.impact_b)
-                    .unwrap_or_default()
-                    .replace('"', "\"\"");
-                let diff_str = serde_json::to_string(&entry.diff)
-                    .unwrap_or_default()
-                    .replace('"', "\"\"");
-                csv_output.push_str(&format!(
-                    "modified,{},\"{}\",\"{}\",\"{}\"\n",
-                    entry.user_id, impact_a_str, impact_b_str, diff_str
-                ));
-            }
-
-            let filename = format!("comparison_{}.csv", comparison_id);
-
-            Ok((
-                [
-                    (header::CONTENT_TYPE, "text/csv"),
-                    (
-                        header::CONTENT_DISPOSITION,
-                        &format!("attachment; filename=\"{}\"", filename),
-                    ),
-                ],
-                csv_output,
-            )
-                .into_response())
+        // Add entries
+        for entry in delta.added {
+            let impact_str = serde_json::to_string(&entry.impact)
+                .unwrap_or_default()
+                .replace('"', "\"\"");
+            csv_output.push_str(&format!(
+                "added,{},\"{}\",\"\",\"\"\n",
+                entry.user_id, impact_str
+            ));
         }
-        _ => {
-            // JSON export (default)
-            let export_data = SimulationComparisonExport {
-                comparison: SimulationComparisonResponse::from(comparison),
-            };
 
-            let json = serde_json::to_string_pretty(&export_data)
-                .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?;
-
-            let filename = format!("comparison_{}.json", comparison_id);
-
-            Ok((
-                [
-                    (header::CONTENT_TYPE, "application/json"),
-                    (
-                        header::CONTENT_DISPOSITION,
-                        &format!("attachment; filename=\"{}\"", filename),
-                    ),
-                ],
-                json,
-            )
-                .into_response())
+        for entry in delta.removed {
+            let impact_str = serde_json::to_string(&entry.impact)
+                .unwrap_or_default()
+                .replace('"', "\"\"");
+            csv_output.push_str(&format!(
+                "removed,{},\"{}\",\"\",\"\"\n",
+                entry.user_id, impact_str
+            ));
         }
+
+        for entry in delta.modified {
+            let impact_a_str = serde_json::to_string(&entry.impact_a)
+                .unwrap_or_default()
+                .replace('"', "\"\"");
+            let impact_b_str = serde_json::to_string(&entry.impact_b)
+                .unwrap_or_default()
+                .replace('"', "\"\"");
+            let diff_str = serde_json::to_string(&entry.diff)
+                .unwrap_or_default()
+                .replace('"', "\"\"");
+            csv_output.push_str(&format!(
+                "modified,{},\"{}\",\"{}\",\"{}\"\n",
+                entry.user_id, impact_a_str, impact_b_str, diff_str
+            ));
+        }
+
+        let filename = format!("comparison_{comparison_id}.csv");
+
+        Ok((
+            [
+                (header::CONTENT_TYPE, "text/csv"),
+                (
+                    header::CONTENT_DISPOSITION,
+                    &format!("attachment; filename=\"{filename}\""),
+                ),
+            ],
+            csv_output,
+        )
+            .into_response())
+    } else {
+        // JSON export (default)
+        let export_data = SimulationComparisonExport {
+            comparison: SimulationComparisonResponse::from(comparison),
+        };
+
+        let json = serde_json::to_string_pretty(&export_data)
+            .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?;
+
+        let filename = format!("comparison_{comparison_id}.json");
+
+        Ok((
+            [
+                (header::CONTENT_TYPE, "application/json"),
+                (
+                    header::CONTENT_DISPOSITION,
+                    &format!("attachment; filename=\"{filename}\""),
+                ),
+            ],
+            json,
+        )
+            .into_response())
     }
 }
 

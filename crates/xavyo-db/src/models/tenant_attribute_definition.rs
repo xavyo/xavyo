@@ -73,12 +73,12 @@ impl TenantAttributeDefinition {
         sort_order: i32,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_attribute_definitions
                 (tenant_id, name, display_label, data_type, required, validation_rules, default_value, sort_order)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -107,13 +107,13 @@ impl TenantAttributeDefinition {
         well_known_slug: &str,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_attribute_definitions
                 (tenant_id, name, display_label, data_type, required, validation_rules,
                  default_value, sort_order, is_well_known, well_known_slug)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -135,10 +135,10 @@ impl TenantAttributeDefinition {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM tenant_attribute_definitions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -153,10 +153,10 @@ impl TenantAttributeDefinition {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM tenant_attribute_definitions
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -175,11 +175,11 @@ impl TenantAttributeDefinition {
         match (is_active, data_type) {
             (Some(active), Some(dt)) => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM tenant_attribute_definitions
                     WHERE tenant_id = $1 AND is_active = $2 AND data_type = $3
                     ORDER BY sort_order ASC, name ASC
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(active)
@@ -189,11 +189,11 @@ impl TenantAttributeDefinition {
             }
             (Some(active), None) => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM tenant_attribute_definitions
                     WHERE tenant_id = $1 AND is_active = $2
                     ORDER BY sort_order ASC, name ASC
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(active)
@@ -202,11 +202,11 @@ impl TenantAttributeDefinition {
             }
             (None, Some(dt)) => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM tenant_attribute_definitions
                     WHERE tenant_id = $1 AND data_type = $2
                     ORDER BY sort_order ASC, name ASC
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(dt)
@@ -215,11 +215,11 @@ impl TenantAttributeDefinition {
             }
             (None, None) => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM tenant_attribute_definitions
                     WHERE tenant_id = $1
                     ORDER BY sort_order ASC, name ASC
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .fetch_all(pool)
@@ -231,10 +231,10 @@ impl TenantAttributeDefinition {
     /// Count attribute definitions for a tenant (for limit enforcement).
     pub async fn count_by_tenant(pool: &PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM tenant_attribute_definitions
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -247,11 +247,11 @@ impl TenantAttributeDefinition {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM tenant_attribute_definitions
             WHERE tenant_id = $1 AND required = true AND is_active = true
             ORDER BY sort_order ASC, name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -272,7 +272,7 @@ impl TenantAttributeDefinition {
         is_active: Option<bool>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE tenant_attribute_definitions
             SET display_label = COALESCE($3, display_label),
                 required = COALESCE($4, required),
@@ -283,7 +283,7 @@ impl TenantAttributeDefinition {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -302,10 +302,10 @@ impl TenantAttributeDefinition {
     /// Delete an attribute definition (hard delete).
     pub async fn delete(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM tenant_attribute_definitions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -322,10 +322,10 @@ impl TenantAttributeDefinition {
         attribute_name: &str,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM users
             WHERE tenant_id = $1 AND custom_attributes ? $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(attribute_name)

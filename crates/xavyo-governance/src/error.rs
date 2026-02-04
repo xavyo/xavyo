@@ -69,31 +69,31 @@ pub enum GovernanceError {
     // =========================================================================
     // SoD (Separation of Duties) Errors
     // =========================================================================
-    /// SoD rule not found.
+    /// `SoD` rule not found.
     #[error("SoD rule not found: {0}")]
     SodRuleNotFound(Uuid),
 
-    /// SoD rule name already exists.
+    /// `SoD` rule name already exists.
     #[error("SoD rule name '{0}' already exists in this tenant")]
     SodRuleNameExists(String),
 
-    /// Duplicate SoD rule (entitlement pair already exists).
+    /// Duplicate `SoD` rule (entitlement pair already exists).
     #[error("SoD rule already exists for this entitlement pair")]
     SodRuleDuplicate,
 
-    /// SoD rule entitlement pair already exists (with details).
+    /// `SoD` rule entitlement pair already exists (with details).
     #[error("SoD rule '{rule_name}' already exists for this entitlement pair (id: {rule_id})")]
     SodRulePairExists { rule_id: Uuid, rule_name: String },
 
-    /// Cannot use the same entitlement twice in an SoD rule.
+    /// Cannot use the same entitlement twice in an `SoD` rule.
     #[error("First and second entitlement cannot be the same")]
     SodSameEntitlement,
 
-    /// Cannot delete SoD rule with active violations.
+    /// Cannot delete `SoD` rule with active violations.
     #[error("Cannot delete SoD rule with {0} active violations (use force=true)")]
     SodRuleHasViolations(i64),
 
-    /// SoD violation detected - blocks assignment.
+    /// `SoD` violation detected - blocks assignment.
     #[error("Assignment would create SoD violation: rule '{rule_name}' (severity: {severity})")]
     SodViolationBlocked {
         rule_id: Uuid,
@@ -102,51 +102,51 @@ pub enum GovernanceError {
         conflicting_entitlement_id: Uuid,
     },
 
-    /// SoD violation not found.
+    /// `SoD` violation not found.
     #[error("SoD violation not found: {0}")]
     SodViolationNotFound(Uuid),
 
-    /// SoD violation already remediated.
+    /// `SoD` violation already remediated.
     #[error("SoD violation already remediated: {0}")]
     SodViolationAlreadyRemediated(Uuid),
 
-    /// SoD exemption not found.
+    /// `SoD` exemption not found.
     #[error("SoD exemption not found: {0}")]
     SodExemptionNotFound(Uuid),
 
-    /// SoD exemption already exists.
+    /// `SoD` exemption already exists.
     #[error("Active SoD exemption already exists for this user/rule combination")]
     SodExemptionAlreadyExists,
 
-    /// SoD exemption already inactive (expired or revoked).
+    /// `SoD` exemption already inactive (expired or revoked).
     #[error("SoD exemption is already inactive: {0}")]
     SodExemptionAlreadyInactive(Uuid),
 
-    /// SoD exemption justification required.
+    /// `SoD` exemption justification required.
     #[error("SoD exemption requires a non-empty justification")]
     SodExemptionJustificationRequired,
 
-    /// SoD exemption justification too short.
+    /// `SoD` exemption justification too short.
     #[error("SoD exemption justification must be at least {0} characters")]
     SodExemptionJustificationTooShort(usize),
 
-    /// SoD exemption expiry date must be in the future.
+    /// `SoD` exemption expiry date must be in the future.
     #[error("SoD exemption expiry date must be in the future")]
     SodExemptionExpiryInPast,
 
-    /// SoD rule requires at least 2 entitlements.
+    /// `SoD` rule requires at least 2 entitlements.
     #[error("SoD rule requires at least 2 entitlements, got {0}")]
     SodRuleTooFewEntitlements(usize),
 
-    /// SoD cardinality max_count must be less than entitlement count.
+    /// `SoD` cardinality `max_count` must be less than entitlement count.
     #[error("SoD cardinality max_count ({0}) must be less than entitlement count ({1})")]
     SodRuleInvalidMaxCount(u32, usize),
 
-    /// SoD cardinality max_count is required.
+    /// `SoD` cardinality `max_count` is required.
     #[error("SoD cardinality rule requires max_count to be set")]
     SodRuleMaxCountRequired,
 
-    /// Multiple SoD violations detected.
+    /// Multiple `SoD` violations detected.
     #[error("Assignment blocked by {0} SoD violation(s)")]
     SodMultipleViolations(usize),
 
@@ -401,11 +401,11 @@ pub enum GovernanceError {
     #[error("Cannot cancel action that is not a scheduled revocation")]
     CannotCancelNonScheduledAction,
 
-    /// Mover event requires attributes_before.
+    /// Mover event requires `attributes_before`.
     #[error("Mover event requires attributes_before")]
     MoverEventRequiresAttributesBefore,
 
-    /// Joiner/mover event requires attributes_after.
+    /// Joiner/mover event requires `attributes_after`.
     #[error("Joiner or mover event requires attributes_after")]
     EventRequiresAttributesAfter,
 
@@ -1605,7 +1605,7 @@ pub enum GovernanceError {
     #[error("Source and target identities must be different")]
     MergeIdentitiesMustBeDifferent,
 
-    /// SoD override reason required.
+    /// `SoD` override reason required.
     #[error("SoD override reason is required when overriding SoD violations")]
     SodOverrideReasonRequired,
 
@@ -2073,6 +2073,7 @@ pub enum GovernanceError {
 
 impl GovernanceError {
     /// Returns true if this is a not-found error.
+    #[must_use] 
     pub fn is_not_found(&self) -> bool {
         matches!(
             self,
@@ -2206,6 +2207,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a conflict/duplicate error.
+    #[must_use] 
     pub fn is_conflict(&self) -> bool {
         matches!(
             self,
@@ -2324,6 +2326,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an escalation error.
+    #[must_use] 
     pub fn is_escalation_error(&self) -> bool {
         matches!(
             self,
@@ -2344,12 +2347,14 @@ impl GovernanceError {
         )
     }
 
-    /// Returns true if this is an SoD violation error.
+    /// Returns true if this is an `SoD` violation error.
+    #[must_use] 
     pub fn is_sod_violation(&self) -> bool {
         matches!(self, Self::SodViolationBlocked { .. })
     }
 
     /// Returns true if this is a precondition failure.
+    #[must_use] 
     pub fn is_precondition_failed(&self) -> bool {
         matches!(
             self,
@@ -2419,6 +2424,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a forbidden action.
+    #[must_use] 
     pub fn is_forbidden(&self) -> bool {
         matches!(
             self,
@@ -2433,6 +2439,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a certification campaign error.
+    #[must_use] 
     pub fn is_certification_error(&self) -> bool {
         matches!(
             self,
@@ -2456,6 +2463,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a lifecycle workflow error.
+    #[must_use] 
     pub fn is_lifecycle_error(&self) -> bool {
         matches!(
             self,
@@ -2480,6 +2488,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a risk scoring error.
+    #[must_use] 
     pub fn is_risk_scoring_error(&self) -> bool {
         matches!(
             self,
@@ -2501,6 +2510,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an orphan detection error.
+    #[must_use] 
     pub fn is_orphan_detection_error(&self) -> bool {
         matches!(
             self,
@@ -2522,6 +2532,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a compliance reporting error.
+    #[must_use] 
     pub fn is_compliance_reporting_error(&self) -> bool {
         matches!(
             self,
@@ -2549,6 +2560,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an object lifecycle states error.
+    #[must_use] 
     pub fn is_lifecycle_states_error(&self) -> bool {
         matches!(
             self,
@@ -2585,6 +2597,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a delegation error.
+    #[must_use] 
     pub fn is_delegation_error(&self) -> bool {
         matches!(
             self,
@@ -2606,6 +2619,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a micro-certification error.
+    #[must_use] 
     pub fn is_micro_certification_error(&self) -> bool {
         matches!(
             self,
@@ -2633,6 +2647,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a role mining error.
+    #[must_use] 
     pub fn is_role_mining_error(&self) -> bool {
         matches!(
             self,
@@ -2663,6 +2678,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a meta-role error.
+    #[must_use] 
     pub fn is_meta_role_error(&self) -> bool {
         matches!(
             self,
@@ -2691,6 +2707,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an NHI (Non-Human Identity) lifecycle error.
+    #[must_use] 
     pub fn is_nhi_error(&self) -> bool {
         matches!(
             self,
@@ -2728,6 +2745,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a parametric role error.
+    #[must_use] 
     pub fn is_parametric_role_error(&self) -> bool {
         matches!(
             self,
@@ -2754,6 +2772,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an outlier detection error.
+    #[must_use] 
     pub fn is_outlier_detection_error(&self) -> bool {
         matches!(
             self,
@@ -2776,6 +2795,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a provisioning scripts error.
+    #[must_use] 
     pub fn is_provisioning_script_error(&self) -> bool {
         matches!(
             self,
@@ -2800,6 +2820,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an object template error.
+    #[must_use] 
     pub fn is_object_template_error(&self) -> bool {
         matches!(
             self,
@@ -2838,6 +2859,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an enhanced simulation error.
+    #[must_use] 
     pub fn is_simulation_error(&self) -> bool {
         matches!(
             self,
@@ -2860,6 +2882,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a role hierarchy error (F088).
+    #[must_use] 
     pub fn is_role_hierarchy_error(&self) -> bool {
         matches!(
             self,

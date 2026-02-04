@@ -78,6 +78,7 @@ pub struct ConflictService {
 
 impl ConflictService {
     /// Create a new conflict service.
+    #[must_use] 
     pub fn new(pool: sqlx::PgPool) -> Self {
         Self { pool }
     }
@@ -95,7 +96,7 @@ impl ConflictService {
     ) -> ConflictResult<Option<DetectedConflict>> {
         // Find any in-progress or pending operations for the same target
         let conflicting: Option<ConflictingOperationRow> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, payload, created_at, status
             FROM provisioning_operations
             WHERE tenant_id = $1
@@ -105,7 +106,7 @@ impl ConflictService {
                 AND status IN ('pending', 'in_progress')
             ORDER BY created_at ASC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -298,7 +299,7 @@ impl ConflictService {
     ) -> ConflictResult<ConflictRecord> {
         let input = ResolveConflict {
             outcome,
-            notes: notes.map(|s| s.to_string()),
+            notes: notes.map(std::string::ToString::to_string),
         };
 
         let record =

@@ -2,7 +2,7 @@
 //!
 //! Links AI agents to secret types they are permitted to access,
 //! with optional overrides for TTL and rate limits.
-//! Part of the SecretlessAI feature (F120).
+//! Part of the `SecretlessAI` feature (F120).
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -43,6 +43,7 @@ pub struct AgentSecretPermission {
 
 impl AgentSecretPermission {
     /// Check if this permission is currently valid.
+    #[must_use] 
     pub fn is_valid(&self) -> bool {
         match self.expires_at {
             Some(expires) => expires > Utc::now(),
@@ -51,17 +52,17 @@ impl AgentSecretPermission {
     }
 
     /// Get the effective max TTL for this permission.
+    #[must_use] 
     pub fn effective_max_ttl(&self, type_max_ttl: i32) -> i32 {
         self.max_ttl_seconds
-            .map(|ttl| ttl.min(type_max_ttl))
-            .unwrap_or(type_max_ttl)
+            .map_or(type_max_ttl, |ttl| ttl.min(type_max_ttl))
     }
 
     /// Get the effective rate limit for this permission.
+    #[must_use] 
     pub fn effective_rate_limit(&self, type_rate_limit: i32) -> i32 {
         self.max_requests_per_hour
-            .map(|rate| rate.min(type_rate_limit))
-            .unwrap_or(type_rate_limit)
+            .map_or(type_rate_limit, |rate| rate.min(type_rate_limit))
     }
 }
 
@@ -120,10 +121,10 @@ impl AgentSecretPermission {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM agent_secret_permissions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -139,10 +140,10 @@ impl AgentSecretPermission {
         secret_type: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM agent_secret_permissions
             WHERE tenant_id = $1 AND agent_id = $2 AND secret_type = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -159,11 +160,11 @@ impl AgentSecretPermission {
         secret_type: &str,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM agent_secret_permissions
             WHERE tenant_id = $1 AND agent_id = $2 AND secret_type = $3
             AND (expires_at IS NULL OR expires_at > NOW())
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -183,26 +184,26 @@ impl AgentSecretPermission {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM agent_secret_permissions
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.agent_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND agent_id = ${}", param_count));
+            query.push_str(&format!(" AND agent_id = ${param_count}"));
         }
 
         if filter.secret_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND secret_type = ${}", param_count));
+            query.push_str(&format!(" AND secret_type = ${param_count}"));
         }
 
         if filter.granted_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND granted_by = ${}", param_count));
+            query.push_str(&format!(" AND granted_by = ${param_count}"));
         }
 
         if filter.valid_only {
@@ -237,12 +238,12 @@ impl AgentSecretPermission {
         agent_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM agent_secret_permissions
             WHERE tenant_id = $1 AND agent_id = $2
             AND (expires_at IS NULL OR expires_at > NOW())
             ORDER BY secret_type
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -259,7 +260,7 @@ impl AgentSecretPermission {
         input: GrantSecretPermission,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO agent_secret_permissions (
                 tenant_id, agent_id, secret_type, max_ttl_seconds,
                 max_requests_per_hour, expires_at, granted_by
@@ -273,7 +274,7 @@ impl AgentSecretPermission {
                 granted_by = EXCLUDED.granted_by,
                 granted_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -297,15 +298,15 @@ impl AgentSecretPermission {
         let mut param_idx = 3;
 
         if input.max_ttl_seconds.is_some() {
-            updates.push(format!("max_ttl_seconds = ${}", param_idx));
+            updates.push(format!("max_ttl_seconds = ${param_idx}"));
             param_idx += 1;
         }
         if input.max_requests_per_hour.is_some() {
-            updates.push(format!("max_requests_per_hour = ${}", param_idx));
+            updates.push(format!("max_requests_per_hour = ${param_idx}"));
             param_idx += 1;
         }
         if input.expires_at.is_some() {
-            updates.push(format!("expires_at = ${}", param_idx));
+            updates.push(format!("expires_at = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -343,10 +344,10 @@ impl AgentSecretPermission {
         secret_type: &str,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM agent_secret_permissions
             WHERE tenant_id = $1 AND agent_id = $2 AND secret_type = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -364,10 +365,10 @@ impl AgentSecretPermission {
         agent_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM agent_secret_permissions
             WHERE tenant_id = $1 AND agent_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -380,10 +381,10 @@ impl AgentSecretPermission {
     /// Delete expired permissions.
     pub async fn delete_expired(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM agent_secret_permissions
             WHERE tenant_id = $1 AND expires_at IS NOT NULL AND expires_at <= NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(pool)

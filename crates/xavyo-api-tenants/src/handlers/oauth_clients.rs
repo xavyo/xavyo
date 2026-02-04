@@ -30,7 +30,7 @@ use crate::router::TenantAppState;
 /// is immediately invalidated and all refresh tokens are revoked.
 ///
 /// Note: Unlike API keys, OAuth client secrets do not support a grace period
-/// because the OAuth2 spec requires immediate invalidation of the old secret
+/// because the `OAuth2` spec requires immediate invalidation of the old secret
 /// for security reasons.
 #[utoipa::path(
     post,
@@ -85,7 +85,7 @@ pub async fn rotate_oauth_secret_handler(
         .await
         .map_err(|e| match e {
             xavyo_api_oauth::error::OAuthError::ClientNotFound => {
-                TenantError::NotFoundWithMessage(format!("OAuth client {} not found", client_id))
+                TenantError::NotFoundWithMessage(format!("OAuth client {client_id} not found"))
             }
             _ => TenantError::Database(e.to_string()),
         })?;
@@ -96,7 +96,7 @@ pub async fn rotate_oauth_secret_handler(
         .await
         .map_err(|e| match e {
             xavyo_api_oauth::error::OAuthError::ClientNotFound => {
-                TenantError::NotFoundWithMessage(format!("OAuth client {} not found", client_id))
+                TenantError::NotFoundWithMessage(format!("OAuth client {client_id} not found"))
             }
             xavyo_api_oauth::error::OAuthError::InvalidClient(msg) => TenantError::Validation(msg),
             _ => TenantError::Database(e.to_string()),
@@ -260,7 +260,7 @@ pub async fn deactivate_oauth_client_handler(
         .await
         .map_err(|e| match e {
             xavyo_api_oauth::error::OAuthError::ClientNotFound => {
-                TenantError::NotFoundWithMessage(format!("OAuth client {} not found", client_id))
+                TenantError::NotFoundWithMessage(format!("OAuth client {client_id} not found"))
             }
             _ => TenantError::Database(e.to_string()),
         })?;
@@ -271,7 +271,7 @@ pub async fn deactivate_oauth_client_handler(
         .await
         .map_err(|e| match e {
             xavyo_api_oauth::error::OAuthError::ClientNotFound => {
-                TenantError::NotFoundWithMessage(format!("OAuth client {} not found", client_id))
+                TenantError::NotFoundWithMessage(format!("OAuth client {client_id} not found"))
             }
             _ => TenantError::Database(e.to_string()),
         })?;

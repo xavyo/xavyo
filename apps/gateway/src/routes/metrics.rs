@@ -24,7 +24,7 @@ impl MetricsState {
         let builder = PrometheusBuilder::new();
         let handle = builder
             .install_recorder()
-            .map_err(|e| anyhow::anyhow!("Failed to install metrics recorder: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to install metrics recorder: {e}"))?;
 
         Ok(Self { handle })
     }

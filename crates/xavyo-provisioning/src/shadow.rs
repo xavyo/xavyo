@@ -58,6 +58,7 @@ pub enum SyncSituation {
 
 impl SyncSituation {
     /// Convert to string representation.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             SyncSituation::Linked => "linked",
@@ -81,7 +82,7 @@ impl std::str::FromStr for SyncSituation {
             "disputed" => Ok(SyncSituation::Disputed),
             "collision" => Ok(SyncSituation::Collision),
             "deleted" => Ok(SyncSituation::Deleted),
-            _ => Err(format!("Unknown sync situation: {}", s)),
+            _ => Err(format!("Unknown sync situation: {s}")),
         }
     }
 }
@@ -104,6 +105,7 @@ pub enum ShadowState {
 }
 
 impl ShadowState {
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             ShadowState::Active => "active",
@@ -123,7 +125,7 @@ impl std::str::FromStr for ShadowState {
             "pending" => Ok(ShadowState::Pending),
             "dead" => Ok(ShadowState::Dead),
             "unknown" => Ok(ShadowState::Unknown),
-            _ => Err(format!("Unknown shadow state: {}", s)),
+            _ => Err(format!("Unknown shadow state: {s}")),
         }
     }
 }
@@ -179,6 +181,7 @@ pub struct Shadow {
 
 impl Shadow {
     /// Create a new shadow for a linked account.
+    #[must_use] 
     pub fn new_linked(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -208,6 +211,7 @@ impl Shadow {
     }
 
     /// Create a new unlinked shadow (discovered but not matched).
+    #[must_use] 
     pub fn new_unlinked(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -236,6 +240,7 @@ impl Shadow {
     }
 
     /// Check if attributes have diverged from expected.
+    #[must_use] 
     pub fn has_diverged(&self) -> bool {
         self.attributes != self.expected_attributes
     }
@@ -299,6 +304,7 @@ pub struct ShadowRepository {
 
 impl ShadowRepository {
     /// Create a new shadow repository.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -307,7 +313,7 @@ impl ShadowRepository {
     #[instrument(skip(self, shadow))]
     pub async fn upsert(&self, shadow: &Shadow) -> ShadowResult<()> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO gov_shadows (
                 id, tenant_id, connector_id, user_id, object_class, target_uid,
                 attributes, expected_attributes, sync_situation, state,
@@ -323,7 +329,7 @@ impl ShadowRepository {
                 last_sync_at = EXCLUDED.last_sync_at,
                 last_error = EXCLUDED.last_error,
                 updated_at = EXCLUDED.updated_at
-            "#,
+            ",
         )
         .bind(shadow.id)
         .bind(shadow.tenant_id)
@@ -355,13 +361,13 @@ impl ShadowRepository {
         target_uid: &str,
     ) -> ShadowResult<Option<Shadow>> {
         let row = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, connector_id, user_id, object_class, target_uid,
                    attributes, expected_attributes, sync_situation, state,
                    pending_operation_count, last_sync_at, last_error, created_at, updated_at
             FROM gov_shadows
             WHERE tenant_id = $1 AND connector_id = $2 AND target_uid = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -376,14 +382,14 @@ impl ShadowRepository {
     #[instrument(skip(self))]
     pub async fn find_by_user(&self, tenant_id: Uuid, user_id: Uuid) -> ShadowResult<Vec<Shadow>> {
         let rows = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, connector_id, user_id, object_class, target_uid,
                    attributes, expected_attributes, sync_situation, state,
                    pending_operation_count, last_sync_at, last_error, created_at, updated_at
             FROM gov_shadows
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -403,7 +409,7 @@ impl ShadowRepository {
     ) -> ShadowResult<Vec<Shadow>> {
         let rows = if let Some(cid) = connector_id {
             sqlx::query(
-                r#"
+                r"
                 SELECT id, tenant_id, connector_id, user_id, object_class, target_uid,
                        attributes, expected_attributes, sync_situation, state,
                        pending_operation_count, last_sync_at, last_error, created_at, updated_at
@@ -411,7 +417,7 @@ impl ShadowRepository {
                 WHERE tenant_id = $1 AND connector_id = $2 AND state = 'pending'
                 ORDER BY updated_at
                 LIMIT $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(cid)
@@ -420,7 +426,7 @@ impl ShadowRepository {
             .await?
         } else {
             sqlx::query(
-                r#"
+                r"
                 SELECT id, tenant_id, connector_id, user_id, object_class, target_uid,
                        attributes, expected_attributes, sync_situation, state,
                        pending_operation_count, last_sync_at, last_error, created_at, updated_at
@@ -428,7 +434,7 @@ impl ShadowRepository {
                 WHERE tenant_id = $1 AND state = 'pending'
                 ORDER BY updated_at
                 LIMIT $2
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(limit)
@@ -448,7 +454,7 @@ impl ShadowRepository {
         limit: i64,
     ) -> ShadowResult<Vec<Shadow>> {
         let rows = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, connector_id, user_id, object_class, target_uid,
                    attributes, expected_attributes, sync_situation, state,
                    pending_operation_count, last_sync_at, last_error, created_at, updated_at
@@ -456,7 +462,7 @@ impl ShadowRepository {
             WHERE tenant_id = $1 AND connector_id = $2 AND sync_situation = 'unlinked'
             ORDER BY created_at
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -467,7 +473,7 @@ impl ShadowRepository {
         Ok(rows.iter().map(|r| self.row_to_shadow(r)).collect())
     }
 
-    /// Count how many distinct users are linked to shadows with the same target_uid.
+    /// Count how many distinct users are linked to shadows with the same `target_uid`.
     /// This detects collision situations where one external account maps to multiple users.
     /// Returns 0 if no shadow exists, 1 for normal linked state, >1 for collision.
     #[instrument(skip(self))]
@@ -478,14 +484,14 @@ impl ShadowRepository {
         target_uid: &str,
     ) -> ShadowResult<i64> {
         let row = sqlx::query(
-            r#"
+            r"
             SELECT COUNT(DISTINCT user_id) as link_count
             FROM gov_shadows
             WHERE tenant_id = $1
               AND connector_id = $2
               AND target_uid = $3
               AND user_id IS NOT NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -506,14 +512,14 @@ impl ShadowRepository {
         user_id: Uuid,
     ) -> ShadowResult<Vec<Shadow>> {
         let rows = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, connector_id, user_id, object_class, target_uid,
                    attributes, expected_attributes, sync_situation, state,
                    pending_operation_count, last_sync_at, last_error, created_at, updated_at
             FROM gov_shadows
             WHERE tenant_id = $1 AND connector_id = $2 AND user_id = $3
             ORDER BY created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -528,10 +534,10 @@ impl ShadowRepository {
     #[instrument(skip(self))]
     pub async fn cleanup_dead_shadows(&self, retention_days: i32) -> ShadowResult<u64> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_shadows
             WHERE state = 'dead' AND updated_at < NOW() - INTERVAL '1 day' * $1
-            "#,
+            ",
         )
         .bind(retention_days)
         .execute(&self.pool)

@@ -8,7 +8,7 @@ use xavyo_api_tenants::models::{
     ReactivateTenantResponse, SuspendTenantRequest, SuspendTenantResponse, TenantStatusResponse,
 };
 
-/// Test that the SuspendTenantRequest validation works correctly.
+/// Test that the `SuspendTenantRequest` validation works correctly.
 #[test]
 fn test_suspend_request_validation_valid() {
     let request = SuspendTenantRequest {
@@ -20,7 +20,7 @@ fn test_suspend_request_validation_valid() {
 #[test]
 fn test_suspend_request_validation_empty_reason() {
     let request = SuspendTenantRequest {
-        reason: "".to_string(),
+        reason: String::new(),
     };
     let error = request.validate();
     assert!(error.is_some());
@@ -54,7 +54,7 @@ fn test_suspend_request_validation_max_length() {
     assert!(request.validate().is_none());
 }
 
-/// Test response serialization for SuspendTenantResponse.
+/// Test response serialization for `SuspendTenantResponse`.
 #[test]
 fn test_suspend_response_serialization() {
     let response = SuspendTenantResponse {
@@ -70,7 +70,7 @@ fn test_suspend_response_serialization() {
     assert!(json.contains("Test suspension"));
 }
 
-/// Test response serialization for ReactivateTenantResponse.
+/// Test response serialization for `ReactivateTenantResponse`.
 #[test]
 fn test_reactivate_response_serialization() {
     let response = ReactivateTenantResponse {
@@ -83,7 +83,7 @@ fn test_reactivate_response_serialization() {
     assert!(json.contains("reactivated_at"));
 }
 
-/// Test response serialization for TenantStatusResponse.
+/// Test response serialization for `TenantStatusResponse`.
 #[test]
 fn test_status_response_serialization_active() {
     let response = TenantStatusResponse {

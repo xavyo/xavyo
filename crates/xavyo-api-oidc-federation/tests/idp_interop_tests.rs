@@ -1,4 +1,4 @@
-//! IdP Interoperability Tests
+//! `IdP` Interoperability Tests
 //!
 //! Integration tests for OIDC federation with major Identity Providers.
 //! These tests verify correct handling of IdP-specific token formats,

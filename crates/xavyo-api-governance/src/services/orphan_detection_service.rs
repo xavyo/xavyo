@@ -20,11 +20,13 @@ pub struct OrphanDetectionService {
 
 impl OrphanDetectionService {
     /// Create a new orphan detection service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -198,11 +200,11 @@ impl OrphanDetectionService {
     /// Calculate the average age of pending orphan detections.
     async fn calculate_average_age(&self, tenant_id: Uuid) -> Result<f64> {
         let avg: Option<f64> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT AVG(EXTRACT(EPOCH FROM (NOW() - detected_at)) / 86400.0)
             FROM gov_orphan_detections
             WHERE tenant_id = $1 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -516,13 +518,13 @@ impl OrphanDetectionService {
     pub async fn get_age_analysis(&self, tenant_id: Uuid) -> Result<OrphanAgeAnalysis> {
         // Get counts by age bracket
         let under_7_days: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_orphan_detections
             WHERE tenant_id = $1
                 AND status IN ('pending', 'under_review')
                 AND detected_at > NOW() - INTERVAL '7 days'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -530,14 +532,14 @@ impl OrphanDetectionService {
         .map_err(GovernanceError::Database)?;
 
         let from_7_to_30_days: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_orphan_detections
             WHERE tenant_id = $1
                 AND status IN ('pending', 'under_review')
                 AND detected_at <= NOW() - INTERVAL '7 days'
                 AND detected_at > NOW() - INTERVAL '30 days'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -545,14 +547,14 @@ impl OrphanDetectionService {
         .map_err(GovernanceError::Database)?;
 
         let from_30_to_90_days: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_orphan_detections
             WHERE tenant_id = $1
                 AND status IN ('pending', 'under_review')
                 AND detected_at <= NOW() - INTERVAL '30 days'
                 AND detected_at > NOW() - INTERVAL '90 days'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -560,13 +562,13 @@ impl OrphanDetectionService {
         .map_err(GovernanceError::Database)?;
 
         let over_90_days: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_orphan_detections
             WHERE tenant_id = $1
                 AND status IN ('pending', 'under_review')
                 AND detected_at <= NOW() - INTERVAL '90 days'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -578,13 +580,13 @@ impl OrphanDetectionService {
 
         // Get median age
         let median_age_days: Option<f64> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (
                 ORDER BY EXTRACT(EPOCH FROM (NOW() - detected_at)) / 86400.0
             )
             FROM gov_orphan_detections
             WHERE tenant_id = $1 AND status IN ('pending', 'under_review')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -607,11 +609,11 @@ impl OrphanDetectionService {
     pub async fn get_risk_report(&self, tenant_id: Uuid) -> Result<OrphanRiskReport> {
         // Get total active orphans
         let total_orphans: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_orphan_detections
             WHERE tenant_id = $1 AND status IN ('pending', 'under_review')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -621,14 +623,14 @@ impl OrphanDetectionService {
         // Get risk breakdown by joining with risk scores (F039)
         // High risk: score >= 70, Medium: 40-69, Low: < 40
         let high_risk: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_orphan_detections od
             LEFT JOIN gov_risk_scores rs ON od.user_id = rs.user_id AND rs.tenant_id = od.tenant_id
             WHERE od.tenant_id = $1
                 AND od.status IN ('pending', 'under_review')
                 AND COALESCE(rs.score, 0) >= 70
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -636,7 +638,7 @@ impl OrphanDetectionService {
         .map_err(GovernanceError::Database)?;
 
         let medium_risk: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_orphan_detections od
             LEFT JOIN gov_risk_scores rs ON od.user_id = rs.user_id AND rs.tenant_id = od.tenant_id
@@ -644,7 +646,7 @@ impl OrphanDetectionService {
                 AND od.status IN ('pending', 'under_review')
                 AND COALESCE(rs.score, 0) >= 40
                 AND COALESCE(rs.score, 0) < 70
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -652,14 +654,14 @@ impl OrphanDetectionService {
         .map_err(GovernanceError::Database)?;
 
         let low_risk: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_orphan_detections od
             LEFT JOIN gov_risk_scores rs ON od.user_id = rs.user_id AND rs.tenant_id = od.tenant_id
             WHERE od.tenant_id = $1
                 AND od.status IN ('pending', 'under_review')
                 AND COALESCE(rs.score, 0) < 40
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -668,7 +670,7 @@ impl OrphanDetectionService {
 
         // Check for active sessions (simplified - checking recent login)
         let with_active_sessions: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(DISTINCT od.id)
             FROM gov_orphan_detections od
             JOIN login_attempts la ON od.user_id = la.user_id AND la.tenant_id = od.tenant_id
@@ -676,7 +678,7 @@ impl OrphanDetectionService {
                 AND od.status IN ('pending', 'under_review')
                 AND la.is_successful = true
                 AND la.created_at > NOW() - INTERVAL '24 hours'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -685,13 +687,13 @@ impl OrphanDetectionService {
 
         // Recent activity (last 7 days)
         let with_recent_activity: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_orphan_detections
             WHERE tenant_id = $1
                 AND status IN ('pending', 'under_review')
                 AND last_activity_at > NOW() - INTERVAL '7 days'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -729,7 +731,7 @@ impl OrphanDetectionService {
         }
 
         let rows: Vec<HighRiskOrphanRow> = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 od.id as detection_id,
                 od.user_id,
@@ -749,7 +751,7 @@ impl OrphanDetectionService {
                 AND od.status IN ('pending', 'under_review')
             ORDER BY COALESCE(rs.score, 0) DESC, od.detected_at ASC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -800,7 +802,7 @@ impl OrphanDetectionService {
                     .unwrap_or_default(),
                 d.days_inactive.unwrap_or(0),
                 d.remediation_action
-                    .map(|a| format!("{:?}", a))
+                    .map(|a| format!("{a:?}"))
                     .unwrap_or_default(),
                 d.remediation_by.map(|u| u.to_string()).unwrap_or_default(),
                 d.remediation_at

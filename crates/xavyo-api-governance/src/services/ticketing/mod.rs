@@ -1,7 +1,7 @@
 //! Ticketing system integrations for semi-manual resources (F064).
 //!
 //! Provides integrations with external ticketing systems:
-//! - ServiceNow
+//! - `ServiceNow`
 //! - Jira
 //! - Custom webhooks
 
@@ -112,6 +112,7 @@ pub enum TicketStatus {
 
 impl TicketStatus {
     /// Check if this status represents a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
@@ -120,11 +121,13 @@ impl TicketStatus {
     }
 
     /// Check if this status represents successful completion.
+    #[must_use] 
     pub fn is_success(&self) -> bool {
         matches!(self, TicketStatus::Resolved)
     }
 
     /// Get the string representation of this status.
+    #[must_use] 
     pub fn as_str(&self) -> &str {
         match self {
             TicketStatus::Open => "open",
@@ -220,11 +223,13 @@ pub struct TicketingService {
 
 impl TicketingService {
     /// Create a new ticketing service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -245,9 +250,9 @@ impl TicketingService {
         // Load the task
         let task = GovManualProvisioningTask::find_by_id(&self.pool, tenant_id, task_id)
             .await
-            .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {}", e)))?
+            .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {e}")))?
             .ok_or_else(|| {
-                TicketingError::InvalidConfiguration(format!("Task {} not found", task_id))
+                TicketingError::InvalidConfiguration(format!("Task {task_id} not found"))
             })?;
 
         // Check if task already has a ticket
@@ -260,7 +265,7 @@ impl TicketingService {
         // Load the application to get ticketing configuration
         let application = GovApplication::find_by_id(&self.pool, tenant_id, task.application_id)
             .await
-            .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {}", e)))?
+            .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {e}")))?
             .ok_or_else(|| {
                 TicketingError::InvalidConfiguration(format!(
                     "Application {} not found",
@@ -279,19 +284,18 @@ impl TicketingService {
             GovTicketingConfiguration::find_by_id(&self.pool, tenant_id, ticketing_config_id)
                 .await
                 .map_err(|e| {
-                    TicketingError::InvalidConfiguration(format!("Database error: {}", e))
+                    TicketingError::InvalidConfiguration(format!("Database error: {e}"))
                 })?
                 .ok_or_else(|| {
                     TicketingError::InvalidConfiguration(format!(
-                        "Ticketing configuration {} not found",
-                        ticketing_config_id
+                        "Ticketing configuration {ticketing_config_id} not found"
                     ))
                 })?;
 
         // Load the entitlement for details
         let entitlement = GovEntitlement::find_by_id(&self.pool, tenant_id, task.entitlement_id)
             .await
-            .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {}", e)))?
+            .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {e}")))?
             .ok_or_else(|| {
                 TicketingError::InvalidConfiguration(format!(
                     "Entitlement {} not found",
@@ -314,7 +318,7 @@ impl TicketingService {
             ManualTaskStatus::PendingTicket,
         )
         .await
-        .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {}", e)))?;
+        .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {e}")))?;
 
         // Build the ticket request
         let request = CreateTicketRequest {
@@ -358,15 +362,15 @@ impl TicketingService {
 
         let external_ticket = GovExternalTicket::create(&self.pool, tenant_id, input)
             .await
-            .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {}", e)))?;
+            .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {e}")))?;
 
         // Update the task with the ticket ID and status
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_manual_provisioning_tasks
             SET external_ticket_id = $1, status = $2, updated_at = NOW()
             WHERE id = $3 AND tenant_id = $4
-            "#,
+            ",
         )
         .bind(external_ticket.id)
         .bind(ManualTaskStatus::TicketCreated)
@@ -374,7 +378,7 @@ impl TicketingService {
         .bind(tenant_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {}", e)))?;
+        .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {e}")))?;
 
         tracing::info!(
             tenant_id = %tenant_id,

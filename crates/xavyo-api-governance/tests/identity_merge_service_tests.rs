@@ -245,7 +245,7 @@ fn test_entitlement_manual_strategy_respects_selections() {
     let all_entitlements = vec![ent1.clone(), ent2.clone(), ent3.clone()];
 
     // Manual selection: user chose ent1 and ent3 only
-    let selected_ids = vec![ent1.id, ent3.id];
+    let selected_ids = [ent1.id, ent3.id];
 
     let manual_selection: Vec<_> = all_entitlements
         .into_iter()
@@ -390,7 +390,7 @@ fn test_circular_merge_detection() {
     let identity_b = Uuid::new_v4();
 
     // Pending merge operation: A -> B
-    let pending_operations = vec![(identity_a, identity_b)];
+    let pending_operations = [(identity_a, identity_b)];
 
     // Attempt to create B -> A should be blocked
     let source = identity_b;
@@ -410,7 +410,7 @@ fn test_non_circular_merge_allowed() {
     let identity_c = Uuid::new_v4();
 
     // Pending merge operation: A -> B
-    let pending_operations = vec![(identity_a, identity_b)];
+    let pending_operations = [(identity_a, identity_b)];
 
     // Attempt to create C -> B should be allowed
     let source = identity_c;
@@ -465,11 +465,11 @@ fn test_confidence_score_bounds() {
     let invalid_scores = vec![-1.0, 100.01, 150.0];
 
     for score in valid_scores {
-        assert!(score >= 0.0 && score <= 100.0);
+        assert!((0.0..=100.0).contains(&score));
     }
 
     for score in invalid_scores {
-        assert!(!(score >= 0.0 && score <= 100.0));
+        assert!(!(0.0..=100.0).contains(&score));
     }
 }
 

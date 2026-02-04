@@ -1,13 +1,13 @@
 //! Certificate handlers for Agent PKI & Certificate Issuance (F127).
 //!
 //! Implements certificate CRUD operations:
-//! - POST /agents/{agent_id}/certificates - Issue a new certificate
-//! - GET /agents/{agent_id}/certificates - List certificates for an agent
-//! - GET /agents/{agent_id}/certificates/{cert_id} - Get specific certificate
-//! - POST /agents/{agent_id}/certificates/{cert_id}/renew - Renew certificate
-//! - POST /agents/{agent_id}/certificates/{cert_id}/revoke - Revoke certificate
+//! - POST /`agents/{agent_id}/certificates` - Issue a new certificate
+//! - GET /`agents/{agent_id}/certificates` - List certificates for an agent
+//! - GET /`agents/{agent_id}/certificates/{cert_id`} - Get specific certificate
+//! - POST /`agents/{agent_id}/certificates/{cert_id}/renew` - Renew certificate
+//! - POST /`agents/{agent_id}/certificates/{cert_id}/revoke` - Revoke certificate
 //! - GET /certificates - List all certificates (admin)
-//! - GET /certificates/{cert_id} - Get certificate by ID (admin)
+//! - GET /`certificates/{cert_id`} - Get certificate by ID (admin)
 //! - GET /certificates/expiring - List expiring certificates
 
 use axum::{
@@ -25,7 +25,7 @@ use crate::services::certificate_service::RenewCertificateRequest;
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::agent_certificate::{AgentCertificateFilter, IssueCertificateRequest};
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()
@@ -33,7 +33,7 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
         .ok_or(ApiAgentsError::MissingTenant)
 }
 
-/// Extract user_id from JWT claims.
+/// Extract `user_id` from JWT claims.
 fn extract_user_id(claims: &JwtClaims) -> Option<Uuid> {
     claims.sub.parse().ok()
 }
@@ -77,7 +77,7 @@ fn default_expiring_days() -> i32 {
     30
 }
 
-/// POST /agents/{agent_id}/certificates - Issue a new certificate for an agent.
+/// POST /`agents/{agent_id}/certificates` - Issue a new certificate for an agent.
 ///
 /// This endpoint issues a new X.509 certificate for the specified AI agent.
 /// The certificate and private key are returned only once - the private key
@@ -118,7 +118,7 @@ pub async fn issue_certificate(
     Ok((StatusCode::CREATED, Json(response)))
 }
 
-/// GET /agents/{agent_id}/certificates - List certificates for an agent.
+/// GET /`agents/{agent_id}/certificates` - List certificates for an agent.
 #[cfg_attr(feature = "openapi", utoipa::path(
     get,
     path = "/agents/{agent_id}/certificates",
@@ -154,7 +154,7 @@ pub async fn list_agent_certificates(
     Ok(Json(response))
 }
 
-/// GET /agents/{agent_id}/certificates/{cert_id} - Get a specific certificate for an agent.
+/// GET /`agents/{agent_id}/certificates/{cert_id`} - Get a specific certificate for an agent.
 #[cfg_attr(feature = "openapi", utoipa::path(
     get,
     path = "/agents/{agent_id}/certificates/{cert_id}",
@@ -228,7 +228,7 @@ pub async fn list_certificates(
     Ok(Json(response))
 }
 
-/// Query parameters for listing certificates (admin view with agent_id filter).
+/// Query parameters for listing certificates (admin view with `agent_id` filter).
 #[derive(Debug, Deserialize)]
 pub struct ListCertificatesQueryWithAgent {
     /// Filter by agent ID.
@@ -251,7 +251,7 @@ pub struct ListCertificatesQueryWithAgent {
     pub offset: i64,
 }
 
-/// GET /certificates/{cert_id} - Get a certificate by ID (admin view).
+/// GET /`certificates/{cert_id`} - Get a certificate by ID (admin view).
 #[cfg_attr(feature = "openapi", utoipa::path(
     get,
     path = "/certificates/{cert_id}",
@@ -319,19 +319,19 @@ pub async fn list_expiring_certificates(
 pub struct RevokeCertificateRequest {
     /// Reason for revocation. Valid values:
     /// - unspecified (default)
-    /// - key_compromise
-    /// - ca_compromise
-    /// - affiliation_changed
+    /// - `key_compromise`
+    /// - `ca_compromise`
+    /// - `affiliation_changed`
     /// - superseded
-    /// - cessation_of_operation
-    /// - certificate_hold
-    /// - remove_from_crl
-    /// - privilege_withdrawn
-    /// - aa_compromise
+    /// - `cessation_of_operation`
+    /// - `certificate_hold`
+    /// - `remove_from_crl`
+    /// - `privilege_withdrawn`
+    /// - `aa_compromise`
     pub reason: Option<String>,
 }
 
-/// POST /agents/{agent_id}/certificates/{cert_id}/renew - Renew a certificate.
+/// POST /`agents/{agent_id}/certificates/{cert_id}/renew` - Renew a certificate.
 ///
 /// Issues a new certificate with the same identity as the original, extending
 /// the validity period. The old certificate remains valid until it expires or
@@ -373,7 +373,7 @@ pub async fn renew_certificate(
     Ok((StatusCode::CREATED, Json(response)))
 }
 
-/// POST /agents/{agent_id}/certificates/{cert_id}/revoke - Revoke a certificate.
+/// POST /`agents/{agent_id}/certificates/{cert_id}/revoke` - Revoke a certificate.
 ///
 /// Marks a certificate as revoked. Revoked certificates will be rejected by
 /// mTLS validation and included in the Certificate Revocation List (CRL).

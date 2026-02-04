@@ -23,8 +23,8 @@ use crate::router::TenantAppState;
 ///
 /// On success (201 Created):
 /// - `tenant`: Created tenant details (id, slug, name)
-/// - `admin`: Admin user details (id, email, api_key)
-/// - `oauth_client`: OAuth client credentials (client_id, client_secret)
+/// - `admin`: Admin user details (id, email, `api_key`)
+/// - `oauth_client`: OAuth client credentials (`client_id`, `client_secret`)
 /// - `endpoints`: API endpoint URLs
 /// - `next_steps`: Suggested actions for getting started
 ///
@@ -59,15 +59,15 @@ pub async fn provision_handler(
         .headers()
         .get("user-agent")
         .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
+        .map(std::string::ToString::to_string);
 
     // Parse request body
     let body_bytes = axum::body::to_bytes(request_parts.into_body(), 1024 * 1024)
         .await
-        .map_err(|e| TenantError::Validation(format!("Failed to read request body: {}", e)))?;
+        .map_err(|e| TenantError::Validation(format!("Failed to read request body: {e}")))?;
 
     let request: ProvisionTenantRequest = serde_json::from_slice(&body_bytes)
-        .map_err(|e| TenantError::Validation(format!("Invalid JSON: {}", e)))?;
+        .map_err(|e| TenantError::Validation(format!("Invalid JSON: {e}")))?;
 
     // Extract email from JWT claims
     let email = claims
@@ -122,7 +122,7 @@ mod tests {
     #[test]
     fn test_request_validation_empty() {
         let request = ProvisionTenantRequest {
-            organization_name: "".to_string(),
+            organization_name: String::new(),
         };
         assert!(request.validate().is_some());
     }

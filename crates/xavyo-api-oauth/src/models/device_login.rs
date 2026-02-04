@@ -43,7 +43,7 @@ pub struct DeviceLoginResponse {
     /// Whether MFA verification is required before proceeding.
     pub mfa_required: bool,
 
-    /// Session ID for MFA flow (only present if mfa_required=true).
+    /// Session ID for MFA flow (only present if `mfa_required=true`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mfa_session_id: Option<Uuid>,
 
@@ -53,6 +53,7 @@ pub struct DeviceLoginResponse {
 
 impl DeviceLoginResponse {
     /// Create a response for successful login (no MFA).
+    #[must_use] 
     pub fn success(user_id: Uuid, email: String, user_code: &str) -> Self {
         Self {
             user_id,
@@ -60,11 +61,12 @@ impl DeviceLoginResponse {
             mfa_required: false,
             mfa_session_id: None,
             // F112: Fixed redirect to correct endpoint /device/authorize
-            redirect_url: format!("/device/authorize?user_code={}", user_code),
+            redirect_url: format!("/device/authorize?user_code={user_code}"),
         }
     }
 
     /// Create a response requiring MFA verification.
+    #[must_use] 
     pub fn mfa_required(
         user_id: Uuid,
         email: String,
@@ -78,8 +80,7 @@ impl DeviceLoginResponse {
             mfa_session_id: Some(mfa_session_id),
             // F112: Redirect to MFA page with session ID
             redirect_url: format!(
-                "/device/mfa?session_id={}&user_code={}",
-                mfa_session_id, user_code
+                "/device/mfa?session_id={mfa_session_id}&user_code={user_code}"
             ),
         }
     }
@@ -120,12 +121,13 @@ pub struct DeviceMfaResponse {
 
 impl DeviceMfaResponse {
     /// Create a response for successful MFA verification.
+    #[must_use] 
     pub fn success(user_id: Uuid, email: String, user_code: &str) -> Self {
         Self {
             user_id,
             email,
             // F112: Fixed redirect to correct endpoint /device/authorize
-            redirect_url: format!("/device/authorize?user_code={}", user_code),
+            redirect_url: format!("/device/authorize?user_code={user_code}"),
         }
     }
 }
@@ -139,7 +141,7 @@ pub struct DeviceLoginErrorResponse {
     /// Human-readable error message.
     pub message: String,
 
-    /// When the account will be unlocked (only for account_locked error).
+    /// When the account will be unlocked (only for `account_locked` error).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locked_until: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -155,6 +157,7 @@ impl DeviceLoginErrorResponse {
     }
 
     /// Create an invalid credentials error response.
+    #[must_use] 
     pub fn invalid_credentials() -> Self {
         Self {
             error: "invalid_credentials".to_string(),
@@ -164,6 +167,7 @@ impl DeviceLoginErrorResponse {
     }
 
     /// Create an account locked error response.
+    #[must_use] 
     pub fn account_locked(locked_until: chrono::DateTime<chrono::Utc>) -> Self {
         Self {
             error: "account_locked".to_string(),
@@ -176,6 +180,7 @@ impl DeviceLoginErrorResponse {
     }
 
     /// Create an account inactive error response.
+    #[must_use] 
     pub fn account_inactive() -> Self {
         Self {
             error: "account_inactive".to_string(),
@@ -185,6 +190,7 @@ impl DeviceLoginErrorResponse {
     }
 
     /// Create a device code not found error response.
+    #[must_use] 
     pub fn device_code_not_found() -> Self {
         Self {
             error: "device_code_not_found".to_string(),
@@ -194,6 +200,7 @@ impl DeviceLoginErrorResponse {
     }
 
     /// Create an invalid MFA code error response.
+    #[must_use] 
     pub fn invalid_mfa_code() -> Self {
         Self {
             error: "invalid_mfa_code".to_string(),
@@ -203,6 +210,7 @@ impl DeviceLoginErrorResponse {
     }
 
     /// Create an MFA session not found error response.
+    #[must_use] 
     pub fn mfa_session_not_found() -> Self {
         Self {
             error: "mfa_session_not_found".to_string(),
@@ -212,6 +220,7 @@ impl DeviceLoginErrorResponse {
     }
 
     /// Create a rate limit exceeded error response.
+    #[must_use] 
     pub fn rate_limit_exceeded() -> Self {
         Self {
             error: "rate_limit_exceeded".to_string(),
@@ -251,7 +260,7 @@ mod tests {
     fn test_device_login_request_validation_empty_password() {
         let request = DeviceLoginRequest {
             email: "user@example.com".to_string(),
-            password: "".to_string(),
+            password: String::new(),
             user_code: "ABCD-EFGH".to_string(),
             csrf_token: None,
         };

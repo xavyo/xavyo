@@ -51,7 +51,7 @@ pub fn saml_admin_router(state: SamlState) -> Router {
         .with_state(state)
 }
 
-/// Create SAML router with all routes (deprecated - use saml_public_router and saml_admin_router)
+/// Create SAML router with all routes (deprecated - use `saml_public_router` and `saml_admin_router`)
 #[deprecated(
     note = "Use saml_public_router and saml_admin_router for proper middleware separation"
 )]
@@ -85,6 +85,7 @@ pub fn saml_router(state: SamlState) -> Router {
 }
 
 /// Create SAML state from configuration
+#[must_use] 
 pub fn create_saml_state(
     pool: sqlx::PgPool,
     base_url: String,

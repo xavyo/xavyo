@@ -50,10 +50,10 @@ impl GovTemplateScope {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_scopes
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -68,11 +68,11 @@ impl GovTemplateScope {
         template_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_scopes
             WHERE tenant_id = $1 AND template_id = $2
             ORDER BY scope_type ASC, scope_value ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -88,11 +88,11 @@ impl GovTemplateScope {
         scope_type: TemplateScopeType,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_scopes
             WHERE tenant_id = $1 AND template_id = $2 AND scope_type = $3
             ORDER BY scope_value ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -107,10 +107,10 @@ impl GovTemplateScope {
         tenant_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT template_id FROM gov_template_scopes
             WHERE tenant_id = $1 AND scope_type = 'global'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -124,12 +124,12 @@ impl GovTemplateScope {
         organization_id: &str,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT template_id FROM gov_template_scopes
             WHERE tenant_id = $1
               AND scope_type = 'organization'
               AND scope_value = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(organization_id)
@@ -144,12 +144,12 @@ impl GovTemplateScope {
         category: &str,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT template_id FROM gov_template_scopes
             WHERE tenant_id = $1
               AND scope_type = 'category'
               AND scope_value = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(category)
@@ -163,10 +163,10 @@ impl GovTemplateScope {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_scopes
             WHERE tenant_id = $1 AND scope_type = 'condition'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -181,13 +181,13 @@ impl GovTemplateScope {
         input: CreateGovTemplateScope,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_template_scopes (
                 tenant_id, template_id, scope_type, scope_value, condition
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -205,10 +205,10 @@ impl GovTemplateScope {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_template_scopes
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -225,10 +225,10 @@ impl GovTemplateScope {
         template_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_template_scopes
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -245,10 +245,10 @@ impl GovTemplateScope {
         template_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_template_scopes
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -257,21 +257,25 @@ impl GovTemplateScope {
     }
 
     /// Check if scope is global.
+    #[must_use] 
     pub fn is_global(&self) -> bool {
         self.scope_type == TemplateScopeType::Global
     }
 
     /// Check if scope is organization-based.
+    #[must_use] 
     pub fn is_organization(&self) -> bool {
         self.scope_type == TemplateScopeType::Organization
     }
 
     /// Check if scope is category-based.
+    #[must_use] 
     pub fn is_category(&self) -> bool {
         self.scope_type == TemplateScopeType::Category
     }
 
     /// Check if scope is condition-based.
+    #[must_use] 
     pub fn is_condition(&self) -> bool {
         self.scope_type == TemplateScopeType::Condition
     }

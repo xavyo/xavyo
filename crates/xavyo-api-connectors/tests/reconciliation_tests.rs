@@ -357,7 +357,7 @@ fn test_weekly_schedule_day_validation() {
 fn test_monthly_schedule_day_validation() {
     // Valid days for monthly schedule (1-28 to be safe for all months)
     for day in 1..=28 {
-        assert!(day >= 1 && day <= 28);
+        assert!((1..=28).contains(&day));
     }
 }
 
@@ -384,7 +384,7 @@ fn test_action_types() {
 
 #[test]
 fn test_action_result_types() {
-    let result_types = vec!["success", "failure", "skipped"];
+    let result_types = ["success", "failure", "skipped"];
 
     assert_eq!(result_types.len(), 3);
 }

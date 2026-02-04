@@ -50,10 +50,10 @@ impl GovPersonaLink {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_links
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -69,10 +69,10 @@ impl GovPersonaLink {
         persona_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_links
             WHERE tenant_id = $1 AND physical_user_id = $2 AND persona_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(physical_user_id)
@@ -88,11 +88,11 @@ impl GovPersonaLink {
         physical_user_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_links
             WHERE tenant_id = $1 AND physical_user_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(physical_user_id)
@@ -107,11 +107,11 @@ impl GovPersonaLink {
         persona_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_links
             WHERE tenant_id = $1 AND persona_id = $2
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(persona_id)
@@ -126,10 +126,10 @@ impl GovPersonaLink {
         persona_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_links
             WHERE tenant_id = $1 AND persona_id = $2 AND link_type = 'owner'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(persona_id)
@@ -145,13 +145,13 @@ impl GovPersonaLink {
         input: CreatePersonaLink,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_persona_links (
                 tenant_id, physical_user_id, persona_id, link_type, created_by
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.physical_user_id)
@@ -169,10 +169,10 @@ impl GovPersonaLink {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_persona_links
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -189,10 +189,10 @@ impl GovPersonaLink {
         persona_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_persona_links
             WHERE tenant_id = $1 AND persona_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(persona_id)

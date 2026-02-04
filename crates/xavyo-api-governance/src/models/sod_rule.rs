@@ -1,4 +1,4 @@
-//! Request and response models for SoD rule endpoints.
+//! Request and response models for `SoD` rule endpoints.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ use uuid::Uuid;
 use validator::Validate;
 use xavyo_db::{GovSodRule, GovSodRuleStatus, GovSodSeverity};
 
-/// Request to create a new SoD rule.
+/// Request to create a new `SoD` rule.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct CreateSodRuleRequest {
     /// Display name for the rule.
@@ -35,7 +35,7 @@ pub struct CreateSodRuleRequest {
     pub business_rationale: Option<String>,
 }
 
-/// Request to update an existing SoD rule.
+/// Request to update an existing `SoD` rule.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct UpdateSodRuleRequest {
     /// Updated display name.
@@ -57,7 +57,7 @@ pub struct UpdateSodRuleRequest {
     pub business_rationale: Option<String>,
 }
 
-/// Query parameters for listing SoD rules.
+/// Query parameters for listing `SoD` rules.
 #[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct ListSodRulesQuery {
     /// Filter by rule status.
@@ -90,7 +90,7 @@ impl Default for ListSodRulesQuery {
     }
 }
 
-/// SoD rule response.
+/// `SoD` rule response.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SodRuleResponse {
     /// Unique identifier.
@@ -145,7 +145,7 @@ impl From<GovSodRule> for SodRuleResponse {
     }
 }
 
-/// Paginated list of SoD rules.
+/// Paginated list of `SoD` rules.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SodRuleListResponse {
     /// List of rules.
@@ -161,7 +161,7 @@ pub struct SodRuleListResponse {
     pub offset: i64,
 }
 
-/// Request to check for SoD violations before assignment.
+/// Request to check for `SoD` violations before assignment.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct SodCheckRequest {
     /// User ID to check.
@@ -171,7 +171,7 @@ pub struct SodCheckRequest {
     pub entitlement_id: Uuid,
 }
 
-/// Result of an SoD check.
+/// Result of an `SoD` check.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SodCheckResponse {
     /// Whether the assignment would be allowed.
@@ -181,7 +181,7 @@ pub struct SodCheckResponse {
     pub violations: Vec<SodCheckViolation>,
 }
 
-/// A potential violation found during SoD check.
+/// A potential violation found during `SoD` check.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SodCheckViolation {
     /// Rule that would be violated.

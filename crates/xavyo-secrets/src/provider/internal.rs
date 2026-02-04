@@ -13,7 +13,7 @@ use crate::SecretError;
 
 /// Internal provider that generates credentials without external dependencies.
 ///
-/// This is the fallback provider when no external secret manager (OpenBao, Infisical)
+/// This is the fallback provider when no external secret manager (`OpenBao`, Infisical)
 /// is configured. It generates random usernames and passwords.
 #[derive(Debug, Clone)]
 pub struct InternalSecretProvider {
@@ -28,7 +28,8 @@ impl Default for InternalSecretProvider {
 }
 
 impl InternalSecretProvider {
-    /// Create a new InternalSecretProvider.
+    /// Create a new `InternalSecretProvider`.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             username_prefix: "dynamic_".to_string(),

@@ -56,7 +56,8 @@ pub struct PermissionWithTool {
 }
 
 impl AssessmentService {
-    /// Create a new AssessmentService.
+    /// Create a new `AssessmentService`.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -227,24 +228,21 @@ impl AssessmentService {
             VulnerabilityCheck::pass(
                 CheckName::TokenLifetime,
                 format!(
-                    "Token lifetime is {} seconds (≤{} recommended)",
-                    lifetime, MAX_TOKEN_LIFETIME_SECS
+                    "Token lifetime is {lifetime} seconds (≤{MAX_TOKEN_LIFETIME_SECS} recommended)"
                 ),
             )
         } else if lifetime <= MAX_TOKEN_LIFETIME_SECS * 2 {
             VulnerabilityCheck::warning(
                 CheckName::TokenLifetime,
                 format!(
-                    "Token lifetime is {} seconds (>{} not recommended)",
-                    lifetime, MAX_TOKEN_LIFETIME_SECS
+                    "Token lifetime is {lifetime} seconds (>{MAX_TOKEN_LIFETIME_SECS} not recommended)"
                 ),
             )
         } else {
             VulnerabilityCheck::fail(
                 CheckName::TokenLifetime,
                 format!(
-                    "Token lifetime is {} seconds (>{} is a security risk)",
-                    lifetime, MAX_TOKEN_LIFETIME_SECS
+                    "Token lifetime is {lifetime} seconds (>{MAX_TOKEN_LIFETIME_SECS} is a security risk)"
                 ),
             )
         }
@@ -263,16 +261,14 @@ impl AssessmentService {
             VulnerabilityCheck::pass(
                 CheckName::GranularScopes,
                 format!(
-                    "Agent has {} tool permissions (<{} recommended)",
-                    count, MAX_TOOL_PERMISSIONS
+                    "Agent has {count} tool permissions (<{MAX_TOOL_PERMISSIONS} recommended)"
                 ),
             )
         } else {
             VulnerabilityCheck::warning(
                 CheckName::GranularScopes,
                 format!(
-                    "Agent has {} tool permissions (>{} may be excessive)",
-                    count, MAX_TOOL_PERMISSIONS
+                    "Agent has {count} tool permissions (>{MAX_TOOL_PERMISSIONS} may be excessive)"
                 ),
             )
         }
@@ -561,24 +557,21 @@ impl AssessmentService {
             VulnerabilityCheck::pass(
                 CheckName::CredentialRotation,
                 format!(
-                    "Agent configuration updated {} days ago (≤{} recommended)",
-                    age_days, MAX_CREDENTIAL_AGE_DAYS
+                    "Agent configuration updated {age_days} days ago (≤{MAX_CREDENTIAL_AGE_DAYS} recommended)"
                 ),
             )
         } else if age_days <= MAX_CREDENTIAL_AGE_DAYS * 2 {
             VulnerabilityCheck::warning(
                 CheckName::CredentialRotation,
                 format!(
-                    "Agent configuration is {} days old (>{} may indicate stale credentials)",
-                    age_days, MAX_CREDENTIAL_AGE_DAYS
+                    "Agent configuration is {age_days} days old (>{MAX_CREDENTIAL_AGE_DAYS} may indicate stale credentials)"
                 ),
             )
         } else {
             VulnerabilityCheck::fail(
                 CheckName::CredentialRotation,
                 format!(
-                    "Agent configuration is {} days old - credential rotation recommended",
-                    age_days
+                    "Agent configuration is {age_days} days old - credential rotation recommended"
                 ),
             )
         }
@@ -632,8 +625,7 @@ impl AssessmentService {
             return VulnerabilityCheck::fail(
                 CheckName::AnomalyDetection,
                 format!(
-                    "{} critical anomalies detected in last 24h ({} high, {} medium)",
-                    critical, high, medium
+                    "{critical} critical anomalies detected in last 24h ({high} high, {medium} medium)"
                 ),
             );
         }
@@ -642,8 +634,7 @@ impl AssessmentService {
             return VulnerabilityCheck::fail(
                 CheckName::AnomalyDetection,
                 format!(
-                    "{} high-severity anomalies detected in last 24h ({} medium)",
-                    high, medium
+                    "{high} high-severity anomalies detected in last 24h ({medium} medium)"
                 ),
             );
         }
@@ -651,7 +642,7 @@ impl AssessmentService {
         if medium > 0 {
             return VulnerabilityCheck::warning(
                 CheckName::AnomalyDetection,
-                format!("{} medium-severity anomalies detected in last 24h", medium),
+                format!("{medium} medium-severity anomalies detected in last 24h"),
             );
         }
 
@@ -808,8 +799,8 @@ impl AssessmentService {
         for check in checks {
             let deduction = match check.status {
                 Status::Pass => 0,
-                Status::Warning => check.severity.warning_deduction() as i16,
-                Status::Fail => check.severity.fail_deduction() as i16,
+                Status::Warning => i16::from(check.severity.warning_deduction()),
+                Status::Fail => i16::from(check.severity.fail_deduction()),
             };
             score -= deduction;
         }
@@ -826,8 +817,7 @@ impl AssessmentService {
                 checks
                     .iter()
                     .find(|c| c.id == id)
-                    .map(|c| c.status == Status::Pass)
-                    .unwrap_or(false)
+                    .is_some_and(|c| c.status == Status::Pass)
             })
             .count() as u8;
 
@@ -835,15 +825,13 @@ impl AssessmentService {
         let a2a_protocol = checks
             .iter()
             .find(|c| c.id == 3)
-            .map(|c| c.status == Status::Pass)
-            .unwrap_or(false);
+            .is_some_and(|c| c.status == Status::Pass);
 
         // MCP OAuth: check 1 (token_lifetime) passes AND lifetime <= 900s
         let mcp_oauth = checks
             .iter()
             .find(|c| c.id == 1)
-            .map(|c| c.status == Status::Pass)
-            .unwrap_or(false)
+            .is_some_and(|c| c.status == Status::Pass)
             && agent.max_token_lifetime_secs <= MAX_TOKEN_LIFETIME_SECS;
 
         ComplianceStatus {

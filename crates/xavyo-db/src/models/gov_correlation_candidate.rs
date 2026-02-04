@@ -90,14 +90,14 @@ impl GovCorrelationCandidate {
             .unwrap_or_else(|_| serde_json::json!({}));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_correlation_candidates (
                 case_id, identity_id, identity_display_name, identity_attributes,
                 aggregate_confidence, per_attribute_scores, is_deactivated, is_definitive_match
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.case_id)
         .bind(input.identity_id)
@@ -130,11 +130,11 @@ impl GovCorrelationCandidate {
         case_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_correlation_candidates
             WHERE case_id = $1
             ORDER BY aggregate_confidence DESC
-            "#,
+            ",
         )
         .bind(case_id)
         .fetch_all(pool)
@@ -144,10 +144,10 @@ impl GovCorrelationCandidate {
     /// Find a candidate by its unique ID.
     pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_correlation_candidates
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .fetch_optional(pool)
@@ -161,11 +161,11 @@ impl GovCorrelationCandidate {
         identity_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_correlation_candidates
             SET identity_display_name = '[identity removed]'
             WHERE identity_id = $1
-            "#,
+            ",
         )
         .bind(identity_id)
         .execute(pool)

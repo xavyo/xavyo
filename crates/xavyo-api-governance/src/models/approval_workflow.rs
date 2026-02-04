@@ -33,7 +33,7 @@ pub struct CreateApprovalStepRequest {
     /// Type of approver for this step.
     pub approver_type: GovApproverType,
 
-    /// Specific approver user IDs (required for SpecificUsers type).
+    /// Specific approver user IDs (required for `SpecificUsers` type).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub specific_approvers: Option<Vec<Uuid>>,
 }

@@ -1,6 +1,6 @@
-//! GitHub OAuth2 Integration Tests
+//! GitHub `OAuth2` Integration Tests
 //!
-//! Tests for GitHub OAuth2 flow including:
+//! Tests for GitHub `OAuth2` flow including:
 //! - Authorization URL generation
 //! - Token exchange
 //! - User API retrieval
@@ -16,7 +16,7 @@ use super::mock_server::{
     setup_token_endpoint_error, setup_token_endpoint_success, OAuthError,
 };
 
-/// GitHub OAuth2 endpoints
+/// GitHub `OAuth2` endpoints
 const GITHUB_AUTH_ENDPOINT: &str = "https://github.com/login/oauth/authorize";
 #[allow(dead_code)]
 const GITHUB_TOKEN_ENDPOINT: &str = "https://github.com/login/oauth/access_token";
@@ -43,7 +43,7 @@ async fn test_github_authorization_url_generation() {
     assert!(auth_url.starts_with(GITHUB_AUTH_ENDPOINT));
     assert!(auth_url.contains(&format!("client_id={}", fixture.client_id)));
     assert!(auth_url.contains("response_type=code"));
-    assert!(auth_url.contains(&format!("state={}", TEST_STATE)));
+    assert!(auth_url.contains(&format!("state={TEST_STATE}")));
 
     // Verify GitHub scopes
     assert!(auth_url.contains("user%3Aemail") || auth_url.contains("user:email"));

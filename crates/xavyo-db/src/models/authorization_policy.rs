@@ -79,10 +79,10 @@ impl AuthorizationPolicy {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM authorization_policies
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -96,14 +96,14 @@ impl AuthorizationPolicy {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM authorization_policies
             WHERE tenant_id = $1 AND status = 'active'
             ORDER BY
                 CASE effect WHEN 'deny' THEN 0 ELSE 1 END,
                 priority ASC,
                 created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -118,12 +118,12 @@ impl AuthorizationPolicy {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM authorization_policies
             WHERE tenant_id = $1
             ORDER BY priority ASC, created_at DESC
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -135,10 +135,10 @@ impl AuthorizationPolicy {
     /// Count policies for a tenant.
     pub async fn count_by_tenant(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM authorization_policies
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -154,14 +154,14 @@ impl AuthorizationPolicy {
         input: CreateAuthorizationPolicy,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO authorization_policies (
                 tenant_id, name, description, effect, priority,
                 resource_type, action, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -197,13 +197,13 @@ impl AuthorizationPolicy {
         let action = input.action.or(existing.action);
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE authorization_policies
             SET name = $3, description = $4, effect = $5, priority = $6,
                 status = $7, resource_type = $8, action = $9, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -225,10 +225,10 @@ impl AuthorizationPolicy {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM authorization_policies
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

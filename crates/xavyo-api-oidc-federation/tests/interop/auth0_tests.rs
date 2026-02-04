@@ -16,7 +16,7 @@ mod auth0_fixtures {
     pub fn issuer(base_url: &str, tenant: &str) -> String {
         // In production: https://{tenant}.auth0.com/
         // Note: Auth0 issuers have a trailing slash
-        format!("{}/{}/", base_url, tenant)
+        format!("{base_url}/{tenant}/")
     }
 
     /// Auth0 discovery document
@@ -72,9 +72,9 @@ mod auth0_fixtures {
         permissions: Vec<&str>,
     ) -> TestClaims {
         TestClaims::new(sub, issuer, vec!["https://api.myapp.com".to_string()])
-            .with_email(&format!("{}@example.com", sub))
-            .with_claim(&format!("{}/roles", namespace), json!(roles))
-            .with_claim(&format!("{}/permissions", namespace), json!(permissions))
+            .with_email(&format!("{sub}@example.com"))
+            .with_claim(&format!("{namespace}/roles"), json!(roles))
+            .with_claim(&format!("{namespace}/permissions"), json!(permissions))
     }
 }
 

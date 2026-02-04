@@ -1,6 +1,6 @@
 //! # xavyo-db
 //!
-//! PostgreSQL database layer with multi-tenant Row-Level Security (RLS) support
+//! `PostgreSQL` database layer with multi-tenant Row-Level Security (RLS) support
 //! for xavyo.
 //!
 //! ## Features
@@ -36,7 +36,7 @@
 //!
 //! ## Multi-Tenant Security
 //!
-//! This library enforces tenant isolation at the database level using PostgreSQL
+//! This library enforces tenant isolation at the database level using `PostgreSQL`
 //! Row-Level Security (RLS). When a tenant context is set, all queries on
 //! tenant-scoped tables automatically filter by `tenant_id`.
 //!

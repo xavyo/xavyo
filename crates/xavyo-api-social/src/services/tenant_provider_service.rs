@@ -27,6 +27,7 @@ pub struct ProviderConfig {
 
 impl TenantProviderService {
     /// Create a new tenant provider service.
+    #[must_use] 
     pub fn new(pool: PgPool, encryption: EncryptionService) -> Self {
         Self { pool, encryption }
     }
@@ -38,11 +39,11 @@ impl TenantProviderService {
         provider: ProviderType,
     ) -> SocialResult<Option<ProviderConfig>> {
         let row: Option<ProviderRow> = sqlx::query_as(
-            r#"
+            r"
             SELECT provider, enabled, client_id, client_secret_encrypted, additional_config, scopes
             FROM tenant_social_providers
             WHERE tenant_id = $1 AND provider = $2 AND enabled = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(provider.to_string())
@@ -71,11 +72,11 @@ impl TenantProviderService {
     /// List all enabled providers for a tenant (for login page).
     pub async fn list_enabled_providers(&self, tenant_id: Uuid) -> SocialResult<Vec<ProviderType>> {
         let rows: Vec<(String,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT provider FROM tenant_social_providers
             WHERE tenant_id = $1 AND enabled = true
             ORDER BY provider ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -97,12 +98,12 @@ impl TenantProviderService {
         tenant_id: Uuid,
     ) -> SocialResult<Vec<TenantProviderResponse>> {
         let rows: Vec<AdminProviderRow> = sqlx::query_as(
-            r#"
+            r"
             SELECT provider, enabled, client_id, scopes, created_at, updated_at
             FROM tenant_social_providers
             WHERE tenant_id = $1
             ORDER BY provider ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -137,7 +138,7 @@ impl TenantProviderService {
         let client_secret_encrypted = self.encryption.encrypt_string(tenant_id, client_secret)?;
 
         let row: AdminProviderRow = sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_social_providers (
                 tenant_id, provider, enabled, client_id, client_secret_encrypted,
                 additional_config, scopes
@@ -152,7 +153,7 @@ impl TenantProviderService {
                 scopes = EXCLUDED.scopes,
                 updated_at = NOW()
             RETURNING provider, enabled, client_id, scopes, created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(provider.to_string())
@@ -182,11 +183,11 @@ impl TenantProviderService {
         provider: ProviderType,
     ) -> SocialResult<bool> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE tenant_social_providers
             SET enabled = false, updated_at = NOW()
             WHERE tenant_id = $1 AND provider = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(provider.to_string())

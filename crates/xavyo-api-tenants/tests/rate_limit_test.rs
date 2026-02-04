@@ -18,15 +18,13 @@ fn test_provision_rate_limiter_configuration() {
     assert_eq!(
         limiter.config().max_attempts,
         PROVISION_RATE_LIMIT_MAX,
-        "Rate limiter should allow {} attempts",
-        PROVISION_RATE_LIMIT_MAX
+        "Rate limiter should allow {PROVISION_RATE_LIMIT_MAX} attempts"
     );
 
     assert_eq!(
         limiter.config().window.as_secs(),
         PROVISION_RATE_LIMIT_WINDOW_SECS,
-        "Rate limiter window should be {} seconds",
-        PROVISION_RATE_LIMIT_WINDOW_SECS
+        "Rate limiter window should be {PROVISION_RATE_LIMIT_WINDOW_SECS} seconds"
     );
 }
 
@@ -130,7 +128,7 @@ fn test_rate_limiter_thread_safety() {
     // Spawn multiple threads that try to record attempts
     for i in 0..5 {
         let limiter_clone = Arc::clone(&limiter);
-        let ip: std::net::IpAddr = format!("10.0.0.{}", i).parse().unwrap();
+        let ip: std::net::IpAddr = format!("10.0.0.{i}").parse().unwrap();
 
         let handle = thread::spawn(move || {
             for _ in 0..3 {

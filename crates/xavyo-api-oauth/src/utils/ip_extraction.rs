@@ -1,7 +1,7 @@
 //! IP address extraction utilities for Storm-2372 remediation.
 //!
 //! Extracts the client's real IP address from HTTP headers, supporting
-//! various proxy configurations (CloudFlare, nginx, standard).
+//! various proxy configurations (`CloudFlare`, nginx, standard).
 
 use axum::http::HeaderMap;
 use std::net::SocketAddr;
@@ -9,7 +9,7 @@ use std::net::SocketAddr;
 /// Extract the origin IP address from request headers.
 ///
 /// Priority order:
-/// 1. CF-Connecting-IP (CloudFlare)
+/// 1. CF-Connecting-IP (`CloudFlare`)
 /// 2. X-Real-IP (nginx)
 /// 3. X-Forwarded-For (first IP in chain)
 /// 4. Socket peer address (fallback)
@@ -20,6 +20,7 @@ use std::net::SocketAddr;
 ///
 /// # Returns
 /// The extracted IP address as a string, or `None` if unavailable.
+#[must_use] 
 pub fn extract_origin_ip(headers: &HeaderMap, socket_addr: Option<&SocketAddr>) -> Option<String> {
     // 1. CloudFlare: CF-Connecting-IP
     if let Some(cf_ip) = headers.get("CF-Connecting-IP") {
@@ -126,7 +127,7 @@ mod tests {
     #[test]
     fn test_socket_fallback() {
         let headers = HeaderMap::new();
-        let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080);
         let result = extract_origin_ip(&headers, Some(&socket));
         assert_eq!(result, Some("127.0.0.1".to_string()));
     }

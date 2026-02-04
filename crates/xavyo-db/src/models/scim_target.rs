@@ -105,13 +105,13 @@ pub struct UpdateScimTarget {
 impl ScimTarget {
     /// Create a new SCIM target record.
     ///
-    /// Accepts any executor (PgPool, Transaction, etc.) to support RLS with tenant context.
+    /// Accepts any executor (`PgPool`, Transaction, etc.) to support RLS with tenant context.
     pub async fn create<'e, E>(executor: E, data: &CreateScimTarget) -> Result<Self, sqlx::Error>
     where
         E: Executor<'e, Database = Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO scim_targets
                 (tenant_id, name, base_url, auth_method, credentials_encrypted,
                  credentials_key_version, deprovisioning_strategy, tls_verify,
@@ -119,7 +119,7 @@ impl ScimTarget {
                  status, service_provider_config)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(&data.name)
@@ -145,10 +145,10 @@ impl ScimTarget {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_targets
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -164,63 +164,60 @@ impl ScimTarget {
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<Self>, i64), sqlx::Error> {
-        let (targets, total) = match status {
-            Some(s) => {
-                let targets = sqlx::query_as(
-                    r#"
-                    SELECT * FROM scim_targets
-                    WHERE tenant_id = $1 AND status = $2
-                    ORDER BY created_at DESC
-                    LIMIT $3 OFFSET $4
-                    "#,
-                )
-                .bind(tenant_id)
-                .bind(s)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(pool)
-                .await?;
+        let (targets, total) = if let Some(s) = status {
+            let targets = sqlx::query_as(
+                r"
+                SELECT * FROM scim_targets
+                WHERE tenant_id = $1 AND status = $2
+                ORDER BY created_at DESC
+                LIMIT $3 OFFSET $4
+                ",
+            )
+            .bind(tenant_id)
+            .bind(s)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await?;
 
-                let total: i64 = sqlx::query_scalar(
-                    r#"
-                    SELECT COUNT(*) FROM scim_targets
-                    WHERE tenant_id = $1 AND status = $2
-                    "#,
-                )
-                .bind(tenant_id)
-                .bind(s)
-                .fetch_one(pool)
-                .await?;
+            let total: i64 = sqlx::query_scalar(
+                r"
+                SELECT COUNT(*) FROM scim_targets
+                WHERE tenant_id = $1 AND status = $2
+                ",
+            )
+            .bind(tenant_id)
+            .bind(s)
+            .fetch_one(pool)
+            .await?;
 
-                (targets, total)
-            }
-            None => {
-                let targets = sqlx::query_as(
-                    r#"
-                    SELECT * FROM scim_targets
-                    WHERE tenant_id = $1
-                    ORDER BY created_at DESC
-                    LIMIT $2 OFFSET $3
-                    "#,
-                )
-                .bind(tenant_id)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(pool)
-                .await?;
+            (targets, total)
+        } else {
+            let targets = sqlx::query_as(
+                r"
+                SELECT * FROM scim_targets
+                WHERE tenant_id = $1
+                ORDER BY created_at DESC
+                LIMIT $2 OFFSET $3
+                ",
+            )
+            .bind(tenant_id)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(pool)
+            .await?;
 
-                let total: i64 = sqlx::query_scalar(
-                    r#"
-                    SELECT COUNT(*) FROM scim_targets
-                    WHERE tenant_id = $1
-                    "#,
-                )
-                .bind(tenant_id)
-                .fetch_one(pool)
-                .await?;
+            let total: i64 = sqlx::query_scalar(
+                r"
+                SELECT COUNT(*) FROM scim_targets
+                WHERE tenant_id = $1
+                ",
+            )
+            .bind(tenant_id)
+            .fetch_one(pool)
+            .await?;
 
-                (targets, total)
-            }
+            (targets, total)
         };
 
         Ok((targets, total))
@@ -236,7 +233,7 @@ impl ScimTarget {
         data: &UpdateScimTarget,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE scim_targets
             SET name = COALESCE($3, name),
                 base_url = COALESCE($4, base_url),
@@ -252,7 +249,7 @@ impl ScimTarget {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -275,10 +272,10 @@ impl ScimTarget {
     /// Returns true if a row was deleted.
     pub async fn delete(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM scim_targets
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -294,11 +291,11 @@ impl ScimTarget {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_targets
             WHERE tenant_id = $1 AND status = 'active'
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -313,12 +310,12 @@ impl ScimTarget {
         status: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE scim_targets
             SET status = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -337,7 +334,7 @@ impl ScimTarget {
         config: Option<&serde_json::Value>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE scim_targets
             SET status = $3,
                 last_health_check_at = NOW(),
@@ -346,7 +343,7 @@ impl ScimTarget {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

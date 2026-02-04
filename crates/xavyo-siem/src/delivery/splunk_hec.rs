@@ -20,6 +20,7 @@ pub struct SplunkHecWorker {
 }
 
 impl SplunkHecWorker {
+    #[must_use] 
     pub fn new(
         host: String,
         port: u16,
@@ -55,14 +56,12 @@ impl SplunkHecWorker {
     /// Build the HEC JSON payload wrapping the event data.
     fn build_hec_payload(&self, event_json: &str) -> Result<String, DeliveryError> {
         let event: serde_json::Value = serde_json::from_str(event_json)
-            .map_err(|e| DeliveryError::SendFailed(format!("Invalid event JSON: {}", e)))?;
+            .map_err(|e| DeliveryError::SendFailed(format!("Invalid event JSON: {e}")))?;
 
         let timestamp = event
             .get("timestamp")
             .and_then(|t| t.as_str())
-            .and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok())
-            .map(|dt| dt.timestamp())
-            .unwrap_or_else(|| chrono::Utc::now().timestamp());
+            .and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok()).map_or_else(|| chrono::Utc::now().timestamp(), |dt| dt.timestamp());
 
         let mut payload = json!({
             "time": timestamp,
@@ -80,7 +79,7 @@ impl SplunkHecWorker {
         }
 
         serde_json::to_string(&payload)
-            .map_err(|e| DeliveryError::SendFailed(format!("JSON serialization failed: {}", e)))
+            .map_err(|e| DeliveryError::SendFailed(format!("JSON serialization failed: {e}")))
     }
 }
 
@@ -102,9 +101,9 @@ impl DeliveryWorker for SplunkHecWorker {
             .await
             .map_err(|e| {
                 if e.is_timeout() {
-                    DeliveryError::Timeout(format!("HEC timeout after {:?}", HEC_TIMEOUT))
+                    DeliveryError::Timeout(format!("HEC timeout after {HEC_TIMEOUT:?}"))
                 } else if e.is_connect() {
-                    DeliveryError::ConnectionFailed(format!("HEC connect to {} failed: {}", url, e))
+                    DeliveryError::ConnectionFailed(format!("HEC connect to {url} failed: {e}"))
                 } else {
                     DeliveryError::SendFailed(e.to_string())
                 }

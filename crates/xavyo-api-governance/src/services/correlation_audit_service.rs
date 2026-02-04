@@ -25,11 +25,13 @@ pub struct CorrelationAuditService {
 
 impl CorrelationAuditService {
     /// Create a new correlation audit service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -370,8 +372,7 @@ pub fn parse_event_type(s: &str) -> Result<GovCorrelationEventType> {
         "case_reassigned" | "casereassigned" => Ok(GovCorrelationEventType::CaseReassigned),
         "rules_changed" | "ruleschanged" => Ok(GovCorrelationEventType::RulesChanged),
         other => Err(GovernanceError::Validation(format!(
-            "Invalid event type '{}'. Must be one of: auto_evaluated, manual_reviewed, case_created, case_reassigned, rules_changed",
-            other
+            "Invalid event type '{other}'. Must be one of: auto_evaluated, manual_reviewed, case_created, case_reassigned, rules_changed"
         ))),
     }
 }
@@ -393,8 +394,7 @@ pub fn parse_outcome(s: &str) -> Result<GovCorrelationOutcome> {
             Ok(GovCorrelationOutcome::DeferredToReview)
         }
         other => Err(GovernanceError::Validation(format!(
-            "Invalid outcome '{}'. Must be one of: auto_confirmed, manual_confirmed, manual_rejected, new_identity_created, no_match, collision_detected, deferred_to_review",
-            other
+            "Invalid outcome '{other}'. Must be one of: auto_confirmed, manual_confirmed, manual_rejected, new_identity_created, no_match, collision_detected, deferred_to_review"
         ))),
     }
 }

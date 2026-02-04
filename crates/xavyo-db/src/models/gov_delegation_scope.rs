@@ -1,7 +1,7 @@
 //! Governance Delegation Scope model.
 //!
 //! Defines scope restrictions for delegations. When a delegation has no scope
-//! (scope_id is NULL), it grants full approval authority. When a scope is
+//! (`scope_id` is NULL), it grants full approval authority. When a scope is
 //! specified, the deputy can only act on work items matching the scope criteria.
 //!
 //! Part of F053 Deputy & Power of Attorney feature.
@@ -33,7 +33,7 @@ pub struct GovDelegationScope {
     pub role_ids: Vec<Uuid>,
 
     /// Workflow types in scope. Empty = no type restriction.
-    /// Valid values: "access_request", "certification", "state_transition"
+    /// Valid values: "`access_request`", "certification", "`state_transition`"
     pub workflow_types: Vec<String>,
 
     /// When the scope was created.
@@ -57,10 +57,10 @@ impl GovDelegationScope {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_delegation_scopes
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -75,13 +75,13 @@ impl GovDelegationScope {
         input: CreateGovDelegationScope,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_delegation_scopes (
                 tenant_id, application_ids, entitlement_ids, role_ids, workflow_types
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.application_ids.unwrap_or_default())
@@ -99,10 +99,10 @@ impl GovDelegationScope {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_delegation_scopes
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -114,6 +114,7 @@ impl GovDelegationScope {
 
     /// Check if the scope is empty (no restrictions defined).
     /// An empty scope is equivalent to full delegation.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.application_ids.is_empty()
             && self.entitlement_ids.is_empty()
@@ -126,6 +127,7 @@ impl GovDelegationScope {
     /// Returns true if:
     /// - The scope is empty (full delegation), OR
     /// - The work item matches at least one criterion (OR semantics)
+    #[must_use] 
     pub fn matches_work_item(
         &self,
         application_id: Option<Uuid>,
@@ -184,10 +186,10 @@ impl GovDelegationScope {
         if let Some(ref app_ids) = input.application_ids {
             if !app_ids.is_empty() {
                 let count: i64 = sqlx::query_scalar(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM gov_applications
                     WHERE tenant_id = $1 AND id = ANY($2)
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(app_ids)
@@ -204,10 +206,10 @@ impl GovDelegationScope {
         if let Some(ref ent_ids) = input.entitlement_ids {
             if !ent_ids.is_empty() {
                 let count: i64 = sqlx::query_scalar(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM gov_entitlements
                     WHERE tenant_id = $1 AND id = ANY($2)
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(ent_ids)
@@ -225,7 +227,7 @@ impl GovDelegationScope {
             let valid_types = ["access_request", "certification", "state_transition"];
             for wf_type in wf_types {
                 if !valid_types.contains(&wf_type.as_str()) {
-                    errors.push(format!("Invalid workflow type: {}", wf_type));
+                    errors.push(format!("Invalid workflow type: {wf_type}"));
                 }
             }
         }

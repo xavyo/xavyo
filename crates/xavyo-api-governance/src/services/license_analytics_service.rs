@@ -44,6 +44,7 @@ pub struct LicenseAnalyticsService {
 
 impl LicenseAnalyticsService {
     /// Create a new license analytics service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -63,8 +64,8 @@ impl LicenseAnalyticsService {
 
         // Build summary by aggregating pool data
         let total_pools = active_pools.len() as i64;
-        let total_capacity: i64 = active_pools.iter().map(|p| p.total_capacity as i64).sum();
-        let total_allocated: i64 = active_pools.iter().map(|p| p.allocated_count as i64).sum();
+        let total_capacity: i64 = active_pools.iter().map(|p| i64::from(p.total_capacity)).sum();
+        let total_allocated: i64 = active_pools.iter().map(|p| i64::from(p.allocated_count)).sum();
         let total_available = total_capacity - total_allocated;
 
         let overall_utilization = if total_capacity > 0 {
@@ -75,7 +76,7 @@ impl LicenseAnalyticsService {
 
         let total_monthly_cost: Decimal = active_pools
             .iter()
-            .filter_map(|p| p.monthly_allocated_cost())
+            .filter_map(xavyo_db::models::GovLicensePool::monthly_allocated_cost)
             .sum();
 
         let expiring_soon_count = active_pools
@@ -199,11 +200,10 @@ impl LicenseAnalyticsService {
             if pool.should_show_expiration_warning() {
                 let days_remaining = pool
                     .expiration_date
-                    .map(|exp| {
+                    .map_or(0, |exp| {
                         let diff = exp - Utc::now();
                         diff.num_days()
-                    })
-                    .unwrap_or(0);
+                    });
 
                 recommendations.push(LicenseRecommendation {
                     recommendation_type: RecommendationType::ExpiringSoon,
@@ -253,6 +253,7 @@ impl LicenseAnalyticsService {
     }
 
     /// Get the underlying database pool reference.
+    #[must_use] 
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }
@@ -285,8 +286,8 @@ fn build_vendor_costs(pools: &[GovLicensePool]) -> Vec<VendorCost> {
         let key = (pool.vendor.clone(), pool.currency.clone());
         let entry = groups.entry(key).or_insert_with(VendorCostAccumulator::new);
         entry.pool_count += 1;
-        entry.total_capacity += pool.total_capacity as i64;
-        entry.allocated_count += pool.allocated_count as i64;
+        entry.total_capacity += i64::from(pool.total_capacity);
+        entry.allocated_count += i64::from(pool.allocated_count);
         entry.monthly_cost += pool.monthly_allocated_cost().unwrap_or(Decimal::ZERO);
     }
 

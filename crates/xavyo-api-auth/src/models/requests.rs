@@ -25,7 +25,7 @@ pub struct LoginRequest {
     pub email: String,
 
     /// User password.
-    /// Length validation prevents DoS attacks via extremely long passwords
+    /// Length validation prevents `DoS` attacks via extremely long passwords
     /// that could consume excessive CPU during hashing.
     #[validate(length(min = 1, max = 1024, message = "Password must be 1-1024 characters"))]
     pub password: String,

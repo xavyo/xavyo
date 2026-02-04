@@ -86,10 +86,10 @@ impl GovOutlierResult {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_outlier_results
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -104,13 +104,13 @@ impl GovOutlierResult {
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT r.* FROM gov_outlier_results r
             JOIN gov_outlier_analyses a ON r.analysis_id = a.id
             WHERE r.tenant_id = $1 AND r.user_id = $2 AND a.status = 'completed'
             ORDER BY r.created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -131,23 +131,23 @@ impl GovOutlierResult {
 
         if filter.analysis_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND analysis_id = ${}", param_count));
+            query.push_str(&format!(" AND analysis_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.classification.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND classification = ${}", param_count));
+            query.push_str(&format!(" AND classification = ${param_count}"));
         }
         if filter.min_score.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND overall_score >= ${}", param_count));
+            query.push_str(&format!(" AND overall_score >= ${param_count}"));
         }
         if filter.max_score.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND overall_score <= ${}", param_count));
+            query.push_str(&format!(" AND overall_score <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -189,23 +189,23 @@ impl GovOutlierResult {
 
         if filter.analysis_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND analysis_id = ${}", param_count));
+            query.push_str(&format!(" AND analysis_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.classification.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND classification = ${}", param_count));
+            query.push_str(&format!(" AND classification = ${param_count}"));
         }
         if filter.min_score.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND overall_score >= ${}", param_count));
+            query.push_str(&format!(" AND overall_score >= ${param_count}"));
         }
         if filter.max_score.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND overall_score <= ${}", param_count));
+            query.push_str(&format!(" AND overall_score <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -236,7 +236,7 @@ impl GovOutlierResult {
         analysis_id: Uuid,
     ) -> Result<OutlierResultSummary, sqlx::Error> {
         let row: (i64, i64, i64, i64, Option<f64>, Option<f64>) = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 COUNT(*) as total_users,
                 COUNT(*) FILTER (WHERE classification = 'outlier') as outlier_count,
@@ -246,7 +246,7 @@ impl GovOutlierResult {
                 MAX(overall_score) as max_score
             FROM gov_outlier_results
             WHERE tenant_id = $1 AND analysis_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(analysis_id)
@@ -270,14 +270,14 @@ impl GovOutlierResult {
         input: CreateOutlierResult,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_outlier_results (
                 tenant_id, analysis_id, user_id, overall_score, classification,
                 peer_scores, factor_breakdown, previous_score, score_change
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.analysis_id)
@@ -307,13 +307,13 @@ impl GovOutlierResult {
 
         for input in results {
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO gov_outlier_results (
                     tenant_id, analysis_id, user_id, overall_score, classification,
                     peer_scores, factor_breakdown, previous_score, score_change
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(input.analysis_id)
@@ -340,10 +340,10 @@ impl GovOutlierResult {
         analysis_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_outlier_results
             WHERE tenant_id = $1 AND analysis_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(analysis_id)
@@ -361,13 +361,13 @@ impl GovOutlierResult {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT r.* FROM gov_outlier_results r
             JOIN gov_outlier_analyses a ON r.analysis_id = a.id
             WHERE r.tenant_id = $1 AND r.user_id = $2 AND a.status = 'completed'
             ORDER BY r.created_at DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -384,12 +384,12 @@ impl GovOutlierResult {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_outlier_results
             WHERE tenant_id = $1 AND analysis_id = $2 AND classification = 'outlier'
             ORDER BY overall_score DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(analysis_id)
@@ -399,16 +399,19 @@ impl GovOutlierResult {
     }
 
     /// Get peer scores as a vec.
+    #[must_use] 
     pub fn get_peer_scores(&self) -> &Vec<PeerGroupScore> {
         &self.peer_scores.0
     }
 
     /// Get factor breakdown.
+    #[must_use] 
     pub fn get_factors(&self) -> &FactorBreakdown {
         &self.factor_breakdown.0
     }
 
     /// Check if this is an outlier.
+    #[must_use] 
     pub fn is_outlier(&self) -> bool {
         matches!(self.classification, OutlierClassification::Outlier)
     }

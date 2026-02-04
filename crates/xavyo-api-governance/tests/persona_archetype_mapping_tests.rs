@@ -1,7 +1,7 @@
 //! Unit tests for archetype attribute mappings (US3).
 //!
 //! Tests the attribute mapping configuration including propagate,
-//! computed, and persona_only attribute types.
+//! computed, and `persona_only` attribute types.
 
 use serde_json::json;
 use uuid::Uuid;
@@ -208,7 +208,7 @@ mod attribute_inheritance_tests {
 }
 
 mod naming_pattern_validation {
-    use super::*;
+    
     use xavyo_api_governance::services::validate_naming_pattern;
 
     #[test]

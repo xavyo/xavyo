@@ -42,7 +42,7 @@ impl AuthorizationAudit {
     ///
     /// Respects verbosity settings:
     /// - "all": log all decisions
-    /// - "deny_only": only log denied decisions
+    /// - "`deny_only"`: only log denied decisions
     pub fn emit_decision(
         decision: &AuthorizationDecision,
         request: &AuthorizationRequest,
@@ -127,6 +127,7 @@ pub struct InMemoryPolicyAuditStore {
 
 impl InMemoryPolicyAuditStore {
     /// Create a new in-memory policy audit store.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             events: Arc::new(RwLock::new(HashMap::new())),
@@ -219,8 +220,7 @@ impl PolicyAuditStore for InMemoryPolicyAuditStore {
 
         let version_number = versions
             .get(&key)
-            .map(|v| v.iter().map(|pv| pv.version_number).max().unwrap_or(0) + 1)
-            .unwrap_or(1);
+            .map_or(1, |v| v.iter().map(|pv| pv.version_number).max().unwrap_or(0) + 1);
 
         let version = PolicyVersion {
             id: Uuid::new_v4(),
@@ -276,8 +276,7 @@ impl PolicyAuditStore for InMemoryPolicyAuditStore {
 
         Ok(versions
             .get(&key)
-            .map(|v| v.iter().map(|pv| pv.version_number).max().unwrap_or(0) + 1)
-            .unwrap_or(1))
+            .map_or(1, |v| v.iter().map(|pv| pv.version_number).max().unwrap_or(0) + 1))
     }
 }
 

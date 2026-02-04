@@ -35,7 +35,7 @@
 //! ## Database Integration with xavyo-db
 //!
 //! After the middleware extracts the tenant context, you can use it with
-//! xavyo-db to set the PostgreSQL session variable for Row-Level Security:
+//! xavyo-db to set the `PostgreSQL` session variable for Row-Level Security:
 //!
 //! ```rust,ignore
 //! use axum::{Extension, extract::State};

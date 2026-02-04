@@ -15,6 +15,7 @@ pub struct CertificationRemediationService {
 
 impl CertificationRemediationService {
     /// Create a new certification remediation service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -48,19 +49,19 @@ impl CertificationRemediationService {
         let deleted =
             GovEntitlementAssignment::revoke(&self.pool, tenant_id, assignment_id).await?;
 
-        if !deleted {
-            tracing::warn!(
-                "Failed to delete assignment {} during remediation for item {}",
-                assignment_id,
-                item.id
-            );
-        } else {
+        if deleted {
             tracing::info!(
                 "Remediated assignment {} for certification item {} (decision: {}, decided_by: {})",
                 assignment_id,
                 item.id,
                 decision.id,
                 decision.decided_by
+            );
+        } else {
+            tracing::warn!(
+                "Failed to delete assignment {} during remediation for item {}",
+                assignment_id,
+                item.id
             );
         }
 
@@ -113,6 +114,7 @@ impl CertificationRemediationService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

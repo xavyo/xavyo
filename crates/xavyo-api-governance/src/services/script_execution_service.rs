@@ -40,6 +40,7 @@ pub struct DryRunExecutionResult {
 
 impl ScriptExecutionService {
     /// Create a new script execution service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -48,6 +49,7 @@ impl ScriptExecutionService {
     }
 
     /// Validate a script for syntax errors (without executing it).
+    #[must_use] 
     pub fn validate_script(&self, script_body: &str) -> ValidationResult {
         let errors = self.executor.validate_script(script_body);
         ValidationResult {
@@ -93,8 +95,7 @@ impl ScriptExecutionService {
         } else if result
             .error
             .as_ref()
-            .map(|e| e.contains("Too many operations"))
-            .unwrap_or(false)
+            .is_some_and(|e| e.contains("Too many operations"))
         {
             ExecutionStatus::Timeout
         } else {
@@ -131,11 +132,13 @@ impl ScriptExecutionService {
     }
 
     /// Validate a raw script body (not yet saved).
+    #[must_use] 
     pub fn validate_raw_script(&self, script_body: &str) -> ValidationResult {
         self.validate_script(script_body)
     }
 
     /// Dry-run a raw script body (not yet saved) with sample context.
+    #[must_use] 
     pub fn dry_run_raw(
         &self,
         script_body: &str,
@@ -187,7 +190,7 @@ impl ScriptExecutionService {
     }
 }
 
-/// Build a HookContext from a JSON sample context.
+/// Build a `HookContext` from a JSON sample context.
 fn build_hook_context_from_json(data: &serde_json::Value, tenant_id: Uuid) -> HookContext {
     use xavyo_connector::types::OperationType;
 
@@ -206,13 +209,12 @@ fn build_hook_context_from_json(data: &serde_json::Value, tenant_id: Uuid) -> Ho
     let operation_type = data
         .get("operation_type")
         .and_then(|v| v.as_str())
-        .map(|s| match s {
+        .map_or(OperationType::Create, |s| match s {
             "create" => OperationType::Create,
             "update" => OperationType::Update,
             "delete" => OperationType::Delete,
             _ => OperationType::Create,
-        })
-        .unwrap_or(OperationType::Create);
+        });
 
     let object_class = data
         .get("object_class")

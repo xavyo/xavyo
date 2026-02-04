@@ -58,13 +58,14 @@ pub struct JobService {
 
 impl JobService {
     /// Create a new job service.
+    #[must_use] 
     pub fn new(pool: Arc<PgPool>) -> Self {
         Self { pool }
     }
 
     /// List jobs with filtering and pagination.
     ///
-    /// T013: Create JobService with list_jobs() method
+    /// T013: Create `JobService` with `list_jobs()` method
     #[instrument(skip(self))]
     pub async fn list_jobs(
         &self,
@@ -119,7 +120,7 @@ impl JobService {
 
     /// Get detailed job information including execution attempts.
     ///
-    /// T014: Add get_job_detail() method to JobService
+    /// T014: Add `get_job_detail()` method to `JobService`
     #[instrument(skip(self))]
     pub async fn get_job_detail(
         &self,
@@ -151,7 +152,7 @@ impl JobService {
 
     /// Cancel a job.
     ///
-    /// T024: Add cancel_job() method to JobService
+    /// T024: Add `cancel_job()` method to `JobService`
     #[instrument(skip(self))]
     pub async fn cancel_job(
         &self,
@@ -196,7 +197,7 @@ impl JobService {
 
     /// List dead letter queue entries.
     ///
-    /// T033: Add list_dlq() method to JobService
+    /// T033: Add `list_dlq()` method to `JobService`
     #[instrument(skip(self))]
     pub async fn list_dlq(
         &self,
@@ -240,7 +241,7 @@ impl JobService {
 
     /// Replay a single DLQ entry.
     ///
-    /// T034: Add replay_dlq_entry() method to JobService
+    /// T034: Add `replay_dlq_entry()` method to `JobService`
     #[instrument(skip(self))]
     pub async fn replay_dlq_entry(
         &self,
@@ -292,7 +293,7 @@ impl JobService {
 
     /// Bulk replay multiple DLQ entries.
     ///
-    /// T035: Add bulk_replay_dlq() method to JobService
+    /// T035: Add `bulk_replay_dlq()` method to `JobService`
     #[instrument(skip(self))]
     pub async fn bulk_replay_dlq(
         &self,
@@ -322,19 +323,19 @@ impl JobService {
                 // Check why it wasn't replayed
                 match ProvisioningOperation::find_by_id(&self.pool, tenant_id, *id).await {
                     Ok(Some(op)) => {
-                        if !op.is_dead_letter() {
-                            skipped += 1;
-                            results.push(ReplayResponse {
-                                id: *id,
-                                status: "skipped".to_string(),
-                                message: Some(format!("Not in DLQ: status is {}", op.status)),
-                            });
-                        } else {
+                        if op.is_dead_letter() {
                             failed += 1;
                             results.push(ReplayResponse {
                                 id: *id,
                                 status: "failed".to_string(),
                                 message: Some("Failed to replay".to_string()),
+                            });
+                        } else {
+                            skipped += 1;
+                            results.push(ReplayResponse {
+                                id: *id,
+                                status: "skipped".to_string(),
+                                message: Some(format!("Not in DLQ: status is {}", op.status)),
                             });
                         }
                     }
@@ -436,7 +437,7 @@ impl JobService {
                 success,
                 error_code: None, // Operation logs don't have error codes
                 error_message: log.error_message.clone(),
-                duration_ms: log.duration_ms.map(|d| d as i64),
+                duration_ms: log.duration_ms.map(i64::from),
             });
         }
 

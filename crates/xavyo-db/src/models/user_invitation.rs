@@ -13,9 +13,9 @@ use uuid::Uuid;
 /// When users are imported via CSV or invited by an admin, they receive an email invitation
 /// containing a secure, time-limited link to set their password and activate their account.
 ///
-/// For bulk imports (F086): job_id is set, user_id points to existing user.
-/// For admin invites (F-ADMIN-INVITE): job_id is NULL, invited_by_user_id is set,
-/// user_id may be NULL (user created on acceptance).
+/// For bulk imports (F086): `job_id` is set, `user_id` points to existing user.
+/// For admin invites (F-ADMIN-INVITE): `job_id` is NULL, `invited_by_user_id` is set,
+/// `user_id` may be NULL (user created on acceptance).
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UserInvitation {
@@ -94,12 +94,12 @@ impl UserInvitation {
     /// Create a new invitation record (F086 bulk import).
     pub async fn create(pool: &PgPool, data: &CreateInvitation) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO user_invitations
                 (tenant_id, user_id, job_id, token_hash, expires_at)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(data.user_id)
@@ -112,19 +112,19 @@ impl UserInvitation {
 
     /// Create an admin invitation (F-ADMIN-INVITE).
     ///
-    /// Unlike bulk import invitations, admin invitations don't have a user_id
+    /// Unlike bulk import invitations, admin invitations don't have a `user_id`
     /// initially - the user is created when the invitation is accepted.
     pub async fn create_admin_invitation(
         pool: &PgPool,
         data: &CreateAdminInvitation,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO user_invitations
                 (tenant_id, email, token_hash, expires_at, invited_by_user_id, role_template_id)
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(&data.email)
@@ -143,12 +143,12 @@ impl UserInvitation {
         email: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_invitations
             WHERE tenant_id = $1 AND email = $2 AND status IN ('pending', 'sent')
             ORDER BY created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(email)
@@ -163,10 +163,10 @@ impl UserInvitation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_invitations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -180,10 +180,10 @@ impl UserInvitation {
         tenant_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM user_invitations
             WHERE tenant_id = $1 AND status IN ('pending', 'sent')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -202,21 +202,21 @@ impl UserInvitation {
     ) -> Result<Vec<Self>, sqlx::Error> {
         // Build dynamic query based on filters
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM user_invitations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_index = 2;
 
         if status_filter.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_index));
+            query.push_str(&format!(" AND status = ${param_index}"));
             param_index += 1;
         }
 
         if email_search.is_some() {
-            query.push_str(&format!(" AND email ILIKE ${}", param_index));
+            query.push_str(&format!(" AND email ILIKE ${param_index}"));
             param_index += 1;
         }
 
@@ -233,7 +233,7 @@ impl UserInvitation {
         }
 
         if let Some(email) = email_search {
-            q = q.bind(format!("%{}%", email));
+            q = q.bind(format!("%{email}%"));
         }
 
         q = q.bind(limit).bind(offset);
@@ -249,21 +249,21 @@ impl UserInvitation {
         email_search: Option<&str>,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM user_invitations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_index = 2;
 
         if status_filter.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_index));
+            query.push_str(&format!(" AND status = ${param_index}"));
             param_index += 1;
         }
 
         if email_search.is_some() {
-            query.push_str(&format!(" AND email ILIKE ${}", param_index));
+            query.push_str(&format!(" AND email ILIKE ${param_index}"));
         }
 
         let mut q = sqlx::query_as::<_, (i64,)>(&query).bind(tenant_id);
@@ -273,7 +273,7 @@ impl UserInvitation {
         }
 
         if let Some(email) = email_search {
-            q = q.bind(format!("%{}%", email));
+            q = q.bind(format!("%{email}%"));
         }
 
         let row = q.fetch_one(pool).await?;
@@ -287,12 +287,12 @@ impl UserInvitation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_invitations
             SET status = 'cancelled', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status IN ('pending', 'sent')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -300,7 +300,7 @@ impl UserInvitation {
         .await
     }
 
-    /// Update user_id after user creation on acceptance.
+    /// Update `user_id` after user creation on acceptance.
     pub async fn set_user_id(
         pool: &PgPool,
         tenant_id: Uuid,
@@ -308,12 +308,12 @@ impl UserInvitation {
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_invitations
             SET user_id = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -329,11 +329,11 @@ impl UserInvitation {
         email: &str,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE user_invitations
             SET status = 'expired', updated_at = NOW()
             WHERE tenant_id = $1 AND email = $2 AND status IN ('pending', 'sent')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(email)
@@ -352,12 +352,12 @@ impl UserInvitation {
         new_expires_at: DateTime<Utc>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_invitations
             SET token_hash = $3, expires_at = $4, status = 'pending', sent_at = NULL, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status IN ('pending', 'sent')
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -373,10 +373,10 @@ impl UserInvitation {
         token_hash: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_invitations
             WHERE token_hash = $1
-            "#,
+            ",
         )
         .bind(token_hash)
         .fetch_optional(pool)
@@ -390,12 +390,12 @@ impl UserInvitation {
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_invitations
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -420,12 +420,11 @@ impl UserInvitation {
                     .collect();
                 let in_clause = placeholders.join(", ");
                 let query = format!(
-                    r#"
+                    r"
                     SELECT * FROM user_invitations
-                    WHERE tenant_id = $1 AND job_id = $2 AND status IN ({})
+                    WHERE tenant_id = $1 AND job_id = $2 AND status IN ({in_clause})
                     ORDER BY created_at ASC
-                    "#,
-                    in_clause
+                    "
                 );
 
                 let mut q = sqlx::query_as::<_, Self>(&query)
@@ -440,11 +439,11 @@ impl UserInvitation {
             }
             _ => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM user_invitations
                     WHERE tenant_id = $1 AND job_id = $2
                     ORDER BY created_at ASC
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(job_id)
@@ -461,12 +460,12 @@ impl UserInvitation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_invitations
             SET status = 'sent', sent_at = NOW(), updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -486,12 +485,12 @@ impl UserInvitation {
         user_agent_str: Option<&str>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_invitations
             SET status = 'accepted', accepted_at = NOW(), ip_address = $3, user_agent = $4, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status != 'accepted'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -508,11 +507,11 @@ impl UserInvitation {
         user_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE user_invitations
             SET status = 'expired', updated_at = NOW()
             WHERE tenant_id = $1 AND user_id = $2 AND status IN ('pending', 'sent')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

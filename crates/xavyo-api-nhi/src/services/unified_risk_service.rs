@@ -14,7 +14,8 @@ pub struct UnifiedRiskService {
 }
 
 impl UnifiedRiskService {
-    /// Creates a new UnifiedRiskService.
+    /// Creates a new `UnifiedRiskService`.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -22,7 +23,7 @@ impl UnifiedRiskService {
     /// Gets risk summary statistics for a tenant.
     ///
     /// Aggregates risk data across all NHI types:
-    /// - Total count by type (service_account, ai_agent)
+    /// - Total count by type (`service_account`, `ai_agent`)
     /// - Count by risk level (critical, high, medium, low)
     /// - NHIs pending certification
     /// - Inactive NHIs (no activity in 30 days)

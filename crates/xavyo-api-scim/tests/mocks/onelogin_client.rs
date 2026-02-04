@@ -1,20 +1,20 @@
-//! OneLogin SCIM client mock implementation.
+//! `OneLogin` SCIM client mock implementation.
 //!
-//! Simulates OneLogin's SCIM provisioning behavior including known quirks.
+//! Simulates `OneLogin`'s SCIM provisioning behavior including known quirks.
 
 use serde_json::{json, Value};
 
 use super::base_client::{MockClientConfig, MockScimClient};
 use super::quirks::{onelogin_quirks, QuirkDefinition};
 
-/// Mock OneLogin SCIM client that simulates OneLogin's provisioning behavior.
+/// Mock `OneLogin` SCIM client that simulates `OneLogin`'s provisioning behavior.
 #[derive(Debug)]
 pub struct OneLoginClient {
     config: MockClientConfig,
 }
 
 impl OneLoginClient {
-    /// Create a new OneLogin mock client with default configuration.
+    /// Create a new `OneLogin` mock client with default configuration.
     pub fn new() -> Self {
         let quirk_ids = onelogin_quirks().into_iter().map(|q| q.id).collect();
         Self {
@@ -114,7 +114,7 @@ impl MockScimClient for OneLoginClient {
         } else {
             operator.to_string()
         };
-        format!("{} {} \"{}\"", attribute, op, value)
+        format!("{attribute} {op} \"{value}\"")
     }
 }
 

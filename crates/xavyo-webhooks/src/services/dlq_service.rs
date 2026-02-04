@@ -98,6 +98,7 @@ pub struct BulkReplayRequest {
 
 impl DlqService {
     /// Create a new DLQ service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -322,7 +323,7 @@ impl DlqService {
             return Ok(BulkReplayResponse {
                 replayed_count,
                 delivery_ids,
-                message: format!("Replayed {} webhooks", replayed_count),
+                message: format!("Replayed {replayed_count} webhooks"),
             });
         }
 
@@ -394,8 +395,7 @@ impl DlqService {
             replayed_count,
             delivery_ids,
             message: format!(
-                "Replayed {} webhooks for subscription {}",
-                replayed_count, subscription_id
+                "Replayed {replayed_count} webhooks for subscription {subscription_id}"
             ),
         })
     }
@@ -419,7 +419,7 @@ impl DlqService {
 
 /// Extract attempt count from attempt history JSON.
 fn extract_attempt_count(history: &serde_json::Value) -> i32 {
-    history.as_array().map(|arr| arr.len() as i32).unwrap_or(0)
+    history.as_array().map_or(0, |arr| arr.len() as i32)
 }
 
 #[cfg(test)]

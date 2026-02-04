@@ -20,6 +20,7 @@ pub enum TokenType {
 
 impl TokenType {
     /// Convert to string representation.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             TokenType::Precise => "precise",
@@ -41,7 +42,7 @@ impl std::str::FromStr for TokenType {
         match s.to_lowercase().as_str() {
             "precise" => Ok(TokenType::Precise),
             "batch" => Ok(TokenType::Batch),
-            _ => Err(format!("Unknown token type: {}", s)),
+            _ => Err(format!("Unknown token type: {s}")),
         }
     }
 }
@@ -73,6 +74,7 @@ pub struct SyncToken {
 
 impl SyncToken {
     /// Create a new sync token.
+    #[must_use] 
     pub fn new(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -95,6 +97,7 @@ impl SyncToken {
     }
 
     /// Check if this token can be used for resumable sync.
+    #[must_use] 
     pub fn can_resume(&self) -> bool {
         self.is_valid && !self.token_value.is_empty()
     }
@@ -114,6 +117,7 @@ pub struct SyncTokenManager {
 
 impl SyncTokenManager {
     /// Create a new sync token manager.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -122,19 +126,19 @@ impl SyncTokenManager {
     #[instrument(skip(self))]
     pub async fn get(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncResult<Option<SyncToken>> {
         let result = sqlx::query_as::<_, SyncTokenRow>(
-            r#"
+            r"
             SELECT id, tenant_id, connector_id, token_value, token_type,
                    sequence_number, last_processed_at, is_valid, created_at, updated_at
             FROM gov_sync_tokens
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(|row| row.into_token()))
+        Ok(result.map(SyncTokenRow::into_token))
     }
 
     /// Get a valid token (returns None if token is invalid).
@@ -145,26 +149,26 @@ impl SyncTokenManager {
         connector_id: Uuid,
     ) -> SyncResult<Option<SyncToken>> {
         let result = sqlx::query_as::<_, SyncTokenRow>(
-            r#"
+            r"
             SELECT id, tenant_id, connector_id, token_value, token_type,
                    sequence_number, last_processed_at, is_valid, created_at, updated_at
             FROM gov_sync_tokens
             WHERE tenant_id = $1 AND connector_id = $2 AND is_valid = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(|row| row.into_token()))
+        Ok(result.map(SyncTokenRow::into_token))
     }
 
     /// Create or update a token.
     #[instrument(skip(self))]
     pub async fn upsert(&self, token: &SyncToken) -> SyncResult<SyncToken> {
         let result = sqlx::query_as::<_, SyncTokenRow>(
-            r#"
+            r"
             INSERT INTO gov_sync_tokens (
                 tenant_id, connector_id, token_value, token_type, sequence_number
             )
@@ -178,7 +182,7 @@ impl SyncTokenManager {
                 updated_at = NOW()
             RETURNING id, tenant_id, connector_id, token_value, token_type,
                       sequence_number, last_processed_at, is_valid, created_at, updated_at
-            "#,
+            ",
         )
         .bind(token.tenant_id)
         .bind(token.connector_id)
@@ -203,7 +207,7 @@ impl SyncTokenManager {
         new_sequence: i64,
     ) -> SyncResult<Option<SyncToken>> {
         let result = sqlx::query_as::<_, SyncTokenRow>(
-            r#"
+            r"
             UPDATE gov_sync_tokens
             SET token_value = $4,
                 sequence_number = $5,
@@ -214,7 +218,7 @@ impl SyncTokenManager {
                 AND sequence_number = $3
             RETURNING id, tenant_id, connector_id, token_value, token_type,
                       sequence_number, last_processed_at, is_valid, created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -224,18 +228,18 @@ impl SyncTokenManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(result.map(|row| row.into_token()))
+        Ok(result.map(SyncTokenRow::into_token))
     }
 
     /// Invalidate a token (triggers full resync on next sync).
     #[instrument(skip(self))]
     pub async fn invalidate(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncResult<bool> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_sync_tokens
             SET is_valid = false, updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -249,10 +253,10 @@ impl SyncTokenManager {
     #[instrument(skip(self))]
     pub async fn reset(&self, tenant_id: Uuid, connector_id: Uuid) -> SyncResult<bool> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_sync_tokens
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)

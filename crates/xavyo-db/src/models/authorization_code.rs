@@ -10,7 +10,7 @@ use xavyo_core::{TenantId, UserId};
 /// Default authorization code expiration time in minutes.
 pub const AUTH_CODE_EXPIRY_MINUTES: i64 = 10;
 
-/// A temporary authorization code for the OAuth2 authorization code flow.
+/// A temporary authorization code for the `OAuth2` authorization code flow.
 ///
 /// Authorization codes are single-use and expire after 10 minutes.
 /// They are bound to a specific client, user, redirect URI, and PKCE challenge.
@@ -22,7 +22,7 @@ pub struct AuthorizationCode {
     /// SHA-256 hash of the authorization code.
     pub code_hash: String,
 
-    /// Reference to the OAuth2 client.
+    /// Reference to the `OAuth2` client.
     pub client_id: uuid::Uuid,
 
     /// Reference to the authorizing user.
@@ -34,7 +34,7 @@ pub struct AuthorizationCode {
     /// Redirect URI that must match the token request.
     pub redirect_uri: String,
 
-    /// Granted OAuth2 scopes (space-separated).
+    /// Granted `OAuth2` scopes (space-separated).
     pub scope: String,
 
     /// PKCE code challenge from the authorization request.

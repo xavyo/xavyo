@@ -54,14 +54,14 @@ impl WebhookSubscription {
         input: CreateWebhookSubscription,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO webhook_subscriptions (
                 tenant_id, name, description, url, secret_encrypted,
                 event_types, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(&input.name)
@@ -81,10 +81,10 @@ impl WebhookSubscription {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM webhook_subscriptions
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -103,12 +103,12 @@ impl WebhookSubscription {
         match enabled {
             Some(e) => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM webhook_subscriptions
                     WHERE tenant_id = $1 AND enabled = $2
                     ORDER BY created_at DESC
                     LIMIT $3 OFFSET $4
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(e)
@@ -119,12 +119,12 @@ impl WebhookSubscription {
             }
             None => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM webhook_subscriptions
                     WHERE tenant_id = $1
                     ORDER BY created_at DESC
                     LIMIT $2 OFFSET $3
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(limit)
@@ -144,10 +144,10 @@ impl WebhookSubscription {
         let row: (i64,) = match enabled {
             Some(e) => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM webhook_subscriptions
                     WHERE tenant_id = $1 AND enabled = $2
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(e)
@@ -156,10 +156,10 @@ impl WebhookSubscription {
             }
             None => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM webhook_subscriptions
                     WHERE tenant_id = $1
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .fetch_one(pool)
@@ -177,7 +177,7 @@ impl WebhookSubscription {
         input: UpdateWebhookSubscription,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE webhook_subscriptions
             SET
                 name = COALESCE($3, name),
@@ -188,7 +188,7 @@ impl WebhookSubscription {
                 enabled = COALESCE($8, enabled)
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -205,10 +205,10 @@ impl WebhookSubscription {
     /// Delete a webhook subscription.
     pub async fn delete(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM webhook_subscriptions
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -219,19 +219,19 @@ impl WebhookSubscription {
     }
 
     /// Find all active (enabled) subscriptions for a tenant that subscribe to a given event type.
-    /// Uses the GIN index on event_types for efficient array containment check.
+    /// Uses the GIN index on `event_types` for efficient array containment check.
     pub async fn find_active_by_event_type(
         pool: &PgPool,
         tenant_id: Uuid,
         event_type: &str,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM webhook_subscriptions
             WHERE tenant_id = $1
               AND enabled = true
               AND event_types @> ARRAY[$2]::text[]
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(event_type)
@@ -246,12 +246,12 @@ impl WebhookSubscription {
         id: Uuid,
     ) -> Result<i32, sqlx::Error> {
         let row: (i32,) = sqlx::query_as(
-            r#"
+            r"
             UPDATE webhook_subscriptions
             SET consecutive_failures = consecutive_failures + 1
             WHERE tenant_id = $1 AND id = $2
             RETURNING consecutive_failures
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -268,11 +268,11 @@ impl WebhookSubscription {
         id: Uuid,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE webhook_subscriptions
             SET consecutive_failures = 0
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -285,11 +285,11 @@ impl WebhookSubscription {
     /// Disable a subscription (e.g., after exceeding consecutive failure threshold).
     pub async fn disable(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE webhook_subscriptions
             SET enabled = false
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)

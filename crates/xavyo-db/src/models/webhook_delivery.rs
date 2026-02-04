@@ -46,14 +46,14 @@ impl WebhookDelivery {
     /// Create a new delivery record.
     pub async fn create(pool: &PgPool, input: CreateWebhookDelivery) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO webhook_deliveries (
                 tenant_id, subscription_id, event_id, event_type,
                 request_payload, max_attempts, next_attempt_at
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(input.subscription_id)
@@ -74,10 +74,10 @@ impl WebhookDelivery {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM webhook_deliveries
             WHERE tenant_id = $1 AND subscription_id = $2 AND id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(subscription_id)
@@ -98,12 +98,12 @@ impl WebhookDelivery {
         match status {
             Some(s) => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM webhook_deliveries
                     WHERE tenant_id = $1 AND subscription_id = $2 AND status = $3
                     ORDER BY created_at DESC
                     LIMIT $4 OFFSET $5
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(subscription_id)
@@ -115,12 +115,12 @@ impl WebhookDelivery {
             }
             None => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT * FROM webhook_deliveries
                     WHERE tenant_id = $1 AND subscription_id = $2
                     ORDER BY created_at DESC
                     LIMIT $3 OFFSET $4
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(subscription_id)
@@ -142,10 +142,10 @@ impl WebhookDelivery {
         let row: (i64,) = match status {
             Some(s) => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM webhook_deliveries
                     WHERE tenant_id = $1 AND subscription_id = $2 AND status = $3
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(subscription_id)
@@ -155,10 +155,10 @@ impl WebhookDelivery {
             }
             None => {
                 sqlx::query_as(
-                    r#"
+                    r"
                     SELECT COUNT(*) FROM webhook_deliveries
                     WHERE tenant_id = $1 AND subscription_id = $2
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(subscription_id)
@@ -169,20 +169,20 @@ impl WebhookDelivery {
         Ok(row.0)
     }
 
-    /// Find pending deliveries ready for retry (status = 'pending' AND next_attempt_at <= now()).
+    /// Find pending deliveries ready for retry (status = 'pending' AND `next_attempt_at` <= `now()`).
     pub async fn find_pending_for_retry(
         pool: &PgPool,
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM webhook_deliveries
             WHERE status = 'pending'
               AND next_attempt_at IS NOT NULL
               AND next_attempt_at <= NOW()
             ORDER BY next_attempt_at ASC
             LIMIT $1
-            "#,
+            ",
         )
         .bind(limit)
         .fetch_all(pool)
@@ -206,7 +206,7 @@ impl WebhookDelivery {
         completed_at: Option<DateTime<Utc>>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE webhook_deliveries
             SET
                 status = $3,
@@ -220,7 +220,7 @@ impl WebhookDelivery {
                 completed_at = $11
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -248,7 +248,7 @@ impl WebhookDelivery {
         request_headers: Option<&serde_json::Value>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE webhook_deliveries
             SET
                 status = 'success',
@@ -260,7 +260,7 @@ impl WebhookDelivery {
                 completed_at = NOW()
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -295,7 +295,7 @@ impl WebhookDelivery {
         };
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE webhook_deliveries
             SET
                 status = $3,
@@ -309,7 +309,7 @@ impl WebhookDelivery {
                 completed_at = CASE WHEN $3 = 'failed' THEN NOW() ELSE completed_at END
             WHERE tenant_id = $1 AND id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -332,7 +332,7 @@ impl WebhookDelivery {
         subscription_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE webhook_deliveries
             SET
                 status = 'abandoned',
@@ -341,7 +341,7 @@ impl WebhookDelivery {
             WHERE tenant_id = $1
               AND subscription_id = $2
               AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(subscription_id)

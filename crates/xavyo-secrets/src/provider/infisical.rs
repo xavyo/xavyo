@@ -27,7 +27,7 @@ pub enum InfisicalAuthMethod {
 /// Configuration for Infisical provider.
 #[derive(Debug, Clone)]
 pub struct InfisicalConfig {
-    /// Infisical API URL (default: "https://app.infisical.com").
+    /// Infisical API URL (default: "<https://app.infisical.com>").
     pub api_url: String,
     /// Workspace/Project ID.
     pub workspace_id: String,
@@ -81,7 +81,7 @@ impl std::fmt::Debug for InfisicalSecretProvider {
 }
 
 impl InfisicalSecretProvider {
-    /// Create a new InfisicalSecretProvider from configuration.
+    /// Create a new `InfisicalSecretProvider` from configuration.
     pub async fn new(config: &InfisicalConfig) -> Result<Self, SecretError> {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
@@ -208,7 +208,7 @@ impl InfisicalSecretProvider {
         let resp = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .json(&body)
             .send()
             .await
@@ -321,21 +321,20 @@ impl DynamicSecretProvider for InfisicalSecretProvider {
         let resp = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", access_token))
+            .header("Authorization", format!("Bearer {access_token}"))
             .json(&body)
             .send()
             .await
             .map_err(|e| SecretError::ProviderUnavailable {
                 provider: "infisical".to_string(),
                 detail: format!(
-                    "Failed to generate credentials for '{}': {}",
-                    secret_name, e
+                    "Failed to generate credentials for '{secret_name}': {e}"
                 ),
             })?;
 
         if resp.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(SecretError::NotFound {
-                name: format!("dynamic secret: {}", secret_name),
+                name: format!("dynamic secret: {secret_name}"),
             });
         }
 
@@ -345,8 +344,7 @@ impl DynamicSecretProvider for InfisicalSecretProvider {
             return Err(SecretError::ProviderUnavailable {
                 provider: "infisical".to_string(),
                 detail: format!(
-                    "Infisical returned HTTP {} for credential generation: {}",
-                    status, body_text
+                    "Infisical returned HTTP {status} for credential generation: {body_text}"
                 ),
             });
         }
@@ -365,14 +363,14 @@ impl DynamicSecretProvider for InfisicalSecretProvider {
         let lease_id = lease
             .get("id")
             .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
+            .map(std::string::ToString::to_string);
 
         let credentials = lease.get("data").cloned().unwrap_or(serde_json::json!({}));
 
         let ttl = lease
             .get("ttl")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(request.ttl_seconds as i64);
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(i64::from(request.ttl_seconds));
 
         tracing::info!(
             secret_name = %secret_name,
@@ -402,15 +400,17 @@ impl DynamicSecretProvider for InfisicalSecretProvider {
         let resp = self
             .client
             .delete(&url)
-            .header("Authorization", format!("Bearer {}", access_token))
+            .header("Authorization", format!("Bearer {access_token}"))
             .send()
             .await
             .map_err(|e| SecretError::ProviderUnavailable {
                 provider: "infisical".to_string(),
-                detail: format!("Failed to revoke lease '{}': {}", lease_id, e),
+                detail: format!("Failed to revoke lease '{lease_id}': {e}"),
             })?;
 
-        if !resp.status().is_success() {
+        if resp.status().is_success() {
+            tracing::info!(lease_id = lease_id, "Infisical: Successfully revoked lease");
+        } else {
             let status = resp.status();
             let body_text = resp.text().await.unwrap_or_default();
             tracing::warn!(
@@ -420,8 +420,6 @@ impl DynamicSecretProvider for InfisicalSecretProvider {
                 "Infisical: Lease revocation returned non-success status"
             );
             // Don't fail on revocation errors - the lease may have already expired
-        } else {
-            tracing::info!(lease_id = lease_id, "Infisical: Successfully revoked lease");
         }
 
         Ok(())
@@ -442,7 +440,7 @@ impl DynamicSecretProvider for InfisicalSecretProvider {
         let resp = self
             .client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", access_token))
+            .header("Authorization", format!("Bearer {access_token}"))
             .send()
             .await
             .map_err(|e| SecretError::ProviderUnavailable {

@@ -68,7 +68,7 @@ pub fn validate_image(data: &[u8], filename: &str) -> Result<ImageMetadata, ApiA
 
     // Use image crate to validate and get dimensions
     let img = image::load_from_memory(data)
-        .map_err(|e| ApiAuthError::InvalidImageFormat(format!("Failed to decode image: {}", e)))?;
+        .map_err(|e| ApiAuthError::InvalidImageFormat(format!("Failed to decode image: {e}")))?;
 
     let (width, height) = img.dimensions();
 
@@ -161,15 +161,13 @@ fn validate_svg(data: &[u8]) -> Result<(), ApiAuthError> {
             for handler in &event_handlers {
                 if content_lower.contains(handler) {
                     return Err(ApiAuthError::InvalidImageFormat(format!(
-                        "SVG contains disallowed event handler: {}",
-                        handler
+                        "SVG contains disallowed event handler: {handler}"
                     )));
                 }
             }
         } else if content_lower.contains(pattern) {
             return Err(ApiAuthError::InvalidImageFormat(format!(
-                "SVG contains disallowed content: {}",
-                pattern
+                "SVG contains disallowed content: {pattern}"
             )));
         }
     }
@@ -178,6 +176,7 @@ fn validate_svg(data: &[u8]) -> Result<(), ApiAuthError> {
 }
 
 /// Calculate SHA-256 checksum of data.
+#[must_use] 
 pub fn calculate_checksum(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data);
@@ -185,11 +184,13 @@ pub fn calculate_checksum(data: &[u8]) -> String {
 }
 
 /// Get file extension from filename.
+#[must_use] 
 pub fn get_extension(filename: &str) -> Option<String> {
-    filename.rsplit('.').next().map(|ext| ext.to_lowercase())
+    filename.rsplit('.').next().map(str::to_lowercase)
 }
 
 /// Get content type from file extension.
+#[must_use] 
 pub fn content_type_from_extension(ext: &str) -> Option<&'static str> {
     match ext.to_lowercase().as_str() {
         "png" => Some("image/png"),

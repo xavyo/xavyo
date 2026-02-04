@@ -4,9 +4,9 @@
 //!
 //! # Modules
 //!
-//! - [`ids`] - Strongly typed identifiers (TenantId, UserId, SessionId)
-//! - [`traits`] - Multi-tenant traits (TenantAware)
-//! - [`error`] - Standardized error types (XavyoError)
+//! - [`ids`] - Strongly typed identifiers (`TenantId`, `UserId`, `SessionId`)
+//! - [`traits`] - Multi-tenant traits (`TenantAware`)
+//! - [`error`] - Standardized error types (`XavyoError`)
 //!
 //! # Example
 //!
@@ -33,11 +33,13 @@ pub use ids::{SessionId, TenantId, UserId};
 pub use traits::TenantAware;
 
 /// Returns a greeting message (legacy - to be removed)
+#[must_use] 
 pub fn hello() -> String {
     "Hello from Xavyo Core!".to_string()
 }
 
 /// Adds two numbers (legacy - to be removed)
+#[must_use] 
 pub fn add(a: i32, b: i32) -> i32 {
     a + b
 }

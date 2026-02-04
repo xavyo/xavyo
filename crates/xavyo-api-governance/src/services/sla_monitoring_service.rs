@@ -26,6 +26,7 @@ pub struct SlaMonitoringService {
 
 impl SlaMonitoringService {
     /// Create a new SLA monitoring service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         let notification_service = Arc::new(SlaNotificationService::with_defaults(pool.clone()));
         Self {
@@ -35,6 +36,7 @@ impl SlaMonitoringService {
     }
 
     /// Create with custom notification configuration.
+    #[must_use] 
     pub fn with_notification_config(pool: PgPool, config: SlaNotificationConfig) -> Self {
         let notification_service = Arc::new(SlaNotificationService::new(pool.clone(), config));
         Self {
@@ -44,6 +46,7 @@ impl SlaMonitoringService {
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -57,7 +60,7 @@ impl SlaMonitoringService {
 
         // Get tasks approaching SLA deadline that haven't received warning
         let tasks = sqlx::query_as::<_, TaskWithSla>(
-            r#"
+            r"
             SELECT
                 t.id as task_id,
                 t.tenant_id,
@@ -80,7 +83,7 @@ impl SlaMonitoringService {
             ORDER BY t.sla_deadline ASC
             LIMIT $2
             FOR UPDATE OF t SKIP LOCKED
-            "#,
+            ",
         )
         .bind(now)
         .bind(limit)
@@ -99,7 +102,7 @@ impl SlaMonitoringService {
 
             let warning_percent = task.warning_threshold_percent.unwrap_or(75);
             let target_seconds = task.target_duration_seconds.unwrap_or(3600);
-            let warning_seconds = (target_seconds as i64 * warning_percent as i64) / 100;
+            let warning_seconds = (i64::from(target_seconds) * i64::from(warning_percent)) / 100;
             let warning_time = deadline - Duration::seconds(warning_seconds);
 
             if now >= warning_time {
@@ -128,7 +131,7 @@ impl SlaMonitoringService {
 
         // Get tasks past SLA deadline that aren't marked as breached
         let tasks = sqlx::query_as::<_, TaskWithSla>(
-            r#"
+            r"
             SELECT
                 t.id as task_id,
                 t.tenant_id,
@@ -150,7 +153,7 @@ impl SlaMonitoringService {
             ORDER BY t.sla_deadline ASC
             LIMIT $2
             FOR UPDATE OF t SKIP LOCKED
-            "#,
+            ",
         )
         .bind(now)
         .bind(limit)
@@ -181,7 +184,7 @@ impl SlaMonitoringService {
 
         // Get all active tasks with their SLA policies
         let tasks = sqlx::query_as::<_, TaskWithSla>(
-            r#"
+            r"
             SELECT
                 t.id as task_id,
                 t.tenant_id,
@@ -199,7 +202,7 @@ impl SlaMonitoringService {
             WHERE t.tenant_id = $1
             AND t.status NOT IN ('completed', 'rejected', 'cancelled', 'failed_permanent')
             AND t.sla_deadline IS NOT NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -238,7 +241,7 @@ impl SlaMonitoringService {
                 (task.warning_threshold_percent, task.target_duration_seconds)
             {
                 // Warning when remaining time is less than warning_percent of total
-                let warning_seconds = (target_seconds as i64 * warning_percent as i64) / 100;
+                let warning_seconds = (i64::from(target_seconds) * i64::from(warning_percent)) / 100;
                 let warning_time = deadline - Duration::seconds(warning_seconds);
                 if now > warning_time && !task.sla_warning_sent {
                     match self
@@ -278,11 +281,11 @@ impl SlaMonitoringService {
     async fn mark_breach(&self, tenant_id: Uuid, task_id: Uuid, task: &TaskWithSla) -> Result<()> {
         // Update the task
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_manual_provisioning_tasks
             SET sla_breached = true, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(task_id)
         .bind(tenant_id)
@@ -400,19 +403,15 @@ impl SlaMonitoringService {
         ent_id: Uuid,
     ) -> Result<(String, String)> {
         let app = GovApplication::find_by_id(&self.pool, tenant_id, app_id)
-            .await?
-            .map(|a| a.name)
-            .unwrap_or_else(|| "Unknown".to_string());
+            .await?.map_or_else(|| "Unknown".to_string(), |a| a.name);
 
         let ent = GovEntitlement::find_by_id(&self.pool, tenant_id, ent_id)
-            .await?
-            .map(|e| e.name)
-            .unwrap_or_else(|| "Unknown".to_string());
+            .await?.map_or_else(|| "Unknown".to_string(), |e| e.name);
 
         Ok((app, ent))
     }
 
-    /// Lookup user email by ID (include tenant_id for defense-in-depth).
+    /// Lookup user email by ID (include `tenant_id` for defense-in-depth).
     async fn get_user_email(&self, tenant_id: Uuid, user_id: Uuid) -> Option<String> {
         match User::find_by_id_in_tenant(&self.pool, tenant_id, user_id).await {
             Ok(Some(user)) => Some(user.email),
@@ -427,7 +426,7 @@ impl SlaMonitoringService {
         }
     }
 
-    /// Get user display name or fallback to email or ID (include tenant_id for defense-in-depth).
+    /// Get user display name or fallback to email or ID (include `tenant_id` for defense-in-depth).
     async fn get_user_display_name(&self, tenant_id: Uuid, user_id: Uuid) -> String {
         match User::find_by_id_in_tenant(&self.pool, tenant_id, user_id).await {
             Ok(Some(user)) => user
@@ -435,7 +434,7 @@ impl SlaMonitoringService {
                 .or_else(|| {
                     // Build name from first + last
                     match (&user.first_name, &user.last_name) {
-                        (Some(first), Some(last)) => Some(format!("{} {}", first, last)),
+                        (Some(first), Some(last)) => Some(format!("{first} {last}")),
                         (Some(first), None) => Some(first.clone()),
                         (None, Some(last)) => Some(last.clone()),
                         (None, None) => None,
@@ -457,11 +456,11 @@ impl SlaMonitoringService {
     ) -> Result<()> {
         // Update the task
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_manual_provisioning_tasks
             SET sla_warning_sent = true, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(task_id)
         .bind(tenant_id)
@@ -569,7 +568,7 @@ impl SlaMonitoringService {
             .ok_or(GovernanceError::SlaPolicyNotFound(policy_id))?;
 
         Ok(Some(
-            created_at + Duration::seconds(policy.target_duration_seconds as i64),
+            created_at + Duration::seconds(i64::from(policy.target_duration_seconds)),
         ))
     }
 
@@ -615,7 +614,7 @@ impl SlaMonitoringService {
     /// Get summary of SLA compliance for a tenant.
     pub async fn get_compliance_summary(&self, tenant_id: Uuid) -> Result<SlaComplianceSummary> {
         let row = sqlx::query_as::<_, ComplianceRow>(
-            r#"
+            r"
             SELECT
                 COUNT(*) FILTER (WHERE sla_deadline IS NOT NULL AND status NOT IN ('completed', 'rejected', 'cancelled', 'failed_permanent')) as active_with_sla,
                 COUNT(*) FILTER (WHERE sla_breached = true AND status NOT IN ('completed', 'rejected', 'cancelled', 'failed_permanent')) as currently_breached,
@@ -625,7 +624,7 @@ impl SlaMonitoringService {
                 COUNT(*) FILTER (WHERE status = 'completed' AND sla_breached = true AND sla_deadline IS NOT NULL) as completed_breached
             FROM gov_manual_provisioning_tasks
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)

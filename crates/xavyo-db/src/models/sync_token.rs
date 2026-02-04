@@ -33,7 +33,7 @@ impl std::str::FromStr for SyncTokenType {
         match s.to_lowercase().as_str() {
             "precise" => Ok(SyncTokenType::Precise),
             "batch" => Ok(SyncTokenType::Batch),
-            _ => Err(format!("Unknown token type: {}", s)),
+            _ => Err(format!("Unknown token type: {s}")),
         }
     }
 }
@@ -55,6 +55,7 @@ pub struct SyncToken {
 
 impl SyncToken {
     /// Get the token type enum.
+    #[must_use] 
     pub fn token_type(&self) -> SyncTokenType {
         self.token_type.parse().unwrap_or(SyncTokenType::Batch)
     }
@@ -67,13 +68,13 @@ impl SyncToken {
         input: &CreateSyncToken,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_sync_tokens (
                 tenant_id, connector_id, token_value, token_type, sequence_number
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -91,10 +92,10 @@ impl SyncToken {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sync_tokens
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -109,10 +110,10 @@ impl SyncToken {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sync_tokens
             WHERE tenant_id = $1 AND connector_id = $2 AND is_valid = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -129,7 +130,7 @@ impl SyncToken {
         sequence_number: i64,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sync_tokens
             SET token_value = $3,
                 sequence_number = $4,
@@ -137,7 +138,7 @@ impl SyncToken {
                 updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -154,12 +155,12 @@ impl SyncToken {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sync_tokens
             SET is_valid = false, updated_at = NOW()
             WHERE tenant_id = $1 AND connector_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -174,10 +175,10 @@ impl SyncToken {
         connector_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_sync_tokens
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -195,7 +196,7 @@ impl SyncToken {
         input: &CreateSyncToken,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_sync_tokens (
                 tenant_id, connector_id, token_value, token_type, sequence_number
             )
@@ -208,7 +209,7 @@ impl SyncToken {
                 last_processed_at = NOW(),
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -229,7 +230,7 @@ impl SyncToken {
         new_sequence: i64,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sync_tokens
             SET token_value = $4,
                 sequence_number = $5,
@@ -239,7 +240,7 @@ impl SyncToken {
                 AND connector_id = $2
                 AND sequence_number = $3
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -261,6 +262,7 @@ pub struct CreateSyncToken {
 
 impl CreateSyncToken {
     /// Create a new initial token.
+    #[must_use] 
     pub fn initial(token_value: String, token_type: SyncTokenType) -> Self {
         Self {
             token_value,

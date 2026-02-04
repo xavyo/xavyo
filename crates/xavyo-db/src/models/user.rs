@@ -71,7 +71,7 @@ pub struct User {
     /// Timestamp when lockout expires (None for permanent lockout).
     pub locked_until: Option<DateTime<Utc>>,
 
-    /// Why account was locked: max_attempts, admin_action, security.
+    /// Why account was locked: `max_attempts`, `admin_action`, security.
     pub lockout_reason: Option<String>,
 
     // Password expiration tracking fields (F024)
@@ -147,12 +147,12 @@ impl User {
     /// Find a user by ID (without tenant filter).
     ///
     /// # Warning
-    /// This method does not filter by tenant_id. Use `find_by_id_in_tenant()` for
+    /// This method does not filter by `tenant_id`. Use `find_by_id_in_tenant()` for
     /// most use cases. This method should only be used when:
-    /// - Looking up a user to discover their tenant_id (e.g., in event consumers)
+    /// - Looking up a user to discover their `tenant_id` (e.g., in event consumers)
     /// - Internal operations where tenant isolation is enforced elsewhere
     ///
-    /// Always prefer `find_by_id_in_tenant()` when tenant_id is available.
+    /// Always prefer `find_by_id_in_tenant()` when `tenant_id` is available.
     pub async fn find_by_id(
         pool: &sqlx::PgPool,
         id: uuid::Uuid,
@@ -226,11 +226,11 @@ impl User {
         display_name: Option<String>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO users (tenant_id, email, password_hash, display_name, is_active, email_verified, email_verified_at)
             VALUES ($1, $2, '', $3, true, true, NOW())
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&email)
@@ -247,11 +247,11 @@ impl User {
         display_name: Option<String>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE users SET display_name = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -260,7 +260,7 @@ impl User {
         .await
     }
 
-    /// Update user's profile fields (display_name, first_name, last_name, avatar_url) within a specific tenant.
+    /// Update user's profile fields (`display_name`, `first_name`, `last_name`, `avatar_url`) within a specific tenant.
     pub async fn update_profile(
         pool: &sqlx::PgPool,
         tenant_id: uuid::Uuid,
@@ -271,7 +271,7 @@ impl User {
         avatar_url: Option<String>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE users
             SET display_name = COALESCE($3, display_name),
                 first_name = COALESCE($4, first_name),
@@ -280,7 +280,7 @@ impl User {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -300,7 +300,7 @@ impl User {
         new_email: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE users
             SET email = $3,
                 email_verified = true,
@@ -308,7 +308,7 @@ impl User {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -325,13 +325,13 @@ impl User {
         lifecycle_state_id: Option<uuid::Uuid>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE users
             SET lifecycle_state_id = $3,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -347,10 +347,10 @@ impl User {
         user_id: uuid::Uuid,
     ) -> Result<Option<uuid::Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT lifecycle_state_id FROM users
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -365,11 +365,11 @@ impl User {
         user_id: uuid::Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT m.* FROM users u
             JOIN users m ON m.id = u.manager_id AND m.tenant_id = u.tenant_id
             WHERE u.id = $1 AND u.tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -386,9 +386,9 @@ impl User {
         max_depth: i32,
     ) -> Result<Vec<uuid::Uuid>, sqlx::Error> {
         let rows: Vec<(uuid::Uuid,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT manager_id FROM get_manager_chain($1, $2, $3)
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -407,13 +407,13 @@ impl User {
         manager_id: Option<uuid::Uuid>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE users
             SET manager_id = $3,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -449,14 +449,14 @@ impl User {
         display_name: Option<&str>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO users (
                 tenant_id, email, password_hash, display_name,
                 is_active, email_verified, email_verified_at
             )
             VALUES ($1, $2, '', $3, true, true, NOW())
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(email)

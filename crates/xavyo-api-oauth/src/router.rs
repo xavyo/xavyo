@@ -3,8 +3,8 @@
 //! Configures routes for OAuth2/OIDC endpoints:
 //! - GET /oauth/authorize - Authorization endpoint
 //! - POST /oauth/authorize/consent - Consent submission
-//! - POST /oauth/token - Token endpoint (includes device_code grant)
-//! - GET /oauth/userinfo - UserInfo endpoint
+//! - POST /oauth/token - Token endpoint (includes `device_code` grant)
+//! - GET /oauth/userinfo - `UserInfo` endpoint
 //! - POST /oauth/device/code - RFC 8628 Device Authorization endpoint
 //! - GET /device - Device verification page
 //! - POST /device/verify - Verify user code
@@ -52,15 +52,15 @@ pub struct OAuthSigningKey {
 pub struct OAuthState {
     /// Database connection pool.
     pub pool: PgPool,
-    /// OAuth2 client service.
+    /// `OAuth2` client service.
     pub client_service: Arc<OAuth2ClientService>,
     /// Authorization service.
     pub authorization_service: Arc<AuthorizationService>,
     /// Token service.
     pub token_service: Arc<TokenService>,
-    /// UserInfo service.
+    /// `UserInfo` service.
     pub userinfo_service: Arc<UserInfoService>,
-    /// Issuer URL (e.g., "https://idp.xavyo.com").
+    /// Issuer URL (e.g., "<https://idp.xavyo.com>").
     pub issuer: String,
     /// JWT private key (PEM format) for signing tokens (active key).
     pub private_key: Vec<u8>,
@@ -89,11 +89,12 @@ impl OAuthState {
     /// # Arguments
     ///
     /// * `pool` - Database connection pool
-    /// * `issuer` - Issuer URL (e.g., "https://idp.xavyo.com")
+    /// * `issuer` - Issuer URL (e.g., "<https://idp.xavyo.com>")
     /// * `private_key` - JWT private key in PEM format
     /// * `public_key` - JWT public key in PEM format
     /// * `key_id` - Key ID for JWKS
     /// * `csrf_secret` - CSRF secret for consent form protection (MUST be independent of JWT key)
+    #[must_use] 
     pub fn new(
         pool: PgPool,
         issuer: String,
@@ -130,6 +131,7 @@ impl OAuthState {
     /// * `key_id` - Active key ID
     /// * `signing_keys` - All signing keys (active + rotated)
     /// * `csrf_secret` - CSRF secret for consent form protection (MUST be independent of JWT key)
+    #[must_use] 
     pub fn with_signing_keys(
         pool: PgPool,
         issuer: String,
@@ -170,8 +172,8 @@ impl OAuthState {
 
     /// Set the revocation cache (F084).
     ///
-    /// Call this after construction to share the RevocationCache instance
-    /// used by jwt_auth_middleware with the OAuth2 revocation/introspection handlers.
+    /// Call this after construction to share the `RevocationCache` instance
+    /// used by `jwt_auth_middleware` with the `OAuth2` revocation/introspection handlers.
     #[must_use]
     pub fn with_revocation_cache(mut self, cache: RevocationCache) -> Self {
         self.revocation_cache = Some(cache);
@@ -210,11 +212,13 @@ impl OAuthState {
     }
 
     /// Returns the active signing key.
+    #[must_use] 
     pub fn active_signing_key(&self) -> Option<&OAuthSigningKey> {
         self.signing_keys.iter().find(|k| k.is_active)
     }
 
     /// Find a signing key by its kid.
+    #[must_use] 
     pub fn find_key_by_kid(&self, kid: &str) -> Option<&OAuthSigningKey> {
         self.signing_keys.iter().find(|k| k.kid == kid)
     }
@@ -223,6 +227,7 @@ impl OAuthState {
     ///
     /// SECURITY: Returns an independently-generated secret that is NOT derived
     /// from the JWT signing key. This prevents key material reuse vulnerabilities.
+    #[must_use] 
     pub fn csrf_secret(&self) -> &[u8] {
         &self.csrf_secret
     }
@@ -232,6 +237,7 @@ impl OAuthState {
     /// Returns `true` if the issuer URL indicates a production deployment
     /// (i.e., not localhost). Used to determine cookie security flags.
     #[inline]
+    #[must_use] 
     pub fn is_production(&self) -> bool {
         !self.issuer.starts_with("http://localhost")
     }
@@ -246,20 +252,20 @@ impl OAuthState {
 /// - `GET /.well-known/openid-configuration` - OIDC Discovery document
 /// - `GET /.well-known/jwks.json` - JSON Web Key Set
 /// - `GET /oauth/authorize` - Authorization endpoint (redirects to login)
-/// - `POST /oauth/token` - Token endpoint (supports device_code grant)
+/// - `POST /oauth/token` - Token endpoint (supports `device_code` grant)
 /// - `POST /oauth/device/code` - RFC 8628 Device Authorization endpoint
 ///
 /// ## Protected Endpoints (require valid access token)
 ///
-/// - `GET /oauth/userinfo` - UserInfo endpoint (requires openid scope)
+/// - `GET /oauth/userinfo` - `UserInfo` endpoint (requires openid scope)
 ///
 /// ## Admin Endpoints (require admin role)
 ///
-/// - `GET /admin/oauth/clients` - List OAuth2 clients
-/// - `POST /admin/oauth/clients` - Create OAuth2 client
-/// - `GET /admin/oauth/clients/:id` - Get OAuth2 client by ID
-/// - `PUT /admin/oauth/clients/:id` - Update OAuth2 client
-/// - `DELETE /admin/oauth/clients/:id` - Deactivate OAuth2 client
+/// - `GET /admin/oauth/clients` - List `OAuth2` clients
+/// - `POST /admin/oauth/clients` - Create `OAuth2` client
+/// - `GET /admin/oauth/clients/:id` - Get `OAuth2` client by ID
+/// - `PUT /admin/oauth/clients/:id` - Update `OAuth2` client
+/// - `DELETE /admin/oauth/clients/:id` - Deactivate `OAuth2` client
 /// - `POST /admin/oauth/clients/:id/regenerate-secret` - Regenerate client secret
 ///
 /// # Arguments

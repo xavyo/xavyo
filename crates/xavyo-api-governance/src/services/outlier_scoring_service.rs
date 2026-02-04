@@ -72,14 +72,16 @@ pub struct OutlierScoringService {
 }
 
 impl OutlierScoringService {
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Calculate Z-score for a value given mean and standard deviation.
     ///
-    /// Z-score = (value - mean) / std_dev
-    /// Returns 0 if std_dev is 0 (no variation in data).
+    /// Z-score = (value - mean) / `std_dev`
+    /// Returns 0 if `std_dev` is 0 (no variation in data).
+    #[must_use] 
     pub fn calculate_z_score(value: f64, mean: f64, std_dev: f64) -> f64 {
         if std_dev <= 0.0 {
             return 0.0;
@@ -94,6 +96,7 @@ impl OutlierScoringService {
     /// - Z-score of 2 maps to ~88
     /// - Z-score of 3 maps to ~95
     /// - Negative Z-scores map below 50
+    #[must_use] 
     pub fn normalize_z_score_to_percentage(z_score: f64) -> f64 {
         // Use logistic function to map z-score to 0-100
         // Adjusted so z=0 -> 50, z=2 -> ~88, z=-2 -> ~12
@@ -102,6 +105,7 @@ impl OutlierScoringService {
     }
 
     /// Calculate deviation factor from Z-score (0-100 scale).
+    #[must_use] 
     pub fn z_score_to_deviation_factor(z_score: f64) -> f64 {
         // Absolute value since we care about magnitude of deviation
         Self::normalize_z_score_to_percentage(z_score.abs())
@@ -109,8 +113,9 @@ impl OutlierScoringService {
 
     /// Calculate weighted composite score from factor scores.
     ///
-    /// Each factor contributes: raw_value * weight
+    /// Each factor contributes: `raw_value` * weight
     /// Sum is clamped to 0-100.
+    #[must_use] 
     pub fn calculate_weighted_score(factors: &FactorBreakdown, weights: &ScoringWeights) -> f64 {
         let mut total = 0.0;
 
@@ -138,6 +143,7 @@ impl OutlierScoringService {
     /// - Normal: Score below threshold or no peer groups flag as outlier
     /// - Outlier: At least one peer group Z-score exceeds confidence threshold
     /// - Unclassifiable: No valid peer groups for comparison
+    #[must_use] 
     pub fn classify_user(
         peer_scores: &[PeerGroupScore],
         _confidence_threshold: f64,
@@ -158,6 +164,7 @@ impl OutlierScoringService {
     }
 
     /// Score a user against a single peer group.
+    #[must_use] 
     pub fn score_against_peer_group(
         &self,
         user: &UserAccessProfile,
@@ -166,14 +173,14 @@ impl OutlierScoringService {
     ) -> PeerGroupScore {
         // Calculate Z-score for entitlement count
         let entitlement_z = Self::calculate_z_score(
-            user.entitlement_count as f64,
+            f64::from(user.entitlement_count),
             stats.mean_entitlements,
             stats.std_dev_entitlements,
         );
 
         // Calculate Z-score for role count
         let role_z = Self::calculate_z_score(
-            user.role_count as f64,
+            f64::from(user.role_count),
             stats.mean_roles,
             stats.std_dev_roles,
         );
@@ -202,6 +209,7 @@ impl OutlierScoringService {
     ///
     /// Measures how many of the user's roles are uncommon in their peer groups.
     /// Higher score = more unusual roles.
+    #[must_use] 
     pub fn calculate_role_frequency_factor(
         user: &UserAccessProfile,
         peer_stats: &[PeerGroupStats],
@@ -226,8 +234,7 @@ impl OutlierScoringService {
                 stats
                     .role_frequencies
                     .get(role_id)
-                    .map(|&freq| freq < frequency_threshold)
-                    .unwrap_or(true) // Role not found = unusual
+                    .is_none_or(|&freq| freq < frequency_threshold) // Role not found = unusual
             });
 
             if is_unusual {
@@ -235,7 +242,7 @@ impl OutlierScoringService {
             }
         }
 
-        let unusual_ratio = unusual_role_count as f64 / total_roles as f64;
+        let unusual_ratio = f64::from(unusual_role_count) / total_roles as f64;
         let raw_value = unusual_ratio * 100.0;
         let contribution = raw_value * weight;
 
@@ -256,6 +263,7 @@ impl OutlierScoringService {
     ///
     /// Compares user's entitlement count to peer average.
     /// Uses highest deviation across peer groups.
+    #[must_use] 
     pub fn calculate_entitlement_count_factor(
         user: &UserAccessProfile,
         peer_stats: &[PeerGroupStats],
@@ -275,7 +283,7 @@ impl OutlierScoringService {
 
         for stats in peer_stats {
             let z_score = Self::calculate_z_score(
-                user.entitlement_count as f64,
+                f64::from(user.entitlement_count),
                 stats.mean_entitlements,
                 stats.std_dev_entitlements,
             );
@@ -304,6 +312,7 @@ impl OutlierScoringService {
     ///
     /// Analyzes how user's role assignments differ from typical patterns.
     /// Placeholder: Uses role count deviation as proxy.
+    #[must_use] 
     pub fn calculate_assignment_pattern_factor(
         user: &UserAccessProfile,
         peer_stats: &[PeerGroupStats],
@@ -323,7 +332,7 @@ impl OutlierScoringService {
 
         for stats in peer_stats {
             let z_score = Self::calculate_z_score(
-                user.role_count as f64,
+                f64::from(user.role_count),
                 stats.mean_roles,
                 stats.std_dev_roles,
             );
@@ -352,13 +361,14 @@ impl OutlierScoringService {
     ///
     /// Measures how many peer groups the user belongs to.
     /// Users in very few groups may be harder to classify.
+    #[must_use] 
     pub fn calculate_peer_group_coverage_factor(
         user: &UserAccessProfile,
         total_applicable_groups: i32,
         weight: f64,
     ) -> FactorScore {
         let coverage = if total_applicable_groups > 0 {
-            user.peer_group_ids.len() as f64 / total_applicable_groups as f64
+            user.peer_group_ids.len() as f64 / f64::from(total_applicable_groups)
         } else {
             0.0
         };
@@ -383,6 +393,7 @@ impl OutlierScoringService {
     ///
     /// Compares current score to previous score.
     /// Large increases are more concerning.
+    #[must_use] 
     pub fn calculate_historical_deviation_factor(
         current_score: f64,
         previous_score: Option<f64>,
@@ -399,7 +410,7 @@ impl OutlierScoringService {
                     raw_value,
                     weight,
                     contribution,
-                    details: format!("Score changed by {:.1} from previous {:.1}", change, prev),
+                    details: format!("Score changed by {change:.1} from previous {prev:.1}"),
                 }
             }
             None => FactorScore {
@@ -412,6 +423,7 @@ impl OutlierScoringService {
     }
 
     /// Score a user against all their peer groups.
+    #[must_use] 
     pub fn score_user(
         &self,
         user: &UserAccessProfile,
@@ -767,7 +779,7 @@ impl OutlierScoringService {
             }
 
             // Update progress
-            let progress = ((users_processed as f64 / total_users as f64) * 100.0) as i32;
+            let progress = ((f64::from(users_processed) / total_users as f64) * 100.0) as i32;
             let _ = GovOutlierAnalysis::update_progress(
                 &self.pool,
                 tenant_id,
@@ -796,7 +808,7 @@ impl OutlierScoringService {
     async fn load_user_profiles(&self, tenant_id: Uuid) -> Result<Vec<UserAccessProfile>> {
         // Query to get users with their entitlement counts and peer group memberships
         let rows: Vec<UserProfileRow> = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 u.id as user_id,
                 COALESCE(ec.entitlement_count, 0) as entitlement_count,
@@ -828,7 +840,7 @@ impl OutlierScoringService {
                 LIMIT 1
             ) prev ON true
             WHERE u.tenant_id = $1 AND u.is_active = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -969,7 +981,9 @@ impl OutlierScoringService {
             .map_err(GovernanceError::Database)?;
 
         // Then update it to the requested status
-        if status != OutlierDispositionStatus::New {
+        if status == OutlierDispositionStatus::New {
+            Ok(disposition)
+        } else {
             let update_input = UpdateDisposition {
                 status,
                 justification,
@@ -987,8 +1001,6 @@ impl OutlierScoringService {
             .await
             .map_err(GovernanceError::Database)?
             .ok_or_else(|| GovernanceError::OutlierDispositionNotFound(disposition.id))
-        } else {
-            Ok(disposition)
         }
     }
 
@@ -1034,7 +1046,7 @@ impl OutlierScoringService {
         .ok_or_else(|| {
             GovernanceError::OutlierDispositionInvalidTransition(
                 format!("{:?}", disposition.status),
-                format!("{:?}", new_status),
+                format!("{new_status:?}"),
             )
         })
     }

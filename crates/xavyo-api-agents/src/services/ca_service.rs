@@ -31,7 +31,8 @@ pub struct CaService {
 }
 
 impl CaService {
-    /// Create a new CaService.
+    /// Create a new `CaService`.
+    #[must_use] 
     pub fn new(pool: PgPool, encryption: Arc<EncryptionService>) -> Self {
         Self {
             pool,
@@ -40,7 +41,7 @@ impl CaService {
         }
     }
 
-    /// Create a new CaService with a secret provider for external CA credentials.
+    /// Create a new `CaService` with a secret provider for external CA credentials.
     pub fn with_secret_provider(
         pool: PgPool,
         encryption: Arc<EncryptionService>,
@@ -71,13 +72,12 @@ impl CaService {
             // Load from secret provider
             let secret_value = provider.get_secret(secret_name).await.map_err(|e| {
                 ApiAgentsError::CaCreationFailed(format!(
-                    "Failed to load secret '{}': {}",
-                    secret_name, e
+                    "Failed to load secret '{secret_name}': {e}"
                 ))
             })?;
 
-            secret_value.as_str().map(|s| s.to_string()).map_err(|e| {
-                ApiAgentsError::CaCreationFailed(format!("Invalid secret value: {}", e))
+            secret_value.as_str().map(std::string::ToString::to_string).map_err(|e| {
+                ApiAgentsError::CaCreationFailed(format!("Invalid secret value: {e}"))
             })
         } else {
             // No secret provider configured - return as-is (development mode)
@@ -111,9 +111,9 @@ impl CaService {
 
         // Determine key algorithm
         let algorithm = match request.key_algorithm.as_deref() {
-            Some("ecdsa-p384") | Some("ecdsa_p384") => KeyAlgorithm::EcdsaP384,
-            Some("rsa-2048") | Some("rsa2048") => KeyAlgorithm::Rsa2048,
-            Some("rsa-4096") | Some("rsa4096") => KeyAlgorithm::Rsa4096,
+            Some("ecdsa-p384" | "ecdsa_p384") => KeyAlgorithm::EcdsaP384,
+            Some("rsa-2048" | "rsa2048") => KeyAlgorithm::Rsa2048,
+            Some("rsa-4096" | "rsa4096") => KeyAlgorithm::Rsa4096,
             _ => KeyAlgorithm::EcdsaP256, // Default
         };
 
@@ -135,12 +135,12 @@ impl CaService {
 
         // Parse certificate to get not_before/not_after
         let cert_der = ::pem::parse(&ca_cert_pem).map_err(|e| {
-            ApiAgentsError::CaCreationFailed(format!("Failed to parse CA cert: {}", e))
+            ApiAgentsError::CaCreationFailed(format!("Failed to parse CA cert: {e}"))
         })?;
 
         let (_, cert) = x509_parser::certificate::X509Certificate::from_der(cert_der.contents())
             .map_err(|e| {
-                ApiAgentsError::CaCreationFailed(format!("Failed to parse X.509: {:?}", e))
+                ApiAgentsError::CaCreationFailed(format!("Failed to parse X.509: {e:?}"))
             })?;
 
         let not_before: DateTime<Utc> =
@@ -148,7 +148,7 @@ impl CaService {
                 .unwrap_or_else(Utc::now);
         let not_after: DateTime<Utc> =
             DateTime::from_timestamp(cert.validity().not_after.timestamp(), 0)
-                .unwrap_or_else(|| Utc::now() + chrono::Duration::days(validity_days as i64));
+                .unwrap_or_else(|| Utc::now() + chrono::Duration::days(i64::from(validity_days)));
 
         // Create DB record
         let ca = CertificateAuthority::create_internal(
@@ -195,12 +195,12 @@ impl CaService {
 
         // Parse the CA chain certificate
         let cert_der = ::pem::parse(&request.ca_chain_pem).map_err(|e| {
-            ApiAgentsError::CaCreationFailed(format!("Failed to parse CA chain: {}", e))
+            ApiAgentsError::CaCreationFailed(format!("Failed to parse CA chain: {e}"))
         })?;
 
         let (_, cert) = x509_parser::certificate::X509Certificate::from_der(cert_der.contents())
             .map_err(|e| {
-                ApiAgentsError::CaCreationFailed(format!("Failed to parse X.509: {:?}", e))
+                ApiAgentsError::CaCreationFailed(format!("Failed to parse X.509: {e:?}"))
             })?;
 
         let subject_dn = format_subject_dn(cert.subject());
@@ -437,8 +437,7 @@ impl CaService {
                 let key_pem = if let Some(ref encrypted) = ca.private_key_encrypted {
                     let encrypted_str = String::from_utf8(encrypted.clone()).map_err(|e| {
                         ApiAgentsError::CaCreationFailed(format!(
-                            "Invalid encrypted key encoding: {}",
-                            e
+                            "Invalid encrypted key encoding: {e}"
                         ))
                     })?;
                     self.encryption.decrypt(&encrypted_str)?
@@ -474,7 +473,7 @@ impl CaService {
                 let base_config: serde_json::Value = external_config;
                 let mut config: StepCaConfig =
                     serde_json::from_value(base_config).map_err(|e| {
-                        ApiAgentsError::CaCreationFailed(format!("Invalid step-ca config: {}", e))
+                        ApiAgentsError::CaCreationFailed(format!("Invalid step-ca config: {e}"))
                     })?;
 
                 // Fill in fields from the CA record
@@ -499,7 +498,7 @@ impl CaService {
                 let base_config: serde_json::Value = external_config;
                 let mut config: VaultPkiConfig =
                     serde_json::from_value(base_config).map_err(|e| {
-                        ApiAgentsError::CaCreationFailed(format!("Invalid Vault PKI config: {}", e))
+                        ApiAgentsError::CaCreationFailed(format!("Invalid Vault PKI config: {e}"))
                     })?;
 
                 // Fill in fields from the CA record
@@ -521,7 +520,7 @@ impl CaService {
 fn format_subject_dn(subject: &x509_parser::x509::X509Name) -> String {
     subject
         .iter()
-        .flat_map(|rdn| rdn.iter())
+        .flat_map(x509_parser::prelude::RelativeDistinguishedName::iter)
         .filter_map(|attr| {
             let oid_str = match attr.attr_type().to_string().as_str() {
                 "2.5.4.3" => Some("CN"),
@@ -548,7 +547,7 @@ pub struct CreateInternalCaRequest {
     pub description: Option<String>,
     /// Organization name for the CA certificate.
     pub organization: String,
-    /// Key algorithm: "ecdsa_p256" (default), "ecdsa_p384", "rsa2048", "rsa4096".
+    /// Key algorithm: "`ecdsa_p256`" (default), "`ecdsa_p384`", "rsa2048", "rsa4096".
     pub key_algorithm: Option<String>,
     /// Validity period in days (default: 3650 = 10 years).
     pub validity_days: Option<i32>,
@@ -566,7 +565,7 @@ pub struct CreateInternalCaRequest {
 #[derive(Debug, Clone, serde::Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CreateExternalCaRequest {
-    /// CA type: "step_ca" or "vault_pki".
+    /// CA type: "`step_ca`" or "`vault_pki`".
     pub ca_type: String,
     /// Name of the CA.
     pub name: String,

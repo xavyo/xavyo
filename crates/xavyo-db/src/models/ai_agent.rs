@@ -1,6 +1,6 @@
 //! AI Agent model for agent identity registry.
 //!
-//! Represents AI agent identities with A2A AgentCard support,
+//! Represents AI agent identities with A2A `AgentCard` support,
 //! ownership tracking, and security settings per OWASP ASI guidelines.
 
 use chrono::{DateTime, Utc};
@@ -42,7 +42,7 @@ impl std::str::FromStr for AiAgentType {
             "copilot" => Ok(AiAgentType::Copilot),
             "workflow" => Ok(AiAgentType::Workflow),
             "orchestrator" => Ok(AiAgentType::Orchestrator),
-            _ => Err(format!("Invalid agent type: {}", s)),
+            _ => Err(format!("Invalid agent type: {s}")),
         }
     }
 }
@@ -77,7 +77,7 @@ impl std::str::FromStr for AiAgentStatus {
             "active" => Ok(AiAgentStatus::Active),
             "suspended" => Ok(AiAgentStatus::Suspended),
             "expired" => Ok(AiAgentStatus::Expired),
-            _ => Err(format!("Invalid agent status: {}", s)),
+            _ => Err(format!("Invalid agent status: {s}")),
         }
     }
 }
@@ -122,7 +122,7 @@ pub struct AiAgent {
     /// A2A Protocol: URL to /.well-known/agent.json.
     pub agent_card_url: Option<String>,
 
-    /// A2A Protocol: JWS signature for AgentCard verification.
+    /// A2A Protocol: JWS signature for `AgentCard` verification.
     pub agent_card_signature: Option<String>,
 
     /// Agent status (active, suspended, expired).
@@ -156,7 +156,7 @@ pub struct AiAgent {
     /// When grace period expires and agent will be suspended.
     pub grace_period_ends_at: Option<DateTime<Utc>>,
 
-    /// Reason for suspension (Inactive, CertificationRevoked, Emergency, Manual).
+    /// Reason for suspension (Inactive, `CertificationRevoked`, Emergency, Manual).
     pub suspension_reason: Option<String>,
 
     // F108: Credential rotation tracking
@@ -197,11 +197,13 @@ impl AiAgent {
     }
 
     /// Check if the agent is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         self.status == "active"
     }
 
     /// Check if the agent has expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
             expires_at < Utc::now()
@@ -242,7 +244,7 @@ pub struct CreateAiAgent {
     /// Model version.
     pub model_version: Option<String>,
 
-    /// A2A AgentCard URL.
+    /// A2A `AgentCard` URL.
     pub agent_card_url: Option<String>,
 
     /// Risk level (default: medium).
@@ -310,10 +312,10 @@ pub struct UpdateAiAgent {
     /// Updated model version.
     pub model_version: Option<String>,
 
-    /// Updated AgentCard URL.
+    /// Updated `AgentCard` URL.
     pub agent_card_url: Option<String>,
 
-    /// Updated AgentCard signature.
+    /// Updated `AgentCard` signature.
     pub agent_card_signature: Option<String>,
 
     /// Updated risk level.
@@ -373,10 +375,10 @@ impl AiAgent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM ai_agents
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -384,20 +386,20 @@ impl AiAgent {
         .await
     }
 
-    /// Update the last_rotation_at timestamp for an agent.
+    /// Update the `last_rotation_at` timestamp for an agent.
     pub async fn update_last_rotation(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE ai_agents
             SET last_rotation_at = NOW(),
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -412,10 +414,10 @@ impl AiAgent {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM ai_agents
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -432,36 +434,36 @@ impl AiAgent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM ai_agents
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         if filter.agent_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND agent_type = ${}", param_count));
+            query.push_str(&format!(" AND agent_type = ${param_count}"));
         }
 
         if filter.owner_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND owner_id = ${}", param_count));
+            query.push_str(&format!(" AND owner_id = ${param_count}"));
         }
 
         if filter.risk_level.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND risk_level = ${}", param_count));
+            query.push_str(&format!(" AND risk_level = ${param_count}"));
         }
 
         if filter.name_prefix.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${} || '%'", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count} || '%'"));
         }
 
         query.push_str(&format!(
@@ -498,36 +500,36 @@ impl AiAgent {
         filter: &AiAgentFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM ai_agents
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         if filter.agent_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND agent_type = ${}", param_count));
+            query.push_str(&format!(" AND agent_type = ${param_count}"));
         }
 
         if filter.owner_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND owner_id = ${}", param_count));
+            query.push_str(&format!(" AND owner_id = ${param_count}"));
         }
 
         if filter.risk_level.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND risk_level = ${}", param_count));
+            query.push_str(&format!(" AND risk_level = ${param_count}"));
         }
 
         if filter.name_prefix.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${} || '%'", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count} || '%'"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -558,7 +560,7 @@ impl AiAgent {
         input: CreateAiAgent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO ai_agents (
                 tenant_id, name, description, agent_type, owner_id, team_id,
                 backup_owner_id, model_provider, model_name, model_version, agent_card_url,
@@ -567,7 +569,7 @@ impl AiAgent {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -602,79 +604,79 @@ impl AiAgent {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.owner_id.is_some() {
-            updates.push(format!("owner_id = ${}", param_idx));
+            updates.push(format!("owner_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.team_id.is_some() {
-            updates.push(format!("team_id = ${}", param_idx));
+            updates.push(format!("team_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.backup_owner_id.is_some() {
-            updates.push(format!("backup_owner_id = ${}", param_idx));
+            updates.push(format!("backup_owner_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.model_provider.is_some() {
-            updates.push(format!("model_provider = ${}", param_idx));
+            updates.push(format!("model_provider = ${param_idx}"));
             param_idx += 1;
         }
         if input.model_name.is_some() {
-            updates.push(format!("model_name = ${}", param_idx));
+            updates.push(format!("model_name = ${param_idx}"));
             param_idx += 1;
         }
         if input.model_version.is_some() {
-            updates.push(format!("model_version = ${}", param_idx));
+            updates.push(format!("model_version = ${param_idx}"));
             param_idx += 1;
         }
         if input.agent_card_url.is_some() {
-            updates.push(format!("agent_card_url = ${}", param_idx));
+            updates.push(format!("agent_card_url = ${param_idx}"));
             param_idx += 1;
         }
         if input.agent_card_signature.is_some() {
-            updates.push(format!("agent_card_signature = ${}", param_idx));
+            updates.push(format!("agent_card_signature = ${param_idx}"));
             param_idx += 1;
         }
         if input.risk_level.is_some() {
-            updates.push(format!("risk_level = ${}", param_idx));
+            updates.push(format!("risk_level = ${param_idx}"));
             param_idx += 1;
         }
         if input.max_token_lifetime_secs.is_some() {
-            updates.push(format!("max_token_lifetime_secs = ${}", param_idx));
+            updates.push(format!("max_token_lifetime_secs = ${param_idx}"));
             param_idx += 1;
         }
         if input.requires_human_approval.is_some() {
-            updates.push(format!("requires_human_approval = ${}", param_idx));
+            updates.push(format!("requires_human_approval = ${param_idx}"));
             param_idx += 1;
         }
         if input.expires_at.is_some() {
-            updates.push(format!("expires_at = ${}", param_idx));
+            updates.push(format!("expires_at = ${param_idx}"));
             param_idx += 1;
         }
         if input.inactivity_threshold_days.is_some() {
-            updates.push(format!("inactivity_threshold_days = ${}", param_idx));
+            updates.push(format!("inactivity_threshold_days = ${param_idx}"));
             param_idx += 1;
         }
         if input.grace_period_ends_at.is_some() {
-            updates.push(format!("grace_period_ends_at = ${}", param_idx));
+            updates.push(format!("grace_period_ends_at = ${param_idx}"));
             param_idx += 1;
         }
         if input.suspension_reason.is_some() {
-            updates.push(format!("suspension_reason = ${}", param_idx));
+            updates.push(format!("suspension_reason = ${param_idx}"));
             param_idx += 1;
         }
         if input.rotation_interval_days.is_some() {
-            updates.push(format!("rotation_interval_days = ${}", param_idx));
+            updates.push(format!("rotation_interval_days = ${param_idx}"));
             param_idx += 1;
         }
         if input.last_rotation_at.is_some() {
-            updates.push(format!("last_rotation_at = ${}", param_idx));
+            updates.push(format!("last_rotation_at = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -755,10 +757,10 @@ impl AiAgent {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM ai_agents
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -775,12 +777,12 @@ impl AiAgent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE ai_agents
             SET status = 'suspended', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -795,12 +797,12 @@ impl AiAgent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE ai_agents
             SET status = 'active', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'suspended'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -815,11 +817,11 @@ impl AiAgent {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE ai_agents
             SET last_activity_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

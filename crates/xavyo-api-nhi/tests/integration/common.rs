@@ -27,14 +27,14 @@ pub async fn create_test_tenant(pool: &PgPool) -> Uuid {
     let tenant_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO tenants (id, name, slug, created_at)
         VALUES ($1, $2, $3, NOW())
         ON CONFLICT (id) DO NOTHING
-        "#,
+        ",
     )
     .bind(tenant_id)
-    .bind(format!("Test Tenant {}", tenant_id))
+    .bind(format!("Test Tenant {tenant_id}"))
     .bind(format!("test-{}", &tenant_id.to_string()[..8]))
     .execute(pool)
     .await
@@ -48,11 +48,11 @@ pub async fn create_test_user(pool: &PgPool, tenant_id: Uuid, email: &str) -> Uu
     let user_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO users (id, tenant_id, email, password_hash, is_active, created_at, updated_at)
         VALUES ($1, $2, $3, $4, true, NOW(), NOW())
         ON CONFLICT (id) DO NOTHING
-        "#,
+        ",
     )
     .bind(user_id)
     .bind(tenant_id)
@@ -75,17 +75,17 @@ pub async fn create_test_service_account(
     let sa_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_service_accounts (id, tenant_id, user_id, name, purpose, owner_id, status, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW(), NOW())
         ON CONFLICT (id) DO NOTHING
-        "#,
+        ",
     )
     .bind(sa_id)
     .bind(tenant_id)
     .bind(owner_id) // user_id is same as owner for test
     .bind(name)
-    .bind(format!("Test purpose for {}", name))
+    .bind(format!("Test purpose for {name}"))
     .bind(owner_id)
     .execute(pool)
     .await
@@ -94,9 +94,9 @@ pub async fn create_test_service_account(
     sa_id
 }
 
-/// Create a test NHI record in the appropriate table based on nhi_type.
-/// For 'service_account' -> gov_service_accounts table
-/// For 'ai_agent' -> ai_agents table
+/// Create a test NHI record in the appropriate table based on `nhi_type`.
+/// For '`service_account`' -> `gov_service_accounts` table
+/// For '`ai_agent`' -> `ai_agents` table
 pub async fn create_test_nhi(
     pool: &PgPool,
     tenant_id: Uuid,
@@ -110,19 +110,19 @@ pub async fn create_test_nhi(
         "service_account" => {
             // Use nhi_id as user_id to ensure uniqueness
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO gov_service_accounts (
                     id, tenant_id, user_id, name, purpose, owner_id, status,
                     created_at, updated_at
                 )
                 VALUES ($1, $2, $1, $3, $4, $5, 'active', NOW(), NOW())
                 ON CONFLICT (id) DO NOTHING
-                "#,
+                ",
             )
             .bind(nhi_id)
             .bind(tenant_id)
             .bind(name)
-            .bind(format!("Test NHI: {}", name))
+            .bind(format!("Test NHI: {name}"))
             .bind(owner_id)
             .execute(pool)
             .await
@@ -130,25 +130,25 @@ pub async fn create_test_nhi(
         }
         "ai_agent" => {
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO ai_agents (
                     id, tenant_id, name, description, agent_type, owner_id, status,
                     risk_level, created_at, updated_at
                 )
                 VALUES ($1, $2, $3, $4, 'autonomous', $5, 'active', 'low', NOW(), NOW())
                 ON CONFLICT (id) DO NOTHING
-                "#,
+                ",
             )
             .bind(nhi_id)
             .bind(tenant_id)
             .bind(name)
-            .bind(format!("Test NHI: {}", name))
+            .bind(format!("Test NHI: {name}"))
             .bind(owner_id)
             .execute(pool)
             .await
             .expect("Failed to create test AI agent");
         }
-        _ => panic!("Unknown nhi_type: {}", nhi_type),
+        _ => panic!("Unknown nhi_type: {nhi_type}"),
     }
 
     nhi_id
@@ -249,7 +249,7 @@ impl TestContext {
     }
 }
 
-/// Set risk score for an NHI via the gov_nhi_risk_scores table.
+/// Set risk score for an NHI via the `gov_nhi_risk_scores` table.
 pub async fn set_nhi_risk_score(pool: &PgPool, tenant_id: Uuid, nhi_id: Uuid, score: i32) {
     let risk_level = match score {
         0..=39 => "low",
@@ -259,11 +259,11 @@ pub async fn set_nhi_risk_score(pool: &PgPool, tenant_id: Uuid, nhi_id: Uuid, sc
     };
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_nhi_risk_scores (id, tenant_id, nhi_id, total_score, risk_level, factor_breakdown, calculated_at)
         VALUES (gen_random_uuid(), $1, $2, $3, $4::gov_risk_level, '{}', NOW())
         ON CONFLICT (tenant_id, nhi_id) DO UPDATE SET total_score = $3, risk_level = $4::gov_risk_level, calculated_at = NOW()
-        "#,
+        ",
     )
     .bind(tenant_id)
     .bind(nhi_id)

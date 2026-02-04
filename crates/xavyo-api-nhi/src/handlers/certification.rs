@@ -206,7 +206,7 @@ pub struct ItemListResponse {
 #[derive(Debug, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
 pub struct ListItemsQuery {
-    /// Filter by NHI type: service_account, ai_agent
+    /// Filter by NHI type: `service_account`, `ai_agent`
     pub nhi_type: Option<String>,
     /// Filter by status: pending, certified, revoked
     pub status: Option<String>,
@@ -498,7 +498,7 @@ pub async fn list_campaigns(
 
 /// Gets a specific campaign with item counts.
 ///
-/// GET /nhi/certifications/campaigns/:campaign_id
+/// GET /`nhi/certifications/campaigns/:campaign_id`
 #[cfg_attr(feature = "openapi", utoipa::path(
     get,
     path = "/nhi/certifications/campaigns/{campaign_id}",
@@ -555,7 +555,7 @@ pub async fn get_campaign(
 
 /// Launches a campaign.
 ///
-/// POST /nhi/certifications/campaigns/:campaign_id/launch
+/// POST /`nhi/certifications/campaigns/:campaign_id/launch`
 #[cfg_attr(feature = "openapi", utoipa::path(
     post,
     path = "/nhi/certifications/campaigns/{campaign_id}/launch",
@@ -609,7 +609,7 @@ pub async fn launch_campaign(
 
 /// Cancels a campaign.
 ///
-/// POST /nhi/certifications/campaigns/:campaign_id/cancel
+/// POST /`nhi/certifications/campaigns/:campaign_id/cancel`
 #[cfg_attr(feature = "openapi", utoipa::path(
     post,
     path = "/nhi/certifications/campaigns/{campaign_id}/cancel",
@@ -656,7 +656,7 @@ pub async fn cancel_campaign(
 
 /// Lists items for a campaign.
 ///
-/// GET /nhi/certifications/campaigns/:campaign_id/items
+/// GET /`nhi/certifications/campaigns/:campaign_id/items`
 #[cfg_attr(feature = "openapi", utoipa::path(
     get,
     path = "/nhi/certifications/campaigns/{campaign_id}/items",
@@ -741,7 +741,7 @@ pub async fn list_campaign_items(
 
 /// Makes a decision on a certification item.
 ///
-/// POST /nhi/certifications/items/:item_id/decide
+/// POST /`nhi/certifications/items/:item_id/decide`
 #[cfg_attr(feature = "openapi", utoipa::path(
     post,
     path = "/nhi/certifications/items/{item_id}/decide",
@@ -819,7 +819,7 @@ pub async fn decide_item(
 
 /// Gets campaign summary statistics.
 ///
-/// GET /nhi/certifications/campaigns/:campaign_id/summary
+/// GET /`nhi/certifications/campaigns/:campaign_id/summary`
 #[cfg_attr(feature = "openapi", utoipa::path(
     get,
     path = "/nhi/certifications/campaigns/{campaign_id}/summary",

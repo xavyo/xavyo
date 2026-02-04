@@ -20,6 +20,7 @@ pub struct RiskEventService {
 
 impl RiskEventService {
     /// Create a new risk event service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -57,8 +58,7 @@ impl RiskEventService {
         let event = GovRiskEvent::find_by_id(&self.pool, tenant_id, event_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk event not found: {}",
-                event_id
+                "Risk event not found: {event_id}"
             )))?;
 
         Ok(RiskEventResponse::from(event))
@@ -102,8 +102,7 @@ impl RiskEventService {
         GovRiskEvent::find_by_id(&self.pool, tenant_id, event_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Risk event not found: {}",
-                event_id
+                "Risk event not found: {event_id}"
             )))?;
 
         GovRiskEvent::delete(&self.pool, tenant_id, event_id).await?;

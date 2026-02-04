@@ -23,6 +23,7 @@ pub struct ParameterService {
 
 impl ParameterService {
     /// Create a new parameter service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -264,7 +265,7 @@ impl ParameterService {
 
         // Update each parameter
         let mut results = Vec::new();
-        for param in values.iter() {
+        for param in &values {
             if let Some(updated) = GovRoleAssignmentParameter::update_by_assignment_and_parameter(
                 &self.pool,
                 tenant_id,

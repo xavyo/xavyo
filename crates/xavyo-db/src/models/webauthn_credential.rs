@@ -1,4 +1,4 @@
-//! WebAuthn credential model.
+//! `WebAuthn` credential model.
 //!
 //! Stores registered WebAuthn/FIDO2 credentials for MFA authentication.
 
@@ -7,14 +7,14 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgExecutor};
 use uuid::Uuid;
 
-/// Authenticator type for WebAuthn credentials.
+/// Authenticator type for `WebAuthn` credentials.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "varchar", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum AuthenticatorType {
     /// Platform authenticator (Touch ID, Windows Hello, Face ID).
     Platform,
-    /// Cross-platform authenticator (YubiKey, security keys).
+    /// Cross-platform authenticator (`YubiKey`, security keys).
     #[serde(rename = "cross-platform")]
     #[sqlx(rename = "cross-platform")]
     CrossPlatform,
@@ -36,12 +36,12 @@ impl std::str::FromStr for AuthenticatorType {
         match s.to_lowercase().as_str() {
             "platform" => Ok(Self::Platform),
             "cross-platform" | "crossplatform" => Ok(Self::CrossPlatform),
-            _ => Err(format!("Invalid authenticator type: {}", s)),
+            _ => Err(format!("Invalid authenticator type: {s}")),
         }
     }
 }
 
-/// A user's WebAuthn credential for MFA authentication.
+/// A user's `WebAuthn` credential for MFA authentication.
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct UserWebAuthnCredential {
     /// Unique identifier for this credential record.
@@ -96,7 +96,7 @@ pub struct UserWebAuthnCredential {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Data required to create a new WebAuthn credential.
+/// Data required to create a new `WebAuthn` credential.
 #[derive(Debug)]
 pub struct CreateWebAuthnCredential {
     pub user_id: Uuid,
@@ -142,7 +142,7 @@ impl From<UserWebAuthnCredential> for CredentialInfo {
 }
 
 impl UserWebAuthnCredential {
-    /// Create a new WebAuthn credential.
+    /// Create a new `WebAuthn` credential.
     pub async fn create<'e, E>(
         executor: E,
         data: CreateWebAuthnCredential,
@@ -151,14 +151,14 @@ impl UserWebAuthnCredential {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO user_webauthn_credentials (
                 user_id, tenant_id, credential_id, public_key, sign_count,
                 aaguid, name, authenticator_type, transports, backup_eligible, backup_state
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.user_id)
         .bind(data.tenant_id)
@@ -177,7 +177,7 @@ impl UserWebAuthnCredential {
 
     /// Find a credential by its ID.
     ///
-    /// **SECURITY WARNING**: This method does NOT filter by tenant_id.
+    /// **SECURITY WARNING**: This method does NOT filter by `tenant_id`.
     /// Use `find_by_id_and_tenant()` for tenant-isolated queries.
     #[deprecated(
         since = "0.1.0",
@@ -197,7 +197,7 @@ impl UserWebAuthnCredential {
 
     /// Find a credential by its ID with tenant isolation.
     ///
-    /// SECURITY: This method ensures tenant isolation by requiring tenant_id.
+    /// SECURITY: This method ensures tenant isolation by requiring `tenant_id`.
     pub async fn find_by_id_and_tenant<'e, E>(
         executor: E,
         tenant_id: Uuid,
@@ -215,9 +215,9 @@ impl UserWebAuthnCredential {
         .await
     }
 
-    /// Find a credential by its credential_id bytes.
+    /// Find a credential by its `credential_id` bytes.
     ///
-    /// **SECURITY WARNING**: This method does NOT filter by tenant_id.
+    /// **SECURITY WARNING**: This method does NOT filter by `tenant_id`.
     /// Use `find_by_credential_id_and_tenant()` for tenant-isolated queries.
     #[deprecated(
         since = "0.1.0",
@@ -238,9 +238,9 @@ impl UserWebAuthnCredential {
         .await
     }
 
-    /// Find a credential by its credential_id bytes with tenant isolation.
+    /// Find a credential by its `credential_id` bytes with tenant isolation.
     ///
-    /// SECURITY: This method ensures tenant isolation by requiring tenant_id.
+    /// SECURITY: This method ensures tenant isolation by requiring `tenant_id`.
     pub async fn find_by_credential_id_and_tenant<'e, E>(
         executor: E,
         tenant_id: Uuid,
@@ -260,7 +260,7 @@ impl UserWebAuthnCredential {
 
     /// Find all credentials for a user.
     ///
-    /// SECURITY: Caller must validate that user_id belongs to the current tenant.
+    /// SECURITY: Caller must validate that `user_id` belongs to the current tenant.
     pub async fn find_by_user_id<'e, E>(
         executor: E,
         user_id: Uuid,
@@ -278,7 +278,7 @@ impl UserWebAuthnCredential {
 
     /// Find all credentials for a user with tenant isolation.
     ///
-    /// SECURITY: This method ensures tenant isolation by requiring tenant_id.
+    /// SECURITY: This method ensures tenant isolation by requiring `tenant_id`.
     pub async fn find_by_user_id_and_tenant<'e, E>(
         executor: E,
         tenant_id: Uuid,
@@ -298,7 +298,7 @@ impl UserWebAuthnCredential {
 
     /// Count credentials for a user.
     ///
-    /// SECURITY: Caller must validate that user_id belongs to the current tenant.
+    /// SECURITY: Caller must validate that `user_id` belongs to the current tenant.
     pub async fn count_by_user_id<'e, E>(executor: E, user_id: Uuid) -> Result<i64, sqlx::Error>
     where
         E: PgExecutor<'e>,
@@ -314,7 +314,7 @@ impl UserWebAuthnCredential {
 
     /// Count credentials for a user with tenant isolation.
     ///
-    /// SECURITY: This method ensures tenant isolation by requiring tenant_id.
+    /// SECURITY: This method ensures tenant isolation by requiring `tenant_id`.
     pub async fn count_by_user_id_and_tenant<'e, E>(
         executor: E,
         tenant_id: Uuid,
@@ -354,7 +354,7 @@ impl UserWebAuthnCredential {
 
     /// Update the sign counter after successful authentication.
     ///
-    /// SECURITY: This method requires tenant_id to ensure tenant isolation.
+    /// SECURITY: This method requires `tenant_id` to ensure tenant isolation.
     pub async fn update_sign_count<'e, E>(
         executor: E,
         tenant_id: Uuid,
@@ -365,11 +365,11 @@ impl UserWebAuthnCredential {
         E: PgExecutor<'e>,
     {
         sqlx::query(
-            r#"
+            r"
             UPDATE user_webauthn_credentials
             SET sign_count = $3, last_used_at = NOW(), updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -381,7 +381,7 @@ impl UserWebAuthnCredential {
 
     /// Rename a credential.
     ///
-    /// SECURITY: This method requires tenant_id to ensure tenant isolation.
+    /// SECURITY: This method requires `tenant_id` to ensure tenant isolation.
     pub async fn rename<'e, E>(
         executor: E,
         tenant_id: Uuid,
@@ -392,12 +392,12 @@ impl UserWebAuthnCredential {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE user_webauthn_credentials
             SET name = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -408,7 +408,7 @@ impl UserWebAuthnCredential {
 
     /// Delete a credential (hard delete).
     ///
-    /// SECURITY: This method requires tenant_id to ensure tenant isolation.
+    /// SECURITY: This method requires `tenant_id` to ensure tenant isolation.
     pub async fn delete<'e, E>(executor: E, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error>
     where
         E: PgExecutor<'e>,
@@ -436,7 +436,7 @@ impl UserWebAuthnCredential {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Check if user has any enabled WebAuthn credentials.
+    /// Check if user has any enabled `WebAuthn` credentials.
     pub async fn has_enabled_credentials<'e, E>(
         executor: E,
         user_id: Uuid,

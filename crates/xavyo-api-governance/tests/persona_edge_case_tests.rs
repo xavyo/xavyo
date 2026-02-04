@@ -12,9 +12,9 @@ use uuid::Uuid;
 mod common;
 
 mod authorization_tests {
-    use super::*;
+    
     use xavyo_api_governance::services::{
-        AuthorizationResult, PersonaAuthorizationService, PersonaPermission,
+        AuthorizationResult, PersonaPermission,
     };
 
     #[test]
@@ -44,13 +44,11 @@ mod authorization_tests {
     #[test]
     fn test_persona_permission_variants() {
         // Verify all permission types exist
-        let permissions = vec![
-            PersonaPermission::CreatePersona,
+        let permissions = [PersonaPermission::CreatePersona,
             PersonaPermission::ManageOwnPersonas,
             PersonaPermission::ManageAllPersonas,
             PersonaPermission::DeletePersona,
-            PersonaPermission::ManageArchetype,
-        ];
+            PersonaPermission::ManageArchetype];
 
         assert_eq!(permissions.len(), 5);
     }
@@ -71,7 +69,7 @@ mod authorization_tests {
 mod validation_tests {
     use super::*;
     use xavyo_api_governance::services::{
-        ConflictCheckResult, MultiPersonaOperationResult, PersonaValidationService,
+        ConflictCheckResult, MultiPersonaOperationResult,
     };
 
     #[test]
@@ -139,7 +137,7 @@ mod validation_tests {
 }
 
 mod archetype_conflict_scenarios {
-    use super::*;
+    
     use xavyo_db::models::{AttributeMappings, ComputedMapping, PropagateMapping};
 
     /// Test: Two archetypes with same computed target should conflict.
@@ -220,7 +218,7 @@ mod archetype_conflict_scenarios {
         assert!(conflicts[0].contains("default"));
     }
 
-    /// Test: Two archetypes with overlapping persona_only attributes should conflict.
+    /// Test: Two archetypes with overlapping `persona_only` attributes should conflict.
     #[test]
     fn test_persona_only_conflict() {
         let arch1_mappings = AttributeMappings {
@@ -319,7 +317,7 @@ mod approval_workflow_compatibility {
         let arr = entitlements.as_array().unwrap();
         let has_approval_requirement = arr.iter().any(|ent| {
             ent.get("requires_approval")
-                .and_then(|v| v.as_bool())
+                .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false)
         });
 
@@ -344,7 +342,7 @@ mod approval_workflow_compatibility {
         let arr = entitlements.as_array().unwrap();
         let has_approval_requirement = arr.iter().any(|ent| {
             ent.get("requires_approval")
-                .and_then(|v| v.as_bool())
+                .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false)
         });
 
@@ -390,8 +388,8 @@ mod error_type_tests {
             details: "Archetype conflict detected".to_string(),
         };
         let msg = error.to_string();
-        assert!(msg.contains("2"));
-        assert!(msg.contains("1"));
+        assert!(msg.contains('2'));
+        assert!(msg.contains('1'));
         assert!(msg.contains("conflict"));
     }
 
@@ -428,7 +426,7 @@ mod IGA_edge_case_scenarios {
     /// then an error in one persona may cause the other persona not to be provisioned."
     #[test]
     fn test_batch_operation_rollback_semantics() {
-        let persona_ids = vec![Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
+        let persona_ids = [Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
 
         // Simulate batch operation where second fails
         let mut succeeded = vec![];

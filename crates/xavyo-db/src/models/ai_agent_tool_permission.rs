@@ -25,6 +25,7 @@ pub struct AiAgentToolPermission {
 
 impl AiAgentToolPermission {
     /// Check if the permission has expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
             expires_at < Utc::now()
@@ -34,6 +35,7 @@ impl AiAgentToolPermission {
     }
 
     /// Check if the permission is currently valid.
+    #[must_use] 
     pub fn is_valid(&self) -> bool {
         !self.is_expired()
     }
@@ -84,12 +86,12 @@ impl AiAgentToolPermission {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, tool_id, allowed_parameters, max_calls_per_hour,
                    requires_approval, granted_at, granted_by, expires_at
             FROM ai_agent_tool_permissions
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -106,13 +108,13 @@ impl AiAgentToolPermission {
         tool_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, tool_id, allowed_parameters, max_calls_per_hour,
                    requires_approval, granted_at, granted_by, expires_at
             FROM ai_agent_tool_permissions
             WHERE tenant_id = $1 AND agent_id = $2 AND tool_id = $3
               AND (expires_at IS NULL OR expires_at > NOW())
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -128,13 +130,13 @@ impl AiAgentToolPermission {
         agent_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, tool_id, allowed_parameters, max_calls_per_hour,
                    requires_approval, granted_at, granted_by, expires_at
             FROM ai_agent_tool_permissions
             WHERE tenant_id = $1 AND agent_id = $2
             ORDER BY granted_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -149,7 +151,7 @@ impl AiAgentToolPermission {
         agent_id: Uuid,
     ) -> Result<Vec<AiAgentToolPermissionDetails>, sqlx::Error> {
         sqlx::query_as::<_, AiAgentToolPermissionDetails>(
-            r#"
+            r"
             SELECT p.id, p.tenant_id, p.agent_id, a.name as agent_name, p.tool_id, t.name as tool_name,
                    p.allowed_parameters, p.max_calls_per_hour, p.requires_approval, p.granted_at,
                    p.granted_by, p.expires_at
@@ -158,7 +160,7 @@ impl AiAgentToolPermission {
             JOIN ai_tools t ON p.tool_id = t.id AND t.tenant_id = $1
             WHERE p.tenant_id = $1 AND p.agent_id = $2
             ORDER BY p.granted_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -173,13 +175,13 @@ impl AiAgentToolPermission {
         tool_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, tool_id, allowed_parameters, max_calls_per_hour,
                    requires_approval, granted_at, granted_by, expires_at
             FROM ai_agent_tool_permissions
             WHERE tenant_id = $1 AND tool_id = $2
             ORDER BY granted_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(tool_id)
@@ -194,7 +196,7 @@ impl AiAgentToolPermission {
         tool_id: Uuid,
     ) -> Result<Vec<AiAgentToolPermissionDetails>, sqlx::Error> {
         sqlx::query_as::<_, AiAgentToolPermissionDetails>(
-            r#"
+            r"
             SELECT p.id, p.tenant_id, p.agent_id, a.name as agent_name, p.tool_id, t.name as tool_name,
                    p.allowed_parameters, p.max_calls_per_hour, p.requires_approval, p.granted_at,
                    p.granted_by, p.expires_at
@@ -203,7 +205,7 @@ impl AiAgentToolPermission {
             JOIN ai_tools t ON p.tool_id = t.id AND t.tenant_id = $1
             WHERE p.tenant_id = $1 AND p.tool_id = $2
             ORDER BY p.granted_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(tool_id)
@@ -220,7 +222,7 @@ impl AiAgentToolPermission {
         granted_by: Option<Uuid>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO ai_agent_tool_permissions (
                 tenant_id, agent_id, tool_id, allowed_parameters, max_calls_per_hour,
                 requires_approval, granted_by, expires_at
@@ -236,7 +238,7 @@ impl AiAgentToolPermission {
                 expires_at = EXCLUDED.expires_at
             RETURNING id, tenant_id, agent_id, tool_id, allowed_parameters, max_calls_per_hour,
                       requires_approval, granted_at, granted_by, expires_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.agent_id)
@@ -258,7 +260,7 @@ impl AiAgentToolPermission {
         input: UpdateToolPermission,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE ai_agent_tool_permissions
             SET allowed_parameters = COALESCE($3, allowed_parameters),
                 max_calls_per_hour = COALESCE($4, max_calls_per_hour),
@@ -267,7 +269,7 @@ impl AiAgentToolPermission {
             WHERE tenant_id = $1 AND id = $2
             RETURNING id, tenant_id, agent_id, tool_id, allowed_parameters, max_calls_per_hour,
                       requires_approval, granted_at, granted_by, expires_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -279,7 +281,7 @@ impl AiAgentToolPermission {
         .await
     }
 
-    /// Revoke a specific permission (by agent_id and tool_id).
+    /// Revoke a specific permission (by `agent_id` and `tool_id`).
     pub async fn revoke(
         pool: &PgPool,
         tenant_id: Uuid,
@@ -287,10 +289,10 @@ impl AiAgentToolPermission {
         tool_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM ai_agent_tool_permissions
             WHERE tenant_id = $1 AND agent_id = $2 AND tool_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -308,10 +310,10 @@ impl AiAgentToolPermission {
         agent_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM ai_agent_tool_permissions
             WHERE tenant_id = $1 AND agent_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -328,10 +330,10 @@ impl AiAgentToolPermission {
         tool_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM ai_agent_tool_permissions
             WHERE tenant_id = $1 AND tool_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(tool_id)
@@ -348,12 +350,12 @@ impl AiAgentToolPermission {
         agent_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar::<_, i64>(
-            r#"
+            r"
             SELECT COUNT(*) as count
             FROM ai_agent_tool_permissions
             WHERE tenant_id = $1 AND agent_id = $2
               AND (expires_at IS NULL OR expires_at > NOW())
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -368,12 +370,12 @@ impl AiAgentToolPermission {
         tool_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar::<_, i64>(
-            r#"
+            r"
             SELECT COUNT(*) as count
             FROM ai_agent_tool_permissions
             WHERE tenant_id = $1 AND tool_id = $2
               AND (expires_at IS NULL OR expires_at > NOW())
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(tool_id)
@@ -384,10 +386,10 @@ impl AiAgentToolPermission {
     /// Clean up expired permissions for a tenant.
     pub async fn cleanup_expired(pool: &PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM ai_agent_tool_permissions
             WHERE tenant_id = $1 AND expires_at IS NOT NULL AND expires_at < NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(pool)

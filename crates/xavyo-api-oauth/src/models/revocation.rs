@@ -13,7 +13,7 @@ pub struct RevocationRequest {
     /// The token to revoke (access token JWT or opaque refresh token).
     pub token: String,
 
-    /// Hint about the token type: "access_token" or "refresh_token".
+    /// Hint about the token type: "`access_token`" or "`refresh_token`".
     pub token_type_hint: Option<String>,
 
     /// Client ID (alternative to HTTP Basic Auth).

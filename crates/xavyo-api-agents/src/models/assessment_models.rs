@@ -27,6 +27,7 @@ pub enum RiskLevel {
 
 impl RiskLevel {
     /// Determine risk level from overall score.
+    #[must_use] 
     pub fn from_score(score: u8) -> Self {
         match score {
             75..=100 => RiskLevel::Low,
@@ -82,6 +83,7 @@ pub enum Severity {
 
 impl Severity {
     /// Get the score deduction for a failure.
+    #[must_use] 
     pub fn fail_deduction(&self) -> u8 {
         match self {
             Severity::Low => 5,
@@ -92,6 +94,7 @@ impl Severity {
     }
 
     /// Get the score deduction for a warning.
+    #[must_use] 
     pub fn warning_deduction(&self) -> u8 {
         self.fail_deduction() / 2
     }
@@ -161,6 +164,7 @@ pub enum CheckName {
 
 impl CheckName {
     /// Get check ID (1-14).
+    #[must_use] 
     pub fn id(&self) -> u8 {
         match self {
             CheckName::TokenLifetime => 1,
@@ -181,6 +185,7 @@ impl CheckName {
     }
 
     /// Get check category.
+    #[must_use] 
     pub fn category(&self) -> Category {
         match self {
             CheckName::TokenLifetime | CheckName::CredentialRotation => Category::Authentication,
@@ -200,6 +205,7 @@ impl CheckName {
     }
 
     /// Get check severity.
+    #[must_use] 
     pub fn severity(&self) -> Severity {
         match self {
             CheckName::AuditLogging | CheckName::PrivilegeEscalation => Severity::Critical,
@@ -219,6 +225,7 @@ impl CheckName {
     }
 
     /// Get all check names in order.
+    #[must_use] 
     pub fn all() -> [CheckName; 14] {
         [
             CheckName::TokenLifetime,
@@ -305,7 +312,7 @@ pub struct OwaspAgenticCompliance {
     /// Total number of OWASP Agentic controls (always 8).
     pub total_controls: u8,
 
-    /// True if controls_satisfied >= 6.
+    /// True if `controls_satisfied` >= 6.
     pub compliant: bool,
 }
 
@@ -314,6 +321,7 @@ impl OwaspAgenticCompliance {
     pub const CONTROL_CHECK_IDS: [u8; 8] = [1, 2, 3, 4, 5, 6, 8, 12];
 
     /// Create compliance status from passing check count.
+    #[must_use] 
     pub fn from_passing_count(controls_satisfied: u8) -> Self {
         Self {
             controls_satisfied,

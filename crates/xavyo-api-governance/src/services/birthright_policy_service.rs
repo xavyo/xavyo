@@ -23,6 +23,7 @@ pub struct BirthrightPolicyService {
 
 impl BirthrightPolicyService {
     /// Create a new birthright policy service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -565,11 +566,11 @@ impl BirthrightPolicyService {
                 let mut losing = Vec::new();
 
                 for ent_id in &entitlement_ids {
-                    if !user_current_ents.contains(ent_id) {
+                    if user_current_ents.contains(ent_id) {
+                        *entitlement_already_have.entry(*ent_id).or_default() += 1;
+                    } else {
                         gaining.push(*ent_id);
                         *entitlement_gaining.entry(*ent_id).or_default() += 1;
-                    } else {
-                        *entitlement_already_have.entry(*ent_id).or_default() += 1;
                     }
                 }
 
@@ -682,7 +683,7 @@ impl BirthrightPolicyService {
     async fn get_tenant_users(&self, tenant_id: Uuid) -> Result<Vec<UserForImpact>> {
         // Query users with their profile data
         let rows = sqlx::query_as::<_, UserForImpact>(
-            r#"
+            r"
             SELECT
                 id,
                 email,
@@ -695,7 +696,7 @@ impl BirthrightPolicyService {
                 ) as attributes
             FROM users
             WHERE tenant_id = $1 AND deleted_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -708,13 +709,13 @@ impl BirthrightPolicyService {
     /// Get all entitlement assignments for a tenant.
     async fn get_tenant_assignments(&self, tenant_id: Uuid) -> Result<Vec<(Uuid, Uuid)>> {
         let rows = sqlx::query_as::<_, (Uuid, Uuid)>(
-            r#"
+            r"
             SELECT target_id, entitlement_id
             FROM gov_entitlement_assignments
             WHERE tenant_id = $1
               AND target_type = 'user'
               AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)

@@ -51,9 +51,9 @@ pub struct BatchExportResult {
     pub expires_at: DateTime<Utc>,
 }
 
-/// Writes a batch of SiemEvents to a file in the specified format.
+/// Writes a batch of `SiemEvents` to a file in the specified format.
 ///
-/// This function is format-agnostic and works with any slice of SiemEvents.
+/// This function is format-agnostic and works with any slice of `SiemEvents`.
 /// In production, the caller fetches events page-by-page from the DB and
 /// calls this to append to the output file.
 pub fn write_batch_to_file(
@@ -68,7 +68,7 @@ pub fn write_batch_to_file(
         ExportFormat::Csv => {
             if include_header {
                 let header = CsvFormatter::header_row();
-                writeln!(writer, "{}", header)?;
+                writeln!(writer, "{header}")?;
                 bytes_written += header.len() + 1;
             }
             let formatter = CsvFormatter::new();
@@ -76,7 +76,7 @@ pub fn write_batch_to_file(
                 let row = formatter
                     .format(event)
                     .map_err(|e| std::io::Error::other(e.to_string()))?;
-                writeln!(writer, "{}", row)?;
+                writeln!(writer, "{row}")?;
                 bytes_written += row.len() + 1;
             }
         }
@@ -94,7 +94,7 @@ pub fn write_batch_to_file(
                 let line = formatter
                     .format(event)
                     .map_err(|e| std::io::Error::other(e.to_string()))?;
-                writeln!(writer, "{}", line)?;
+                writeln!(writer, "{line}")?;
                 bytes_written += line.len() + 1;
             }
         }
@@ -104,6 +104,7 @@ pub fn write_batch_to_file(
 }
 
 /// Generate a unique file name for a batch export.
+#[must_use] 
 pub fn export_file_name(export_id: Uuid, format: ExportFormat) -> String {
     let extension = match format {
         ExportFormat::Csv => "csv",
@@ -111,10 +112,11 @@ pub fn export_file_name(export_id: Uuid, format: ExportFormat) -> String {
         ExportFormat::Cef => "cef.log",
         ExportFormat::SyslogRfc5424 => "syslog.log",
     };
-    format!("siem-export-{}.{}", export_id, extension)
+    format!("siem-export-{export_id}.{extension}")
 }
 
 /// Compute the expiry time for a completed export.
+#[must_use] 
 pub fn export_expires_at(retention_days: i64) -> DateTime<Utc> {
     Utc::now() + Duration::days(retention_days)
 }

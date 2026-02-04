@@ -233,8 +233,7 @@ fn show_template(name: &str, json_output: bool) -> CliResult<()> {
     let template = TemplateRegistry::find(name).ok_or_else(|| {
         let available = TemplateRegistry::names().join(", ");
         CliError::Validation(format!(
-            "Template '{}' not found. Available templates: {}",
-            name, available
+            "Template '{name}' not found. Available templates: {available}"
         ))
     })?;
 
@@ -274,8 +273,7 @@ async fn use_template(
     let template = TemplateRegistry::find(name).ok_or_else(|| {
         let available = TemplateRegistry::names().join(", ");
         CliError::Validation(format!(
-            "Template '{}' not found. Available templates: {}",
-            name, available
+            "Template '{name}' not found. Available templates: {available}"
         ))
     })?;
 
@@ -374,8 +372,7 @@ async fn use_template(
 
         let confirm = dialoguer::Confirm::new()
             .with_prompt(format!(
-                "Apply {} change(s) from template '{}'?",
-                changes_count, name
+                "Apply {changes_count} change(s) from template '{name}'?"
             ))
             .default(false)
             .interact()
@@ -422,8 +419,7 @@ async fn use_template(
         println!();
         if failed > 0 {
             println!(
-                "Template applied with errors: {} created, {} updated, {} skipped, {} failed",
-                created, updated, skipped, failed
+                "Template applied with errors: {created} created, {updated} updated, {skipped} skipped, {failed} failed"
             );
         } else {
             println!("Template applied successfully!");
@@ -443,14 +439,14 @@ async fn use_template(
                     .count()
             );
             if skipped > 0 {
-                println!("Skipped: {} (already exist)", skipped);
+                println!("Skipped: {skipped} (already exist)");
             }
         }
     }
 
     // Return error if any changes failed
     if failed > 0 {
-        return Err(CliError::Validation(format!("{} change(s) failed", failed)));
+        return Err(CliError::Validation(format!("{failed} change(s) failed")));
     }
 
     Ok(())

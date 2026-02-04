@@ -37,7 +37,7 @@ const SLOW_DOWN_INCREMENT: i32 = 5;
 pub enum DeviceAuthorizationStatus {
     /// User hasn't completed authorization yet.
     Pending,
-    /// User approved, ready for token exchange. Contains user_id.
+    /// User approved, ready for token exchange. Contains `user_id`.
     Authorized(Uuid),
     /// User denied the authorization request.
     Denied,
@@ -58,18 +58,20 @@ pub struct DeviceCodeService {
 
 impl DeviceCodeService {
     /// Create a new device code service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Generate a cryptographically secure device code (32 bytes URL-safe base64).
     ///
-    /// SECURITY: Uses OsRng directly from the operating system's CSPRNG.
+    /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
     fn generate_device_code() -> String {
         use rand::rngs::OsRng;
         use rand::RngCore;
@@ -80,7 +82,7 @@ impl DeviceCodeService {
 
     /// Generate a user-friendly user code (8 chars, no ambiguous characters).
     ///
-    /// SECURITY: Uses OsRng directly from the operating system's CSPRNG.
+    /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
     fn generate_user_code() -> String {
         use rand::rngs::OsRng;
         let code: String = (0..USER_CODE_LENGTH)
@@ -157,7 +159,7 @@ impl DeviceCodeService {
             })?;
 
         // Build verification_uri_complete with the user code
-        let verification_uri_complete = format!("{}?code={}", verification_uri, user_code_raw);
+        let verification_uri_complete = format!("{verification_uri}?code={user_code_raw}");
 
         tracing::info!(
             "Device code created: client_id={}, origin_ip={:?}, origin_country={:?}",
@@ -341,7 +343,7 @@ impl DeviceCodeService {
 
     /// Exchange a device code for tokens (after authorization).
     ///
-    /// This consumes the device code (one-time use) and returns the user_id
+    /// This consumes the device code (one-time use) and returns the `user_id`
     /// and scopes for token generation.
     pub async fn exchange_for_tokens(
         &self,
@@ -423,7 +425,7 @@ impl DeviceCodeService {
         })
     }
 
-    /// Storm-2372 Remediation (F117): Get client name from oauth_clients table.
+    /// Storm-2372 Remediation (F117): Get client name from `oauth_clients` table.
     ///
     /// Returns the human-readable client name if found, or None if the client
     /// doesn't exist or has no name set. This is used to display a meaningful
@@ -451,10 +453,10 @@ impl DeviceCodeService {
 
         // Query just the name field
         let result: Option<(String,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT name FROM oauth_clients
             WHERE client_id = $1 AND tenant_id = $2 AND is_active = true
-            "#,
+            ",
         )
         .bind(client_id)
         .bind(tenant_id)
@@ -480,7 +482,7 @@ pub struct DeviceAuthorizationResponse {
     pub verification_uri: String,
     /// URL with code pre-filled.
     pub verification_uri_complete: String,
-    /// Seconds until device_code expires.
+    /// Seconds until `device_code` expires.
     pub expires_in: i64,
     /// Minimum seconds between polling requests.
     pub interval: i32,
@@ -607,8 +609,7 @@ mod tests {
         for c in code.chars() {
             assert!(
                 c.is_ascii_alphanumeric() || c == '-' || c == '_',
-                "Invalid character in device code: {}",
-                c
+                "Invalid character in device code: {c}"
             );
         }
     }

@@ -40,7 +40,7 @@ pub struct ProvisioningLogListResponse {
     pub offset: i64,
 }
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid> {
     claims
         .tenant_id()

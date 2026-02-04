@@ -91,10 +91,10 @@ impl GovScheduledTransition {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_scheduled_transitions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -109,10 +109,10 @@ impl GovScheduledTransition {
         transition_request_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_scheduled_transitions
             WHERE transition_request_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(transition_request_id)
         .bind(tenant_id)
@@ -126,12 +126,12 @@ impl GovScheduledTransition {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_scheduled_transitions
             WHERE status = 'pending' AND scheduled_for <= NOW()
             ORDER BY scheduled_for ASC
             LIMIT $1
-            "#,
+            ",
         )
         .bind(limit)
         .fetch_all(pool)
@@ -147,26 +147,26 @@ impl GovScheduledTransition {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_scheduled_transitions
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_num = 2;
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_num));
+            query.push_str(&format!(" AND status = ${param_num}"));
             param_num += 1;
         }
 
         if filter.scheduled_before.is_some() {
-            query.push_str(&format!(" AND scheduled_for <= ${}", param_num));
+            query.push_str(&format!(" AND scheduled_for <= ${param_num}"));
             param_num += 1;
         }
 
         if filter.scheduled_after.is_some() {
-            query.push_str(&format!(" AND scheduled_for >= ${}", param_num));
+            query.push_str(&format!(" AND scheduled_for >= ${param_num}"));
             param_num += 1;
         }
 
@@ -200,26 +200,26 @@ impl GovScheduledTransition {
         filter: &ScheduledTransitionFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_scheduled_transitions
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_num = 2;
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_num));
+            query.push_str(&format!(" AND status = ${param_num}"));
             param_num += 1;
         }
 
         if filter.scheduled_before.is_some() {
-            query.push_str(&format!(" AND scheduled_for <= ${}", param_num));
+            query.push_str(&format!(" AND scheduled_for <= ${param_num}"));
             param_num += 1;
         }
 
         if filter.scheduled_after.is_some() {
-            query.push_str(&format!(" AND scheduled_for >= ${}", param_num));
+            query.push_str(&format!(" AND scheduled_for >= ${param_num}"));
         }
 
         let mut db_query = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -242,10 +242,10 @@ impl GovScheduledTransition {
     /// Count pending schedules for a tenant.
     pub async fn count_pending(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_scheduled_transitions
             WHERE tenant_id = $1 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -259,13 +259,13 @@ impl GovScheduledTransition {
         input: &CreateGovScheduledTransition,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_scheduled_transitions (
                 tenant_id, transition_request_id, scheduled_for
             )
             VALUES ($1, $2, $3)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.transition_request_id)
@@ -282,7 +282,7 @@ impl GovScheduledTransition {
         input: &UpdateGovScheduledTransition,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_scheduled_transitions
             SET
                 status = COALESCE($3, status),
@@ -293,7 +293,7 @@ impl GovScheduledTransition {
                 error_message = COALESCE($8, error_message)
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -310,11 +310,11 @@ impl GovScheduledTransition {
     /// Mark a schedule as executed.
     pub async fn mark_executed(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_scheduled_transitions
             SET status = 'executed', executed_at = NOW()
             WHERE id = $1 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(id)
         .execute(pool)
@@ -330,11 +330,11 @@ impl GovScheduledTransition {
         error_message: &str,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_scheduled_transitions
             SET status = 'failed', error_message = $2
             WHERE id = $1 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(id)
         .bind(error_message)
@@ -352,12 +352,12 @@ impl GovScheduledTransition {
         cancelled_by: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_scheduled_transitions
             SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = $3
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -374,12 +374,12 @@ impl GovScheduledTransition {
         new_scheduled_for: DateTime<Utc>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_scheduled_transitions
             SET scheduled_for = $3
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -395,10 +395,10 @@ impl GovScheduledTransition {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_scheduled_transitions
             WHERE id = $1 AND tenant_id = $2 AND status = 'cancelled'
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -415,12 +415,12 @@ impl GovScheduledTransition {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_scheduled_transitions
             WHERE tenant_id = $1 AND status = 'pending' AND scheduled_for <= NOW()
             ORDER BY scheduled_for ASC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -433,10 +433,10 @@ impl GovScheduledTransition {
         pool: &sqlx::PgPool,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT tenant_id FROM gov_scheduled_transitions
             WHERE status = 'pending' AND scheduled_for <= NOW()
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await

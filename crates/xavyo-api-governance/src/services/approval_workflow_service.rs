@@ -21,6 +21,7 @@ pub struct ApprovalWorkflowService {
 
 impl ApprovalWorkflowService {
     /// Create a new approval workflow service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -261,6 +262,7 @@ impl ApprovalWorkflowService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

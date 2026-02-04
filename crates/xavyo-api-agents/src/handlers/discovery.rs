@@ -1,4 +1,4 @@
-//! A2A Protocol AgentCard discovery handler.
+//! A2A Protocol `AgentCard` discovery handler.
 
 use axum::{
     extract::{Path, State},
@@ -13,9 +13,9 @@ use xavyo_db::models::ai_agent::AiAgent;
 use xavyo_db::models::ai_agent_tool_permission::AiAgentToolPermission;
 use xavyo_db::models::ai_tool::AiTool;
 
-/// GET /.well-known/agents/{id} - A2A AgentCard discovery.
+/// GET /.well-known/agents/{id} - A2A `AgentCard` discovery.
 ///
-/// Returns the AgentCard for the specified agent in A2A Protocol v0.3 format.
+/// Returns the `AgentCard` for the specified agent in A2A Protocol v0.3 format.
 /// This endpoint is publicly accessible for agent discovery.
 #[cfg_attr(feature = "openapi", utoipa::path(
     get,
@@ -95,10 +95,10 @@ pub async fn get_agent_card(
 /// For public discovery, we don't require tenant context.
 async fn find_agent_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<AiAgent>, sqlx::Error> {
     sqlx::query_as::<_, AiAgent>(
-        r#"
+        r"
         SELECT * FROM ai_agents
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(id)
     .fetch_optional(pool)

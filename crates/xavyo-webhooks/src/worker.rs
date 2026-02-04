@@ -29,6 +29,7 @@ pub struct WebhookWorker {
 
 impl WebhookWorker {
     /// Create a new webhook worker.
+    #[must_use] 
     pub fn new(
         delivery_service: DeliveryService,
         event_rx: broadcast::Receiver<WebhookEvent>,
@@ -71,7 +72,7 @@ impl WebhookWorker {
             _ = retry_handle => {
                 tracing::info!(target: "webhook_delivery", "Retry poller loop ended");
             }
-            _ = token.cancelled() => {
+            () = token.cancelled() => {
                 tracing::info!(target: "webhook_delivery", "Webhook delivery worker shutdown requested");
             }
         }
@@ -88,7 +89,7 @@ async fn run_event_receiver(
 ) {
     loop {
         tokio::select! {
-            _ = token.cancelled() => {
+            () = token.cancelled() => {
                 tracing::info!(target: "webhook_delivery", "Event receiver shutting down");
                 break;
             }
@@ -133,7 +134,7 @@ async fn run_retry_poller(delivery_service: DeliveryService, token: Cancellation
 
     loop {
         tokio::select! {
-            _ = token.cancelled() => {
+            () = token.cancelled() => {
                 tracing::info!(target: "webhook_delivery", "Retry poller shutting down");
                 break;
             }

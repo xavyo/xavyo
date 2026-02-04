@@ -1,6 +1,6 @@
-//! WebAuthn credential management handlers.
+//! `WebAuthn` credential management handlers.
 //!
-//! Endpoints for listing, renaming, and deleting WebAuthn credentials.
+//! Endpoints for listing, renaming, and deleting `WebAuthn` credentials.
 
 use axum::{
     extract::{Path, State},
@@ -20,7 +20,7 @@ use crate::{error::ApiAuthError, router::AuthState};
 /// Response containing a list of credentials.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct CredentialListResponse {
-    /// List of registered WebAuthn credentials.
+    /// List of registered `WebAuthn` credentials.
     pub credentials: Vec<CredentialInfo>,
     /// Total count of credentials.
     pub count: usize,
@@ -45,7 +45,7 @@ pub struct UpdateCredentialResponse {
 
 /// GET /auth/mfa/webauthn/credentials
 ///
-/// List all WebAuthn credentials for the authenticated user.
+/// List all `WebAuthn` credentials for the authenticated user.
 #[utoipa::path(
     get,
     path = "/auth/mfa/webauthn/credentials",
@@ -70,9 +70,9 @@ pub async fn list_webauthn_credentials(
     Ok(Json(CredentialListResponse { credentials, count }))
 }
 
-/// PATCH /auth/mfa/webauthn/credentials/{credential_id}
+/// PATCH /`auth/mfa/webauthn/credentials/{credential_id`}
 ///
-/// Update (rename) a WebAuthn credential.
+/// Update (rename) a `WebAuthn` credential.
 #[utoipa::path(
     patch,
     path = "/auth/mfa/webauthn/credentials/{credential_id}",
@@ -129,9 +129,9 @@ pub async fn update_webauthn_credential(
     }))
 }
 
-/// DELETE /auth/mfa/webauthn/credentials/{credential_id}
+/// DELETE /`auth/mfa/webauthn/credentials/{credential_id`}
 ///
-/// Delete a WebAuthn credential.
+/// Delete a `WebAuthn` credential.
 #[utoipa::path(
     delete,
     path = "/auth/mfa/webauthn/credentials/{credential_id}",

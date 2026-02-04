@@ -41,7 +41,7 @@ impl std::str::FromStr for SyncConflictType {
             "stale_data" => Ok(SyncConflictType::StaleData),
             "attribute_conflict" => Ok(SyncConflictType::AttributeConflict),
             "identity_mismatch" => Ok(SyncConflictType::IdentityMismatch),
-            _ => Err(format!("Unknown conflict type: {}", s)),
+            _ => Err(format!("Unknown conflict type: {s}")),
         }
     }
 }
@@ -85,7 +85,7 @@ impl std::str::FromStr for SyncResolutionStrategy {
             "merge" => Ok(SyncResolutionStrategy::Merge),
             "manual" => Ok(SyncResolutionStrategy::Manual),
             "pending" => Ok(SyncResolutionStrategy::Pending),
-            _ => Err(format!("Unknown resolution strategy: {}", s)),
+            _ => Err(format!("Unknown resolution strategy: {s}")),
         }
     }
 }
@@ -110,6 +110,7 @@ pub struct SyncConflict {
 
 impl SyncConflict {
     /// Get the conflict type enum.
+    #[must_use] 
     pub fn conflict_type(&self) -> SyncConflictType {
         self.conflict_type
             .parse()
@@ -117,6 +118,7 @@ impl SyncConflict {
     }
 
     /// Get the resolution strategy enum.
+    #[must_use] 
     pub fn resolution_strategy(&self) -> SyncResolutionStrategy {
         self.resolution_strategy
             .parse()
@@ -124,6 +126,7 @@ impl SyncConflict {
     }
 
     /// Check if conflict is resolved.
+    #[must_use] 
     pub fn is_resolved(&self) -> bool {
         self.resolved_at.is_some()
     }
@@ -135,7 +138,7 @@ impl SyncConflict {
         input: &CreateSyncConflict,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_sync_conflicts (
                 tenant_id, inbound_change_id, outbound_operation_id,
                 conflict_type, affected_attributes, inbound_value,
@@ -143,7 +146,7 @@ impl SyncConflict {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.inbound_change_id)
@@ -164,10 +167,10 @@ impl SyncConflict {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sync_conflicts
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -182,10 +185,10 @@ impl SyncConflict {
         inbound_change_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_sync_conflicts
             WHERE tenant_id = $1 AND inbound_change_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(inbound_change_id)
@@ -202,7 +205,7 @@ impl SyncConflict {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT sc.* FROM gov_sync_conflicts sc
             JOIN gov_inbound_changes ic ON sc.inbound_change_id = ic.id
             WHERE sc.tenant_id = $1
@@ -210,7 +213,7 @@ impl SyncConflict {
                 AND sc.resolution_strategy = 'pending'
             ORDER BY sc.created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -227,13 +230,13 @@ impl SyncConflict {
         connector_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_sync_conflicts sc
             JOIN gov_inbound_changes ic ON sc.inbound_change_id = ic.id
             WHERE sc.tenant_id = $1
                 AND ic.connector_id = $2
                 AND sc.resolution_strategy = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -274,7 +277,7 @@ impl SyncConflict {
         input: &ResolveSyncConflict,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_sync_conflicts
             SET resolution_strategy = $3,
                 resolved_by = $4,
@@ -282,7 +285,7 @@ impl SyncConflict {
                 resolution_notes = $5
             WHERE tenant_id = $1 AND id = $2 AND resolution_strategy = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)

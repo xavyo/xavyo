@@ -14,7 +14,7 @@ use xavyo_connector::schema::AttributeDataType;
 
 /// Well-known LDAP object class definitions.
 ///
-/// Format: (name, required_attrs, optional_attrs)
+/// Format: (name, `required_attrs`, `optional_attrs`)
 pub const COMMON_OBJECT_CLASSES: &[(&str, &[&str], &[&str])] = &[
     // Standard LDAP person classes
     (
@@ -161,7 +161,7 @@ pub const COMMON_OBJECT_CLASSES: &[(&str, &[&str], &[&str])] = &[
 
 /// Well-known LDAP attribute types and their data types.
 ///
-/// Format: (name, data_type, multi_valued)
+/// Format: (name, `data_type`, `multi_valued`)
 pub const ATTRIBUTE_TYPES: &[(&str, AttributeDataType, bool)] = &[
     // String attributes
     ("cn", AttributeDataType::String, false),

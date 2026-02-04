@@ -1,7 +1,7 @@
 //! Apple Sign In Integration Tests
 //!
 //! Tests for Apple Sign In flow including:
-//! - Authorization URL with form_post response_mode
+//! - Authorization URL with `form_post` `response_mode`
 //! - Form-post callback handling
 //! - JWT identity token validation
 //! - Private relay email handling
@@ -66,8 +66,8 @@ async fn test_apple_authorization_url_with_form_post_response_mode() {
     assert!(auth_url.contains(&format!("client_id={}", fixture.client_id)));
     assert!(auth_url.contains("response_type=code"));
     assert!(auth_url.contains("response_mode=form_post"));
-    assert!(auth_url.contains(&format!("state={}", TEST_STATE)));
-    assert!(auth_url.contains(&format!("nonce={}", TEST_NONCE)));
+    assert!(auth_url.contains(&format!("state={TEST_STATE}")));
+    assert!(auth_url.contains(&format!("nonce={TEST_NONCE}")));
 
     // Apple scopes
     assert!(auth_url.contains("name"));

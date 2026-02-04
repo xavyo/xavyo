@@ -39,11 +39,11 @@ async fn test_create_service_account() {
 
     // Verify the service account was created
     let row: ServiceAccountRow = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, name, purpose, owner_id, status::text as status
         FROM gov_service_accounts
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(sa_id)
     .fetch_one(&pool)
@@ -72,11 +72,11 @@ async fn test_get_service_account() {
 
     // Fetch the service account
     let row: ServiceAccountRow = sqlx::query_as(
-        r#"
+        r"
         SELECT id, tenant_id, name, purpose, owner_id, status::text as status
         FROM gov_service_accounts
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id)
     .bind(tenant_id)
@@ -107,11 +107,11 @@ async fn test_update_service_account() {
     // Update the service account
     let new_purpose = "Updated purpose for testing";
     sqlx::query(
-        r#"
+        r"
         UPDATE gov_service_accounts
         SET purpose = $1, updated_at = NOW()
         WHERE id = $2 AND tenant_id = $3
-        "#,
+        ",
     )
     .bind(new_purpose)
     .bind(sa_id)
@@ -122,11 +122,11 @@ async fn test_update_service_account() {
 
     // Verify the update
     let row = sqlx::query(
-        r#"
+        r"
         SELECT purpose
         FROM gov_service_accounts
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(sa_id)
     .fetch_one(&pool)
@@ -152,11 +152,11 @@ async fn test_suspend_service_account() {
 
     // Suspend the service account
     sqlx::query(
-        r#"
+        r"
         UPDATE gov_service_accounts
         SET status = 'suspended', updated_at = NOW()
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id)
     .bind(tenant_id)
@@ -166,11 +166,11 @@ async fn test_suspend_service_account() {
 
     // Verify the status
     let row = sqlx::query(
-        r#"
+        r"
         SELECT status::text as status
         FROM gov_service_accounts
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(sa_id)
     .fetch_one(&pool)
@@ -196,11 +196,11 @@ async fn test_reactivate_service_account() {
 
     // First suspend
     sqlx::query(
-        r#"
+        r"
         UPDATE gov_service_accounts
         SET status = 'suspended', updated_at = NOW()
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id)
     .bind(tenant_id)
@@ -210,11 +210,11 @@ async fn test_reactivate_service_account() {
 
     // Then reactivate
     sqlx::query(
-        r#"
+        r"
         UPDATE gov_service_accounts
         SET status = 'active', updated_at = NOW()
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id)
     .bind(tenant_id)
@@ -224,11 +224,11 @@ async fn test_reactivate_service_account() {
 
     // Verify the status
     let row = sqlx::query(
-        r#"
+        r"
         SELECT status::text as status
         FROM gov_service_accounts
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(sa_id)
     .fetch_one(&pool)
@@ -254,11 +254,11 @@ async fn test_delete_service_account() {
 
     // Verify it exists
     let exists_before: (i64,) = sqlx::query_as(
-        r#"
+        r"
         SELECT COUNT(*) as count
         FROM gov_service_accounts
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(sa_id)
     .fetch_one(&pool)
@@ -269,10 +269,10 @@ async fn test_delete_service_account() {
 
     // Delete the service account
     sqlx::query(
-        r#"
+        r"
         DELETE FROM gov_service_accounts
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id)
     .bind(tenant_id)
@@ -282,11 +282,11 @@ async fn test_delete_service_account() {
 
     // Verify it's gone
     let exists_after: (i64,) = sqlx::query_as(
-        r#"
+        r"
         SELECT COUNT(*) as count
         FROM gov_service_accounts
         WHERE id = $1
-        "#,
+        ",
     )
     .bind(sa_id)
     .fetch_one(&pool)

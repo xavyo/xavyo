@@ -28,8 +28,8 @@ pub struct GovRoleEntitlement {
     /// Who created this mapping.
     pub created_by: Uuid,
 
-    /// Optional FK to gov_roles entity for structured role hierarchy support (F088).
-    /// When set, this mapping links to a formal GovRole rather than just a string role_name.
+    /// Optional FK to `gov_roles` entity for structured role hierarchy support (F088).
+    /// When set, this mapping links to a formal `GovRole` rather than just a string `role_name`.
     pub role_id: Option<Uuid>,
 }
 
@@ -56,10 +56,10 @@ impl GovRoleEntitlement {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_entitlements
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -75,10 +75,10 @@ impl GovRoleEntitlement {
         entitlement_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_entitlements
             WHERE tenant_id = $1 AND role_name = $2 AND entitlement_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_name)
@@ -96,20 +96,20 @@ impl GovRoleEntitlement {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_role_entitlements
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.entitlement_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND entitlement_id = ${}", param_count));
+            query.push_str(&format!(" AND entitlement_id = ${param_count}"));
         }
         if filter.role_name.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND role_name = ${}", param_count));
+            query.push_str(&format!(" AND role_name = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -137,20 +137,20 @@ impl GovRoleEntitlement {
         filter: &RoleEntitlementFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_entitlements
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.entitlement_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND entitlement_id = ${}", param_count));
+            query.push_str(&format!(" AND entitlement_id = ${param_count}"));
         }
         if filter.role_name.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND role_name = ${}", param_count));
+            query.push_str(&format!(" AND role_name = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -172,11 +172,11 @@ impl GovRoleEntitlement {
         input: CreateGovRoleEntitlement,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_role_entitlements (tenant_id, entitlement_id, role_name, created_by)
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.entitlement_id)
@@ -193,10 +193,10 @@ impl GovRoleEntitlement {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_entitlements
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -213,10 +213,10 @@ impl GovRoleEntitlement {
         role_name: &str,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT entitlement_id FROM gov_role_entitlements
             WHERE tenant_id = $1 AND role_name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_name)
@@ -231,10 +231,10 @@ impl GovRoleEntitlement {
         entitlement_id: Uuid,
     ) -> Result<Vec<String>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT role_name FROM gov_role_entitlements
             WHERE tenant_id = $1 AND entitlement_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_id)
@@ -248,11 +248,11 @@ impl GovRoleEntitlement {
         tenant_id: Uuid,
     ) -> Result<Vec<String>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT role_name FROM gov_role_entitlements
             WHERE tenant_id = $1
             ORDER BY role_name
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -261,17 +261,17 @@ impl GovRoleEntitlement {
 
     // ====== F088: Role Hierarchy Support ======
 
-    /// List all entitlement IDs for a GovRole (by role_id UUID).
+    /// List all entitlement IDs for a `GovRole` (by `role_id` UUID).
     pub async fn list_entitlement_ids_by_role_id(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         role_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT entitlement_id FROM gov_role_entitlements
             WHERE tenant_id = $1 AND role_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -279,18 +279,18 @@ impl GovRoleEntitlement {
         .await
     }
 
-    /// List all role-entitlement mappings for a GovRole.
+    /// List all role-entitlement mappings for a `GovRole`.
     pub async fn list_by_role_id(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         role_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_entitlements
             WHERE tenant_id = $1 AND role_id = $2
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -298,7 +298,7 @@ impl GovRoleEntitlement {
         .await
     }
 
-    /// Create a new role-entitlement mapping with role_id (for GovRole hierarchy).
+    /// Create a new role-entitlement mapping with `role_id` (for `GovRole` hierarchy).
     pub async fn create_with_role_id(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -308,9 +308,9 @@ impl GovRoleEntitlement {
     ) -> Result<Self, sqlx::Error> {
         // Use the role name from the GovRole for backward compatibility
         let role_name: String = sqlx::query_scalar(
-            r#"
+            r"
             SELECT name FROM gov_roles WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -318,11 +318,11 @@ impl GovRoleEntitlement {
         .await?;
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_role_entitlements (tenant_id, entitlement_id, role_name, created_by, role_id)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_id)
@@ -333,7 +333,7 @@ impl GovRoleEntitlement {
         .await
     }
 
-    /// Find an existing mapping by role_id and entitlement_id.
+    /// Find an existing mapping by `role_id` and `entitlement_id`.
     pub async fn find_by_role_id_and_entitlement(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -341,10 +341,10 @@ impl GovRoleEntitlement {
         entitlement_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_entitlements
             WHERE tenant_id = $1 AND role_id = $2 AND entitlement_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -353,7 +353,7 @@ impl GovRoleEntitlement {
         .await
     }
 
-    /// Delete a role-entitlement mapping by role_id and entitlement_id.
+    /// Delete a role-entitlement mapping by `role_id` and `entitlement_id`.
     pub async fn delete_by_role_id_and_entitlement(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -361,10 +361,10 @@ impl GovRoleEntitlement {
         entitlement_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_entitlements
             WHERE tenant_id = $1 AND role_id = $2 AND entitlement_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -375,17 +375,17 @@ impl GovRoleEntitlement {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Count direct entitlements for a GovRole.
+    /// Count direct entitlements for a `GovRole`.
     pub async fn count_by_role_id(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         role_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_role_entitlements
             WHERE tenant_id = $1 AND role_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)

@@ -21,6 +21,7 @@ pub enum PlanTier {
 
 impl PlanTier {
     /// Get the numeric order of this tier (0 = lowest, 3 = highest).
+    #[must_use] 
     pub fn tier_order(&self) -> i32 {
         match self {
             PlanTier::Free => 0,
@@ -31,16 +32,19 @@ impl PlanTier {
     }
 
     /// Check if this tier is higher than another.
+    #[must_use] 
     pub fn is_higher_than(&self, other: &PlanTier) -> bool {
         self.tier_order() > other.tier_order()
     }
 
     /// Check if this tier is lower than another.
+    #[must_use] 
     pub fn is_lower_than(&self, other: &PlanTier) -> bool {
         self.tier_order() < other.tier_order()
     }
 
     /// Get the plan name as a string.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             PlanTier::Free => "free",
@@ -51,6 +55,7 @@ impl PlanTier {
     }
 
     /// Get all available tiers in order.
+    #[must_use] 
     pub fn all() -> Vec<PlanTier> {
         vec![
             PlanTier::Free,
@@ -76,7 +81,7 @@ impl std::str::FromStr for PlanTier {
             "starter" => Ok(PlanTier::Starter),
             "professional" => Ok(PlanTier::Professional),
             "enterprise" => Ok(PlanTier::Enterprise),
-            _ => Err(format!("Invalid plan tier: {}", s)),
+            _ => Err(format!("Invalid plan tier: {s}")),
         }
     }
 }
@@ -98,6 +103,7 @@ pub struct PlanDefinition {
 
 impl PlanDefinition {
     /// Get the definition for a plan tier.
+    #[must_use] 
     pub fn for_tier(tier: PlanTier) -> Self {
         match tier {
             PlanTier::Free => Self {
@@ -140,6 +146,7 @@ impl PlanDefinition {
     }
 
     /// Convert to settings JSON for tenant.
+    #[must_use] 
     pub fn to_settings_json(&self) -> serde_json::Value {
         serde_json::json!({
             "plan": self.tier.as_str(),
@@ -179,7 +186,7 @@ impl std::str::FromStr for PlanChangeStatus {
             "pending" => Ok(PlanChangeStatus::Pending),
             "applied" => Ok(PlanChangeStatus::Applied),
             "cancelled" => Ok(PlanChangeStatus::Cancelled),
-            _ => Err(format!("Invalid plan change status: {}", s)),
+            _ => Err(format!("Invalid plan change status: {s}")),
         }
     }
 }
@@ -228,6 +235,7 @@ pub struct TenantPlanChange {
 
 impl TenantPlanChange {
     /// Get the change type as enum.
+    #[must_use] 
     pub fn change_type_enum(&self) -> Option<PlanChangeType> {
         match self.change_type.as_str() {
             "upgrade" => Some(PlanChangeType::Upgrade),
@@ -237,6 +245,7 @@ impl TenantPlanChange {
     }
 
     /// Get the status as enum.
+    #[must_use] 
     pub fn status_enum(&self) -> Option<PlanChangeStatus> {
         self.status.parse().ok()
     }
@@ -254,12 +263,12 @@ impl TenantPlanChange {
         reason: Option<&str>,
     ) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO tenant_plan_changes
                 (tenant_id, change_type, old_plan, new_plan, effective_at, admin_user_id, reason)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id, tenant_id, change_type, old_plan, new_plan, effective_at, status, admin_user_id, reason, created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(change_type.to_string())
@@ -276,12 +285,12 @@ impl TenantPlanChange {
     /// Mark a plan change as applied.
     pub async fn mark_applied(pool: &PgPool, id: Uuid) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE tenant_plan_changes
             SET status = 'applied'
             WHERE id = $1
             RETURNING id, tenant_id, change_type, old_plan, new_plan, effective_at, status, admin_user_id, reason, created_at
-            "#,
+            ",
         )
         .bind(id)
         .fetch_one(pool)
@@ -292,12 +301,12 @@ impl TenantPlanChange {
     /// Mark a plan change as cancelled.
     pub async fn mark_cancelled(pool: &PgPool, id: Uuid) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE tenant_plan_changes
             SET status = 'cancelled'
             WHERE id = $1
             RETURNING id, tenant_id, change_type, old_plan, new_plan, effective_at, status, admin_user_id, reason, created_at
-            "#,
+            ",
         )
         .bind(id)
         .fetch_one(pool)
@@ -312,13 +321,13 @@ impl TenantPlanChange {
         limit: i32,
     ) -> Result<Vec<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, change_type, old_plan, new_plan, effective_at, status, admin_user_id, reason, created_at
             FROM tenant_plan_changes
             WHERE tenant_id = $1
             ORDER BY created_at DESC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -333,7 +342,7 @@ impl TenantPlanChange {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, change_type, old_plan, new_plan, effective_at, status, admin_user_id, reason, created_at
             FROM tenant_plan_changes
             WHERE tenant_id = $1
@@ -341,7 +350,7 @@ impl TenantPlanChange {
               AND status = 'pending'
             ORDER BY effective_at ASC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(pool)
@@ -349,16 +358,16 @@ impl TenantPlanChange {
         .map_err(DbError::QueryFailed)
     }
 
-    /// Get all pending changes that should be applied (effective_at <= now).
+    /// Get all pending changes that should be applied (`effective_at` <= now).
     pub async fn get_due_pending_changes(pool: &PgPool) -> Result<Vec<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, change_type, old_plan, new_plan, effective_at, status, admin_user_id, reason, created_at
             FROM tenant_plan_changes
             WHERE status = 'pending'
               AND effective_at <= NOW()
             ORDER BY effective_at ASC
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await
@@ -367,6 +376,7 @@ impl TenantPlanChange {
 }
 
 /// Calculate the first day of the next month.
+#[must_use] 
 pub fn next_billing_cycle_date() -> DateTime<Utc> {
     let now = Utc::now();
     let next_month = if now.month() == 12 {

@@ -144,7 +144,7 @@ impl GovCorrelationAuditEvent {
         input: CreateGovCorrelationAuditEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_correlation_audit_events (
                 tenant_id, connector_id, account_id, case_id, identity_id,
                 event_type, outcome, confidence_score, candidate_count,
@@ -153,7 +153,7 @@ impl GovCorrelationAuditEvent {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(input.connector_id)
@@ -182,10 +182,10 @@ impl GovCorrelationAuditEvent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_correlation_audit_events
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -202,36 +202,36 @@ impl GovCorrelationAuditEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_correlation_audit_events
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.connector_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND connector_id = ${}", param_count));
+            query.push_str(&format!(" AND connector_id = ${param_count}"));
         }
         if filter.event_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_type = ${}", param_count));
+            query.push_str(&format!(" AND event_type = ${param_count}"));
         }
         if filter.outcome.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND outcome = ${}", param_count));
+            query.push_str(&format!(" AND outcome = ${param_count}"));
         }
         if filter.start_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.end_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND actor_id = ${}", param_count));
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -271,36 +271,36 @@ impl GovCorrelationAuditEvent {
         filter: &CorrelationAuditFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_correlation_audit_events
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.connector_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND connector_id = ${}", param_count));
+            query.push_str(&format!(" AND connector_id = ${param_count}"));
         }
         if filter.event_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND event_type = ${}", param_count));
+            query.push_str(&format!(" AND event_type = ${param_count}"));
         }
         if filter.outcome.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND outcome = ${}", param_count));
+            query.push_str(&format!(" AND outcome = ${param_count}"));
         }
         if filter.start_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.end_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND actor_id = ${}", param_count));
+            query.push_str(&format!(" AND actor_id = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -337,20 +337,20 @@ impl GovCorrelationAuditEvent {
         end_date: Option<DateTime<Utc>>,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_correlation_audit_events
             WHERE tenant_id = $1 AND connector_id = $2 AND outcome = $3
-            "#,
+            ",
         );
         let mut param_count = 3;
 
         if start_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if end_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         let _ = param_count; // suppress unused warning
@@ -379,20 +379,20 @@ impl GovCorrelationAuditEvent {
         end_date: Option<DateTime<Utc>>,
     ) -> Result<Option<rust_decimal::Decimal>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT AVG(confidence_score) FROM gov_correlation_audit_events
             WHERE tenant_id = $1 AND connector_id = $2 AND confidence_score IS NOT NULL
-            "#,
+            ",
         );
         let mut param_count = 2;
 
         if start_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if end_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         let _ = param_count; // suppress unused warning

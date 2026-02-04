@@ -48,12 +48,12 @@ impl UserLocation {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let row: (bool,) = sqlx::query_as(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM user_locations
                 WHERE tenant_id = $1 AND user_id = $2 AND country = $3 AND city = $4
             )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -77,10 +77,10 @@ impl UserLocation {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_locations
             WHERE tenant_id = $1 AND user_id = $2 AND country = $3 AND city = $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -92,7 +92,7 @@ impl UserLocation {
 
     /// Record a location login (upsert with ON CONFLICT).
     ///
-    /// Returns (location, is_new) where is_new indicates if this was a new location.
+    /// Returns (location, `is_new`) where `is_new` indicates if this was a new location.
     pub async fn record_login<'e, E>(
         executor: E,
         tenant_id: Uuid,
@@ -105,13 +105,13 @@ impl UserLocation {
     {
         // Use INSERT with ON CONFLICT and check if it was an insert or update
         let location: Self = sqlx::query_as(
-            r#"
+            r"
             INSERT INTO user_locations (tenant_id, user_id, country, city)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (tenant_id, user_id, country, city)
             DO UPDATE SET last_seen_at = NOW(), login_count = user_locations.login_count + 1
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -135,11 +135,11 @@ impl UserLocation {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_locations
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY last_seen_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -157,10 +157,10 @@ impl UserLocation {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM user_locations
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -181,10 +181,10 @@ impl UserLocation {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM user_locations
             WHERE tenant_id = $1 AND id = $2 AND user_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)

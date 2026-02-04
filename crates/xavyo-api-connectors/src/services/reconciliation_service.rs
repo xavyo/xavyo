@@ -52,6 +52,7 @@ pub struct ReconciliationService {
 
 impl ReconciliationService {
     /// Create a new reconciliation service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -280,7 +281,7 @@ impl ReconciliationService {
 
         // Parse action type
         let action_type: ReconciliationActionType = action.parse().map_err(|_| {
-            ReconciliationServiceError::InvalidParameter(format!("Invalid action: {}", action))
+            ReconciliationServiceError::InvalidParameter(format!("Invalid action: {action}"))
         })?;
 
         let resolved_user_id = user_id.unwrap_or_else(Uuid::nil);
@@ -641,7 +642,7 @@ impl ReconciliationService {
         // Calculate performance
         let duration = stats.duration_seconds;
         let accounts_per_second = if duration > 0 {
-            stats.accounts_processed as f64 / duration as f64
+            f64::from(stats.accounts_processed) / duration as f64
         } else {
             0.0
         };

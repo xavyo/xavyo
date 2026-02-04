@@ -78,8 +78,8 @@ impl ProviderTestContext {
         let tenant_id = Uuid::new_v4();
         let slug = format!("test-{}", &tenant_id.to_string()[..8]);
         if sqlx::query("INSERT INTO tenants (id, name, slug) VALUES ($1, $2, $3)")
-            .bind(&tenant_id)
-            .bind(&format!("Test Tenant {}", &tenant_id.to_string()[..8]))
+            .bind(tenant_id)
+            .bind(format!("Test Tenant {}", &tenant_id.to_string()[..8]))
             .bind(&slug)
             .execute(&admin_pool)
             .await
@@ -99,14 +99,14 @@ impl ProviderTestContext {
     async fn create_provider(&self, name: &str, provider_type: &str) -> Result<Uuid, sqlx::Error> {
         let provider_id = Uuid::new_v4();
         sqlx::query(
-            r#"
+            r"
             INSERT INTO secret_provider_configs
                 (id, tenant_id, name, provider_type, config, status)
             VALUES ($1, $2, $3, $4, $5, 'active')
-            "#,
+            ",
         )
-        .bind(&provider_id)
-        .bind(&self.tenant_id)
+        .bind(provider_id)
+        .bind(self.tenant_id)
         .bind(name)
         .bind(provider_type)
         .bind(serde_json::json!({
@@ -123,13 +123,13 @@ impl ProviderTestContext {
     async fn cleanup(&self) {
         // Delete providers first (due to FK constraints)
         let _ = sqlx::query("DELETE FROM secret_provider_configs WHERE tenant_id = $1")
-            .bind(&self.tenant_id)
+            .bind(self.tenant_id)
             .execute(&self.admin_pool)
             .await;
 
         // Delete tenant
         let _ = sqlx::query("DELETE FROM tenants WHERE id = $1")
-            .bind(&self.tenant_id)
+            .bind(self.tenant_id)
             .execute(&self.admin_pool)
             .await;
     }
@@ -146,12 +146,9 @@ impl Drop for ProviderTestContext {
 #[tokio::test]
 #[ignore = "requires database - run with: cargo test -p xavyo-api-agents --test providers_test -- --ignored"]
 async fn test_create_provider_via_db() {
-    let ctx = match ProviderTestContext::new().await {
-        Some(c) => c,
-        None => {
-            eprintln!("Skipping test: database not available");
-            return;
-        }
+    let ctx = if let Some(c) = ProviderTestContext::new().await { c } else {
+        eprintln!("Skipping test: database not available");
+        return;
     };
 
     // Create a provider
@@ -164,7 +161,7 @@ async fn test_create_provider_via_db() {
     let row = sqlx::query_as::<_, (String, String)>(
         "SELECT name, provider_type FROM secret_provider_configs WHERE id = $1",
     )
-    .bind(&provider_id)
+    .bind(provider_id)
     .fetch_one(&ctx.admin_pool)
     .await
     .expect("Provider not found");
@@ -179,12 +176,9 @@ async fn test_create_provider_via_db() {
 #[tokio::test]
 #[ignore = "requires database - run with: cargo test -p xavyo-api-agents --test providers_test -- --ignored"]
 async fn test_list_providers_by_type() {
-    let ctx = match ProviderTestContext::new().await {
-        Some(c) => c,
-        None => {
-            eprintln!("Skipping test: database not available");
-            return;
-        }
+    let ctx = if let Some(c) = ProviderTestContext::new().await { c } else {
+        eprintln!("Skipping test: database not available");
+        return;
     };
 
     // Create providers of different types
@@ -214,12 +208,9 @@ async fn test_list_providers_by_type() {
 #[tokio::test]
 #[ignore = "requires database - run with: cargo test -p xavyo-api-agents --test providers_test -- --ignored"]
 async fn test_provider_tenant_isolation() {
-    let ctx = match ProviderTestContext::new().await {
-        Some(c) => c,
-        None => {
-            eprintln!("Skipping test: database not available");
-            return;
-        }
+    let ctx = if let Some(c) = ProviderTestContext::new().await { c } else {
+        eprintln!("Skipping test: database not available");
+        return;
     };
 
     // Create provider for our test tenant
@@ -229,7 +220,7 @@ async fn test_provider_tenant_isolation() {
     let other_tenant_id = Uuid::new_v4();
     let other_slug = format!("other-{}", &other_tenant_id.to_string()[..8]);
     sqlx::query("INSERT INTO tenants (id, name, slug) VALUES ($1, $2, $3)")
-        .bind(&other_tenant_id)
+        .bind(other_tenant_id)
         .bind("Other Tenant")
         .bind(&other_slug)
         .execute(&ctx.admin_pool)
@@ -237,14 +228,14 @@ async fn test_provider_tenant_isolation() {
         .expect("Failed to create other tenant");
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO secret_provider_configs
             (id, tenant_id, name, provider_type, config, status)
         VALUES ($1, $2, $3, 'openbao', $4, 'active')
-        "#,
+        ",
     )
     .bind(Uuid::new_v4())
-    .bind(&other_tenant_id)
+    .bind(other_tenant_id)
     .bind("other-vault")
     .bind(serde_json::json!({}))
     .execute(&ctx.admin_pool)
@@ -263,11 +254,11 @@ async fn test_provider_tenant_isolation() {
 
     // Cleanup other tenant
     let _ = sqlx::query("DELETE FROM secret_provider_configs WHERE tenant_id = $1")
-        .bind(&other_tenant_id)
+        .bind(other_tenant_id)
         .execute(&ctx.admin_pool)
         .await;
     let _ = sqlx::query("DELETE FROM tenants WHERE id = $1")
-        .bind(&other_tenant_id)
+        .bind(other_tenant_id)
         .execute(&ctx.admin_pool)
         .await;
 
@@ -278,12 +269,9 @@ async fn test_provider_tenant_isolation() {
 #[tokio::test]
 #[ignore = "requires database - run with: cargo test -p xavyo-api-agents --test providers_test -- --ignored"]
 async fn test_update_provider_status() {
-    let ctx = match ProviderTestContext::new().await {
-        Some(c) => c,
-        None => {
-            eprintln!("Skipping test: database not available");
-            return;
-        }
+    let ctx = if let Some(c) = ProviderTestContext::new().await { c } else {
+        eprintln!("Skipping test: database not available");
+        return;
     };
 
     // Create a provider
@@ -294,14 +282,14 @@ async fn test_update_provider_status() {
 
     // Update status to inactive
     sqlx::query("UPDATE secret_provider_configs SET status = 'inactive' WHERE id = $1")
-        .bind(&provider_id)
+        .bind(provider_id)
         .execute(&ctx.admin_pool)
         .await
         .expect("Update failed");
 
     // Verify status changed
     let row: (String,) = sqlx::query_as("SELECT status FROM secret_provider_configs WHERE id = $1")
-        .bind(&provider_id)
+        .bind(provider_id)
         .fetch_one(&ctx.admin_pool)
         .await
         .expect("Provider not found");
@@ -315,12 +303,9 @@ async fn test_update_provider_status() {
 #[tokio::test]
 #[ignore = "requires database - run with: cargo test -p xavyo-api-agents --test providers_test -- --ignored"]
 async fn test_delete_provider() {
-    let ctx = match ProviderTestContext::new().await {
-        Some(c) => c,
-        None => {
-            eprintln!("Skipping test: database not available");
-            return;
-        }
+    let ctx = if let Some(c) = ProviderTestContext::new().await { c } else {
+        eprintln!("Skipping test: database not available");
+        return;
     };
 
     // Create a provider
@@ -331,7 +316,7 @@ async fn test_delete_provider() {
 
     // Delete the provider
     sqlx::query("DELETE FROM secret_provider_configs WHERE id = $1")
-        .bind(&provider_id)
+        .bind(provider_id)
         .execute(&ctx.admin_pool)
         .await
         .expect("Delete failed");
@@ -339,7 +324,7 @@ async fn test_delete_provider() {
     // Verify it's gone
     let count: (i64,) =
         sqlx::query_as("SELECT COUNT(*) FROM secret_provider_configs WHERE id = $1")
-            .bind(&provider_id)
+            .bind(provider_id)
             .fetch_one(&ctx.admin_pool)
             .await
             .expect("Query failed");

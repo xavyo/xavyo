@@ -1,4 +1,4 @@
-//! Unit tests for PersonaSessionService (US2).
+//! Unit tests for `PersonaSessionService` (US2).
 //!
 //! Tests the context switching functionality for persona management.
 
@@ -11,11 +11,11 @@ mod common;
 mod persona_session_service_tests {
     use super::*;
 
-    /// T035: Unit test for PersonaSessionService core functionality
+    /// T035: Unit test for `PersonaSessionService` core functionality
     #[test]
     fn test_create_persona_session() {
-        let tenant_id = Uuid::new_v4();
-        let user_id = Uuid::new_v4();
+        let _tenant_id = Uuid::new_v4();
+        let _user_id = Uuid::new_v4();
         let persona_id = Uuid::new_v4();
         let expires_at = Utc::now() + Duration::hours(8);
 
@@ -32,7 +32,7 @@ mod persona_session_service_tests {
 
     #[test]
     fn test_switch_context_to_persona() {
-        let user_id = Uuid::new_v4();
+        let _user_id = Uuid::new_v4();
         let persona_id = Uuid::new_v4();
         let reason = "Need admin access for server maintenance";
 
@@ -51,7 +51,7 @@ mod persona_session_service_tests {
 
     #[test]
     fn test_switch_context_back_to_physical() {
-        let user_id = Uuid::new_v4();
+        let _user_id = Uuid::new_v4();
         let reason = "Administrative tasks completed";
 
         // Switch back sets active_persona_id to None
@@ -99,8 +99,8 @@ mod persona_session_service_tests {
 
     #[test]
     fn test_find_active_session_for_user() {
-        let tenant_id = Uuid::new_v4();
-        let user_id = Uuid::new_v4();
+        let _tenant_id = Uuid::new_v4();
+        let _user_id = Uuid::new_v4();
 
         // Should find the most recent non-expired session
         let session_found = true;
@@ -118,7 +118,7 @@ mod persona_session_service_tests {
 
     #[test]
     fn test_invalidate_sessions_by_persona() {
-        let persona_id = Uuid::new_v4();
+        let _persona_id = Uuid::new_v4();
         let sessions_invalidated = 3;
 
         // When persona is deactivated, all its sessions should be invalidated
@@ -130,7 +130,7 @@ mod persona_session_service_tests {
 
     #[test]
     fn test_invalidate_sessions_by_user() {
-        let user_id = Uuid::new_v4();
+        let _user_id = Uuid::new_v4();
         let sessions_invalidated = 2;
 
         // When user is deactivated, all sessions should be invalidated
@@ -157,7 +157,7 @@ mod context_switch_validation_tests {
     fn test_validate_persona_belongs_to_user() {
         let user_id = Uuid::new_v4();
         let persona_owner_id = user_id; // Same user
-        let persona_id = Uuid::new_v4();
+        let _persona_id = Uuid::new_v4();
 
         // Validation should pass
         assert_eq!(user_id, persona_owner_id);
@@ -261,7 +261,7 @@ mod jwt_enhancement_tests {
 
     #[test]
     fn test_jwt_includes_persona_claims() {
-        let user_id = Uuid::new_v4();
+        let _user_id = Uuid::new_v4();
         let persona_id = Uuid::new_v4();
         let archetype = "admin";
 

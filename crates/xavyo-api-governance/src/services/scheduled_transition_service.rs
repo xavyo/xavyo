@@ -24,6 +24,7 @@ pub struct ScheduledTransitionService {
 
 impl ScheduledTransitionService {
     /// Create a new scheduled transition service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -294,7 +295,7 @@ impl ScheduledTransitionService {
                     continue;
                 }
                 Err(e) => {
-                    let error = format!("Failed to fetch transition request: {}", e);
+                    let error = format!("Failed to fetch transition request: {e}");
                     GovScheduledTransition::mark_failed(&self.pool, schedule.id, &error).await?;
                     errors.push((schedule.id, error));
                     failed += 1;
@@ -330,8 +331,8 @@ impl ScheduledTransitionService {
 
     /// Create a scheduled transition for an existing transition request.
     ///
-    /// This is called by StateTransitionService when a transition is requested
-    /// with a scheduled_for time.
+    /// This is called by `StateTransitionService` when a transition is requested
+    /// with a `scheduled_for` time.
     pub async fn create_schedule(
         &self,
         tenant_id: Uuid,
@@ -391,7 +392,7 @@ impl ScheduledTransitionService {
         batch_size: i32,
     ) -> Result<usize> {
         let due_schedules =
-            GovScheduledTransition::find_due_for_tenant(&self.pool, tenant_id, batch_size as i64)
+            GovScheduledTransition::find_due_for_tenant(&self.pool, tenant_id, i64::from(batch_size))
                 .await?;
 
         let mut processed = 0;
@@ -415,7 +416,7 @@ impl ScheduledTransitionService {
                     continue;
                 }
                 Err(e) => {
-                    let error = format!("Failed to fetch transition request: {}", e);
+                    let error = format!("Failed to fetch transition request: {e}");
                     GovScheduledTransition::mark_failed(&self.pool, schedule.id, &error).await?;
                     continue;
                 }

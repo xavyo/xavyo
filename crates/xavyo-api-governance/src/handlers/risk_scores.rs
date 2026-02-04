@@ -262,7 +262,7 @@ pub async fn save_risk_score_snapshot(
 /// Get risk enforcement action required for a user.
 ///
 /// Returns the action that should be taken based on the user's risk score
-/// and configured thresholds (Alert, RequireMFA, or Block).
+/// and configured thresholds (Alert, `RequireMFA`, or Block).
 #[utoipa::path(
     get,
     path = "/governance/users/{user_id}/risk-enforcement",
@@ -366,8 +366,7 @@ pub async fn upsert_enforcement_policy(
         Some("enforce") => Some(xavyo_db::EnforcementMode::Enforce),
         Some(other) => {
             return Err(ApiGovernanceError::Validation(format!(
-                "Invalid enforcement_mode '{}'. Must be 'disabled', 'monitor', or 'enforce'.",
-                other
+                "Invalid enforcement_mode '{other}'. Must be 'disabled', 'monitor', or 'enforce'."
             )));
         }
         None => None,

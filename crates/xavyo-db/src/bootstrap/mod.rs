@@ -57,8 +57,8 @@ pub const CLI_OAUTH_CLIENT_ID: &str = "xavyo-cli";
 pub const CLI_OAUTH_CLIENT_NAME: &str = "Xavyo CLI";
 
 /// Grant types enabled for the CLI OAuth client.
-/// - device_code: For CLI authentication flow
-/// - refresh_token: To refresh access tokens
+/// - `device_code`: For CLI authentication flow
+/// - `refresh_token`: To refresh access tokens
 pub const CLI_OAUTH_GRANT_TYPES: &[&str] = &[
     "urn:ietf:params:oauth:grant-type:device_code",
     "refresh_token",

@@ -13,7 +13,7 @@ use xavyo_api_scim::models::{
     ScimGroup, ScimGroupListResponse, ScimPatchRequest, ScimUser, ScimUserListResponse,
 };
 
-/// SCIM ServiceProviderConfig response (subset of RFC 7643 Section 5).
+/// SCIM `ServiceProviderConfig` response (subset of RFC 7643 Section 5).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceProviderConfig {
@@ -41,7 +41,7 @@ pub struct ServiceProviderConfig {
     #[serde(default)]
     pub sort: FeatureSupport,
 
-    /// ETag support.
+    /// `ETag` support.
     #[serde(default)]
     pub etag: FeatureSupport,
 
@@ -83,7 +83,7 @@ pub struct HealthCheckResult {
     pub healthy: bool,
     /// Timestamp of the check.
     pub checked_at: chrono::DateTime<chrono::Utc>,
-    /// Cached ServiceProviderConfig if healthy.
+    /// Cached `ServiceProviderConfig` if healthy.
     pub service_provider_config: Option<ServiceProviderConfig>,
     /// Error message if unhealthy.
     pub error: Option<String>,
@@ -95,13 +95,13 @@ pub struct HealthCheckResult {
 /// and error handling per RFC 7644.
 #[derive(Debug, Clone)]
 pub struct ScimClient {
-    /// Base URL of the SCIM target (e.g., "https://api.example.com/scim/v2").
+    /// Base URL of the SCIM target (e.g., "<https://api.example.com/scim/v2>").
     base_url: String,
     /// Authentication handler.
     auth: ScimAuth,
     /// Underlying HTTP client.
     http_client: Client,
-    /// Whether the target supports PATCH (from ServiceProviderConfig).
+    /// Whether the target supports PATCH (from `ServiceProviderConfig`).
     patch_supported: bool,
 }
 
@@ -133,7 +133,8 @@ impl ScimClient {
         })
     }
 
-    /// Create a client with a pre-built reqwest::Client (for testing).
+    /// Create a client with a pre-built `reqwest::Client` (for testing).
+    #[must_use] 
     pub fn with_http_client(base_url: String, auth: ScimAuth, http_client: Client) -> Self {
         let base_url = base_url.trim_end_matches('/').to_string();
         Self {
@@ -150,18 +151,20 @@ impl ScimClient {
     }
 
     /// Whether the target supports PATCH operations.
+    #[must_use] 
     pub fn patch_supported(&self) -> bool {
         self.patch_supported
     }
 
     /// Get the base URL.
+    #[must_use] 
     pub fn base_url(&self) -> &str {
         &self.base_url
     }
 
     // ── Discovery ─────────────────────────────────────────────────────
 
-    /// Discover the target's ServiceProviderConfig (RFC 7643 Section 5).
+    /// Discover the target's `ServiceProviderConfig` (RFC 7643 Section 5).
     pub async fn discover_service_provider_config(
         &self,
     ) -> ScimClientResult<ServiceProviderConfig> {

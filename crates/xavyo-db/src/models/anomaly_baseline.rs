@@ -38,7 +38,7 @@ impl std::str::FromStr for DbBaselineType {
             "hourly_volume" => Ok(DbBaselineType::HourlyVolume),
             "tool_distribution" => Ok(DbBaselineType::ToolDistribution),
             "hour_distribution" => Ok(DbBaselineType::HourDistribution),
-            _ => Err(format!("Invalid baseline type: {}", s)),
+            _ => Err(format!("Invalid baseline type: {s}")),
         }
     }
 }
@@ -55,7 +55,7 @@ pub struct AnomalyBaseline {
     /// The agent this baseline is for.
     pub agent_id: Uuid,
 
-    /// Type of baseline (hourly_volume, tool_distribution, hour_distribution).
+    /// Type of baseline (`hourly_volume`, `tool_distribution`, `hour_distribution`).
     pub baseline_type: String,
 
     /// Mean value of the baseline metric.
@@ -70,10 +70,10 @@ pub struct AnomalyBaseline {
     /// Percentile values (p5, p25, p50, p75, p95).
     pub percentiles: Option<serde_json::Value>,
 
-    /// Tool frequency distribution (for tool_distribution type).
+    /// Tool frequency distribution (for `tool_distribution` type).
     pub tool_frequencies: Option<serde_json::Value>,
 
-    /// Hour frequency distribution (for hour_distribution type).
+    /// Hour frequency distribution (for `hour_distribution` type).
     pub hour_frequencies: Option<serde_json::Value>,
 
     /// Start of the data window used to compute this baseline.
@@ -114,14 +114,14 @@ impl AnomalyBaseline {
         baseline_type: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, AnomalyBaseline>(
-            r#"
+            r"
             SELECT
                 id, tenant_id, agent_id, baseline_type, mean_value,
                 std_deviation, sample_count, percentiles, tool_frequencies,
                 hour_frequencies, window_start, window_end, computed_at, is_valid
             FROM anomaly_baselines
             WHERE tenant_id = $1 AND agent_id = $2 AND baseline_type = $3 AND is_valid = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -137,7 +137,7 @@ impl AnomalyBaseline {
         agent_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as::<_, AnomalyBaseline>(
-            r#"
+            r"
             SELECT
                 id, tenant_id, agent_id, baseline_type, mean_value,
                 std_deviation, sample_count, percentiles, tool_frequencies,
@@ -145,7 +145,7 @@ impl AnomalyBaseline {
             FROM anomaly_baselines
             WHERE tenant_id = $1 AND agent_id = $2 AND is_valid = true
             ORDER BY baseline_type
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -156,7 +156,7 @@ impl AnomalyBaseline {
     /// Create or update a baseline (upsert).
     pub async fn upsert(pool: &PgPool, data: CreateAnomalyBaseline) -> Result<Self, sqlx::Error> {
         sqlx::query_as::<_, AnomalyBaseline>(
-            r#"
+            r"
             INSERT INTO anomaly_baselines (
                 tenant_id, agent_id, baseline_type, mean_value, std_deviation,
                 sample_count, percentiles, tool_frequencies, hour_frequencies,
@@ -179,7 +179,7 @@ impl AnomalyBaseline {
                 id, tenant_id, agent_id, baseline_type, mean_value,
                 std_deviation, sample_count, percentiles, tool_frequencies,
                 hour_frequencies, window_start, window_end, computed_at, is_valid
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(data.agent_id)
@@ -203,11 +203,11 @@ impl AnomalyBaseline {
         agent_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE anomaly_baselines
             SET is_valid = false
             WHERE tenant_id = $1 AND agent_id = $2 AND is_valid = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)

@@ -129,7 +129,7 @@ fn default_true() -> bool {
 /// Response for mapping preview.
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct PreviewMappingResponse {
-    /// Transformed attributes (target_attr -> value).
+    /// Transformed attributes (`target_attr` -> value).
     pub attributes: HashMap<String, String>,
     /// Any errors during transformation.
     pub errors: Vec<TransformError>,
@@ -156,6 +156,7 @@ pub struct MappingService {
 
 impl MappingService {
     /// Create a new mapping service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -269,7 +270,7 @@ impl MappingService {
         let deprovision_action: Option<DbDeprovisionAction> =
             if let Some(ref action) = request.deprovision_action {
                 Some(action.parse().map_err(|_| {
-                    ConnectorApiError::Validation(format!("Invalid deprovision action: {}", action))
+                    ConnectorApiError::Validation(format!("Invalid deprovision action: {action}"))
                 })?)
             } else {
                 None
@@ -398,22 +399,19 @@ impl MappingService {
         for (i, rule) in rules.iter().enumerate() {
             if !rule.is_object() {
                 return Err(ConnectorApiError::Validation(format!(
-                    "Mapping rule {} must be an object",
-                    i
+                    "Mapping rule {i} must be an object"
                 )));
             }
 
             // Check required fields
             if rule.get("target_attribute").is_none() {
                 return Err(ConnectorApiError::Validation(format!(
-                    "Mapping rule {} missing 'target_attribute'",
-                    i
+                    "Mapping rule {i} missing 'target_attribute'"
                 )));
             }
             if rule.get("source").is_none() {
                 return Err(ConnectorApiError::Validation(format!(
-                    "Mapping rule {} missing 'source'",
-                    i
+                    "Mapping rule {i} missing 'source'"
                 )));
             }
         }
@@ -421,12 +419,12 @@ impl MappingService {
         Ok(())
     }
 
-    /// Parse a database mapping to a MappingConfiguration for the transform engine.
+    /// Parse a database mapping to a `MappingConfiguration` for the transform engine.
     fn parse_mapping_config(&self, mapping: &AttributeMapping) -> Result<MappingConfiguration> {
         // Try to parse mappings as array of MappingRule
         let attribute_mappings: Vec<MappingRule> = if mapping.mappings.is_array() {
             serde_json::from_value(mapping.mappings.clone()).map_err(|e| {
-                ConnectorApiError::Validation(format!("Invalid mapping rules: {}", e))
+                ConnectorApiError::Validation(format!("Invalid mapping rules: {e}"))
             })?
         } else if mapping.mappings.is_object() {
             // Simple format: {source_attr: target_attr}

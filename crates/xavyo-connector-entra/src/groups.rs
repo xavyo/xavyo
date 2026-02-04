@@ -56,12 +56,12 @@ impl MappedEntraGroup {
 
         let security_enabled = value
             .get("securityEnabled")
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
 
         let mail_enabled = value
             .get("mailEnabled")
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
 
         let is_dynamic = group_types.contains(&"DynamicMembership".to_string());

@@ -1,6 +1,6 @@
 //! Discovery State Manager for schema discovery tracking.
 //!
-//! Provides in-memory state tracking and PostgreSQL advisory locks
+//! Provides in-memory state tracking and `PostgreSQL` advisory locks
 //! to prevent concurrent schema discoveries for the same connector.
 
 use std::collections::HashMap;
@@ -29,11 +29,11 @@ pub const MAX_DISCOVERY_TIMEOUT_SECS: u64 = 300;
 
 /// Manager for tracking schema discovery state.
 ///
-/// Uses in-memory state for quick lookups and PostgreSQL advisory locks
+/// Uses in-memory state for quick lookups and `PostgreSQL` advisory locks
 /// to prevent concurrent discoveries across multiple API instances.
 pub struct DiscoveryStateManager {
     pool: PgPool,
-    /// In-memory cache of discovery states by connector_id.
+    /// In-memory cache of discovery states by `connector_id`.
     states: Arc<RwLock<HashMap<Uuid, DiscoveryStatus>>>,
     /// Discovery timeout duration.
     timeout: Duration,
@@ -41,6 +41,7 @@ pub struct DiscoveryStateManager {
 
 impl DiscoveryStateManager {
     /// Create a new discovery state manager with default timeout.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self::with_timeout(pool, Duration::from_secs(DEFAULT_DISCOVERY_TIMEOUT_SECS))
     }
@@ -67,6 +68,7 @@ impl DiscoveryStateManager {
     }
 
     /// Get the configured timeout duration.
+    #[must_use] 
     pub fn timeout(&self) -> Duration {
         self.timeout
     }
@@ -74,7 +76,7 @@ impl DiscoveryStateManager {
     /// Try to acquire a discovery lock for a connector.
     ///
     /// Returns `Ok(true)` if lock acquired, `Ok(false)` if already locked.
-    /// Uses PostgreSQL advisory locks to coordinate across instances.
+    /// Uses `PostgreSQL` advisory locks to coordinate across instances.
     pub async fn try_acquire_lock(&self, connector_id: Uuid) -> Result<bool> {
         // Convert UUID to i64 for advisory lock (use first 8 bytes)
         let lock_key = uuid_to_lock_key(connector_id);
@@ -134,14 +136,12 @@ impl DiscoveryStateManager {
             if let Some(status) = states.get(&connector_id) {
                 if status.state == DiscoveryState::InProgress {
                     return Err(ConnectorApiError::Conflict(format!(
-                        "Schema discovery already in progress for connector {}",
-                        connector_id
+                        "Schema discovery already in progress for connector {connector_id}"
                     )));
                 }
             }
             return Err(ConnectorApiError::Conflict(format!(
-                "Could not acquire discovery lock for connector {}",
-                connector_id
+                "Could not acquire discovery lock for connector {connector_id}"
             )));
         }
 
@@ -324,7 +324,7 @@ impl DiscoveryStateManager {
                 matches!(
                     status.state,
                     DiscoveryState::Completed | DiscoveryState::Failed
-                ) && status.completed_at.map(|t| t < cutoff).unwrap_or(false)
+                ) && status.completed_at.is_some_and(|t| t < cutoff)
             })
             .map(|(id, _)| *id)
             .collect();
@@ -339,8 +339,7 @@ impl DiscoveryStateManager {
         let states = self.states.read().await;
         states
             .get(&connector_id)
-            .map(|s| s.state == DiscoveryState::InProgress)
-            .unwrap_or(false)
+            .is_some_and(|s| s.state == DiscoveryState::InProgress)
     }
 
     /// Reset a stuck discovery (for recovery scenarios).

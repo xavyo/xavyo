@@ -39,7 +39,7 @@ impl std::str::FromStr for HealthStatus {
             "connected" => Ok(HealthStatus::Connected),
             "degraded" => Ok(HealthStatus::Degraded),
             "disconnected" => Ok(HealthStatus::Disconnected),
-            _ => Err(format!("Unknown health status: {}", s)),
+            _ => Err(format!("Unknown health status: {s}")),
         }
     }
 }
@@ -76,7 +76,7 @@ impl std::str::FromStr for CircuitState {
             "closed" => Ok(CircuitState::Closed),
             "open" => Ok(CircuitState::Open),
             "half_open" => Ok(CircuitState::HalfOpen),
-            _ => Err(format!("Unknown circuit state: {}", s)),
+            _ => Err(format!("Unknown circuit state: {s}")),
         }
     }
 }
@@ -172,10 +172,10 @@ impl ConnectorHealth {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM connector_health
             WHERE connector_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -191,11 +191,11 @@ impl ConnectorHealth {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if let Some(s) = status {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM connector_health
                 WHERE tenant_id = $1 AND status = $2
                 ORDER BY updated_at DESC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(s.to_string())
@@ -203,11 +203,11 @@ impl ConnectorHealth {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM connector_health
                 WHERE tenant_id = $1
                 ORDER BY updated_at DESC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .fetch_all(pool)
@@ -222,7 +222,7 @@ impl ConnectorHealth {
         connector_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE connector_health
             SET status = 'connected',
                 last_check_at = NOW(),
@@ -237,7 +237,7 @@ impl ConnectorHealth {
                 END,
                 updated_at = NOW()
             WHERE connector_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -286,7 +286,7 @@ impl ConnectorHealth {
             };
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE connector_health
             SET status = $3,
                 last_check_at = NOW(),
@@ -296,7 +296,7 @@ impl ConnectorHealth {
                 updated_at = NOW()
             WHERE connector_id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -316,13 +316,13 @@ impl ConnectorHealth {
         config: &CircuitBreakerConfig,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE connector_health
             SET circuit_state = 'half_open', updated_at = NOW()
             WHERE connector_id = $1 AND tenant_id = $2
                 AND circuit_state = 'open'
                 AND circuit_opened_at <= NOW() - ($3 || ' seconds')::interval
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -344,7 +344,7 @@ impl ConnectorHealth {
         avg_latency: Option<i32>,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE connector_health
             SET operations_pending = $3,
                 operations_completed_24h = $4,
@@ -352,7 +352,7 @@ impl ConnectorHealth {
                 avg_latency_ms = $6,
                 updated_at = NOW()
             WHERE connector_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -367,11 +367,13 @@ impl ConnectorHealth {
     }
 
     /// Check if the circuit is open (blocking operations).
+    #[must_use] 
     pub fn is_circuit_open(&self) -> bool {
         matches!(self.circuit_state, CircuitState::Open)
     }
 
     /// Check if the circuit allows operations.
+    #[must_use] 
     pub fn allows_operations(&self) -> bool {
         matches!(
             self.circuit_state,
@@ -380,17 +382,19 @@ impl ConnectorHealth {
     }
 
     /// Check if connector is healthy.
+    #[must_use] 
     pub fn is_healthy(&self) -> bool {
         matches!(self.status, HealthStatus::Connected)
     }
 
     /// Get failure rate as percentage.
+    #[must_use] 
     pub fn failure_rate(&self) -> f64 {
         let total = self.operations_completed_24h + self.operations_failed_24h;
         if total == 0 {
             0.0
         } else {
-            (self.operations_failed_24h as f64 / total as f64) * 100.0
+            (f64::from(self.operations_failed_24h) / f64::from(total)) * 100.0
         }
     }
 
@@ -399,11 +403,13 @@ impl ConnectorHealth {
     /// A connector is offline if:
     /// - Status is disconnected, OR
     /// - Consecutive failures >= 3 (offline threshold)
+    #[must_use] 
     pub fn is_offline(&self) -> bool {
         self.status == HealthStatus::Disconnected || self.consecutive_failures >= 3
     }
 
     /// Check if connector is online and accepting operations.
+    #[must_use] 
     pub fn is_online(&self) -> bool {
         !self.is_offline() && self.allows_operations()
     }
@@ -416,14 +422,14 @@ impl ConnectorHealth {
         error: Option<&str>,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE connector_health
             SET status = 'disconnected',
                 offline_since = COALESCE(offline_since, NOW()),
                 last_error = $3,
                 updated_at = NOW()
             WHERE connector_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -441,7 +447,7 @@ impl ConnectorHealth {
         connector_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE connector_health
             SET status = 'connected',
                 offline_since = NULL,
@@ -452,7 +458,7 @@ impl ConnectorHealth {
                 last_error = NULL,
                 updated_at = NOW()
             WHERE connector_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -469,13 +475,13 @@ impl ConnectorHealth {
         connector_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE connector_health
             SET last_success_at = NOW(),
                 consecutive_failures = 0,
                 updated_at = NOW()
             WHERE connector_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -491,12 +497,12 @@ impl ConnectorHealth {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM connector_health
             WHERE tenant_id = $1
                 AND (status = 'disconnected' OR consecutive_failures >= 3)
             ORDER BY offline_since ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -504,6 +510,7 @@ impl ConnectorHealth {
     }
 
     /// Get duration the connector has been offline.
+    #[must_use] 
     pub fn offline_duration(&self) -> Option<chrono::Duration> {
         self.offline_since.map(|since| Utc::now() - since)
     }

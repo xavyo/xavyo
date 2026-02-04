@@ -20,7 +20,7 @@ use crate::services::unified_list_service::UnifiedListService;
 #[derive(Debug, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
 pub struct NhiListQuery {
-    /// Filter by NHI type: "service_account", "ai_agent", or omit for all.
+    /// Filter by NHI type: "`service_account`", "`ai_agent`", or omit for all.
     #[serde(rename = "type")]
     pub nhi_type: Option<String>,
 
@@ -102,7 +102,7 @@ pub struct NhiItem {
     /// Description or purpose.
     pub description: Option<String>,
 
-    /// Type discriminator: "service_account" or "ai_agent".
+    /// Type discriminator: "`service_account`" or "`ai_agent`".
     pub nhi_type: String,
 
     /// Primary owner user ID.

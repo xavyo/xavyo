@@ -1,7 +1,7 @@
-//! SoD validation service for preventive and detective validation.
+//! `SoD` validation service for preventive and detective validation.
 //!
 //! This module provides the `SodValidationService` for checking entitlement
-//! assignments against SoD rules and detecting existing violations.
+//! assignments against `SoD` rules and detecting existing violations.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -20,7 +20,7 @@ use crate::types::{SodConflictType, SodRuleId, SodSeverity, SodViolationId, SodV
 // Domain Types
 // ============================================================================
 
-/// An SoD violation detected in the system.
+/// An `SoD` violation detected in the system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SodViolation {
     /// Unique identifier.
@@ -41,7 +41,7 @@ pub struct SodViolation {
     pub status: SodViolationStatus,
 }
 
-/// Information about a single SoD violation for reporting.
+/// Information about a single `SoD` violation for reporting.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SodViolationInfo {
     /// The rule that was violated.
@@ -67,6 +67,7 @@ pub struct PreventiveValidationResult {
 
 impl PreventiveValidationResult {
     /// Create a successful validation result.
+    #[must_use] 
     pub fn success() -> Self {
         Self {
             is_valid: true,
@@ -75,6 +76,7 @@ impl PreventiveValidationResult {
     }
 
     /// Create a failed validation result.
+    #[must_use] 
     pub fn failure(violations: Vec<SodViolationInfo>) -> Self {
         Self {
             is_valid: violations.is_empty(),
@@ -122,7 +124,7 @@ pub struct DetectiveScanResult {
 // Store Trait
 // ============================================================================
 
-/// Trait for SoD violation storage backends.
+/// Trait for `SoD` violation storage backends.
 #[async_trait::async_trait]
 pub trait SodViolationStore: Send + Sync {
     /// Get a violation by ID.
@@ -170,7 +172,7 @@ pub trait SodViolationStore: Send + Sync {
 // In-Memory Store (for testing)
 // ============================================================================
 
-/// In-memory SoD violation store for testing.
+/// In-memory `SoD` violation store for testing.
 #[derive(Debug, Default)]
 pub struct InMemorySodViolationStore {
     violations: Arc<RwLock<HashMap<Uuid, SodViolation>>>,
@@ -178,6 +180,7 @@ pub struct InMemorySodViolationStore {
 
 impl InMemorySodViolationStore {
     /// Create a new in-memory store.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             violations: Arc::new(RwLock::new(HashMap::new())),
@@ -338,7 +341,7 @@ impl SodViolationStore for InMemorySodViolationStore {
 // Service
 // ============================================================================
 
-/// Service for validating entitlement assignments against SoD rules.
+/// Service for validating entitlement assignments against `SoD` rules.
 pub struct SodValidationService {
     rule_store: Arc<dyn SodRuleStore>,
     violation_store: Arc<dyn SodViolationStore>,
@@ -346,7 +349,7 @@ pub struct SodValidationService {
 }
 
 impl SodValidationService {
-    /// Create a new SoD validation service.
+    /// Create a new `SoD` validation service.
     pub fn new(
         rule_store: Arc<dyn SodRuleStore>,
         violation_store: Arc<dyn SodViolationStore>,

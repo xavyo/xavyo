@@ -115,7 +115,7 @@ impl RateLimitState {
     pub fn check(&self, tenant_id: Option<&str>) -> Result<(), u64> {
         let limiter = self.get_limiter(tenant_id);
         match limiter.check() {
-            Ok(_) => Ok(()),
+            Ok(()) => Ok(()),
             Err(not_until) => {
                 let wait_time =
                     not_until.wait_time_from(governor::clock::Clock::now(&DefaultClock::default()));
@@ -204,7 +204,7 @@ where
 fn rate_limited_response(retry_after: u64) -> Response {
     let body = ErrorResponse {
         error: "RATE_LIMITED".to_string(),
-        message: format!("Rate limit exceeded. Try again in {} seconds.", retry_after),
+        message: format!("Rate limit exceeded. Try again in {retry_after} seconds."),
         request_id: None,
     };
 

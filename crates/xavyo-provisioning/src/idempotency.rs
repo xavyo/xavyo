@@ -32,10 +32,10 @@ pub type IdempotencyResult<T> = Result<T, IdempotencyError>;
 /// Service for generating and checking idempotency keys.
 ///
 /// The idempotency key is a SHA256 hash of:
-/// - tenant_id
-/// - connector_id
-/// - user_id (optional)
-/// - operation_type
+/// - `tenant_id`
+/// - `connector_id`
+/// - `user_id` (optional)
+/// - `operation_type`
 /// - payload hash (canonical JSON)
 ///
 /// This ensures that identical operations produce the same key,
@@ -45,6 +45,7 @@ pub struct IdempotencyService;
 
 impl IdempotencyService {
     /// Create a new idempotency service.
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
@@ -79,14 +80,12 @@ impl IdempotencyService {
 
         // Build the composite string to hash
         let mut composite = format!(
-            "{}:{}:{}:{}",
-            tenant_id, connector_id, operation_type, payload_hash
+            "{tenant_id}:{connector_id}:{operation_type}:{payload_hash}"
         );
 
         if let Some(uid) = user_id {
             composite = format!(
-                "{}:{}:{}:{}:{}",
-                tenant_id, connector_id, uid, operation_type, payload_hash
+                "{tenant_id}:{connector_id}:{uid}:{operation_type}:{payload_hash}"
             );
         }
 
@@ -110,8 +109,7 @@ impl IdempotencyService {
         let payload_hash = self.hash_string(&canonical_payload);
 
         let composite = format!(
-            "{}:{}:{}:{}:{}:{}",
-            tenant_id, connector_id, entity_type, entity_id, operation_type, payload_hash
+            "{tenant_id}:{connector_id}:{entity_type}:{entity_id}:{operation_type}:{payload_hash}"
         );
 
         Ok(self.hash_string(&composite))
@@ -137,11 +135,11 @@ impl IdempotencyService {
         idempotency_key: &str,
     ) -> IdempotencyResult<Option<Uuid>> {
         let result: Option<(Uuid,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT id FROM provisioning_operations
             WHERE tenant_id = $1 AND idempotency_key = $2
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(idempotency_key)
@@ -182,11 +180,11 @@ impl IdempotencyService {
         idempotency_key: &str,
     ) -> IdempotencyResult<()> {
         sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET idempotency_key = $3
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(operation_id)
         .bind(tenant_id)

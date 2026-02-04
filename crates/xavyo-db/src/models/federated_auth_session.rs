@@ -45,14 +45,14 @@ impl FederatedAuthSession {
         let expires_at = Utc::now() + Duration::minutes(SESSION_EXPIRY_MINUTES);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO federated_auth_sessions (
                 tenant_id, identity_provider_id, state, nonce,
                 pkce_verifier, redirect_uri, expires_at
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(input.identity_provider_id)
@@ -71,10 +71,10 @@ impl FederatedAuthSession {
         state: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM federated_auth_sessions
             WHERE state = $1 AND expires_at > NOW()
-            "#,
+            ",
         )
         .bind(state)
         .fetch_optional(pool)
@@ -115,7 +115,7 @@ impl FederatedAuthSession {
         Ok(result.rows_affected())
     }
 
-    /// Delete expired sessions (alias for cleanup_expired).
+    /// Delete expired sessions (alias for `cleanup_expired`).
     pub async fn delete_expired(pool: &sqlx::PgPool) -> Result<u64, sqlx::Error> {
         Self::cleanup_expired(pool).await
     }
@@ -130,11 +130,13 @@ impl FederatedAuthSession {
     }
 
     /// Check if session is expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         Utc::now() > self.expires_at
     }
 
     /// Check if session has been used.
+    #[must_use] 
     pub fn is_used(&self) -> bool {
         self.is_used
     }

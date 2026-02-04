@@ -27,7 +27,7 @@ pub struct ApiKey {
     /// Human-readable name for the API key.
     pub name: String,
 
-    /// First characters of the key for identification (e.g., "xavyo_sk").
+    /// First characters of the key for identification (e.g., "`xavyo_sk`").
     pub key_prefix: String,
 
     /// SHA-256 hash of the full API key.
@@ -80,14 +80,14 @@ impl ApiKey {
 
     /// Create a new API key in the database.
     ///
-    /// The key_hash should be a SHA-256 hash of the full API key.
+    /// The `key_hash` should be a SHA-256 hash of the full API key.
     pub async fn create(pool: &PgPool, data: CreateApiKey) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO api_keys (tenant_id, user_id, name, key_prefix, key_hash, scopes, expires_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(data.user_id)
@@ -107,11 +107,11 @@ impl ApiKey {
         data: CreateApiKey,
     ) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO api_keys (tenant_id, user_id, name, key_prefix, key_hash, scopes, expires_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(data.user_id)
@@ -130,9 +130,9 @@ impl ApiKey {
     /// This is the primary lookup method for authentication.
     pub async fn find_by_hash(pool: &PgPool, key_hash: &str) -> Result<Option<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM api_keys WHERE key_hash = $1
-            "#,
+            ",
         )
         .bind(key_hash)
         .fetch_optional(pool)
@@ -147,9 +147,9 @@ impl ApiKey {
         id: Uuid,
     ) -> Result<Option<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM api_keys WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -165,11 +165,11 @@ impl ApiKey {
         user_id: Uuid,
     ) -> Result<Vec<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM api_keys
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -178,12 +178,12 @@ impl ApiKey {
         .map_err(DbError::QueryFailed)
     }
 
-    /// Update the last_used_at timestamp.
+    /// Update the `last_used_at` timestamp.
     pub async fn update_last_used(pool: &PgPool, id: Uuid) -> Result<(), DbError> {
         sqlx::query(
-            r#"
+            r"
             UPDATE api_keys SET last_used_at = NOW() WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .execute(pool)
@@ -200,11 +200,11 @@ impl ApiKey {
         id: Uuid,
     ) -> Result<Option<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE api_keys SET is_active = false
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -216,9 +216,9 @@ impl ApiKey {
     /// Delete an API key.
     pub async fn delete(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<bool, DbError> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM api_keys WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -278,11 +278,11 @@ impl ApiKey {
     /// List all API keys for a tenant (admin view).
     pub async fn list_by_tenant(pool: &PgPool, tenant_id: Uuid) -> Result<Vec<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT * FROM api_keys
             WHERE tenant_id = $1
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)

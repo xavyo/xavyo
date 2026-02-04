@@ -60,13 +60,13 @@ impl GovScriptAuditEvent {
         params: &CreateScriptAuditEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_script_audit_events (
                 tenant_id, script_id, action, actor_id, details
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(params.tenant_id)
         .bind(params.script_id)
@@ -79,7 +79,7 @@ impl GovScriptAuditEvent {
 
     /// List audit events for a tenant with filtering and pagination.
     ///
-    /// Returns a tuple of (events, total_count).
+    /// Returns a tuple of (events, `total_count`).
     pub async fn list_by_tenant(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -92,27 +92,27 @@ impl GovScriptAuditEvent {
 
         if filter.script_id.is_some() {
             param_count += 1;
-            base_where.push_str(&format!(" AND script_id = ${}", param_count));
+            base_where.push_str(&format!(" AND script_id = ${param_count}"));
         }
         if filter.action.is_some() {
             param_count += 1;
-            base_where.push_str(&format!(" AND action = ${}", param_count));
+            base_where.push_str(&format!(" AND action = ${param_count}"));
         }
         if filter.actor_id.is_some() {
             param_count += 1;
-            base_where.push_str(&format!(" AND actor_id = ${}", param_count));
+            base_where.push_str(&format!(" AND actor_id = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            base_where.push_str(&format!(" AND created_at >= ${}", param_count));
+            base_where.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            base_where.push_str(&format!(" AND created_at <= ${}", param_count));
+            base_where.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         // Count query
-        let count_query = format!("SELECT COUNT(*){}", base_where);
+        let count_query = format!("SELECT COUNT(*){base_where}");
         let mut count_q = sqlx::query_scalar::<_, i64>(&count_query).bind(tenant_id);
 
         if let Some(script_id) = filter.script_id {
@@ -165,7 +165,7 @@ impl GovScriptAuditEvent {
 
     /// List audit events for a specific script with pagination.
     ///
-    /// Returns a tuple of (events, total_count).
+    /// Returns a tuple of (events, `total_count`).
     pub async fn list_by_script(
         pool: &sqlx::PgPool,
         script_id: Uuid,
@@ -174,10 +174,10 @@ impl GovScriptAuditEvent {
         offset: i64,
     ) -> Result<(Vec<Self>, i64), sqlx::Error> {
         let total: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_script_audit_events
             WHERE tenant_id = $1 AND script_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(script_id)
@@ -185,12 +185,12 @@ impl GovScriptAuditEvent {
         .await?;
 
         let events = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_script_audit_events
             WHERE tenant_id = $1 AND script_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(script_id)

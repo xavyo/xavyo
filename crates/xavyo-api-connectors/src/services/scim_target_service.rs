@@ -133,11 +133,13 @@ pub struct HealthCheckResponse {
 }
 
 impl ScimTargetService {
+    #[must_use] 
     pub fn new(pool: PgPool, encryption: Arc<CredentialEncryption>) -> Self {
         Self { pool, encryption }
     }
 
     /// Get a reference to the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -236,7 +238,7 @@ impl ScimTargetService {
             .await
             .map_err(|e| {
                 error!("Failed to set tenant context: {:?}", e);
-                ConnectorApiError::Internal(format!("Failed to set tenant context: {}", e))
+                ConnectorApiError::Internal(format!("Failed to set tenant context: {e}"))
             })?;
 
         let target = ScimTarget::create(&mut *tx, &create).await.map_err(|e| {
@@ -338,8 +340,7 @@ impl ScimTargetService {
         if let Some(ref auth_method) = req.auth_method {
             if auth_method != "bearer" && auth_method != "oauth2" {
                 return Err(ConnectorApiError::Validation(format!(
-                    "auth_method must be 'bearer' or 'oauth2', got '{}'",
-                    auth_method
+                    "auth_method must be 'bearer' or 'oauth2', got '{auth_method}'"
                 )));
             }
         }
@@ -348,8 +349,7 @@ impl ScimTargetService {
         if let Some(ref strategy) = req.deprovisioning_strategy {
             if strategy != "deactivate" && strategy != "delete" {
                 return Err(ConnectorApiError::Validation(format!(
-                    "deprovisioning_strategy must be 'deactivate' or 'delete', got '{}'",
-                    strategy
+                    "deprovisioning_strategy must be 'deactivate' or 'delete', got '{strategy}'"
                 )));
             }
         }
@@ -493,7 +493,7 @@ impl ScimTargetService {
         })
     }
 
-    /// Build a ScimClient from a target's stored configuration.
+    /// Build a `ScimClient` from a target's stored configuration.
     pub fn build_client(
         &self,
         target: &ScimTarget,
@@ -520,7 +520,7 @@ impl ScimTargetService {
             .map_err(|e| ConnectorApiError::DecryptionFailed(e.to_string()))
     }
 
-    /// Validate a SCIM target connection by discovering ServiceProviderConfig.
+    /// Validate a SCIM target connection by discovering `ServiceProviderConfig`.
     async fn validate_connection(
         &self,
         base_url: &str,

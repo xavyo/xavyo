@@ -44,7 +44,7 @@ impl std::str::FromStr for TemplateType {
             "mfa_setup" => Ok(Self::MfaSetup),
             "security_alert" => Ok(Self::SecurityAlert),
             "account_locked" => Ok(Self::AccountLocked),
-            _ => Err(format!("Invalid template type: {}", s)),
+            _ => Err(format!("Invalid template type: {s}")),
         }
     }
 }
@@ -126,10 +126,10 @@ impl EmailTemplate {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM email_templates
             WHERE tenant_id = $1 AND template_type = $2 AND locale = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_type)
@@ -147,11 +147,11 @@ impl EmailTemplate {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM email_templates
             WHERE tenant_id = $1
             ORDER BY template_type, locale
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(executor)
@@ -172,7 +172,7 @@ impl EmailTemplate {
         let is_active = data.is_active.unwrap_or(true);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO email_templates (
                 tenant_id, template_type, locale, subject,
                 body_html, body_text, available_variables,
@@ -187,7 +187,7 @@ impl EmailTemplate {
                 is_active = EXCLUDED.is_active,
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&data.template_type)
@@ -213,10 +213,10 @@ impl EmailTemplate {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM email_templates
             WHERE tenant_id = $1 AND template_type = $2 AND locale = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_type)
@@ -238,11 +238,11 @@ impl EmailTemplate {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE email_templates
             SET is_active = $4, updated_at = NOW()
             WHERE tenant_id = $1 AND template_type = $2 AND locale = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_type)

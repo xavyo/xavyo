@@ -15,6 +15,7 @@ pub struct ApplicationService {
 
 impl ApplicationService {
     /// Create a new application service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

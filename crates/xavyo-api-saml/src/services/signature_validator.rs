@@ -1,6 +1,6 @@
-//! AuthnRequest signature validation service
+//! `AuthnRequest` signature validation service
 //!
-//! Validates SAML AuthnRequest signatures for both HTTP-Redirect and HTTP-POST bindings.
+//! Validates SAML `AuthnRequest` signatures for both HTTP-Redirect and HTTP-POST bindings.
 
 use crate::error::{SamlError, SamlResult};
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -19,9 +19,9 @@ impl SignatureValidator {
     /// `SAMLRequest=value&RelayState=value&SigAlg=value` (URL-encoded)
     ///
     /// # Arguments
-    /// * `saml_request` - URL-encoded SAMLRequest parameter value
-    /// * `relay_state` - Optional URL-encoded RelayState parameter value
-    /// * `sig_alg` - URL-encoded SigAlg parameter value
+    /// * `saml_request` - URL-encoded `SAMLRequest` parameter value
+    /// * `relay_state` - Optional URL-encoded `RelayState` parameter value
+    /// * `sig_alg` - URL-encoded `SigAlg` parameter value
     /// * `signature` - Base64-encoded signature value
     /// * `sp_certificate_pem` - SP's X.509 certificate in PEM format
     pub fn validate_redirect_signature(
@@ -34,11 +34,11 @@ impl SignatureValidator {
         // Parse certificate
         let cert = parse_certificate(sp_certificate_pem)?;
         let public_key = cert.public_key().map_err(|e| {
-            SamlError::SignatureValidationFailed(format!("Invalid certificate: {}", e))
+            SamlError::SignatureValidationFailed(format!("Invalid certificate: {e}"))
         })?;
 
         // Reconstruct the signed data (URL query string order matters!)
-        let mut signed_data = format!("SAMLRequest={}", saml_request);
+        let mut signed_data = format!("SAMLRequest={saml_request}");
         if let Some(rs) = relay_state {
             if !rs.is_empty() {
                 signed_data.push_str("&RelayState=");
@@ -50,13 +50,13 @@ impl SignatureValidator {
 
         // Decode signature
         let signature_bytes = STANDARD.decode(signature).map_err(|e| {
-            SamlError::SignatureValidationFailed(format!("Invalid signature encoding: {}", e))
+            SamlError::SignatureValidationFailed(format!("Invalid signature encoding: {e}"))
         })?;
 
         // Determine digest algorithm from SigAlg
         let (digest, _alg_name) = match urlencoding::decode(sig_alg)
             .map_err(|e| {
-                SamlError::SignatureValidationFailed(format!("Invalid SigAlg encoding: {}", e))
+                SamlError::SignatureValidationFailed(format!("Invalid SigAlg encoding: {e}"))
             })?
             .as_ref()
         {
@@ -72,23 +72,22 @@ impl SignatureValidator {
             }
             alg => {
                 return Err(SamlError::SignatureValidationFailed(format!(
-                    "Unsupported signature algorithm: {}",
-                    alg
+                    "Unsupported signature algorithm: {alg}"
                 )));
             }
         };
 
         // Verify signature
         let mut verifier = Verifier::new(digest, &public_key).map_err(|e| {
-            SamlError::SignatureValidationFailed(format!("Verifier creation failed: {}", e))
+            SamlError::SignatureValidationFailed(format!("Verifier creation failed: {e}"))
         })?;
 
         verifier.update(signed_data.as_bytes()).map_err(|e| {
-            SamlError::SignatureValidationFailed(format!("Signature update failed: {}", e))
+            SamlError::SignatureValidationFailed(format!("Signature update failed: {e}"))
         })?;
 
         let valid = verifier.verify(&signature_bytes).map_err(|e| {
-            SamlError::SignatureValidationFailed(format!("Signature verification failed: {}", e))
+            SamlError::SignatureValidationFailed(format!("Signature verification failed: {e}"))
         })?;
 
         if valid {
@@ -105,13 +104,13 @@ impl SignatureValidator {
     /// Extracts the ds:Signature element from the XML and validates it.
     ///
     /// # Arguments
-    /// * `xml` - The decoded AuthnRequest XML
+    /// * `xml` - The decoded `AuthnRequest` XML
     /// * `sp_certificate_pem` - SP's X.509 certificate in PEM format
     pub fn validate_post_signature(xml: &str, sp_certificate_pem: &str) -> SamlResult<()> {
         // Parse certificate
         let cert = parse_certificate(sp_certificate_pem)?;
         let public_key = cert.public_key().map_err(|e| {
-            SamlError::SignatureValidationFailed(format!("Invalid certificate: {}", e))
+            SamlError::SignatureValidationFailed(format!("Invalid certificate: {e}"))
         })?;
 
         // Extract signature components from XML
@@ -127,22 +126,22 @@ impl SignatureValidator {
         let signature_bytes = STANDARD
             .decode(sig_info.signature_value.replace(['\n', '\r', ' '], ""))
             .map_err(|e| {
-                SamlError::SignatureValidationFailed(format!("Invalid signature encoding: {}", e))
+                SamlError::SignatureValidationFailed(format!("Invalid signature encoding: {e}"))
             })?;
 
         // Verify signature (assume SHA256 for now, can extend based on SignatureMethod)
         let mut verifier = Verifier::new(MessageDigest::sha256(), &public_key).map_err(|e| {
-            SamlError::SignatureValidationFailed(format!("Verifier creation failed: {}", e))
+            SamlError::SignatureValidationFailed(format!("Verifier creation failed: {e}"))
         })?;
 
         verifier
             .update(canonicalized_signed_info.as_bytes())
             .map_err(|e| {
-                SamlError::SignatureValidationFailed(format!("Signature update failed: {}", e))
+                SamlError::SignatureValidationFailed(format!("Signature update failed: {e}"))
             })?;
 
         let valid = verifier.verify(&signature_bytes).map_err(|e| {
-            SamlError::SignatureValidationFailed(format!("Signature verification failed: {}", e))
+            SamlError::SignatureValidationFailed(format!("Signature verification failed: {e}"))
         })?;
 
         if valid {
@@ -176,7 +175,7 @@ fn parse_certificate(pem: &str) -> SamlResult<X509> {
     };
 
     X509::from_pem(pem_data.as_bytes())
-        .map_err(|e| SamlError::SignatureValidationFailed(format!("Invalid certificate: {}", e)))
+        .map_err(|e| SamlError::SignatureValidationFailed(format!("Invalid certificate: {e}")))
 }
 
 /// Apply Exclusive XML Canonicalization (C14N)
@@ -186,11 +185,11 @@ fn canonicalize_xml(xml: &str) -> SamlResult<String> {
         .write_to_writer(&mut output)
         .canonicalize(false) // Exclusive C14N without comments
         .map_err(|e| {
-            SamlError::SignatureValidationFailed(format!("Canonicalization failed: {}", e))
+            SamlError::SignatureValidationFailed(format!("Canonicalization failed: {e}"))
         })?;
 
     String::from_utf8(output)
-        .map_err(|e| SamlError::SignatureValidationFailed(format!("Invalid UTF-8: {}", e)))
+        .map_err(|e| SamlError::SignatureValidationFailed(format!("Invalid UTF-8: {e}")))
 }
 
 /// Extract signature information from XML using quick-xml
@@ -280,8 +279,7 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
             Ok(Event::Eof) => break,
             Err(e) => {
                 return Err(SamlError::SignatureValidationFailed(format!(
-                    "XML parse error: {}",
-                    e
+                    "XML parse error: {e}"
                 )));
             }
             _ => {}
@@ -318,11 +316,10 @@ fn verify_reference_digest(xml: &str, sig_info: &SignatureInfo) -> SamlResult<()
     }
 
     // Find element with this ID
-    let id_pattern = format!("ID=\"{}\"", element_id);
+    let id_pattern = format!("ID=\"{element_id}\"");
     let element_start = xml.find(&id_pattern).ok_or_else(|| {
         SamlError::SignatureValidationFailed(format!(
-            "Referenced element not found: {}",
-            element_id
+            "Referenced element not found: {element_id}"
         ))
     })?;
 
@@ -332,7 +329,7 @@ fn verify_reference_digest(xml: &str, sig_info: &SignatureInfo) -> SamlResult<()
 
     // Find the corresponding end tag - for AuthnRequest this is usually the root element
     let tag_name = extract_tag_name(&xml[open_tag_start..]);
-    let close_tag = format!("</{}", tag_name);
+    let close_tag = format!("</{tag_name}");
     let element_end = xml
         .find(&close_tag)
         .map(|pos| pos + close_tag.len() + 1) // +1 for the >
@@ -348,7 +345,7 @@ fn verify_reference_digest(xml: &str, sig_info: &SignatureInfo) -> SamlResult<()
     // Canonicalize and compute digest
     let canonicalized = canonicalize_xml(&content_without_sig)?;
     let digest = openssl::hash::hash(MessageDigest::sha256(), canonicalized.as_bytes())
-        .map_err(|e| SamlError::SignatureValidationFailed(format!("Hash failed: {}", e)))?;
+        .map_err(|e| SamlError::SignatureValidationFailed(format!("Hash failed: {e}")))?;
     let computed_digest = STANDARD.encode(digest);
 
     // Compare with expected digest
@@ -370,7 +367,7 @@ fn verify_document_digest(xml: &str, sig_info: &SignatureInfo) -> SamlResult<()>
     // Canonicalize and compute digest
     let canonicalized = canonicalize_xml(&content_without_sig)?;
     let digest = openssl::hash::hash(MessageDigest::sha256(), canonicalized.as_bytes())
-        .map_err(|e| SamlError::SignatureValidationFailed(format!("Hash failed: {}", e)))?;
+        .map_err(|e| SamlError::SignatureValidationFailed(format!("Hash failed: {e}")))?;
     let computed_digest = STANDARD.encode(digest);
 
     let expected_digest = sig_info.digest_value.replace(['\n', '\r', ' '], "");

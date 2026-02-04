@@ -30,6 +30,7 @@ pub struct PeerGroupService {
 
 impl PeerGroupService {
     /// Create a new peer group service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -59,8 +60,7 @@ impl PeerGroupService {
         let group = GovPeerGroup::find_by_id(&self.pool, tenant_id, group_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Peer group not found: {}",
-                group_id
+                "Peer group not found: {group_id}"
             )))?;
 
         Ok(PeerGroupResponse::from(group))
@@ -98,8 +98,7 @@ impl PeerGroupService {
         GovPeerGroup::find_by_id(&self.pool, tenant_id, group_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Peer group not found: {}",
-                group_id
+                "Peer group not found: {group_id}"
             )))?;
 
         // Clear all members first
@@ -121,8 +120,7 @@ impl PeerGroupService {
         GovPeerGroup::find_by_id(&self.pool, tenant_id, group_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Peer group not found: {}",
-                group_id
+                "Peer group not found: {group_id}"
             )))?;
 
         // Get all member user IDs
@@ -138,8 +136,7 @@ impl PeerGroupService {
             let updated = GovPeerGroup::update_stats(&self.pool, tenant_id, group_id, stats)
                 .await?
                 .ok_or(ApiGovernanceError::NotFound(format!(
-                    "Peer group not found: {}",
-                    group_id
+                    "Peer group not found: {group_id}"
                 )))?;
 
             return Ok(RefreshStatsResponse {
@@ -174,8 +171,7 @@ impl PeerGroupService {
         let updated = GovPeerGroup::update_stats(&self.pool, tenant_id, group_id, stats)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Peer group not found: {}",
-                group_id
+                "Peer group not found: {group_id}"
             )))?;
 
         Ok(RefreshStatsResponse {
@@ -279,8 +275,7 @@ impl PeerGroupService {
         GovPeerGroup::find_by_id(&self.pool, tenant_id, group_id)
             .await?
             .ok_or(ApiGovernanceError::NotFound(format!(
-                "Peer group not found: {}",
-                group_id
+                "Peer group not found: {group_id}"
             )))?;
 
         GovPeerGroupMember::add_member(&self.pool, tenant_id, group_id, user_id).await?;
@@ -300,6 +295,7 @@ impl PeerGroupService {
     }
 
     /// Get the minimum peer group size required for statistical validity.
+    #[must_use] 
     pub fn min_peer_group_size() -> i32 {
         MIN_PEER_GROUP_SIZE
     }

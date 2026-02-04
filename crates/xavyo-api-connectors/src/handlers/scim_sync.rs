@@ -49,7 +49,7 @@ pub struct SyncRunListResponse {
     pub offset: i64,
 }
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid> {
     claims
         .tenant_id()
@@ -61,7 +61,7 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid> {
 
 /// POST /admin/scim-targets/:id/sync — Trigger a full sync.
 ///
-/// Returns 202 Accepted with sync_run_id, or 409 if a sync is already running.
+/// Returns 202 Accepted with `sync_run_id`, or 409 if a sync is already running.
 #[utoipa::path(
     post,
     path = "/admin/scim-targets/{target_id}/sync",
@@ -129,7 +129,7 @@ pub async fn trigger_sync(
 
 /// POST /admin/scim-targets/:id/reconcile — Trigger a reconciliation.
 ///
-/// Returns 202 Accepted with sync_run_id, or 409 if a sync is already running.
+/// Returns 202 Accepted with `sync_run_id`, or 409 if a sync is already running.
 #[utoipa::path(
     post,
     path = "/admin/scim-targets/{target_id}/reconcile",

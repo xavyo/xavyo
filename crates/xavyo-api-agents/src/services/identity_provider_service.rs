@@ -24,6 +24,7 @@ pub struct IdentityProviderService {
 
 impl IdentityProviderService {
     /// Create a new identity provider service.
+    #[must_use] 
     pub fn new(pool: PgPool, audit_service: IdentityAuditService) -> Self {
         Self {
             pool,
@@ -132,7 +133,7 @@ impl IdentityProviderService {
         // Build update request
         let update_request = UpdateIdentityProviderConfig {
             name: request.name.clone(),
-            configuration: encrypted_config.map(|s| s.to_string()),
+            configuration: encrypted_config.map(std::string::ToString::to_string),
             is_active: request.is_active,
         };
 
@@ -328,7 +329,7 @@ impl IdentityProviderService {
     /// Parse and validate provider configuration JSON.
     pub fn parse_provider_config(&self, json: &str) -> Result<ProviderConfig, ApiAgentsError> {
         serde_json::from_str(json).map_err(|e| {
-            ApiAgentsError::InvalidProviderConfig(format!("Invalid configuration JSON: {}", e))
+            ApiAgentsError::InvalidProviderConfig(format!("Invalid configuration JSON: {e}"))
         })
     }
 

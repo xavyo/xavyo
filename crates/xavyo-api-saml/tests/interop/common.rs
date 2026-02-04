@@ -100,6 +100,7 @@ pub struct AttributeMapping {
 
 impl SpProfile {
     /// Create a Salesforce SP profile
+    #[must_use] 
     pub fn salesforce() -> Self {
         Self {
             name: "Salesforce".to_string(),
@@ -130,7 +131,8 @@ impl SpProfile {
         }
     }
 
-    /// Create a ServiceNow SP profile
+    /// Create a `ServiceNow` SP profile
+    #[must_use] 
     pub fn servicenow() -> Self {
         Self {
             name: "ServiceNow".to_string(),
@@ -170,6 +172,7 @@ impl SpProfile {
     }
 
     /// Create a Workday SP profile
+    #[must_use] 
     pub fn workday() -> Self {
         Self {
             name: "Workday".to_string(),
@@ -189,6 +192,7 @@ impl SpProfile {
     }
 
     /// Create an AWS SSO SP profile
+    #[must_use] 
     pub fn aws_sso() -> Self {
         Self {
             name: "AWS SSO".to_string(),
@@ -229,11 +233,12 @@ impl SpProfile {
 // ============================================================================
 
 /// Generate mock signing credentials for testing
-/// Returns a tuple of (certificate_pem, private_key_pem)
+/// Returns a tuple of (`certificate_pem`, `private_key_pem`)
+#[must_use] 
 pub fn mock_signing_credentials() -> (String, String) {
     // Use pre-generated test certificates (self-signed, for testing only)
     // These are NOT real certificates and should never be used in production
-    let cert = r#"-----BEGIN CERTIFICATE-----
+    let cert = r"-----BEGIN CERTIFICATE-----
 MIICpDCCAYwCCQDU+pQ4P5aDgTANBgkqhkiG9w0BAQsFADAUMRIwEAYDVQQDDAls
 b2NhbGhvc3QwHhcNMjQwMTAxMDAwMDAwWhcNMjUwMTAxMDAwMDAwWjAUMRIwEAYD
 VQQDDAlsb2NhbGhvc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7
@@ -244,9 +249,9 @@ JlJCJiJ7JpJGJgJ1JoJEJdJzJnJBJcJyJmJAJbJxJkJ9JaJwJjJ8J0J6J2J4JqJF
 JjJ3JlJCJiJ7JpJGJgJ1JoJEJdJzJnJBJcJyJmJAJbJxJkJ9JaJwJjJ8J0J6J2J4
 JqJFAgMBAAEwDQYJKoZIhvcNAQELBQADggEBAKxC9m5k7lLLW5+M7TKlZbBhJ5ye
 QaLqJM7n6zK7HqL7GkJ6xE4vN6lJ8x0n7hQd8cCuVkp7lL9o8F7t2YsD5e0yqT4Q
------END CERTIFICATE-----"#;
+-----END CERTIFICATE-----";
 
-    let key = r#"-----BEGIN PRIVATE KEY-----
+    let key = r"-----BEGIN PRIVATE KEY-----
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7o5e7gReJwANH
 xPQgFdYGPhSTlK8cA4BzVmFQr6KwdJ5bJqR0TxCY7VYpJoqJyFy1yMYrFU4hXzLZ
 JFgWJCmzaLSQ7OYEJl2Lx5mCXQ3jU5z0cCRkfJL8KxDAU8oC8xBxYPZLrJ4J8CrB
@@ -254,7 +259,7 @@ JFgWJCmzaLSQ7OYEJl2Lx5mCXQ3jU5z0cCRkfJL8KxDAU8oC8xBxYPZLrJ4J8CrB
 JgJ1JoJEJdJzJnJBJcJyJmJAJbJxJkJ9JaJwJjJ8J0J6J2J4JqJFJjJ3JlJCJiJ7
 JpJGJgJ1JoJEJdJzJnJBJcJyJmJAJbJxJkJ9JaJwJjJ8J0J6J2J4JqJFAgMBAAEC
 ggEAYZ1wD8dKJ8nLK7J9xL5J7J6J5J4J3J2J1J0JzJyJxJwJvJuJtJsJrJqJpJoJn
------END PRIVATE KEY-----"#;
+-----END PRIVATE KEY-----";
 
     (cert.to_string(), key.to_string())
 }
@@ -290,9 +295,9 @@ pub struct ParsedAssertion {
 pub fn parse_saml_response(base64_response: &str) -> Result<ParsedAssertion, String> {
     let decoded = STANDARD
         .decode(base64_response)
-        .map_err(|e| format!("Base64 decode error: {}", e))?;
+        .map_err(|e| format!("Base64 decode error: {e}"))?;
 
-    let xml = String::from_utf8(decoded).map_err(|e| format!("UTF-8 decode error: {}", e))?;
+    let xml = String::from_utf8(decoded).map_err(|e| format!("UTF-8 decode error: {e}"))?;
 
     parse_saml_xml(&xml)
 }
@@ -309,7 +314,7 @@ pub fn parse_saml_xml(xml: &str) -> Result<ParsedAssertion, String> {
 
     loop {
         match reader.read_event() {
-            Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+            Ok(Event::Start(e) | Event::Empty(e)) => {
                 let name = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 current_element = name.clone();
 
@@ -460,7 +465,7 @@ pub fn parse_saml_xml(xml: &str) -> Result<ParsedAssertion, String> {
                 }
             }
             Ok(Event::Eof) => break,
-            Err(e) => return Err(format!("XML parse error: {}", e)),
+            Err(e) => return Err(format!("XML parse error: {e}")),
             _ => {}
         }
     }
@@ -469,6 +474,7 @@ pub fn parse_saml_xml(xml: &str) -> Result<ParsedAssertion, String> {
 }
 
 /// Validate that an assertion has all required elements for a given SP
+#[must_use] 
 pub fn validate_assertion_structure(assertion: &ParsedAssertion, sp: &SpProfile) -> Vec<String> {
     let mut errors = Vec::new();
 
@@ -514,17 +520,18 @@ pub fn validate_assertion_structure(assertion: &ParsedAssertion, sp: &SpProfile)
 }
 
 /// Extract attribute values by name
+#[must_use] 
 pub fn get_attribute_values(assertion: &ParsedAssertion, name: &str) -> Option<Vec<String>> {
     assertion.attributes.get(name).cloned()
 }
 
-/// Validate NameID format matches expected format
+/// Validate `NameID` format matches expected format
+#[must_use] 
 pub fn validate_nameid_format(assertion: &ParsedAssertion, expected_format: &str) -> bool {
     assertion
         .name_id_format
         .as_ref()
-        .map(|f| f == expected_format)
-        .unwrap_or(false)
+        .is_some_and(|f| f == expected_format)
 }
 
 /// Validate assertion timing is within acceptable window
@@ -559,21 +566,21 @@ pub fn validate_assertion_timing(
 }
 
 /// Validate signature algorithm is RSA-SHA256
+#[must_use] 
 pub fn validate_signature_algorithm(assertion: &ParsedAssertion) -> bool {
     assertion
         .signature_algorithm
         .as_ref()
-        .map(|a| a == "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256")
-        .unwrap_or(false)
+        .is_some_and(|a| a == "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256")
 }
 
 /// Validate canonicalization method is Exclusive C14N
+#[must_use] 
 pub fn validate_canonicalization_method(assertion: &ParsedAssertion) -> bool {
     assertion
         .canonicalization_method
         .as_ref()
-        .map(|m| m == "http://www.w3.org/2001/10/xml-exc-c14n#")
-        .unwrap_or(false)
+        .is_some_and(|m| m == "http://www.w3.org/2001/10/xml-exc-c14n#")
 }
 
 // ============================================================================
@@ -581,6 +588,7 @@ pub fn validate_canonicalization_method(assertion: &ParsedAssertion) -> bool {
 // ============================================================================
 
 /// Build a test SAML response XML for validation testing
+#[must_use] 
 pub fn build_test_response(
     sp: &SpProfile,
     user: &StandardTestUser,
@@ -593,12 +601,12 @@ pub fn build_test_response(
     let not_before = (now - Duration::minutes(2))
         .format("%Y-%m-%dT%H:%M:%SZ")
         .to_string();
-    let not_on_or_after = (now + Duration::seconds(sp.assertion_validity_seconds as i64))
+    let not_on_or_after = (now + Duration::seconds(i64::from(sp.assertion_validity_seconds)))
         .format("%Y-%m-%dT%H:%M:%SZ")
         .to_string();
 
     let in_response_to_attr = in_response_to
-        .map(|id| format!(" InResponseTo=\"{}\"", id))
+        .map(|id| format!(" InResponseTo=\"{id}\""))
         .unwrap_or_default();
 
     let name_id_value = if sp.name_id_format.contains("emailAddress") {
@@ -629,14 +637,13 @@ pub fn build_test_response(
                 mapping
                     .format
                     .as_ref()
-                    .map(|f| format!(r#" NameFormat="{}""#, f))
+                    .map(|f| format!(r#" NameFormat="{f}""#))
                     .unwrap_or_default()
             ));
             attrs_xml.push('\n');
             for value in values {
                 attrs_xml.push_str(&format!(
-                    r#"                <saml:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">{}</saml:AttributeValue>"#,
-                    value
+                    r#"                <saml:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">{value}</saml:AttributeValue>"#
                 ));
                 attrs_xml.push('\n');
             }
@@ -648,14 +655,12 @@ pub fn build_test_response(
     if let Some(ref group_attr) = sp.group_attribute_name {
         if !user.groups.is_empty() {
             attrs_xml.push_str(&format!(
-                r#"            <saml:Attribute Name="{}">"#,
-                group_attr
+                r#"            <saml:Attribute Name="{group_attr}">"#
             ));
             attrs_xml.push('\n');
             for group in &user.groups {
                 attrs_xml.push_str(&format!(
-                    r#"                <saml:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">{}</saml:AttributeValue>"#,
-                    group
+                    r#"                <saml:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">{group}</saml:AttributeValue>"#
                 ));
                 attrs_xml.push('\n');
             }
@@ -663,15 +668,14 @@ pub fn build_test_response(
         }
     }
 
-    let attribute_statement = if !attrs_xml.is_empty() {
-        format!(
-            r#"        <saml:AttributeStatement>
-{}        </saml:AttributeStatement>"#,
-            attrs_xml
-        )
-    } else {
-        String::new()
-    };
+    let attribute_statement = if attrs_xml.is_empty() {
+            String::new()
+        } else {
+            format!(
+                r"        <saml:AttributeStatement>
+    {attrs_xml}        </saml:AttributeStatement>"
+            )
+        };
 
     let signature_xml = if sp.sign_assertions {
         r#"
@@ -745,6 +749,7 @@ pub fn build_test_response(
 }
 
 /// Build a test SAML response for AWS SSO with role attributes
+#[must_use] 
 pub fn build_aws_test_response(sp: &SpProfile, user: &AwsRoleTestUser) -> String {
     let response_id = format!("_resp_{}", Uuid::new_v4());
     let assertion_id = format!("_assert_{}", Uuid::new_v4());
@@ -753,7 +758,7 @@ pub fn build_aws_test_response(sp: &SpProfile, user: &AwsRoleTestUser) -> String
     let not_before = (now - Duration::minutes(2))
         .format("%Y-%m-%dT%H:%M:%SZ")
         .to_string();
-    let not_on_or_after = (now + Duration::seconds(sp.assertion_validity_seconds as i64))
+    let not_on_or_after = (now + Duration::seconds(i64::from(sp.assertion_validity_seconds)))
         .format("%Y-%m-%dT%H:%M:%SZ")
         .to_string();
 
@@ -761,9 +766,8 @@ pub fn build_aws_test_response(sp: &SpProfile, user: &AwsRoleTestUser) -> String
     let mut role_values = String::new();
     for role in &user.aws_roles {
         role_values.push_str(&format!(
-            r#"                <saml:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">{}</saml:AttributeValue>
-"#,
-            role
+            r#"                <saml:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">{role}</saml:AttributeValue>
+"#
         ));
     }
 

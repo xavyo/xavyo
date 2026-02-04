@@ -62,7 +62,7 @@ async fn test_get_risk_summary() {
 
     // Query risk distribution
     let row = sqlx::query(
-        r#"
+        r"
         SELECT
             COUNT(*) as total,
             COUNT(*) FILTER (WHERE risk_score < 40) as low_risk,
@@ -70,7 +70,7 @@ async fn test_get_risk_summary() {
             COUNT(*) FILTER (WHERE risk_score >= 70) as high_risk
         FROM v_non_human_identities
         WHERE tenant_id = $1
-        "#,
+        ",
     )
     .bind(tenant_id)
     .fetch_one(&pool)
@@ -102,11 +102,11 @@ async fn test_certify_service_account() {
     // Certify the service account
     let now = Utc::now();
     sqlx::query(
-        r#"
+        r"
         UPDATE gov_service_accounts
         SET last_certified_at = $1, certified_by = $2, updated_at = NOW()
         WHERE id = $3 AND tenant_id = $4
-        "#,
+        ",
     )
     .bind(now)
     .bind(owner_id)
@@ -118,11 +118,11 @@ async fn test_certify_service_account() {
 
     // Verify certification
     let row = sqlx::query(
-        r#"
+        r"
         SELECT last_certified_at, certified_by
         FROM gov_service_accounts
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id)
     .bind(tenant_id)
@@ -160,11 +160,11 @@ async fn test_certification_status_persisted() {
     // Certify
     let cert_time = Utc::now();
     sqlx::query(
-        r#"
+        r"
         UPDATE gov_service_accounts
         SET last_certified_at = $1, certified_by = $2, updated_at = NOW()
         WHERE id = $3 AND tenant_id = $4
-        "#,
+        ",
     )
     .bind(cert_time)
     .bind(owner_id)
@@ -176,11 +176,11 @@ async fn test_certification_status_persisted() {
 
     // Fetch and verify
     let row = sqlx::query(
-        r#"
+        r"
         SELECT id, name, last_certified_at, certified_by
         FROM gov_service_accounts
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(sa_id)
     .bind(tenant_id)
@@ -222,11 +222,11 @@ async fn test_risk_score_endpoint() {
 
     // Fetch risk score from view
     let row = sqlx::query(
-        r#"
+        r"
         SELECT id, name, risk_score
         FROM v_non_human_identities
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(nhi_id)
     .bind(tenant_id)

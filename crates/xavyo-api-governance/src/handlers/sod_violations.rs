@@ -1,4 +1,4 @@
-//! SoD violation handlers for governance API.
+//! `SoD` violation handlers for governance API.
 
 use axum::{
     extract::{Path, Query, State},
@@ -17,7 +17,7 @@ use crate::models::{
 use crate::router::GovernanceState;
 use crate::services::SodViolationService;
 
-/// List SoD violations with optional filtering and pagination.
+/// List `SoD` violations with optional filtering and pagination.
 #[utoipa::path(
     get,
     path = "/governance/sod-violations",
@@ -68,7 +68,7 @@ pub async fn list_violations(
     }))
 }
 
-/// Get an SoD violation by ID.
+/// Get an `SoD` violation by ID.
 #[utoipa::path(
     get,
     path = "/governance/sod-violations/{id}",

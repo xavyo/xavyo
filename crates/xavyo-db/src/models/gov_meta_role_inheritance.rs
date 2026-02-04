@@ -61,10 +61,10 @@ impl GovMetaRoleInheritance {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_inheritances
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -80,10 +80,10 @@ impl GovMetaRoleInheritance {
         child_role_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_meta_role_inheritances
             WHERE tenant_id = $1 AND meta_role_id = $2 AND child_role_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -103,12 +103,12 @@ impl GovMetaRoleInheritance {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if let Some(status) = status {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_meta_role_inheritances
                 WHERE tenant_id = $1 AND meta_role_id = $2 AND status = $3
                 ORDER BY matched_at ASC
                 LIMIT $4 OFFSET $5
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(meta_role_id)
@@ -119,12 +119,12 @@ impl GovMetaRoleInheritance {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_meta_role_inheritances
                 WHERE tenant_id = $1 AND meta_role_id = $2
                 ORDER BY matched_at ASC
                 LIMIT $3 OFFSET $4
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(meta_role_id)
@@ -144,11 +144,11 @@ impl GovMetaRoleInheritance {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if let Some(status) = status {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_meta_role_inheritances
                 WHERE tenant_id = $1 AND child_role_id = $2 AND status = $3
                 ORDER BY matched_at ASC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(child_role_id)
@@ -157,11 +157,11 @@ impl GovMetaRoleInheritance {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_meta_role_inheritances
                 WHERE tenant_id = $1 AND child_role_id = $2
                 ORDER BY matched_at ASC
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(child_role_id)
@@ -177,10 +177,10 @@ impl GovMetaRoleInheritance {
         meta_role_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_meta_role_inheritances
             WHERE tenant_id = $1 AND meta_role_id = $2 AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -195,13 +195,13 @@ impl GovMetaRoleInheritance {
         input: CreateGovMetaRoleInheritance,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_meta_role_inheritances (
                 tenant_id, meta_role_id, child_role_id, match_reason
             )
             VALUES ($1, $2, $3, $4)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.meta_role_id)
@@ -219,12 +219,12 @@ impl GovMetaRoleInheritance {
         status: InheritanceStatus,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_meta_role_inheritances
             SET status = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -240,11 +240,11 @@ impl GovMetaRoleInheritance {
         meta_role_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_meta_role_inheritances
             SET status = 'suspended', updated_at = NOW()
             WHERE tenant_id = $1 AND meta_role_id = $2 AND status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -261,11 +261,11 @@ impl GovMetaRoleInheritance {
         meta_role_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_meta_role_inheritances
             SET status = 'active', updated_at = NOW()
             WHERE tenant_id = $1 AND meta_role_id = $2 AND status = 'suspended'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(meta_role_id)
@@ -282,12 +282,12 @@ impl GovMetaRoleInheritance {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_meta_role_inheritances
             SET status = 'removed', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -302,10 +302,10 @@ impl GovMetaRoleInheritance {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_meta_role_inheritances
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -316,6 +316,7 @@ impl GovMetaRoleInheritance {
     }
 
     /// Check if inheritance is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         self.status == InheritanceStatus::Active
     }

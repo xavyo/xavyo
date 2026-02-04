@@ -31,14 +31,14 @@ pub struct CreateCampaignRequest {
     /// Scope type for the campaign.
     pub scope_type: CertScopeType,
 
-    /// Scope configuration (depends on scope_type).
+    /// Scope configuration (depends on `scope_type`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scope_config: Option<ScopeConfig>,
 
     /// How to assign reviewers.
     pub reviewer_type: CertReviewerType,
 
-    /// Specific reviewer user IDs (required when reviewer_type is specific_users).
+    /// Specific reviewer user IDs (required when `reviewer_type` is `specific_users`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub specific_reviewers: Option<Vec<Uuid>>,
 
@@ -49,15 +49,15 @@ pub struct CreateCampaignRequest {
 /// Scope configuration for campaigns.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ScopeConfig {
-    /// Application ID (when scope_type is application).
+    /// Application ID (when `scope_type` is application).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub application_id: Option<Uuid>,
 
-    /// Entitlement ID (when scope_type is entitlement).
+    /// Entitlement ID (when `scope_type` is entitlement).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub entitlement_id: Option<Uuid>,
 
-    /// Department name (when scope_type is department).
+    /// Department name (when `scope_type` is department).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub department: Option<String>,
 }
@@ -503,7 +503,7 @@ pub struct DecisionRequest {
     /// Decision type (approved or revoked).
     pub decision_type: CertDecisionType,
 
-    /// Justification (required when decision_type is revoked, minimum 20 characters).
+    /// Justification (required when `decision_type` is revoked, minimum 20 characters).
     #[validate(length(min = 20, message = "Justification must be at least 20 characters"))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub justification: Option<String>,

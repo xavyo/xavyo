@@ -96,11 +96,11 @@ impl MfaAuditLog {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO mfa_audit_log (user_id, tenant_id, action, ip_address, user_agent, metadata)
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.user_id)
         .bind(data.tenant_id)
@@ -123,12 +123,12 @@ impl MfaAuditLog {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM mfa_audit_log
             WHERE user_id = $1
             ORDER BY created_at DESC
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(limit)
@@ -150,12 +150,12 @@ impl MfaAuditLog {
     {
         if let Some(action) = action_filter {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM mfa_audit_log
                 WHERE tenant_id = $1 AND action = $2
                 ORDER BY created_at DESC
                 LIMIT $3 OFFSET $4
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(action)
@@ -165,12 +165,12 @@ impl MfaAuditLog {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM mfa_audit_log
                 WHERE tenant_id = $1
                 ORDER BY created_at DESC
                 LIMIT $2 OFFSET $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(limit)
@@ -190,12 +190,12 @@ impl MfaAuditLog {
         E: PgExecutor<'e>,
     {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM mfa_audit_log
             WHERE user_id = $1
               AND action = 'verify_failed'
               AND created_at > NOW() - ($2 || ' minutes')::INTERVAL
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(minutes.to_string())

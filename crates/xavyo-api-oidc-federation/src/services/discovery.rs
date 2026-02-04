@@ -1,7 +1,7 @@
 //! OIDC Discovery service for fetching provider metadata.
 
 use crate::error::{FederationError, FederationResult};
-use openidconnect::{core::CoreProviderMetadata, reqwest::async_http_client, IssuerUrl};
+use openidconnect::{core::CoreProviderMetadata, IssuerUrl};
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
@@ -21,6 +21,7 @@ pub struct DiscoveryService;
 
 impl DiscoveryService {
     /// Create a new discovery service.
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
@@ -33,11 +34,17 @@ impl DiscoveryService {
 
         // Parse issuer URL
         let issuer = IssuerUrl::new(issuer_url.to_string()).map_err(|e| {
-            FederationError::InvalidConfiguration(format!("Invalid issuer URL: {}", e))
+            FederationError::InvalidConfiguration(format!("Invalid issuer URL: {e}"))
         })?;
 
+        // Create HTTP client (no redirects for SSRF protection)
+        let http_client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|e| FederationError::InvalidConfiguration(format!("Failed to create HTTP client: {e}")))?;
+
         // Fetch provider metadata
-        let metadata = CoreProviderMetadata::discover_async(issuer, async_http_client)
+        let metadata = CoreProviderMetadata::discover_async(issuer, &http_client)
             .await
             .map_err(|e| FederationError::DiscoveryFailed {
                 issuer: issuer_url.to_string(),
@@ -80,9 +87,10 @@ impl DiscoveryService {
     }
 
     /// Get well-known configuration URL for an issuer.
+    #[must_use] 
     pub fn get_well_known_url(issuer_url: &str) -> String {
         let issuer_url = issuer_url.trim_end_matches('/');
-        format!("{}/.well-known/openid-configuration", issuer_url)
+        format!("{issuer_url}/.well-known/openid-configuration")
     }
 }
 

@@ -188,10 +188,10 @@ impl GovRole {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_roles
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -206,10 +206,10 @@ impl GovRole {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_roles
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -226,10 +226,10 @@ impl GovRole {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_roles
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
@@ -239,18 +239,18 @@ impl GovRole {
                 query.push_str(" AND parent_role_id IS NULL");
             } else {
                 param_count += 1;
-                query.push_str(&format!(" AND parent_role_id = ${}", param_count));
+                query.push_str(&format!(" AND parent_role_id = ${param_count}"));
             }
         }
 
         if filter.is_abstract.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_abstract = ${}", param_count));
+            query.push_str(&format!(" AND is_abstract = ${param_count}"));
         }
 
         if filter.name_prefix.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${} || '%'", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count} || '%'"));
         }
 
         query.push_str(&format!(
@@ -281,10 +281,10 @@ impl GovRole {
         filter: &GovRoleFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_roles
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
@@ -293,18 +293,18 @@ impl GovRole {
                 query.push_str(" AND parent_role_id IS NULL");
             } else {
                 param_count += 1;
-                query.push_str(&format!(" AND parent_role_id = ${}", param_count));
+                query.push_str(&format!(" AND parent_role_id = ${param_count}"));
             }
         }
 
         if filter.is_abstract.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_abstract = ${}", param_count));
+            query.push_str(&format!(" AND is_abstract = ${param_count}"));
         }
 
         if filter.name_prefix.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${} || '%'", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count} || '%'"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -323,7 +323,7 @@ impl GovRole {
     }
 
     /// Create a new governance role.
-    /// Computes hierarchy_depth based on parent and validates constraints.
+    /// Computes `hierarchy_depth` based on parent and validates constraints.
     pub async fn create(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -334,10 +334,10 @@ impl GovRole {
         // Compute depth based on parent
         let depth = if let Some(parent_id) = input.parent_role_id {
             let parent_depth: i32 = sqlx::query_scalar(
-                r#"
+                r"
                 SELECT hierarchy_depth FROM gov_roles
                 WHERE id = $1 AND tenant_id = $2
-                "#,
+                ",
             )
             .bind(parent_id)
             .bind(tenant_id)
@@ -347,8 +347,7 @@ impl GovRole {
             let new_depth = parent_depth + 1;
             if new_depth > max_depth {
                 return Err(sqlx::Error::Protocol(format!(
-                    "Maximum hierarchy depth of {} exceeded",
-                    max_depth
+                    "Maximum hierarchy depth of {max_depth} exceeded"
                 )));
             }
             new_depth
@@ -357,11 +356,11 @@ impl GovRole {
         };
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_roles (tenant_id, name, description, parent_role_id, is_abstract, hierarchy_depth, created_by)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -384,10 +383,10 @@ impl GovRole {
     ) -> Result<Option<Self>, sqlx::Error> {
         // First verify version
         let current: Option<GovRole> = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_roles
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -406,40 +405,37 @@ impl GovRole {
 
         // Compute new depth if parent is changing
         let new_depth = if let Some(new_parent_opt) = &input.parent_role_id {
-            if *new_parent_opt != current.parent_role_id {
-                if let Some(new_parent_id) = new_parent_opt {
-                    // Check for cycle
-                    if Self::would_create_cycle(pool, tenant_id, id, *new_parent_id).await? {
-                        return Err(sqlx::Error::Protocol(
-                            "Circular reference detected: setting this parent would create a cycle"
-                                .to_string(),
-                        ));
-                    }
-
-                    let parent_depth: i32 = sqlx::query_scalar(
-                        r#"
-                        SELECT hierarchy_depth FROM gov_roles
-                        WHERE id = $1 AND tenant_id = $2
-                        "#,
-                    )
-                    .bind(new_parent_id)
-                    .bind(tenant_id)
-                    .fetch_one(pool)
-                    .await?;
-
-                    let depth = parent_depth + 1;
-                    if depth > max_depth {
-                        return Err(sqlx::Error::Protocol(format!(
-                            "Maximum hierarchy depth of {} exceeded",
-                            max_depth
-                        )));
-                    }
-                    Some(depth)
-                } else {
-                    Some(0) // Becoming a root role
-                }
-            } else {
+            if *new_parent_opt == current.parent_role_id {
                 None
+            } else if let Some(new_parent_id) = new_parent_opt {
+                // Check for cycle
+                if Self::would_create_cycle(pool, tenant_id, id, *new_parent_id).await? {
+                    return Err(sqlx::Error::Protocol(
+                        "Circular reference detected: setting this parent would create a cycle"
+                            .to_string(),
+                    ));
+                }
+
+                let parent_depth: i32 = sqlx::query_scalar(
+                    r"
+                    SELECT hierarchy_depth FROM gov_roles
+                    WHERE id = $1 AND tenant_id = $2
+                    ",
+                )
+                .bind(new_parent_id)
+                .bind(tenant_id)
+                .fetch_one(pool)
+                .await?;
+
+                let depth = parent_depth + 1;
+                if depth > max_depth {
+                    return Err(sqlx::Error::Protocol(format!(
+                        "Maximum hierarchy depth of {max_depth} exceeded"
+                    )));
+                }
+                Some(depth)
+            } else {
+                Some(0) // Becoming a root role
             }
         } else {
             None
@@ -453,23 +449,23 @@ impl GovRole {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.parent_role_id.is_some() {
-            updates.push(format!("parent_role_id = ${}", param_idx));
+            updates.push(format!("parent_role_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_abstract.is_some() {
-            updates.push(format!("is_abstract = ${}", param_idx));
+            updates.push(format!("is_abstract = ${param_idx}"));
             param_idx += 1;
         }
         if new_depth.is_some() {
-            updates.push(format!("hierarchy_depth = ${}", param_idx));
+            updates.push(format!("hierarchy_depth = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -510,10 +506,10 @@ impl GovRole {
         // First promote children to root roles (parent_role_id = NULL, depth = 0)
         // This happens automatically via ON DELETE SET NULL, but we need to fix depths
         let children: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT id FROM gov_roles
             WHERE parent_role_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -522,10 +518,10 @@ impl GovRole {
 
         // Delete the role (CASCADE will handle effective entitlements and blocks)
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_roles
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -549,7 +545,7 @@ impl GovRole {
         role_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             WITH RECURSIVE ancestors AS (
                 -- Base case: the direct parent
                 SELECT r.* FROM gov_roles r
@@ -565,7 +561,7 @@ impl GovRole {
             )
             SELECT * FROM ancestors
             ORDER BY hierarchy_depth DESC
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -580,7 +576,7 @@ impl GovRole {
         role_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             WITH RECURSIVE descendants AS (
                 -- Base case: direct children
                 SELECT r.* FROM gov_roles r
@@ -595,7 +591,7 @@ impl GovRole {
             )
             SELECT * FROM descendants
             ORDER BY hierarchy_depth ASC
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -617,7 +613,7 @@ impl GovRole {
         }
 
         let is_descendant: bool = sqlx::query_scalar(
-            r#"
+            r"
             WITH RECURSIVE descendants AS (
                 SELECT id FROM gov_roles WHERE parent_role_id = $1 AND tenant_id = $3
 
@@ -628,7 +624,7 @@ impl GovRole {
                 WHERE r.tenant_id = $3
             )
             SELECT EXISTS(SELECT 1 FROM descendants WHERE id = $2)
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(new_parent_id)
@@ -648,10 +644,10 @@ impl GovRole {
     ) -> Result<(), sqlx::Error> {
         // Update root role's depth
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_roles SET hierarchy_depth = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(root_id)
         .bind(tenant_id)
@@ -661,7 +657,7 @@ impl GovRole {
 
         // Update all descendants using recursive CTE
         sqlx::query(
-            r#"
+            r"
             WITH RECURSIVE subtree AS (
                 SELECT id, hierarchy_depth, 1 as relative_depth
                 FROM gov_roles WHERE parent_role_id = $1 AND tenant_id = $2
@@ -678,7 +674,7 @@ impl GovRole {
                 updated_at = NOW()
             FROM subtree
             WHERE gov_roles.id = subtree.id AND gov_roles.tenant_id = $2
-            "#,
+            ",
         )
         .bind(root_id)
         .bind(tenant_id)
@@ -700,10 +696,10 @@ impl GovRole {
     ) -> Result<(Self, i64), sqlx::Error> {
         // Verify version
         let current: GovRole = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_roles
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -730,10 +726,10 @@ impl GovRole {
         // Compute new depth
         let new_depth = if let Some(parent_id) = new_parent_id {
             let parent_depth: i32 = sqlx::query_scalar(
-                r#"
+                r"
                 SELECT hierarchy_depth FROM gov_roles
                 WHERE id = $1 AND tenant_id = $2
-                "#,
+                ",
             )
             .bind(parent_id)
             .bind(tenant_id)
@@ -747,7 +743,7 @@ impl GovRole {
 
         // Get max descendant depth to validate
         let max_descendant_depth: Option<i32> = sqlx::query_scalar(
-            r#"
+            r"
             WITH RECURSIVE descendants AS (
                 SELECT id, hierarchy_depth FROM gov_roles
                 WHERE parent_role_id = $1 AND tenant_id = $2
@@ -759,7 +755,7 @@ impl GovRole {
                 WHERE r.tenant_id = $2
             )
             SELECT MAX(hierarchy_depth) FROM descendants
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -771,15 +767,14 @@ impl GovRole {
             let new_max = max_desc_depth + depth_delta;
             if new_max > max_depth {
                 return Err(sqlx::Error::Protocol(format!(
-                    "Move would cause descendants to exceed maximum hierarchy depth of {}",
-                    max_depth
+                    "Move would cause descendants to exceed maximum hierarchy depth of {max_depth}"
                 )));
             }
         }
 
         // Update the role's parent
         let updated: GovRole = sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_roles SET
                 parent_role_id = $3,
                 hierarchy_depth = $4,
@@ -787,7 +782,7 @@ impl GovRole {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(role_id)
         .bind(tenant_id)
@@ -812,11 +807,11 @@ impl GovRole {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_roles
             WHERE tenant_id = $1 AND parent_role_id IS NULL
             ORDER BY name
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -830,11 +825,11 @@ impl GovRole {
         parent_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_roles
             WHERE tenant_id = $1 AND parent_role_id = $2
             ORDER BY name
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(parent_id)

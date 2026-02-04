@@ -87,11 +87,6 @@ impl MockScimClient for AzureAdClient {
     fn build_patch_user_payload(&self, operations: Vec<Value>) -> Value {
         let ops: Vec<Value> = operations
             .into_iter()
-            .map(|op| {
-                // AAD-003: Azure AD may include full resource in PATCH replace
-                // This is handled at a higher level, not in individual operations
-                op
-            })
             .collect();
 
         json!({
@@ -103,9 +98,9 @@ impl MockScimClient for AzureAdClient {
     fn build_filter(&self, attribute: &str, operator: &str, value: &str) -> String {
         // AAD-005: Azure AD sends filters with extra whitespace
         if self.config.quirk_enabled("AAD-005") {
-            format!("{}  {}  \"{}\"", attribute, operator, value)
+            format!("{attribute}  {operator}  \"{value}\"")
         } else {
-            format!("{} {} \"{}\"", attribute, operator, value)
+            format!("{attribute} {operator} \"{value}\"")
         }
     }
 

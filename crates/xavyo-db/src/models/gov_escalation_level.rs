@@ -33,14 +33,14 @@ pub struct GovEscalationLevel {
     /// Type of escalation target.
     pub target_type: EscalationTargetType,
 
-    /// Target ID for specific_user or approval_group.
+    /// Target ID for `specific_user` or `approval_group`.
     pub target_id: Option<Uuid>,
 
-    /// Depth for manager_chain type.
+    /// Depth for `manager_chain` type.
     pub manager_chain_depth: Option<i32>,
 
     /// Timeout for this escalation level.
-    /// Note: PgInterval doesn't implement Serialize/Deserialize, use timeout_secs() accessor.
+    /// Note: `PgInterval` doesn't implement Serialize/Deserialize, use `timeout_secs()` accessor.
     #[serde(skip)]
     pub timeout: sqlx::postgres::types::PgInterval,
 
@@ -79,10 +79,10 @@ impl GovEscalationLevel {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_escalation_levels
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -90,18 +90,18 @@ impl GovEscalationLevel {
         .await
     }
 
-    /// Find all levels for a policy, ordered by level_order.
+    /// Find all levels for a policy, ordered by `level_order`.
     pub async fn find_by_policy(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         policy_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_escalation_levels
             WHERE tenant_id = $1 AND policy_id = $2
             ORDER BY level_order ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(policy_id)
@@ -109,18 +109,18 @@ impl GovEscalationLevel {
         .await
     }
 
-    /// Find all levels for a rule, ordered by level_order.
+    /// Find all levels for a rule, ordered by `level_order`.
     pub async fn find_by_rule(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         rule_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_escalation_levels
             WHERE tenant_id = $1 AND rule_id = $2
             ORDER BY level_order ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_id)
@@ -135,10 +135,10 @@ impl GovEscalationLevel {
         policy_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_escalation_levels
             WHERE tenant_id = $1 AND policy_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(policy_id)
@@ -153,10 +153,10 @@ impl GovEscalationLevel {
         rule_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_escalation_levels
             WHERE tenant_id = $1 AND rule_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_id)
@@ -172,14 +172,14 @@ impl GovEscalationLevel {
         input: CreateEscalationLevel,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_escalation_levels (
                 tenant_id, policy_id, level_order, level_name,
                 target_type, target_id, manager_chain_depth, timeout
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, make_interval(secs => $8))
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(policy_id)
@@ -201,14 +201,14 @@ impl GovEscalationLevel {
         input: CreateEscalationLevel,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_escalation_levels (
                 tenant_id, rule_id, level_order, level_name,
                 target_type, target_id, manager_chain_depth, timeout
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, make_interval(secs => $8))
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_id)
@@ -270,23 +270,23 @@ impl GovEscalationLevel {
         let mut param_idx = 3;
 
         if input.level_name.is_some() {
-            updates.push(format!("level_name = ${}", param_idx));
+            updates.push(format!("level_name = ${param_idx}"));
             param_idx += 1;
         }
         if input.target_type.is_some() {
-            updates.push(format!("target_type = ${}", param_idx));
+            updates.push(format!("target_type = ${param_idx}"));
             param_idx += 1;
         }
         if input.target_id.is_some() {
-            updates.push(format!("target_id = ${}", param_idx));
+            updates.push(format!("target_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.manager_chain_depth.is_some() {
-            updates.push(format!("manager_chain_depth = ${}", param_idx));
+            updates.push(format!("manager_chain_depth = ${param_idx}"));
             param_idx += 1;
         }
         if input.timeout_secs.is_some() {
-            updates.push(format!("timeout = make_interval(secs => ${})", param_idx));
+            updates.push(format!("timeout = make_interval(secs => ${param_idx})"));
             // param_idx += 1;
         }
 
@@ -327,10 +327,10 @@ impl GovEscalationLevel {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_escalation_levels
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -347,10 +347,10 @@ impl GovEscalationLevel {
         policy_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_escalation_levels
             WHERE tenant_id = $1 AND policy_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(policy_id)
@@ -367,10 +367,10 @@ impl GovEscalationLevel {
         rule_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_escalation_levels
             WHERE tenant_id = $1 AND rule_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(rule_id)
@@ -381,20 +381,22 @@ impl GovEscalationLevel {
     }
 
     /// Get timeout as Duration.
+    #[must_use] 
     pub fn timeout_duration(&self) -> chrono::Duration {
         let microseconds = self.timeout.microseconds;
-        let days = self.timeout.days as i64;
-        let months = self.timeout.months as i64;
+        let days = i64::from(self.timeout.days);
+        let months = i64::from(self.timeout.months);
         let total_days = days + (months * 30);
         let total_microseconds = microseconds + (total_days * 24 * 60 * 60 * 1_000_000);
         chrono::Duration::microseconds(total_microseconds)
     }
 
     /// Get timeout in seconds (for serialization).
+    #[must_use] 
     pub fn timeout_secs(&self) -> i64 {
         let microseconds = self.timeout.microseconds;
-        let days = self.timeout.days as i64;
-        let months = self.timeout.months as i64;
+        let days = i64::from(self.timeout.days);
+        let months = i64::from(self.timeout.months);
         let total_days = days + (months * 30);
         (microseconds / 1_000_000) + (total_days * 24 * 60 * 60)
     }
@@ -423,8 +425,7 @@ impl GovEscalationLevel {
                 Some(depth) if (1..=10).contains(&depth) => {}
                 Some(depth) => {
                     return Err(format!(
-                        "manager_chain_depth must be between 1 and 10, got {}",
-                        depth
+                        "manager_chain_depth must be between 1 and 10, got {depth}"
                     ))
                 }
                 None => {

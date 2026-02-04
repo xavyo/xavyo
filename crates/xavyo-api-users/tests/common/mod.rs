@@ -26,13 +26,13 @@ pub async fn create_test_tenant(pool: &PgPool) -> Uuid {
     let tenant_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO tenants (id, name, slug, created_at)
         VALUES ($1, $2, $3, NOW())
-        "#,
+        ",
     )
     .bind(tenant_id)
-    .bind(format!("Test Tenant {}", tenant_id))
+    .bind(format!("Test Tenant {tenant_id}"))
     .bind(format!("test-{}", &tenant_id.to_string()[..8]))
     .execute(pool)
     .await
@@ -46,10 +46,10 @@ pub async fn create_test_user(pool: &PgPool, tenant_id: Uuid, email: &str) -> Uu
     let user_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO users (id, tenant_id, email, password_hash, is_active, created_at, updated_at)
         VALUES ($1, $2, $3, $4, true, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(user_id)
     .bind(tenant_id)
@@ -70,13 +70,13 @@ pub async fn create_test_user_with_roles(
     roles: &[&str],
 ) -> Uuid {
     let user_id = Uuid::new_v4();
-    let roles_array: Vec<String> = roles.iter().map(|s| s.to_string()).collect();
+    let roles_array: Vec<String> = roles.iter().map(std::string::ToString::to_string).collect();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO users (id, tenant_id, email, password_hash, roles, is_active, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(user_id)
     .bind(tenant_id)
@@ -95,10 +95,10 @@ pub async fn create_test_group(pool: &PgPool, tenant_id: Uuid, name: &str) -> Uu
     let group_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO groups (id, tenant_id, name, created_at, updated_at)
         VALUES ($1, $2, $3, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(group_id)
     .bind(tenant_id)
@@ -120,10 +120,10 @@ pub async fn create_test_group_with_parent(
     let group_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO groups (id, tenant_id, name, parent_group_id, created_at, updated_at)
         VALUES ($1, $2, $3, $4, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(group_id)
     .bind(tenant_id)
@@ -139,10 +139,10 @@ pub async fn create_test_group_with_parent(
 /// Add a user to a group.
 pub async fn add_user_to_group(pool: &PgPool, tenant_id: Uuid, group_id: Uuid, user_id: Uuid) {
     sqlx::query(
-        r#"
+        r"
         INSERT INTO group_members (group_id, user_id, tenant_id, created_at)
         VALUES ($1, $2, $3, NOW())
-        "#,
+        ",
     )
     .bind(group_id)
     .bind(user_id)
@@ -163,15 +163,15 @@ pub async fn create_test_attribute_definition(
     let definition_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO user_attribute_definitions (id, tenant_id, name, display_name, data_type, required, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5::user_attribute_data_type, $6, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(definition_id)
     .bind(tenant_id)
     .bind(name)
-    .bind(format!("Test {}", name))
+    .bind(format!("Test {name}"))
     .bind(data_type)
     .bind(required)
     .execute(pool)
@@ -193,15 +193,15 @@ pub async fn create_test_attribute_definition_with_regex(
     let definition_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO user_attribute_definitions (id, tenant_id, name, display_name, data_type, required, validation_regex, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5::user_attribute_data_type, $6, $7, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(definition_id)
     .bind(tenant_id)
     .bind(name)
-    .bind(format!("Test {}", name))
+    .bind(format!("Test {name}"))
     .bind(data_type)
     .bind(required)
     .bind(validation_regex)
@@ -220,11 +220,11 @@ pub async fn set_user_custom_attribute(
     value: serde_json::Value,
 ) {
     sqlx::query(
-        r#"
+        r"
         INSERT INTO user_custom_attributes (user_id, definition_id, value, created_at, updated_at)
         VALUES ($1, $2, $3, NOW(), NOW())
         ON CONFLICT (user_id, definition_id) DO UPDATE SET value = $3, updated_at = NOW()
-        "#,
+        ",
     )
     .bind(user_id)
     .bind(definition_id)

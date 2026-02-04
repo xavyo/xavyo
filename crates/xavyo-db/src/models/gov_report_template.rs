@@ -55,6 +55,7 @@ pub enum TemplateStatus {
 
 impl TemplateStatus {
     /// Check if the template is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self, Self::Active)
     }
@@ -192,10 +193,10 @@ impl GovReportTemplate {
     /// Find a template by ID.
     pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_report_templates
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .fetch_optional(pool)
@@ -209,10 +210,10 @@ impl GovReportTemplate {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_report_templates
             WHERE id = $1 AND (tenant_id IS NULL OR tenant_id = $2)
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -227,10 +228,10 @@ impl GovReportTemplate {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_report_templates
             WHERE name = $1 AND (tenant_id IS NULL OR tenant_id = $2)
-            "#,
+            ",
         )
         .bind(name)
         .bind(tenant_id)
@@ -247,11 +248,11 @@ impl GovReportTemplate {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_report_templates
             WHERE status = 'active'
             AND (tenant_id = $1 OR tenant_id IS NULL)
-            "#,
+            ",
         );
         let mut param_count = 1;
 
@@ -260,11 +261,11 @@ impl GovReportTemplate {
         }
         if filter.template_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND template_type = ${}", param_count));
+            query.push_str(&format!(" AND template_type = ${param_count}"));
         }
         if filter.compliance_standard.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND compliance_standard = ${}", param_count));
+            query.push_str(&format!(" AND compliance_standard = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -292,11 +293,11 @@ impl GovReportTemplate {
         filter: &ReportTemplateFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_report_templates
             WHERE status = 'active'
             AND (tenant_id = $1 OR tenant_id IS NULL)
-            "#,
+            ",
         );
         let mut param_count = 1;
 
@@ -305,11 +306,11 @@ impl GovReportTemplate {
         }
         if filter.template_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND template_type = ${}", param_count));
+            query.push_str(&format!(" AND template_type = ${param_count}"));
         }
         if filter.compliance_standard.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND compliance_standard = ${}", param_count));
+            query.push_str(&format!(" AND compliance_standard = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -334,14 +335,14 @@ impl GovReportTemplate {
             serde_json::to_value(&input.definition).unwrap_or_else(|_| serde_json::json!({}));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_report_templates (
                 tenant_id, name, description, template_type, compliance_standard,
                 definition, is_system, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6, false, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -362,7 +363,7 @@ impl GovReportTemplate {
         input: CloneReportTemplate,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_report_templates (
                 tenant_id, name, description, template_type, compliance_standard,
                 definition, is_system, cloned_from, created_by
@@ -373,7 +374,7 @@ impl GovReportTemplate {
             FROM gov_report_templates
             WHERE id = $5
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -395,25 +396,25 @@ impl GovReportTemplate {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.definition.is_some() {
-            updates.push(format!("definition = ${}", param_idx));
+            updates.push(format!("definition = ${param_idx}"));
             let _ = param_idx;
         }
 
         let query = format!(
-            r#"
+            r"
             UPDATE gov_report_templates
             SET {}
             WHERE id = $1 AND tenant_id = $2 AND is_system = false
             RETURNING *
-            "#,
+            ",
             updates.join(", ")
         );
 
@@ -443,12 +444,12 @@ impl GovReportTemplate {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_report_templates
             SET status = 'archived', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND is_system = false AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -459,27 +460,30 @@ impl GovReportTemplate {
     /// List all system templates.
     pub async fn list_system_templates(pool: &sqlx::PgPool) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_report_templates
             WHERE is_system = true AND status = 'active'
             ORDER BY compliance_standard, template_type, name
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await
     }
 
     /// Parse the template definition.
+    #[must_use] 
     pub fn parse_definition(&self) -> TemplateDefinition {
         serde_json::from_value(self.definition.clone()).unwrap_or_default()
     }
 
     /// Check if this is a system template.
+    #[must_use] 
     pub fn is_system_template(&self) -> bool {
         self.is_system
     }
 
     /// Check if the template can be modified.
+    #[must_use] 
     pub fn can_modify(&self) -> bool {
         !self.is_system && self.status.is_active()
     }

@@ -96,6 +96,7 @@ impl Default for InMemoryVersionStore {
 }
 
 impl InMemoryVersionStore {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             versions: RwLock::new(HashMap::new()),
@@ -193,7 +194,7 @@ impl VersionStore for InMemoryVersionStore {
         let versions = self.versions.read().await;
         let key = (tenant_id, policy_id);
 
-        Ok(versions.get(&key).map(|v| v.len()).unwrap_or(0))
+        Ok(versions.get(&key).map_or(0, std::vec::Vec::len))
     }
 }
 
@@ -207,6 +208,7 @@ impl PolicyVersionService {
         Self { store }
     }
 
+    #[must_use] 
     pub fn in_memory() -> Self {
         Self::new(Arc::new(InMemoryVersionStore::new()))
     }
@@ -267,12 +269,11 @@ impl PolicyVersionService {
             .await?
             .ok_or_else(|| {
                 AuthorizationError::NotFound(format!(
-                    "Version {} not found for policy {}",
-                    target_version, policy_id
+                    "Version {target_version} not found for policy {policy_id}"
                 ))
             })?;
 
-        let change_summary = Some(format!("Rollback to version {}", target_version));
+        let change_summary = Some(format!("Rollback to version {target_version}"));
 
         self.create_version(
             tenant_id,
@@ -284,6 +285,7 @@ impl PolicyVersionService {
         .await
     }
 
+    #[must_use] 
     pub fn compare_versions(v1: &PolicyVersion, v2: &PolicyVersion) -> VersionDiff {
         VersionDiff {
             version_a: v1.version,

@@ -1,7 +1,7 @@
 //! Pluggable secret provider abstraction for the xavyo platform.
 //!
 //! This crate provides a `SecretProvider` trait that abstracts secret retrieval
-//! from multiple backends: environment variables, files, HashiCorp Vault, and
+//! from multiple backends: environment variables, files, `HashiCorp` Vault, and
 //! AWS Secrets Manager.
 //!
 //! # Usage
@@ -73,7 +73,7 @@ pub enum SecretError {
 /// A resolved secret value returned by any provider.
 #[derive(Clone)]
 pub struct SecretValue {
-    /// Logical secret name (e.g., "jwt_signing_keys").
+    /// Logical secret name (e.g., "`jwt_signing_keys`").
     pub name: String,
 
     /// Raw secret bytes (UTF-8 text or binary).
@@ -98,7 +98,7 @@ impl std::fmt::Debug for SecretValue {
 }
 
 impl SecretValue {
-    /// Create a new SecretValue.
+    /// Create a new `SecretValue`.
     pub fn new(name: impl Into<String>, value: Vec<u8>) -> Self {
         Self {
             name: name.into(),

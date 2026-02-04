@@ -178,12 +178,12 @@ impl IntoResponse for FederationError {
             FederationError::InvalidDomain(domain) => (
                 StatusCode::BAD_REQUEST,
                 "invalid_domain",
-                format!("Invalid domain format: {}", domain),
+                format!("Invalid domain format: {domain}"),
             ),
             FederationError::RequiredClaimMissing(claim) => (
                 StatusCode::BAD_REQUEST,
                 "required_claim_missing",
-                format!("Required claim missing: {}", claim),
+                format!("Required claim missing: {claim}"),
             ),
 
             // 401 Unauthorized
@@ -207,26 +207,26 @@ impl IntoResponse for FederationError {
             FederationError::IdpDisabled(id) => (
                 StatusCode::FORBIDDEN,
                 "idp_disabled",
-                format!("Identity provider {} is disabled", id),
+                format!("Identity provider {id} is disabled"),
             ),
 
             // 404 Not Found
             FederationError::IdpNotFound(id) => (
                 StatusCode::NOT_FOUND,
                 "idp_not_found",
-                format!("Identity provider {} not found", id),
+                format!("Identity provider {id} not found"),
             ),
             FederationError::DomainNotConfigured(domain) => (
                 StatusCode::NOT_FOUND,
                 "domain_not_configured",
-                format!("No IdP configured for domain {}", domain),
+                format!("No IdP configured for domain {domain}"),
             ),
 
             // 409 Conflict
             FederationError::DomainAlreadyExists(domain) => (
                 StatusCode::CONFLICT,
                 "domain_exists",
-                format!("Domain {} is already configured", domain),
+                format!("Domain {domain} is already configured"),
             ),
             FederationError::UserAlreadyLinked => (
                 StatusCode::CONFLICT,
@@ -236,7 +236,7 @@ impl IntoResponse for FederationError {
             FederationError::IdpHasLinkedUsers(count) => (
                 StatusCode::CONFLICT,
                 "idp_has_users",
-                format!("Cannot delete IdP: {} users are still linked", count),
+                format!("Cannot delete IdP: {count} users are still linked"),
             ),
             FederationError::IssuerAlreadyExists => (
                 StatusCode::CONFLICT,
@@ -248,7 +248,7 @@ impl IntoResponse for FederationError {
             FederationError::DiscoveryFailed { issuer, message } => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "discovery_failed",
-                format!("Discovery failed for {}: {}", issuer, message),
+                format!("Discovery failed for {issuer}: {message}"),
             ),
             FederationError::ValidationFailed(msg) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
@@ -288,12 +288,12 @@ impl IntoResponse for FederationError {
             FederationError::MissingRequiredClaim(claim) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "missing_required_claim",
-                format!("Missing required claim: {}", claim),
+                format!("Missing required claim: {claim}"),
             ),
             FederationError::InvalidEmail(email) => (
                 StatusCode::BAD_REQUEST,
                 "invalid_email",
-                format!("Invalid email address: {}", email),
+                format!("Invalid email address: {email}"),
             ),
             FederationError::InvalidCallback(msg) => {
                 (StatusCode::BAD_REQUEST, "invalid_callback", msg.clone())
@@ -301,7 +301,7 @@ impl IntoResponse for FederationError {
             FederationError::IdpError { error, description } => (
                 StatusCode::BAD_REQUEST,
                 "idp_error",
-                format!("{}: {}", error, description),
+                format!("{error}: {description}"),
             ),
             FederationError::SessionExpired => (
                 StatusCode::UNAUTHORIZED,
@@ -311,7 +311,7 @@ impl IntoResponse for FederationError {
             FederationError::UserNotFound(id) => (
                 StatusCode::NOT_FOUND,
                 "user_not_found",
-                format!("User {} not found", id),
+                format!("User {id} not found"),
             ),
             FederationError::LinkNotFound => (
                 StatusCode::NOT_FOUND,
@@ -329,7 +329,7 @@ impl IntoResponse for FederationError {
             FederationError::TokenVerificationFailed(msg) => (
                 StatusCode::UNAUTHORIZED,
                 "token_verification_failed",
-                format!("Token verification failed: {}", msg),
+                format!("Token verification failed: {msg}"),
             ),
             FederationError::TokenExpired => (
                 StatusCode::UNAUTHORIZED,
@@ -339,7 +339,7 @@ impl IntoResponse for FederationError {
             FederationError::InvalidIssuer(iss) => (
                 StatusCode::UNAUTHORIZED,
                 "invalid_issuer",
-                format!("Invalid or untrusted issuer: {}", iss),
+                format!("Invalid or untrusted issuer: {iss}"),
             ),
             FederationError::JwksFetchFailed(msg) => {
                 tracing::error!("JWKS fetch failed: {}", msg);
@@ -352,7 +352,7 @@ impl IntoResponse for FederationError {
             FederationError::JwksKeyNotFound(kid) => (
                 StatusCode::UNAUTHORIZED,
                 "jwks_key_not_found",
-                format!("Signing key not found: {}", kid),
+                format!("Signing key not found: {kid}"),
             ),
 
             // 500 Internal Server Error

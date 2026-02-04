@@ -368,7 +368,7 @@ pub struct ExtendPersonaResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub persona: Option<PersonaResponse>,
 
-    /// Approval request ID (if pending_approval).
+    /// Approval request ID (if `pending_approval`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approval_request_id: Option<Uuid>,
 }
@@ -429,7 +429,7 @@ pub struct PersonaDetailResponse {
     #[serde(flatten)]
     pub base: PersonaResponse,
 
-    /// Persona attributes (inherited, overrides, persona_specific).
+    /// Persona attributes (inherited, overrides, `persona_specific`).
     pub attributes: PersonaAttributesResponse,
 
     /// Assigned entitlements.

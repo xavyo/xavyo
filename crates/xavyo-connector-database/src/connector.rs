@@ -2,8 +2,8 @@
 //!
 //! Implements the Connector trait for various database backends.
 //!
-//! Note: This connector uses SQLx with PostgreSQL features. Support for
-//! MySQL, MSSQL, and Oracle would require additional feature flags and
+//! Note: This connector uses `SQLx` with `PostgreSQL` features. Support for
+//! `MySQL`, MSSQL, and Oracle would require additional feature flags and
 //! database-specific implementations.
 
 use async_trait::async_trait;
@@ -27,7 +27,7 @@ use crate::config::DatabaseConfig;
 
 /// Database Connector for provisioning to relational databases.
 ///
-/// Currently supports PostgreSQL. Support for other databases (MySQL, MSSQL, Oracle)
+/// Currently supports `PostgreSQL`. Support for other databases (`MySQL`, MSSQL, Oracle)
 /// can be added by extending the connection handling.
 pub struct DatabaseConnector {
     /// Configuration.
@@ -36,7 +36,7 @@ pub struct DatabaseConnector {
     /// Display name for this connector instance.
     display_name: String,
 
-    /// PostgreSQL connection pool (lazily initialized).
+    /// `PostgreSQL` connection pool (lazily initialized).
     pool: Arc<RwLock<Option<PgPool>>>,
 
     /// Whether the connector has been disposed.
@@ -55,7 +55,7 @@ impl std::fmt::Debug for DatabaseConnector {
 impl DatabaseConnector {
     /// Create a new database connector with the given configuration.
     ///
-    /// Per Constitution Principle XI, only PostgreSQL is supported.
+    /// Per Constitution Principle XI, only `PostgreSQL` is supported.
     pub fn new(config: DatabaseConfig) -> ConnectorResult<Self> {
         config.validate()?;
 
@@ -137,7 +137,7 @@ impl DatabaseConnector {
         Ok(pool)
     }
 
-    /// Build the connection URL for SQLx.
+    /// Build the connection URL for `SQLx`.
     fn build_connection_url(&self) -> String {
         let password = self.config.password.as_deref().unwrap_or("");
         let port = self.config.effective_port();
@@ -152,7 +152,7 @@ impl DatabaseConnector {
 
         // Add schema if specified
         if let Some(ref schema) = self.config.schema {
-            url.push_str(&format!("&options=-c%20search_path={}", schema));
+            url.push_str(&format!("&options=-c%20search_path={schema}"));
         }
 
         url
@@ -213,7 +213,7 @@ impl DatabaseConnector {
             }
             Filter::Contains { attribute, value } => {
                 *param_offset += 1;
-                params.push(format!("%{}%", value));
+                params.push(format!("%{value}%"));
                 format!(
                     "\"{}\" LIKE ${}",
                     Self::escape_identifier(attribute),
@@ -222,7 +222,7 @@ impl DatabaseConnector {
             }
             Filter::StartsWith { attribute, value } => {
                 *param_offset += 1;
-                params.push(format!("{}%", value));
+                params.push(format!("{value}%"));
                 format!(
                     "\"{}\" LIKE ${}",
                     Self::escape_identifier(attribute),
@@ -231,7 +231,7 @@ impl DatabaseConnector {
             }
             Filter::EndsWith { attribute, value } => {
                 *param_offset += 1;
-                params.push(format!("%{}", value));
+                params.push(format!("%{value}"));
                 format!(
                     "\"{}\" LIKE ${}",
                     Self::escape_identifier(attribute),
@@ -285,7 +285,7 @@ impl DatabaseConnector {
         identifier.replace('"', "\"\"")
     }
 
-    /// Convert a SQL row to an AttributeSet.
+    /// Convert a SQL row to an `AttributeSet`.
     fn row_to_attribute_set(row: &sqlx::postgres::PgRow, columns: &[String]) -> AttributeSet {
         let mut attrs = AttributeSet::new();
 
@@ -296,7 +296,7 @@ impl DatabaseConnector {
             } else if let Ok(val) = row.try_get::<i64, _>(col.as_str()) {
                 attrs.set(col.clone(), AttributeValue::Integer(val));
             } else if let Ok(val) = row.try_get::<i32, _>(col.as_str()) {
-                attrs.set(col.clone(), AttributeValue::Integer(val as i64));
+                attrs.set(col.clone(), AttributeValue::Integer(i64::from(val)));
             } else if let Ok(val) = row.try_get::<f64, _>(col.as_str()) {
                 attrs.set(col.clone(), AttributeValue::Float(val));
             } else if let Ok(val) = row.try_get::<bool, _>(col.as_str()) {
@@ -312,7 +312,7 @@ impl DatabaseConnector {
         attrs
     }
 
-    /// Convert AttributeValue to SQL string for insertion.
+    /// Convert `AttributeValue` to SQL string for insertion.
     fn attribute_value_to_sql_string(value: &AttributeValue) -> String {
         match value {
             AttributeValue::String(s) => s.clone(),
@@ -330,7 +330,7 @@ impl DatabaseConnector {
             AttributeValue::Object(obj) => {
                 serde_json::to_string(obj).unwrap_or_else(|_| "{}".to_string())
             }
-            AttributeValue::Null => "".to_string(), // Will be bound as NULL
+            AttributeValue::Null => String::new(), // Will be bound as NULL
         }
     }
 }
@@ -369,8 +369,7 @@ impl Connector for DatabaseConnector {
 
         if table_exists.is_none() {
             return Err(ConnectorError::connection_failed(format!(
-                "Users table '{}' not found in database",
-                users_table
+                "Users table '{users_table}' not found in database"
             )));
         }
 
@@ -475,7 +474,7 @@ impl DatabaseConnector {
         table_name: &str,
         id_column: &str,
     ) -> ConnectorResult<Option<ObjectClass>> {
-        let columns_query = r#"
+        let columns_query = r"
             SELECT
                 column_name,
                 data_type,
@@ -484,14 +483,14 @@ impl DatabaseConnector {
             FROM information_schema.columns
             WHERE table_name = $1
             ORDER BY ordinal_position
-        "#;
+        ";
 
         let rows: Vec<sqlx::postgres::PgRow> = sqlx::query(columns_query)
             .bind(table_name)
             .fetch_all(pool)
             .await
             .map_err(|e| ConnectorError::SchemaDiscoveryFailed {
-                message: format!("Failed to query columns for table {}: {}", table_name, e),
+                message: format!("Failed to query columns for table {table_name}: {e}"),
             })?;
 
         if rows.is_empty() {
@@ -570,7 +569,7 @@ impl DatabaseConnector {
         Ok(Some(oc))
     }
 
-    /// Convert SQL data type to AttributeDataType.
+    /// Convert SQL data type to `AttributeDataType`.
     fn sql_type_to_attribute_type(&self, sql_type: &str) -> AttributeDataType {
         let lower = sql_type.to_lowercase();
 
@@ -625,7 +624,7 @@ impl CreateOp for DatabaseConnector {
         for (name, value) in attrs.iter() {
             param_idx += 1;
             columns.push(format!("\"{}\"", Self::escape_identifier(name)));
-            placeholders.push(format!("${}", param_idx));
+            placeholders.push(format!("${param_idx}"));
             values.push(Self::attribute_value_to_sql_string(value));
         }
 
@@ -658,7 +657,7 @@ impl CreateOp for DatabaseConnector {
                 }
             } else {
                 ConnectorError::operation_failed_with_source(
-                    format!("Failed to insert into {}", table),
+                    format!("Failed to insert into {table}"),
                     e,
                 )
             }
@@ -821,7 +820,7 @@ impl SearchOp for DatabaseConnector {
         // Add WHERE clause if filter provided
         if let Some(ref f) = filter {
             let where_clause = Self::filter_to_sql(f, &mut params, &mut param_offset);
-            query.push_str(&format!(" WHERE {}", where_clause));
+            query.push_str(&format!(" WHERE {where_clause}"));
         }
 
         // Add pagination
@@ -845,7 +844,7 @@ impl SearchOp for DatabaseConnector {
         }
 
         // Add LIMIT and OFFSET
-        query.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
+        query.push_str(&format!(" LIMIT {limit} OFFSET {offset}"));
 
         // Build count query for total
         let mut count_query = format!(
@@ -856,7 +855,7 @@ impl SearchOp for DatabaseConnector {
         if let Some(ref f) = filter {
             let mut count_param_offset = 0usize;
             let where_clause = Self::filter_to_sql(f, &mut count_params, &mut count_param_offset);
-            count_query.push_str(&format!(" WHERE {}", where_clause));
+            count_query.push_str(&format!(" WHERE {where_clause}"));
         }
 
         // Execute count query
@@ -882,15 +881,15 @@ impl SearchOp for DatabaseConnector {
             .map_err(|e| ConnectorError::operation_failed_with_source("Search query failed", e))?;
 
         // Get column names from first row (if any)
-        let columns: Vec<String> = if !rows.is_empty() {
+        let columns: Vec<String> = if rows.is_empty() {
+            Vec::new()
+        } else {
             use sqlx::Column;
             rows[0]
                 .columns()
                 .iter()
                 .map(|c| c.name().to_string())
                 .collect()
-        } else {
-            Vec::new()
         };
 
         // Convert rows to AttributeSet
@@ -1381,8 +1380,7 @@ mod tests {
                 volatile_columns
                     .iter()
                     .any(|&c| c.eq_ignore_ascii_case(col)),
-                "Column '{}' should be detected as volatile",
-                col
+                "Column '{col}' should be detected as volatile"
             );
         }
 
@@ -1406,8 +1404,7 @@ mod tests {
                 secondary_id_columns
                     .iter()
                     .any(|&c| c.eq_ignore_ascii_case(col)),
-                "Column '{}' should be detected as secondary identifier",
-                col
+                "Column '{col}' should be detected as secondary identifier"
             );
         }
 
@@ -1446,11 +1443,10 @@ mod tests {
         ];
 
         for pattern in auto_gen_patterns {
-            let column_default = format!("{}('seq_name'::regclass)", pattern);
+            let column_default = format!("{pattern}('seq_name'::regclass)");
             assert!(
                 column_default.contains(pattern),
-                "Pattern '{}' should be detected in column_default",
-                pattern
+                "Pattern '{pattern}' should be detected in column_default"
             );
         }
     }
@@ -1461,17 +1457,17 @@ mod tests {
         // (actual execution requires a real database)
 
         // Query to find unique constraints
-        let _unique_constraint_query = r#"
+        let _unique_constraint_query = r"
             SELECT c.column_name
             FROM information_schema.table_constraints tc
             JOIN information_schema.constraint_column_usage c
               ON tc.constraint_name = c.constraint_name
             WHERE tc.table_name = $1
               AND tc.constraint_type = 'UNIQUE'
-        "#;
+        ";
 
         // Query to find foreign key relationships
-        let _fk_query = r#"
+        let _fk_query = r"
             SELECT
                 kcu.column_name,
                 ccu.table_name AS foreign_table_name,
@@ -1483,10 +1479,10 @@ mod tests {
               ON tc.constraint_name = ccu.constraint_name
             WHERE tc.table_name = $1
               AND tc.constraint_type = 'FOREIGN KEY'
-        "#;
+        ";
 
         // Query to find check constraints
-        let _check_constraint_query = r#"
+        let _check_constraint_query = r"
             SELECT
                 tc.constraint_name,
                 cc.check_clause
@@ -1495,17 +1491,17 @@ mod tests {
               ON tc.constraint_name = cc.constraint_name
             WHERE tc.table_name = $1
               AND tc.constraint_type = 'CHECK'
-        "#;
+        ";
 
         // Query to find column character_maximum_length
-        let _length_query = r#"
+        let _length_query = r"
             SELECT
                 column_name,
                 character_maximum_length
             FROM information_schema.columns
             WHERE table_name = $1
               AND character_maximum_length IS NOT NULL
-        "#;
+        ";
 
         // These tests just verify the queries are valid SQL syntax
         // Actual execution would require database integration tests

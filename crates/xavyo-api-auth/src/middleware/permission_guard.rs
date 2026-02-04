@@ -18,6 +18,7 @@ use uuid::Uuid;
 use xavyo_auth::JwtClaims;
 
 /// Check if the user is a super admin based on their JWT claims.
+#[must_use] 
 pub fn is_super_admin(claims: &JwtClaims) -> bool {
     claims.roles.contains(&"super_admin".to_string())
 }
@@ -41,8 +42,8 @@ impl PermissionGuard {
 /// Middleware that checks if the user has the required permission.
 ///
 /// This middleware expects:
-/// - JwtClaims extension (from authentication middleware)
-/// - DelegatedAdminService in state or extension
+/// - `JwtClaims` extension (from authentication middleware)
+/// - `DelegatedAdminService` in state or extension
 /// - Tenant ID from claims
 ///
 /// Super admins bypass permission checks entirely.
@@ -58,21 +59,15 @@ pub async fn permission_guard_middleware(
     }
 
     // Extract tenant_id from claims (tid field)
-    let tenant_id = match claims.tid {
-        Some(id) => id,
-        None => {
-            warn!("Missing tenant_id in claims");
-            return ApiAuthError::Unauthorized.into_response();
-        }
+    let tenant_id = if let Some(id) = claims.tid { id } else {
+        warn!("Missing tenant_id in claims");
+        return ApiAuthError::Unauthorized.into_response();
     };
 
     // Extract user_id from claims (sub field)
-    let user_id = match Uuid::parse_str(&claims.sub) {
-        Ok(id) => id,
-        Err(_) => {
-            warn!("Invalid user_id in claims");
-            return ApiAuthError::Unauthorized.into_response();
-        }
+    let user_id = if let Ok(id) = Uuid::parse_str(&claims.sub) { id } else {
+        warn!("Invalid user_id in claims");
+        return ApiAuthError::Unauthorized.into_response();
     };
 
     // Check if user has the required permission
@@ -224,8 +219,7 @@ pub async fn require_permission(
         Ok(())
     } else {
         Err(ApiAuthError::PermissionDenied(format!(
-            "You do not have the '{}' permission",
-            required_permission
+            "You do not have the '{required_permission}' permission"
         )))
     }
 }
@@ -252,16 +246,15 @@ pub async fn require_scope(
             allowed_scopes,
             resource_scope,
         } => Err(ApiAuthError::ScopeViolation(format!(
-            "Resource '{}' is outside your allowed {} scopes: {:?}",
-            resource_scope, scope_type, allowed_scopes
+            "Resource '{resource_scope}' is outside your allowed {scope_type} scopes: {allowed_scopes:?}"
         ))),
     }
 }
 
-/// Middleware that requires the super_admin role.
+/// Middleware that requires the `super_admin` role.
 ///
 /// This middleware should be applied to admin endpoints that require
-/// super_admin access. It rejects requests from non-super_admin users
+/// `super_admin` access. It rejects requests from non-super_admin users
 /// with a 403 Forbidden response.
 pub async fn require_super_admin_middleware(
     Extension(claims): Extension<JwtClaims>,

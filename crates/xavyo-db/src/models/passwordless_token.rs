@@ -29,6 +29,7 @@ impl PasswordlessTokenType {
     }
 
     /// Parse from database string representation.
+    #[must_use] 
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "magic_link" => Some(Self::MagicLink),
@@ -49,11 +50,11 @@ pub struct PasswordlessToken {
     pub user_id: Uuid,
     /// SHA-256 hash of the token value.
     pub token_hash: String,
-    /// Discriminator: 'magic_link' or 'email_otp'.
+    /// Discriminator: '`magic_link`' or '`email_otp`'.
     pub token_type: String,
-    /// SHA-256 hash of the 6-digit OTP code (email_otp only).
+    /// SHA-256 hash of the 6-digit OTP code (`email_otp` only).
     pub otp_code_hash: Option<String>,
-    /// Remaining verification attempts (email_otp only).
+    /// Remaining verification attempts (`email_otp` only).
     pub otp_attempts_remaining: Option<i32>,
     /// When the token expires.
     pub expires_at: DateTime<Utc>,
@@ -86,7 +87,7 @@ impl PasswordlessToken {
         self.expires_at <= Utc::now()
     }
 
-    /// Check if OTP attempts are exhausted (email_otp only).
+    /// Check if OTP attempts are exhausted (`email_otp` only).
     #[must_use]
     pub fn is_exhausted(&self) -> bool {
         self.otp_attempts_remaining == Some(0)
@@ -110,7 +111,7 @@ impl PasswordlessToken {
         TenantId::from_uuid(self.tenant_id)
     }
 
-    /// Get the IP address as parsed IpAddr (if present and valid).
+    /// Get the IP address as parsed `IpAddr` (if present and valid).
     #[must_use]
     pub fn ip_addr(&self) -> Option<IpAddr> {
         self.ip_address.as_ref().and_then(|s| s.parse().ok())
@@ -131,14 +132,14 @@ impl PasswordlessToken {
         user_agent: Option<&str>,
     ) -> Result<Self, sqlx::Error> {
         let token = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO passwordless_tokens
                 (tenant_id, user_id, token_hash, token_type, otp_code_hash,
                  otp_attempts_remaining, expires_at, ip_address, user_agent)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING id, tenant_id, user_id, token_hash, token_type, otp_code_hash,
                       otp_attempts_remaining, expires_at, used_at, ip_address, user_agent, created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -162,12 +163,12 @@ impl PasswordlessToken {
         token_hash: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         let token = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, user_id, token_hash, token_type, otp_code_hash,
                    otp_attempts_remaining, expires_at, used_at, ip_address, user_agent, created_at
             FROM passwordless_tokens
             WHERE tenant_id = $1 AND token_hash = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(token_hash)
@@ -185,7 +186,7 @@ impl PasswordlessToken {
         token_type: PasswordlessTokenType,
     ) -> Result<Option<Self>, sqlx::Error> {
         let token = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, user_id, token_hash, token_type, otp_code_hash,
                    otp_attempts_remaining, expires_at, used_at, ip_address, user_agent, created_at
             FROM passwordless_tokens
@@ -193,7 +194,7 @@ impl PasswordlessToken {
                   AND used_at IS NULL AND expires_at > NOW()
             ORDER BY created_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -212,11 +213,11 @@ impl PasswordlessToken {
         token_type: PasswordlessTokenType,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE passwordless_tokens
             SET used_at = NOW()
             WHERE tenant_id = $1 AND user_id = $2 AND token_type = $3 AND used_at IS NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -230,11 +231,11 @@ impl PasswordlessToken {
     /// Mark a token as used.
     pub async fn mark_used(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE passwordless_tokens
             SET used_at = NOW()
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -251,12 +252,12 @@ impl PasswordlessToken {
         id: Uuid,
     ) -> Result<i32, sqlx::Error> {
         let remaining: (i32,) = sqlx::query_as(
-            r#"
+            r"
             UPDATE passwordless_tokens
             SET otp_attempts_remaining = otp_attempts_remaining - 1
             WHERE tenant_id = $1 AND id = $2 AND otp_attempts_remaining > 0
             RETURNING otp_attempts_remaining
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -269,10 +270,10 @@ impl PasswordlessToken {
     /// Delete expired tokens (cleanup task).
     pub async fn delete_expired(pool: &PgPool) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM passwordless_tokens
             WHERE expires_at < NOW() - INTERVAL '1 hour'
-            "#,
+            ",
         )
         .execute(pool)
         .await?;

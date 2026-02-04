@@ -54,7 +54,7 @@ pub async fn callback_get(
     process_callback(state, provider_type, &code, &query.state, None).await
 }
 
-/// Handle Apple callback (POST with form_post).
+/// Handle Apple callback (POST with `form_post`).
 #[utoipa::path(
     post,
     path = "/auth/social/apple/callback",
@@ -262,7 +262,7 @@ async fn process_callback(
             .redirect_after
             .unwrap_or_else(|| format!("{}/settings", state.frontend_url));
         return Ok(
-            Redirect::temporary(&format!("{}?linked={}", redirect_url, provider_type))
+            Redirect::temporary(&format!("{redirect_url}?linked={provider_type}"))
                 .into_response(),
         );
     }
@@ -391,9 +391,7 @@ fn redirect_with_tokens(
     tokens: &JwtTokens,
 ) -> Response {
     let base = redirect_after
-        .as_ref()
-        .map(|r| format!("{}{}", frontend_url, r))
-        .unwrap_or_else(|| format!("{}/", frontend_url));
+        .as_ref().map_or_else(|| format!("{frontend_url}/"), |r| format!("{frontend_url}{r}"));
 
     // Use fragment (#) instead of query (?) for token security
     let url = format!(

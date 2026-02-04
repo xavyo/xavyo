@@ -18,15 +18,15 @@ async fn create_test_role(pool: &PgPool, tenant_id: Uuid, application_id: Uuid) 
     let role_id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO gov_entitlements (id, tenant_id, application_id, name, description, risk_level, status, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, 'low', 'active', NOW(), NOW())
-        "#,
+        ",
     )
     .bind(role_id)
     .bind(tenant_id)
     .bind(application_id)
-    .bind(format!("Database Access Role {}", role_id))
+    .bind(format!("Database Access Role {role_id}"))
     .bind("A parametric role for database access")
     .execute(pool)
     .await
@@ -106,8 +106,8 @@ async fn test_list_parameters() {
     // Create multiple parameters
     for i in 1..=3 {
         let input = CreateGovRoleParameter {
-            name: format!("param_{}", i),
-            display_name: Some(format!("Parameter {}", i)),
+            name: format!("param_{i}"),
+            display_name: Some(format!("Parameter {i}")),
             description: None,
             parameter_type: ParameterType::String,
             is_required: Some(i == 1),
@@ -469,7 +469,7 @@ async fn test_enum_parameter() {
     cleanup_test_tenant(&pool, tenant_id).await;
 }
 
-/// Test role_has_parameters check.
+/// Test `role_has_parameters` check.
 #[tokio::test]
 #[ignore = "Requires database - run locally with DATABASE_URL"]
 async fn test_role_has_parameters() {

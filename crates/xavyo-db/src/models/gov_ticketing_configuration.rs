@@ -34,7 +34,7 @@ pub struct GovTicketingConfiguration {
     /// Default assignee for tickets.
     pub default_assignee: Option<String>,
 
-    /// ServiceNow assignment group.
+    /// `ServiceNow` assignment group.
     pub default_assignment_group: Option<String>,
 
     /// Jira project key.
@@ -111,10 +111,10 @@ impl GovTicketingConfiguration {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_ticketing_configurations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -131,20 +131,20 @@ impl GovTicketingConfiguration {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_ticketing_configurations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.ticketing_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND ticketing_type = ${}", param_count));
+            query.push_str(&format!(" AND ticketing_type = ${param_count}"));
         }
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -172,20 +172,20 @@ impl GovTicketingConfiguration {
         filter: &TicketingConfigFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_ticketing_configurations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.ticketing_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND ticketing_type = ${}", param_count));
+            query.push_str(&format!(" AND ticketing_type = ${param_count}"));
         }
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -207,7 +207,7 @@ impl GovTicketingConfiguration {
         input: CreateTicketingConfiguration,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_ticketing_configurations (
                 tenant_id, name, ticketing_type, endpoint_url, credentials,
                 field_mappings, default_assignee, default_assignment_group,
@@ -216,7 +216,7 @@ impl GovTicketingConfiguration {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -243,7 +243,7 @@ impl GovTicketingConfiguration {
         input: UpdateTicketingConfiguration,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_ticketing_configurations
             SET
                 name = COALESCE($3, name),
@@ -261,7 +261,7 @@ impl GovTicketingConfiguration {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -288,10 +288,10 @@ impl GovTicketingConfiguration {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_ticketing_configurations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -308,10 +308,10 @@ impl GovTicketingConfiguration {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_applications
             WHERE tenant_id = $1 AND ticketing_config_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)

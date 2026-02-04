@@ -28,7 +28,7 @@ impl FromStr for SecurityProtocol {
             "SASL_SSL" => Ok(Self::SaslSsl),
             _ => Err(EventError::ConfigInvalid {
                 var: "KAFKA_SECURITY_PROTOCOL".to_string(),
-                reason: format!("Unknown protocol: {}", s),
+                reason: format!("Unknown protocol: {s}"),
             }),
         }
     }
@@ -36,6 +36,7 @@ impl FromStr for SecurityProtocol {
 
 impl SecurityProtocol {
     /// Convert to rdkafka string value.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Plaintext => "PLAINTEXT",
@@ -64,7 +65,7 @@ impl FromStr for SaslMechanism {
             "SCRAM_SHA_512" => Ok(Self::ScramSha512),
             _ => Err(EventError::ConfigInvalid {
                 var: "KAFKA_SASL_MECHANISM".to_string(),
-                reason: format!("Unknown mechanism: {}", s),
+                reason: format!("Unknown mechanism: {s}"),
             }),
         }
     }
@@ -72,6 +73,7 @@ impl FromStr for SaslMechanism {
 
 impl SaslMechanism {
     /// Convert to rdkafka string value.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Plain => "PLAIN",
@@ -109,7 +111,7 @@ impl KafkaConfig {
     /// - `KAFKA_BOOTSTRAP_SERVERS`: Comma-separated broker list
     ///
     /// Optional:
-    /// - `KAFKA_SECURITY_PROTOCOL`: PLAINTEXT (default), SSL, SASL_PLAINTEXT, SASL_SSL
+    /// - `KAFKA_SECURITY_PROTOCOL`: PLAINTEXT (default), SSL, `SASL_PLAINTEXT`, `SASL_SSL`
     /// - `KAFKA_CLIENT_ID`: Client identifier (default: "xavyo-events")
     /// - `KAFKA_SASL_MECHANISM`: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512 (required if SASL)
     /// - `KAFKA_SASL_USERNAME`: SASL username (required if SASL)
@@ -164,12 +166,13 @@ impl KafkaConfig {
     }
 
     /// Create a new configuration builder.
+    #[must_use] 
     pub fn builder() -> KafkaConfigBuilder {
         KafkaConfigBuilder::new()
     }
 }
 
-/// Builder for KafkaConfig.
+/// Builder for `KafkaConfig`.
 #[derive(Debug, Default)]
 pub struct KafkaConfigBuilder {
     bootstrap_servers: Option<String>,
@@ -180,6 +183,7 @@ pub struct KafkaConfigBuilder {
 
 impl KafkaConfigBuilder {
     /// Create a new builder.
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
@@ -191,12 +195,14 @@ impl KafkaConfigBuilder {
     }
 
     /// Set security protocol.
+    #[must_use] 
     pub fn security_protocol(mut self, protocol: SecurityProtocol) -> Self {
         self.security_protocol = Some(protocol);
         self
     }
 
     /// Set SASL credentials.
+    #[must_use] 
     pub fn sasl(mut self, mechanism: SaslMechanism, username: String, password: String) -> Self {
         self.sasl = Some(SaslCredentials {
             mechanism,

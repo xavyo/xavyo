@@ -1,4 +1,4 @@
-//! SoD exemption handlers for governance API.
+//! `SoD` exemption handlers for governance API.
 
 use axum::{
     extract::{Path, Query, State},
@@ -18,7 +18,7 @@ use crate::models::{
 use crate::router::GovernanceState;
 use crate::services::SodExemptionService;
 
-/// List SoD exemptions with optional filtering and pagination.
+/// List `SoD` exemptions with optional filtering and pagination.
 #[utoipa::path(
     get,
     path = "/governance/sod-exemptions",
@@ -67,7 +67,7 @@ pub async fn list_exemptions(
     }))
 }
 
-/// Get an SoD exemption by ID.
+/// Get an `SoD` exemption by ID.
 #[utoipa::path(
     get,
     path = "/governance/sod-exemptions/{id}",
@@ -101,7 +101,7 @@ pub async fn get_exemption(
     Ok(Json(SodExemptionService::to_api_response(&exemption)))
 }
 
-/// Create a new SoD exemption.
+/// Create a new `SoD` exemption.
 ///
 /// Grants a time-limited exception for a user to hold conflicting entitlements.
 #[utoipa::path(
@@ -151,7 +151,7 @@ pub async fn create_exemption(
     ))
 }
 
-/// Revoke an SoD exemption.
+/// Revoke an `SoD` exemption.
 ///
 /// The exemption will be marked as revoked and can no longer be used.
 #[utoipa::path(

@@ -15,7 +15,7 @@ pub type SamlResult<T> = Result<T, SamlError>;
 /// SAML-specific errors
 #[derive(Debug, Error)]
 pub enum SamlError {
-    /// Invalid or malformed AuthnRequest
+    /// Invalid or malformed `AuthnRequest`
     #[error("Invalid AuthnRequest: {0}")]
     InvalidAuthnRequest(String),
 
@@ -39,7 +39,7 @@ pub enum SamlError {
     #[error("Signature validation failed: {0}")]
     SignatureValidationFailed(String),
 
-    /// No active IdP signing certificate
+    /// No active `IdP` signing certificate
     #[error("No active IdP signing certificate for tenant")]
     NoActiveCertificate,
 
@@ -63,7 +63,7 @@ pub enum SamlError {
     #[error("User not authenticated")]
     NotAuthenticated,
 
-    /// Invalid NameID format
+    /// Invalid `NameID` format
     #[error("Unsupported NameID format: {0}")]
     UnsupportedNameIdFormat(String),
 

@@ -156,14 +156,14 @@ async fn try_introspect_access_token(
         // after this token was issued, the token should be treated as revoked.
         // Filter by tenant_id to prevent cross-tenant leakage.
         let sentinel_revoked: bool = sqlx::query_scalar(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM revoked_tokens
                 WHERE jti LIKE 'revoke-all:' || $1 || ':%'
                   AND tenant_id = $3
                   AND created_at > to_timestamp($2)
             )
-            "#,
+            ",
         )
         .bind(&claims.sub)
         .bind(claims.iat as f64)
@@ -207,7 +207,7 @@ async fn try_introspect_access_token(
 
 /// Try to introspect a token as a refresh token (opaque).
 ///
-/// Hashes the token, looks up in oauth_refresh_tokens, checks validity.
+/// Hashes the token, looks up in `oauth_refresh_tokens`, checks validity.
 /// Returns Some(IntrospectionResponse) if the token is a known refresh token.
 async fn try_introspect_refresh_token(
     state: &OAuthState,
@@ -225,11 +225,11 @@ async fn try_introspect_refresh_token(
 
     // Look up the refresh token
     let row: Option<RefreshTokenRow> = sqlx::query_as(
-        r#"
+        r"
         SELECT rt.id, rt.user_id, rt.scope, rt.revoked, rt.created_at, rt.expires_at
         FROM oauth_refresh_tokens rt
         WHERE rt.token_hash = $1 AND rt.tenant_id = $2
-        "#,
+        ",
     )
     .bind(&token_hash)
     .bind(tenant_id)

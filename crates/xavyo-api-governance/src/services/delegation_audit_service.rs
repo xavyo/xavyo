@@ -48,6 +48,7 @@ pub struct ListAuditParams {
 
 impl DelegationAuditService {
     /// Create a new delegation audit service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -87,8 +88,8 @@ impl DelegationAuditService {
 
     /// List delegation audit records with filtering.
     ///
-    /// Supports filtering by delegation_id, deputy_id, delegator_id,
-    /// action_type, work_item_type, and date range.
+    /// Supports filtering by `delegation_id`, `deputy_id`, `delegator_id`,
+    /// `action_type`, `work_item_type`, and date range.
     pub async fn list_delegation_audit(
         &self,
         tenant_id: Uuid,
@@ -192,6 +193,7 @@ impl DelegationAuditService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

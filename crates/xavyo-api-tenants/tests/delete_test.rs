@@ -9,11 +9,11 @@ use xavyo_api_tenants::models::{
     RestoreTenantResponse,
 };
 
-/// Test that the DeleteTenantRequest validation rejects empty reason.
+/// Test that the `DeleteTenantRequest` validation rejects empty reason.
 #[test]
 fn test_delete_request_validation_empty_reason() {
     let request = DeleteTenantRequest {
-        reason: "".to_string(),
+        reason: String::new(),
         immediate: false,
     };
     assert_eq!(
@@ -22,7 +22,7 @@ fn test_delete_request_validation_empty_reason() {
     );
 }
 
-/// Test that the DeleteTenantRequest validation rejects whitespace reason.
+/// Test that the `DeleteTenantRequest` validation rejects whitespace reason.
 #[test]
 fn test_delete_request_validation_whitespace_reason() {
     let request = DeleteTenantRequest {
@@ -35,7 +35,7 @@ fn test_delete_request_validation_whitespace_reason() {
     );
 }
 
-/// Test that the DeleteTenantRequest validation rejects too long reason.
+/// Test that the `DeleteTenantRequest` validation rejects too long reason.
 #[test]
 fn test_delete_request_validation_too_long() {
     let request = DeleteTenantRequest {
@@ -48,7 +48,7 @@ fn test_delete_request_validation_too_long() {
     );
 }
 
-/// Test that the DeleteTenantRequest validation accepts valid request.
+/// Test that the `DeleteTenantRequest` validation accepts valid request.
 #[test]
 fn test_delete_request_validation_valid() {
     let request = DeleteTenantRequest {
@@ -58,7 +58,7 @@ fn test_delete_request_validation_valid() {
     assert_eq!(request.validate(), None);
 }
 
-/// Test that the DeleteTenantRequest validation accepts max length reason.
+/// Test that the `DeleteTenantRequest` validation accepts max length reason.
 #[test]
 fn test_delete_request_validation_max_length() {
     let request = DeleteTenantRequest {
@@ -68,7 +68,7 @@ fn test_delete_request_validation_max_length() {
     assert_eq!(request.validate(), None);
 }
 
-/// Test that the DeleteTenantRequest default is correct.
+/// Test that the `DeleteTenantRequest` default is correct.
 #[test]
 fn test_delete_request_default() {
     let request = DeleteTenantRequest::default();
@@ -76,7 +76,7 @@ fn test_delete_request_default() {
     assert!(!request.immediate);
 }
 
-/// Test response serialization for DeleteTenantResponse.
+/// Test response serialization for `DeleteTenantResponse`.
 #[test]
 fn test_delete_response_serialization() {
     let now = Utc::now();
@@ -94,7 +94,7 @@ fn test_delete_response_serialization() {
     assert!(json.contains("Test deletion"));
 }
 
-/// Test response serialization for RestoreTenantResponse.
+/// Test response serialization for `RestoreTenantResponse`.
 #[test]
 fn test_restore_response_serialization() {
     let response = RestoreTenantResponse {
@@ -107,7 +107,7 @@ fn test_restore_response_serialization() {
     assert!(json.contains("restored_at"));
 }
 
-/// Test response serialization for DeletedTenantInfo.
+/// Test response serialization for `DeletedTenantInfo`.
 #[test]
 fn test_deleted_tenant_info_serialization() {
     let now = Utc::now();
@@ -128,7 +128,7 @@ fn test_deleted_tenant_info_serialization() {
     assert!(json.contains("scheduled_purge_at"));
 }
 
-/// Test response serialization for DeletedTenantInfo without reason.
+/// Test response serialization for `DeletedTenantInfo` without reason.
 #[test]
 fn test_deleted_tenant_info_serialization_no_reason() {
     let now = Utc::now();
@@ -146,7 +146,7 @@ fn test_deleted_tenant_info_serialization_no_reason() {
     assert!(json.contains("\"deletion_reason\":null"));
 }
 
-/// Test response serialization for DeletedTenantListResponse.
+/// Test response serialization for `DeletedTenantListResponse`.
 #[test]
 fn test_deleted_tenant_list_response_serialization() {
     let now = Utc::now();
@@ -180,7 +180,7 @@ fn test_deleted_tenant_list_response_serialization() {
     assert!(json.contains("tenant-2"));
 }
 
-/// Test response serialization for empty DeletedTenantListResponse.
+/// Test response serialization for empty `DeletedTenantListResponse`.
 #[test]
 fn test_deleted_tenant_list_response_empty() {
     let response = DeletedTenantListResponse {
@@ -193,7 +193,7 @@ fn test_deleted_tenant_list_response_empty() {
     assert!(json.contains("\"deleted_tenants\":[]"));
 }
 
-/// Test response deserialization for DeleteTenantRequest.
+/// Test response deserialization for `DeleteTenantRequest`.
 #[test]
 fn test_delete_request_deserialization() {
     let json = r#"{"reason":"Customer requested closure","immediate":true}"#;
@@ -202,7 +202,7 @@ fn test_delete_request_deserialization() {
     assert!(request.immediate);
 }
 
-/// Test response deserialization for DeleteTenantRequest with defaults.
+/// Test response deserialization for `DeleteTenantRequest` with defaults.
 #[test]
 fn test_delete_request_deserialization_defaults() {
     let json = r#"{"reason":"Customer requested closure"}"#;

@@ -22,7 +22,7 @@ pub struct GovExternalTicket {
     /// The ticketing configuration used.
     pub ticketing_config_id: Uuid,
 
-    /// External system reference (ServiceNow sys_id, Jira key).
+    /// External system reference (`ServiceNow` `sys_id`, Jira key).
     pub external_reference: String,
 
     /// URL to the ticket in the external system.
@@ -74,10 +74,10 @@ impl GovExternalTicket {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_external_tickets
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -92,10 +92,10 @@ impl GovExternalTicket {
         task_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_external_tickets
             WHERE tenant_id = $1 AND task_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(task_id)
@@ -111,10 +111,10 @@ impl GovExternalTicket {
         external_reference: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_external_tickets
             WHERE tenant_id = $1 AND ticketing_config_id = $2 AND external_reference = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(ticketing_config_id)
@@ -130,7 +130,7 @@ impl GovExternalTicket {
         input: CreateExternalTicket,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_external_tickets (
                 tenant_id, task_id, ticketing_config_id, external_reference,
                 external_url, external_status, status_category,
@@ -138,7 +138,7 @@ impl GovExternalTicket {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.task_id)
@@ -163,7 +163,7 @@ impl GovExternalTicket {
         raw_response: Option<&serde_json::Value>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_external_tickets
             SET
                 external_status = $3,
@@ -174,7 +174,7 @@ impl GovExternalTicket {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -193,7 +193,7 @@ impl GovExternalTicket {
         error: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_external_tickets
             SET
                 sync_error = $3,
@@ -201,7 +201,7 @@ impl GovExternalTicket {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -217,14 +217,14 @@ impl GovExternalTicket {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_external_tickets
             WHERE status_category NOT IN ('resolved', 'closed', 'rejected')
               AND (last_synced_at IS NULL OR last_synced_at < $1)
             ORDER BY last_synced_at ASC NULLS FIRST
             LIMIT $2
             FOR UPDATE SKIP LOCKED
-            "#,
+            ",
         )
         .bind(stale_threshold)
         .bind(limit)
@@ -239,10 +239,10 @@ impl GovExternalTicket {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_external_tickets
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

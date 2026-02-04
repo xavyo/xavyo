@@ -1,9 +1,9 @@
 //! Integration tests for F054 Workflow Escalation notification events.
 //!
 //! These tests validate the Kafka events that trigger notifications:
-//! - EscalationWarning (pre-escalation warning)
-//! - EscalationOccurred (escalation happened)
-//! - EscalationExhausted (all levels exhausted)
+//! - `EscalationWarning` (pre-escalation warning)
+//! - `EscalationOccurred` (escalation happened)
+//! - `EscalationExhausted` (all levels exhausted)
 
 #[cfg(test)]
 mod tests {

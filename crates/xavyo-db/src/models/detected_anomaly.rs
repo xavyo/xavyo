@@ -46,7 +46,7 @@ impl std::str::FromStr for DbAnomalyType {
             "unusual_tool" => Ok(DbAnomalyType::UnusualTool),
             "off_hours" => Ok(DbAnomalyType::OffHours),
             "rapid_burst" => Ok(DbAnomalyType::RapidBurst),
-            _ => Err(format!("Invalid anomaly type: {}", s)),
+            _ => Err(format!("Invalid anomaly type: {s}")),
         }
     }
 }
@@ -81,7 +81,7 @@ impl std::str::FromStr for DbAnomalySeverity {
             "medium" => Ok(DbAnomalySeverity::Medium),
             "high" => Ok(DbAnomalySeverity::High),
             "critical" => Ok(DbAnomalySeverity::Critical),
-            _ => Err(format!("Invalid severity: {}", s)),
+            _ => Err(format!("Invalid severity: {s}")),
         }
     }
 }
@@ -119,7 +119,7 @@ pub struct DetectedAnomaly {
     /// Human-readable description of the anomaly.
     pub description: String,
 
-    /// Additional context (conversation_id, tool_name, etc.).
+    /// Additional context (`conversation_id`, `tool_name`, etc.).
     pub context: Option<serde_json::Value>,
 
     /// When the anomaly was detected.
@@ -159,7 +159,7 @@ impl DetectedAnomaly {
     /// Create a new detected anomaly.
     pub async fn create(pool: &PgPool, data: CreateDetectedAnomaly) -> Result<Self, sqlx::Error> {
         sqlx::query_as::<_, DetectedAnomaly>(
-            r#"
+            r"
             INSERT INTO detected_anomalies (
                 tenant_id, agent_id, anomaly_type, severity, score,
                 z_score, baseline_value, observed_value, description,
@@ -170,7 +170,7 @@ impl DetectedAnomaly {
                 id, tenant_id, agent_id, anomaly_type, severity, score,
                 z_score, baseline_value, observed_value, description,
                 context, detected_at, alert_sent, alert_sent_at
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(data.agent_id)
@@ -196,7 +196,7 @@ impl DetectedAnomaly {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as::<_, DetectedAnomaly>(
-            r#"
+            r"
             SELECT
                 id, tenant_id, agent_id, anomaly_type, severity, score,
                 z_score, baseline_value, observed_value, description,
@@ -209,7 +209,7 @@ impl DetectedAnomaly {
                 AND ($5::text IS NULL OR severity = $5)
             ORDER BY detected_at DESC
             LIMIT $6 OFFSET $7
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -230,7 +230,7 @@ impl DetectedAnomaly {
         filter: &DetectedAnomalyFilter,
     ) -> Result<i64, sqlx::Error> {
         let row = sqlx::query(
-            r#"
+            r"
             SELECT COUNT(*) as count
             FROM detected_anomalies
             WHERE tenant_id = $1
@@ -238,7 +238,7 @@ impl DetectedAnomaly {
                 AND ($3::timestamptz IS NULL OR detected_at >= $3)
                 AND ($4::text IS NULL OR anomaly_type = $4)
                 AND ($5::text IS NULL OR severity = $5)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -254,11 +254,11 @@ impl DetectedAnomaly {
     /// Mark an anomaly as alert sent.
     pub async fn mark_alert_sent(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE detected_anomalies
             SET alert_sent = true, alert_sent_at = NOW()
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .execute(pool)
@@ -276,7 +276,7 @@ impl DetectedAnomaly {
         since: DateTime<Utc>,
     ) -> Result<bool, sqlx::Error> {
         let row = sqlx::query(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM detected_anomalies
                 WHERE tenant_id = $1
@@ -285,7 +285,7 @@ impl DetectedAnomaly {
                     AND alert_sent = true
                     AND alert_sent_at > $4
             ) as exists
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)

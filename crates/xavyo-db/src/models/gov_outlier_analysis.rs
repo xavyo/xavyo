@@ -78,10 +78,10 @@ impl GovOutlierAnalysis {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_outlier_analyses
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -95,12 +95,12 @@ impl GovOutlierAnalysis {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_outlier_analyses
             WHERE tenant_id = $1 AND status = 'completed'
             ORDER BY completed_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(pool)
@@ -110,12 +110,12 @@ impl GovOutlierAnalysis {
     /// Check if there's a running analysis.
     pub async fn has_running(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<bool, sqlx::Error> {
         let exists: bool = sqlx::query_scalar(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM gov_outlier_analyses
                 WHERE tenant_id = $1 AND status = 'running'
             )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -137,11 +137,11 @@ impl GovOutlierAnalysis {
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.triggered_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND triggered_by = ${}", param_count));
+            query.push_str(&format!(" AND triggered_by = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -174,11 +174,11 @@ impl GovOutlierAnalysis {
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.triggered_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND triggered_by = ${}", param_count));
+            query.push_str(&format!(" AND triggered_by = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -200,13 +200,13 @@ impl GovOutlierAnalysis {
         input: CreateOutlierAnalysis,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_outlier_analyses (
                 tenant_id, config_snapshot, status, triggered_by
             )
             VALUES ($1, $2, 'pending', $3)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(sqlx::types::Json(&input.config_snapshot))
@@ -222,12 +222,12 @@ impl GovOutlierAnalysis {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_outlier_analyses
             SET status = 'running', started_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -245,12 +245,12 @@ impl GovOutlierAnalysis {
         outliers_detected: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_outlier_analyses
             SET progress_percent = $3, users_analyzed = $4, outliers_detected = $5
             WHERE id = $1 AND tenant_id = $2 AND status = 'running'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -270,13 +270,13 @@ impl GovOutlierAnalysis {
         outliers_detected: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_outlier_analyses
             SET status = 'completed', completed_at = NOW(), progress_percent = 100,
                 users_analyzed = $3, outliers_detected = $4
             WHERE id = $1 AND tenant_id = $2 AND status = 'running'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -294,12 +294,12 @@ impl GovOutlierAnalysis {
         error_message: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_outlier_analyses
             SET status = 'failed', completed_at = NOW(), error_message = $3
             WHERE id = $1 AND tenant_id = $2 AND status = 'running'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -315,12 +315,12 @@ impl GovOutlierAnalysis {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_outlier_analyses
             SET status = 'failed', completed_at = NOW(), error_message = 'Cancelled by user'
             WHERE id = $1 AND tenant_id = $2 AND status = 'running'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -335,10 +335,10 @@ impl GovOutlierAnalysis {
         retention_days: i32,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_outlier_analyses
             WHERE tenant_id = $1 AND created_at < NOW() - ($2 || ' days')::INTERVAL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(retention_days)
@@ -349,6 +349,7 @@ impl GovOutlierAnalysis {
     }
 
     /// Get the config snapshot as a struct.
+    #[must_use] 
     pub fn get_config(&self) -> &ConfigSnapshot {
         &self.config_snapshot.0
     }

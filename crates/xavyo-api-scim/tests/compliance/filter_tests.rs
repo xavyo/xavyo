@@ -85,7 +85,7 @@ mod tests {
         // RFC 7644: pr - present (has value)
         let filter = "nickName pr";
         assert!(filter.contains("pr"));
-        assert!(!filter.contains("\""));
+        assert!(!filter.contains('"'));
     }
 
     #[test]
@@ -161,7 +161,7 @@ mod tests {
         // RFC 7644: Logical NOT
         let filter = "not(active eq false)";
         assert!(filter.starts_with("not("));
-        assert!(filter.ends_with(")"));
+        assert!(filter.ends_with(')'));
     }
 
     #[test]
@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn test_filter_parentheses_grouping() {
         let filter = "(active eq true or locked eq false) and emails pr";
-        assert!(filter.starts_with("("));
+        assert!(filter.starts_with('('));
         assert!(filter.contains(") and"));
     }
 

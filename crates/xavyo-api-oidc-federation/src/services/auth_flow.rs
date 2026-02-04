@@ -45,9 +45,9 @@ pub struct InitiateAuthInput {
 /// Token exchange result.
 #[derive(Debug, Clone)]
 pub struct TokenExchangeResult {
-    /// Access token from the IdP.
+    /// Access token from the `IdP`.
     pub access_token: String,
-    /// ID token (JWT) from the IdP.
+    /// ID token (JWT) from the `IdP`.
     pub id_token: String,
     /// Optional refresh token.
     pub refresh_token: Option<String>,
@@ -60,7 +60,7 @@ pub struct TokenExchangeResult {
 /// Decoded ID token claims.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdTokenClaims {
-    /// Subject (user ID at IdP).
+    /// Subject (user ID at `IdP`).
     pub sub: String,
     /// Issuer.
     pub iss: String,
@@ -98,6 +98,7 @@ pub struct IdTokenClaims {
 
 impl AuthFlowService {
     /// Create a new authorization flow service.
+    #[must_use] 
     pub fn new(pool: PgPool, encryption: EncryptionService, callback_base_url: String) -> Self {
         Self {
             pool,
@@ -355,7 +356,7 @@ impl AuthFlowService {
     }
 }
 
-/// Token response from IdP.
+/// Token response from `IdP`.
 #[derive(Debug, Clone, Deserialize)]
 struct TokenResponse {
     access_token: String,

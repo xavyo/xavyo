@@ -88,7 +88,7 @@ pub struct CertificateListResponse {
     pub items: Vec<xavyo_db::models::CertificateInfo>,
 }
 
-/// Re-export CertificateInfo for schema reference
+/// Re-export `CertificateInfo` for schema reference
 pub use xavyo_db::models::CertificateInfo;
 
 /// Pagination query parameters
@@ -106,6 +106,7 @@ fn default_limit() -> i32 {
 }
 
 /// SAML Response auto-submit form HTML
+#[must_use] 
 pub fn generate_auto_submit_form(
     acs_url: &str,
     saml_response: &str,

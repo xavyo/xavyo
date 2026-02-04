@@ -1,7 +1,7 @@
 //! Integration tests for F054 Workflow Escalation audit trail.
 //!
 //! These tests validate the escalation event query capabilities:
-//! - Query by request_id (escalation history)
+//! - Query by `request_id` (escalation history)
 //! - Query by date range
 //! - Query by approver/target
 
@@ -267,7 +267,7 @@ mod tests {
 
         for reason in reasons {
             let filter = EscalationEventFilter {
-                reason: Some(reason.clone()),
+                reason: Some(reason),
                 ..Default::default()
             };
 

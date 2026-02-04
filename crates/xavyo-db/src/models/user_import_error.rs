@@ -29,7 +29,7 @@ pub struct UserImportError {
     /// Column that caused the error.
     pub column_name: Option<String>,
 
-    /// Error category: validation, duplicate_in_file, duplicate_in_tenant, role_not_found, group_error, attribute_error, system.
+    /// Error category: validation, `duplicate_in_file`, `duplicate_in_tenant`, `role_not_found`, `group_error`, `attribute_error`, system.
     pub error_type: String,
 
     /// Human-readable error description.
@@ -55,12 +55,12 @@ impl UserImportError {
     /// Create a single import error record.
     pub async fn create(pool: &PgPool, data: &CreateImportError) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO user_import_errors
                 (tenant_id, job_id, line_number, email, column_name, error_type, error_message)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.tenant_id)
         .bind(data.job_id)
@@ -85,11 +85,11 @@ impl UserImportError {
         let mut count = 0u64;
         for error in errors {
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO user_import_errors
                     (tenant_id, job_id, line_number, email, column_name, error_type, error_message)
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
-                "#,
+                ",
             )
             .bind(error.tenant_id)
             .bind(error.job_id)
@@ -115,12 +115,12 @@ impl UserImportError {
         offset: i64,
     ) -> Result<(Vec<Self>, i64), sqlx::Error> {
         let items = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_import_errors
             WHERE tenant_id = $1 AND job_id = $2
             ORDER BY line_number ASC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(job_id)
@@ -130,10 +130,10 @@ impl UserImportError {
         .await?;
 
         let total: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM user_import_errors
             WHERE tenant_id = $1 AND job_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(job_id)
@@ -150,11 +150,11 @@ impl UserImportError {
         job_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM user_import_errors
             WHERE tenant_id = $1 AND job_id = $2
             ORDER BY line_number ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(job_id)
@@ -169,10 +169,10 @@ impl UserImportError {
         job_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM user_import_errors
             WHERE tenant_id = $1 AND job_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(job_id)

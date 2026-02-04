@@ -22,6 +22,7 @@ pub struct CertificationCampaignService {
 
 impl CertificationCampaignService {
     /// Create a new certification campaign service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -49,7 +50,7 @@ impl CertificationCampaignService {
 
         // Validate specific reviewers if reviewer type requires them
         if reviewer_type == CertReviewerType::SpecificUsers
-            && specific_reviewers.as_ref().is_none_or(|r| r.is_empty())
+            && specific_reviewers.as_ref().is_none_or(std::vec::Vec::is_empty)
         {
             return Err(GovernanceError::SpecificReviewersRequired);
         }
@@ -340,13 +341,13 @@ impl CertificationCampaignService {
     ) -> Result<Vec<GovEntitlementAssignment>> {
         // Get all active user assignments (not group assignments for certification)
         sqlx::query_as::<_, GovEntitlementAssignment>(
-            r#"
+            r"
             SELECT * FROM gov_entitlement_assignments
             WHERE tenant_id = $1
               AND target_type = 'user'
               AND status = 'active'
             ORDER BY created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -361,7 +362,7 @@ impl CertificationCampaignService {
         application_id: Uuid,
     ) -> Result<Vec<GovEntitlementAssignment>> {
         sqlx::query_as::<_, GovEntitlementAssignment>(
-            r#"
+            r"
             SELECT a.* FROM gov_entitlement_assignments a
             JOIN gov_entitlements e ON a.entitlement_id = e.id
             WHERE a.tenant_id = $1
@@ -369,7 +370,7 @@ impl CertificationCampaignService {
               AND a.target_type = 'user'
               AND a.status = 'active'
             ORDER BY a.created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(application_id)
@@ -385,14 +386,14 @@ impl CertificationCampaignService {
         entitlement_id: Uuid,
     ) -> Result<Vec<GovEntitlementAssignment>> {
         sqlx::query_as::<_, GovEntitlementAssignment>(
-            r#"
+            r"
             SELECT * FROM gov_entitlement_assignments
             WHERE tenant_id = $1
               AND entitlement_id = $2
               AND target_type = 'user'
               AND status = 'active'
             ORDER BY created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(entitlement_id)
@@ -409,7 +410,7 @@ impl CertificationCampaignService {
     ) -> Result<Vec<GovEntitlementAssignment>> {
         // Note: This assumes users have a department field. Adjust based on actual schema.
         sqlx::query_as::<_, GovEntitlementAssignment>(
-            r#"
+            r"
             SELECT a.* FROM gov_entitlement_assignments a
             JOIN users u ON a.target_id = u.id
             WHERE a.tenant_id = $1
@@ -417,7 +418,7 @@ impl CertificationCampaignService {
               AND a.target_type = 'user'
               AND a.status = 'active'
             ORDER BY a.created_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(department)
@@ -461,15 +462,14 @@ impl CertificationCampaignService {
 
     /// Get a user's manager.
     ///
-    /// Note: The User model doesn't currently have a manager_id field.
+    /// Note: The User model doesn't currently have a `manager_id` field.
     /// This is a placeholder that requires extension of the User model
     /// or integration with an HR data source.
     async fn get_user_manager(&self, _tenant_id: Uuid, user_id: Uuid) -> Result<Uuid> {
         // TODO: User model needs manager_id field or HR integration
         // For now, this feature is not available
         Err(GovernanceError::ReviewerNotFound(format!(
-            "Manager-based reviewer assignment not yet supported. User {} has no manager data available.",
-            user_id
+            "Manager-based reviewer assignment not yet supported. User {user_id} has no manager data available."
         )))
     }
 
@@ -502,8 +502,7 @@ impl CertificationCampaignService {
 
         entitlement.owner_id.ok_or_else(|| {
             GovernanceError::ReviewerNotFound(format!(
-                "Entitlement {} has no owner assigned",
-                entitlement_id
+                "Entitlement {entitlement_id} has no owner assigned"
             ))
         })
     }
@@ -568,6 +567,7 @@ impl CertificationCampaignService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

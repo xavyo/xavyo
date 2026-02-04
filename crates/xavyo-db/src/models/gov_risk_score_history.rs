@@ -67,6 +67,7 @@ pub struct RiskScoreTrend {
 
 impl TrendDirection {
     /// Determine trend direction from score change.
+    #[must_use] 
     pub fn from_change(change: i32, threshold: i32) -> Self {
         if change > threshold {
             Self::Increasing
@@ -86,10 +87,10 @@ impl GovRiskScoreHistory {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_score_history
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -106,12 +107,12 @@ impl GovRiskScoreHistory {
         end_date: NaiveDate,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_score_history
             WHERE tenant_id = $1 AND user_id = $2
             AND snapshot_date >= $3 AND snapshot_date <= $4
             ORDER BY snapshot_date ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -129,12 +130,12 @@ impl GovRiskScoreHistory {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_score_history
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY snapshot_date DESC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -151,10 +152,10 @@ impl GovRiskScoreHistory {
         date: NaiveDate,
     ) -> Result<Option<i32>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT score FROM gov_risk_score_history
             WHERE tenant_id = $1 AND user_id = $2 AND snapshot_date = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -171,12 +172,12 @@ impl GovRiskScoreHistory {
         date: NaiveDate,
     ) -> Result<Option<i32>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT score FROM gov_risk_score_history
             WHERE tenant_id = $1 AND user_id = $2 AND snapshot_date <= $3
             ORDER BY snapshot_date DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -194,7 +195,7 @@ impl GovRiskScoreHistory {
         let risk_level = RiskLevel::from_score(input.score);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_risk_score_history (
                 tenant_id, user_id, score, risk_level, snapshot_date
             )
@@ -203,7 +204,7 @@ impl GovRiskScoreHistory {
                 score = EXCLUDED.score,
                 risk_level = EXCLUDED.risk_level
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.user_id)
@@ -221,10 +222,10 @@ impl GovRiskScoreHistory {
         before: NaiveDate,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_risk_score_history
             WHERE tenant_id = $1 AND snapshot_date < $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(before)
@@ -282,11 +283,11 @@ impl GovRiskScoreHistory {
         end_date: NaiveDate,
     ) -> Result<Option<f64>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT AVG(score::float8) FROM gov_risk_score_history
             WHERE tenant_id = $1 AND user_id = $2
             AND snapshot_date >= $3 AND snapshot_date <= $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

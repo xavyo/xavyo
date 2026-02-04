@@ -33,11 +33,13 @@ pub enum GovRequestStatus {
 
 impl GovRequestStatus {
     /// Check if the request is in a pending state (can be actioned).
+    #[must_use] 
     pub fn is_pending(&self) -> bool {
         matches!(self, Self::Pending | Self::PendingApproval)
     }
 
     /// Check if the request is in a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
@@ -76,10 +78,10 @@ pub struct GovAccessRequest {
     /// Optional requested access expiration.
     pub requested_expires_at: Option<DateTime<Utc>>,
 
-    /// Whether SoD violations were detected.
+    /// Whether `SoD` violations were detected.
     pub has_sod_warning: bool,
 
-    /// SoD violation details for approver review.
+    /// `SoD` violation details for approver review.
     pub sod_violations: Option<serde_json::Value>,
 
     /// Assignment ID after provisioning.
@@ -136,10 +138,10 @@ impl GovAccessRequest {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_access_requests
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -157,11 +159,11 @@ impl GovAccessRequest {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_access_requests
             WHERE id = $1 AND tenant_id = $2
             FOR UPDATE
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -177,13 +179,13 @@ impl GovAccessRequest {
         entitlement_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_access_requests
             WHERE tenant_id = $1
               AND requester_id = $2
               AND entitlement_id = $3
               AND status IN ('pending', 'pending_approval')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(requester_id)
@@ -201,28 +203,28 @@ impl GovAccessRequest {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_access_requests
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.requester_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND requester_id = ${}", param_count));
+            query.push_str(&format!(" AND requester_id = ${param_count}"));
         }
         if filter.entitlement_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND entitlement_id = ${}", param_count));
+            query.push_str(&format!(" AND entitlement_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.has_sod_warning.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND has_sod_warning = ${}", param_count));
+            query.push_str(&format!(" AND has_sod_warning = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -256,28 +258,28 @@ impl GovAccessRequest {
         filter: &AccessRequestFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_access_requests
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.requester_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND requester_id = ${}", param_count));
+            query.push_str(&format!(" AND requester_id = ${param_count}"));
         }
         if filter.entitlement_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND entitlement_id = ${}", param_count));
+            query.push_str(&format!(" AND entitlement_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.has_sod_warning.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND has_sod_warning = ${}", param_count));
+            query.push_str(&format!(" AND has_sod_warning = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -305,7 +307,7 @@ impl GovAccessRequest {
         input: CreateGovAccessRequest,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_access_requests (
                 tenant_id, requester_id, entitlement_id, workflow_id,
                 justification, requested_expires_at, has_sod_warning,
@@ -313,7 +315,7 @@ impl GovAccessRequest {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.requester_id)
@@ -336,12 +338,12 @@ impl GovAccessRequest {
         status: GovRequestStatus,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_access_requests
             SET status = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -357,14 +359,14 @@ impl GovAccessRequest {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_access_requests
             SET current_step = current_step + 1,
                 status = 'pending_approval',
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -380,14 +382,14 @@ impl GovAccessRequest {
         assignment_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_access_requests
             SET status = 'provisioned',
                 provisioned_assignment_id = $3,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -402,12 +404,12 @@ impl GovAccessRequest {
         now: DateTime<Utc>,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_access_requests
             WHERE status IN ('pending', 'pending_approval')
               AND expires_at IS NOT NULL
               AND expires_at <= $1
-            "#,
+            ",
         )
         .bind(now)
         .fetch_all(pool)
@@ -417,13 +419,13 @@ impl GovAccessRequest {
     /// Expire stale requests.
     pub async fn expire_stale(pool: &sqlx::PgPool, now: DateTime<Utc>) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_access_requests
             SET status = 'expired', updated_at = NOW()
             WHERE status IN ('pending', 'pending_approval')
               AND expires_at IS NOT NULL
               AND expires_at <= $1
-            "#,
+            ",
         )
         .bind(now)
         .execute(pool)
@@ -445,7 +447,7 @@ impl GovAccessRequest {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_access_requests
             WHERE status IN ('pending', 'pending_approval')
               AND current_deadline IS NOT NULL
@@ -453,7 +455,7 @@ impl GovAccessRequest {
             ORDER BY current_deadline ASC
             LIMIT $2
             FOR UPDATE SKIP LOCKED
-            "#,
+            ",
         )
         .bind(now)
         .bind(limit)
@@ -471,7 +473,7 @@ impl GovAccessRequest {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_access_requests
             WHERE status IN ('pending', 'pending_approval')
               AND current_deadline IS NOT NULL
@@ -481,7 +483,7 @@ impl GovAccessRequest {
             ORDER BY current_deadline ASC
             LIMIT $3
             FOR UPDATE SKIP LOCKED
-            "#,
+            ",
         )
         .bind(now)
         .bind(warning_threshold)
@@ -499,7 +501,7 @@ impl GovAccessRequest {
         new_deadline: Option<DateTime<Utc>>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_access_requests
             SET current_escalation_level = $3,
                 current_deadline = $4,
@@ -507,7 +509,7 @@ impl GovAccessRequest {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -524,13 +526,13 @@ impl GovAccessRequest {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_access_requests
             SET escalation_warning_sent = true,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -546,7 +548,7 @@ impl GovAccessRequest {
         deadline: Option<DateTime<Utc>>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_access_requests
             SET current_deadline = $3,
                 current_escalation_level = 0,
@@ -554,7 +556,7 @@ impl GovAccessRequest {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -570,14 +572,14 @@ impl GovAccessRequest {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_access_requests
             SET current_deadline = NULL,
                 escalation_warning_sent = false,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -593,7 +595,7 @@ impl GovAccessRequest {
         new_deadline: Option<DateTime<Utc>>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_access_requests
             SET current_escalation_level = 0,
                 current_deadline = $3,
@@ -601,7 +603,7 @@ impl GovAccessRequest {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

@@ -1,6 +1,6 @@
 //! Operation Queue Service
 //!
-//! Manages the provisioning operation queue backed by PostgreSQL.
+//! Manages the provisioning operation queue backed by `PostgreSQL`.
 //! Provides durable storage with retry scheduling and dead letter handling.
 
 use std::str::FromStr;
@@ -25,6 +25,7 @@ pub enum EnqueueResult {
 
 impl EnqueueResult {
     /// Get the operation ID (either new or existing).
+    #[must_use] 
     pub fn operation_id(&self) -> Uuid {
         match self {
             EnqueueResult::Enqueued { id } => *id,
@@ -33,11 +34,13 @@ impl EnqueueResult {
     }
 
     /// Check if this was a new operation.
+    #[must_use] 
     pub fn is_new(&self) -> bool {
         matches!(self, EnqueueResult::Enqueued { .. })
     }
 
     /// Check if this was a duplicate.
+    #[must_use] 
     pub fn is_duplicate(&self) -> bool {
         matches!(self, EnqueueResult::Duplicate { .. })
     }
@@ -138,6 +141,7 @@ pub struct QueuedOperation {
 
 impl QueuedOperation {
     /// Create a new queued operation.
+    #[must_use] 
     pub fn new(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -180,12 +184,14 @@ impl QueuedOperation {
     }
 
     /// Set the priority.
+    #[must_use] 
     pub fn with_priority(mut self, priority: i32) -> Self {
         self.priority = priority;
         self
     }
 
     /// Set max retries.
+    #[must_use] 
     pub fn with_max_retries(mut self, max: i32) -> Self {
         self.max_retries = max;
         self
@@ -198,11 +204,13 @@ impl QueuedOperation {
     }
 
     /// Check if the operation can be retried.
+    #[must_use] 
     pub fn can_retry(&self) -> bool {
         self.retry_count < self.max_retries
     }
 
     /// Check if the operation is ready for processing.
+    #[must_use] 
     pub fn is_ready(&self) -> bool {
         match self.status {
             OperationStatus::Pending => true,
@@ -263,16 +271,19 @@ pub struct OperationBatch {
 
 impl OperationBatch {
     /// Get the number of operations in this batch.
+    #[must_use] 
     pub fn len(&self) -> usize {
         self.operations.len()
     }
 
     /// Check if this batch is empty.
+    #[must_use] 
     pub fn is_empty(&self) -> bool {
         self.operations.is_empty()
     }
 
     /// Get operation IDs in this batch.
+    #[must_use] 
     pub fn operation_ids(&self) -> Vec<Uuid> {
         self.operations.iter().map(|op| op.id).collect()
     }
@@ -286,6 +297,7 @@ pub struct OperationQueue {
 
 impl OperationQueue {
     /// Create a new operation queue.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -294,19 +306,20 @@ impl OperationQueue {
     }
 
     /// Create with custom configuration.
+    #[must_use] 
     pub fn with_config(pool: PgPool, config: QueueConfig) -> Self {
         Self { pool, config }
     }
 
     /// Enqueue a new operation.
     ///
-    /// If the operation has an idempotency_key set, duplicates will be detected.
+    /// If the operation has an `idempotency_key` set, duplicates will be detected.
     #[instrument(skip(self, operation), fields(operation_id = %operation.id))]
     pub async fn enqueue(&self, operation: QueuedOperation) -> QueueResult<Uuid> {
         let payload_str = serde_json::to_string(&operation.payload)?;
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO provisioning_operations (
                 id, tenant_id, connector_id, user_id, operation_type,
                 object_class, target_uid, payload, status,
@@ -318,7 +331,7 @@ impl OperationQueue {
                 $10, $11, $12,
                 $13, $14, $15, $16
             )
-            "#,
+            ",
         )
         .bind(operation.id)
         .bind(operation.tenant_id)
@@ -414,7 +427,7 @@ impl OperationQueue {
 
     /// Dequeue operations ready for processing.
     ///
-    /// This atomically selects and locks operations, marking them as in_progress.
+    /// This atomically selects and locks operations, marking them as `in_progress`.
     #[instrument(skip(self))]
     pub async fn dequeue(
         &self,
@@ -426,7 +439,7 @@ impl OperationQueue {
 
     /// Dequeue operations ready for processing, excluding offline connectors.
     ///
-    /// This atomically selects and locks operations, marking them as in_progress.
+    /// This atomically selects and locks operations, marking them as `in_progress`.
     /// Operations for connectors in `offline_connectors` are skipped.
     #[instrument(skip(self, offline_connectors))]
     pub async fn dequeue_excluding(
@@ -452,7 +465,7 @@ impl OperationQueue {
             }
 
             sqlx::query(
-                r#"
+                r"
                 UPDATE provisioning_operations
                 SET status = 'in_progress',
                     started_at = $1,
@@ -471,17 +484,17 @@ impl OperationQueue {
                           retry_count, max_retries, next_retry_at, error_message,
                           priority, created_at, updated_at, started_at, completed_at, idempotency_key,
                           resolution_notes, resolved_by, resolved_at
-                "#
+                "
             )
             .bind(now)
             .bind(cid)
-            .bind(limit as i64)
+            .bind(i64::from(limit))
             .fetch_all(&self.pool)
             .await?
         } else if has_offline {
             // Exclude offline connectors using NOT IN clause
             sqlx::query(
-                r#"
+                r"
                 UPDATE provisioning_operations
                 SET status = 'in_progress',
                     started_at = $1,
@@ -500,17 +513,17 @@ impl OperationQueue {
                           retry_count, max_retries, next_retry_at, error_message,
                           priority, created_at, updated_at, started_at, completed_at, idempotency_key,
                           resolution_notes, resolved_by, resolved_at
-                "#
+                "
             )
             .bind(now)
-            .bind(limit as i64)
+            .bind(i64::from(limit))
             .bind(&offline_ids)
             .fetch_all(&self.pool)
             .await?
         } else {
             // No filters - get all operations
             sqlx::query(
-                r#"
+                r"
                 UPDATE provisioning_operations
                 SET status = 'in_progress',
                     started_at = $1,
@@ -528,10 +541,10 @@ impl OperationQueue {
                           retry_count, max_retries, next_retry_at, error_message,
                           priority, created_at, updated_at, started_at, completed_at, idempotency_key,
                           resolution_notes, resolved_by, resolved_at
-                "#
+                "
             )
             .bind(now)
-            .bind(limit as i64)
+            .bind(i64::from(limit))
             .fetch_all(&self.pool)
             .await?
         };
@@ -601,7 +614,7 @@ impl OperationQueue {
     pub async fn get_operation(&self, id: Uuid) -> QueueResult<Option<QueuedOperation>> {
         let now = Utc::now();
         let row = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, connector_id, user_id, operation_type,
                    object_class, target_uid, payload, status,
                    retry_count, max_retries, next_retry_at, error_message,
@@ -609,7 +622,7 @@ impl OperationQueue {
                    resolution_notes, resolved_by, resolved_at
             FROM provisioning_operations
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -624,7 +637,7 @@ impl OperationQueue {
         let now = Utc::now();
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'completed',
                 target_uid = COALESCE($2, target_uid),
@@ -632,7 +645,7 @@ impl OperationQueue {
                 updated_at = $3,
                 error_message = NULL
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .bind(target_uid)
@@ -656,7 +669,7 @@ impl OperationQueue {
 
         // Get current retry count
         let row = sqlx::query(
-            r#"SELECT retry_count, max_retries FROM provisioning_operations WHERE id = $1"#,
+            r"SELECT retry_count, max_retries FROM provisioning_operations WHERE id = $1",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -679,7 +692,7 @@ impl OperationQueue {
         };
 
         sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = $2,
                 retry_count = $3,
@@ -687,7 +700,7 @@ impl OperationQueue {
                 error_message = $5,
                 updated_at = $6
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .bind(status)
@@ -722,12 +735,12 @@ impl OperationQueue {
         let now = Utc::now();
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'cancelled',
                 updated_at = $2
             WHERE id = $1 AND status IN ('pending', 'failed')
-            "#,
+            ",
         )
         .bind(id)
         .bind(now)
@@ -752,7 +765,7 @@ impl OperationQueue {
         let now = Utc::now();
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'pending',
                 retry_count = 0,
@@ -760,7 +773,7 @@ impl OperationQueue {
                 error_message = NULL,
                 updated_at = $2
             WHERE id = $1 AND status = 'dead_letter'
-            "#,
+            ",
         )
         .bind(id)
         .bind(now)
@@ -782,7 +795,7 @@ impl OperationQueue {
     /// Get operation by ID.
     pub async fn get(&self, id: Uuid) -> QueueResult<Option<QueuedOperation>> {
         let row = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, connector_id, user_id, operation_type,
                    object_class, target_uid, payload, status,
                    retry_count, max_retries, next_retry_at, error_message,
@@ -790,7 +803,7 @@ impl OperationQueue {
                    resolution_notes, resolved_by, resolved_at
             FROM provisioning_operations
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -802,7 +815,7 @@ impl OperationQueue {
     /// Get queue statistics.
     pub async fn stats(&self, connector_id: Option<Uuid>) -> QueueResult<QueueStats> {
         let query = if connector_id.is_some() {
-            r#"
+            r"
             SELECT
                 COUNT(*) FILTER (WHERE status = 'pending') as pending,
                 COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
@@ -813,9 +826,9 @@ impl OperationQueue {
                 AVG(EXTRACT(EPOCH FROM (completed_at - created_at))) FILTER (WHERE status = 'completed') as avg_processing_time
             FROM provisioning_operations
             WHERE connector_id = $1
-            "#
+            "
         } else {
-            r#"
+            r"
             SELECT
                 COUNT(*) FILTER (WHERE status = 'pending') as pending,
                 COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
@@ -825,7 +838,7 @@ impl OperationQueue {
                 COUNT(*) FILTER (WHERE status = 'awaiting_system') as awaiting_system,
                 AVG(EXTRACT(EPOCH FROM (completed_at - created_at))) FILTER (WHERE status = 'completed') as avg_processing_time
             FROM provisioning_operations
-            "#
+            "
         };
 
         let row = if let Some(cid) = connector_id {
@@ -847,19 +860,19 @@ impl OperationQueue {
         })
     }
 
-    /// Transition operations to awaiting_system status when connector is offline.
+    /// Transition operations to `awaiting_system` status when connector is offline.
     #[instrument(skip(self))]
     pub async fn transition_to_awaiting_system(&self, connector_id: Uuid) -> QueueResult<u64> {
         let now = Utc::now();
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'awaiting_system',
                 updated_at = $1
             WHERE connector_id = $2
             AND status IN ('pending', 'failed')
-            "#,
+            ",
         )
         .bind(now)
         .bind(connector_id)
@@ -884,13 +897,13 @@ impl OperationQueue {
         let now = Utc::now();
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'pending',
                 updated_at = $1
             WHERE connector_id = $2
             AND status = 'awaiting_system'
-            "#,
+            ",
         )
         .bind(now)
         .bind(connector_id)
@@ -920,7 +933,7 @@ impl OperationQueue {
         let now = Utc::now();
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'resolved',
                 resolved_at = $2,
@@ -929,7 +942,7 @@ impl OperationQueue {
                 updated_at = $2
             WHERE id = $1
             AND status = 'dead_letter'
-            "#,
+            ",
         )
         .bind(id)
         .bind(now)
@@ -959,7 +972,7 @@ impl OperationQueue {
     ) -> QueueResult<Vec<QueuedOperation>> {
         let now = Utc::now();
         let query = if connector_id.is_some() {
-            r#"
+            r"
             SELECT id, tenant_id, connector_id, user_id, operation_type,
                    object_class, target_uid, payload, status,
                    retry_count, max_retries, next_retry_at, error_message,
@@ -969,9 +982,9 @@ impl OperationQueue {
             WHERE connector_id = $1 AND status = 'dead_letter'
             ORDER BY created_at DESC
             LIMIT $2 OFFSET $3
-            "#
+            "
         } else {
-            r#"
+            r"
             SELECT id, tenant_id, connector_id, user_id, operation_type,
                    object_class, target_uid, payload, status,
                    retry_count, max_retries, next_retry_at, error_message,
@@ -981,7 +994,7 @@ impl OperationQueue {
             WHERE status = 'dead_letter'
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
-            "#
+            "
         };
 
         let rows = if let Some(cid) = connector_id {
@@ -1029,14 +1042,14 @@ impl OperationQueue {
         let stale_threshold = now - Duration::seconds(self.config.lock_timeout_secs);
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE provisioning_operations
             SET status = 'pending',
                 started_at = NULL,
                 updated_at = $1
             WHERE status = 'in_progress'
             AND started_at < $2
-            "#,
+            ",
         )
         .bind(now)
         .bind(stale_threshold)
@@ -1052,7 +1065,7 @@ impl OperationQueue {
     }
 }
 
-/// Convert a database row to a QueuedOperation.
+/// Convert a database row to a `QueuedOperation`.
 fn row_to_operation(row: &sqlx::postgres::PgRow, now: DateTime<Utc>) -> QueuedOperation {
     let operation_type_str: String = row.get("operation_type");
     let status_str: String = row.get("status");
@@ -1117,11 +1130,13 @@ pub struct QueueStats {
 
 impl QueueStats {
     /// Total operations in the queue (excluding completed).
+    #[must_use] 
     pub fn total_queued(&self) -> u64 {
         self.pending + self.in_progress + self.failed + self.awaiting_system
     }
 
     /// Calculate success rate as percentage.
+    #[must_use] 
     pub fn success_rate(&self) -> f64 {
         let total = self.completed + self.dead_letter;
         if total == 0 {

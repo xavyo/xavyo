@@ -101,7 +101,7 @@ pub async fn execute(args: SetupArgs) -> CliResult<()> {
                 .items(&options)
                 .default(0)
                 .interact()
-                .map_err(|e| CliError::InputError(format!("Selection failed: {}", e)))?;
+                .map_err(|e| CliError::InputError(format!("Selection failed: {e}")))?;
 
             println!();
 
@@ -125,7 +125,7 @@ pub async fn execute(args: SetupArgs) -> CliResult<()> {
             println!();
         }
         AuthState::LoggedIn { email } => {
-            print_success(&format!("Logged in as {}", email));
+            print_success(&format!("Logged in as {email}"));
             println!();
         }
     }
@@ -144,14 +144,14 @@ pub async fn execute(args: SetupArgs) -> CliResult<()> {
                 .with_prompt("Would you like to create a new tenant?")
                 .default(true)
                 .interact()
-                .map_err(|e| CliError::InputError(format!("Confirmation failed: {}", e)))?;
+                .map_err(|e| CliError::InputError(format!("Confirmation failed: {e}")))?;
 
             if create_tenant {
                 println!();
                 let org_name: String = dialoguer::Input::new()
                     .with_prompt("Organization name")
                     .interact_text()
-                    .map_err(|e| CliError::InputError(format!("Input failed: {}", e)))?;
+                    .map_err(|e| CliError::InputError(format!("Input failed: {e}")))?;
 
                 println!();
 
@@ -167,7 +167,7 @@ pub async fn execute(args: SetupArgs) -> CliResult<()> {
             println!();
         }
         TenantState::HasTenant { name, slug } => {
-            print_success(&format!("Tenant: {} ({})", name, slug));
+            print_success(&format!("Tenant: {name} ({slug})"));
             println!();
         }
     }
@@ -182,7 +182,7 @@ pub async fn execute(args: SetupArgs) -> CliResult<()> {
 
     match &final_auth {
         AuthState::LoggedIn { email } => {
-            print_success(&format!("Authenticated as: {}", email));
+            print_success(&format!("Authenticated as: {email}"));
         }
         AuthState::NotLoggedIn => {
             print_info("Not authenticated");
@@ -191,7 +191,7 @@ pub async fn execute(args: SetupArgs) -> CliResult<()> {
 
     match &final_tenant {
         TenantState::HasTenant { name, slug } => {
-            print_success(&format!("Tenant: {} ({})", name, slug));
+            print_success(&format!("Tenant: {name} ({slug})"));
         }
         TenantState::NoTenant => {
             print_info("No tenant configured");
@@ -216,7 +216,7 @@ fn execute_check_mode(auth_state: &AuthState, tenant_state: &TenantState) -> Cli
 
     let auth_ok = match auth_state {
         AuthState::LoggedIn { email } => {
-            print_success(&format!("Authentication: Logged in as {}", email));
+            print_success(&format!("Authentication: Logged in as {email}"));
             true
         }
         AuthState::NotLoggedIn => {
@@ -227,7 +227,7 @@ fn execute_check_mode(auth_state: &AuthState, tenant_state: &TenantState) -> Cli
 
     let tenant_ok = match tenant_state {
         TenantState::HasTenant { name, slug } => {
-            print_success(&format!("Tenant: {} ({})", name, slug));
+            print_success(&format!("Tenant: {name} ({slug})"));
             true
         }
         TenantState::NoTenant => {

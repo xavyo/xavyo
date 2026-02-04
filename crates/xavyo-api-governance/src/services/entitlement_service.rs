@@ -16,6 +16,7 @@ pub struct EntitlementService {
 
 impl EntitlementService {
     /// Create a new entitlement service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

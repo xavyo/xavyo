@@ -2,7 +2,6 @@
 //!
 //! These tests use mock services to avoid requiring a database connection.
 
-use std::sync::Arc;
 use uuid::Uuid;
 
 /// Test context containing tenant and authentication info.
@@ -36,5 +35,5 @@ impl Default for TestContext {
 
 /// Generate a test JWT token for the given tenant and user.
 fn generate_test_jwt(tenant_id: Uuid, user_id: Uuid) -> String {
-    format!("test_token_{}_{}", tenant_id, user_id)
+    format!("test_token_{tenant_id}_{user_id}")
 }

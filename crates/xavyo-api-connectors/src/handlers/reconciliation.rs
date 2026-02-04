@@ -124,9 +124,9 @@ pub struct ListDiscrepanciesResponse {
 /// Request to remediate a discrepancy.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RemediateRequest {
-    /// Action: create, update, delete, link, unlink, inactivate_identity.
+    /// Action: create, update, delete, link, unlink, `inactivate_identity`.
     pub action: String,
-    /// Direction for update: xavyo_to_target or target_to_xavyo.
+    /// Direction for update: `xavyo_to_target` or `target_to_xavyo`.
     #[serde(default = "default_direction")]
     pub direction: String,
     /// Identity ID for link action.

@@ -70,6 +70,7 @@ pub enum EventError {
 
 impl EventError {
     /// Returns true if this error is transient and can be retried.
+    #[must_use] 
     pub fn is_transient(&self) -> bool {
         matches!(
             self,
@@ -82,6 +83,7 @@ impl EventError {
     }
 
     /// Returns true if this is a configuration error.
+    #[must_use] 
     pub fn is_config_error(&self) -> bool {
         matches!(
             self,

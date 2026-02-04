@@ -19,7 +19,7 @@ use tower_service::Service;
 /// This service wraps an inner service and:
 /// 1. Extracts tenant ID from request headers or JWT claims
 /// 2. Validates the tenant ID format
-/// 3. Inserts the TenantId into request extensions
+/// 3. Inserts the `TenantId` into request extensions
 /// 4. Rejects requests without valid tenant context (if required)
 ///
 /// # Type Parameters
@@ -32,7 +32,7 @@ pub struct TenantService<S> {
 }
 
 impl<S> TenantService<S> {
-    /// Create a new TenantService.
+    /// Create a new `TenantService`.
     pub fn new(inner: S, config: Arc<TenantConfig>) -> Self {
         Self { inner, config }
     }

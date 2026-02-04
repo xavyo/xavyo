@@ -44,6 +44,7 @@ pub struct RemediationResult {
 
 impl RemediationResult {
     /// Create a successful result.
+    #[must_use] 
     pub fn success(discrepancy_id: Uuid, action: ActionType, dry_run: bool) -> Self {
         Self {
             discrepancy_id,
@@ -58,6 +59,7 @@ impl RemediationResult {
     }
 
     /// Create a failure result.
+    #[must_use] 
     pub fn failure(discrepancy_id: Uuid, action: ActionType, error: String, dry_run: bool) -> Self {
         Self {
             discrepancy_id,
@@ -72,23 +74,27 @@ impl RemediationResult {
     }
 
     /// Add before state.
+    #[must_use] 
     pub fn with_before_state(mut self, state: JsonValue) -> Self {
         self.before_state = Some(state);
         self
     }
 
     /// Add after state.
+    #[must_use] 
     pub fn with_after_state(mut self, state: JsonValue) -> Self {
         self.after_state = Some(state);
         self
     }
 
     /// Check if successful.
+    #[must_use] 
     pub fn is_success(&self) -> bool {
         matches!(self.result, ActionResult::Success)
     }
 
     /// Check if failed.
+    #[must_use] 
     pub fn is_failure(&self) -> bool {
         matches!(self.result, ActionResult::Failure)
     }
@@ -114,6 +120,7 @@ pub struct RemediationRequest {
 
 impl RemediationRequest {
     /// Create a new remediation request.
+    #[must_use] 
     pub fn new(discrepancy_id: Uuid, action: ActionType) -> Self {
         Self {
             discrepancy_id,
@@ -125,18 +132,21 @@ impl RemediationRequest {
     }
 
     /// Set direction.
+    #[must_use] 
     pub fn with_direction(mut self, direction: RemediationDirection) -> Self {
         self.direction = direction;
         self
     }
 
     /// Set identity ID for link action.
+    #[must_use] 
     pub fn with_identity(mut self, identity_id: Uuid) -> Self {
         self.identity_id = Some(identity_id);
         self
     }
 
     /// Set dry run mode.
+    #[must_use] 
     pub fn with_dry_run(mut self, dry_run: bool) -> Self {
         self.dry_run = dry_run;
         self
@@ -200,6 +210,7 @@ pub struct BulkRemediationSummary {
 
 impl BulkRemediationResult {
     /// Create from results.
+    #[must_use] 
     pub fn from_results(results: Vec<RemediationResult>) -> Self {
         let total = results.len();
         let succeeded = results.iter().filter(|r| r.is_success()).count();
@@ -373,7 +384,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Create,
-                    format!("Failed to get identity attributes: {}", e),
+                    format!("Failed to get identity attributes: {e}"),
                     dry_run,
                 );
             }
@@ -396,7 +407,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Create,
-                    format!("Failed to get connector: {}", e),
+                    format!("Failed to get connector: {e}"),
                     false,
                 );
             }
@@ -490,7 +501,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Update,
-                    format!("Shadow not found for external UID: {}", external_uid),
+                    format!("Shadow not found for external UID: {external_uid}"),
                     dry_run,
                 );
             }
@@ -498,7 +509,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Update,
-                    format!("Failed to lookup shadow: {}", e),
+                    format!("Failed to lookup shadow: {e}"),
                     dry_run,
                 );
             }
@@ -556,7 +567,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Update,
-                    format!("Failed to get identity attributes: {}", e),
+                    format!("Failed to get identity attributes: {e}"),
                     dry_run,
                 )
                 .with_before_state(before_state);
@@ -580,7 +591,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Update,
-                    format!("Failed to get connector: {}", e),
+                    format!("Failed to get connector: {e}"),
                     false,
                 )
                 .with_before_state(before_state);
@@ -656,7 +667,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Update,
-                    format!("Failed to get connector: {}", e),
+                    format!("Failed to get connector: {e}"),
                     dry_run,
                 )
                 .with_before_state(before_state);
@@ -670,7 +681,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Update,
-                    format!("Object not found in target: {}", external_uid),
+                    format!("Object not found in target: {external_uid}"),
                     dry_run,
                 )
                 .with_before_state(before_state);
@@ -679,7 +690,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Update,
-                    format!("Failed to get target attributes: {}", e),
+                    format!("Failed to get target attributes: {e}"),
                     dry_run,
                 )
                 .with_before_state(before_state);
@@ -701,7 +712,7 @@ where
             return RemediationResult::failure(
                 discrepancy_id,
                 ActionType::Update,
-                format!("Failed to update identity: {}", e),
+                format!("Failed to update identity: {e}"),
                 false,
             )
             .with_before_state(before_state);
@@ -777,7 +788,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Delete,
-                    format!("Failed to get connector: {}", e),
+                    format!("Failed to get connector: {e}"),
                     false,
                 )
                 .with_before_state(before_state);
@@ -864,7 +875,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Link,
-                    format!("Shadow not found for external UID: {}", external_uid),
+                    format!("Shadow not found for external UID: {external_uid}"),
                     dry_run,
                 );
             }
@@ -872,7 +883,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Link,
-                    format!("Failed to lookup shadow: {}", e),
+                    format!("Failed to lookup shadow: {e}"),
                     dry_run,
                 );
             }
@@ -895,7 +906,7 @@ where
             return RemediationResult::failure(
                 discrepancy_id,
                 ActionType::Link,
-                format!("Shadow already linked to identity: {}", existing_user_id),
+                format!("Shadow already linked to identity: {existing_user_id}"),
                 dry_run,
             )
             .with_before_state(before_state);
@@ -919,7 +930,7 @@ where
             return RemediationResult::failure(
                 discrepancy_id,
                 ActionType::Link,
-                format!("Failed to update shadow: {}", e),
+                format!("Failed to update shadow: {e}"),
                 false,
             )
             .with_before_state(before_state);
@@ -975,7 +986,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Unlink,
-                    format!("Shadow not found for external UID: {}", external_uid),
+                    format!("Shadow not found for external UID: {external_uid}"),
                     dry_run,
                 );
             }
@@ -983,7 +994,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::Unlink,
-                    format!("Failed to lookup shadow: {}", e),
+                    format!("Failed to lookup shadow: {e}"),
                     dry_run,
                 );
             }
@@ -1019,7 +1030,7 @@ where
             return RemediationResult::failure(
                 discrepancy_id,
                 ActionType::Unlink,
-                format!("Failed to update shadow: {}", e),
+                format!("Failed to update shadow: {e}"),
                 false,
             )
             .with_before_state(before_state);
@@ -1071,7 +1082,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::InactivateIdentity,
-                    format!("Failed to check identity status: {}", e),
+                    format!("Failed to check identity status: {e}"),
                     dry_run,
                 );
             }
@@ -1116,7 +1127,7 @@ where
             return RemediationResult::failure(
                 discrepancy_id,
                 ActionType::InactivateIdentity,
-                format!("Failed to inactivate identity: {}", e),
+                format!("Failed to inactivate identity: {e}"),
                 false,
             )
             .with_before_state(before_state);
@@ -1185,7 +1196,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::CreateIdentity,
-                    format!("Failed to create identity: {}", e),
+                    format!("Failed to create identity: {e}"),
                     false,
                 )
                 .with_before_state(before_state);
@@ -1240,7 +1251,7 @@ where
                 return RemediationResult::failure(
                     discrepancy_id,
                     ActionType::DeleteIdentity,
-                    format!("Failed to check identity existence: {}", e),
+                    format!("Failed to check identity existence: {e}"),
                     dry_run,
                 );
             }
@@ -1297,7 +1308,7 @@ where
             return RemediationResult::failure(
                 discrepancy_id,
                 ActionType::DeleteIdentity,
-                format!("Failed to delete identity: {}", e),
+                format!("Failed to delete identity: {e}"),
                 false,
             )
             .with_before_state(before_state);
@@ -1321,6 +1332,7 @@ where
     }
 
     /// Begin a new remediation transaction.
+    #[must_use] 
     pub fn begin_transaction(&self) -> RemediationTransaction {
         RemediationTransaction::new(self.tenant_id)
     }

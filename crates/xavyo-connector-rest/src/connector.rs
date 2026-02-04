@@ -33,7 +33,7 @@ pub struct RestConnector {
     /// HTTP client.
     client: Arc<Client>,
 
-    /// Cached OAuth2 token (if using OAuth2 auth).
+    /// Cached `OAuth2` token (if using `OAuth2` auth).
     oauth_token: Arc<RwLock<Option<String>>>,
 
     /// Whether the connector has been disposed.
@@ -91,7 +91,7 @@ impl RestConnector {
         builder
             .build()
             .map_err(|e| ConnectorError::InvalidConfiguration {
-                message: format!("Failed to build HTTP client: {}", e),
+                message: format!("Failed to build HTTP client: {e}"),
             })
     }
 
@@ -112,9 +112,9 @@ impl RestConnector {
             AuthConfig::Basic { username, password } => {
                 let credentials = format!("{}:{}", username, password.as_deref().unwrap_or(""));
                 let encoded = base64_encode(&credentials);
-                Ok(Some(format!("Basic {}", encoded)))
+                Ok(Some(format!("Basic {encoded}")))
             }
-            AuthConfig::Bearer { token } => Ok(Some(format!("Bearer {}", token))),
+            AuthConfig::Bearer { token } => Ok(Some(format!("Bearer {token}"))),
             AuthConfig::ApiKey {
                 key: _,
                 header_name,
@@ -134,7 +134,7 @@ impl RestConnector {
                 {
                     let token_guard = self.oauth_token.read().await;
                     if let Some(ref token) = *token_guard {
-                        return Ok(Some(format!("Bearer {}", token)));
+                        return Ok(Some(format!("Bearer {token}")));
                     }
                 }
 
@@ -149,12 +149,12 @@ impl RestConnector {
                     *token_guard = Some(token.clone());
                 }
 
-                Ok(Some(format!("Bearer {}", token)))
+                Ok(Some(format!("Bearer {token}")))
             }
         }
     }
 
-    /// Fetch OAuth2 token using client credentials flow.
+    /// Fetch `OAuth2` token using client credentials flow.
     async fn fetch_oauth_token(
         &self,
         token_url: &str,
@@ -193,7 +193,7 @@ impl RestConnector {
 
         body.get("access_token")
             .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .ok_or(ConnectorError::AuthenticationFailed)
     }
 
@@ -268,7 +268,7 @@ impl RestConnector {
             // Acquire rate limit permit
             let _guard = self.rate_limiter.acquire(url).await.map_err(|e| {
                 ConnectorError::TargetUnavailable {
-                    message: format!("Rate limit error: {}", e),
+                    message: format!("Rate limit error: {e}"),
                 }
             })?;
 
@@ -370,7 +370,7 @@ impl RestConnector {
                     }
 
                     return Err(ConnectorError::connection_failed_with_source(
-                        format!("Request failed after {} attempts: {}", attempt, url),
+                        format!("Request failed after {attempt} attempts: {url}"),
                         e,
                     ));
                 }
@@ -388,9 +388,7 @@ impl RestConnector {
         // Try to extract error message from response
         let error_message = if let Ok(json) = serde_json::from_str::<Value>(body) {
             json.get(&self.config.response.error_message_path)
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| body.to_string())
+                .and_then(|v| v.as_str()).map_or_else(|| body.to_string(), std::string::ToString::to_string)
         } else {
             body.to_string()
         };
@@ -407,14 +405,14 @@ impl RestConnector {
                 identifier: "unknown".to_string(),
             },
             StatusCode::TOO_MANY_REQUESTS => ConnectorError::TargetUnavailable {
-                message: format!("Rate limited: {}", error_message),
+                message: format!("Rate limited: {error_message}"),
             },
             StatusCode::SERVICE_UNAVAILABLE
             | StatusCode::BAD_GATEWAY
             | StatusCode::GATEWAY_TIMEOUT => ConnectorError::TargetUnavailable {
                 message: error_message,
             },
-            _ => ConnectorError::operation_failed(format!("HTTP {}: {}", status, error_message)),
+            _ => ConnectorError::operation_failed(format!("HTTP {status}: {error_message}")),
         }
     }
 
@@ -443,7 +441,7 @@ impl RestConnector {
             .as_ref()
             .and_then(|path| {
                 body.pointer(&format!("/{}", path.replace('.', "/")))
-                    .and_then(|v| v.as_u64())
+                    .and_then(serde_json::Value::as_u64)
             })
     }
 
@@ -456,11 +454,11 @@ impl RestConnector {
             .and_then(|path| {
                 body.pointer(&format!("/{}", path.replace('.', "/")))
                     .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
             })
     }
 
-    /// Convert JSON value to AttributeSet.
+    /// Convert JSON value to `AttributeSet`.
     fn json_to_attribute_set(&self, value: &Value) -> AttributeSet {
         let mut attrs = AttributeSet::new();
 
@@ -473,7 +471,7 @@ impl RestConnector {
         attrs
     }
 
-    /// Convert JSON value to AttributeValue.
+    /// Convert JSON value to `AttributeValue`.
     fn json_to_attribute_value(value: &Value) -> AttributeValue {
         match value {
             Value::Null => AttributeValue::Null,
@@ -495,7 +493,7 @@ impl RestConnector {
         }
     }
 
-    /// Convert AttributeSet to JSON object.
+    /// Convert `AttributeSet` to JSON object.
     fn attribute_set_to_json(&self, attrs: &AttributeSet) -> Value {
         let mut obj = serde_json::Map::new();
 
@@ -506,7 +504,7 @@ impl RestConnector {
         Value::Object(obj)
     }
 
-    /// Convert AttributeValue to JSON value.
+    /// Convert `AttributeValue` to JSON value.
     fn attribute_value_to_json(value: &AttributeValue) -> Value {
         match value {
             AttributeValue::Null => Value::Null,
@@ -514,8 +512,7 @@ impl RestConnector {
             AttributeValue::Integer(i) => Value::Number(serde_json::Number::from(*i)),
             AttributeValue::Boolean(b) => Value::Bool(*b),
             AttributeValue::Float(f) => serde_json::Number::from_f64(*f)
-                .map(Value::Number)
-                .unwrap_or(Value::Null),
+                .map_or(Value::Null, Value::Number),
             AttributeValue::Binary(b) => Value::String(base64_encode(b)),
             AttributeValue::Array(arr) => {
                 Value::Array(arr.iter().map(Self::attribute_value_to_json).collect())
@@ -524,7 +521,7 @@ impl RestConnector {
         }
     }
 
-    /// Convert AttributeDelta to JSON for update operations.
+    /// Convert `AttributeDelta` to JSON for update operations.
     fn delta_to_json(&self, changes: &AttributeDelta) -> Value {
         let mut obj = serde_json::Map::new();
 
@@ -583,27 +580,27 @@ impl RestConnector {
             }
             // Default to treating object class as resource path
             (_, "list", _) => (
-                self.config.url(&format!("/{}", object_class)),
+                self.config.url(&format!("/{object_class}")),
                 HttpMethod::Get,
             ),
             (_, "get", Some(uid)) => (
-                self.config.url(&format!("/{}/{}", object_class, uid)),
+                self.config.url(&format!("/{object_class}/{uid}")),
                 HttpMethod::Get,
             ),
             (_, "create", _) => (
-                self.config.url(&format!("/{}", object_class)),
+                self.config.url(&format!("/{object_class}")),
                 HttpMethod::Post,
             ),
             (_, "update", Some(uid)) => (
-                self.config.url(&format!("/{}/{}", object_class, uid)),
+                self.config.url(&format!("/{object_class}/{uid}")),
                 endpoints.update_method,
             ),
             (_, "delete", Some(uid)) => (
-                self.config.url(&format!("/{}/{}", object_class, uid)),
+                self.config.url(&format!("/{object_class}/{uid}")),
                 HttpMethod::Delete,
             ),
             _ => (
-                self.config.url(&format!("/{}", object_class)),
+                self.config.url(&format!("/{object_class}")),
                 HttpMethod::Get,
             ),
         }
@@ -797,7 +794,7 @@ impl RestConnector {
         use std::net::{IpAddr, Ipv4Addr};
 
         let url = url::Url::parse(url_str).map_err(|e| ConnectorError::InvalidConfiguration {
-            message: format!("Invalid URL: {}", e),
+            message: format!("Invalid URL: {e}"),
         })?;
 
         // Only allow HTTP and HTTPS
@@ -806,8 +803,7 @@ impl RestConnector {
             scheme => {
                 return Err(ConnectorError::InvalidConfiguration {
                     message: format!(
-                        "URL scheme '{}' not allowed; only HTTP(S) permitted",
-                        scheme
+                        "URL scheme '{scheme}' not allowed; only HTTP(S) permitted"
                     ),
                 });
             }
@@ -847,8 +843,7 @@ impl RestConnector {
             if is_blocked {
                 return Err(ConnectorError::InvalidConfiguration {
                     message: format!(
-                        "URL host '{}' is not allowed (internal/private address)",
-                        host
+                        "URL host '{host}' is not allowed (internal/private address)"
                     ),
                 });
             }
@@ -866,10 +861,10 @@ impl RestConnector {
 
             if blocked_hosts
                 .iter()
-                .any(|&h| host_lower == h || host_lower.ends_with(&format!(".{}", h)))
+                .any(|&h| host_lower == h || host_lower.ends_with(&format!(".{h}")))
             {
                 return Err(ConnectorError::InvalidConfiguration {
-                    message: format!("URL host '{}' is not allowed", host),
+                    message: format!("URL host '{host}' is not allowed"),
                 });
             }
         }
@@ -891,7 +886,7 @@ impl RestConnector {
         }
     }
 
-    /// Discover schema from OpenAPI specification.
+    /// Discover schema from `OpenAPI` specification.
     async fn discover_from_openapi(&self, openapi_url: &str) -> ConnectorResult<Schema> {
         // SECURITY: Validate URL to prevent SSRF attacks
         Self::validate_url_for_ssrf(openapi_url)?;
@@ -899,7 +894,7 @@ impl RestConnector {
         // Fetch OpenAPI spec
         let response = self.client.get(openapi_url).send().await.map_err(|e| {
             ConnectorError::SchemaDiscoveryFailed {
-                message: format!("Failed to fetch OpenAPI spec from {}: {}", openapi_url, e),
+                message: format!("Failed to fetch OpenAPI spec from {openapi_url}: {e}"),
             }
         })?;
 
@@ -918,7 +913,7 @@ impl RestConnector {
                 .json()
                 .await
                 .map_err(|e| ConnectorError::SchemaDiscoveryFailed {
-                    message: format!("Failed to parse OpenAPI spec: {}", e),
+                    message: format!("Failed to parse OpenAPI spec: {e}"),
                 })?;
 
         // Parse schemas from OpenAPI components
@@ -932,7 +927,7 @@ impl RestConnector {
         Ok(Schema::with_object_classes(object_classes))
     }
 
-    /// Parse OpenAPI schemas into object classes with property validations.
+    /// Parse `OpenAPI` schemas into object classes with property validations.
     fn parse_openapi_schemas(&self, spec: &Value) -> ConnectorResult<Vec<ObjectClass>> {
         let mut object_classes = Vec::new();
 
@@ -953,7 +948,7 @@ impl RestConnector {
         Ok(object_classes)
     }
 
-    /// Parse a single OpenAPI schema into an ObjectClass.
+    /// Parse a single `OpenAPI` schema into an `ObjectClass`.
     fn parse_openapi_schema(&self, name: &str, schema: &Value) -> Option<ObjectClass> {
         let properties = schema.get("properties")?.as_object()?;
         let required_props: Vec<&str> = schema
@@ -980,7 +975,7 @@ impl RestConnector {
         Some(oc)
     }
 
-    /// Parse an OpenAPI property into a SchemaAttribute with validations.
+    /// Parse an `OpenAPI` property into a `SchemaAttribute` with validations.
     fn parse_openapi_property(&self, name: &str, prop: &Value, required: bool) -> SchemaAttribute {
         // Determine data type from JSON Schema type
         let json_type = prop
@@ -1005,10 +1000,10 @@ impl RestConnector {
         // Extract validation constraints (T058 - property validations)
 
         // minLength / maxLength for strings
-        if let Some(min) = prop.get("minLength").and_then(|v| v.as_u64()) {
+        if let Some(min) = prop.get("minLength").and_then(serde_json::Value::as_u64) {
             attr = attr.with_min_length(min as usize);
         }
-        if let Some(max) = prop.get("maxLength").and_then(|v| v.as_u64()) {
+        if let Some(max) = prop.get("maxLength").and_then(serde_json::Value::as_u64) {
             attr = attr.with_max_length(max as usize);
         }
 
@@ -1036,7 +1031,7 @@ impl RestConnector {
         // readOnly
         if prop
             .get("readOnly")
-            .and_then(|r| r.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(false)
         {
             attr = attr.read_only();
@@ -1045,7 +1040,7 @@ impl RestConnector {
         // writeOnly (not readable)
         if prop
             .get("writeOnly")
-            .and_then(|w| w.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(false)
         {
             attr.readable = false;
@@ -1054,7 +1049,7 @@ impl RestConnector {
         attr
     }
 
-    /// Convert JSON Schema type to AttributeDataType.
+    /// Convert JSON Schema type to `AttributeDataType`.
     fn json_schema_type_to_attribute_type(
         &self,
         json_type: &str,
@@ -1120,7 +1115,7 @@ impl CreateOp for RestConnector {
             ))
             .and_then(|v| v.as_str())
             .or_else(|| response_body.get("id").and_then(|v| v.as_str()))
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .ok_or_else(|| ConnectorError::InvalidData {
                 message: "Response did not contain an ID".to_string(),
             })?;
@@ -1231,7 +1226,7 @@ impl SearchOp for RestConnector {
             // Acquire rate limit permit
             let _guard = self.rate_limiter.acquire(&url).await.map_err(|e| {
                 ConnectorError::TargetUnavailable {
-                    message: format!("Rate limit error: {}", e),
+                    message: format!("Rate limit error: {e}"),
                 }
             })?;
 
@@ -1297,7 +1292,7 @@ impl SearchOp for RestConnector {
                     }
 
                     return Err(ConnectorError::connection_failed_with_source(
-                        format!("Search failed after {} attempts", attempt),
+                        format!("Search failed after {attempt} attempts"),
                         e,
                     ));
                 }
@@ -1367,7 +1362,7 @@ impl RestConnector {
             }
             Filter::Contains { attribute, value } => {
                 // Some APIs support search parameter
-                vec![(format!("{}_contains", attribute), value.clone())]
+                vec![(format!("{attribute}_contains"), value.clone())]
             }
             Filter::And { filters } => filters
                 .iter()

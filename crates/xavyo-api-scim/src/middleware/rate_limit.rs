@@ -76,17 +76,19 @@ impl RateLimiter {
     ///
     /// - `requests_per_second`: Maximum sustained request rate.
     /// - `burst`: Maximum burst capacity.
+    #[must_use] 
     pub fn new(requests_per_second: u32, burst: u32) -> Self {
         Self {
             buckets: Arc::new(Mutex::new(HashMap::new())),
-            max_tokens: burst as f64,
-            refill_rate: requests_per_second as f64,
+            max_tokens: f64::from(burst),
+            refill_rate: f64::from(requests_per_second),
         }
     }
 
     /// Try to acquire a token for the given tenant.
     ///
     /// Returns `None` if allowed, or `Some(wait_time)` if rate limited.
+    #[must_use] 
     pub fn try_acquire(&self, tenant_id: Uuid) -> Option<Duration> {
         let mut buckets = self.buckets.lock().unwrap();
 
@@ -117,6 +119,7 @@ impl RateLimitLayer {
     ///
     /// - `requests_per_second`: Maximum sustained request rate per tenant.
     /// - `burst`: Maximum burst capacity per tenant.
+    #[must_use] 
     pub fn new(requests_per_second: u32, burst: u32) -> Self {
         Self {
             limiter: RateLimiter::new(requests_per_second, burst),

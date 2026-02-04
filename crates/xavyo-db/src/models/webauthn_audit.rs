@@ -1,13 +1,13 @@
-//! WebAuthn audit log model.
+//! `WebAuthn` audit log model.
 //!
-//! Stores security audit events for all WebAuthn operations.
+//! Stores security audit events for all `WebAuthn` operations.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgExecutor};
 use uuid::Uuid;
 
-/// WebAuthn audit action types.
+/// `WebAuthn` audit action types.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WebAuthnAuditAction {
@@ -47,7 +47,7 @@ impl std::fmt::Display for WebAuthnAuditAction {
             Self::CredentialRevokedByAdmin => "credential_revoked_by_admin",
             Self::CounterAnomalyDetected => "counter_anomaly_detected",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -66,12 +66,12 @@ impl std::str::FromStr for WebAuthnAuditAction {
             "credential_deleted" => Ok(Self::CredentialDeleted),
             "credential_revoked_by_admin" => Ok(Self::CredentialRevokedByAdmin),
             "counter_anomaly_detected" => Ok(Self::CounterAnomalyDetected),
-            _ => Err(format!("Invalid WebAuthn audit action: {}", s)),
+            _ => Err(format!("Invalid WebAuthn audit action: {s}")),
         }
     }
 }
 
-/// A WebAuthn audit log entry.
+/// A `WebAuthn` audit log entry.
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct WebAuthnAuditLog {
     /// Unique identifier for this log entry.
@@ -114,7 +114,7 @@ pub struct CreateWebAuthnAuditLog {
     pub metadata: Option<serde_json::Value>,
 }
 
-/// Filter for querying WebAuthn audit logs.
+/// Filter for querying `WebAuthn` audit logs.
 #[derive(Debug, Default)]
 pub struct WebAuthnAuditLogFilter {
     pub user_id: Option<Uuid>,
@@ -136,13 +136,13 @@ impl WebAuthnAuditLog {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO webauthn_audit_log (
                 user_id, tenant_id, credential_id, action, ip_address, user_agent, metadata
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(data.user_id)
         .bind(data.tenant_id)
@@ -166,12 +166,12 @@ impl WebAuthnAuditLog {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM webauthn_audit_log
             WHERE user_id = $1
             ORDER BY created_at DESC
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(limit)
@@ -190,12 +190,12 @@ impl WebAuthnAuditLog {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM webauthn_audit_log
             WHERE credential_id = $1
             ORDER BY created_at DESC
             LIMIT $2
-            "#,
+            ",
         )
         .bind(credential_id)
         .bind(limit)
@@ -213,12 +213,12 @@ impl WebAuthnAuditLog {
         E: PgExecutor<'e>,
     {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM webauthn_audit_log
             WHERE user_id = $1
                 AND action = 'authentication_failed'
                 AND created_at > NOW() - ($2 || ' minutes')::INTERVAL
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(minutes.to_string())
@@ -236,11 +236,11 @@ impl WebAuthnAuditLog {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM webauthn_audit_log
             WHERE credential_id = $1 AND action = 'counter_anomaly_detected'
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(credential_id)
         .fetch_all(executor)

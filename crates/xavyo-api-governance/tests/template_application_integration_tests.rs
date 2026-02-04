@@ -3,8 +3,7 @@
 //! Tests template application during object creation and modification.
 
 use serde_json::json;
-use std::collections::HashMap;
-use xavyo_db::models::{TemplateObjectType, TemplateRuleType, TemplateStrength};
+use xavyo_db::models::{TemplateRuleType, TemplateStrength};
 
 // =============================================================================
 // Template Application on Create Tests (User Story 2)
@@ -766,15 +765,15 @@ fn apply_rules_on_create(rules: &[TestRule], input: &serde_json::Value) -> serde
         match rule.rule_type {
             TemplateRuleType::Default => {
                 // Only set if attribute is missing (for non-strong strength)
-                if rule.strength != TemplateStrength::Strong {
+                if rule.strength == TemplateStrength::Strong {
+                    // Strong always applies
+                    let value = evaluate_expression_simple(&rule.expression, input);
+                    result[&rule.target_attribute] = value;
+                } else {
                     if result.get(&rule.target_attribute).is_none() {
                         let value = evaluate_expression_simple(&rule.expression, input);
                         result[&rule.target_attribute] = value;
                     }
-                } else {
-                    // Strong always applies
-                    let value = evaluate_expression_simple(&rule.expression, input);
-                    result[&rule.target_attribute] = value;
                 }
             }
             TemplateRuleType::Computed => {
@@ -928,7 +927,7 @@ fn apply_single_rule(
     expression.trim_matches('"').to_string()
 }
 
-fn resolve_strength_conflict(normal: &str, strong: &str) -> String {
+fn resolve_strength_conflict(_normal: &str, strong: &str) -> String {
     // Strong always wins
     strong.to_string()
 }
@@ -941,7 +940,7 @@ fn evaluate_expression_simple(expression: &str, context: &serde_json::Value) -> 
     }
 
     // Handle simple path references like ${name}
-    if expression.starts_with("${") && expression.ends_with("}") && !expression.contains(" ") {
+    if expression.starts_with("${") && expression.ends_with('}') && !expression.contains(' ') {
         let attr = &expression[2..expression.len() - 1];
         if let Some(val) = context.get(attr) {
             return val.clone();
@@ -954,7 +953,7 @@ fn evaluate_expression_simple(expression: &str, context: &serde_json::Value) -> 
         let parts: Vec<&str> = expression.split(" + ").collect();
         let mut result = String::new();
         for part in parts {
-            if part.starts_with("${") && part.ends_with("}") {
+            if part.starts_with("${") && part.ends_with('}') {
                 let attr = &part[2..part.len() - 1];
                 if let Some(val) = context.get(attr).and_then(|v| v.as_str()) {
                     result.push_str(val);
@@ -975,11 +974,10 @@ fn evaluate_expression_simple(expression: &str, context: &serde_json::Value) -> 
     if expression.starts_with("if(") {
         // Parse if(condition, true_val, false_val)
         if expression.contains("${is_manager}") {
-            if context.get("is_manager").and_then(|v| v.as_bool()) == Some(true) {
+            if context.get("is_manager").and_then(serde_json::Value::as_bool) == Some(true) {
                 return json!("elevated");
-            } else {
-                return json!("standard");
             }
+            return json!("standard");
         }
     }
 
@@ -1008,7 +1006,7 @@ fn evaluate_validation(expression: &str, context: &serde_json::Value) -> bool {
             if expression.contains("@company.com") {
                 return email.contains("@company.com");
             }
-            return email.contains("@");
+            return email.contains('@');
         }
         return false;
     }
@@ -1024,9 +1022,9 @@ fn evaluate_validation(expression: &str, context: &serde_json::Value) -> bool {
         let attr = expression
             .split("${")
             .nth(1)
-            .and_then(|s| s.split("}").next())
+            .and_then(|s| s.split('}').next())
             .unwrap_or("");
-        return context.get(attr).map(|v| !v.is_null()).unwrap_or(false);
+        return context.get(attr).is_some_and(|v| !v.is_null());
     }
 
     true
@@ -1034,7 +1032,7 @@ fn evaluate_validation(expression: &str, context: &serde_json::Value) -> bool {
 
 fn evaluate_condition(condition: &str, context: &serde_json::Value) -> bool {
     if condition.contains("is_manager") && condition.contains("false") {
-        return context.get("is_manager").and_then(|v| v.as_bool()) == Some(false);
+        return context.get("is_manager").and_then(serde_json::Value::as_bool) == Some(false);
     }
     true
 }

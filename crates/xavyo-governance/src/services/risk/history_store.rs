@@ -17,7 +17,7 @@ pub trait RiskHistoryStore: Send + Sync {
 
     /// Get risk trend for a user since a given date.
     ///
-    /// Returns entries ordered by recorded_at ascending.
+    /// Returns entries ordered by `recorded_at` ascending.
     async fn get_trend(
         &self,
         tenant_id: Uuid,
@@ -33,7 +33,7 @@ pub trait RiskHistoryStore: Send + Sync {
     ) -> Result<Option<RiskHistory>, GovernanceError>;
 }
 
-/// In-memory implementation of RiskHistoryStore for testing.
+/// In-memory implementation of `RiskHistoryStore` for testing.
 #[derive(Debug, Default)]
 pub struct InMemoryRiskHistoryStore {
     // Key: (tenant_id, user_id), Value: list of history entries
@@ -42,6 +42,7 @@ pub struct InMemoryRiskHistoryStore {
 
 impl InMemoryRiskHistoryStore {
     /// Create a new in-memory history store.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             history: RwLock::new(HashMap::new()),
@@ -70,7 +71,7 @@ impl InMemoryRiskHistoryStore {
             .read()
             .expect("lock poisoned")
             .values()
-            .map(|v| v.len())
+            .map(std::vec::Vec::len)
             .sum()
     }
 }

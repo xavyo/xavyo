@@ -158,19 +158,19 @@ impl UserService {
 
         // Fetch roles for all users in a single query to avoid N+1
         let user_ids: Vec<uuid::Uuid> = users.iter().map(|u| u.id).collect();
-        let all_roles: Vec<(uuid::Uuid, String)> = if !user_ids.is_empty() {
+        let all_roles: Vec<(uuid::Uuid, String)> = if user_ids.is_empty() {
+            Vec::new()
+        } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT user_id, role_name FROM user_roles
                 WHERE user_id = ANY($1)
                 ORDER BY user_id, role_name
-                "#,
+                ",
             )
             .bind(&user_ids)
             .fetch_all(&self.pool)
             .await?
-        } else {
-            Vec::new()
         };
 
         // Group roles by user_id
@@ -183,20 +183,20 @@ impl UserService {
         // Fetch lifecycle states for users that have them (F052)
         let lifecycle_state_ids: Vec<uuid::Uuid> =
             users.iter().filter_map(|u| u.lifecycle_state_id).collect();
-        let lifecycle_states: Vec<(uuid::Uuid, String, bool)> = if !lifecycle_state_ids.is_empty() {
+        let lifecycle_states: Vec<(uuid::Uuid, String, bool)> = if lifecycle_state_ids.is_empty() {
+            Vec::new()
+        } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT id, name, is_terminal
                 FROM gov_lifecycle_states
                 WHERE id = ANY($1)
-                "#,
+                ",
             )
             .bind(&lifecycle_state_ids)
             .fetch_all(&self.pool)
             .await
             .unwrap_or_default()
-        } else {
-            Vec::new()
         };
 
         // Build lifecycle state map
@@ -305,14 +305,14 @@ impl UserService {
         for (i, role) in request.roles.iter().enumerate() {
             if role.is_empty() {
                 validation_errors.push(FieldValidationError {
-                    field: format!("roles[{}]", i),
+                    field: format!("roles[{i}]"),
                     code: "empty".to_string(),
                     message: "Role name cannot be empty".to_string(),
                     constraints: None,
                 });
             } else if role.len() > 50 {
                 validation_errors.push(FieldValidationError {
-                    field: format!("roles[{}]", i),
+                    field: format!("roles[{i}]"),
                     code: "too_long".to_string(),
                     message: "Role name must not exceed 50 characters".to_string(),
                     constraints: Some(serde_json::json!({"max_length": 50, "actual": role.len()})),
@@ -358,10 +358,10 @@ impl UserService {
         let now = chrono::Utc::now();
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO users (id, tenant_id, email, password_hash, is_active, email_verified, created_at, updated_at)
             VALUES ($1, $2, $3, $4, true, false, $5, $5)
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id.as_uuid())
@@ -374,11 +374,11 @@ impl UserService {
         // Insert roles
         for role in &request.roles {
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO user_roles (user_id, role_name, created_at)
                 VALUES ($1, $2, $3)
                 ON CONFLICT (user_id, role_name) DO NOTHING
-                "#,
+                ",
             )
             .bind(user_id)
             .bind(role)
@@ -431,11 +431,11 @@ impl UserService {
         user_id: UserId,
     ) -> Result<UserResponse, ApiUsersError> {
         let user: Option<User> = sqlx::query_as(
-            r#"
+            r"
             SELECT *
             FROM users
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id.as_uuid())
         .bind(tenant_id.as_uuid())
@@ -446,11 +446,11 @@ impl UserService {
 
         // Fetch roles
         let roles: Vec<String> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT role_name FROM user_roles
             WHERE user_id = $1
             ORDER BY role_name
-            "#,
+            ",
         )
         .bind(user.id)
         .fetch_all(&self.pool)
@@ -459,11 +459,11 @@ impl UserService {
         // Fetch lifecycle state if present (F052)
         let lifecycle_state = if let Some(state_id) = user.lifecycle_state_id {
             let state: Option<(uuid::Uuid, String, bool)> = sqlx::query_as(
-                r#"
+                r"
                 SELECT id, name, is_terminal
                 FROM gov_lifecycle_states
                 WHERE id = $1
-                "#,
+                ",
             )
             .bind(state_id)
             .fetch_optional(&self.pool)
@@ -514,11 +514,11 @@ impl UserService {
     ) -> Result<UserResponse, ApiUsersError> {
         // Check user exists in tenant
         let user: Option<User> = sqlx::query_as(
-            r#"
+            r"
             SELECT *
             FROM users
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id.as_uuid())
         .bind(tenant_id.as_uuid())
@@ -569,14 +569,14 @@ impl UserService {
             for (i, role) in new_roles.iter().enumerate() {
                 if role.is_empty() {
                     validation_errors.push(FieldValidationError {
-                        field: format!("roles[{}]", i),
+                        field: format!("roles[{i}]"),
                         code: "empty".to_string(),
                         message: "Role name cannot be empty".to_string(),
                         constraints: None,
                     });
                 } else if role.len() > 50 {
                     validation_errors.push(FieldValidationError {
-                        field: format!("roles[{}]", i),
+                        field: format!("roles[{i}]"),
                         code: "too_long".to_string(),
                         message: "Role name must not exceed 50 characters".to_string(),
                         constraints: Some(
@@ -654,10 +654,10 @@ impl UserService {
 
             for role in new_roles {
                 sqlx::query(
-                    r#"
+                    r"
                     INSERT INTO user_roles (user_id, role_name, created_at)
                     VALUES ($1, $2, $3)
-                    "#,
+                    ",
                 )
                 .bind(user_id.as_uuid())
                 .bind(role)
@@ -694,11 +694,11 @@ impl UserService {
         // Fetch lifecycle state if present (F052)
         let lifecycle_state = if let Some(state_id) = user.lifecycle_state_id {
             let state: Option<(uuid::Uuid, String, bool)> = sqlx::query_as(
-                r#"
+                r"
                 SELECT id, name, is_terminal
                 FROM gov_lifecycle_states
                 WHERE id = $1
-                "#,
+                ",
             )
             .bind(state_id)
             .fetch_optional(&self.pool)
@@ -743,10 +743,10 @@ impl UserService {
         user_id: UserId,
     ) -> Result<(), ApiUsersError> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE users SET is_active = false, updated_at = $1
             WHERE id = $2 AND tenant_id = $3
-            "#,
+            ",
         )
         .bind(chrono::Utc::now())
         .bind(user_id.as_uuid())
@@ -851,9 +851,10 @@ fn build_custom_attr_filter_clauses(filters: &[CustomAttributeFilter]) -> Vec<Fi
         .collect()
 }
 
-/// Convert a User entity and roles to a UserResponse.
+/// Convert a User entity and roles to a `UserResponse`.
 ///
 /// This is a helper function to build API responses from database entities.
+#[must_use] 
 pub fn user_to_response(
     user: &User,
     roles: Vec<String>,

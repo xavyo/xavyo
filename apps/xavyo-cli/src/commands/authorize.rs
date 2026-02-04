@@ -74,8 +74,7 @@ pub async fn execute(args: AuthorizeArgs) -> CliResult<()> {
 fn parse_agent_id(id_str: &str) -> CliResult<Uuid> {
     Uuid::parse_str(id_str).map_err(|_| {
         CliError::Validation(format!(
-            "Invalid agent ID '{}'. Must be a valid UUID.",
-            id_str
+            "Invalid agent ID '{id_str}'. Must be a valid UUID."
         ))
     })
 }
@@ -83,13 +82,13 @@ fn parse_agent_id(id_str: &str) -> CliResult<Uuid> {
 /// Parse JSON string
 fn parse_json(json_str: &str, flag_name: &str) -> CliResult<serde_json::Value> {
     serde_json::from_str(json_str)
-        .map_err(|e| CliError::Validation(format!("Invalid JSON in {}: {}", flag_name, e)))
+        .map_err(|e| CliError::Validation(format!("Invalid JSON in {flag_name}: {e}")))
 }
 
 /// Parse authorization context from JSON string
 fn parse_context(json_str: &str) -> CliResult<AuthorizationContext> {
     serde_json::from_str(json_str)
-        .map_err(|e| CliError::Validation(format!("Invalid JSON in --context: {}", e)))
+        .map_err(|e| CliError::Validation(format!("Invalid JSON in --context: {e}")))
 }
 
 /// Print authorization result in human-readable format
@@ -97,8 +96,8 @@ fn print_authorization_result(agent: &str, tool: &str, response: &AuthorizeRespo
     println!();
     println!("Authorization Decision");
     println!("{}", "━".repeat(45));
-    println!("Agent:       {}", agent);
-    println!("Tool:        {}", tool);
+    println!("Agent:       {agent}");
+    println!("Tool:        {tool}");
 
     // Decision with indicator
     let (indicator, decision_display) = match response.decision.as_str() {
@@ -107,14 +106,14 @@ fn print_authorization_result(agent: &str, tool: &str, response: &AuthorizeRespo
         "require_approval" => ("⏳", "REQUIRE_APPROVAL"),
         _ => ("?", response.decision.as_str()),
     };
-    println!("Decision:    {} {}", indicator, decision_display);
+    println!("Decision:    {indicator} {decision_display}");
 
     println!("Reason:      {}", response.reason);
     println!("Decision ID: {}", response.decision_id);
 
     // Show approval request ID if present
     if let Some(approval_id) = response.approval_request_id {
-        println!("Approval ID: {}", approval_id);
+        println!("Approval ID: {approval_id}");
     }
 
     println!("Latency:     {:.1}ms", response.latency_ms);

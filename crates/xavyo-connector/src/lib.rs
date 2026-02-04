@@ -8,7 +8,7 @@
 //!
 //! ## Architecture
 //!
-//! The framework uses a capability-based trait system inspired by ConnId:
+//! The framework uses a capability-based trait system inspired by `ConnId`:
 //!
 //! - [`Connector`] - Base trait all connectors implement
 //! - [`SchemaDiscovery`] - Discover target system schema
@@ -54,12 +54,12 @@
 //!
 //! ## Crate Organization
 //!
-//! - [`ids`] - Type-safe identifiers (ConnectorId, OperationId, etc.)
+//! - [`ids`] - Type-safe identifiers (`ConnectorId`, `OperationId`, etc.)
 //! - [`types`] - Enums and status types
 //! - [`error`] - Error types with transient/permanent classification
 //! - [`traits`] - Connector capability traits
-//! - [`schema`] - Schema types (ObjectClass, SchemaAttribute)
-//! - [`operation`] - Operation types (Uid, AttributeSet, Filter)
+//! - [`schema`] - Schema types (`ObjectClass`, `SchemaAttribute`)
+//! - [`operation`] - Operation types (Uid, `AttributeSet`, Filter)
 //! - [`config`] - Configuration types and traits
 //! - [`crypto`] - Credential encryption
 //! - [`registry`] - Connector factory and instance management

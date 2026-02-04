@@ -128,7 +128,7 @@ pub async fn upload_asset(
     while let Some(field) = multipart
         .next_field()
         .await
-        .map_err(|e| ApiAuthError::Validation(format!("Failed to parse multipart: {}", e)))?
+        .map_err(|e| ApiAuthError::Validation(format!("Failed to parse multipart: {e}")))?
     {
         let name = field.name().unwrap_or_default().to_string();
 
@@ -137,23 +137,22 @@ pub async fn upload_asset(
                 let text = field
                     .text()
                     .await
-                    .map_err(|e| ApiAuthError::Validation(format!("Invalid asset_type: {}", e)))?;
+                    .map_err(|e| ApiAuthError::Validation(format!("Invalid asset_type: {e}")))?;
                 total_size += text.len();
                 asset_type_str = Some(text);
             }
             "file" => {
-                filename = field.file_name().map(|s| s.to_string());
+                filename = field.file_name().map(std::string::ToString::to_string);
                 let bytes = field
                     .bytes()
                     .await
-                    .map_err(|e| ApiAuthError::Validation(format!("Failed to read file: {}", e)))?;
+                    .map_err(|e| ApiAuthError::Validation(format!("Failed to read file: {e}")))?;
                 total_size += bytes.len();
 
                 // Check total size limit
                 if total_size > MAX_MULTIPART_SIZE {
                     return Err(ApiAuthError::FileTooLarge(format!(
-                        "Total upload size exceeds {} bytes",
-                        MAX_MULTIPART_SIZE
+                        "Total upload size exceeds {MAX_MULTIPART_SIZE} bytes"
                     )));
                 }
 
@@ -167,8 +166,7 @@ pub async fn upload_asset(
         // Early check on total size
         if total_size > MAX_MULTIPART_SIZE {
             return Err(ApiAuthError::FileTooLarge(format!(
-                "Total upload size exceeds {} bytes",
-                MAX_MULTIPART_SIZE
+                "Total upload size exceeds {MAX_MULTIPART_SIZE} bytes"
             )));
         }
     }

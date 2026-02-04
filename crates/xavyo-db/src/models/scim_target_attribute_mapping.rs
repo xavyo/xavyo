@@ -29,7 +29,7 @@ pub struct ScimTargetAttributeMapping {
     /// Mapping type: "direct", "constant", or "expression".
     pub mapping_type: String,
 
-    /// Constant value when mapping_type is "constant".
+    /// Constant value when `mapping_type` is "constant".
     pub constant_value: Option<String>,
 
     /// Optional transform to apply (e.g., "lowercase", "uppercase").
@@ -68,11 +68,11 @@ impl ScimTargetAttributeMapping {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if let Some(rt) = resource_type {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM scim_target_attribute_mappings
                 WHERE tenant_id = $1 AND target_id = $2 AND resource_type = $3
                 ORDER BY created_at
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(target_id)
@@ -81,11 +81,11 @@ impl ScimTargetAttributeMapping {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM scim_target_attribute_mappings
                 WHERE tenant_id = $1 AND target_id = $2
                 ORDER BY created_at
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(target_id)
@@ -106,10 +106,10 @@ impl ScimTargetAttributeMapping {
         let mut tx = pool.begin().await?;
 
         sqlx::query(
-            r#"
+            r"
             DELETE FROM scim_target_attribute_mappings
             WHERE tenant_id = $1 AND target_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(target_id)
@@ -120,14 +120,14 @@ impl ScimTargetAttributeMapping {
 
         for m in mappings {
             let row: ScimTargetAttributeMapping = sqlx::query_as(
-                r#"
+                r"
                 INSERT INTO scim_target_attribute_mappings (
                     tenant_id, target_id, source_field, target_scim_path,
                     mapping_type, constant_value, transform, resource_type
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 RETURNING *
-                "#,
+                ",
             )
             .bind(m.tenant_id)
             .bind(m.target_id)
@@ -155,10 +155,10 @@ impl ScimTargetAttributeMapping {
         target_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM scim_target_attribute_mappings
             WHERE tenant_id = $1 AND target_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(target_id)
@@ -180,10 +180,10 @@ impl ScimTargetAttributeMapping {
         let mut tx = pool.begin().await?;
 
         sqlx::query(
-            r#"
+            r"
             DELETE FROM scim_target_attribute_mappings
             WHERE tenant_id = $1 AND target_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(target_id)
@@ -205,14 +205,14 @@ impl ScimTargetAttributeMapping {
 
         for (source, target) in &default_user_mappings {
             let row: ScimTargetAttributeMapping = sqlx::query_as(
-                r#"
+                r"
                 INSERT INTO scim_target_attribute_mappings (
                     tenant_id, target_id, source_field, target_scim_path,
                     mapping_type, resource_type
                 )
                 VALUES ($1, $2, $3, $4, 'direct', 'user')
                 RETURNING *
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(target_id)
@@ -226,14 +226,14 @@ impl ScimTargetAttributeMapping {
 
         for (source, target) in &default_group_mappings {
             let row: ScimTargetAttributeMapping = sqlx::query_as(
-                r#"
+                r"
                 INSERT INTO scim_target_attribute_mappings (
                     tenant_id, target_id, source_field, target_scim_path,
                     mapping_type, resource_type
                 )
                 VALUES ($1, $2, $3, $4, 'direct', 'group')
                 RETURNING *
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(target_id)
@@ -281,14 +281,14 @@ impl ScimTargetAttributeMapping {
 
         for (source, target) in &default_user_mappings {
             let row: ScimTargetAttributeMapping = sqlx::query_as(
-                r#"
+                r"
                 INSERT INTO scim_target_attribute_mappings (
                     tenant_id, target_id, source_field, target_scim_path,
                     mapping_type, resource_type
                 )
                 VALUES ($1, $2, $3, $4, 'direct', 'user')
                 RETURNING *
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(target_id)
@@ -302,14 +302,14 @@ impl ScimTargetAttributeMapping {
 
         for (source, target) in &default_group_mappings {
             let row: ScimTargetAttributeMapping = sqlx::query_as(
-                r#"
+                r"
                 INSERT INTO scim_target_attribute_mappings (
                     tenant_id, target_id, source_field, target_scim_path,
                     mapping_type, resource_type
                 )
                 VALUES ($1, $2, $3, $4, 'direct', 'group')
                 RETURNING *
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(target_id)
@@ -350,14 +350,14 @@ impl ScimTargetAttributeMapping {
 
         for (source, target) in &default_user_mappings {
             let row: ScimTargetAttributeMapping = sqlx::query_as(
-                r#"
+                r"
                 INSERT INTO scim_target_attribute_mappings (
                     tenant_id, target_id, source_field, target_scim_path,
                     mapping_type, resource_type
                 )
                 VALUES ($1, $2, $3, $4, 'direct', 'user')
                 RETURNING *
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(target_id)
@@ -371,14 +371,14 @@ impl ScimTargetAttributeMapping {
 
         for (source, target) in &default_group_mappings {
             let row: ScimTargetAttributeMapping = sqlx::query_as(
-                r#"
+                r"
                 INSERT INTO scim_target_attribute_mappings (
                     tenant_id, target_id, source_field, target_scim_path,
                     mapping_type, resource_type
                 )
                 VALUES ($1, $2, $3, $4, 'direct', 'group')
                 RETURNING *
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(target_id)

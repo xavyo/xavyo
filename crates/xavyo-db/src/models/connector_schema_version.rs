@@ -23,6 +23,7 @@ pub enum TriggeredBy {
 
 impl TriggeredBy {
     /// Get the string representation.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             TriggeredBy::Manual => "manual",
@@ -32,6 +33,7 @@ impl TriggeredBy {
     }
 
     /// Parse from string.
+    #[must_use] 
     pub fn parse_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "manual" => Some(TriggeredBy::Manual),
@@ -132,12 +134,12 @@ impl ConnectorSchemaVersion {
         connector_id: Uuid,
     ) -> Result<Option<i32>, sqlx::Error> {
         let result: Option<(i32,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT version FROM connector_schema_versions
             WHERE connector_id = $1 AND tenant_id = $2
             ORDER BY version DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -152,7 +154,7 @@ impl ConnectorSchemaVersion {
         pool: &sqlx::PgPool,
         connector_id: Uuid,
     ) -> Result<i32, sqlx::Error> {
-        let result: (i32,) = sqlx::query_as(r#"SELECT get_next_schema_version($1)"#)
+        let result: (i32,) = sqlx::query_as(r"SELECT get_next_schema_version($1)")
             .bind(connector_id)
             .fetch_one(pool)
             .await?;
@@ -168,7 +170,7 @@ impl ConnectorSchemaVersion {
         input: &CreateSchemaVersion,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO connector_schema_versions (
                 tenant_id, connector_id, version, schema_data,
                 object_class_count, attribute_count, discovered_at,
@@ -180,7 +182,7 @@ impl ConnectorSchemaVersion {
                 $6, $7, $8
             )
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -202,10 +204,10 @@ impl ConnectorSchemaVersion {
         version: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM connector_schema_versions
             WHERE connector_id = $1 AND tenant_id = $2 AND version = $3
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -221,12 +223,12 @@ impl ConnectorSchemaVersion {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM connector_schema_versions
             WHERE connector_id = $1 AND tenant_id = $2
             ORDER BY version DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -243,12 +245,12 @@ impl ConnectorSchemaVersion {
         offset: i32,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM connector_schema_versions
             WHERE connector_id = $1 AND tenant_id = $2
             ORDER BY version DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -265,10 +267,10 @@ impl ConnectorSchemaVersion {
         connector_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM connector_schema_versions
             WHERE connector_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -284,7 +286,7 @@ impl ConnectorSchemaVersion {
         connector_id: Uuid,
         keep_count: i32,
     ) -> Result<u64, sqlx::Error> {
-        let result: (i32,) = sqlx::query_as(r#"SELECT cleanup_old_schema_versions($1, $2)"#)
+        let result: (i32,) = sqlx::query_as(r"SELECT cleanup_old_schema_versions($1, $2)")
             .bind(connector_id)
             .bind(keep_count)
             .fetch_one(pool)
@@ -300,10 +302,10 @@ impl ConnectorSchemaVersion {
         connector_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM connector_schema_versions
             WHERE connector_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(connector_id)
         .bind(tenant_id)
@@ -314,6 +316,7 @@ impl ConnectorSchemaVersion {
     }
 
     /// Convert to summary.
+    #[must_use] 
     pub fn to_summary(&self) -> SchemaVersionSummary {
         SchemaVersionSummary {
             version: self.version,

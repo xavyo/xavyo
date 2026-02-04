@@ -1,4 +1,4 @@
-//! SoD rule handlers for governance API.
+//! `SoD` rule handlers for governance API.
 
 use axum::{
     extract::{Path, Query, State},
@@ -19,7 +19,7 @@ use crate::models::{
 use crate::router::GovernanceState;
 use crate::services::SodEnforcementService;
 
-/// List SoD rules with optional filtering and pagination.
+/// List `SoD` rules with optional filtering and pagination.
 #[utoipa::path(
     get,
     path = "/governance/sod-rules",
@@ -65,7 +65,7 @@ pub async fn list_sod_rules(
     }))
 }
 
-/// Get an SoD rule by ID.
+/// Get an `SoD` rule by ID.
 #[utoipa::path(
     get,
     path = "/governance/sod-rules/{id}",
@@ -96,7 +96,7 @@ pub async fn get_sod_rule(
     Ok(Json(rule.into()))
 }
 
-/// Create a new SoD rule.
+/// Create a new `SoD` rule.
 #[utoipa::path(
     post,
     path = "/governance/sod-rules",
@@ -140,7 +140,7 @@ pub async fn create_sod_rule(
     Ok((StatusCode::CREATED, Json(rule.into())))
 }
 
-/// Update an SoD rule.
+/// Update an `SoD` rule.
 #[utoipa::path(
     put,
     path = "/governance/sod-rules/{id}",
@@ -187,7 +187,7 @@ pub async fn update_sod_rule(
     Ok(Json(rule.into()))
 }
 
-/// Delete an SoD rule.
+/// Delete an `SoD` rule.
 #[utoipa::path(
     delete,
     path = "/governance/sod-rules/{id}",
@@ -218,7 +218,7 @@ pub async fn delete_sod_rule(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Enable an SoD rule.
+/// Enable an `SoD` rule.
 #[utoipa::path(
     post,
     path = "/governance/sod-rules/{id}/enable",
@@ -249,7 +249,7 @@ pub async fn enable_sod_rule(
     Ok(Json(rule.into()))
 }
 
-/// Disable an SoD rule.
+/// Disable an `SoD` rule.
 #[utoipa::path(
     post,
     path = "/governance/sod-rules/{id}/disable",
@@ -280,7 +280,7 @@ pub async fn disable_sod_rule(
     Ok(Json(rule.into()))
 }
 
-/// Check if an assignment would create SoD violations.
+/// Check if an assignment would create `SoD` violations.
 ///
 /// This is a pre-flight check endpoint that allows clients to validate
 /// an assignment before attempting it. Useful for UI feedback.

@@ -33,6 +33,7 @@ impl EnabledMethods {
     }
 
     /// Parse from database string representation.
+    #[must_use] 
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "disabled" => Some(Self::Disabled),
@@ -63,7 +64,7 @@ pub struct PasswordlessPolicy {
     pub id: Uuid,
     /// The tenant this policy belongs to.
     pub tenant_id: Uuid,
-    /// Which methods are enabled: 'disabled', 'magic_link_only', 'otp_only', 'all_methods'.
+    /// Which methods are enabled: 'disabled', '`magic_link_only`', '`otp_only`', '`all_methods`'.
     pub enabled_methods: String,
     /// Magic link expiry in minutes.
     pub magic_link_expiry_minutes: i32,
@@ -121,13 +122,13 @@ impl PasswordlessPolicy {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         let policy = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, enabled_methods, magic_link_expiry_minutes,
                    otp_expiry_minutes, otp_max_attempts, require_mfa_after_passwordless,
                    created_at, updated_at
             FROM passwordless_policies
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(pool)
@@ -155,7 +156,7 @@ impl PasswordlessPolicy {
         require_mfa_after_passwordless: bool,
     ) -> Result<Self, sqlx::Error> {
         let policy = sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO passwordless_policies
                 (tenant_id, enabled_methods, magic_link_expiry_minutes,
                  otp_expiry_minutes, otp_max_attempts, require_mfa_after_passwordless)
@@ -170,7 +171,7 @@ impl PasswordlessPolicy {
             RETURNING id, tenant_id, enabled_methods, magic_link_expiry_minutes,
                       otp_expiry_minutes, otp_max_attempts, require_mfa_after_passwordless,
                       created_at, updated_at
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(enabled_methods)

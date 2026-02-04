@@ -1,7 +1,7 @@
 //! In-memory caches for authorization policies and entitlement action mappings.
 //!
 //! Uses moka for TTL-based caching to avoid hitting the database on every
-//! authorization check. Caches are keyed by tenant_id and automatically
+//! authorization check. Caches are keyed by `tenant_id` and automatically
 //! expire after 60 seconds.
 
 use std::sync::Arc;
@@ -22,7 +22,7 @@ use xavyo_db::models::policy_condition::PolicyConditionRecord;
 
 /// Cache of active policies (with conditions) per tenant.
 ///
-/// Key: tenant_id (Uuid)
+/// Key: `tenant_id` (Uuid)
 /// Value: Vec<PolicyWithConditions> (sorted: deny-first, then by priority)
 /// TTL: 60 seconds
 /// Max entries: 1000
@@ -32,6 +32,7 @@ pub struct PolicyCache {
 
 impl PolicyCache {
     /// Create a new policy cache.
+    #[must_use] 
     pub fn new() -> Self {
         let cache = Cache::builder()
             .max_capacity(1000)
@@ -124,7 +125,7 @@ impl Default for PolicyCache {
 
 /// Cache of entitlement-to-action mappings per tenant.
 ///
-/// Key: tenant_id (Uuid)
+/// Key: `tenant_id` (Uuid)
 /// Value: Vec<EntitlementActionMapping>
 /// TTL: 60 seconds
 /// Max entries: 1000
@@ -134,6 +135,7 @@ pub struct MappingCache {
 
 impl MappingCache {
     /// Create a new mapping cache.
+    #[must_use] 
     pub fn new() -> Self {
         let cache = Cache::builder()
             .max_capacity(1000)

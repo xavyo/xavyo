@@ -35,7 +35,7 @@ impl std::str::FromStr for LogStatus {
         match s.to_lowercase().as_str() {
             "success" => Ok(LogStatus::Success),
             "failure" => Ok(LogStatus::Failure),
-            _ => Err(format!("Unknown log status: {}", s)),
+            _ => Err(format!("Unknown log status: {s}")),
         }
     }
 }
@@ -117,10 +117,10 @@ impl OperationLog {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM operation_logs
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -135,11 +135,11 @@ impl OperationLog {
         operation_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM operation_logs
             WHERE operation_id = $1 AND tenant_id = $2
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(operation_id)
         .bind(tenant_id)
@@ -156,36 +156,36 @@ impl OperationLog {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM operation_logs
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.operation_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND operation_id = ${}", param_count));
+            query.push_str(&format!(" AND operation_id = ${param_count}"));
         }
         if filter.connector_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND connector_id = ${}", param_count));
+            query.push_str(&format!(" AND connector_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -225,7 +225,7 @@ impl OperationLog {
         input: &CreateOperationLog,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO operation_logs (
                 tenant_id, operation_id, connector_id, user_id, operation_type,
                 target_uid, status, duration_ms, request_payload,
@@ -233,7 +233,7 @@ impl OperationLog {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.operation_id)
@@ -258,11 +258,11 @@ impl OperationLog {
         status: LogStatus,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM operation_logs
             WHERE tenant_id = $1 AND connector_id = $2 AND status = $3
                 AND created_at >= NOW() - INTERVAL '24 hours'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -278,12 +278,12 @@ impl OperationLog {
         connector_id: Uuid,
     ) -> Result<Option<f64>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT AVG(duration_ms)::float8 FROM operation_logs
             WHERE tenant_id = $1 AND connector_id = $2
                 AND duration_ms IS NOT NULL
                 AND created_at >= NOW() - INTERVAL '24 hours'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -294,10 +294,10 @@ impl OperationLog {
     /// Delete old log entries (retention policy).
     pub async fn delete_older_than(pool: &sqlx::PgPool, days: i32) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM operation_logs
             WHERE created_at < NOW() - ($1 || ' days')::interval
-            "#,
+            ",
         )
         .bind(days.to_string())
         .execute(pool)
@@ -307,6 +307,7 @@ impl OperationLog {
     }
 
     /// Check if operation was successful.
+    #[must_use] 
     pub fn is_success(&self) -> bool {
         matches!(self.status, LogStatus::Success)
     }

@@ -62,7 +62,7 @@ pub struct ReclamationExecutionResult {
 /// The system actor UUID used for automated reclamation (all zeros).
 ///
 /// When reclamation is triggered automatically (e.g., by a lifecycle event),
-/// this nil UUID is used as the actor_id in audit logs to distinguish
+/// this nil UUID is used as the `actor_id` in audit logs to distinguish
 /// system-initiated actions from human-initiated ones.
 pub(crate) fn system_actor_id() -> Uuid {
     Uuid::nil()
@@ -200,7 +200,7 @@ pub(crate) fn build_lifecycle_candidates(
         .collect()
 }
 
-/// Placeholder: cancel_if_active always returns false in the current
+/// Placeholder: `cancel_if_active` always returns false in the current
 /// implementation since reclamation is immediate (no grace period).
 pub(crate) fn cancel_if_active_placeholder() -> bool {
     false
@@ -218,6 +218,7 @@ pub struct LicenseReclamationService {
 
 impl LicenseReclamationService {
     /// Create a new license reclamation service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: LicenseAuditService::new(pool.clone()),
@@ -569,7 +570,7 @@ impl LicenseReclamationService {
     /// Execute reclamation for a list of candidates.
     ///
     /// For each candidate:
-    /// 1. Reclaims the assignment using GovLicenseAssignment::reclaim
+    /// 1. Reclaims the assignment using `GovLicenseAssignment::reclaim`
     /// 2. Decrements the pool's allocated count
     /// 3. Logs an audit event
     ///
@@ -646,7 +647,7 @@ impl LicenseReclamationService {
     /// # Arguments
     /// * `tenant_id` - The tenant ID
     /// * `user_id` - The user whose lifecycle state changed
-    /// * `event_type` - The lifecycle state (e.g., "terminated", "on_leave")
+    /// * `event_type` - The lifecycle state (e.g., "terminated", "`on_leave`")
     ///
     /// # Returns
     /// The number of licenses reclaimed.
@@ -681,9 +682,7 @@ impl LicenseReclamationService {
                 // Get pool name for audit
                 let pool_name =
                     GovLicensePool::find_by_id(&self.pool, tenant_id, rule.license_pool_id)
-                        .await?
-                        .map(|p| p.name)
-                        .unwrap_or_else(|| "Unknown Pool".to_string());
+                        .await?.map_or_else(|| "Unknown Pool".to_string(), |p| p.name);
 
                 rule_assignment_pairs.push((
                     rule.id,
@@ -711,23 +710,25 @@ impl LicenseReclamationService {
     /// Cancel a pending reclamation if user becomes active again.
     ///
     /// In a full implementation, this would be invoked when a user logs in
-    /// or their lifecycle state reverts (e.g., from "on_leave" back to "active"),
+    /// or their lifecycle state reverts (e.g., from "`on_leave`" back to "active"),
     /// cancelling any scheduled reclamation.
     ///
     /// Since reclamation in this implementation is immediate rather than
     /// scheduled, this method serves as a placeholder for future grace-period
-    /// based reclamation where assignments might be marked as "pending_reclamation"
+    /// based reclamation where assignments might be marked as "`pending_reclamation`"
     /// before being fully reclaimed.
     pub async fn cancel_if_active(&self, _tenant_id: Uuid, _user_id: Uuid) -> Result<bool> {
         Ok(cancel_if_active_placeholder())
     }
 
     /// Get the underlying database pool reference.
+    #[must_use] 
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get the audit service reference.
+    #[must_use] 
     pub fn audit_service(&self) -> &LicenseAuditService {
         &self.audit_service
     }

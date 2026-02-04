@@ -23,11 +23,13 @@ pub const CSV_HEADERS: &[&str] = &[
 pub struct CsvFormatter;
 
 impl CsvFormatter {
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
 
     /// Generate the CSV header row.
+    #[must_use] 
     pub fn header_row() -> String {
         CSV_HEADERS.join(",")
     }

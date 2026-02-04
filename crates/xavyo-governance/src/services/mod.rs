@@ -1,7 +1,7 @@
 //! Service layer for identity governance.
 //!
 //! This module provides business logic services for managing entitlements,
-//! assignments, validation rules, Separation of Duties (SoD), and risk assessment.
+//! assignments, validation rules, Separation of Duties (`SoD`), and risk assessment.
 
 pub mod assignment;
 pub mod entitlement;

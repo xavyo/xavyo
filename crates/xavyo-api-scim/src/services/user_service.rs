@@ -88,7 +88,7 @@ impl UserService {
         let custom_attrs = serde_json::Value::Object(data.custom_attributes.clone());
 
         let user: User = sqlx::query_as(
-            r#"
+            r"
             INSERT INTO users (
                 tenant_id, email, password_hash, display_name, is_active,
                 email_verified, external_id, first_name, last_name,
@@ -96,7 +96,7 @@ impl UserService {
             )
             VALUES ($1, $2, '', $3, $4, true, $5, $6, $7, true, NOW(), $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&data.email)
@@ -123,17 +123,17 @@ impl UserService {
     /// Find a user by ID, returning error if not found.
     async fn find_user(&self, tenant_id: Uuid, user_id: Uuid) -> ScimResult<User> {
         let user: Option<User> = sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM users
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await?;
 
-        user.ok_or_else(|| ScimError::NotFound(format!("User {} not found", user_id)))
+        user.ok_or_else(|| ScimError::NotFound(format!("User {user_id} not found")))
     }
 
     /// List users with optional filtering and pagination.
@@ -171,7 +171,7 @@ impl UserService {
             Some("descending") => "DESC",
             _ => "ASC",
         };
-        base_query.push_str(&format!(" ORDER BY {} {}", sort_column, sort_order));
+        base_query.push_str(&format!(" ORDER BY {sort_column} {sort_order}"));
 
         // Apply pagination
         let param_offset = params.len() + 2;
@@ -267,7 +267,7 @@ impl UserService {
 
         // Update user
         let user: User = sqlx::query_as(
-            r#"
+            r"
             UPDATE users SET
                 email = $3,
                 display_name = $4,
@@ -280,7 +280,7 @@ impl UserService {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -318,7 +318,7 @@ impl UserService {
 
         // Update in database (includes custom_attributes for enterprise extension patches — F081)
         let updated: User = sqlx::query_as(
-            r#"
+            r"
             UPDATE users SET
                 email = $3,
                 display_name = $4,
@@ -331,7 +331,7 @@ impl UserService {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -363,19 +363,19 @@ impl UserService {
 
                 match path {
                     "displayName" | "displayname" => {
-                        user.display_name = value.as_str().map(|s| s.to_string());
+                        user.display_name = value.as_str().map(std::string::ToString::to_string);
                     }
                     "active" => {
                         user.is_active = value.as_bool().unwrap_or(true);
                     }
                     "externalId" | "externalid" => {
-                        user.external_id = value.as_str().map(|s| s.to_string());
+                        user.external_id = value.as_str().map(std::string::ToString::to_string);
                     }
                     "name.givenName" | "name.givenname" => {
-                        user.first_name = value.as_str().map(|s| s.to_string());
+                        user.first_name = value.as_str().map(std::string::ToString::to_string);
                     }
                     "name.familyName" | "name.familyname" => {
-                        user.last_name = value.as_str().map(|s| s.to_string());
+                        user.last_name = value.as_str().map(std::string::ToString::to_string);
                     }
                     "userName" | "username" => {
                         if let Some(email) = value.as_str() {
@@ -389,7 +389,7 @@ impl UserService {
                                 user.is_active = active.as_bool().unwrap_or(true);
                             }
                             if let Some(display_name) = obj.get("displayName") {
-                                user.display_name = display_name.as_str().map(|s| s.to_string());
+                                user.display_name = display_name.as_str().map(std::string::ToString::to_string);
                             }
                             // Handle enterprise extension attributes in bulk patch (F081)
                             let enterprise_uri =
@@ -500,13 +500,13 @@ impl UserService {
     /// Delete (deactivate) a user.
     pub async fn delete_user(&self, tenant_id: Uuid, user_id: Uuid) -> ScimResult<()> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE users SET
                 is_active = false,
                 scim_last_sync = NOW(),
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(tenant_id)
@@ -514,7 +514,7 @@ impl UserService {
         .await?;
 
         if result.rows_affected() == 0 {
-            return Err(ScimError::NotFound(format!("User {} not found", user_id)));
+            return Err(ScimError::NotFound(format!("User {user_id} not found")));
         }
 
         Ok(())

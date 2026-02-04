@@ -34,7 +34,7 @@ impl std::str::FromStr for ApprovalStatus {
             "approved" => Ok(Self::Approved),
             "denied" => Ok(Self::Denied),
             "expired" => Ok(Self::Expired),
-            _ => Err(format!("Unknown approval status: {}", s)),
+            _ => Err(format!("Unknown approval status: {s}")),
         }
     }
 }
@@ -52,6 +52,7 @@ impl std::fmt::Display for ApprovalStatus {
 
 impl ApprovalStatus {
     /// Convert to database string.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -62,6 +63,7 @@ impl ApprovalStatus {
     }
 
     /// Check if this is a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Approved | Self::Denied | Self::Expired)
     }
@@ -98,16 +100,19 @@ impl AiAgentApprovalRequest {
     }
 
     /// Check if the approval request is still pending.
+    #[must_use] 
     pub fn is_pending(&self) -> bool {
         self.status == "pending"
     }
 
-    /// Check if the approval has expired (past expires_at time).
+    /// Check if the approval has expired (past `expires_at` time).
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         self.expires_at < Utc::now()
     }
 
     /// Check if the approval can still be decided (pending and not expired).
+    #[must_use] 
     pub fn can_be_decided(&self) -> bool {
         self.is_pending() && !self.is_expired()
     }
@@ -146,14 +151,14 @@ impl AiAgentApprovalRequest {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, tool_id, parameters, context, risk_score,
                    user_instruction, session_id, conversation_id, status, requested_at,
                    expires_at, decided_by, decided_at, decision_reason, conditions,
                    notification_sent, notification_url
             FROM ai_agent_approval_requests
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -170,37 +175,37 @@ impl AiAgentApprovalRequest {
         offset: i32,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, tool_id, parameters, context, risk_score,
                    user_instruction, session_id, conversation_id, status, requested_at,
                    expires_at, decided_by, decided_at, decision_reason, conditions,
                    notification_sent, notification_url
             FROM ai_agent_approval_requests
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
         let mut conditions = Vec::new();
 
         if filter.status.is_some() {
-            conditions.push(format!("status = ${}", param_idx));
+            conditions.push(format!("status = ${param_idx}"));
             param_idx += 1;
         }
         if filter.agent_id.is_some() {
-            conditions.push(format!("agent_id = ${}", param_idx));
+            conditions.push(format!("agent_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.tool_id.is_some() {
-            conditions.push(format!("tool_id = ${}", param_idx));
+            conditions.push(format!("tool_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.from_date.is_some() {
-            conditions.push(format!("requested_at >= ${}", param_idx));
+            conditions.push(format!("requested_at >= ${param_idx}"));
             param_idx += 1;
         }
         if filter.to_date.is_some() {
-            conditions.push(format!("requested_at <= ${}", param_idx));
+            conditions.push(format!("requested_at <= ${param_idx}"));
             param_idx += 1;
         }
 
@@ -245,34 +250,34 @@ impl AiAgentApprovalRequest {
         filter: &ApprovalRequestFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) as count
             FROM ai_agent_approval_requests
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
         let mut conditions = Vec::new();
 
         if filter.status.is_some() {
-            conditions.push(format!("status = ${}", param_idx));
+            conditions.push(format!("status = ${param_idx}"));
             param_idx += 1;
         }
         if filter.agent_id.is_some() {
-            conditions.push(format!("agent_id = ${}", param_idx));
+            conditions.push(format!("agent_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.tool_id.is_some() {
-            conditions.push(format!("tool_id = ${}", param_idx));
+            conditions.push(format!("tool_id = ${param_idx}"));
             param_idx += 1;
         }
         if filter.from_date.is_some() {
-            conditions.push(format!("requested_at >= ${}", param_idx));
+            conditions.push(format!("requested_at >= ${param_idx}"));
             param_idx += 1;
         }
         if filter.to_date.is_some() {
-            conditions.push(format!("requested_at <= ${}", param_idx));
+            conditions.push(format!("requested_at <= ${param_idx}"));
             // param_idx not needed after last use
         }
 
@@ -309,7 +314,7 @@ impl AiAgentApprovalRequest {
         agent_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, tenant_id, agent_id, tool_id, parameters, context, risk_score,
                    user_instruction, session_id, conversation_id, status, requested_at,
                    expires_at, decided_by, decided_at, decision_reason, conditions,
@@ -317,7 +322,7 @@ impl AiAgentApprovalRequest {
             FROM ai_agent_approval_requests
             WHERE tenant_id = $1 AND agent_id = $2 AND status = 'pending'
             ORDER BY requested_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -335,7 +340,7 @@ impl AiAgentApprovalRequest {
         let expires_at = Utc::now() + Duration::seconds(timeout_secs);
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO ai_agent_approval_requests (
                 tenant_id, agent_id, tool_id, parameters, context, risk_score,
                 user_instruction, session_id, conversation_id, expires_at, notification_url
@@ -345,7 +350,7 @@ impl AiAgentApprovalRequest {
                       user_instruction, session_id, conversation_id, status, requested_at,
                       expires_at, decided_by, decided_at, decision_reason, conditions,
                       notification_sent, notification_url
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.agent_id)
@@ -373,7 +378,7 @@ impl AiAgentApprovalRequest {
         conditions: Option<serde_json::Value>,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE ai_agent_approval_requests
             SET status = 'approved',
                 decided_by = $3,
@@ -385,7 +390,7 @@ impl AiAgentApprovalRequest {
                       user_instruction, session_id, conversation_id, status, requested_at,
                       expires_at, decided_by, decided_at, decision_reason, conditions,
                       notification_sent, notification_url
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -406,7 +411,7 @@ impl AiAgentApprovalRequest {
         reason: String,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE ai_agent_approval_requests
             SET status = 'denied',
                 decided_by = $3,
@@ -417,7 +422,7 @@ impl AiAgentApprovalRequest {
                       user_instruction, session_id, conversation_id, status, requested_at,
                       expires_at, decided_by, decided_at, decision_reason, conditions,
                       notification_sent, notification_url
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -434,11 +439,11 @@ impl AiAgentApprovalRequest {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE ai_agent_approval_requests
             SET notification_sent = true
             WHERE tenant_id = $1 AND id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)
@@ -453,11 +458,11 @@ impl AiAgentApprovalRequest {
     /// Returns the number of expired requests.
     pub async fn expire_pending(pool: &PgPool) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE ai_agent_approval_requests
             SET status = 'expired'
             WHERE status = 'pending' AND expires_at < NOW()
-            "#,
+            ",
         )
         .execute(pool)
         .await?;
@@ -471,11 +476,11 @@ impl AiAgentApprovalRequest {
         tenant_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE ai_agent_approval_requests
             SET status = 'expired'
             WHERE tenant_id = $1 AND status = 'pending' AND expires_at < NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(pool)
@@ -487,11 +492,11 @@ impl AiAgentApprovalRequest {
     /// Count pending approvals for a tenant.
     pub async fn count_pending(pool: &PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar::<_, i64>(
-            r#"
+            r"
             SELECT COUNT(*) as count
             FROM ai_agent_approval_requests
             WHERE tenant_id = $1 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -505,11 +510,11 @@ impl AiAgentApprovalRequest {
         agent_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar::<_, i64>(
-            r#"
+            r"
             SELECT COUNT(*) as count
             FROM ai_agent_approval_requests
             WHERE tenant_id = $1 AND agent_id = $2 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)

@@ -18,7 +18,7 @@ use xavyo_api_governance::models::{
 // Test Helpers
 // =============================================================================
 
-/// Create a test CreateNhiRequest with default values.
+/// Create a test `CreateNhiRequest` with default values.
 fn create_test_request(name: &str, owner_id: Uuid) -> CreateNhiRequest {
     CreateNhiRequest {
         user_id: Uuid::new_v4(),
@@ -32,7 +32,7 @@ fn create_test_request(name: &str, owner_id: Uuid) -> CreateNhiRequest {
     }
 }
 
-/// Create a mock NhiResponse for testing.
+/// Create a mock `NhiResponse` for testing.
 fn create_mock_nhi_response(name: &str, status: ServiceAccountStatus) -> NhiResponse {
     NhiResponse {
         id: Uuid::new_v4(),
@@ -567,7 +567,7 @@ fn test_nhi_with_all_suspension_reasons() {
     for reason in suspension_reasons {
         let request = SuspendNhiRequest {
             reason,
-            details: Some(format!("Suspended due to {:?}", reason)),
+            details: Some(format!("Suspended due to {reason:?}")),
         };
 
         // Each suspension reason should be valid
@@ -772,7 +772,7 @@ fn test_suspend_request_all_reasons() {
 
     for reason in reasons {
         let request = SuspendNhiRequest {
-            reason: reason.clone(),
+            reason: reason,
             details: None,
         };
 
@@ -851,7 +851,7 @@ use xavyo_api_governance::models::{
 };
 use xavyo_db::NhiCredentialType;
 
-/// Create a mock NhiCredentialResponse for testing.
+/// Create a mock `NhiCredentialResponse` for testing.
 fn create_mock_credential_response(
     credential_type: NhiCredentialType,
     is_active: bool,

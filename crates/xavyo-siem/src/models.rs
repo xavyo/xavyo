@@ -21,6 +21,7 @@ pub enum DestinationType {
 
 impl DestinationType {
     /// Default port for this destination type.
+    #[must_use] 
     pub fn default_port(&self) -> u16 {
         match self {
             Self::SyslogTcpTls => 6514,
@@ -31,6 +32,7 @@ impl DestinationType {
     }
 
     /// String representation for database storage.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::SyslogTcpTls => "syslog_tcp_tls",
@@ -41,6 +43,7 @@ impl DestinationType {
     }
 
     /// Parse from database string.
+    #[must_use] 
     pub fn from_str_value(s: &str) -> Option<Self> {
         match s {
             "syslog_tcp_tls" => Some(Self::SyslogTcpTls),
@@ -67,6 +70,7 @@ pub enum ExportFormat {
 }
 
 impl ExportFormat {
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Cef => "cef",
@@ -76,6 +80,7 @@ impl ExportFormat {
         }
     }
 
+    #[must_use] 
     pub fn from_str_value(s: &str) -> Option<Self> {
         match s {
             "cef" => Some(Self::Cef),
@@ -99,6 +104,7 @@ pub enum DeliveryStatus {
 }
 
 impl DeliveryStatus {
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -109,6 +115,7 @@ impl DeliveryStatus {
         }
     }
 
+    #[must_use] 
     pub fn from_str_value(s: &str) -> Option<Self> {
         match s {
             "pending" => Some(Self::Pending),
@@ -134,6 +141,7 @@ pub enum CircuitState {
 }
 
 impl CircuitState {
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Closed => "closed",
@@ -142,6 +150,7 @@ impl CircuitState {
         }
     }
 
+    #[must_use] 
     pub fn from_str_value(s: &str) -> Option<Self> {
         match s {
             "closed" => Some(Self::Closed),
@@ -163,6 +172,7 @@ pub enum BatchExportStatus {
 }
 
 impl BatchExportStatus {
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -172,6 +182,7 @@ impl BatchExportStatus {
         }
     }
 
+    #[must_use] 
     pub fn from_str_value(s: &str) -> Option<Self> {
         match s {
             "pending" => Some(Self::Pending),
@@ -199,6 +210,7 @@ pub enum EventCategory {
 }
 
 impl EventCategory {
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Authentication => "authentication",
@@ -213,6 +225,7 @@ impl EventCategory {
         }
     }
 
+    #[must_use] 
     pub fn from_str_value(s: &str) -> Option<Self> {
         match s {
             "authentication" => Some(Self::Authentication),
@@ -230,6 +243,7 @@ impl EventCategory {
 
     /// CEF severity mapping based on event category.
     /// 0-3: low/informational, 4-6: medium, 7-10: high
+    #[must_use] 
     pub fn default_severity(&self) -> u8 {
         match self {
             Self::SodViolation => 9,
@@ -250,7 +264,7 @@ impl EventCategory {
 pub struct SiemEvent {
     /// Unique event identifier
     pub event_id: Uuid,
-    /// Event type / class identifier (e.g., "AUTH_FAILURE", "USER_CREATED")
+    /// Event type / class identifier (e.g., "`AUTH_FAILURE`", "`USER_CREATED`")
     pub event_type: String,
     /// Event category
     pub category: EventCategory,
@@ -276,7 +290,7 @@ pub struct SiemEvent {
     pub action: String,
     /// Outcome (Success/Failure)
     pub outcome: String,
-    /// Reason for outcome (e.g., "InvalidCredentials")
+    /// Reason for outcome (e.g., "`InvalidCredentials`")
     pub reason: Option<String>,
     /// Session ID
     pub session_id: Option<Uuid>,
@@ -288,6 +302,7 @@ pub struct SiemEvent {
 
 impl SiemEvent {
     /// Get severity label for display.
+    #[must_use] 
     pub fn severity_label(&self) -> &'static str {
         match self.severity {
             0 => "Informational",

@@ -37,8 +37,7 @@ pub fn validate_email(email: &str) -> Result<(), String> {
 
     if email.len() > MAX_EMAIL_LENGTH {
         return Err(format!(
-            "Email exceeds maximum length of {} characters",
-            MAX_EMAIL_LENGTH
+            "Email exceeds maximum length of {MAX_EMAIL_LENGTH} characters"
         ));
     }
 
@@ -80,6 +79,7 @@ pub fn validate_email(email: &str) -> Result<(), String> {
 /// Sanitize a display name by stripping HTML and script content.
 ///
 /// Uses the ammonia library for HTML sanitization, then trims whitespace.
+#[must_use] 
 pub fn sanitize_display_name(name: &str) -> String {
     let cleaned = ammonia::clean(name);
     cleaned.trim().to_string()
@@ -90,7 +90,7 @@ pub fn sanitize_display_name(name: &str) -> String {
 pub struct HeaderValidation {
     /// Whether validation passed (email column present).
     pub valid: bool,
-    /// Indices of known columns (column_name -> index).
+    /// Indices of known columns (`column_name` -> index).
     pub known_columns: std::collections::HashMap<String, usize>,
     /// Names of columns that are not in the known set (potential custom attributes).
     pub custom_columns: Vec<(String, usize)>,
@@ -102,6 +102,7 @@ pub struct HeaderValidation {
 ///
 /// Returns a mapping of known column names to their 0-based indices,
 /// plus any unrecognized columns that may be custom attributes.
+#[must_use] 
 pub fn validate_csv_headers(headers: &[String]) -> HeaderValidation {
     let mut known_columns = std::collections::HashMap::new();
     let mut custom_columns = Vec::new();

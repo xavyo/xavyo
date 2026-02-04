@@ -1,6 +1,6 @@
-//! Shared client authentication utilities for OAuth2 endpoints.
+//! Shared client authentication utilities for `OAuth2` endpoints.
 //!
-//! Extracts and validates OAuth2 client credentials from HTTP Basic Auth
+//! Extracts and validates `OAuth2` client credentials from HTTP Basic Auth
 //! or form body parameters. Used by token, revocation, and introspection handlers.
 
 use crate::error::OAuthError;
@@ -39,11 +39,10 @@ pub fn extract_client_credentials(
             let parts: Vec<&str> = decoded_str.splitn(2, ':').collect();
             if parts.len() == 2 {
                 return Ok((parts[0].to_string(), Some(parts[1].to_string())));
-            } else {
-                return Err(OAuthError::InvalidClient(
-                    "Invalid credential format".to_string(),
-                ));
             }
+            return Err(OAuthError::InvalidClient(
+                "Invalid credential format".to_string(),
+            ));
         }
     }
 
@@ -58,7 +57,7 @@ pub fn extract_client_credentials(
 
 /// Extract tenant ID from the `X-Tenant-ID` request header.
 ///
-/// Used by OAuth2 endpoints (revocation, introspection) that authenticate
+/// Used by `OAuth2` endpoints (revocation, introspection) that authenticate
 /// via client credentials rather than JWT claims.
 pub fn extract_tenant_from_header(headers: &HeaderMap) -> Result<Uuid, OAuthError> {
     let tenant_str = headers
@@ -72,10 +71,10 @@ pub fn extract_tenant_from_header(headers: &HeaderMap) -> Result<Uuid, OAuthErro
         .map_err(|_| OAuthError::InvalidRequest("X-Tenant-ID is not a valid UUID".to_string()))
 }
 
-/// Authenticate an OAuth2 client using extracted credentials.
+/// Authenticate an `OAuth2` client using extracted credentials.
 ///
-/// Looks up the client by client_id within the given tenant, then verifies
-/// the client_secret against the stored hash.
+/// Looks up the client by `client_id` within the given tenant, then verifies
+/// the `client_secret` against the stored hash.
 ///
 /// Returns the internal client UUID on success.
 pub async fn authenticate_client(

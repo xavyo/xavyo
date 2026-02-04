@@ -38,7 +38,7 @@ impl ApiClient {
         if response.status().is_success() {
             response.json().await.map_err(Into::into)
         } else if response.status() == reqwest::StatusCode::NOT_FOUND {
-            Err(CliError::NotFound(format!("Tool not found: {}", id)))
+            Err(CliError::NotFound(format!("Tool not found: {id}")))
         } else {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
@@ -84,7 +84,7 @@ impl ApiClient {
         if response.status().is_success() || response.status() == reqwest::StatusCode::NO_CONTENT {
             Ok(())
         } else if response.status() == reqwest::StatusCode::NOT_FOUND {
-            Err(CliError::NotFound(format!("Tool not found: {}", id)))
+            Err(CliError::NotFound(format!("Tool not found: {id}")))
         } else {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();

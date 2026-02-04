@@ -22,7 +22,7 @@ pub const DEFAULT_BATCH_SIZE: i32 = 10;
 
 /// Job for executing scheduled schema refreshes.
 ///
-/// This job polls the schema_refresh_schedules table for due schedules
+/// This job polls the `schema_refresh_schedules` table for due schedules
 /// and triggers schema discovery for each connector.
 pub struct SchemaSchedulerJob {
     #[allow(dead_code)]
@@ -35,6 +35,7 @@ pub struct SchemaSchedulerJob {
 
 impl SchemaSchedulerJob {
     /// Create a new schema scheduler job.
+    #[must_use] 
     pub fn new(
         pool: PgPool,
         schedule_service: ScheduleService,
@@ -51,6 +52,7 @@ impl SchemaSchedulerJob {
     }
 
     /// Create with custom batch size.
+    #[must_use] 
     pub fn with_batch_size(mut self, batch_size: i32) -> Self {
         self.batch_size = batch_size.max(1);
         self
@@ -79,7 +81,7 @@ impl SchemaSchedulerJob {
 
         for schedule in due_schedules {
             match self.process_schedule(&schedule).await {
-                Ok(_) => {
+                Ok(()) => {
                     processed += 1;
                     info!(
                         schedule_id = %schedule.id,
@@ -231,6 +233,7 @@ impl SchemaSchedulerJob {
     }
 
     /// Get the batch size for polling.
+    #[must_use] 
     pub fn batch_size(&self) -> i32 {
         self.batch_size
     }

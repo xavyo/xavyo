@@ -26,6 +26,7 @@ pub enum ServiceAccountStatus {
 
 impl ServiceAccountStatus {
     /// Check if this status allows normal operations.
+    #[must_use] 
     pub fn is_operational(&self) -> bool {
         matches!(self, Self::Active)
     }
@@ -152,6 +153,7 @@ pub struct ServiceAccountFilter {
 
 impl GovServiceAccount {
     /// Check if this account is expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
             expires_at < Utc::now()
@@ -161,6 +163,7 @@ impl GovServiceAccount {
     }
 
     /// Get days until expiration (negative if expired).
+    #[must_use] 
     pub fn days_until_expiry(&self) -> Option<i64> {
         self.expires_at.map(|exp| {
             let duration = exp.signed_duration_since(Utc::now());
@@ -169,6 +172,7 @@ impl GovServiceAccount {
     }
 
     /// Check if certification is due (more than 365 days since last cert).
+    #[must_use] 
     pub fn needs_certification(&self) -> bool {
         match self.last_certified_at {
             Some(certified_at) => {
@@ -180,33 +184,37 @@ impl GovServiceAccount {
     }
 
     /// Check if credential rotation is needed.
+    #[must_use] 
     pub fn needs_rotation(&self) -> bool {
         let interval = self.rotation_interval_days.unwrap_or(90);
         match self.last_rotation_at {
             Some(last_rotation) => {
                 let days_since = Utc::now().signed_duration_since(last_rotation).num_days();
-                days_since >= interval as i64
+                days_since >= i64::from(interval)
             }
             None => true, // Never rotated, needs rotation
         }
     }
 
     /// Get days since last use.
+    #[must_use] 
     pub fn days_since_last_use(&self) -> Option<i64> {
         self.last_used_at
             .map(|used| Utc::now().signed_duration_since(used).num_days())
     }
 
     /// Check if NHI is inactive (not used within threshold).
+    #[must_use] 
     pub fn is_inactive(&self) -> bool {
         let threshold = self.inactivity_threshold_days.unwrap_or(90);
         match self.days_since_last_use() {
-            Some(days) => days >= threshold as i64,
+            Some(days) => days >= i64::from(threshold),
             None => true, // Never used, considered inactive
         }
     }
 
     /// Check if NHI is in grace period before suspension.
+    #[must_use] 
     pub fn is_in_grace_period(&self) -> bool {
         match self.grace_period_ends_at {
             Some(ends_at) => ends_at > Utc::now(),
@@ -221,10 +229,10 @@ impl GovServiceAccount {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_service_accounts
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -239,10 +247,10 @@ impl GovServiceAccount {
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_service_accounts
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -257,10 +265,10 @@ impl GovServiceAccount {
         user_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_service_accounts
             WHERE tenant_id = $1 AND user_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -277,10 +285,10 @@ impl GovServiceAccount {
         name: &str,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_service_accounts
             WHERE tenant_id = $1 AND LOWER(name) = LOWER($2)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -297,11 +305,11 @@ impl GovServiceAccount {
         owner_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_service_accounts
             WHERE tenant_id = $1 AND owner_id = $2
             ORDER BY name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(owner_id)
@@ -316,7 +324,7 @@ impl GovServiceAccount {
         days: i32,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_service_accounts
             WHERE tenant_id = $1
                 AND status = 'active'
@@ -324,7 +332,7 @@ impl GovServiceAccount {
                 AND expires_at <= NOW() + ($2 || ' days')::interval
                 AND expires_at > NOW()
             ORDER BY expires_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(days)
@@ -338,7 +346,7 @@ impl GovServiceAccount {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_service_accounts
             WHERE tenant_id = $1
                 AND status = 'active'
@@ -347,7 +355,7 @@ impl GovServiceAccount {
                     OR last_certified_at < NOW() - INTERVAL '365 days'
                 )
             ORDER BY last_certified_at ASC NULLS FIRST
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -363,28 +371,27 @@ impl GovServiceAccount {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_service_accounts
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_idx));
+            query.push_str(&format!(" AND status = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.owner_id.is_some() {
-            query.push_str(&format!(" AND owner_id = ${}", param_idx));
+            query.push_str(&format!(" AND owner_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.expiring_within_days.is_some() {
             query.push_str(&format!(
-                " AND expires_at IS NOT NULL AND expires_at <= NOW() + (${} || ' days')::interval AND expires_at > NOW()",
-                param_idx
+                " AND expires_at IS NOT NULL AND expires_at <= NOW() + (${param_idx} || ' days')::interval AND expires_at > NOW()"
             ));
             param_idx += 1;
         }
@@ -427,28 +434,27 @@ impl GovServiceAccount {
         filter: &ServiceAccountFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_service_accounts
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_idx));
+            query.push_str(&format!(" AND status = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.owner_id.is_some() {
-            query.push_str(&format!(" AND owner_id = ${}", param_idx));
+            query.push_str(&format!(" AND owner_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.expiring_within_days.is_some() {
             query.push_str(&format!(
-                " AND expires_at IS NOT NULL AND expires_at <= NOW() + (${} || ' days')::interval AND expires_at > NOW()",
-                param_idx
+                " AND expires_at IS NOT NULL AND expires_at <= NOW() + (${param_idx} || ' days')::interval AND expires_at > NOW()"
             ));
         }
 
@@ -482,13 +488,13 @@ impl GovServiceAccount {
         data: CreateGovServiceAccount,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_service_accounts (
                 tenant_id, user_id, name, purpose, owner_id, expires_at
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.user_id)
@@ -508,7 +514,7 @@ impl GovServiceAccount {
         data: UpdateGovServiceAccount,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_service_accounts
             SET
                 name = COALESCE($3, name),
@@ -518,7 +524,7 @@ impl GovServiceAccount {
                 expires_at = COALESCE($7, expires_at)
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -539,14 +545,14 @@ impl GovServiceAccount {
         certified_by: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_service_accounts
             SET
                 last_certified_at = NOW(),
                 certified_by = $3
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -562,12 +568,12 @@ impl GovServiceAccount {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_service_accounts
             SET status = 'suspended'
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -582,12 +588,12 @@ impl GovServiceAccount {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_service_accounts
             SET status = 'active'
             WHERE id = $1 AND tenant_id = $2 AND status = 'suspended'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -598,14 +604,14 @@ impl GovServiceAccount {
     /// Mark expired accounts.
     pub async fn mark_expired(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_service_accounts
             SET status = 'expired'
             WHERE tenant_id = $1
                 AND status = 'active'
                 AND expires_at IS NOT NULL
                 AND expires_at < NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(pool)
@@ -621,10 +627,10 @@ impl GovServiceAccount {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_service_accounts
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -640,30 +646,30 @@ impl GovServiceAccount {
         tenant_id: Uuid,
     ) -> Result<Vec<Uuid>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT user_id FROM gov_service_accounts
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
         .await
     }
 
-    /// Update the last_rotation_at timestamp for an NHI.
+    /// Update the `last_rotation_at` timestamp for an NHI.
     pub async fn update_last_rotation(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_service_accounts
             SET last_rotation_at = NOW(),
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -671,7 +677,7 @@ impl GovServiceAccount {
         .await
     }
 
-    /// Update the last_used_at timestamp for an NHI (for activity tracking).
+    /// Update the `last_used_at` timestamp for an NHI (for activity tracking).
     /// This is called during credential validation to track NHI usage.
     pub async fn update_last_used(
         pool: &sqlx::PgPool,
@@ -679,13 +685,13 @@ impl GovServiceAccount {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_service_accounts
             SET last_used_at = NOW(),
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -696,15 +702,15 @@ impl GovServiceAccount {
     /// Find NHIs that need credential rotation.
     ///
     /// Returns NHIs where:
-    /// - rotation_interval_days is set
-    /// - last_rotation_at is older than rotation_interval_days
-    /// - OR last_rotation_at is NULL and created_at is older than rotation_interval_days
+    /// - `rotation_interval_days` is set
+    /// - `last_rotation_at` is older than `rotation_interval_days`
+    /// - OR `last_rotation_at` is NULL and `created_at` is older than `rotation_interval_days`
     pub async fn find_needing_rotation(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_service_accounts
             WHERE tenant_id = $1
                 AND status = 'active'
@@ -715,7 +721,7 @@ impl GovServiceAccount {
                     (last_rotation_at IS NULL AND created_at < NOW() - (rotation_interval_days || ' days')::INTERVAL)
                 )
             ORDER BY COALESCE(last_rotation_at, created_at) ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)

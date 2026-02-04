@@ -47,11 +47,11 @@ pub struct LdapConfig {
     #[serde(default)]
     pub tls: TlsConfig,
 
-    /// User container DN (e.g., "ou=users" - relative to base_dn).
+    /// User container DN (e.g., "ou=users" - relative to `base_dn`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_container: Option<String>,
 
-    /// Group container DN (e.g., "ou=groups" - relative to base_dn).
+    /// Group container DN (e.g., "ou=groups" - relative to `base_dn`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub group_container: Option<String>,
 
@@ -157,6 +157,7 @@ impl LdapConfig {
     }
 
     /// Enable SSL (LDAPS).
+    #[must_use] 
     pub fn with_ssl(mut self) -> Self {
         self.use_ssl = true;
         self.port = 636;
@@ -165,6 +166,7 @@ impl LdapConfig {
     }
 
     /// Enable STARTTLS.
+    #[must_use] 
     pub fn with_starttls(mut self) -> Self {
         self.use_starttls = true;
         self
@@ -183,6 +185,7 @@ impl LdapConfig {
     }
 
     /// Get the full user container DN.
+    #[must_use] 
     pub fn user_dn(&self) -> String {
         match &self.user_container {
             Some(container) => format!("{},{}", container, self.base_dn),
@@ -191,6 +194,7 @@ impl LdapConfig {
     }
 
     /// Get the full group container DN.
+    #[must_use] 
     pub fn group_dn(&self) -> String {
         match &self.group_container {
             Some(container) => format!("{},{}", container, self.base_dn),
@@ -199,6 +203,7 @@ impl LdapConfig {
     }
 
     /// Get the LDAP URL.
+    #[must_use] 
     pub fn url(&self) -> String {
         let scheme = if self.use_ssl { "ldaps" } else { "ldap" };
         format!("{}://{}:{}", scheme, self.host, self.port)
@@ -355,7 +360,7 @@ pub struct ActiveDirectoryConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub outbound_target_ou: Option<String>,
 
-    /// Conflict resolution strategy: "source_wins", "target_wins", "manual".
+    /// Conflict resolution strategy: "`source_wins`", "`target_wins`", "manual".
     #[serde(default = "default_conflict_strategy")]
     pub conflict_strategy: String,
 }
@@ -367,12 +372,13 @@ fn default_true() -> bool {
 impl ActiveDirectoryConfig {
     /// Create a new AD config from domain name.
     ///
-    /// Automatically derives base_dn from domain.
+    /// Automatically derives `base_dn` from domain.
+    #[must_use] 
     pub fn from_domain(domain: &str, bind_dn: &str, bind_password: &str) -> Self {
         // Convert domain.com to dc=domain,dc=com
         let base_dn = domain
             .split('.')
-            .map(|part| format!("dc={}", part))
+            .map(|part| format!("dc={part}"))
             .collect::<Vec<_>>()
             .join(",");
 

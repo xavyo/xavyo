@@ -25,12 +25,12 @@ pub struct GovEscalationPolicy {
     pub description: Option<String>,
 
     /// Default step timeout (e.g., '48 hours').
-    /// Note: PgInterval doesn't implement Serialize/Deserialize, use timeout_secs() accessor.
+    /// Note: `PgInterval` doesn't implement Serialize/Deserialize, use `timeout_secs()` accessor.
     #[serde(skip)]
     pub default_timeout: sqlx::postgres::types::PgInterval,
 
     /// Time before timeout to send warning (e.g., '4 hours').
-    /// Note: PgInterval doesn't implement Serialize/Deserialize, use warning_threshold_secs() accessor.
+    /// Note: `PgInterval` doesn't implement Serialize/Deserialize, use `warning_threshold_secs()` accessor.
     #[serde(skip)]
     pub warning_threshold: Option<sqlx::postgres::types::PgInterval>,
 
@@ -94,10 +94,10 @@ impl GovEscalationPolicy {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_escalation_policies
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -111,11 +111,11 @@ impl GovEscalationPolicy {
         tenant_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_escalation_policies
             WHERE tenant_id = $1 AND is_active = true
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_optional(pool)
@@ -129,10 +129,10 @@ impl GovEscalationPolicy {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_escalation_policies
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -153,7 +153,7 @@ impl GovEscalationPolicy {
 
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -183,7 +183,7 @@ impl GovEscalationPolicy {
 
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -202,7 +202,7 @@ impl GovEscalationPolicy {
         input: CreateEscalationPolicy,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_escalation_policies (
                 tenant_id, name, description, default_timeout,
                 warning_threshold, final_fallback
@@ -214,7 +214,7 @@ impl GovEscalationPolicy {
                 $6
             )
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -238,33 +238,31 @@ impl GovEscalationPolicy {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.default_timeout_secs.is_some() {
             updates.push(format!(
-                "default_timeout = make_interval(secs => ${})",
-                param_idx
+                "default_timeout = make_interval(secs => ${param_idx})"
             ));
             param_idx += 1;
         }
         if input.warning_threshold_secs.is_some() {
             updates.push(format!(
-                "warning_threshold = make_interval(secs => ${})",
-                param_idx
+                "warning_threshold = make_interval(secs => ${param_idx})"
             ));
             param_idx += 1;
         }
         if input.final_fallback.is_some() {
-            updates.push(format!("final_fallback = ${}", param_idx));
+            updates.push(format!("final_fallback = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_active.is_some() {
-            updates.push(format!("is_active = ${}", param_idx));
+            updates.push(format!("is_active = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -304,10 +302,10 @@ impl GovEscalationPolicy {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_escalation_policies
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -324,11 +322,11 @@ impl GovEscalationPolicy {
         except_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_escalation_policies
             SET is_active = false, updated_at = NOW()
             WHERE tenant_id = $1 AND id != $2 AND is_active = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(except_id)
@@ -339,11 +337,13 @@ impl GovEscalationPolicy {
     }
 
     /// Get timeout as Duration.
+    #[must_use] 
     pub fn timeout_duration(&self) -> chrono::Duration {
         interval_to_duration(&self.default_timeout)
     }
 
     /// Get timeout in seconds (for serialization).
+    #[must_use] 
     pub fn timeout_secs(&self) -> i64 {
         interval_to_secs(&self.default_timeout)
     }
@@ -359,11 +359,11 @@ impl GovEscalationPolicy {
     }
 }
 
-/// Convert PgInterval to chrono::Duration.
+/// Convert `PgInterval` to `chrono::Duration`.
 fn interval_to_duration(interval: &sqlx::postgres::types::PgInterval) -> chrono::Duration {
     let microseconds = interval.microseconds;
-    let days = interval.days as i64;
-    let months = interval.months as i64;
+    let days = i64::from(interval.days);
+    let months = i64::from(interval.months);
 
     // Approximate: 1 month = 30 days
     let total_days = days + (months * 30);
@@ -372,11 +372,11 @@ fn interval_to_duration(interval: &sqlx::postgres::types::PgInterval) -> chrono:
     chrono::Duration::microseconds(total_microseconds)
 }
 
-/// Convert PgInterval to seconds.
+/// Convert `PgInterval` to seconds.
 fn interval_to_secs(interval: &sqlx::postgres::types::PgInterval) -> i64 {
     let microseconds = interval.microseconds;
-    let days = interval.days as i64;
-    let months = interval.months as i64;
+    let days = i64::from(interval.days);
+    let months = i64::from(interval.months);
 
     // Approximate: 1 month = 30 days
     let total_days = days + (months * 30);

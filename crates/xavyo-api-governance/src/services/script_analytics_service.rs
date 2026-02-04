@@ -115,6 +115,7 @@ pub struct ScriptAnalyticsService {
 
 impl ScriptAnalyticsService {
     /// Create a new script analytics service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -124,14 +125,14 @@ impl ScriptAnalyticsService {
     /// By default, aggregates data from the last 30 days. Override with `days`.
     pub async fn get_dashboard(&self, tenant_id: Uuid, days: Option<i32>) -> Result<DashboardData> {
         let window_days = days.unwrap_or(30);
-        let since = Utc::now() - Duration::days(window_days as i64);
+        let since = Utc::now() - Duration::days(i64::from(window_days));
 
         // 1. Count total scripts
         let total_scripts = sqlx::query_scalar::<_, i64>(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_provisioning_scripts
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(&self.pool)
@@ -187,7 +188,7 @@ impl ScriptAnalyticsService {
         days: Option<i32>,
     ) -> Result<ScriptAnalyticsData> {
         let window_days = days.unwrap_or(30);
-        let since = Utc::now() - Duration::days(window_days as i64);
+        let since = Utc::now() - Duration::days(i64::from(window_days));
 
         // 1. Get the script (for name)
         let script = GovProvisioningScript::get_by_id(&self.pool, script_id, tenant_id)
@@ -265,7 +266,7 @@ impl ScriptAnalyticsService {
         threshold_percent: f64,
         window_hours: i32,
     ) -> Result<bool> {
-        let since = Utc::now() - Duration::hours(window_hours as i64);
+        let since = Utc::now() - Duration::hours(i64::from(window_hours));
 
         let error_rate =
             GovScriptExecutionLog::get_error_rate(&self.pool, script_id, tenant_id, since)
@@ -328,8 +329,8 @@ impl ScriptAnalyticsService {
             let name =
                 match GovProvisioningScript::get_by_id(&self.pool, script_id, tenant_id).await {
                     Ok(Some(script)) => script.name,
-                    Ok(None) => format!("Deleted script ({})", script_id),
-                    Err(_) => format!("Unknown ({})", script_id),
+                    Ok(None) => format!("Deleted script ({script_id})"),
+                    Err(_) => format!("Unknown ({script_id})"),
                 };
 
             summaries.push(ScriptSummaryData {
@@ -353,7 +354,7 @@ impl ScriptAnalyticsService {
         since: DateTime<Utc>,
     ) -> Result<Vec<ErrorSummaryData>> {
         let rows = sqlx::query_as::<_, TopErrorRow>(
-            r#"
+            r"
             SELECT
                 error_message,
                 COUNT(*) AS error_count,
@@ -367,7 +368,7 @@ impl ScriptAnalyticsService {
             GROUP BY error_message
             ORDER BY error_count DESC
             LIMIT 10
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(script_id)

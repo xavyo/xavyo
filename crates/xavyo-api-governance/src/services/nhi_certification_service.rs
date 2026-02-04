@@ -82,6 +82,7 @@ pub struct NhiCertificationService {
 
 impl NhiCertificationService {
     /// Create a new NHI certification service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             credential_service: NhiCredentialService::new(pool.clone()),
@@ -138,7 +139,7 @@ impl NhiCertificationService {
 
         // Validate specific reviewers if required
         if reviewer_type == NhiCertReviewerType::SpecificUsers
-            && specific_reviewers.as_ref().is_none_or(|r| r.is_empty())
+            && specific_reviewers.as_ref().is_none_or(std::vec::Vec::is_empty)
         {
             return Err(GovernanceError::SpecificReviewersRequired);
         }
@@ -556,13 +557,13 @@ impl NhiCertificationService {
     async fn revoke_nhi(&self, tenant_id: Uuid, nhi_id: Uuid, revoked_by: Uuid) -> Result<()> {
         // Suspend the NHI
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_service_accounts
             SET status = 'suspended',
                 suspension_reason = 'certification_revoked',
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(nhi_id)
         .bind(tenant_id)
@@ -594,17 +595,17 @@ impl NhiCertificationService {
         needs_certification_only: bool,
     ) -> Result<Vec<GovServiceAccount>> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_service_accounts
             WHERE tenant_id = $1
               AND status = 'active'
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if owner_filter.is_some() {
-            query.push_str(&format!(" AND owner_id = ${}", param_idx));
+            query.push_str(&format!(" AND owner_id = ${param_idx}"));
             #[allow(unused_assignments)]
             {
                 param_idx += 1;
@@ -719,7 +720,7 @@ impl NhiCertificationService {
         campaign_id: Uuid,
     ) -> Result<NhiCertificationSummary> {
         let row: (i64, i64, i64, i64, i64) = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE status = 'pending') as pending,
@@ -728,7 +729,7 @@ impl NhiCertificationService {
                 COUNT(*) FILTER (WHERE status = 'expired') as expired
             FROM gov_nhi_certification_items
             WHERE tenant_id = $1 AND campaign_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(campaign_id)
@@ -774,13 +775,13 @@ impl NhiCertificationService {
             .and_then(|r| serde_json::to_value(r).ok());
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO gov_nhi_certification_campaigns (
                 id, tenant_id, name, description, status, reviewer_type,
                 specific_reviewers, deadline, created_by, created_at
             )
             VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9)
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -830,13 +831,13 @@ impl NhiCertificationService {
             Option<DateTime<Utc>>,
             Option<DateTime<Utc>>,
         )> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, status, reviewer_type,
                    specific_reviewers, deadline, created_by, created_at,
                    launched_at, completed_at
             FROM gov_nhi_certification_campaigns
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(campaign_id)
         .bind(tenant_id)
@@ -890,33 +891,33 @@ impl NhiCertificationService {
         offset: i64,
     ) -> Result<(Vec<NhiCertificationCampaign>, i64)> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, status, reviewer_type,
                    specific_reviewers, deadline, created_by, created_at,
                    launched_at, completed_at
             FROM gov_nhi_certification_campaigns
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut count_query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_nhi_certification_campaigns
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_idx));
-            count_query.push_str(&format!(" AND status = ${}", param_idx));
+            query.push_str(&format!(" AND status = ${param_idx}"));
+            count_query.push_str(&format!(" AND status = ${param_idx}"));
             param_idx += 1;
         }
 
         if created_by.is_some() {
-            query.push_str(&format!(" AND created_by = ${}", param_idx));
-            count_query.push_str(&format!(" AND created_by = ${}", param_idx));
+            query.push_str(&format!(" AND created_by = ${param_idx}"));
+            count_query.push_str(&format!(" AND created_by = ${param_idx}"));
             param_idx += 1;
         }
 
@@ -1041,13 +1042,13 @@ impl NhiCertificationService {
         };
 
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_nhi_certification_campaigns
             SET status = $3,
                 launched_at = COALESCE($4, launched_at),
                 completed_at = COALESCE($5, completed_at)
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(campaign_id)
         .bind(tenant_id)
@@ -1073,12 +1074,12 @@ impl NhiCertificationService {
         let now = Utc::now();
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO gov_nhi_certification_items (
                 id, tenant_id, campaign_id, nhi_id, reviewer_id, status, created_at
             )
             VALUES ($1, $2, $3, $4, $5, 'pending', $6)
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -1127,13 +1128,13 @@ impl NhiCertificationService {
             Option<Uuid>,
             DateTime<Utc>,
         )> = sqlx::query_as(
-            r#"
+            r"
             SELECT id, tenant_id, campaign_id, nhi_id, reviewer_id, status,
                    decision, decided_by, decided_at, comment,
                    delegated_by, original_reviewer_id, created_at
             FROM gov_nhi_certification_items
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(item_id)
         .bind(tenant_id)
@@ -1186,48 +1187,48 @@ impl NhiCertificationService {
         offset: i64,
     ) -> Result<(Vec<NhiCertificationItem>, i64)> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT i.id, i.tenant_id, i.campaign_id, i.nhi_id, i.reviewer_id, i.status,
                    i.decision, i.decided_by, i.decided_at, i.comment,
                    i.delegated_by, i.original_reviewer_id, i.created_at
             FROM gov_nhi_certification_items i
             JOIN gov_service_accounts s ON i.nhi_id = s.id
             WHERE i.tenant_id = $1
-            "#,
+            ",
         );
 
         let mut count_query = String::from(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_nhi_certification_items i
             JOIN gov_service_accounts s ON i.nhi_id = s.id
             WHERE i.tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if campaign_id.is_some() {
-            query.push_str(&format!(" AND i.campaign_id = ${}", param_idx));
-            count_query.push_str(&format!(" AND i.campaign_id = ${}", param_idx));
+            query.push_str(&format!(" AND i.campaign_id = ${param_idx}"));
+            count_query.push_str(&format!(" AND i.campaign_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if status.is_some() {
-            query.push_str(&format!(" AND i.status = ${}", param_idx));
-            count_query.push_str(&format!(" AND i.status = ${}", param_idx));
+            query.push_str(&format!(" AND i.status = ${param_idx}"));
+            count_query.push_str(&format!(" AND i.status = ${param_idx}"));
             param_idx += 1;
         }
 
         if reviewer_id.is_some() {
-            query.push_str(&format!(" AND i.reviewer_id = ${}", param_idx));
-            count_query.push_str(&format!(" AND i.reviewer_id = ${}", param_idx));
+            query.push_str(&format!(" AND i.reviewer_id = ${param_idx}"));
+            count_query.push_str(&format!(" AND i.reviewer_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if owner_id.is_some() {
-            query.push_str(&format!(" AND s.owner_id = ${}", param_idx));
-            count_query.push_str(&format!(" AND s.owner_id = ${}", param_idx));
+            query.push_str(&format!(" AND s.owner_id = ${param_idx}"));
+            count_query.push_str(&format!(" AND s.owner_id = ${param_idx}"));
             param_idx += 1;
         }
 
@@ -1357,11 +1358,11 @@ impl NhiCertificationService {
         });
 
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_nhi_certification_items
             SET status = $3, decision = $4, decided_by = $5, decided_at = $6, comment = $7
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(item_id)
         .bind(tenant_id)
@@ -1387,11 +1388,11 @@ impl NhiCertificationService {
         comment: Option<String>,
     ) -> Result<NhiCertificationItem> {
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_nhi_certification_items
             SET reviewer_id = $3, delegated_by = $4, original_reviewer_id = $5, comment = $6
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(item_id)
         .bind(tenant_id)
@@ -1543,6 +1544,7 @@ impl NhiCertificationService {
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

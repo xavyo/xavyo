@@ -1,4 +1,4 @@
-//! Token verification service for validating federated IdP tokens.
+//! Token verification service for validating federated `IdP` tokens.
 //!
 //! This service verifies JWT tokens from federated Identity Providers using
 //! JWKS (JSON Web Key Sets) for signature verification.
@@ -34,6 +34,7 @@ impl Default for VerificationConfig {
 
 impl VerificationConfig {
     /// Create a new verification config with custom clock skew tolerance.
+    #[must_use] 
     pub fn with_clock_skew(tolerance_secs: u64) -> Self {
         Self {
             clock_skew_tolerance: tolerance_secs,
@@ -54,6 +55,7 @@ impl VerificationConfig {
     }
 
     /// Disable expiration validation (use with caution).
+    #[must_use] 
     pub fn skip_exp_validation(mut self) -> Self {
         self.validate_exp = false;
         self
@@ -73,7 +75,7 @@ pub struct VerifiedToken {
 
 /// Token verification service.
 ///
-/// Verifies JWT tokens from federated IdPs using JWKS-based signature verification.
+/// Verifies JWT tokens from federated `IdPs` using JWKS-based signature verification.
 #[derive(Clone)]
 pub struct TokenVerifierService {
     jwks_cache: JwksCache,
@@ -82,6 +84,7 @@ pub struct TokenVerifierService {
 
 impl TokenVerifierService {
     /// Create a new token verifier with default configuration.
+    #[must_use] 
     pub fn new(config: VerificationConfig) -> Self {
         Self {
             jwks_cache: JwksCache::default(),
@@ -90,16 +93,17 @@ impl TokenVerifierService {
     }
 
     /// Create a new token verifier with custom JWKS cache.
+    #[must_use] 
     pub fn with_cache(config: VerificationConfig, jwks_cache: JwksCache) -> Self {
         Self { jwks_cache, config }
     }
 
-    /// Verify a JWT token using the IdP's JWKS.
+    /// Verify a JWT token using the `IdP`'s JWKS.
     ///
     /// # Arguments
     ///
     /// * `token` - The JWT token string to verify
-    /// * `jwks_uri` - The JWKS endpoint URI for the IdP
+    /// * `jwks_uri` - The JWKS endpoint URI for the `IdP`
     ///
     /// # Returns
     ///
@@ -246,11 +250,12 @@ impl TokenVerifierService {
     }
 
     /// Get a reference to the JWKS cache.
+    #[must_use] 
     pub fn jwks_cache(&self) -> &JwksCache {
         &self.jwks_cache
     }
 
-    /// Force refresh the JWKS for an IdP.
+    /// Force refresh the JWKS for an `IdP`.
     ///
     /// Call this when you suspect keys have rotated.
     pub async fn refresh_jwks(&self, jwks_uri: &str) -> FederationResult<()> {

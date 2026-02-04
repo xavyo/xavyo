@@ -31,7 +31,7 @@ pub struct EntitlementUsage {
     pub used_by_count: i32,
     /// Total users with the role.
     pub total_users: i32,
-    /// Usage rate (used_by_count / total_users).
+    /// Usage rate (`used_by_count` / `total_users`).
     pub usage_rate: f64,
 }
 
@@ -101,12 +101,12 @@ impl GovRoleMetrics {
         role_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_metrics
             WHERE tenant_id = $1 AND role_id = $2
             ORDER BY calculated_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -121,10 +121,10 @@ impl GovRoleMetrics {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_metrics
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -141,12 +141,12 @@ impl GovRoleMetrics {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_role_metrics
             WHERE tenant_id = $1 AND role_id = $2
             ORDER BY calculated_at DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(role_id)
@@ -166,29 +166,29 @@ impl GovRoleMetrics {
     ) -> Result<Vec<Self>, sqlx::Error> {
         // Use DISTINCT ON to get latest metrics per role
         let mut query = String::from(
-            r#"
+            r"
             SELECT DISTINCT ON (role_id) *
             FROM gov_role_metrics
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.role_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND role_id = ${}", param_count));
+            query.push_str(&format!(" AND role_id = ${param_count}"));
         }
         if filter.trend_direction.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND trend_direction = ${}", param_count));
+            query.push_str(&format!(" AND trend_direction = ${param_count}"));
         }
         if filter.min_utilization.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND utilization_rate >= ${}", param_count));
+            query.push_str(&format!(" AND utilization_rate >= ${param_count}"));
         }
         if filter.max_utilization.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND utilization_rate <= ${}", param_count));
+            query.push_str(&format!(" AND utilization_rate <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -222,28 +222,28 @@ impl GovRoleMetrics {
         filter: &RoleMetricsFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(DISTINCT role_id) FROM gov_role_metrics
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.role_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND role_id = ${}", param_count));
+            query.push_str(&format!(" AND role_id = ${param_count}"));
         }
         if filter.trend_direction.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND trend_direction = ${}", param_count));
+            query.push_str(&format!(" AND trend_direction = ${param_count}"));
         }
         if filter.min_utilization.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND utilization_rate >= ${}", param_count));
+            query.push_str(&format!(" AND utilization_rate >= ${param_count}"));
         }
         if filter.max_utilization.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND utilization_rate <= ${}", param_count));
+            query.push_str(&format!(" AND utilization_rate <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -274,14 +274,14 @@ impl GovRoleMetrics {
             .unwrap_or_else(|_| serde_json::json!([]));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_role_metrics (
                 tenant_id, role_id, calculated_at, utilization_rate, coverage_rate,
                 user_count, active_user_count, entitlement_usage, trend_direction
             )
             VALUES ($1, $2, NOW(), $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.role_id)
@@ -316,7 +316,7 @@ impl GovRoleMetrics {
         keep_count: i64,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_role_metrics
             WHERE tenant_id = $1
             AND id NOT IN (
@@ -327,7 +327,7 @@ impl GovRoleMetrics {
                 ) ranked
                 WHERE rn <= $2
             )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(keep_count)
@@ -338,6 +338,7 @@ impl GovRoleMetrics {
     }
 
     /// Parse entitlement usage from JSON.
+    #[must_use] 
     pub fn parse_entitlement_usage(&self) -> Vec<EntitlementUsage> {
         serde_json::from_value(self.entitlement_usage.clone()).unwrap_or_default()
     }

@@ -49,7 +49,7 @@ mod tests {
 
         for (target, expected) in targets {
             let json = serde_json::to_string(&target).unwrap();
-            assert_eq!(json, expected, "Serialization mismatch for {:?}", target);
+            assert_eq!(json, expected, "Serialization mismatch for {target:?}");
         }
     }
 
@@ -115,8 +115,7 @@ mod tests {
     #[test]
     fn test_escalation_levels_ordering() {
         // Test that escalation levels can be ordered correctly
-        let levels = vec![
-            CreateEscalationLevel {
+        let levels = [CreateEscalationLevel {
                 level_order: 1,
                 level_name: Some("Level 1: Manager".to_string()),
                 target_type: EscalationTargetType::Manager,
@@ -139,8 +138,7 @@ mod tests {
                 target_id: None,
                 manager_chain_depth: None,
                 timeout_secs: 48 * 3600,
-            },
-        ];
+            }];
 
         assert_eq!(levels.len(), 3);
         assert_eq!(levels[0].level_order, 1);
@@ -177,7 +175,7 @@ mod tests {
 
         for (action, expected) in actions {
             let json = serde_json::to_string(&action).unwrap();
-            assert_eq!(json, expected, "Serialization mismatch for {:?}", action);
+            assert_eq!(json, expected, "Serialization mismatch for {action:?}");
         }
     }
 
@@ -230,7 +228,7 @@ mod tests {
 
         for (reason, expected) in reasons {
             let json = serde_json::to_string(&reason).unwrap();
-            assert_eq!(json, expected, "Serialization mismatch for {:?}", reason);
+            assert_eq!(json, expected, "Serialization mismatch for {reason:?}");
         }
     }
 
@@ -282,7 +280,7 @@ mod tests {
     fn test_step_specific_rule_override() {
         let rule = CreateEscalationRule {
             timeout_secs: 4 * 3600,                 // Faster timeout (4 hours)
-            warning_threshold_secs: Some(1 * 3600), // 1 hour warning
+            warning_threshold_secs: Some(3600), // 1 hour warning
             final_fallback: Some(FinalFallbackAction::AutoReject),
         };
 
@@ -393,8 +391,7 @@ mod tests {
         // 3. Then escalate to security team after 24h
         // 4. Finally escalate to tenant admin after 48h
 
-        let levels = vec![
-            CreateEscalationLevel {
+        let levels = [CreateEscalationLevel {
                 level_order: 1,
                 level_name: Some("Direct Manager".to_string()),
                 target_type: EscalationTargetType::Manager,
@@ -425,8 +422,7 @@ mod tests {
                 target_id: None,
                 manager_chain_depth: None,
                 timeout_secs: 48 * 3600,
-            },
-        ];
+            }];
 
         // Verify the escalation path
         assert_eq!(levels.len(), 4);

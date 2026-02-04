@@ -80,6 +80,7 @@ pub struct AuditService {
 
 impl AuditService {
     /// Create a new audit service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -260,7 +261,7 @@ impl AuditService {
 
         // Get basic counts
         let counts: (i64, i64, i64, i64, i64) = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE success = true) as successful,
@@ -269,7 +270,7 @@ impl AuditService {
                 COUNT(*) FILTER (WHERE is_new_location = true) as new_location
             FROM login_attempts
             WHERE tenant_id = $1 AND created_at >= $2 AND created_at <= $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(start_date)
@@ -282,11 +283,11 @@ impl AuditService {
 
         // Get unique users count
         let unique_users: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(DISTINCT user_id)
             FROM login_attempts
             WHERE tenant_id = $1 AND created_at >= $2 AND created_at <= $3 AND user_id IS NOT NULL
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(start_date)
@@ -297,14 +298,14 @@ impl AuditService {
 
         // Get failure reasons breakdown
         let failure_rows: Vec<(String, i64)> = sqlx::query_as(
-            r#"
+            r"
             SELECT failure_reason, COUNT(*) as count
             FROM login_attempts
             WHERE tenant_id = $1 AND created_at >= $2 AND created_at <= $3
               AND success = false AND failure_reason IS NOT NULL
             GROUP BY failure_reason
             ORDER BY count DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(start_date)
@@ -320,13 +321,13 @@ impl AuditService {
 
         // Get hourly distribution
         let hourly_rows: Vec<(i32, i64)> = sqlx::query_as(
-            r#"
+            r"
             SELECT EXTRACT(HOUR FROM created_at)::int as hour, COUNT(*) as count
             FROM login_attempts
             WHERE tenant_id = $1 AND created_at >= $2 AND created_at <= $3
             GROUP BY hour
             ORDER BY hour
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(start_date)
@@ -412,10 +413,10 @@ impl AuditService {
         let one_hour_ago = Utc::now() - Duration::hours(1);
 
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM login_attempts
             WHERE tenant_id = $1 AND user_id = $2 AND success = false AND created_at >= $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

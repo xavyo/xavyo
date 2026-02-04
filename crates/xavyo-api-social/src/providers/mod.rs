@@ -50,11 +50,12 @@ pub struct SocialUserInfo {
 
 impl SocialUserInfo {
     /// Get the display name, falling back to email or provider ID.
+    #[must_use] 
     pub fn display_name(&self) -> String {
         self.name
             .clone()
             .or_else(|| match (&self.given_name, &self.family_name) {
-                (Some(given), Some(family)) => Some(format!("{} {}", given, family)),
+                (Some(given), Some(family)) => Some(format!("{given} {family}")),
                 (Some(given), None) => Some(given.clone()),
                 (None, Some(family)) => Some(family.clone()),
                 _ => None,
@@ -111,11 +112,13 @@ pub struct ProviderFactory;
 
 impl ProviderFactory {
     /// Create a Google provider.
+    #[must_use] 
     pub fn google(client_id: String, client_secret: String) -> google::GoogleProvider {
         google::GoogleProvider::new(client_id, client_secret)
     }
 
     /// Create a Microsoft provider.
+    #[must_use] 
     pub fn microsoft(
         client_id: String,
         client_secret: String,
@@ -135,6 +138,7 @@ impl ProviderFactory {
     }
 
     /// Create a GitHub provider.
+    #[must_use] 
     pub fn github(client_id: String, client_secret: String) -> github::GithubProvider {
         github::GithubProvider::new(client_id, client_secret)
     }

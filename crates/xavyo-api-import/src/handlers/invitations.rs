@@ -1,7 +1,7 @@
 //! Invitation handlers (F086).
 //!
 //! Admin endpoints:
-//! - POST /admin/users/:user_id/invite — Resend invitation for a user
+//! - POST /`admin/users/:user_id/invite` — Resend invitation for a user
 //! - POST /admin/users/imports/:job_id/resend-invitations — Bulk resend
 //!
 //! Public endpoints (no auth):
@@ -25,7 +25,7 @@ use crate::services::import_service::ImportService;
 use crate::services::invitation_service::InvitationService;
 use xavyo_db::models::{User, UserInvitation};
 
-/// POST /admin/users/:user_id/invite
+/// POST /`admin/users/:user_id/invite`
 ///
 /// Send or resend an invitation for a specific user.
 pub async fn resend_user_invitation(
@@ -85,8 +85,7 @@ pub async fn bulk_resend_invitations(
         resent_count,
         skipped_count,
         message: Some(format!(
-            "Resent {} invitations, skipped {}",
-            resent_count, skipped_count
+            "Resent {resent_count} invitations, skipped {skipped_count}"
         )),
     }))
 }
@@ -199,7 +198,7 @@ pub async fn accept_invitation(
 
     // Hash password
     let password_hash = xavyo_auth::hash_password(&body.password)
-        .map_err(|e| ImportError::Internal(format!("Failed to hash password: {}", e)))?;
+        .map_err(|e| ImportError::Internal(format!("Failed to hash password: {e}")))?;
 
     // Atomically mark invitation as accepted (prevents concurrent double-acceptance)
     let accepted = UserInvitation::mark_accepted(
@@ -218,12 +217,12 @@ pub async fn accept_invitation(
 
     // Update user: set password and activate
     sqlx::query(
-        r#"
+        r"
         UPDATE users
         SET password_hash = $3, is_active = true, email_verified = true,
             email_verified_at = NOW(), updated_at = NOW()
         WHERE id = $1 AND tenant_id = $2
-        "#,
+        ",
     )
     .bind(invitation.user_id)
     .bind(invitation.tenant_id)
@@ -244,7 +243,7 @@ pub async fn accept_invitation(
     }))
 }
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ImportError> {
     claims
         .tenant_id()

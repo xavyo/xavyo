@@ -149,7 +149,8 @@ pub struct UnifiedCertificationService {
 }
 
 impl UnifiedCertificationService {
-    /// Creates a new UnifiedCertificationService.
+    /// Creates a new `UnifiedCertificationService`.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -186,11 +187,11 @@ impl UnifiedCertificationService {
             .map(|f| serde_json::to_value(f).unwrap_or_default());
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO unified_nhi_certification_campaigns
             (id, tenant_id, name, description, nhi_types, status, reviewer_id, filter, due_date, created_by, created_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -230,11 +231,11 @@ impl UnifiedCertificationService {
         campaign_id: Uuid,
     ) -> Result<UnifiedCertificationCampaign, UnifiedCertificationError> {
         let row = sqlx::query_as::<_, CampaignRow>(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, nhi_types, status, reviewer_id, filter, due_date, created_by, created_at, launched_at, completed_at
             FROM unified_nhi_certification_campaigns
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(campaign_id)
         .bind(tenant_id)
@@ -255,13 +256,13 @@ impl UnifiedCertificationService {
     ) -> Result<Vec<UnifiedCertificationCampaign>, UnifiedCertificationError> {
         let rows = if let Some(s) = status {
             sqlx::query_as::<_, CampaignRow>(
-                r#"
+                r"
                 SELECT id, tenant_id, name, description, nhi_types, status, reviewer_id, filter, due_date, created_by, created_at, launched_at, completed_at
                 FROM unified_nhi_certification_campaigns
                 WHERE tenant_id = $1 AND status = $2
                 ORDER BY created_at DESC
                 LIMIT $3 OFFSET $4
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(s.to_string())
@@ -271,13 +272,13 @@ impl UnifiedCertificationService {
             .await?
         } else {
             sqlx::query_as::<_, CampaignRow>(
-                r#"
+                r"
                 SELECT id, tenant_id, name, description, nhi_types, status, reviewer_id, filter, due_date, created_by, created_at, launched_at, completed_at
                 FROM unified_nhi_certification_campaigns
                 WHERE tenant_id = $1
                 ORDER BY created_at DESC
                 LIMIT $2 OFFSET $3
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(limit)
@@ -297,10 +298,10 @@ impl UnifiedCertificationService {
     ) -> Result<i64, UnifiedCertificationError> {
         let count: (i64,) = if let Some(s) = status {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT COUNT(*) FROM unified_nhi_certification_campaigns
                 WHERE tenant_id = $1 AND status = $2
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(s.to_string())
@@ -308,10 +309,10 @@ impl UnifiedCertificationService {
             .await?
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT COUNT(*) FROM unified_nhi_certification_campaigns
                 WHERE tenant_id = $1
-                "#,
+                ",
             )
             .bind(tenant_id)
             .fetch_one(&self.pool)
@@ -345,11 +346,11 @@ impl UnifiedCertificationService {
         for nhi in &nhis {
             let item_id = Uuid::new_v4();
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO unified_nhi_certification_items
                 (id, tenant_id, campaign_id, nhi_id, nhi_type, nhi_name, reviewer_id, status, created_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                "#,
+                ",
             )
             .bind(item_id)
             .bind(tenant_id)
@@ -366,11 +367,11 @@ impl UnifiedCertificationService {
 
         // Update campaign status to active
         sqlx::query(
-            r#"
+            r"
             UPDATE unified_nhi_certification_campaigns
             SET status = 'active', launched_at = $1
             WHERE id = $2 AND tenant_id = $3
-            "#,
+            ",
         )
         .bind(now)
         .bind(campaign_id)
@@ -414,7 +415,7 @@ impl UnifiedCertificationService {
         campaign_id: Uuid,
     ) -> Result<ItemCounts, UnifiedCertificationError> {
         let row: (i64, i64, i64, i64) = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE status = 'pending') as pending,
@@ -422,7 +423,7 @@ impl UnifiedCertificationService {
                 COUNT(*) FILTER (WHERE status = 'revoked') as revoked
             FROM unified_nhi_certification_items
             WHERE campaign_id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(campaign_id)
         .bind(tenant_id)
@@ -448,7 +449,7 @@ impl UnifiedCertificationService {
         offset: i64,
     ) -> Result<Vec<UnifiedCertificationItem>, UnifiedCertificationError> {
         let rows = sqlx::query_as::<_, ItemRow>(
-            r#"
+            r"
             SELECT id, tenant_id, campaign_id, nhi_id, nhi_type, nhi_name, reviewer_id, status, decision, decided_by, decided_at, comment, created_at
             FROM unified_nhi_certification_items
             WHERE campaign_id = $1 AND tenant_id = $2
@@ -456,7 +457,7 @@ impl UnifiedCertificationService {
                 AND ($4::text IS NULL OR status = $4)
             ORDER BY created_at
             LIMIT $5 OFFSET $6
-            "#,
+            ",
         )
         .bind(campaign_id)
         .bind(tenant_id)
@@ -479,13 +480,13 @@ impl UnifiedCertificationService {
         status: Option<ItemStatus>,
     ) -> Result<i64, UnifiedCertificationError> {
         let count: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM unified_nhi_certification_items
             WHERE campaign_id = $1 AND tenant_id = $2
                 AND ($3::text IS NULL OR nhi_type = $3)
                 AND ($4::text IS NULL OR status = $4)
-            "#,
+            ",
         )
         .bind(campaign_id)
         .bind(tenant_id)
@@ -504,11 +505,11 @@ impl UnifiedCertificationService {
         item_id: Uuid,
     ) -> Result<UnifiedCertificationItem, UnifiedCertificationError> {
         let row = sqlx::query_as::<_, ItemRow>(
-            r#"
+            r"
             SELECT id, tenant_id, campaign_id, nhi_id, nhi_type, nhi_name, reviewer_id, status, decision, decided_by, decided_at, comment, created_at
             FROM unified_nhi_certification_items
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(item_id)
         .bind(tenant_id)
@@ -551,11 +552,11 @@ impl UnifiedCertificationService {
         let now = Utc::now();
 
         sqlx::query(
-            r#"
+            r"
             UPDATE unified_nhi_certification_items
             SET status = $1, decision = $2, decided_by = $3, decided_at = $4, comment = $5
             WHERE id = $6 AND tenant_id = $7
-            "#,
+            ",
         )
         .bind(new_status.to_string())
         .bind(decision_str)
@@ -591,11 +592,11 @@ impl UnifiedCertificationService {
             "service_account" => {
                 // Suspend the service account
                 sqlx::query(
-                    r#"
+                    r"
                     UPDATE gov_service_accounts
                     SET status = 'suspended', suspension_reason = 'Certification revoked'
                     WHERE id = $1 AND tenant_id = $2
-                    "#,
+                    ",
                 )
                 .bind(item.nhi_id)
                 .bind(tenant_id)
@@ -605,11 +606,11 @@ impl UnifiedCertificationService {
             "ai_agent" => {
                 // Suspend the AI agent
                 sqlx::query(
-                    r#"
+                    r"
                     UPDATE ai_agents
                     SET status = 'suspended'
                     WHERE id = $1 AND tenant_id = $2
-                    "#,
+                    ",
                 )
                 .bind(item.nhi_id)
                 .bind(tenant_id)
@@ -621,7 +622,7 @@ impl UnifiedCertificationService {
         Ok(())
     }
 
-    /// Applies certification to the underlying NHI (updates last_certified_at).
+    /// Applies certification to the underlying NHI (updates `last_certified_at`).
     async fn apply_certification(
         &self,
         tenant_id: Uuid,
@@ -632,11 +633,11 @@ impl UnifiedCertificationService {
         match item.nhi_type.as_str() {
             "service_account" => {
                 sqlx::query(
-                    r#"
+                    r"
                     UPDATE gov_service_accounts
                     SET last_certified_at = $1, certified_by = $2
                     WHERE id = $3 AND tenant_id = $4
-                    "#,
+                    ",
                 )
                 .bind(now)
                 .bind(certified_by)
@@ -647,11 +648,11 @@ impl UnifiedCertificationService {
             }
             "ai_agent" => {
                 sqlx::query(
-                    r#"
+                    r"
                     UPDATE ai_agents
                     SET last_certified_at = $1, last_certified_by = $2
                     WHERE id = $3 AND tenant_id = $4
-                    "#,
+                    ",
                 )
                 .bind(now)
                 .bind(certified_by)
@@ -680,11 +681,11 @@ impl UnifiedCertificationService {
         }
 
         sqlx::query(
-            r#"
+            r"
             UPDATE unified_nhi_certification_campaigns
             SET status = 'cancelled'
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(campaign_id)
         .bind(tenant_id)
@@ -705,7 +706,7 @@ impl UnifiedCertificationService {
 
         // Get counts by NHI type
         let by_type: Vec<(String, i64, i64, i64)> = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 nhi_type,
                 COUNT(*) FILTER (WHERE status = 'pending') as pending,
@@ -714,7 +715,7 @@ impl UnifiedCertificationService {
             FROM unified_nhi_certification_items
             WHERE campaign_id = $1 AND tenant_id = $2
             GROUP BY nhi_type
-            "#,
+            ",
         )
         .bind(campaign_id)
         .bind(tenant_id)
@@ -783,14 +784,14 @@ impl UnifiedCertificationService {
         offset: i64,
     ) -> Result<Vec<UnifiedCertificationItem>, UnifiedCertificationError> {
         let rows = sqlx::query_as::<_, ItemRow>(
-            r#"
+            r"
             SELECT i.id, i.tenant_id, i.campaign_id, i.nhi_id, i.nhi_type, i.nhi_name, i.reviewer_id, i.status, i.decision, i.decided_by, i.decided_at, i.comment, i.created_at
             FROM unified_nhi_certification_items i
             JOIN unified_nhi_certification_campaigns c ON i.campaign_id = c.id
             WHERE i.tenant_id = $1 AND i.reviewer_id = $2 AND i.status = 'pending' AND c.status = 'active'
             ORDER BY c.due_date ASC, i.created_at ASC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(reviewer_id)
@@ -809,12 +810,12 @@ impl UnifiedCertificationService {
         reviewer_id: Uuid,
     ) -> Result<i64, UnifiedCertificationError> {
         let count: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM unified_nhi_certification_items i
             JOIN unified_nhi_certification_campaigns c ON i.campaign_id = c.id
             WHERE i.tenant_id = $1 AND i.reviewer_id = $2 AND i.status = 'pending' AND c.status = 'active'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(reviewer_id)

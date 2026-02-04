@@ -62,7 +62,7 @@ pub async fn execute(args: WatchArgs) -> CliResult<()> {
     // Set up file watcher with debouncing
     let (tx, rx) = mpsc::channel();
     let mut debouncer = new_debouncer(Duration::from_millis(DEFAULT_DEBOUNCE_MS), tx)
-        .map_err(|e| CliError::Io(format!("Failed to create file watcher: {}", e)))?;
+        .map_err(|e| CliError::Io(format!("Failed to create file watcher: {e}")))?;
 
     // Watch the file's parent directory to catch renames/recreations
     let watch_path = args
@@ -77,7 +77,7 @@ pub async fn execute(args: WatchArgs) -> CliResult<()> {
     debouncer
         .watcher()
         .watch(watch_path, RecursiveMode::NonRecursive)
-        .map_err(|e| CliError::Io(format!("Failed to watch directory: {}", e)))?;
+        .map_err(|e| CliError::Io(format!("Failed to watch directory: {e}")))?;
 
     // Run the watch loop
     watch_loop(&client, &args, rx, file_name).await
@@ -99,7 +99,7 @@ async fn watch_loop(
                 println!("Goodbye!");
                 return Ok(());
             }
-            _ = tokio::time::sleep(Duration::from_millis(100)) => {
+            () = tokio::time::sleep(Duration::from_millis(100)) => {
                 // Check for file events (non-blocking)
             }
         }
@@ -110,7 +110,7 @@ async fn watch_loop(
                 // Filter events for our specific file
                 let relevant_events: Vec<_> = events
                     .iter()
-                    .filter(|e| e.path.file_name().map(|n| n == file_name).unwrap_or(false))
+                    .filter(|e| e.path.file_name().is_some_and(|n| n == file_name))
                     .collect();
 
                 if !relevant_events.is_empty() {
@@ -143,7 +143,7 @@ async fn watch_loop(
                         }
                         Err(e) => {
                             // Error - print but continue watching
-                            eprintln!("Error applying changes: {}", e);
+                            eprintln!("Error applying changes: {e}");
                             println!("Watching for more changes...");
                         }
                     }
@@ -152,7 +152,7 @@ async fn watch_loop(
                 }
             }
             Ok(Err(e)) => {
-                eprintln!("Watch error: {}", e);
+                eprintln!("Watch error: {e}");
             }
             Err(mpsc::TryRecvError::Empty) => {
                 // No events, continue
@@ -170,13 +170,13 @@ async fn apply_config_changes(client: &ApiClient, args: &WatchArgs) -> CliResult
     let config = match load_config(&args.file) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Invalid YAML: {}", e);
+            eprintln!("Invalid YAML: {e}");
             return Ok(()); // Continue watching despite parse error
         }
     };
 
     if let Err(e) = validate_config(&config) {
-        eprintln!("Invalid configuration: {}", e);
+        eprintln!("Invalid configuration: {e}");
         return Ok(()); // Continue watching despite validation error
     }
 

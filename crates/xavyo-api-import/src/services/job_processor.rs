@@ -235,7 +235,7 @@ async fn process_single_row(
                 email: Some(row.email.clone()),
                 column_name: None,
                 error_type: "system".to_string(),
-                error_message: format!("Database error checking duplicate: {}", e),
+                error_message: format!("Database error checking duplicate: {e}"),
             };
             let _ = record_error(pool, tenant_id, job_id, &err).await;
             return RowOutcome::Error;
@@ -257,14 +257,14 @@ async fn process_single_row(
 
     // Create user with empty password hash (must use invitation to set password)
     let user_result = sqlx::query_scalar::<_, Uuid>(
-        r#"
+        r"
         INSERT INTO users (
             tenant_id, email, password_hash, display_name, first_name, last_name,
             is_active, email_verified, custom_attributes
         )
         VALUES ($1, $2, '', $3, $4, $5, $6, false, $7)
         RETURNING id
-        "#,
+        ",
     )
     .bind(tenant_id)
     .bind(&row.email)
@@ -284,7 +284,7 @@ async fn process_single_row(
                 email: Some(row.email.clone()),
                 column_name: None,
                 error_type: "system".to_string(),
-                error_message: format!("Failed to create user: {}", e),
+                error_message: format!("Failed to create user: {e}"),
             };
             let _ = record_error(pool, tenant_id, job_id, &err).await;
             return RowOutcome::Error;
@@ -305,7 +305,7 @@ async fn process_single_row(
                 email: Some(row.email.clone()),
                 column_name: Some("groups".to_string()),
                 error_type: "group_error".to_string(),
-                error_message: format!("Failed to assign group '{}': {}", group_name, e),
+                error_message: format!("Failed to assign group '{group_name}': {e}"),
             };
             let _ = record_error(pool, tenant_id, job_id, &err).await;
         }
@@ -386,7 +386,7 @@ async fn assign_group(
     Ok(())
 }
 
-/// Validate that a role name exists as a gov_entitlement with type "role",
+/// Validate that a role name exists as a `gov_entitlement` with type "role",
 /// and record an error if not found.
 async fn validate_and_record_role(
     pool: &PgPool,
@@ -398,12 +398,12 @@ async fn validate_and_record_role(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Check if a role with this name exists in the governance system
     let role_exists: bool = sqlx::query_scalar(
-        r#"
+        r"
         SELECT EXISTS(
             SELECT 1 FROM gov_entitlements
             WHERE tenant_id = $1 AND name = $2 AND entitlement_type = 'role'
         )
-        "#,
+        ",
     )
     .bind(tenant_id)
     .bind(role_name)
@@ -416,7 +416,7 @@ async fn validate_and_record_role(
             email: Some(row.email.clone()),
             column_name: Some("roles".to_string()),
             error_type: "role_not_found".to_string(),
-            error_message: format!("Role '{}' does not exist", role_name),
+            error_message: format!("Role '{role_name}' does not exist"),
         };
         record_error(pool, tenant_id, job_id, &err).await?;
     }

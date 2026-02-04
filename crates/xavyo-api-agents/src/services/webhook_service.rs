@@ -31,8 +31,8 @@ const BASE_RETRY_DELAY_SECS: u64 = 5;
 /// This function validates webhook URLs to prevent Server-Side Request Forgery attacks.
 /// It blocks requests to:
 /// - Private IPv4 ranges (10.x.x.x, 172.16-31.x.x, 192.168.x.x)
-/// - Loopback addresses (127.x.x.x, ::1)
-/// - Link-local addresses (169.254.x.x, fe80::/10)
+/// - Loopback addresses (127.x.x.x, `::1`)
+/// - Link-local addresses (169.254.x.x, `fe80::/10`)
 /// - Documentation/test ranges
 /// - Unspecified addresses (0.0.0.0, ::)
 ///
@@ -44,12 +44,12 @@ const BASE_RETRY_DELAY_SECS: u64 = 5;
 /// - Exfiltrate data through DNS rebinding
 pub fn validate_webhook_url(url_str: &str) -> Result<(), String> {
     // Parse the URL
-    let url = Url::parse(url_str).map_err(|e| format!("Invalid URL: {}", e))?;
+    let url = Url::parse(url_str).map_err(|e| format!("Invalid URL: {e}"))?;
 
     // Only allow HTTPS in production (HTTP allowed for localhost in dev)
     let scheme = url.scheme();
     if scheme != "https" && scheme != "http" {
-        return Err(format!("Unsupported scheme: {}", scheme));
+        return Err(format!("Unsupported scheme: {scheme}"));
     }
 
     // Get the host
@@ -61,15 +61,14 @@ pub fn validate_webhook_url(url_str: &str) -> Result<(), String> {
     if let Ok(ip) = host.parse::<IpAddr>() {
         if is_private_ip(&ip) {
             return Err(format!(
-                "Private/internal IP addresses are not allowed: {}",
-                ip
+                "Private/internal IP addresses are not allowed: {ip}"
             ));
         }
     } else {
         // It's a hostname - resolve it and check all IPs
         // Use port 443 as default for resolution
         let port = url.port().unwrap_or(443);
-        let addr_str = format!("{}:{}", host, port);
+        let addr_str = format!("{host}:{port}");
 
         match addr_str.to_socket_addrs() {
             Ok(addrs) => {
@@ -105,8 +104,8 @@ pub fn validate_webhook_url(url_str: &str) -> Result<(), String> {
     ];
 
     for blocked in blocked_hosts {
-        if lower_host == blocked || lower_host.ends_with(&format!(".{}", blocked)) {
-            return Err(format!("Blocked internal hostname: {}", host));
+        if lower_host == blocked || lower_host.ends_with(&format!(".{blocked}")) {
+            return Err(format!("Blocked internal hostname: {host}"));
         }
     }
 
@@ -262,7 +261,7 @@ impl WebhookService {
                 error = %e,
                 "Webhook URL validation failed (SSRF protection)"
             );
-            ApiAgentsError::Validation(format!("Invalid callback URL: {}", e))
+            ApiAgentsError::Validation(format!("Invalid callback URL: {e}"))
         })?;
 
         let payload_json =
@@ -355,7 +354,7 @@ impl WebhookService {
                 error = %e,
                 "Webhook URL validation failed (SSRF protection)"
             );
-            ApiAgentsError::Validation(format!("Invalid callback URL: {}", e))
+            ApiAgentsError::Validation(format!("Invalid callback URL: {e}"))
         })?;
 
         let payload = A2aTaskWebhookPayload {
@@ -473,11 +472,11 @@ impl WebhookService {
             .client
             .post(url)
             .header("Content-Type", "application/json")
-            .header("X-Webhook-Signature", format!("sha256={}", signature))
+            .header("X-Webhook-Signature", format!("sha256={signature}"))
             .body(payload_json.to_string())
             .send()
             .await
-            .map_err(|e| format!("Request failed: {}", e))?;
+            .map_err(|e| format!("Request failed: {e}"))?;
 
         if response.status().is_success() {
             Ok(())

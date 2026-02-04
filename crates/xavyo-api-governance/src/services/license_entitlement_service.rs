@@ -51,8 +51,7 @@ pub(crate) fn is_entitlement_linked_to_assignment(
     valid_ids: &[Uuid],
 ) -> bool {
     assignment_link_id
-        .map(|lid| valid_ids.contains(&lid))
-        .unwrap_or(false)
+        .is_some_and(|lid| valid_ids.contains(&lid))
 }
 
 /// Sort links by priority ascending (lower number = higher priority).
@@ -91,6 +90,7 @@ pub struct LicenseEntitlementService {
 
 impl LicenseEntitlementService {
     /// Create a new license entitlement service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: LicenseAuditService::new(pool.clone()),
@@ -100,7 +100,7 @@ impl LicenseEntitlementService {
 
     /// Create a new license-entitlement link.
     ///
-    /// Validates that the pool exists, the entitlement_id is provided,
+    /// Validates that the pool exists, the `entitlement_id` is provided,
     /// and that no duplicate link exists for the same pool+entitlement pair.
     pub async fn create_link(
         &self,
@@ -324,8 +324,7 @@ impl LicenseEntitlementService {
                     entitlement_link_id: Some(link.id),
                     session_id: None,
                     notes: Some(format!(
-                        "Auto-allocated via entitlement link (entitlement: {})",
-                        entitlement_id
+                        "Auto-allocated via entitlement link (entitlement: {entitlement_id})"
                     )),
                 };
 
@@ -504,11 +503,13 @@ impl LicenseEntitlementService {
     }
 
     /// Get the underlying database pool reference.
+    #[must_use] 
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get the audit service reference.
+    #[must_use] 
     pub fn audit_service(&self) -> &LicenseAuditService {
         &self.audit_service
     }

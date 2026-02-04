@@ -15,6 +15,7 @@ pub struct HealthStatus {
 
 impl HealthStatus {
     /// Check if the connection is healthy.
+    #[must_use] 
     pub fn is_healthy(&self) -> bool {
         self.connected && self.brokers > 0
     }

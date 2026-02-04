@@ -16,6 +16,7 @@ pub struct EscalationPolicyService {
 
 impl EscalationPolicyService {
     /// Create a new escalation policy service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -258,6 +259,7 @@ impl EscalationPolicyService {
     }
 
     /// Get reference to the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

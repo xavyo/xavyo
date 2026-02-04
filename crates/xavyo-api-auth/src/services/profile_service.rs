@@ -21,6 +21,7 @@ pub struct ProfileService {
 
 impl ProfileService {
     /// Create a new profile service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

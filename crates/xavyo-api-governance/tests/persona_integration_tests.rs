@@ -12,8 +12,8 @@ mod common;
 mod persona_workflow_integration {
     use super::*;
     use xavyo_db::models::{
-        AttributeMappings, ComputedMapping, LifecyclePolicy, PersonaAuditEventType,
-        PersonaLinkType, PersonaStatus, PropagateMapping,
+        PersonaAuditEventType,
+        PersonaLinkType, PersonaStatus,
     };
 
     /// T014: Integration test for persona creation workflow
@@ -53,7 +53,7 @@ mod persona_workflow_integration {
     fn test_persona_assignment_workflow() {
         // 1. Physical user exists: john.doe
         let physical_user_id = Uuid::new_v4();
-        let physical_user_attrs = json!({
+        let _physical_user_attrs = json!({
             "email": "john.doe@example.com",
             "given_name": "John",
             "surname": "Doe",
@@ -153,7 +153,7 @@ mod persona_workflow_integration {
 }
 
 mod persona_activation_integration {
-    use super::*;
+    
     use xavyo_db::models::{PersonaAuditEventType, PersonaStatus};
 
     #[test]
@@ -245,7 +245,7 @@ mod persona_deactivation_integration {
 }
 
 mod persona_archive_integration {
-    use super::*;
+    
     use xavyo_db::models::{PersonaAuditEventType, PersonaStatus};
 
     #[test]
@@ -288,9 +288,9 @@ mod duplicate_prevention_integration {
 
     #[test]
     fn test_prevent_duplicate_persona_same_archetype() {
-        let physical_user_id = Uuid::new_v4();
-        let archetype_id = Uuid::new_v4();
-        let tenant_id = Uuid::new_v4();
+        let _physical_user_id = Uuid::new_v4();
+        let _archetype_id = Uuid::new_v4();
+        let _tenant_id = Uuid::new_v4();
 
         // First persona creation should succeed
         let first_persona_id = Uuid::new_v4();
@@ -307,7 +307,7 @@ mod duplicate_prevention_integration {
 
     #[test]
     fn test_allow_different_archetypes_for_same_user() {
-        let physical_user_id = Uuid::new_v4();
+        let _physical_user_id = Uuid::new_v4();
         let archetype_id_1 = Uuid::new_v4();
         let archetype_id_2 = Uuid::new_v4();
 
@@ -327,7 +327,7 @@ mod duplicate_prevention_integration {
 }
 
 mod archetype_deletion_prevention {
-    use super::*;
+    
 
     #[test]
     fn test_cannot_delete_archetype_with_active_personas() {
@@ -335,8 +335,7 @@ mod archetype_deletion_prevention {
 
         assert!(
             active_personas_count > 0,
-            "Cannot delete archetype with {} active personas",
-            active_personas_count
+            "Cannot delete archetype with {active_personas_count} active personas"
         );
     }
 
@@ -369,7 +368,7 @@ mod validity_period_integration {
     fn test_persona_validity_from_archetype_default() {
         let default_validity_days = 365;
         let now = Utc::now();
-        let valid_until = now + Duration::days(default_validity_days as i64);
+        let valid_until = now + Duration::days(i64::from(default_validity_days));
 
         assert!(valid_until > now);
     }

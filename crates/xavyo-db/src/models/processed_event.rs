@@ -1,4 +1,4 @@
-//! ProcessedEvent model for event idempotence tracking.
+//! `ProcessedEvent` model for event idempotence tracking.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -38,12 +38,12 @@ impl ProcessedEvent {
         consumer_group: &str,
     ) -> Result<bool, sqlx::Error> {
         let result: (bool,) = sqlx::query_as(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM processed_events
                 WHERE event_id = $1 AND consumer_group = $2
             )
-            "#,
+            ",
         )
         .bind(event_id)
         .bind(consumer_group)
@@ -62,11 +62,11 @@ impl ProcessedEvent {
         data: CreateProcessedEvent,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             INSERT INTO processed_events (event_id, consumer_group, topic)
             VALUES ($1, $2, $3)
             ON CONFLICT (event_id, consumer_group) DO NOTHING
-            "#,
+            ",
         )
         .bind(data.event_id)
         .bind(&data.consumer_group)
@@ -100,10 +100,10 @@ impl ProcessedEvent {
         before: DateTime<Utc>,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM processed_events
             WHERE processed_at < $1
-            "#,
+            ",
         )
         .bind(before)
         .execute(pool)

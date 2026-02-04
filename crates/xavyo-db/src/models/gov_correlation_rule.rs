@@ -159,10 +159,10 @@ impl GovCorrelationRule {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_correlation_rules
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -177,10 +177,10 @@ impl GovCorrelationRule {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_correlation_rules
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -194,11 +194,11 @@ impl GovCorrelationRule {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_correlation_rules
             WHERE tenant_id = $1 AND is_active = true
             ORDER BY priority DESC, created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -212,11 +212,11 @@ impl GovCorrelationRule {
         connector_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_correlation_rules
             WHERE tenant_id = $1 AND connector_id = $2 AND is_active = true
             ORDER BY COALESCE(tier, 0) ASC, priority DESC, created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -234,24 +234,24 @@ impl GovCorrelationRule {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_correlation_rules
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         );
         let mut param_count = 2;
 
         if filter.match_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND match_type = ${}", param_count));
+            query.push_str(&format!(" AND match_type = ${param_count}"));
         }
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.tier.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND tier = ${}", param_count));
+            query.push_str(&format!(" AND tier = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -285,24 +285,24 @@ impl GovCorrelationRule {
         filter: &CorrelationRuleFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_correlation_rules
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         );
         let mut param_count = 2;
 
         if filter.match_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND match_type = ${}", param_count));
+            query.push_str(&format!(" AND match_type = ${param_count}"));
         }
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.tier.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND tier = ${}", param_count));
+            query.push_str(&format!(" AND tier = ${param_count}"));
         }
 
         let _ = param_count;
@@ -333,24 +333,24 @@ impl GovCorrelationRule {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_correlation_rules
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.match_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND match_type = ${}", param_count));
+            query.push_str(&format!(" AND match_type = ${param_count}"));
         }
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.attribute.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND attribute = ${}", param_count));
+            query.push_str(&format!(" AND attribute = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -381,24 +381,24 @@ impl GovCorrelationRule {
         filter: &CorrelationRuleFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_correlation_rules
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.match_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND match_type = ${}", param_count));
+            query.push_str(&format!(" AND match_type = ${param_count}"));
         }
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.attribute.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND attribute = ${}", param_count));
+            query.push_str(&format!(" AND attribute = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -423,7 +423,7 @@ impl GovCorrelationRule {
         input: CreateGovCorrelationRule,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_correlation_rules (
                 tenant_id, name, attribute, match_type, algorithm, threshold, weight, priority,
                 connector_id, source_attribute, target_attribute, expression, tier,
@@ -435,7 +435,7 @@ impl GovCorrelationRule {
                 COALESCE($14, false), COALESCE($15, true)
             )
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -467,52 +467,52 @@ impl GovCorrelationRule {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.algorithm.is_some() {
-            updates.push(format!("algorithm = ${}", param_idx));
+            updates.push(format!("algorithm = ${param_idx}"));
             param_idx += 1;
         }
         if input.threshold.is_some() {
-            updates.push(format!("threshold = ${}", param_idx));
+            updates.push(format!("threshold = ${param_idx}"));
             param_idx += 1;
         }
         if input.weight.is_some() {
-            updates.push(format!("weight = ${}", param_idx));
+            updates.push(format!("weight = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_active.is_some() {
-            updates.push(format!("is_active = ${}", param_idx));
+            updates.push(format!("is_active = ${param_idx}"));
             param_idx += 1;
         }
         if input.priority.is_some() {
-            updates.push(format!("priority = ${}", param_idx));
+            updates.push(format!("priority = ${param_idx}"));
             param_idx += 1;
         }
         // F067 fields
         if input.source_attribute.is_some() {
-            updates.push(format!("source_attribute = ${}", param_idx));
+            updates.push(format!("source_attribute = ${param_idx}"));
             param_idx += 1;
         }
         if input.target_attribute.is_some() {
-            updates.push(format!("target_attribute = ${}", param_idx));
+            updates.push(format!("target_attribute = ${param_idx}"));
             param_idx += 1;
         }
         if input.expression.is_some() {
-            updates.push(format!("expression = ${}", param_idx));
+            updates.push(format!("expression = ${param_idx}"));
             param_idx += 1;
         }
         if input.tier.is_some() {
-            updates.push(format!("tier = ${}", param_idx));
+            updates.push(format!("tier = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_definitive.is_some() {
-            updates.push(format!("is_definitive = ${}", param_idx));
+            updates.push(format!("is_definitive = ${param_idx}"));
             param_idx += 1;
         }
         if input.normalize.is_some() {
-            updates.push(format!("normalize = ${}", param_idx));
+            updates.push(format!("normalize = ${param_idx}"));
         }
 
         let query = format!(
@@ -572,10 +572,10 @@ impl GovCorrelationRule {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_correlation_rules
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -593,15 +593,15 @@ impl GovCorrelationRule {
         exclude_rule_id: Option<Uuid>,
     ) -> Result<rust_decimal::Decimal, sqlx::Error> {
         let query = if exclude_rule_id.is_some() {
-            r#"
+            r"
             SELECT COALESCE(SUM(weight), 0) FROM gov_correlation_rules
             WHERE tenant_id = $1 AND connector_id = $2 AND is_active = true AND id != $3
-            "#
+            "
         } else {
-            r#"
+            r"
             SELECT COALESCE(SUM(weight), 0) FROM gov_correlation_rules
             WHERE tenant_id = $1 AND connector_id = $2 AND is_active = true
-            "#
+            "
         };
 
         let mut q = sqlx::query_scalar::<_, rust_decimal::Decimal>(query)
@@ -616,21 +616,25 @@ impl GovCorrelationRule {
     }
 
     /// Check if rule is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         self.is_active
     }
 
     /// Check if this is a fuzzy match rule.
+    #[must_use] 
     pub fn is_fuzzy(&self) -> bool {
         matches!(self.match_type, GovMatchType::Fuzzy)
     }
 
     /// Check if this is an expression-based rule (F067).
+    #[must_use] 
     pub fn is_expression(&self) -> bool {
         matches!(self.match_type, GovMatchType::Expression)
     }
 
     /// Check if this is a connector-scoped rule (F067).
+    #[must_use] 
     pub fn is_connector_scoped(&self) -> bool {
         self.connector_id.is_some()
     }

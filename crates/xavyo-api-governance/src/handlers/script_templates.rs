@@ -52,8 +52,7 @@ fn parse_category(s: &str) -> Result<TemplateCategory, ApiGovernanceError> {
     serde_json::from_value::<TemplateCategory>(serde_json::Value::String(s.to_string()))
         .map_err(|_| {
             ApiGovernanceError::Validation(format!(
-                "Invalid template category: '{}'. Expected one of: attribute_mapping, value_generation, conditional_logic, data_formatting, custom",
-                s
+                "Invalid template category: '{s}'. Expected one of: attribute_mapping, value_generation, conditional_logic, data_formatting, custom"
             ))
         })
 }

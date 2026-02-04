@@ -16,7 +16,7 @@ use crate::services::dlq_service::{
 };
 use xavyo_db::models::DlqFilter;
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, WebhookError> {
     claims
         .tenant_id()

@@ -1,6 +1,6 @@
-//! Google OAuth2 Integration Tests
+//! Google `OAuth2` Integration Tests
 //!
-//! Tests for Google OAuth2 flow including:
+//! Tests for Google `OAuth2` flow including:
 //! - Authorization URL generation
 //! - Token exchange
 //! - Userinfo retrieval
@@ -19,7 +19,7 @@ use super::mock_server::{
     setup_token_endpoint_success, OAuthError,
 };
 
-/// Google OAuth2 endpoints
+/// Google `OAuth2` endpoints
 const GOOGLE_AUTH_ENDPOINT: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 #[allow(dead_code)]
 const GOOGLE_TOKEN_ENDPOINT: &str = "https://oauth2.googleapis.com/token";
@@ -47,7 +47,7 @@ async fn test_google_authorization_url_generation() {
         urlencoding::encode(&fixture.client_id)
     )));
     assert!(auth_url.contains("response_type=code"));
-    assert!(auth_url.contains(&format!("state={}", TEST_STATE)));
+    assert!(auth_url.contains(&format!("state={TEST_STATE}")));
     assert!(auth_url.contains("scope="));
     assert!(auth_url.contains("openid"));
     assert!(auth_url.contains("email"));
@@ -136,7 +136,7 @@ async fn test_google_csrf_state_validation() {
     );
 
     // Verify state is in URL
-    assert!(auth_url.contains(&format!("state={}", original_state)));
+    assert!(auth_url.contains(&format!("state={original_state}")));
 
     // Simulate callback with matching state (valid)
     let callback_state = original_state;

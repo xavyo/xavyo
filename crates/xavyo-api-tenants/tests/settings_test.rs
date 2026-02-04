@@ -6,7 +6,7 @@ use xavyo_api_tenants::models::{
     GetSettingsResponse, UpdateSettingsRequest, UpdateSettingsResponse,
 };
 
-/// Test UpdateSettingsRequest validation with valid settings.
+/// Test `UpdateSettingsRequest` validation with valid settings.
 #[test]
 fn test_validate_valid_settings() {
     let request = UpdateSettingsRequest {
@@ -20,7 +20,7 @@ fn test_validate_valid_settings() {
     assert!(request.validate().is_none());
 }
 
-/// Test UpdateSettingsRequest validation with null limits.
+/// Test `UpdateSettingsRequest` validation with null limits.
 #[test]
 fn test_validate_null_limits() {
     let request = UpdateSettingsRequest {
@@ -33,7 +33,7 @@ fn test_validate_null_limits() {
     assert!(request.validate().is_none());
 }
 
-/// Test UpdateSettingsRequest validation with empty object.
+/// Test `UpdateSettingsRequest` validation with empty object.
 #[test]
 fn test_validate_empty_object() {
     let request = UpdateSettingsRequest {
@@ -42,7 +42,7 @@ fn test_validate_empty_object() {
     assert!(request.validate().is_none());
 }
 
-/// Test UpdateSettingsRequest validation with non-object.
+/// Test `UpdateSettingsRequest` validation with non-object.
 #[test]
 fn test_validate_non_object() {
     let request = UpdateSettingsRequest {
@@ -54,7 +54,7 @@ fn test_validate_non_object() {
     );
 }
 
-/// Test UpdateSettingsRequest validation with non-object limits.
+/// Test `UpdateSettingsRequest` validation with non-object limits.
 #[test]
 fn test_validate_limits_not_object() {
     let request = UpdateSettingsRequest {
@@ -68,7 +68,7 @@ fn test_validate_limits_not_object() {
     );
 }
 
-/// Test UpdateSettingsRequest validation with negative limit.
+/// Test `UpdateSettingsRequest` validation with negative limit.
 #[test]
 fn test_validate_negative_limit() {
     let request = UpdateSettingsRequest {
@@ -84,7 +84,7 @@ fn test_validate_negative_limit() {
     );
 }
 
-/// Test UpdateSettingsRequest validation with string limit.
+/// Test `UpdateSettingsRequest` validation with string limit.
 #[test]
 fn test_validate_string_limit() {
     let request = UpdateSettingsRequest {
@@ -100,7 +100,7 @@ fn test_validate_string_limit() {
     );
 }
 
-/// Test UpdateSettingsRequest validation with features object.
+/// Test `UpdateSettingsRequest` validation with features object.
 #[test]
 fn test_validate_features_object() {
     let request = UpdateSettingsRequest {
@@ -114,7 +114,7 @@ fn test_validate_features_object() {
     assert!(request.validate().is_none());
 }
 
-/// Test UpdateSettingsRequest validation with mixed valid settings.
+/// Test `UpdateSettingsRequest` validation with mixed valid settings.
 #[test]
 fn test_validate_mixed_valid_settings() {
     let request = UpdateSettingsRequest {
@@ -136,7 +136,7 @@ fn test_validate_mixed_valid_settings() {
     assert!(request.validate().is_none());
 }
 
-/// Test UpdateSettingsResponse serialization.
+/// Test `UpdateSettingsResponse` serialization.
 #[test]
 fn test_update_response_serialization() {
     let response = UpdateSettingsResponse {
@@ -154,7 +154,7 @@ fn test_update_response_serialization() {
     assert!(json.contains("max_mau"));
 }
 
-/// Test UpdateSettingsResponse deserialization.
+/// Test `UpdateSettingsResponse` deserialization.
 #[test]
 fn test_update_response_deserialization() {
     let json = r#"{
@@ -171,7 +171,7 @@ fn test_update_response_deserialization() {
     assert_eq!(response.settings["limits"]["max_mau"], 1000);
 }
 
-/// Test GetSettingsResponse serialization.
+/// Test `GetSettingsResponse` serialization.
 #[test]
 fn test_get_response_serialization() {
     let response = GetSettingsResponse {
@@ -189,7 +189,7 @@ fn test_get_response_serialization() {
     assert!(json.contains("mfa_required"));
 }
 
-/// Test GetSettingsResponse deserialization.
+/// Test `GetSettingsResponse` deserialization.
 #[test]
 fn test_get_response_deserialization() {
     let json = r#"{
@@ -206,7 +206,7 @@ fn test_get_response_deserialization() {
     assert_eq!(response.settings["limits"]["max_api_calls"], 100000);
 }
 
-/// Test UpdateSettingsRequest serialization.
+/// Test `UpdateSettingsRequest` serialization.
 #[test]
 fn test_request_serialization() {
     let request = UpdateSettingsRequest {
@@ -221,7 +221,7 @@ fn test_request_serialization() {
     assert!(json.contains("2000"));
 }
 
-/// Test UpdateSettingsRequest deserialization.
+/// Test `UpdateSettingsRequest` deserialization.
 #[test]
 fn test_request_deserialization() {
     let json = r#"{"settings": {"limits": {"max_mau": 3000}}}"#;

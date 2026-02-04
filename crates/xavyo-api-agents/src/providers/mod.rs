@@ -101,6 +101,7 @@ pub struct CloudCredential {
 
 impl CloudCredential {
     /// Create a new AWS STS credential.
+    #[must_use] 
     pub fn aws_sts(
         access_key: String,
         secret_key: String,
@@ -119,6 +120,7 @@ impl CloudCredential {
     }
 
     /// Create a new GCP access token credential.
+    #[must_use] 
     pub fn gcp_access_token(access_token: String, expires_at: i64) -> Self {
         Self {
             credential_type: "gcp-access-token".to_string(),
@@ -132,6 +134,7 @@ impl CloudCredential {
     }
 
     /// Create a new Azure token credential.
+    #[must_use] 
     pub fn azure_token(access_token: String, expires_at: i64) -> Self {
         Self {
             credential_type: "azure-token".to_string(),
@@ -145,6 +148,7 @@ impl CloudCredential {
     }
 
     /// Create a new Kubernetes service account token credential.
+    #[must_use] 
     pub fn kubernetes_token(token: String, expires_at: i64) -> Self {
         Self {
             credential_type: "kubernetes-token".to_string(),
@@ -164,12 +168,14 @@ impl CloudCredential {
     }
 
     /// Check if the credential has expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         let now = chrono::Utc::now().timestamp();
         self.expires_at <= now
     }
 
     /// Get the time until expiration in seconds.
+    #[must_use] 
     pub fn ttl_seconds(&self) -> i64 {
         let now = chrono::Utc::now().timestamp();
         (self.expires_at - now).max(0)
@@ -230,7 +236,7 @@ pub struct AwsStsConfig {
     /// The OIDC provider ARN configured in AWS IAM.
     pub oidc_provider_arn: String,
 
-    /// Session name prefix for AssumeRoleWithWebIdentity.
+    /// Session name prefix for `AssumeRoleWithWebIdentity`.
     #[serde(default = "default_session_prefix")]
     pub session_name_prefix: String,
 
@@ -364,6 +370,7 @@ pub struct TokenValidation {
 
 impl TokenValidation {
     /// Create a valid token validation result.
+    #[must_use] 
     pub fn valid(subject: String, issuer: String, expires_at: i64) -> Self {
         Self {
             valid: true,
@@ -390,6 +397,7 @@ impl TokenValidation {
     }
 
     /// Add audience to the validation result.
+    #[must_use] 
     pub fn with_audience(mut self, audience: Vec<String>) -> Self {
         self.audience = Some(audience);
         self
@@ -512,7 +520,7 @@ impl std::str::FromStr for KeyAlgorithm {
             "rsa4096" | "rsa_4096" => Ok(Self::Rsa4096),
             "ecdsa_p256" | "ecdsap256" | "p256" => Ok(Self::EcdsaP256),
             "ecdsa_p384" | "ecdsap384" | "p384" => Ok(Self::EcdsaP384),
-            _ => Err(format!("Invalid key algorithm: {}", s)),
+            _ => Err(format!("Invalid key algorithm: {s}")),
         }
     }
 }
@@ -637,11 +645,13 @@ pub enum RevocationReason {
 
 impl RevocationReason {
     /// Convert to i16 for database storage.
+    #[must_use] 
     pub fn as_i16(&self) -> i16 {
         *self as i16
     }
 
     /// Create from i16 value.
+    #[must_use] 
     pub fn from_i16(value: i16) -> Option<Self> {
         match value {
             0 => Some(Self::Unspecified),
@@ -691,7 +701,7 @@ impl std::str::FromStr for RevocationReason {
             "remove_from_crl" | "removefromcrl" => Ok(Self::RemoveFromCrl),
             "privilege_withdrawn" | "privilegewithdrawn" => Ok(Self::PrivilegeWithdrawn),
             "aa_compromise" | "aacompromise" => Ok(Self::AaCompromise),
-            _ => Err(format!("Invalid revocation reason: {}", s)),
+            _ => Err(format!("Invalid revocation reason: {s}")),
         }
     }
 }
@@ -767,6 +777,7 @@ pub struct CertificateValidation {
 
 impl CertificateValidation {
     /// Create a valid certificate validation result.
+    #[must_use] 
     pub fn valid(agent_id: Uuid, tenant_id: Uuid, serial_number: String, expires_at: i64) -> Self {
         Self {
             valid: true,

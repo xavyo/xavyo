@@ -51,7 +51,7 @@ pub struct ScimGroup {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<Uuid>,
 
-    /// External identifier from IdP.
+    /// External identifier from `IdP`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub external_id: Option<String>,
 
@@ -96,6 +96,7 @@ impl ScimGroup {
     }
 
     /// Set the resource ID and generate metadata.
+    #[must_use] 
     pub fn with_meta(
         mut self,
         id: Uuid,
@@ -108,13 +109,14 @@ impl ScimGroup {
             resource_type: "Group".to_string(),
             created: created_at,
             last_modified: updated_at,
-            location: Some(format!("{}/scim/v2/Groups/{}", base_url, id)),
+            location: Some(format!("{base_url}/scim/v2/Groups/{id}")),
             version: None,
         });
         self
     }
 
     /// Get member IDs.
+    #[must_use] 
     pub fn member_ids(&self) -> Vec<Uuid> {
         self.members.iter().map(|m| m.value).collect()
     }

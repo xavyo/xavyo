@@ -85,7 +85,7 @@ pub struct Tenant {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deletion_reason: Option<String>,
 
-    /// When permanent deletion will occur (typically 30 days after deleted_at).
+    /// When permanent deletion will occur (typically 30 days after `deleted_at`).
     /// F-DELETE: Added for tenant soft delete support.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scheduled_purge_at: Option<DateTime<Utc>>,
@@ -100,11 +100,13 @@ impl Tenant {
     ///
     /// The system tenant is used for platform-level operations such as
     /// CLI authentication before users have their own tenant.
+    #[must_use] 
     pub fn is_system(&self) -> bool {
         self.tenant_type == TenantType::System
     }
 
     /// Returns `true` if this is a regular user tenant.
+    #[must_use] 
     pub fn is_user(&self) -> bool {
         self.tenant_type == TenantType::User
     }
@@ -112,6 +114,7 @@ impl Tenant {
     /// Returns `true` if this tenant is currently suspended.
     ///
     /// F-SUSPEND: Suspended tenants cannot access any API endpoints.
+    #[must_use] 
     pub fn is_suspended(&self) -> bool {
         self.suspended_at.is_some()
     }
@@ -119,11 +122,13 @@ impl Tenant {
     /// Returns `true` if this tenant has been soft deleted.
     ///
     /// F-DELETE: Deleted tenants cannot access any API endpoints.
+    #[must_use] 
     pub fn is_deleted(&self) -> bool {
         self.deleted_at.is_some()
     }
 
     /// Returns `true` if this tenant is inaccessible (suspended or deleted).
+    #[must_use] 
     pub fn is_inaccessible(&self) -> bool {
         self.is_suspended() || self.is_deleted()
     }
@@ -135,11 +140,11 @@ impl Tenant {
     /// Finds a tenant by its ID.
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
             FROM tenants
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .fetch_optional(pool)
@@ -150,11 +155,11 @@ impl Tenant {
     /// Finds a tenant by its slug.
     pub async fn find_by_slug(pool: &PgPool, slug: &str) -> Result<Option<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
             FROM tenants
             WHERE slug = $1
-            "#,
+            ",
         )
         .bind(slug)
         .fetch_optional(pool)
@@ -171,12 +176,12 @@ impl Tenant {
         tenant_type: TenantType,
     ) -> Result<Vec<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
             FROM tenants
             WHERE tenant_type = $1
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .bind(tenant_type)
         .fetch_all(pool)
@@ -187,11 +192,11 @@ impl Tenant {
     /// Lists all tenants.
     pub async fn list_all(pool: &PgPool) -> Result<Vec<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
             FROM tenants
             ORDER BY created_at ASC
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await
@@ -201,9 +206,9 @@ impl Tenant {
     /// Counts tenants by type.
     pub async fn count_by_type(pool: &PgPool, tenant_type: TenantType) -> Result<i64, DbError> {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM tenants WHERE tenant_type = $1
-            "#,
+            ",
         )
         .bind(tenant_type)
         .fetch_one(pool)
@@ -220,9 +225,9 @@ impl Tenant {
     /// Check if a slug already exists.
     pub async fn slug_exists(pool: &PgPool, slug: &str) -> Result<bool, DbError> {
         let result: (bool,) = sqlx::query_as(
-            r#"
+            r"
             SELECT EXISTS(SELECT 1 FROM tenants WHERE slug = $1)
-            "#,
+            ",
         )
         .bind(slug)
         .fetch_one(pool)
@@ -241,11 +246,11 @@ impl Tenant {
         settings: serde_json::Value,
     ) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO tenants (name, slug, tenant_type, settings)
             VALUES ($1, $2, $3, $4)
             RETURNING id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
-            "#,
+            ",
         )
         .bind(name)
         .bind(slug)
@@ -265,11 +270,11 @@ impl Tenant {
         settings: serde_json::Value,
     ) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO tenants (name, slug, tenant_type, settings)
             VALUES ($1, $2, $3, $4)
             RETURNING id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
-            "#,
+            ",
         )
         .bind(name)
         .bind(slug)
@@ -286,9 +291,9 @@ impl Tenant {
         slug: &str,
     ) -> Result<bool, DbError> {
         let result: (bool,) = sqlx::query_as(
-            r#"
+            r"
             SELECT EXISTS(SELECT 1 FROM tenants WHERE slug = $1)
-            "#,
+            ",
         )
         .bind(slug)
         .fetch_one(&mut **tx)
@@ -307,12 +312,12 @@ impl Tenant {
     /// Returns the updated tenant on success.
     pub async fn suspend(pool: &PgPool, id: Uuid, reason: &str) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE tenants
             SET suspended_at = NOW(), suspension_reason = $2
             WHERE id = $1
             RETURNING id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
-            "#,
+            ",
         )
         .bind(id)
         .bind(reason)
@@ -326,12 +331,12 @@ impl Tenant {
     /// Returns the updated tenant on success.
     pub async fn reactivate(pool: &PgPool, id: Uuid) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE tenants
             SET suspended_at = NULL, suspension_reason = NULL
             WHERE id = $1
             RETURNING id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
-            "#,
+            ",
         )
         .bind(id)
         .fetch_one(pool)
@@ -342,12 +347,12 @@ impl Tenant {
     /// List all suspended tenants.
     pub async fn list_suspended(pool: &PgPool) -> Result<Vec<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
             FROM tenants
             WHERE suspended_at IS NOT NULL
             ORDER BY suspended_at DESC
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await
@@ -372,12 +377,12 @@ impl Tenant {
         let purge_at = now + chrono::Duration::days(grace_period_days);
 
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE tenants
             SET deleted_at = $2, deletion_reason = $3, scheduled_purge_at = $4
             WHERE id = $1
             RETURNING id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
-            "#,
+            ",
         )
         .bind(id)
         .bind(now)
@@ -393,12 +398,12 @@ impl Tenant {
     /// Returns the updated tenant on success.
     pub async fn restore(pool: &PgPool, id: Uuid) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE tenants
             SET deleted_at = NULL, deletion_reason = NULL, scheduled_purge_at = NULL
             WHERE id = $1
             RETURNING id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
-            "#,
+            ",
         )
         .bind(id)
         .fetch_one(pool)
@@ -409,12 +414,12 @@ impl Tenant {
     /// List all soft-deleted tenants.
     pub async fn list_deleted(pool: &PgPool) -> Result<Vec<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
             FROM tenants
             WHERE deleted_at IS NOT NULL
             ORDER BY deleted_at DESC
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await
@@ -426,12 +431,12 @@ impl Tenant {
     /// These tenants are candidates for permanent deletion.
     pub async fn find_pending_purge(pool: &PgPool) -> Result<Vec<Self>, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             SELECT id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
             FROM tenants
             WHERE scheduled_purge_at IS NOT NULL AND scheduled_purge_at <= NOW()
             ORDER BY scheduled_purge_at ASC
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await
@@ -458,19 +463,19 @@ impl Tenant {
         // First, get current settings
         let current = Self::find_by_id(pool, id)
             .await?
-            .ok_or_else(|| DbError::NotFound(format!("Tenant {} not found", id)))?;
+            .ok_or_else(|| DbError::NotFound(format!("Tenant {id} not found")))?;
 
         // Deep merge the settings in Rust
         let merged = Self::deep_merge_settings(current.settings, new_settings);
 
         // Update with the merged result
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE tenants
             SET settings = $2
             WHERE id = $1
             RETURNING id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
-            "#,
+            ",
         )
         .bind(id)
         .bind(merged)
@@ -511,19 +516,19 @@ impl Tenant {
 
     /// Replace tenant settings entirely.
     ///
-    /// Unlike update_settings, this replaces all settings with the new value.
+    /// Unlike `update_settings`, this replaces all settings with the new value.
     pub async fn set_settings(
         pool: &PgPool,
         id: Uuid,
         settings: serde_json::Value,
     ) -> Result<Self, DbError> {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             UPDATE tenants
             SET settings = $2
             WHERE id = $1
             RETURNING id, name, slug, tenant_type, settings, created_at, suspended_at, suspension_reason, deleted_at, deletion_reason, scheduled_purge_at
-            "#,
+            ",
         )
         .bind(id)
         .bind(settings)

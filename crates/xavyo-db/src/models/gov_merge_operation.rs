@@ -44,7 +44,7 @@ pub struct AttributeSelection {
     pub value: serde_json::Value,
 }
 
-/// SoD check result.
+/// `SoD` check result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SodCheckResult {
     pub has_violations: bool,
@@ -52,7 +52,7 @@ pub struct SodCheckResult {
     pub violations: Vec<SodViolationDetail>,
 }
 
-/// SoD violation detail.
+/// `SoD` violation detail.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SodViolationDetail {
     pub rule_id: Uuid,
@@ -97,10 +97,10 @@ pub struct GovMergeOperation {
     /// If manual strategy, which entitlements to keep.
     pub entitlement_selections: Option<serde_json::Value>,
 
-    /// SoD validation results.
+    /// `SoD` validation results.
     pub sod_check_result: Option<serde_json::Value>,
 
-    /// If SoD warning overridden, the justification.
+    /// If `SoD` warning overridden, the justification.
     pub sod_override_reason: Option<String>,
 
     /// Who performed the merge.
@@ -146,10 +146,10 @@ impl GovMergeOperation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_merge_operations
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -164,12 +164,12 @@ impl GovMergeOperation {
         identity_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_merge_operations
             WHERE tenant_id = $1
               AND status = 'in_progress'
               AND (source_identity_id = $2 OR target_identity_id = $2)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(identity_id)
@@ -185,13 +185,13 @@ impl GovMergeOperation {
         target_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_merge_operations
             WHERE tenant_id = $1
               AND status = 'in_progress'
               AND source_identity_id = $2
               AND target_identity_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(target_id) // Reversed: looking for target→source
@@ -209,35 +209,34 @@ impl GovMergeOperation {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_merge_operations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.operator_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND operator_id = ${}", param_count));
+            query.push_str(&format!(" AND operator_id = ${param_count}"));
         }
         if filter.identity_id.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND (source_identity_id = ${0} OR target_identity_id = ${0})",
-                param_count
+                " AND (source_identity_id = ${param_count} OR target_identity_id = ${param_count})"
             ));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND started_at >= ${}", param_count));
+            query.push_str(&format!(" AND started_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND started_at <= ${}", param_count));
+            query.push_str(&format!(" AND started_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -274,35 +273,34 @@ impl GovMergeOperation {
         filter: &MergeOperationFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_merge_operations
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.operator_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND operator_id = ${}", param_count));
+            query.push_str(&format!(" AND operator_id = ${param_count}"));
         }
         if filter.identity_id.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND (source_identity_id = ${0} OR target_identity_id = ${0})",
-                param_count
+                " AND (source_identity_id = ${param_count} OR target_identity_id = ${param_count})"
             ));
         }
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND started_at >= ${}", param_count));
+            query.push_str(&format!(" AND started_at >= ${param_count}"));
         }
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND started_at <= ${}", param_count));
+            query.push_str(&format!(" AND started_at <= ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -333,7 +331,7 @@ impl GovMergeOperation {
         input: CreateGovMergeOperation,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_merge_operations (
                 tenant_id, candidate_id, source_identity_id, target_identity_id,
                 entitlement_strategy, attribute_selections, entitlement_selections,
@@ -341,7 +339,7 @@ impl GovMergeOperation {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.candidate_id)
@@ -362,12 +360,12 @@ impl GovMergeOperation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_merge_operations
             SET status = 'completed', completed_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'in_progress'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -383,12 +381,12 @@ impl GovMergeOperation {
         error_message: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_merge_operations
             SET status = 'failed', completed_at = NOW(), error_message = $3
             WHERE id = $1 AND tenant_id = $2 AND status = 'in_progress'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -404,12 +402,12 @@ impl GovMergeOperation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_merge_operations
             SET status = 'cancelled', completed_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'in_progress'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -418,16 +416,18 @@ impl GovMergeOperation {
     }
 
     /// Check if operation is in progress.
+    #[must_use] 
     pub fn is_in_progress(&self) -> bool {
         matches!(self.status, GovMergeOperationStatus::InProgress)
     }
 
     /// Check if operation is completed.
+    #[must_use] 
     pub fn is_completed(&self) -> bool {
         matches!(self.status, GovMergeOperationStatus::Completed)
     }
 
-    /// Get the SoD check result as structured data.
+    /// Get the `SoD` check result as structured data.
     pub fn get_sod_check_result(&self) -> Result<Option<SodCheckResult>, serde_json::Error> {
         match &self.sod_check_result {
             Some(v) => Ok(Some(serde_json::from_value(v.clone())?)),
@@ -442,12 +442,12 @@ impl GovMergeOperation {
         identity_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_merge_operations
             WHERE tenant_id = $1
               AND status = 'in_progress'
               AND (source_identity_id = $2 OR target_identity_id = $2)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(identity_id)
@@ -466,13 +466,13 @@ impl GovMergeOperation {
     ) -> Result<bool, sqlx::Error> {
         // Check if there's an in-progress merge where target_id is source and source_id is target
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_merge_operations
             WHERE tenant_id = $1
               AND status = 'in_progress'
               AND source_identity_id = $2
               AND target_identity_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(target_id) // Reversed: looking for target→source
@@ -490,7 +490,7 @@ impl GovMergeOperation {
         input: CreateGovMergeOperation,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_merge_operations (
                 tenant_id, candidate_id, source_identity_id, target_identity_id,
                 entitlement_strategy, attribute_selections, entitlement_selections,
@@ -498,7 +498,7 @@ impl GovMergeOperation {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.candidate_id)
@@ -512,7 +512,7 @@ impl GovMergeOperation {
         .await
     }
 
-    /// Set SoD override within a transaction.
+    /// Set `SoD` override within a transaction.
     pub async fn set_sod_override<'e>(
         executor: impl sqlx::Executor<'e, Database = sqlx::Postgres>,
         id: Uuid,
@@ -520,11 +520,11 @@ impl GovMergeOperation {
         sod_override_reason: Option<String>,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            r#"
+            r"
             UPDATE gov_merge_operations
             SET sod_check_result = $2, sod_override_reason = $3
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .bind(sod_check_result)
@@ -542,12 +542,12 @@ impl GovMergeOperation {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_merge_operations
             SET status = 'completed', completed_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'in_progress'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -555,7 +555,7 @@ impl GovMergeOperation {
         .await
     }
 
-    /// Alias for mark_completed (used by service).
+    /// Alias for `mark_completed` (used by service).
     pub async fn complete(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -564,7 +564,7 @@ impl GovMergeOperation {
         Self::mark_completed(pool, tenant_id, id).await
     }
 
-    /// Alias for mark_failed (used by service).
+    /// Alias for `mark_failed` (used by service).
     pub async fn fail(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,

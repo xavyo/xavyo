@@ -1,4 +1,4 @@
-//! Claims mapping service for transforming IdP claims to Xavyo attributes.
+//! Claims mapping service for transforming `IdP` claims to Xavyo attributes.
 
 use crate::error::{FederationError, FederationResult};
 use crate::models::ClaimMappingConfig;
@@ -14,11 +14,12 @@ pub struct ClaimsService;
 
 impl ClaimsService {
     /// Create a new claims service.
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
 
-    /// Map IdP claims to Xavyo attributes based on IdP configuration.
+    /// Map `IdP` claims to Xavyo attributes based on `IdP` configuration.
     #[instrument(skip(self, claims))]
     pub fn map_claims(
         &self,
@@ -58,29 +59,26 @@ impl ClaimsService {
         for entry in &mapping.mappings {
             let source_value = source_claims.get(&entry.source);
 
-            match source_value {
-                Some(value) => {
-                    // Apply transform if specified
-                    let transformed = self.apply_transform(value, entry.transform.as_deref())?;
+            if let Some(value) = source_value {
+                // Apply transform if specified
+                let transformed = self.apply_transform(value, entry.transform.as_deref())?;
 
-                    // Apply group mapping if specified
-                    let final_value = if let Some(group_map) = &entry.group_mapping {
-                        self.apply_group_mapping(&transformed, group_map)?
-                    } else {
-                        transformed
-                    };
+                // Apply group mapping if specified
+                let final_value = if let Some(group_map) = &entry.group_mapping {
+                    self.apply_group_mapping(&transformed, group_map)?
+                } else {
+                    transformed
+                };
 
-                    result.insert(entry.target.clone(), final_value);
+                result.insert(entry.target.clone(), final_value);
+            } else {
+                // Handle missing claim
+                if entry.required {
+                    return Err(FederationError::MissingRequiredClaim(entry.source.clone()));
                 }
-                None => {
-                    // Handle missing claim
-                    if entry.required {
-                        return Err(FederationError::MissingRequiredClaim(entry.source.clone()));
-                    }
-                    // Use default if provided
-                    if let Some(default) = &entry.default {
-                        result.insert(entry.target.clone(), Value::String(default.clone()));
-                    }
+                // Use default if provided
+                if let Some(default) = &entry.default {
+                    result.insert(entry.target.clone(), Value::String(default.clone()));
                 }
             }
         }
@@ -175,8 +173,7 @@ impl ClaimsService {
                 }
             }
             _ => Err(FederationError::InvalidClaimMapping(format!(
-                "Unknown transform: {}",
-                transform
+                "Unknown transform: {transform}"
             ))),
         }
     }
@@ -188,8 +185,7 @@ impl ClaimsService {
             Ok(())
         } else {
             Err(FederationError::InvalidClaimMapping(format!(
-                "Invalid transform: {}. Valid options: {:?}",
-                transform, valid_transforms
+                "Invalid transform: {transform}. Valid options: {valid_transforms:?}"
             )))
         }
     }
@@ -228,7 +224,8 @@ impl ClaimsService {
         Ok(value.clone())
     }
 
-    /// Extract the subject (NameID) from claims based on configuration.
+    /// Extract the subject (`NameID`) from claims based on configuration.
+    #[must_use] 
     pub fn extract_subject(&self, mapping: &ClaimMappingConfig, claims: &IdTokenClaims) -> String {
         // Check name_id configuration
         if let Some(name_id) = &mapping.name_id {

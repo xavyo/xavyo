@@ -2,7 +2,7 @@
 //!
 //! Evaluates authorization policies against an authorization request.
 //! Policies are evaluated in priority order (deny-first). A policy
-//! matches when its resource_type, action, and all conditions are satisfied.
+//! matches when its `resource_type`, action, and all conditions are satisfied.
 
 use uuid::Uuid;
 
@@ -24,6 +24,7 @@ impl PolicyEvaluator {
     /// - All its conditions are satisfied (AND-combined)
     ///
     /// Policies are assumed to be pre-sorted (deny-first, then by priority ascending).
+    #[must_use] 
     pub fn evaluate_policies(
         policies: &[PolicyWithConditions],
         request: &AuthorizationRequest,
@@ -87,7 +88,7 @@ impl PolicyEvaluator {
         }
     }
 
-    /// Evaluate an entitlement_check condition.
+    /// Evaluate an `entitlement_check` condition.
     ///
     /// Checks if the user has a specific entitlement by ID.
     /// Expected value format: `{"entitlement_id": "uuid-string"}`
@@ -112,7 +113,7 @@ impl PolicyEvaluator {
         entitlements.iter().any(|e| e.entitlement_id == required_id)
     }
 
-    /// Evaluate a time_window condition.
+    /// Evaluate a `time_window` condition.
     ///
     /// Checks if the current UTC time is within the specified window.
     /// Expected value format: `{"start_time": "09:00", "end_time": "17:00"}`

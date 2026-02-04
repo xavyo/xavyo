@@ -1,6 +1,6 @@
 //! MFA (Multi-Factor Authentication) handlers.
 //!
-//! Endpoints for TOTP setup, verification, recovery codes, and WebAuthn.
+//! Endpoints for TOTP setup, verification, recovery codes, and `WebAuthn`.
 
 mod disable;
 mod recovery;

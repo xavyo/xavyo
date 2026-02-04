@@ -1,6 +1,6 @@
 //! Authorization service for real-time tool authorization decisions.
 //!
-//! Provides sub-100ms authorization decisions with rate limiting using DashMap.
+//! Provides sub-100ms authorization decisions with rate limiting using `DashMap`.
 //! Includes optional anomaly detection for behavioral analysis (F094).
 
 use chrono::Utc;
@@ -33,14 +33,15 @@ pub struct AuthorizationService {
     audit_service: Arc<AuditService>,
     anomaly_service: Arc<AnomalyService>,
     approval_service: Arc<ApprovalService>,
-    /// In-memory rate limit tracking: (tenant_id, agent_id, tool_id) -> RateLimitEntry
+    /// In-memory rate limit tracking: (`tenant_id`, `agent_id`, `tool_id`) -> `RateLimitEntry`
     rate_limits: Arc<DashMap<(Uuid, Uuid, Uuid), RateLimitEntry>>,
     /// Whether to enable inline anomaly detection (adds latency but improves security)
     anomaly_detection_enabled: bool,
 }
 
 impl AuthorizationService {
-    /// Create a new AuthorizationService.
+    /// Create a new `AuthorizationService`.
+    #[must_use] 
     pub fn new(
         pool: PgPool,
         permission_service: Arc<PermissionService>,
@@ -60,6 +61,7 @@ impl AuthorizationService {
     }
 
     /// Create with explicit anomaly service (for testing or custom configuration).
+    #[must_use] 
     pub fn with_anomaly_service(
         pool: PgPool,
         permission_service: Arc<PermissionService>,
@@ -199,40 +201,36 @@ impl AuthorizationService {
         }
 
         // 2. Check permission exists (~5ms)
-        let (permission, tool) = match self
+        let (permission, tool) = if let Some((p, t)) = self
             .permission_service
             .check_permission_by_tool_name(tenant_id, request.agent_id, &request.tool)
-            .await?
-        {
-            Some((p, t)) => (p, t),
-            None => {
-                let reason = format!("Agent does not have permission for tool '{}'", request.tool);
-                let latency_ms = start.elapsed().as_secs_f64() * 1000.0;
+            .await? { (p, t) } else {
+            let reason = format!("Agent does not have permission for tool '{}'", request.tool);
+            let latency_ms = start.elapsed().as_secs_f64() * 1000.0;
 
-                let _ = self
-                    .log_authorization(
-                        tenant_id,
-                        request.agent_id,
-                        None,
-                        &request.tool,
-                        request.parameters.clone(),
-                        "denied", // DB constraint uses "denied" not "deny"
-                        &reason,
-                        &request.context,
-                        source_ip,
-                        latency_ms as i32,
-                    )
-                    .await;
+            let _ = self
+                .log_authorization(
+                    tenant_id,
+                    request.agent_id,
+                    None,
+                    &request.tool,
+                    request.parameters.clone(),
+                    "denied", // DB constraint uses "denied" not "deny"
+                    &reason,
+                    &request.context,
+                    source_ip,
+                    latency_ms as i32,
+                )
+                .await;
 
-                return Ok(AuthorizeResponse {
-                    decision: "deny".to_string(),
-                    decision_id,
-                    reason,
-                    latency_ms,
-                    approval_request_id: None,
-                    anomaly_warnings: None,
-                });
-            }
+            return Ok(AuthorizeResponse {
+                decision: "deny".to_string(),
+                decision_id,
+                reason,
+                latency_ms,
+                approval_request_id: None,
+                anomaly_warnings: None,
+            });
         };
 
         // Check if tool is active
@@ -327,8 +325,7 @@ impl AuthorizationService {
 
             if current_count > max_calls {
                 let reason = format!(
-                    "Rate limit exceeded: {}/{} calls in current hour",
-                    current_count, max_calls
+                    "Rate limit exceeded: {current_count}/{max_calls} calls in current hour"
                 );
                 let latency_ms = start.elapsed().as_secs_f64() * 1000.0;
 

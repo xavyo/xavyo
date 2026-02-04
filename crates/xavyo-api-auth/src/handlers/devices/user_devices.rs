@@ -41,7 +41,7 @@ pub async fn list_devices(
     let device_responses: Vec<DeviceResponse> = devices
         .into_iter()
         .map(|d| {
-            let is_current = current_device_id.map(|id| id == d.id).unwrap_or(false);
+            let is_current = current_device_id.is_some_and(|id| id == d.id);
             DeviceResponse::from_user_device(d, is_current)
         })
         .collect();

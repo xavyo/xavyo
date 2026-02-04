@@ -119,10 +119,10 @@ impl GovDuplicateCandidate {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_duplicate_candidates
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -140,10 +140,10 @@ impl GovDuplicateCandidate {
         let (id_a, id_b) = Self::canonical_order(identity_a, identity_b);
 
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_duplicate_candidates
             WHERE tenant_id = $1 AND identity_a_id = $2 AND identity_b_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id_a)
@@ -171,30 +171,29 @@ impl GovDuplicateCandidate {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_duplicate_candidates
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.min_confidence.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND confidence_score >= ${}", param_count));
+            query.push_str(&format!(" AND confidence_score >= ${param_count}"));
         }
         if filter.max_confidence.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND confidence_score <= ${}", param_count));
+            query.push_str(&format!(" AND confidence_score <= ${param_count}"));
         }
         if filter.identity_id.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND (identity_a_id = ${0} OR identity_b_id = ${0})",
-                param_count
+                " AND (identity_a_id = ${param_count} OR identity_b_id = ${param_count})"
             ));
         }
 
@@ -229,30 +228,29 @@ impl GovDuplicateCandidate {
         filter: &DuplicateCandidateFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_duplicate_candidates
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.min_confidence.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND confidence_score >= ${}", param_count));
+            query.push_str(&format!(" AND confidence_score >= ${param_count}"));
         }
         if filter.max_confidence.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND confidence_score <= ${}", param_count));
+            query.push_str(&format!(" AND confidence_score <= ${param_count}"));
         }
         if filter.identity_id.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND (identity_a_id = ${0} OR identity_b_id = ${0})",
-                param_count
+                " AND (identity_a_id = ${param_count} OR identity_b_id = ${param_count})"
             ));
         }
 
@@ -285,7 +283,7 @@ impl GovDuplicateCandidate {
             serde_json::to_value(&input.rule_matches).unwrap_or_else(|_| serde_json::json!({}));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_duplicate_candidates (
                 tenant_id, identity_a_id, identity_b_id, confidence_score, rule_matches
             )
@@ -295,7 +293,7 @@ impl GovDuplicateCandidate {
                 rule_matches = EXCLUDED.rule_matches,
                 detected_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id_a)
@@ -313,12 +311,12 @@ impl GovDuplicateCandidate {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_duplicate_candidates
             SET status = 'merged'
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -336,12 +334,12 @@ impl GovDuplicateCandidate {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_duplicate_candidates
             SET status = 'merged'
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -357,7 +355,7 @@ impl GovDuplicateCandidate {
         input: DismissGovDuplicateCandidate,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_duplicate_candidates
             SET status = 'dismissed',
                 dismissed_reason = $3,
@@ -365,7 +363,7 @@ impl GovDuplicateCandidate {
                 dismissed_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -382,13 +380,13 @@ impl GovDuplicateCandidate {
         identity_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_duplicate_candidates
             WHERE tenant_id = $1
               AND status = 'pending'
               AND (identity_a_id = $2 OR identity_b_id = $2)
             ORDER BY confidence_score DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(identity_id)
@@ -397,6 +395,7 @@ impl GovDuplicateCandidate {
     }
 
     /// Check if candidate is pending.
+    #[must_use] 
     pub fn is_pending(&self) -> bool {
         matches!(self.status, GovDuplicateStatus::Pending)
     }
@@ -407,6 +406,7 @@ impl GovDuplicateCandidate {
     }
 
     /// Get the other identity ID given one of the pair.
+    #[must_use] 
     pub fn get_other_identity(&self, identity_id: Uuid) -> Option<Uuid> {
         if self.identity_a_id == identity_id {
             Some(self.identity_b_id)

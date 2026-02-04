@@ -186,10 +186,10 @@ impl GovPersonaArchetype {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_archetypes
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -204,10 +204,10 @@ impl GovPersonaArchetype {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_persona_archetypes
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -228,11 +228,11 @@ impl GovPersonaArchetype {
 
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.name_contains.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${}", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -247,7 +247,7 @@ impl GovPersonaArchetype {
             q = q.bind(is_active);
         }
         if let Some(ref name_contains) = filter.name_contains {
-            q = q.bind(format!("%{}%", name_contains));
+            q = q.bind(format!("%{name_contains}%"));
         }
 
         q.bind(limit).bind(offset).fetch_all(pool).await
@@ -265,11 +265,11 @@ impl GovPersonaArchetype {
 
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.name_contains.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND name ILIKE ${}", param_count));
+            query.push_str(&format!(" AND name ILIKE ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -278,7 +278,7 @@ impl GovPersonaArchetype {
             q = q.bind(is_active);
         }
         if let Some(ref name_contains) = filter.name_contains {
-            q = q.bind(format!("%{}%", name_contains));
+            q = q.bind(format!("%{name_contains}%"));
         }
 
         q.fetch_one(pool).await
@@ -291,14 +291,14 @@ impl GovPersonaArchetype {
         input: CreatePersonaArchetype,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_persona_archetypes (
                 tenant_id, name, description, naming_pattern,
                 attribute_mappings, default_entitlements, lifecycle_policy
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -334,7 +334,7 @@ impl GovPersonaArchetype {
         let is_active = input.is_active.unwrap_or(current.is_active);
 
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_persona_archetypes
             SET name = $3,
                 description = $4,
@@ -346,7 +346,7 @@ impl GovPersonaArchetype {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -368,12 +368,12 @@ impl GovPersonaArchetype {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_persona_archetypes
             SET is_active = false, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -388,10 +388,10 @@ impl GovPersonaArchetype {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_persona_archetypes
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -408,10 +408,10 @@ impl GovPersonaArchetype {
         id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_personas
             WHERE tenant_id = $1 AND archetype_id = $2 AND status NOT IN ('archived')
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(id)

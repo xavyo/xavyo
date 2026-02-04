@@ -14,6 +14,7 @@ pub struct ApiKeyService;
 
 impl ApiKeyService {
     /// Create a new API key service.
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
@@ -25,7 +26,8 @@ impl ApiKeyService {
     /// Returns the plaintext API key. This should be shown to the user once
     /// and then only the hash should be stored.
     ///
-    /// SECURITY: Uses OsRng directly from the operating system's CSPRNG.
+    /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
+    #[must_use] 
     pub fn generate_api_key(&self) -> String {
         use rand::rngs::OsRng;
         use rand::RngCore;
@@ -33,13 +35,14 @@ impl ApiKeyService {
         OsRng.fill_bytes(&mut random_bytes);
         let hex_string = hex::encode(random_bytes);
 
-        format!("{}{}", API_KEY_PREFIX, hex_string)
+        format!("{API_KEY_PREFIX}{hex_string}")
     }
 
     /// Hash an API key using SHA-256.
     ///
     /// The hash is returned as a hex string and should be stored in the database.
     /// The plaintext key cannot be recovered from the hash.
+    #[must_use] 
     pub fn hash_api_key(&self, api_key: &str) -> String {
         let mut hasher = Sha256::new();
         hasher.update(api_key.as_bytes());
@@ -51,13 +54,15 @@ impl ApiKeyService {
     ///
     /// This returns the `xavyo_sk_live_` prefix which can be used to identify
     /// keys in logs without exposing the full key.
+    #[must_use] 
     pub fn get_key_prefix(&self) -> &'static str {
         API_KEY_PREFIX
     }
 
     /// Create an API key for a user and return both the plaintext key and hash.
     ///
-    /// Returns (plaintext_key, key_hash, key_prefix)
+    /// Returns (`plaintext_key`, `key_hash`, `key_prefix`)
+    #[must_use] 
     pub fn create_key_pair(&self) -> (String, String, String) {
         let plaintext_key = self.generate_api_key();
         let key_hash = self.hash_api_key(&plaintext_key);

@@ -141,22 +141,22 @@ impl IntoResponse for ApiNhiError {
                     ApiNhiError::AgentNotFound(id) => (
                         StatusCode::NOT_FOUND,
                         "agent_not_found",
-                        format!("Agent not found: {}", id),
+                        format!("Agent not found: {id}"),
                     ),
                     ApiNhiError::AgentSuspended(id) => (
                         StatusCode::BAD_REQUEST,
                         "agent_suspended",
-                        format!("Agent is suspended: {}", id),
+                        format!("Agent is suspended: {id}"),
                     ),
                     ApiNhiError::CredentialNotFound(id) => (
                         StatusCode::NOT_FOUND,
                         "credential_not_found",
-                        format!("Credential not found: {}", id),
+                        format!("Credential not found: {id}"),
                     ),
                     ApiNhiError::CredentialAlreadyRevoked(id) => (
                         StatusCode::BAD_REQUEST,
                         "credential_already_revoked",
-                        format!("Credential already revoked: {}", id),
+                        format!("Credential already revoked: {id}"),
                     ),
                     ApiNhiError::InvalidExpirationDate => (
                         StatusCode::BAD_REQUEST,
@@ -171,7 +171,7 @@ impl IntoResponse for ApiNhiError {
                     ApiNhiError::CredentialExpired(id) => (
                         StatusCode::UNAUTHORIZED,
                         "credential_expired",
-                        format!("Credential expired: {}", id),
+                        format!("Credential expired: {id}"),
                     ),
                     ApiNhiError::RotationRateLimitExceeded(msg) => (
                         StatusCode::TOO_MANY_REQUESTS,

@@ -1,7 +1,7 @@
 //! Apple Sign In provider implementation.
 //!
 //! Apple Sign In has unique requirements:
-//! - Uses form_post response mode
+//! - Uses `form_post` response mode
 //! - Client secret is a JWT signed with ES256
 //! - User info is only provided on first authorization
 
@@ -14,7 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use super::{SocialProvider, SocialUserInfo, TokenResponse};
 use crate::error::{ProviderType, SocialError, SocialResult};
 
-/// Apple OAuth2 endpoints.
+/// Apple `OAuth2` endpoints.
 const AUTHORIZATION_ENDPOINT: &str = "https://appleid.apple.com/auth/authorize";
 const TOKEN_ENDPOINT: &str = "https://appleid.apple.com/auth/token";
 
@@ -78,7 +78,7 @@ impl AppleProvider {
     ) -> SocialResult<Self> {
         let encoding_key = EncodingKey::from_ec_pem(private_key.as_bytes()).map_err(|e| {
             SocialError::ConfigurationError {
-                message: format!("Invalid Apple private key: {}", e),
+                message: format!("Invalid Apple private key: {e}"),
             }
         })?;
 
@@ -96,7 +96,7 @@ impl AppleProvider {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|e| SocialError::InternalError {
-                message: format!("Time error: {}", e),
+                message: format!("Time error: {e}"),
             })?
             .as_secs();
 
@@ -130,11 +130,11 @@ impl AppleProvider {
         let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
             .decode(parts[1])
             .map_err(|e| SocialError::InvalidCallback {
-                reason: format!("Failed to decode ID token payload: {}", e),
+                reason: format!("Failed to decode ID token payload: {e}"),
             })?;
 
         serde_json::from_slice(&payload).map_err(|e| SocialError::InvalidCallback {
-            reason: format!("Failed to parse ID token claims: {}", e),
+            reason: format!("Failed to parse ID token claims: {e}"),
         })
     }
 }
@@ -219,14 +219,12 @@ impl SocialProvider for AppleProvider {
         let email_verified = claims
             .email_verified
             .as_ref()
-            .map(|v| v == "true")
-            .unwrap_or(false);
+            .is_some_and(|v| v == "true");
 
         let is_private_email = claims
             .is_private_email
             .as_ref()
-            .map(|v| v == "true")
-            .unwrap_or(false);
+            .is_some_and(|v| v == "true");
 
         let raw_claims = serde_json::json!({
             "sub": &claims.sub,

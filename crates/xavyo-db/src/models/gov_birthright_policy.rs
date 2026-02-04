@@ -23,21 +23,25 @@ pub enum BirthrightPolicyStatus {
 
 impl BirthrightPolicyStatus {
     /// Check if the policy is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         matches!(self, Self::Active)
     }
 
     /// Check if the policy can be enabled.
+    #[must_use] 
     pub fn can_enable(&self) -> bool {
         matches!(self, Self::Inactive)
     }
 
     /// Check if the policy can be disabled.
+    #[must_use] 
     pub fn can_disable(&self) -> bool {
         matches!(self, Self::Active)
     }
 
     /// Check if the policy can be archived.
+    #[must_use] 
     pub fn can_archive(&self) -> bool {
         !matches!(self, Self::Archived)
     }
@@ -58,11 +62,13 @@ pub enum EvaluationMode {
 
 impl EvaluationMode {
     /// Check if this is first-match mode.
+    #[must_use] 
     pub fn is_first_match(&self) -> bool {
         matches!(self, Self::FirstMatch)
     }
 
     /// Check if this is all-match mode.
+    #[must_use] 
     pub fn is_all_match(&self) -> bool {
         matches!(self, Self::AllMatch)
     }
@@ -88,6 +94,7 @@ pub enum ConditionOperator {
 
 impl ConditionOperator {
     /// Parse operator from string.
+    #[must_use] 
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "equals" => Some(Self::Equals),
@@ -101,6 +108,7 @@ impl ConditionOperator {
     }
 
     /// Convert operator to string representation.
+    #[must_use] 
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Equals => "equals",
@@ -113,6 +121,7 @@ impl ConditionOperator {
     }
 
     /// Evaluate the condition against a user value.
+    #[must_use] 
     pub fn evaluate(&self, user_value: Option<&str>, condition_value: &serde_json::Value) -> bool {
         let user_value = match user_value {
             Some(v) => v,
@@ -141,7 +150,7 @@ impl ConditionOperator {
 /// A single condition in a birthright policy.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicyCondition {
-    /// User attribute to match (department, title, locale, metadata.*, or custom_attributes.*)
+    /// User attribute to match (department, title, locale, metadata.*, or `custom_attributes`.*)
     pub attribute: String,
     /// Comparison operator.
     pub operator: String,
@@ -179,6 +188,7 @@ impl PolicyCondition {
     }
 
     /// Evaluate this condition against user attributes.
+    #[must_use] 
     pub fn evaluate(&self, user_attrs: &serde_json::Value) -> bool {
         let operator = match ConditionOperator::parse(&self.operator) {
             Some(op) => op,
@@ -222,7 +232,7 @@ pub struct GovBirthrightPolicy {
     /// Policy description.
     pub description: Option<String>,
 
-    /// Conditions for policy evaluation (JSON array of PolicyCondition).
+    /// Conditions for policy evaluation (JSON array of `PolicyCondition`).
     pub conditions: serde_json::Value,
 
     /// Entitlement IDs to provision when conditions match.
@@ -234,7 +244,7 @@ pub struct GovBirthrightPolicy {
     /// Policy status.
     pub status: BirthrightPolicyStatus,
 
-    /// Evaluation mode (first_match or all_match).
+    /// Evaluation mode (`first_match` or `all_match`).
     pub evaluation_mode: EvaluationMode,
 
     /// Grace period in days for mover revocations.
@@ -290,10 +300,10 @@ impl GovBirthrightPolicy {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_birthright_policies
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -308,10 +318,10 @@ impl GovBirthrightPolicy {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_birthright_policies
             WHERE tenant_id = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(name)
@@ -325,11 +335,11 @@ impl GovBirthrightPolicy {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_birthright_policies
             WHERE tenant_id = $1 AND status = 'active'
             ORDER BY priority DESC, name ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -345,20 +355,20 @@ impl GovBirthrightPolicy {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_birthright_policies
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -386,20 +396,20 @@ impl GovBirthrightPolicy {
         filter: &BirthrightPolicyFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_birthright_policies
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
         if filter.created_by.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_by = ${}", param_count));
+            query.push_str(&format!(" AND created_by = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -424,14 +434,14 @@ impl GovBirthrightPolicy {
             serde_json::to_value(&input.conditions).unwrap_or_else(|_| serde_json::json!([]));
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_birthright_policies (
                 tenant_id, name, description, conditions, entitlement_ids,
                 priority, evaluation_mode, grace_period_days, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -457,31 +467,31 @@ impl GovBirthrightPolicy {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.description.is_some() {
-            updates.push(format!("description = ${}", param_idx));
+            updates.push(format!("description = ${param_idx}"));
             param_idx += 1;
         }
         if input.conditions.is_some() {
-            updates.push(format!("conditions = ${}", param_idx));
+            updates.push(format!("conditions = ${param_idx}"));
             param_idx += 1;
         }
         if input.entitlement_ids.is_some() {
-            updates.push(format!("entitlement_ids = ${}", param_idx));
+            updates.push(format!("entitlement_ids = ${param_idx}"));
             param_idx += 1;
         }
         if input.priority.is_some() {
-            updates.push(format!("priority = ${}", param_idx));
+            updates.push(format!("priority = ${param_idx}"));
             param_idx += 1;
         }
         if input.evaluation_mode.is_some() {
-            updates.push(format!("evaluation_mode = ${}", param_idx));
+            updates.push(format!("evaluation_mode = ${param_idx}"));
             param_idx += 1;
         }
         if input.grace_period_days.is_some() {
-            updates.push(format!("grace_period_days = ${}", param_idx));
+            updates.push(format!("grace_period_days = ${param_idx}"));
             let _ = param_idx; // Suppress unused warning
         }
 
@@ -528,12 +538,12 @@ impl GovBirthrightPolicy {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_birthright_policies
             SET status = 'archived', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status != 'archived'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -548,12 +558,12 @@ impl GovBirthrightPolicy {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_birthright_policies
             SET status = 'active', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'inactive'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -568,12 +578,12 @@ impl GovBirthrightPolicy {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_birthright_policies
             SET status = 'inactive', updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -582,12 +592,14 @@ impl GovBirthrightPolicy {
     }
 
     /// Parse conditions from JSON.
+    #[must_use] 
     pub fn parse_conditions(&self) -> Vec<PolicyCondition> {
         serde_json::from_value(self.conditions.clone()).unwrap_or_default()
     }
 
     /// Evaluate this policy against user attributes.
     /// Returns true if all conditions match (AND logic).
+    #[must_use] 
     pub fn evaluate(&self, user_attrs: &serde_json::Value) -> bool {
         if !self.status.is_active() {
             return false;
@@ -774,7 +786,7 @@ mod tests {
     #[test]
     fn test_policy_condition_validate_empty_attribute() {
         let condition = PolicyCondition {
-            attribute: "".to_string(),
+            attribute: String::new(),
             operator: "equals".to_string(),
             value: serde_json::json!("Engineering"),
         };

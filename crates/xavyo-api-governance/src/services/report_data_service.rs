@@ -24,6 +24,7 @@ pub struct ReportData {
 
 impl ReportDataService {
     /// Create a new report data service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -78,7 +79,7 @@ impl ReportDataService {
             String,
             chrono::DateTime<chrono::Utc>,
         )> = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 ea.id,
                 u.email as user_email,
@@ -94,7 +95,7 @@ impl ReportDataService {
             WHERE ea.tenant_id = $1 AND ea.status = 'active'
             ORDER BY u.email, a.name, e.name
             LIMIT 10000
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -128,7 +129,7 @@ impl ReportDataService {
         })
     }
 
-    /// Generate SoD violations report data.
+    /// Generate `SoD` violations report data.
     #[allow(clippy::type_complexity)]
     async fn generate_sod_violations_data(
         &self,
@@ -146,7 +147,7 @@ impl ReportDataService {
             String,
             chrono::DateTime<chrono::Utc>,
         )> = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 v.id,
                 u.email as user_email,
@@ -162,7 +163,7 @@ impl ReportDataService {
             WHERE v.tenant_id = $1
             ORDER BY v.detected_at DESC
             LIMIT 10000
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -205,7 +206,7 @@ impl ReportDataService {
         _parameters: Option<&serde_json::Value>,
     ) -> Result<ReportData> {
         let rows: Vec<(Uuid, String, String, i64, i64, i64, i64)> = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 c.id,
                 c.name,
@@ -218,7 +219,7 @@ impl ReportDataService {
             WHERE c.tenant_id = $1
             ORDER BY c.created_at DESC
             LIMIT 1000
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(&self.pool)
@@ -281,7 +282,7 @@ impl ReportDataService {
             String,
             chrono::DateTime<chrono::Utc>,
         )> = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 a.name as application_name,
                 e.name as entitlement_name,
@@ -296,7 +297,7 @@ impl ReportDataService {
               AND ea.target_type = 'user'
               AND ea.status = 'active'
             ORDER BY a.name, e.name
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -339,16 +340,12 @@ impl ReportDataService {
         let from_date = parameters
             .and_then(|p| p.get("from_date"))
             .and_then(|v| v.as_str())
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-            .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|| chrono::Utc::now() - chrono::Duration::days(30));
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map_or_else(|| chrono::Utc::now() - chrono::Duration::days(30), |dt| dt.with_timezone(&chrono::Utc));
 
         let to_date = parameters
             .and_then(|p| p.get("to_date"))
             .and_then(|v| v.as_str())
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-            .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(chrono::Utc::now);
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map_or_else(chrono::Utc::now, |dt| dt.with_timezone(&chrono::Utc));
 
         // Query admin audit logs for governance events
         let rows: Vec<(
@@ -359,7 +356,7 @@ impl ReportDataService {
             Option<String>,
             serde_json::Value,
         )> = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 performed_at,
                 action,
@@ -375,7 +372,7 @@ impl ReportDataService {
               AND a.resource_type LIKE 'gov_%'
             ORDER BY a.performed_at DESC
             LIMIT 50000
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(from_date)

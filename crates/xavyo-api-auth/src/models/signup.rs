@@ -55,6 +55,7 @@ pub struct SignupResponse {
 
 impl SignupResponse {
     /// Create a new signup response.
+    #[must_use] 
     pub fn new(user_id: Uuid, email: String, access_token: String, expires_in: i64) -> Self {
         Self {
             user_id,

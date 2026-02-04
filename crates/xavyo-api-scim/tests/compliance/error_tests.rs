@@ -64,7 +64,7 @@ mod tests {
             "detail": "The attribute 'userName' is required"
         });
         assert!(error["detail"].is_string());
-        assert!(error["detail"].as_str().unwrap().len() > 0);
+        assert!(!error["detail"].as_str().unwrap().is_empty());
     }
 
     // ============================================================

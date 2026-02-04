@@ -362,7 +362,7 @@ mod tests {
         #[test]
         fn test_clone_semantics() {
             let id1 = SessionId::new();
-            let id2 = id1.clone();
+            let id2 = id1;
             assert_eq!(id1, id2);
         }
     }

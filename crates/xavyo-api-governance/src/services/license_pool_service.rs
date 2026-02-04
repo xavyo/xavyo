@@ -181,6 +181,7 @@ pub struct UpdatePoolResult {
 
 impl LicensePoolService {
     /// Create a new license pool service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: LicenseAuditService::new(pool.clone()),
@@ -283,7 +284,7 @@ impl LicensePoolService {
 
     /// Update a license pool.
     ///
-    /// Validates that capacity changes don't leave allocated_count > total_capacity.
+    /// Validates that capacity changes don't leave `allocated_count` > `total_capacity`.
     pub async fn update(
         &self,
         tenant_id: Uuid,
@@ -382,7 +383,7 @@ impl LicensePoolService {
 
     /// Delete a license pool permanently.
     ///
-    /// Only allowed if there are no active assignments (allocated_count == 0).
+    /// Only allowed if there are no active assignments (`allocated_count` == 0).
     pub async fn delete(&self, tenant_id: Uuid, pool_id: Uuid, actor_id: Uuid) -> Result<bool> {
         // Fetch existing to verify and get name for audit
         let existing = GovLicensePool::find_by_id(&self.pool, tenant_id, pool_id)
@@ -436,11 +437,13 @@ impl LicensePoolService {
     }
 
     /// Get the underlying database pool reference.
+    #[must_use] 
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get the audit service reference.
+    #[must_use] 
     pub fn audit_service(&self) -> &LicenseAuditService {
         &self.audit_service
     }

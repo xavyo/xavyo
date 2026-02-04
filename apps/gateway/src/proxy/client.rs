@@ -31,7 +31,7 @@ impl ProxyClient {
         Ok(Self { client })
     }
 
-    /// Convert axum HeaderMap to reqwest headers.
+    /// Convert axum `HeaderMap` to reqwest headers.
     fn convert_headers(&self, headers: &HeaderMap) -> reqwest::header::HeaderMap {
         let mut reqwest_headers = reqwest::header::HeaderMap::new();
         for (name, value) in headers {
@@ -131,11 +131,11 @@ impl ProxyClient {
                 "Health check returned status {}",
                 response.status()
             )),
-            Err(e) => Err(format!("Health check failed: {}", e)),
+            Err(e) => Err(format!("Health check failed: {e}")),
         }
     }
 
-    /// Fetch OpenAPI spec from a backend service.
+    /// Fetch `OpenAPI` spec from a backend service.
     pub async fn fetch_openapi(&self, backend: &BackendConfig) -> GatewayResult<String> {
         let url = format!("{}{}", backend.url, backend.openapi_path);
 

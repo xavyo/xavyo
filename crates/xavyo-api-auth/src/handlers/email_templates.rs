@@ -35,7 +35,7 @@ pub struct ListTemplatesQuery {
 /// Path parameters for template endpoints.
 #[derive(Debug, Deserialize)]
 pub struct TemplatePath {
-    /// Template type (welcome, password_reset, etc.).
+    /// Template type (welcome, `password_reset`, etc.).
     pub template_type: String,
 }
 

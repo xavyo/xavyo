@@ -120,7 +120,7 @@ pub async fn add_role_parameter(
         parameter_type: request.parameter_type,
         is_required: Some(request.is_required),
         default_value: request.default_value,
-        constraints: request.constraints.map(|c| c.into()),
+        constraints: request.constraints.map(std::convert::Into::into),
         display_order: Some(request.display_order),
     };
 
@@ -226,7 +226,7 @@ pub async fn update_role_parameter(
         description: request.description,
         is_required: request.is_required,
         default_value: request.default_value,
-        constraints: request.constraints.map(|c| c.into()),
+        constraints: request.constraints.map(std::convert::Into::into),
         display_order: request.display_order,
     };
 
@@ -336,15 +336,15 @@ pub async fn validate_parameters(
     }
 
     // Validate using the appropriate method
-    let result = if !values_by_name.is_empty() {
+    let result = if values_by_name.is_empty() {
         state
             .parameter_service
-            .validate_parameters_by_name(tenant_id, role_id, &values_by_name)
+            .validate_parameters(tenant_id, role_id, &values)
             .await?
     } else {
         state
             .parameter_service
-            .validate_parameters(tenant_id, role_id, &values)
+            .validate_parameters_by_name(tenant_id, role_id, &values_by_name)
             .await?
     };
 

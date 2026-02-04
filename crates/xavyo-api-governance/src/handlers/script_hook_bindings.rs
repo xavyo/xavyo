@@ -115,7 +115,7 @@ pub async fn create_binding(
         .as_deref()
         .map(|fp| {
             serde_json::from_value(serde_json::Value::String(fp.to_string())).map_err(|_| {
-                ApiGovernanceError::Validation(format!("Invalid failure_policy: {}", fp))
+                ApiGovernanceError::Validation(format!("Invalid failure_policy: {fp}"))
             })
         })
         .transpose()?
@@ -222,7 +222,7 @@ pub async fn update_binding(
         .as_deref()
         .map(|fp| {
             serde_json::from_value(serde_json::Value::String(fp.to_string())).map_err(|_| {
-                ApiGovernanceError::Validation(format!("Invalid failure_policy: {}", fp))
+                ApiGovernanceError::Validation(format!("Invalid failure_policy: {fp}"))
             })
         })
         .transpose()?;

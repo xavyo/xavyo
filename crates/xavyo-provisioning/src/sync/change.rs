@@ -44,6 +44,7 @@ pub struct InboundChange {
 
 impl InboundChange {
     /// Create a new inbound change.
+    #[must_use] 
     pub fn new(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -72,6 +73,7 @@ impl InboundChange {
     }
 
     /// Create a builder for more complex construction.
+    #[must_use] 
     pub fn builder(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -89,21 +91,25 @@ impl InboundChange {
     }
 
     /// Check if this change is pending processing.
+    #[must_use] 
     pub fn is_pending(&self) -> bool {
         self.processing_status == ProcessingStatus::Pending
     }
 
     /// Check if this change has been processed.
+    #[must_use] 
     pub fn is_processed(&self) -> bool {
         self.processing_status.is_terminal()
     }
 
     /// Check if this change has a conflict.
+    #[must_use] 
     pub fn has_conflict(&self) -> bool {
         self.conflict_id.is_some()
     }
 
     /// Check if this change is linked to an identity.
+    #[must_use] 
     pub fn is_linked(&self) -> bool {
         self.linked_identity_id.is_some() && self.sync_situation == SyncSituation::Linked
     }
@@ -175,6 +181,7 @@ pub struct InboundCorrelationResult {
 
 impl InboundCorrelationResult {
     /// Create result with no matches (Unmatched situation).
+    #[must_use] 
     pub fn unmatched() -> Self {
         Self {
             matched_user_id: None,
@@ -186,6 +193,7 @@ impl InboundCorrelationResult {
     }
 
     /// Create result with single confident match (Unlinked - ready to auto-link).
+    #[must_use] 
     pub fn single_match(user_id: Uuid, confidence: f64, matched_rules: Vec<String>) -> Self {
         Self {
             matched_user_id: Some(user_id),
@@ -201,8 +209,9 @@ impl InboundCorrelationResult {
     }
 
     /// Create result with multiple matches (Disputed situation).
+    #[must_use] 
     pub fn disputed(candidates: Vec<InboundCorrelationCandidate>) -> Self {
-        let highest_confidence = candidates.first().map(|c| c.confidence).unwrap_or(0.0);
+        let highest_confidence = candidates.first().map_or(0.0, |c| c.confidence);
         Self {
             matched_user_id: None,
             candidates,
@@ -213,6 +222,7 @@ impl InboundCorrelationResult {
     }
 
     /// Check if correlation found a confident single match.
+    #[must_use] 
     pub fn has_confident_match(&self) -> bool {
         self.matched_user_id.is_some() && self.confidence >= 0.8
     }
@@ -245,6 +255,7 @@ pub struct InboundChangeBuilder {
 
 impl InboundChangeBuilder {
     /// Create a new builder.
+    #[must_use] 
     pub fn new(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -266,18 +277,21 @@ impl InboundChangeBuilder {
     }
 
     /// Set attributes.
+    #[must_use] 
     pub fn attributes(mut self, attributes: serde_json::Value) -> Self {
         self.attributes = attributes;
         self
     }
 
     /// Set sync situation.
+    #[must_use] 
     pub fn situation(mut self, situation: SyncSituation) -> Self {
         self.sync_situation = situation;
         self
     }
 
     /// Set linked identity.
+    #[must_use] 
     pub fn linked_identity(mut self, identity_id: Uuid) -> Self {
         self.linked_identity_id = Some(identity_id);
         self.sync_situation = SyncSituation::Linked;
@@ -285,12 +299,14 @@ impl InboundChangeBuilder {
     }
 
     /// Set correlation result.
+    #[must_use] 
     pub fn correlation_result(mut self, result: serde_json::Value) -> Self {
         self.correlation_result = Some(result);
         self
     }
 
     /// Build the inbound change.
+    #[must_use] 
     pub fn build(self) -> InboundChange {
         InboundChange {
             id: Uuid::new_v4(),

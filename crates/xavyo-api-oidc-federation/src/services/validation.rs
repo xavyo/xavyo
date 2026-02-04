@@ -17,6 +17,7 @@ pub struct ValidationService {
 
 impl ValidationService {
     /// Create a new validation service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,

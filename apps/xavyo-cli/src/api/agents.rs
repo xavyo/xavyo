@@ -42,7 +42,7 @@ impl ApiClient {
         if response.status().is_success() {
             response.json().await.map_err(Into::into)
         } else if response.status() == reqwest::StatusCode::NOT_FOUND {
-            Err(CliError::NotFound(format!("Agent not found: {}", id)))
+            Err(CliError::NotFound(format!("Agent not found: {id}")))
         } else {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
@@ -88,7 +88,7 @@ impl ApiClient {
         if response.status().is_success() || response.status() == reqwest::StatusCode::NO_CONTENT {
             Ok(())
         } else if response.status() == reqwest::StatusCode::NOT_FOUND {
-            Err(CliError::NotFound(format!("Agent not found: {}", id)))
+            Err(CliError::NotFound(format!("Agent not found: {id}")))
         } else {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
@@ -121,7 +121,7 @@ impl ApiClient {
         if response.status().is_success() {
             response.json().await.map_err(Into::into)
         } else if response.status() == reqwest::StatusCode::NOT_FOUND {
-            Err(CliError::NotFound(format!("Agent not found: {}", agent_id)))
+            Err(CliError::NotFound(format!("Agent not found: {agent_id}")))
         } else {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
@@ -151,8 +151,7 @@ impl ApiClient {
             response.json().await.map_err(Into::into)
         } else if response.status() == reqwest::StatusCode::NOT_FOUND {
             Err(CliError::NotFound(format!(
-                "Credential not found: {}",
-                credential_id
+                "Credential not found: {credential_id}"
             )))
         } else {
             let status = response.status();
@@ -181,7 +180,7 @@ impl ApiClient {
         if response.status().is_success() {
             response.json().await.map_err(Into::into)
         } else if response.status() == reqwest::StatusCode::NOT_FOUND {
-            Err(CliError::NotFound(format!("Agent not found: {}", agent_id)))
+            Err(CliError::NotFound(format!("Agent not found: {agent_id}")))
         } else if response.status() == reqwest::StatusCode::BAD_REQUEST {
             let body = response.text().await.unwrap_or_default();
             Err(CliError::Validation(body))
@@ -215,8 +214,7 @@ impl ApiClient {
             response.json().await.map_err(Into::into)
         } else if response.status() == reqwest::StatusCode::NOT_FOUND {
             Err(CliError::NotFound(format!(
-                "Credential not found: {}",
-                credential_id
+                "Credential not found: {credential_id}"
             )))
         } else if response.status() == reqwest::StatusCode::BAD_REQUEST {
             let body = response.text().await.unwrap_or_default();

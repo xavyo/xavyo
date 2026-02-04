@@ -59,10 +59,10 @@ impl GovCorrelationThreshold {
         connector_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_correlation_thresholds
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -82,7 +82,7 @@ impl GovCorrelationThreshold {
         input: UpsertGovCorrelationThreshold,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_correlation_thresholds (
                 tenant_id, connector_id,
                 auto_confirm_threshold, manual_review_threshold,
@@ -104,7 +104,7 @@ impl GovCorrelationThreshold {
                 batch_size = COALESCE($7, gov_correlation_thresholds.batch_size),
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -126,10 +126,10 @@ impl GovCorrelationThreshold {
         connector_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_correlation_thresholds
             WHERE tenant_id = $1 AND connector_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(connector_id)
@@ -143,6 +143,7 @@ impl GovCorrelationThreshold {
     ///
     /// This is a pure in-memory helper that does not perform any database call.
     /// Uses `Uuid::nil()` for the `id` field to indicate it is not persisted.
+    #[must_use] 
     pub fn find_or_default(tenant_id: Uuid, connector_id: Uuid) -> Self {
         Self {
             id: Uuid::nil(),

@@ -8,7 +8,7 @@
 //! ## Features
 //!
 //! - **Event Publishing**: Publish domain events to Kafka topics
-//! - **Idempotent Consuming**: Process events exactly once using PostgreSQL
+//! - **Idempotent Consuming**: Process events exactly once using `PostgreSQL`
 //! - **Type Safety**: Compile-time topic/event type association via Event trait
 //! - **Multi-tenant**: All events include tenant context
 //!

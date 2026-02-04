@@ -38,7 +38,7 @@ impl std::str::FromStr for CertificateStatus {
             "active" => Ok(CertificateStatus::Active),
             "revoked" => Ok(CertificateStatus::Revoked),
             "expired" => Ok(CertificateStatus::Expired),
-            _ => Err(format!("Invalid certificate status: {}", s)),
+            _ => Err(format!("Invalid certificate status: {s}")),
         }
     }
 }
@@ -103,31 +103,37 @@ impl AgentCertificate {
     }
 
     /// Check if the certificate is active.
+    #[must_use] 
     pub fn is_active(&self) -> bool {
         self.status == "active"
     }
 
     /// Check if the certificate is revoked.
+    #[must_use] 
     pub fn is_revoked(&self) -> bool {
         self.status == "revoked"
     }
 
     /// Check if the certificate has expired (by date).
+    #[must_use] 
     pub fn is_expired_by_date(&self) -> bool {
         self.not_after < Utc::now()
     }
 
     /// Check if the certificate is not yet valid.
+    #[must_use] 
     pub fn is_not_yet_valid(&self) -> bool {
         self.not_before > Utc::now()
     }
 
     /// Check if the certificate is currently valid for use.
+    #[must_use] 
     pub fn is_valid(&self) -> bool {
         self.is_active() && !self.is_expired_by_date() && !self.is_not_yet_valid()
     }
 
     /// Get remaining validity in seconds.
+    #[must_use] 
     pub fn remaining_validity_seconds(&self) -> i64 {
         (self.not_after - Utc::now()).num_seconds().max(0)
     }
@@ -141,7 +147,7 @@ pub struct IssueCertificateRequest {
     #[serde(default = "default_validity_days")]
     pub validity_days: i32,
 
-    /// Key algorithm (rsa2048, rsa4096, ecdsa_p256, ecdsa_p384).
+    /// Key algorithm (rsa2048, rsa4096, `ecdsa_p256`, `ecdsa_p384`).
     #[serde(default = "default_key_algorithm")]
     pub key_algorithm: String,
 
@@ -209,10 +215,10 @@ impl AgentCertificate {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM agent_certificates
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -227,10 +233,10 @@ impl AgentCertificate {
         serial_number: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM agent_certificates
             WHERE tenant_id = $1 AND serial_number = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(serial_number)
@@ -245,10 +251,10 @@ impl AgentCertificate {
         fingerprint: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM agent_certificates
             WHERE tenant_id = $1 AND fingerprint_sha256 = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(fingerprint)
@@ -259,16 +265,16 @@ impl AgentCertificate {
     /// Find a certificate by fingerprint without tenant filter.
     ///
     /// **Security Warning**: Only use for mTLS validation where tenant is
-    /// extracted from the certificate itself. Always verify tenant_id after lookup.
+    /// extracted from the certificate itself. Always verify `tenant_id` after lookup.
     pub async fn find_by_fingerprint_any_tenant(
         pool: &sqlx::PgPool,
         fingerprint: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM agent_certificates
             WHERE fingerprint_sha256 = $1
-            "#,
+            ",
         )
         .bind(fingerprint)
         .fetch_optional(pool)
@@ -282,12 +288,12 @@ impl AgentCertificate {
         agent_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM agent_certificates
             WHERE tenant_id = $1 AND agent_id = $2 AND status = 'active'
             ORDER BY not_after DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -304,33 +310,32 @@ impl AgentCertificate {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM agent_certificates
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.agent_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND agent_id = ${}", param_count));
+            query.push_str(&format!(" AND agent_id = ${param_count}"));
         }
 
         if filter.ca_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND ca_id = ${}", param_count));
+            query.push_str(&format!(" AND ca_id = ${param_count}"));
         }
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         if filter.expiring_within_days.is_some() {
             param_count += 1;
             query.push_str(&format!(
-                " AND status = 'active' AND not_after <= NOW() + INTERVAL '1 day' * ${}",
-                param_count
+                " AND status = 'active' AND not_after <= NOW() + INTERVAL '1 day' * ${param_count}"
             ));
         }
 
@@ -365,10 +370,10 @@ impl AgentCertificate {
         agent_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM agent_certificates
             WHERE tenant_id = $1 AND agent_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -385,10 +390,10 @@ impl AgentCertificate {
         ca_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM agent_certificates
             WHERE tenant_id = $1 AND ca_id = $2 AND status = 'active' AND not_after > NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(ca_id)
@@ -404,7 +409,7 @@ impl AgentCertificate {
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM agent_certificates
             WHERE tenant_id = $1
               AND status = 'active'
@@ -412,7 +417,7 @@ impl AgentCertificate {
               AND not_after <= NOW() + INTERVAL '1 day' * $2
             ORDER BY not_after ASC
             LIMIT $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(within_days)
@@ -437,14 +442,14 @@ impl AgentCertificate {
         created_by: Option<Uuid>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO agent_certificates (
                 tenant_id, agent_id, serial_number, certificate_pem, fingerprint_sha256,
                 subject_dn, issuer_dn, not_before, not_after, ca_id, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -469,12 +474,12 @@ impl AgentCertificate {
         reason: i16,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE agent_certificates
             SET status = 'revoked', revoked_at = NOW(), revocation_reason = $3
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -490,12 +495,12 @@ impl AgentCertificate {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE agent_certificates
             SET status = 'expired'
             WHERE id = $1 AND tenant_id = $2 AND status = 'active' AND not_after < NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -506,11 +511,11 @@ impl AgentCertificate {
     /// Batch update expired certificates to expired status.
     pub async fn update_expired_batch(pool: &sqlx::PgPool) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE agent_certificates
             SET status = 'expired'
             WHERE status = 'active' AND not_after < NOW()
-            "#,
+            ",
         )
         .execute(pool)
         .await?;
@@ -525,10 +530,10 @@ impl AgentCertificate {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM agent_certificates
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

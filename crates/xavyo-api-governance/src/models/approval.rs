@@ -76,10 +76,10 @@ pub struct PendingApprovalItem {
     /// Total steps in the workflow.
     pub total_steps: i32,
 
-    /// Whether SoD violations were detected.
+    /// Whether `SoD` violations were detected.
     pub has_sod_warning: bool,
 
-    /// SoD violation summaries.
+    /// `SoD` violation summaries.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sod_warnings: Option<Vec<SodWarningSummary>>,
 
@@ -98,7 +98,7 @@ pub struct PendingApprovalItem {
     pub previous_decisions: Vec<DecisionSummary>,
 }
 
-/// Summary of an SoD warning for approver review.
+/// Summary of an `SoD` warning for approver review.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SodWarningSummary {
     /// Rule name.

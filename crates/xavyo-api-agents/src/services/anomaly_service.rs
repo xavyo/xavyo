@@ -28,7 +28,8 @@ pub struct AnomalyService {
 }
 
 impl AnomalyService {
-    /// Create a new AnomalyService.
+    /// Create a new `AnomalyService`.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -57,12 +58,12 @@ impl AnomalyService {
             query.offset,
         )
         .await
-        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
         // Get total count
         let total = DbDetectedAnomaly::count(&self.pool, tenant_id, agent_id, &filter)
             .await
-            .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+            .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
         // Convert to API response format
         let items: Vec<DetectedAnomaly> = db_anomalies
@@ -105,7 +106,7 @@ impl AnomalyService {
             "hourly_volume",
         )
         .await
-        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
         let baseline = match baseline {
             Some(b) if b.sample_count >= 24 => b,
@@ -190,7 +191,7 @@ impl AnomalyService {
 
         DbDetectedAnomaly::create(&self.pool, create_data)
             .await
-            .map_err(|e| ApiAgentsError::Internal(format!("Failed to record anomaly: {}", e)))
+            .map_err(|e| ApiAgentsError::Internal(format!("Failed to record anomaly: {e}")))
     }
 
     /// Check if an alert should be sent (respecting aggregation window).
@@ -201,7 +202,7 @@ impl AnomalyService {
         anomaly_type: &str,
         aggregation_window_secs: i32,
     ) -> Result<bool, ApiAgentsError> {
-        let since = Utc::now() - Duration::seconds(aggregation_window_secs as i64);
+        let since = Utc::now() - Duration::seconds(i64::from(aggregation_window_secs));
 
         let has_recent = DbDetectedAnomaly::has_recent_alert(
             &self.pool,
@@ -211,7 +212,7 @@ impl AnomalyService {
             since,
         )
         .await
-        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
         Ok(!has_recent)
     }
@@ -220,7 +221,7 @@ impl AnomalyService {
     pub async fn mark_alert_sent(&self, anomaly_id: Uuid) -> Result<(), ApiAgentsError> {
         DbDetectedAnomaly::mark_alert_sent(&self.pool, anomaly_id)
             .await
-            .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))
+            .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))
     }
 
     /// Detect tool usage anomaly based on historical tool frequency.
@@ -240,7 +241,7 @@ impl AnomalyService {
             "tool_distribution",
         )
         .await
-        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
         let baseline = match baseline {
             Some(b) if b.sample_count >= 24 => b,
@@ -255,7 +256,7 @@ impl AnomalyService {
 
         let tool_freq = tool_frequencies
             .get(tool_name)
-            .and_then(|v| v.as_f64())
+            .and_then(serde_json::Value::as_f64)
             .unwrap_or(0.0);
 
         // Get threshold for unusual tool detection
@@ -278,8 +279,7 @@ impl AnomalyService {
 
         let description = if tool_freq == 0.0 {
             format!(
-                "Unknown tool '{}' used - not in historical baseline",
-                tool_name
+                "Unknown tool '{tool_name}' used - not in historical baseline"
             )
         } else {
             format!(
@@ -324,7 +324,7 @@ impl AnomalyService {
             "hour_distribution",
         )
         .await
-        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
         let baseline = match baseline {
             Some(b) if b.sample_count >= 24 => b,
@@ -339,7 +339,7 @@ impl AnomalyService {
 
         let hour_freq = hour_frequencies
             .get(current_hour.to_string())
-            .and_then(|v| v.as_f64())
+            .and_then(serde_json::Value::as_f64)
             .unwrap_or(0.0);
 
         // Get threshold for off-hours detection
@@ -402,17 +402,16 @@ impl AnomalyService {
             anomaly.anomaly_type.as_str(),
         )
         .await
-        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
-        let alert_enabled = threshold.as_ref().map(|t| t.alert_enabled).unwrap_or(true);
+        let alert_enabled = threshold.as_ref().is_none_or(|t| t.alert_enabled);
         if !alert_enabled {
             return Ok(false);
         }
 
         let aggregation_window = threshold
             .as_ref()
-            .map(|t| t.aggregation_window_secs)
-            .unwrap_or(DEFAULT_AGGREGATION_WINDOW_SECS);
+            .map_or(DEFAULT_AGGREGATION_WINDOW_SECS, |t| t.aggregation_window_secs);
 
         // Check if we should send (respecting aggregation window)
         if !self
@@ -449,7 +448,7 @@ impl AnomalyService {
         let threshold =
             AnomalyThreshold::get_effective(&self.pool, tenant_id, agent_id, anomaly_type)
                 .await
-                .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+                .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
         match threshold {
             Some(t) if t.enabled => Ok(decimal_to_f64(&t.threshold_value)),
@@ -465,7 +464,7 @@ impl AnomalyService {
     ) -> Result<ThresholdsResponse, ApiAgentsError> {
         let db_thresholds = AnomalyThreshold::get_for_agent(&self.pool, tenant_id, agent_id)
             .await
-            .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+            .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
         if db_thresholds.is_empty() {
             return Ok(ThresholdsResponse {
@@ -507,7 +506,7 @@ impl AnomalyService {
     ) -> Result<ThresholdsResponse, ApiAgentsError> {
         let db_thresholds = AnomalyThreshold::get_tenant_defaults(&self.pool, tenant_id)
             .await
-            .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+            .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
         if db_thresholds.is_empty() {
             return Ok(ThresholdsResponse {
@@ -563,7 +562,7 @@ impl AnomalyService {
 
             let saved = AnomalyThreshold::upsert(&self.pool, data)
                 .await
-                .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+                .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
             thresholds.push(Threshold {
                 anomaly_type: t.anomaly_type,
@@ -608,7 +607,7 @@ impl AnomalyService {
 
             let saved = AnomalyThreshold::upsert(&self.pool, data)
                 .await
-                .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+                .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
             thresholds.push(Threshold {
                 anomaly_type: t.anomaly_type,
@@ -635,7 +634,7 @@ impl AnomalyService {
         // Delete agent-specific thresholds
         AnomalyThreshold::delete_for_agent(&self.pool, tenant_id, agent_id)
             .await
-            .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+            .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
         // Return tenant defaults
         self.get_tenant_thresholds(tenant_id).await
@@ -705,29 +704,29 @@ impl AnomalyService {
         let hour_start = now
             .date_naive()
             .and_hms_opt(now.hour(), 0, 0)
-            .map(|dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc))
-            .unwrap_or(now);
+            .map_or(now, |dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
 
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM ai_agent_audit_events
             WHERE tenant_id = $1
               AND agent_id = $2
               AND timestamp >= $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
         .bind(hour_start)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {}", e)))?;
+        .map_err(|e| ApiAgentsError::Internal(format!("Database error: {e}")))?;
 
         Ok(count as f64)
     }
 
     /// Calculate severity based on z-score.
+    #[must_use] 
     pub fn calculate_severity(z_score: f64) -> Severity {
         let abs_z = z_score.abs();
         if abs_z >= 5.0 {
@@ -742,6 +741,7 @@ impl AnomalyService {
     }
 
     /// Calculate anomaly score (0-100) based on z-score.
+    #[must_use] 
     pub fn calculate_score(z_score: f64) -> i32 {
         // Map z-score to 0-100 scale
         // z=3 -> 60, z=4 -> 75, z=5 -> 90, z>=6 -> 100

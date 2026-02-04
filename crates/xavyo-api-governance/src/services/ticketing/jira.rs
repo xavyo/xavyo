@@ -70,7 +70,7 @@ impl JiraProvider {
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e| {
-                TicketingError::InvalidConfiguration(format!("Failed to build HTTP client: {}", e))
+                TicketingError::InvalidConfiguration(format!("Failed to build HTTP client: {e}"))
             })?;
 
         Ok(Self {
@@ -128,7 +128,7 @@ impl JiraProvider {
                     TicketStatus::Resolved
                 }
             }
-            _ => TicketStatus::Unknown(format!("{}:{}", category_key, status_name)),
+            _ => TicketStatus::Unknown(format!("{category_key}:{status_name}")),
         }
     }
 }
@@ -317,7 +317,7 @@ impl TicketingProvider for JiraProvider {
             let error_text = response.text().await.unwrap_or_default();
             Ok(ConnectivityTestResponse {
                 success: false,
-                error_message: Some(format!("API returned status {}: {}", status, error_text)),
+                error_message: Some(format!("API returned status {status}: {error_text}")),
                 details: None,
             })
         }
@@ -350,7 +350,7 @@ impl TicketingProvider for JiraProvider {
             .map(|arr| {
                 arr.iter()
                     .filter_map(|v| v.as_str())
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect()
             });
 
@@ -411,9 +411,7 @@ impl TicketingProvider for JiraProvider {
             })
         } else {
             let error_response: Result<JiraErrorResponse, _> = response.json().await;
-            let message = error_response
-                .map(|e| e.error_messages.join(", "))
-                .unwrap_or_else(|_| "Unknown error".to_string());
+            let message = error_response.map_or_else(|_| "Unknown error".to_string(), |e| e.error_messages.join(", "));
             Err(TicketingError::ApiError {
                 status: status.as_u16(),
                 message,
@@ -425,7 +423,7 @@ impl TicketingProvider for JiraProvider {
         &self,
         external_reference: &str,
     ) -> TicketingResult<TicketStatusResponse> {
-        let url = self.api_url(&format!("issue/{}", external_reference));
+        let url = self.api_url(&format!("issue/{external_reference}"));
 
         let response = self
             .client
@@ -478,7 +476,7 @@ impl TicketingProvider for JiraProvider {
     }
 
     async fn add_comment(&self, external_reference: &str, comment: &str) -> TicketingResult<()> {
-        let url = self.api_url(&format!("issue/{}/comment", external_reference));
+        let url = self.api_url(&format!("issue/{external_reference}/comment"));
 
         let body = serde_json::json!({
             "body": JiraDescription::from_text(comment)

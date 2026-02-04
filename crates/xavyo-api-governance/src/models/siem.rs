@@ -19,7 +19,7 @@ pub struct CreateSiemDestinationRequest {
     #[validate(length(min = 1, max = 255, message = "Name must be 1-255 characters"))]
     pub name: String,
 
-    /// Destination type: syslog_tcp_tls, syslog_udp, webhook, splunk_hec.
+    /// Destination type: `syslog_tcp_tls`, `syslog_udp`, webhook, `splunk_hec`.
     #[validate(length(min = 1, max = 50))]
     pub destination_type: String,
 
@@ -30,7 +30,7 @@ pub struct CreateSiemDestinationRequest {
     /// Port (optional — defaults per type).
     pub endpoint_port: Option<i32>,
 
-    /// Export format: cef, syslog_rfc5424, json, csv.
+    /// Export format: cef, `syslog_rfc5424`, json, csv.
     #[validate(length(min = 1, max = 20))]
     pub export_format: String,
 
@@ -110,7 +110,8 @@ pub struct ListSiemDestinationsQuery {
 impl ListSiemDestinationsQuery {
     /// Validate and clamp pagination values.
     ///
-    /// SECURITY: Prevents DoS via unbounded pagination.
+    /// SECURITY: Prevents `DoS` via unbounded pagination.
+    #[must_use] 
     pub fn validated(self) -> Self {
         Self {
             enabled: self.enabled,

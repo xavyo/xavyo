@@ -30,13 +30,14 @@ pub struct RiskScoreService {
 
 impl RiskScoreService {
     /// Create a new risk score service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the current risk score for a user.
     ///
-    /// Returns the cached score if available, or NotFound if user has no score yet.
+    /// Returns the cached score if available, or `NotFound` if user has no score yet.
     pub async fn get_user_score(
         &self,
         tenant_id: Uuid,
@@ -239,7 +240,7 @@ impl RiskScoreService {
                         }
                     }
                 }
-                Ok(high_risk_count as f64)
+                Ok(f64::from(high_risk_count))
             }
             "sod_violation_count" => {
                 // Count active SoD violations
@@ -470,7 +471,7 @@ impl RiskScoreService {
         .await?;
 
         for score in &all_scores {
-            total_score += score.total_score as i64;
+            total_score += i64::from(score.total_score);
         }
 
         let average_score = if total_users > 0 {

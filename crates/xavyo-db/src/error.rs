@@ -1,6 +1,6 @@
 //! Error types for the xavyo-db crate.
 //!
-//! Provides a unified error type that wraps SQLx errors with additional context.
+//! Provides a unified error type that wraps `SQLx` errors with additional context.
 
 use thiserror::Error;
 

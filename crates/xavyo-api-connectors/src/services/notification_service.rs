@@ -82,16 +82,19 @@ pub struct NotificationService {
 
 impl NotificationService {
     /// Create a new notification service.
+    #[must_use] 
     pub fn new(config: NotificationConfig) -> Self {
         Self { config }
     }
 
     /// Create a disabled notification service.
+    #[must_use] 
     pub fn disabled() -> Self {
         Self::new(NotificationConfig::default())
     }
 
     /// Check if notifications are enabled.
+    #[must_use] 
     pub fn is_enabled(&self) -> bool {
         self.config.enabled
     }

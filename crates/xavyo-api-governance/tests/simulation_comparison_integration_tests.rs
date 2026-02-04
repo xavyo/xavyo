@@ -204,7 +204,7 @@ mod tests {
         assert_eq!(parsed_summary.different_impacts, 20);
     }
 
-    /// Test references_simulation helper
+    /// Test `references_simulation` helper
     #[test]
     fn test_references_simulation() {
         use chrono::Utc;
@@ -235,7 +235,7 @@ mod tests {
         assert!(!comparison.references_simulation(other_id));
     }
 
-    /// Test simulation vs current comparison (simulation_b fields should be None)
+    /// Test simulation vs current comparison (`simulation_b` fields should be None)
     #[test]
     fn test_simulation_vs_current_structure() {
         use chrono::Utc;

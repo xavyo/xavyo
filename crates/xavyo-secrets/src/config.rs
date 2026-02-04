@@ -12,7 +12,7 @@ pub enum ProviderType {
     Env,
     /// Read from filesystem paths.
     File,
-    /// Read from HashiCorp Vault KV v2.
+    /// Read from `HashiCorp` Vault KV v2.
     Vault,
     /// Read from AWS Secrets Manager.
     Aws,
@@ -43,6 +43,7 @@ pub enum AppEnvironment {
 }
 
 impl AppEnvironment {
+    #[must_use] 
     pub fn from_env_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "production" | "prod" => Self::Production,
@@ -50,15 +51,16 @@ impl AppEnvironment {
         }
     }
 
+    #[must_use] 
     pub fn is_production(&self) -> bool {
         *self == Self::Production
     }
 }
 
-/// HashiCorp Vault authentication method.
+/// `HashiCorp` Vault authentication method.
 #[derive(Clone)]
 pub enum VaultAuthMethod {
-    /// Machine-to-machine auth with role_id + secret_id.
+    /// Machine-to-machine auth with `role_id` + `secret_id`.
     AppRole { role_id: String, secret_id: String },
     /// Direct token auth.
     Token { token: String },
@@ -80,7 +82,7 @@ impl std::fmt::Debug for VaultAuthMethod {
     }
 }
 
-/// Configuration specific to HashiCorp Vault.
+/// Configuration specific to `HashiCorp` Vault.
 #[derive(Debug, Clone)]
 pub struct VaultConfig {
     /// Vault server URL.
@@ -135,11 +137,11 @@ pub struct SecretProviderConfig {
     pub cache_ttl_seconds: u64,
     /// Application environment mode.
     pub env: AppEnvironment,
-    /// Vault-specific config (if provider_type == Vault).
+    /// Vault-specific config (if `provider_type` == Vault).
     pub vault: Option<VaultConfig>,
-    /// AWS-specific config (if provider_type == Aws).
+    /// AWS-specific config (if `provider_type` == Aws).
     pub aws: Option<AwsConfig>,
-    /// File-specific config (if provider_type == File).
+    /// File-specific config (if `provider_type` == File).
     pub file: Option<FileConfig>,
 }
 
@@ -151,7 +153,7 @@ impl SecretProviderConfig {
     /// - `SECRET_CACHE_TTL_SECONDS` — cache TTL (default: 300)
     /// - `SECRET_MAP_{NAME}` — secret name mappings
     /// - `APP_ENV` — environment mode
-    /// - Provider-specific variables (VAULT_ADDR, AWS_REGION, etc.)
+    /// - Provider-specific variables (`VAULT_ADDR`, `AWS_REGION`, etc.)
     pub fn from_env() -> Result<Self, SecretError> {
         let app_env = AppEnvironment::from_env_str(
             &env::var("APP_ENV").unwrap_or_else(|_| "development".to_string()),
@@ -200,9 +202,9 @@ impl SecretProviderConfig {
         })
     }
 
-    /// Parse SECRET_MAP_* environment variables into a HashMap.
+    /// Parse `SECRET_MAP`_* environment variables into a `HashMap`.
     ///
-    /// e.g., SECRET_MAP_JWT_SIGNING_KEYS=/etc/secrets/jwt → {"jwt_signing_keys": "/etc/secrets/jwt"}
+    /// e.g., `SECRET_MAP_JWT_SIGNING_KEYS=/etc/secrets/jwt` → {"`jwt_signing_keys"`: "/etc/secrets/jwt"}
     fn parse_secret_mappings() -> HashMap<String, String> {
         let mut mappings = HashMap::new();
         for (key, value) in env::vars() {

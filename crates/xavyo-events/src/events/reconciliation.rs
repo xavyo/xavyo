@@ -136,7 +136,7 @@ pub struct RemediationExecuted {
     pub discrepancy_id: Uuid,
     /// Connector ID.
     pub connector_id: Uuid,
-    /// Action type (create, update, delete, link, unlink, inactivate_identity).
+    /// Action type (create, update, delete, link, unlink, `inactivate_identity`).
     pub action_type: String,
     /// Result of the action (success, failure).
     pub result: String,

@@ -41,7 +41,7 @@ impl TenantSocialProvider {
         input: UpsertTenantSocialProvider,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_social_providers (
                 tenant_id, provider, enabled, client_id, client_secret_encrypted,
                 additional_config, scopes, claims_mapping
@@ -57,7 +57,7 @@ impl TenantSocialProvider {
                 claims_mapping = EXCLUDED.claims_mapping,
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(input.tenant_id)
         .bind(&input.provider)
@@ -78,10 +78,10 @@ impl TenantSocialProvider {
         provider: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM tenant_social_providers
             WHERE tenant_id = $1 AND provider = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(provider)
@@ -96,10 +96,10 @@ impl TenantSocialProvider {
         provider: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM tenant_social_providers
             WHERE tenant_id = $1 AND provider = $2 AND enabled = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(provider)
@@ -113,11 +113,11 @@ impl TenantSocialProvider {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM tenant_social_providers
             WHERE tenant_id = $1
             ORDER BY provider ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -130,11 +130,11 @@ impl TenantSocialProvider {
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM tenant_social_providers
             WHERE tenant_id = $1 AND enabled = true
             ORDER BY provider ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_all(pool)
@@ -148,11 +148,11 @@ impl TenantSocialProvider {
         provider: &str,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE tenant_social_providers
             SET enabled = false, updated_at = NOW()
             WHERE tenant_id = $1 AND provider = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(provider)
@@ -169,10 +169,10 @@ impl TenantSocialProvider {
         provider: &str,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM tenant_social_providers
             WHERE tenant_id = $1 AND provider = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(provider)

@@ -1,7 +1,7 @@
 //! Schema Schedule Service for managing automatic schema refresh.
 //!
 //! Provides CRUD operations for schema refresh schedules and
-//! next_run_at computation for both interval and cron-based schedules.
+//! `next_run_at` computation for both interval and cron-based schedules.
 
 use chrono::{DateTime, Duration, Utc};
 use cron::Schedule as CronSchedule;
@@ -66,7 +66,7 @@ pub fn validate_schedule_config(
 
 /// Compute the next run time based on schedule configuration.
 ///
-/// For interval schedules: adds interval_hours to the reference time.
+/// For interval schedules: adds `interval_hours` to the reference time.
 /// For cron schedules: finds the next occurrence after the reference time.
 pub fn compute_next_run_at(
     schedule_type: &ScheduleType,
@@ -82,7 +82,7 @@ pub fn compute_next_run_at(
             if hours <= 0 {
                 return Err(ScheduleError::InvalidInterval);
             }
-            let next = reference + Duration::hours(hours as i64);
+            let next = reference + Duration::hours(i64::from(hours));
             Ok(Some(next))
         }
         ScheduleType::Cron => {
@@ -107,6 +107,7 @@ pub struct ScheduleService {
 
 impl ScheduleService {
     /// Create a new schedule service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

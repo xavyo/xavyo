@@ -416,7 +416,7 @@ pub async fn export_transition_audit(
         .header(header::CONTENT_TYPE, result.content_type)
         .header(
             header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}\"", filename),
+            format!("attachment; filename=\"{filename}\""),
         )
         .body(Body::from(result.content))
         .unwrap();

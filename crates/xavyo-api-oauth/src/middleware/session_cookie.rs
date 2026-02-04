@@ -1,7 +1,7 @@
 //! Session cookie middleware for device code flow authentication.
 //!
 //! Provides functions to set and extract session cookies for the device code
-//! login flow (F112). Uses HttpOnly, Secure, SameSite=Strict cookies.
+//! login flow (F112). Uses `HttpOnly`, Secure, SameSite=Strict cookies.
 //!
 //! Also provides CSRF token generation and validation for form submissions.
 
@@ -32,11 +32,11 @@ pub const CSRF_COOKIE_MAX_AGE: i64 = 3600;
 /// # Returns
 ///
 /// The cookie header value as a string.
+#[must_use] 
 pub fn create_session_cookie(session_id: Uuid, secure: bool) -> String {
     let secure_flag = if secure { "; Secure" } else { "" };
     format!(
-        "{}={}; HttpOnly{}; SameSite=Strict; Path=/device; Max-Age={}",
-        SESSION_COOKIE_NAME, session_id, secure_flag, SESSION_COOKIE_MAX_AGE
+        "{SESSION_COOKIE_NAME}={session_id}; HttpOnly{secure_flag}; SameSite=Strict; Path=/device; Max-Age={SESSION_COOKIE_MAX_AGE}"
     )
 }
 
@@ -76,7 +76,7 @@ pub fn extract_session_cookie(headers: &HeaderMap) -> Option<Uuid> {
     // Parse cookie string (format: "name1=value1; name2=value2")
     for part in cookie_str.split(';') {
         let part = part.trim();
-        if let Some(value) = part.strip_prefix(&format!("{}=", SESSION_COOKIE_NAME)) {
+        if let Some(value) = part.strip_prefix(&format!("{SESSION_COOKIE_NAME}=")) {
             return Uuid::parse_str(value.trim()).ok();
         }
     }
@@ -93,11 +93,11 @@ pub fn extract_session_cookie(headers: &HeaderMap) -> Option<Uuid> {
 /// # Returns
 ///
 /// The cookie header value for clearing the cookie.
+#[must_use] 
 pub fn clear_session_cookie(secure: bool) -> String {
     let secure_flag = if secure { "; Secure" } else { "" };
     format!(
-        "{}=; HttpOnly{}; SameSite=Strict; Path=/device; Max-Age=0",
-        SESSION_COOKIE_NAME, secure_flag
+        "{SESSION_COOKIE_NAME}=; HttpOnly{secure_flag}; SameSite=Strict; Path=/device; Max-Age=0"
     )
 }
 
@@ -112,6 +112,7 @@ pub fn clear_session_cookie(secure: bool) -> String {
 /// # Returns
 ///
 /// A random CSRF token string (43 characters).
+#[must_use] 
 pub fn generate_csrf_token() -> String {
     let mut bytes = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut bytes);
@@ -120,7 +121,7 @@ pub fn generate_csrf_token() -> String {
 
 /// Create the CSRF cookie value.
 ///
-/// The CSRF cookie is NOT HttpOnly so it can be read by JavaScript if needed,
+/// The CSRF cookie is NOT `HttpOnly` so it can be read by JavaScript if needed,
 /// but we use the double-submit pattern with hidden form fields instead.
 ///
 /// # Arguments
@@ -131,11 +132,11 @@ pub fn generate_csrf_token() -> String {
 /// # Returns
 ///
 /// The cookie header value as a string.
+#[must_use] 
 pub fn create_csrf_cookie(token: &str, secure: bool) -> String {
     let secure_flag = if secure { "; Secure" } else { "" };
     format!(
-        "{}={}{}; SameSite=Strict; Path=/device; Max-Age={}",
-        CSRF_COOKIE_NAME, token, secure_flag, CSRF_COOKIE_MAX_AGE
+        "{CSRF_COOKIE_NAME}={token}{secure_flag}; SameSite=Strict; Path=/device; Max-Age={CSRF_COOKIE_MAX_AGE}"
     )
 }
 
@@ -154,7 +155,7 @@ pub fn extract_csrf_cookie(headers: &HeaderMap) -> Option<String> {
 
     for part in cookie_str.split(';') {
         let part = part.trim();
-        if let Some(value) = part.strip_prefix(&format!("{}=", CSRF_COOKIE_NAME)) {
+        if let Some(value) = part.strip_prefix(&format!("{CSRF_COOKIE_NAME}=")) {
             return Some(value.trim().to_string());
         }
     }
@@ -174,6 +175,7 @@ pub fn extract_csrf_cookie(headers: &HeaderMap) -> Option<String> {
 /// # Returns
 ///
 /// True if the tokens match, false otherwise.
+#[must_use] 
 pub fn validate_csrf_token(cookie_token: &str, form_token: &str) -> bool {
     // Use constant-time comparison
     if cookie_token.len() != form_token.len() {
@@ -196,11 +198,11 @@ pub fn validate_csrf_token(cookie_token: &str, form_token: &str) -> bool {
 /// # Returns
 ///
 /// The cookie header value for clearing the cookie.
+#[must_use] 
 pub fn clear_csrf_cookie(secure: bool) -> String {
     let secure_flag = if secure { "; Secure" } else { "" };
     format!(
-        "{}={}; SameSite=Strict; Path=/device; Max-Age=0",
-        CSRF_COOKIE_NAME, secure_flag
+        "{CSRF_COOKIE_NAME}={secure_flag}; SameSite=Strict; Path=/device; Max-Age=0"
     )
 }
 

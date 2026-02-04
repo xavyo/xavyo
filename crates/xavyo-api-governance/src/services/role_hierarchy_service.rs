@@ -24,6 +24,7 @@ pub struct RoleHierarchyService {
 
 impl RoleHierarchyService {
     /// Create a new role hierarchy service with default max depth.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -32,6 +33,7 @@ impl RoleHierarchyService {
     }
 
     /// Create a new role hierarchy service with custom max depth.
+    #[must_use] 
     pub fn with_max_depth(pool: PgPool, max_depth: i32) -> Self {
         Self { pool, max_depth }
     }
@@ -637,8 +639,7 @@ impl RoleHierarchyService {
             .await?
         {
             return Err(GovernanceError::RoleEntitlementExists(format!(
-                "role_id={}",
-                role_id
+                "role_id={role_id}"
             )));
         }
 
@@ -730,7 +731,7 @@ impl RoleHierarchyService {
     // SoD Re-check Triggers (F088/T063)
     // =========================================================================
 
-    /// Trigger SoD re-check for users affected by hierarchy changes.
+    /// Trigger `SoD` re-check for users affected by hierarchy changes.
     ///
     /// This should be called after any operation that changes effective entitlements:
     /// - Adding/removing entitlements from a role
@@ -753,11 +754,11 @@ impl RoleHierarchyService {
         // Get users assigned to any of these roles
         // Note: This queries the gov_user_role_assignments table
         let user_count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(DISTINCT user_id)
             FROM gov_user_role_assignments
             WHERE tenant_id = $1 AND role_id = ANY($2)
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&affected_role_ids)
@@ -783,7 +784,7 @@ impl RoleHierarchyService {
         Ok(user_count)
     }
 
-    /// Trigger SoD re-check for a specific user after role changes.
+    /// Trigger `SoD` re-check for a specific user after role changes.
     ///
     /// This is a lighter-weight check for single-user scenarios like
     /// assigning a role to a user.

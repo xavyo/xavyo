@@ -34,16 +34,16 @@ pub struct CreatePolicyRequest {
 /// Request to create a condition for a policy.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct CreateConditionRequest {
-    /// Condition type: "time_window", "user_attribute", or "entitlement_check".
+    /// Condition type: "`time_window`", "`user_attribute`", or "`entitlement_check`".
     pub condition_type: String,
 
-    /// Attribute path for user_attribute conditions (e.g., "department").
+    /// Attribute path for `user_attribute` conditions (e.g., "department").
     pub attribute_path: Option<String>,
 
-    /// Comparison operator (e.g., "equals", "not_equals", "contains", "in_list").
+    /// Comparison operator (e.g., "equals", "`not_equals`", "contains", "`in_list`").
     pub operator: Option<String>,
 
-    /// Condition value (type depends on condition_type).
+    /// Condition value (type depends on `condition_type`).
     pub value: serde_json::Value,
 }
 
@@ -124,7 +124,7 @@ pub struct ConditionResponse {
     /// Condition type.
     pub condition_type: String,
 
-    /// Attribute path for user_attribute conditions.
+    /// Attribute path for `user_attribute` conditions.
     pub attribute_path: Option<String>,
 
     /// Comparison operator.
@@ -180,7 +180,7 @@ pub struct ListPoliciesQuery {
 }
 
 impl PolicyResponse {
-    /// Create a PolicyResponse from a DB policy and its conditions.
+    /// Create a `PolicyResponse` from a DB policy and its conditions.
     pub fn from_policy_and_conditions(
         policy: AuthorizationPolicy,
         conditions: Vec<xavyo_db::models::PolicyConditionRecord>,

@@ -11,7 +11,7 @@ use tower::ServiceExt;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-/// Minimal OpenAPI doc for testing.
+/// Minimal `OpenAPI` doc for testing.
 #[derive(OpenApi)]
 #[openapi(info(title = "Test API", version = "1.0.0"))]
 struct TestApiDoc;
@@ -62,13 +62,11 @@ async fn test_openapi_json_endpoint_exists() {
     let content_type = response
         .headers()
         .get("content-type")
-        .map(|v| v.to_str().unwrap_or(""))
-        .unwrap_or("");
+        .map_or("", |v| v.to_str().unwrap_or(""));
 
     assert!(
         content_type.contains("application/json"),
-        "Expected JSON content type, got: {}",
-        content_type
+        "Expected JSON content type, got: {content_type}"
     );
 }
 

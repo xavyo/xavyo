@@ -22,7 +22,7 @@ use crate::models::{
 };
 use crate::router::AgentsState;
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()
@@ -30,8 +30,8 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
         .ok_or(ApiAgentsError::MissingTenantId)
 }
 
-/// Extract agent_id from JWT claims.
-/// For A2A endpoints, the agent_id should be in the subject claim.
+/// Extract `agent_id` from JWT claims.
+/// For A2A endpoints, the `agent_id` should be in the subject claim.
 fn extract_agent_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     Uuid::parse_str(&claims.sub).map_err(|_| ApiAgentsError::MissingAgentId)
 }

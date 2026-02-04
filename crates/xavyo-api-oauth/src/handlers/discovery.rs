@@ -7,7 +7,7 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use rsa::traits::PublicKeyParts;
 use rsa::RsaPublicKey;
 
-/// Returns the OpenID Connect Discovery document.
+/// Returns the `OpenID` Connect Discovery document.
 #[utoipa::path(
     get,
     path = "/.well-known/openid-configuration",
@@ -34,7 +34,17 @@ pub async fn jwks_handler(State(state): State<OAuthState>) -> Json<JwkSet> {
     let mut jwk_set = JwkSet::new();
 
     // Add all signing keys to the JWKS (F069-S5: multi-key rotation support)
-    if !state.signing_keys.is_empty() {
+    if state.signing_keys.is_empty() {
+        // Fallback to single key for backward compatibility
+        match create_jwk_from_pem(&state.public_key, &state.key_id) {
+            Ok(jwk) => {
+                jwk_set = jwk_set.add_key(jwk);
+            }
+            Err(e) => {
+                tracing::error!("Failed to create JWK from public key: {}", e);
+            }
+        }
+    } else {
         for key in &state.signing_keys {
             match create_jwk_from_pem(key.public_key_pem.as_bytes(), &key.kid) {
                 Ok(jwk) => {
@@ -43,16 +53,6 @@ pub async fn jwks_handler(State(state): State<OAuthState>) -> Json<JwkSet> {
                 Err(e) => {
                     tracing::error!(kid = %key.kid, "Failed to create JWK from public key: {}", e);
                 }
-            }
-        }
-    } else {
-        // Fallback to single key for backward compatibility
-        match create_jwk_from_pem(&state.public_key, &state.key_id) {
-            Ok(jwk) => {
-                jwk_set = jwk_set.add_key(jwk);
-            }
-            Err(e) => {
-                tracing::error!("Failed to create JWK from public key: {}", e);
             }
         }
     }
@@ -66,11 +66,11 @@ fn create_jwk_from_pem(pem_data: &[u8], key_id: &str) -> Result<Jwk, String> {
 
     // Parse PEM to string
     let pem_str =
-        std::str::from_utf8(pem_data).map_err(|e| format!("Invalid PEM encoding: {}", e))?;
+        std::str::from_utf8(pem_data).map_err(|e| format!("Invalid PEM encoding: {e}"))?;
 
     // Try to parse as RSA public key from PEM
     let public_key = RsaPublicKey::from_public_key_pem(pem_str)
-        .map_err(|e| format!("Failed to parse RSA public key: {}", e))?;
+        .map_err(|e| format!("Failed to parse RSA public key: {e}"))?;
 
     // Extract n (modulus) and e (exponent)
     let n_bytes = public_key.n().to_bytes_be();

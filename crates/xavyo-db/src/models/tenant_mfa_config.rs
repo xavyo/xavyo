@@ -1,7 +1,7 @@
 //! Tenant MFA configuration model (F097).
 //!
-//! Detailed MFA configuration for tenants stored in tenant_mfa_policies table.
-//! This is separate from the simpler MfaPolicy enum stored in tenants.mfa_policy.
+//! Detailed MFA configuration for tenants stored in `tenant_mfa_policies` table.
+//! This is separate from the simpler `MfaPolicy` enum stored in `tenants.mfa_policy`.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -70,6 +70,7 @@ pub struct UpsertMfaConfig {
 
 impl TenantMfaConfig {
     /// Get default configuration for a tenant (doesn't persist).
+    #[must_use] 
     pub fn default_for_tenant(tenant_id: Uuid) -> Self {
         Self {
             tenant_id,
@@ -110,7 +111,7 @@ impl TenantMfaConfig {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_mfa_policies (
                 tenant_id,
                 required,
@@ -120,7 +121,7 @@ impl TenantMfaConfig {
             )
             VALUES ($1, $2, $3, $4, $5)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(DEFAULT_MFA_REQUIRED)
@@ -151,7 +152,7 @@ impl TenantMfaConfig {
             .collect();
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_mfa_policies (
                 tenant_id,
                 required,
@@ -167,7 +168,7 @@ impl TenantMfaConfig {
                 remember_device_days = COALESCE($5, tenant_mfa_policies.remember_device_days),
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.required.unwrap_or(DEFAULT_MFA_REQUIRED))

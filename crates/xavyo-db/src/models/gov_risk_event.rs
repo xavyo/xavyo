@@ -28,7 +28,7 @@ pub struct GovRiskEvent {
     /// Event magnitude/value.
     pub value: f64,
 
-    /// Reference to source (e.g., login_id, violation_id).
+    /// Reference to source (e.g., `login_id`, `violation_id`).
     pub source_ref: Option<String>,
 
     /// When the event was created.
@@ -66,10 +66,10 @@ impl GovRiskEvent {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_events
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -84,12 +84,12 @@ impl GovRiskEvent {
         user_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_events
             WHERE tenant_id = $1 AND user_id = $2
             AND (expires_at IS NULL OR expires_at > NOW())
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -108,12 +108,12 @@ impl GovRiskEvent {
     ) -> Result<Vec<Self>, sqlx::Error> {
         if include_expired {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_risk_events
                 WHERE tenant_id = $1 AND user_id = $2
                 ORDER BY created_at DESC
                 LIMIT $3 OFFSET $4
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(user_id)
@@ -123,13 +123,13 @@ impl GovRiskEvent {
             .await
         } else {
             sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_risk_events
                 WHERE tenant_id = $1 AND user_id = $2
                 AND (expires_at IS NULL OR expires_at > NOW())
                 ORDER BY created_at DESC
                 LIMIT $3 OFFSET $4
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(user_id)
@@ -149,10 +149,10 @@ impl GovRiskEvent {
     ) -> Result<i64, sqlx::Error> {
         if include_expired {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM gov_risk_events
                 WHERE tenant_id = $1 AND user_id = $2
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(user_id)
@@ -160,11 +160,11 @@ impl GovRiskEvent {
             .await
         } else {
             sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM gov_risk_events
                 WHERE tenant_id = $1 AND user_id = $2
                 AND (expires_at IS NULL OR expires_at > NOW())
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(user_id)
@@ -181,12 +181,12 @@ impl GovRiskEvent {
         event_type: &str,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_risk_events
             WHERE tenant_id = $1 AND user_id = $2 AND event_type = $3
             AND (expires_at IS NULL OR expires_at > NOW())
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -202,13 +202,13 @@ impl GovRiskEvent {
         input: CreateGovRiskEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_risk_events (
                 tenant_id, user_id, factor_id, event_type, value, source_ref, expires_at
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.user_id)
@@ -228,10 +228,10 @@ impl GovRiskEvent {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_risk_events
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -244,10 +244,10 @@ impl GovRiskEvent {
     /// Delete all expired events for a tenant.
     pub async fn cleanup_expired(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_risk_events
             WHERE tenant_id = $1 AND expires_at IS NOT NULL AND expires_at <= NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(pool)
@@ -263,10 +263,10 @@ impl GovRiskEvent {
         before: DateTime<Utc>,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_risk_events
             WHERE tenant_id = $1 AND created_at < $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(before)
@@ -284,11 +284,11 @@ impl GovRiskEvent {
         event_type: &str,
     ) -> Result<f64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COALESCE(SUM(value), 0) FROM gov_risk_events
             WHERE tenant_id = $1 AND user_id = $2 AND event_type = $3
             AND (expires_at IS NULL OR expires_at > NOW())
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)

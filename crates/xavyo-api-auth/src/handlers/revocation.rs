@@ -296,11 +296,11 @@ pub async fn revoke_user_tokens_handler(
 
     // Also revoke all refresh tokens for the user
     let refresh_revoked = sqlx::query(
-        r#"
+        r"
         UPDATE refresh_tokens
         SET revoked_at = NOW()
         WHERE tenant_id = $1 AND user_id = $2 AND revoked_at IS NULL
-        "#,
+        ",
     )
     .bind(tenant_id)
     .bind(body.user_id)

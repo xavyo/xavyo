@@ -27,7 +27,7 @@ use crate::services::ca_service::{
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::certificate_authority::CertificateAuthorityFilter;
 
-/// Extract tenant_id from JWT claims.
+/// Extract `tenant_id` from JWT claims.
 fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
     claims
         .tenant_id()
@@ -38,7 +38,7 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiAgentsError> {
 /// Query parameters for listing CAs.
 #[derive(Debug, Deserialize)]
 pub struct ListCasQuery {
-    /// Filter by CA type (internal, step_ca, vault_pki).
+    /// Filter by CA type (internal, `step_ca`, `vault_pki`).
     #[serde(default)]
     pub ca_type: Option<String>,
     /// Filter by active status.

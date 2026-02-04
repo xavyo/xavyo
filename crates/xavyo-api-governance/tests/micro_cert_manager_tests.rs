@@ -8,7 +8,7 @@ mod manager_change_trigger {
     use super::*;
     use xavyo_db::models::MicroCertTriggerType;
 
-    /// T044: manager_change trigger matching
+    /// T044: `manager_change` trigger matching
     #[test]
     fn test_manager_change_trigger_type_exists() {
         let trigger_type = MicroCertTriggerType::ManagerChange;
@@ -152,7 +152,7 @@ mod bulk_approval {
         // in the bulk request
 
         let reviewer_id = Uuid::new_v4();
-        let certification_reviewer_ids = vec![reviewer_id, reviewer_id, reviewer_id];
+        let certification_reviewer_ids = [reviewer_id, reviewer_id, reviewer_id];
 
         // All should match the requesting user
         assert!(certification_reviewer_ids

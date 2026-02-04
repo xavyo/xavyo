@@ -26,12 +26,12 @@ impl AdminRoleTemplatePermission {
         E: PgExecutor<'e>,
     {
         sqlx::query_as::<_, Self>(
-            r#"
+            r"
             INSERT INTO admin_role_template_permissions (template_id, permission_id)
             VALUES ($1, $2)
             ON CONFLICT DO NOTHING
             RETURNING template_id, permission_id
-            "#,
+            ",
         )
         .bind(template_id)
         .bind(permission_id)
@@ -49,10 +49,10 @@ impl AdminRoleTemplatePermission {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM admin_role_template_permissions
             WHERE template_id = $1 AND permission_id = $2
-            "#,
+            ",
         )
         .bind(template_id)
         .bind(permission_id)
@@ -71,10 +71,10 @@ impl AdminRoleTemplatePermission {
         E: PgExecutor<'e>,
     {
         let rows: Vec<(Uuid,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT permission_id FROM admin_role_template_permissions
             WHERE template_id = $1
-            "#,
+            ",
         )
         .bind(template_id)
         .fetch_all(executor)
@@ -92,10 +92,10 @@ impl AdminRoleTemplatePermission {
         E: PgExecutor<'e>,
     {
         let rows: Vec<(Uuid,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT template_id FROM admin_role_template_permissions
             WHERE permission_id = $1
-            "#,
+            ",
         )
         .bind(permission_id)
         .fetch_all(executor)
@@ -113,10 +113,10 @@ impl AdminRoleTemplatePermission {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM admin_role_template_permissions
             WHERE template_id = $1
-            "#,
+            ",
         )
         .bind(template_id)
         .execute(executor)
@@ -134,10 +134,10 @@ impl AdminRoleTemplatePermission {
         E: PgExecutor<'e>,
     {
         let row: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM admin_role_template_permissions
             WHERE template_id = $1
-            "#,
+            ",
         )
         .bind(template_id)
         .fetch_one(executor)

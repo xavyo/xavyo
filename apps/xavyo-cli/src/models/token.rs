@@ -32,22 +32,22 @@ pub struct OAuthError {
 }
 
 impl OAuthError {
-    /// Check if this is an authorization_pending error
+    /// Check if this is an `authorization_pending` error
     pub fn is_authorization_pending(&self) -> bool {
         self.error == "authorization_pending"
     }
 
-    /// Check if this is a slow_down error
+    /// Check if this is a `slow_down` error
     pub fn is_slow_down(&self) -> bool {
         self.error == "slow_down"
     }
 
-    /// Check if this is an access_denied error
+    /// Check if this is an `access_denied` error
     pub fn is_access_denied(&self) -> bool {
         self.error == "access_denied"
     }
 
-    /// Check if this is an expired_token error
+    /// Check if this is an `expired_token` error
     pub fn is_expired_token(&self) -> bool {
         self.error == "expired_token"
     }

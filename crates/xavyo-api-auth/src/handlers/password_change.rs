@@ -55,7 +55,7 @@ pub async fn password_change_handler(
             .flat_map(|errors| {
                 errors
                     .iter()
-                    .filter_map(|e| e.message.as_ref().map(|m| m.to_string()))
+                    .filter_map(|e| e.message.as_ref().map(std::string::ToString::to_string))
             })
             .collect();
         ApiAuthError::Validation(errors.join(", "))
@@ -94,7 +94,7 @@ pub async fn password_change_handler(
     // Validate new password against policy
     let validation = PasswordPolicyService::validate_password(&request.new_password, &policy);
     if !validation.is_valid {
-        let errors: Vec<String> = validation.errors.iter().map(|e| e.to_string()).collect();
+        let errors: Vec<String> = validation.errors.iter().map(std::string::ToString::to_string).collect();
         return Err(ApiAuthError::WeakPassword(errors));
     }
 

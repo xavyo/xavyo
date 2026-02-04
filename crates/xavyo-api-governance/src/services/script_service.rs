@@ -20,11 +20,13 @@ pub struct ScriptService {
 
 impl ScriptService {
     /// Create a new script service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -223,10 +225,10 @@ impl ScriptService {
         if has_bindings {
             // Count the active bindings for the error message.
             let count: i64 = sqlx::query_scalar(
-                r#"
+                r"
                 SELECT COUNT(*) FROM gov_script_hook_bindings
                 WHERE script_id = $1 AND tenant_id = $2 AND enabled = true
-                "#,
+                ",
             )
             .bind(script_id)
             .bind(tenant_id)
@@ -314,7 +316,7 @@ impl ScriptService {
         let new_version_number = existing.current_version + 1;
 
         let change_description =
-            reason.unwrap_or_else(|| format!("Rollback to version {}", target_version));
+            reason.unwrap_or_else(|| format!("Rollback to version {target_version}"));
 
         let version_params = CreateScriptVersion {
             tenant_id,

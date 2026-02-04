@@ -35,7 +35,7 @@ pub struct AuthorizationContext {
 /// Response from authorization service
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthorizeResponse {
-    /// Authorization decision: allow, deny, require_approval
+    /// Authorization decision: allow, deny, `require_approval`
     pub decision: String,
     /// Decision ID for audit trail correlation
     pub decision_id: Uuid,
@@ -43,7 +43,7 @@ pub struct AuthorizeResponse {
     pub reason: String,
     /// Decision latency in milliseconds
     pub latency_ms: f64,
-    /// Approval request ID (if decision is require_approval)
+    /// Approval request ID (if decision is `require_approval`)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approval_request_id: Option<Uuid>,
 }

@@ -50,12 +50,12 @@ impl GroupMembership {
         user_id: Uuid,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO group_memberships (tenant_id, group_id, user_id)
             VALUES ($1, $2, $3)
             ON CONFLICT (group_id, user_id) DO NOTHING
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -72,10 +72,10 @@ impl GroupMembership {
         user_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM group_memberships
             WHERE tenant_id = $1 AND group_id = $2 AND user_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -94,10 +94,10 @@ impl GroupMembership {
         user_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result: Option<(i64,)> = sqlx::query_as(
-            r#"
+            r"
             SELECT 1 FROM group_memberships
             WHERE tenant_id = $1 AND group_id = $2 AND user_id = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -115,13 +115,13 @@ impl GroupMembership {
         group_id: Uuid,
     ) -> Result<Vec<GroupMemberInfo>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT u.id as user_id, u.display_name, u.email
             FROM group_memberships gm
             JOIN users u ON gm.user_id = u.id AND u.tenant_id = $1
             WHERE gm.tenant_id = $1 AND gm.group_id = $2
             ORDER BY u.email
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -136,13 +136,13 @@ impl GroupMembership {
         user_id: Uuid,
     ) -> Result<Vec<UserGroupInfo>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT g.id as group_id, g.display_name
             FROM group_memberships gm
             JOIN groups g ON gm.group_id = g.id AND g.tenant_id = $1
             WHERE gm.tenant_id = $1 AND gm.user_id = $2
             ORDER BY g.display_name
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -157,10 +157,10 @@ impl GroupMembership {
         group_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM group_memberships
             WHERE tenant_id = $1 AND group_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -182,10 +182,10 @@ impl GroupMembership {
 
         // Remove existing members
         sqlx::query(
-            r#"
+            r"
             DELETE FROM group_memberships
             WHERE tenant_id = $1 AND group_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)
@@ -195,10 +195,10 @@ impl GroupMembership {
         // Add new members
         for user_id in user_ids {
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO group_memberships (tenant_id, group_id, user_id)
                 VALUES ($1, $2, $3)
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(group_id)
@@ -218,10 +218,10 @@ impl GroupMembership {
         group_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM group_memberships
             WHERE tenant_id = $1 AND group_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(group_id)

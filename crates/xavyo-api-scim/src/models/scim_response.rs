@@ -32,6 +32,7 @@ impl<T> ScimListResponse<T> {
     pub const SCHEMA: &'static str = "urn:ietf:params:scim:api:messages:2.0:ListResponse";
 
     /// Create a new list response.
+    #[must_use] 
     pub fn new(
         resources: Vec<T>,
         total_results: i64,
@@ -100,7 +101,7 @@ impl ScimPatchRequest {
 
             // 'remove' requires a path
             if op_lower == "remove" && op.path.is_none() {
-                return Err(format!("Remove operation at index {} requires a path", i));
+                return Err(format!("Remove operation at index {i} requires a path"));
             }
 
             // 'add' and 'replace' require a value (unless path specified for complex attrs)
@@ -140,6 +141,7 @@ impl ScimPagination {
     pub const MAX_COUNT: i64 = 100;
 
     /// Create pagination from query parameters.
+    #[must_use] 
     pub fn from_query(
         start_index: Option<i64>,
         count: Option<i64>,
@@ -157,11 +159,13 @@ impl ScimPagination {
     }
 
     /// Get SQL offset (0-based).
+    #[must_use] 
     pub fn offset(&self) -> i64 {
         (self.start_index - 1).max(0)
     }
 
     /// Get SQL limit.
+    #[must_use] 
     pub fn limit(&self) -> i64 {
         self.count
     }

@@ -52,14 +52,14 @@ impl SiemBatchExport {
         input: CreateSiemBatchExport,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO siem_batch_exports (
                 tenant_id, requested_by, date_range_start, date_range_end,
                 event_type_filter, output_format
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(requested_by)
@@ -78,10 +78,10 @@ impl SiemBatchExport {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM siem_batch_exports
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -98,16 +98,16 @@ impl SiemBatchExport {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM siem_batch_exports
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if status_filter.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -132,16 +132,16 @@ impl SiemBatchExport {
         status_filter: Option<&str>,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM siem_batch_exports
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if status_filter.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -156,7 +156,7 @@ impl SiemBatchExport {
     /// Claim a pending export for processing (atomically).
     pub async fn claim_pending(pool: &sqlx::PgPool) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE siem_batch_exports
             SET status = 'processing', started_at = NOW()
             WHERE id = (
@@ -167,7 +167,7 @@ impl SiemBatchExport {
                 FOR UPDATE SKIP LOCKED
             )
             RETURNING *
-            "#,
+            ",
         )
         .fetch_optional(pool)
         .await
@@ -184,7 +184,7 @@ impl SiemBatchExport {
         expires_at: DateTime<Utc>,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE siem_batch_exports
             SET status = 'completed',
                 completed_at = NOW(),
@@ -193,7 +193,7 @@ impl SiemBatchExport {
                 file_size_bytes = $5,
                 expires_at = $6
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -215,13 +215,13 @@ impl SiemBatchExport {
         error: &str,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE siem_batch_exports
             SET status = 'failed',
                 completed_at = NOW(),
                 error_detail = $3
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -235,10 +235,10 @@ impl SiemBatchExport {
     /// Delete expired batch exports.
     pub async fn delete_expired(pool: &sqlx::PgPool) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM siem_batch_exports
             WHERE status = 'completed' AND expires_at < NOW()
-            "#,
+            ",
         )
         .execute(pool)
         .await?;

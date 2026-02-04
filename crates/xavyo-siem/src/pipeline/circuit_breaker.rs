@@ -15,6 +15,7 @@ pub struct CircuitBreaker {
 
 impl CircuitBreaker {
     /// Create a new circuit breaker with configurable threshold and cooldown.
+    #[must_use] 
     pub fn new(threshold: u32, cooldown_secs: u64) -> Self {
         Self {
             state: CircuitState::Closed,
@@ -97,11 +98,13 @@ impl CircuitBreaker {
     }
 
     /// Get the current circuit state.
+    #[must_use] 
     pub fn state(&self) -> CircuitState {
         self.state
     }
 
     /// Get the consecutive failure count.
+    #[must_use] 
     pub fn failure_count(&self) -> u32 {
         self.failure_count
     }

@@ -22,7 +22,8 @@ pub struct AgentService {
 }
 
 impl AgentService {
-    /// Create a new AgentService.
+    /// Create a new `AgentService`.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -105,8 +106,8 @@ impl AgentService {
             name_prefix: query.name,
         };
 
-        let limit = query.limit.min(1000) as i64;
-        let offset = query.offset.max(0) as i64;
+        let limit = i64::from(query.limit.min(1000));
+        let offset = i64::from(query.offset.max(0));
 
         let agents = AiAgent::list_by_tenant(&self.pool, tenant_id, &filter, limit, offset).await?;
         let total = AiAgent::count_by_tenant(&self.pool, tenant_id, &filter).await?;
@@ -241,11 +242,11 @@ impl AgentService {
     /// Detect agents whose owner no longer exists (F108 governance).
     ///
     /// Returns agents where:
-    /// - owner_id is set but the user no longer exists in the tenant
-    /// - OR owner_id is NULL (unassigned)
+    /// - `owner_id` is set but the user no longer exists in the tenant
+    /// - OR `owner_id` is NULL (unassigned)
     ///
     /// These agents need governance attention - either assign a new owner
-    /// or promote the backup_owner.
+    /// or promote the `backup_owner`.
     pub async fn detect_orphaned_agents(
         &self,
         tenant_id: Uuid,
@@ -305,8 +306,8 @@ impl AgentService {
     /// Promote backup owner to primary owner (F108 governance).
     ///
     /// This is used when the primary owner is no longer available
-    /// (e.g., left the organization). The backup_owner becomes the new owner,
-    /// and backup_owner is cleared.
+    /// (e.g., left the organization). The `backup_owner` becomes the new owner,
+    /// and `backup_owner` is cleared.
     pub async fn promote_backup_owner(
         &self,
         tenant_id: Uuid,
@@ -368,8 +369,8 @@ impl AgentService {
     /// Check for inactive agents and return those that need attention (F108 US5).
     ///
     /// Returns agents where:
-    /// - last_activity_at is older than their inactivity_threshold_days
-    /// - OR last_activity_at is NULL and created_at is older than threshold
+    /// - `last_activity_at` is older than their `inactivity_threshold_days`
+    /// - OR `last_activity_at` is NULL and `created_at` is older than threshold
     ///
     /// These agents are candidates for grace period or suspension.
     pub async fn check_inactive_agents(
@@ -392,7 +393,7 @@ impl AgentService {
             .into_iter()
             .filter(|agent| {
                 if let Some(threshold_days) = agent.inactivity_threshold_days {
-                    let threshold = chrono::Duration::days(threshold_days as i64);
+                    let threshold = chrono::Duration::days(i64::from(threshold_days));
                     let last_activity = agent.last_activity_at.unwrap_or(agent.created_at);
                     now - last_activity > threshold
                 } else {
@@ -423,7 +424,7 @@ impl AgentService {
             return Err(ApiAgentsError::AgentNotActive);
         }
 
-        let grace_period_ends_at = chrono::Utc::now() + chrono::Duration::days(grace_days as i64);
+        let grace_period_ends_at = chrono::Utc::now() + chrono::Duration::days(i64::from(grace_days));
 
         let input = UpdateAiAgent {
             grace_period_ends_at: Some(Some(grace_period_ends_at)),
@@ -439,7 +440,7 @@ impl AgentService {
 
     /// Suspend an agent for inactivity (F108 US5).
     ///
-    /// Sets status to suspended with suspension_reason = "Inactive".
+    /// Sets status to suspended with `suspension_reason` = "Inactive".
     /// Clears the grace period since suspension is now in effect.
     pub async fn suspend_for_inactivity(
         &self,
@@ -474,7 +475,7 @@ impl AgentService {
     /// Reactivate an agent and reset inactivity counters (F108 US5).
     ///
     /// This extends the standard reactivate by also clearing
-    /// grace_period_ends_at and suspension_reason.
+    /// `grace_period_ends_at` and `suspension_reason`.
     pub async fn reactivate_with_reset(
         &self,
         tenant_id: Uuid,
@@ -503,7 +504,7 @@ impl AgentService {
 
     /// Record a credential rotation for an agent (F108 US6).
     ///
-    /// Updates last_rotation_at timestamp to NOW.
+    /// Updates `last_rotation_at` timestamp to NOW.
     pub async fn record_rotation(
         &self,
         tenant_id: Uuid,
@@ -528,8 +529,8 @@ impl AgentService {
     /// Check for agents that need credential rotation (F108 US6).
     ///
     /// Returns agents where:
-    /// - rotation_interval_days is set
-    /// - last_rotation_at is older than rotation_interval_days (or never rotated)
+    /// - `rotation_interval_days` is set
+    /// - `last_rotation_at` is older than `rotation_interval_days` (or never rotated)
     pub async fn check_rotation_needed(
         &self,
         tenant_id: Uuid,
@@ -549,7 +550,7 @@ impl AgentService {
             .into_iter()
             .filter(|agent| {
                 if let Some(interval_days) = agent.rotation_interval_days {
-                    let interval = chrono::Duration::days(interval_days as i64);
+                    let interval = chrono::Duration::days(i64::from(interval_days));
                     match agent.last_rotation_at {
                         Some(last_rotation) => now - last_rotation > interval,
                         None => true, // Never rotated = needs rotation
@@ -571,13 +572,13 @@ impl AgentService {
     /// Check if a user can operate an agent (F123 three-layer authorization).
     ///
     /// Part of the three-layer authorization model:
-    /// 1. User can operate agent (this method) - checks owner/backup_owner
+    /// 1. User can operate agent (this method) - checks `owner/backup_owner`
     /// 2. Agent is active and valid - checked separately
     /// 3. Agent has permission for specific tool - checked separately
     ///
     /// A user can operate an agent if they are:
-    /// - The agent's owner (owner_id)
-    /// - The agent's backup owner (backup_owner_id)
+    /// - The agent's owner (`owner_id`)
+    /// - The agent's backup owner (`backup_owner_id`)
     /// - (Future: member of the agent's team)
     pub async fn can_operate(
         &self,

@@ -51,10 +51,10 @@ impl GovTemplateVersion {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_versions
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -70,10 +70,10 @@ impl GovTemplateVersion {
         version_number: i32,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_versions
             WHERE tenant_id = $1 AND template_id = $2 AND version_number = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -89,12 +89,12 @@ impl GovTemplateVersion {
         template_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_versions
             WHERE tenant_id = $1 AND template_id = $2
             ORDER BY version_number DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -109,11 +109,11 @@ impl GovTemplateVersion {
         template_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_versions
             WHERE tenant_id = $1 AND template_id = $2
             ORDER BY version_number DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -130,12 +130,12 @@ impl GovTemplateVersion {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_template_versions
             WHERE tenant_id = $1 AND template_id = $2
             ORDER BY version_number DESC
             LIMIT $3 OFFSET $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -152,10 +152,10 @@ impl GovTemplateVersion {
         template_id: Uuid,
     ) -> Result<i32, sqlx::Error> {
         let max_version: Option<i32> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT MAX(version_number) FROM gov_template_versions
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -174,14 +174,14 @@ impl GovTemplateVersion {
         input: CreateGovTemplateVersion,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_template_versions (
                 tenant_id, template_id, version_number, rules_snapshot,
                 scopes_snapshot, created_by
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -220,10 +220,10 @@ impl GovTemplateVersion {
         template_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_template_versions
             WHERE tenant_id = $1 AND template_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)
@@ -239,7 +239,7 @@ impl GovTemplateVersion {
         keep_count: i32,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_template_versions
             WHERE tenant_id = $1 AND template_id = $2
               AND version_number NOT IN (
@@ -248,7 +248,7 @@ impl GovTemplateVersion {
                 ORDER BY version_number DESC
                 LIMIT $3
               )
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(template_id)

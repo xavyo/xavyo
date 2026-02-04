@@ -33,7 +33,7 @@ pub struct GovMicroCertTrigger {
     /// How to determine the reviewer.
     pub reviewer_type: MicroCertReviewerType,
 
-    /// User ID when reviewer_type = specific_user.
+    /// User ID when `reviewer_type` = `specific_user`.
     pub specific_reviewer_id: Option<Uuid>,
 
     /// Backup reviewer if primary cannot be resolved.
@@ -48,13 +48,13 @@ pub struct GovMicroCertTrigger {
     /// Revoke access on timeout.
     pub auto_revoke: bool,
 
-    /// For SoD: revoke newer assignment.
+    /// For `SoD`: revoke newer assignment.
     pub revoke_triggering_assignment: bool,
 
     /// Rule enabled/disabled.
     pub is_active: bool,
 
-    /// Tenant-wide default for trigger_type.
+    /// Tenant-wide default for `trigger_type`.
     pub is_default: bool,
 
     /// Higher priority wins when multiple rules match.
@@ -142,10 +142,10 @@ impl GovMicroCertTrigger {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_cert_triggers
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -161,10 +161,10 @@ impl GovMicroCertTrigger {
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_cert_triggers
             WHERE tenant_id = $1 AND trigger_type = $2 AND name = $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(trigger_type)
@@ -180,11 +180,11 @@ impl GovMicroCertTrigger {
         trigger_type: MicroCertTriggerType,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_micro_cert_triggers
             WHERE tenant_id = $1 AND trigger_type = $2 AND is_default = true AND is_active = true
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(trigger_type)
@@ -204,14 +204,14 @@ impl GovMicroCertTrigger {
         // Try entitlement-specific first
         if let Some(ent_id) = entitlement_id {
             let rule: Option<Self> = sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_micro_cert_triggers
                 WHERE tenant_id = $1 AND trigger_type = $2
                   AND scope_type = 'entitlement' AND scope_id = $3
                   AND is_active = true
                 ORDER BY priority DESC
                 LIMIT 1
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(trigger_type)
@@ -227,14 +227,14 @@ impl GovMicroCertTrigger {
         // Try application-specific
         if let Some(app_id) = application_id {
             let rule: Option<Self> = sqlx::query_as(
-                r#"
+                r"
                 SELECT * FROM gov_micro_cert_triggers
                 WHERE tenant_id = $1 AND trigger_type = $2
                   AND scope_type = 'application' AND scope_id = $3
                   AND is_active = true
                 ORDER BY priority DESC
                 LIMIT 1
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(trigger_type)
@@ -264,23 +264,23 @@ impl GovMicroCertTrigger {
 
         if filter.trigger_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND trigger_type = ${}", param_count));
+            query.push_str(&format!(" AND trigger_type = ${param_count}"));
         }
         if filter.scope_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND scope_type = ${}", param_count));
+            query.push_str(&format!(" AND scope_type = ${param_count}"));
         }
         if filter.scope_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND scope_id = ${}", param_count));
+            query.push_str(&format!(" AND scope_id = ${param_count}"));
         }
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.is_default.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_default = ${}", param_count));
+            query.push_str(&format!(" AND is_default = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -322,23 +322,23 @@ impl GovMicroCertTrigger {
 
         if filter.trigger_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND trigger_type = ${}", param_count));
+            query.push_str(&format!(" AND trigger_type = ${param_count}"));
         }
         if filter.scope_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND scope_type = ${}", param_count));
+            query.push_str(&format!(" AND scope_type = ${param_count}"));
         }
         if filter.scope_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND scope_id = ${}", param_count));
+            query.push_str(&format!(" AND scope_id = ${param_count}"));
         }
         if filter.is_active.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_active = ${}", param_count));
+            query.push_str(&format!(" AND is_active = ${param_count}"));
         }
         if filter.is_default.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND is_default = ${}", param_count));
+            query.push_str(&format!(" AND is_default = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -382,7 +382,7 @@ impl GovMicroCertTrigger {
         let priority = input.priority.unwrap_or(0);
 
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_micro_cert_triggers (
                 tenant_id, name, trigger_type, scope_type, scope_id,
                 reviewer_type, specific_reviewer_id, fallback_reviewer_id,
@@ -391,7 +391,7 @@ impl GovMicroCertTrigger {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(&input.name)
@@ -423,59 +423,59 @@ impl GovMicroCertTrigger {
         let mut param_idx = 3;
 
         if input.name.is_some() {
-            updates.push(format!("name = ${}", param_idx));
+            updates.push(format!("name = ${param_idx}"));
             param_idx += 1;
         }
         if input.scope_type.is_some() {
-            updates.push(format!("scope_type = ${}", param_idx));
+            updates.push(format!("scope_type = ${param_idx}"));
             param_idx += 1;
         }
         if input.scope_id.is_some() {
-            updates.push(format!("scope_id = ${}", param_idx));
+            updates.push(format!("scope_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.reviewer_type.is_some() {
-            updates.push(format!("reviewer_type = ${}", param_idx));
+            updates.push(format!("reviewer_type = ${param_idx}"));
             param_idx += 1;
         }
         if input.specific_reviewer_id.is_some() {
-            updates.push(format!("specific_reviewer_id = ${}", param_idx));
+            updates.push(format!("specific_reviewer_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.fallback_reviewer_id.is_some() {
-            updates.push(format!("fallback_reviewer_id = ${}", param_idx));
+            updates.push(format!("fallback_reviewer_id = ${param_idx}"));
             param_idx += 1;
         }
         if input.timeout_secs.is_some() {
-            updates.push(format!("timeout_secs = ${}", param_idx));
+            updates.push(format!("timeout_secs = ${param_idx}"));
             param_idx += 1;
         }
         if input.reminder_threshold_percent.is_some() {
-            updates.push(format!("reminder_threshold_percent = ${}", param_idx));
+            updates.push(format!("reminder_threshold_percent = ${param_idx}"));
             param_idx += 1;
         }
         if input.auto_revoke.is_some() {
-            updates.push(format!("auto_revoke = ${}", param_idx));
+            updates.push(format!("auto_revoke = ${param_idx}"));
             param_idx += 1;
         }
         if input.revoke_triggering_assignment.is_some() {
-            updates.push(format!("revoke_triggering_assignment = ${}", param_idx));
+            updates.push(format!("revoke_triggering_assignment = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_active.is_some() {
-            updates.push(format!("is_active = ${}", param_idx));
+            updates.push(format!("is_active = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_default.is_some() {
-            updates.push(format!("is_default = ${}", param_idx));
+            updates.push(format!("is_default = ${param_idx}"));
             param_idx += 1;
         }
         if input.priority.is_some() {
-            updates.push(format!("priority = ${}", param_idx));
+            updates.push(format!("priority = ${param_idx}"));
             param_idx += 1;
         }
         if input.metadata.is_some() {
-            updates.push(format!("metadata = ${}", param_idx));
+            updates.push(format!("metadata = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -539,10 +539,10 @@ impl GovMicroCertTrigger {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_micro_cert_triggers
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -560,11 +560,11 @@ impl GovMicroCertTrigger {
         except_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_micro_cert_triggers
             SET is_default = false, updated_at = NOW()
             WHERE tenant_id = $1 AND trigger_type = $2 AND id != $3 AND is_default = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(trigger_type)
@@ -609,23 +609,26 @@ impl GovMicroCertTrigger {
     }
 
     /// Calculate the deadline timestamp from now.
+    #[must_use] 
     pub fn calculate_deadline(&self) -> DateTime<Utc> {
-        Utc::now() + chrono::Duration::seconds(self.timeout_secs as i64)
+        Utc::now() + chrono::Duration::seconds(i64::from(self.timeout_secs))
     }
 
     /// Calculate the reminder time based on threshold.
+    #[must_use] 
     pub fn calculate_reminder_time(&self) -> DateTime<Utc> {
         let threshold_secs =
-            (self.timeout_secs as f64 * (self.reminder_threshold_percent as f64 / 100.0)) as i64;
+            (f64::from(self.timeout_secs) * (f64::from(self.reminder_threshold_percent) / 100.0)) as i64;
         Utc::now() + chrono::Duration::seconds(threshold_secs)
     }
 
     /// Calculate escalation deadline (75% of timeout by default, or 50% if specified).
+    #[must_use] 
     pub fn calculate_escalation_deadline(&self) -> Option<DateTime<Utc>> {
         if self.fallback_reviewer_id.is_some() {
             // Escalate at 50% of timeout
             let escalation_secs = self.timeout_secs / 2;
-            Some(Utc::now() + chrono::Duration::seconds(escalation_secs as i64))
+            Some(Utc::now() + chrono::Duration::seconds(i64::from(escalation_secs)))
         } else {
             None
         }
@@ -769,7 +772,7 @@ mod tests {
         let diff = (deadline - now).num_seconds();
 
         // Should be approximately 3600 seconds
-        assert!(diff >= 3599 && diff <= 3601);
+        assert!((3599..=3601).contains(&diff));
     }
 
     #[test]

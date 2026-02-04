@@ -19,6 +19,7 @@ pub enum AttributeDataType {
 
 impl AttributeDataType {
     /// Parse data type from string.
+    #[must_use] 
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "string" => Some(Self::String),
@@ -41,7 +42,7 @@ pub struct AttributeFieldError {
     pub error: String,
 }
 
-/// Maximum allowed size for the entire custom_attributes JSONB value (64KB).
+/// Maximum allowed size for the entire `custom_attributes` JSONB value (64KB).
 const MAX_ATTRIBUTES_SIZE: usize = 64 * 1024;
 
 /// Attribute validation service.
@@ -79,15 +80,12 @@ impl AttributeValidationService {
         }
 
         // Attributes must be an object
-        let attrs = match attributes.as_object() {
-            Some(obj) => obj,
-            None => {
-                errors.push(AttributeFieldError {
-                    attribute: "*".to_string(),
-                    error: "Custom attributes must be a JSON object".to_string(),
-                });
-                return Err(errors);
-            }
+        let attrs = if let Some(obj) = attributes.as_object() { obj } else {
+            errors.push(AttributeFieldError {
+                attribute: "*".to_string(),
+                error: "Custom attributes must be a JSON object".to_string(),
+            });
+            return Err(errors);
         };
 
         // Build definitions lookup by name (only active definitions)
@@ -101,7 +99,7 @@ impl AttributeValidationService {
             if !def_names.contains(key.as_str()) {
                 errors.push(AttributeFieldError {
                     attribute: key.clone(),
-                    error: format!("Unknown attribute '{}': not defined in tenant schema", key),
+                    error: format!("Unknown attribute '{key}': not defined in tenant schema"),
                 });
             }
         }
@@ -126,15 +124,12 @@ impl AttributeValidationService {
                     continue;
                 }
 
-                let data_type = match AttributeDataType::parse(&def.data_type) {
-                    Some(dt) => dt,
-                    None => {
-                        errors.push(AttributeFieldError {
-                            attribute: def.name.clone(),
-                            error: format!("Unknown data type '{}' in definition", def.data_type),
-                        });
-                        continue;
-                    }
+                let data_type = if let Some(dt) = AttributeDataType::parse(&def.data_type) { dt } else {
+                    errors.push(AttributeFieldError {
+                        attribute: def.name.clone(),
+                        error: format!("Unknown data type '{}' in definition", def.data_type),
+                    });
+                    continue;
                 };
 
                 // Type validation
@@ -226,7 +221,7 @@ impl AttributeValidationService {
         if *data_type == AttributeDataType::String || *data_type == AttributeDataType::Date {
             if let Some(s) = value.as_str() {
                 // max_length
-                if let Some(max) = rules_obj.get("max_length").and_then(|v| v.as_u64()) {
+                if let Some(max) = rules_obj.get("max_length").and_then(serde_json::Value::as_u64) {
                     if s.len() as u64 > max {
                         errors.push(AttributeFieldError {
                             attribute: name.to_string(),
@@ -241,7 +236,7 @@ impl AttributeValidationService {
                 }
 
                 // min_length
-                if let Some(min) = rules_obj.get("min_length").and_then(|v| v.as_u64()) {
+                if let Some(min) = rules_obj.get("min_length").and_then(serde_json::Value::as_u64) {
                     if (s.len() as u64) < min {
                         errors.push(AttributeFieldError {
                             attribute: name.to_string(),
@@ -266,8 +261,7 @@ impl AttributeValidationService {
                                 errors.push(AttributeFieldError {
                                     attribute: name.to_string(),
                                     error: format!(
-                                        "'{}' does not match required pattern '{}'",
-                                        name, pattern
+                                        "'{name}' does not match required pattern '{pattern}'"
                                     ),
                                 });
                             }
@@ -276,8 +270,7 @@ impl AttributeValidationService {
                             errors.push(AttributeFieldError {
                                 attribute: name.to_string(),
                                 error: format!(
-                                    "Invalid regex pattern '{}' in validation rules for '{}'",
-                                    pattern, name
+                                    "Invalid regex pattern '{pattern}' in validation rules for '{name}'"
                                 ),
                             });
                         }
@@ -290,21 +283,21 @@ impl AttributeValidationService {
         if *data_type == AttributeDataType::Number {
             if let Some(n) = value.as_f64() {
                 // min
-                if let Some(min) = rules_obj.get("min").and_then(|v| v.as_f64()) {
+                if let Some(min) = rules_obj.get("min").and_then(serde_json::Value::as_f64) {
                     if n < min {
                         errors.push(AttributeFieldError {
                             attribute: name.to_string(),
-                            error: format!("'{}' value {} is less than minimum {}", name, n, min),
+                            error: format!("'{name}' value {n} is less than minimum {min}"),
                         });
                     }
                 }
 
                 // max
-                if let Some(max) = rules_obj.get("max").and_then(|v| v.as_f64()) {
+                if let Some(max) = rules_obj.get("max").and_then(serde_json::Value::as_f64) {
                     if n > max {
                         errors.push(AttributeFieldError {
                             attribute: name.to_string(),
-                            error: format!("'{}' value {} exceeds maximum {}", name, n, max),
+                            error: format!("'{name}' value {n} exceeds maximum {max}"),
                         });
                     }
                 }
@@ -317,9 +310,7 @@ impl AttributeValidationService {
                 let allowed_strs: Vec<String> = allowed
                     .iter()
                     .map(|v| {
-                        v.as_str()
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| v.to_string())
+                        v.as_str().map_or_else(|| v.to_string(), std::string::ToString::to_string)
                     })
                     .collect();
                 errors.push(AttributeFieldError {

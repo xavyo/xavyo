@@ -17,8 +17,8 @@ pub const DEFAULT_BATCH_SIZE: i64 = 50;
 
 /// Job for retrying failed lifecycle operations.
 ///
-/// This job polls the gov_lifecycle_failed_operations table for operations
-/// due for retry (next_retry_at <= now AND status IN ('pending', 'retrying'))
+/// This job polls the `gov_lifecycle_failed_operations` table for operations
+/// due for retry (`next_retry_at` <= now AND status IN ('pending', 'retrying'))
 /// and attempts to execute them.
 pub struct FailedOperationRetryJob {
     failed_operation_service: Arc<FailedOperationService>,
@@ -27,6 +27,7 @@ pub struct FailedOperationRetryJob {
 
 impl FailedOperationRetryJob {
     /// Create a new failed operation retry job.
+    #[must_use] 
     pub fn new(failed_operation_service: FailedOperationService) -> Self {
         Self {
             failed_operation_service: Arc::new(failed_operation_service),
@@ -35,6 +36,7 @@ impl FailedOperationRetryJob {
     }
 
     /// Create from an Arc-wrapped service.
+    #[must_use] 
     pub fn from_arc(failed_operation_service: Arc<FailedOperationService>) -> Self {
         Self {
             failed_operation_service,

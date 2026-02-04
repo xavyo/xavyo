@@ -57,6 +57,7 @@ pub struct NhiCredentialService {
 
 impl NhiCredentialService {
     /// Create a new credential service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -373,7 +374,7 @@ impl NhiCredentialService {
 
     /// Validate a credential and return the associated NHI if valid.
     ///
-    /// This is used for authentication. Returns (tenant_id, nhi_id) if the
+    /// This is used for authentication. Returns (`tenant_id`, `nhi_id`) if the
     /// credential is valid, otherwise returns an appropriate error.
     ///
     /// Implementation note: Since we use Argon2 with random salts, we cannot
@@ -436,10 +437,10 @@ impl NhiCredentialService {
     /// Find all active credentials for validation.
     async fn find_all_active_credentials(&self) -> Result<Vec<GovNhiCredential>> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_nhi_credentials
             WHERE is_active = true AND valid_until > NOW() AND valid_from <= NOW()
-            "#,
+            ",
         )
         .fetch_all(&self.pool)
         .await
@@ -473,8 +474,7 @@ impl NhiCredentialService {
                     .await
                     .map_err(GovernanceError::Database)?
                     .first()
-                    .map(|c| c.credential_type)
-                    .unwrap_or(NhiCredentialType::ApiKey);
+                    .map_or(NhiCredentialType::ApiKey, |c| c.credential_type);
 
             let request = RotateCredentialsRequest {
                 credential_type,
@@ -646,19 +646,19 @@ impl NhiCredentialService {
 
     /// Generate a secure API key.
     ///
-    /// SECURITY: Uses OsRng (CSPRNG) for cryptographic randomness.
+    /// SECURITY: Uses `OsRng` (CSPRNG) for cryptographic randomness.
     fn generate_api_key(&self) -> String {
         use base64::Engine as _;
         use rand::{rngs::OsRng, RngCore};
         let mut random_bytes = [0u8; 32];
         OsRng.fill_bytes(&mut random_bytes);
         let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random_bytes);
-        format!("{}{}", API_KEY_PREFIX, encoded)
+        format!("{API_KEY_PREFIX}{encoded}")
     }
 
     /// Generate a secure secret.
     ///
-    /// SECURITY: Uses OsRng (CSPRNG) for cryptographic randomness.
+    /// SECURITY: Uses `OsRng` (CSPRNG) for cryptographic randomness.
     fn generate_secret(&self) -> String {
         use base64::Engine as _;
         use rand::{rngs::OsRng, RngCore};
@@ -669,7 +669,7 @@ impl NhiCredentialService {
 
     /// Generate a certificate token (placeholder for real PKI integration).
     ///
-    /// SECURITY: Uses OsRng (CSPRNG) for cryptographic randomness.
+    /// SECURITY: Uses `OsRng` (CSPRNG) for cryptographic randomness.
     fn generate_certificate_token(&self) -> String {
         use base64::Engine as _;
         use rand::{rngs::OsRng, RngCore};
@@ -700,8 +700,7 @@ impl NhiCredentialService {
             // This error should never occur in practice (Argon2 only fails on OOM).
             .map_err(|e| {
                 GovernanceError::NhiRiskCalculationFailed(format!(
-                    "Credential hashing failed: {}",
-                    e
+                    "Credential hashing failed: {e}"
                 ))
             })
     }

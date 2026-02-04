@@ -240,7 +240,7 @@ mod tests {
         // The specific error depends on implementation - both are valid rejections
         assert!(matches!(
             result,
-            Err(SessionError::Expired { .. }) | Err(SessionError::AlreadyConsumed { .. })
+            Err(SessionError::Expired { .. } | SessionError::AlreadyConsumed { .. })
         ));
     }
 

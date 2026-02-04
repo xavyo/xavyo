@@ -1,6 +1,6 @@
 //! OAuth2/OIDC error types.
 //!
-//! Provides error types for OAuth2 flows following RFC 6749.
+//! Provides error types for `OAuth2` flows following RFC 6749.
 
 use axum::{
     http::StatusCode,
@@ -10,7 +10,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-/// OAuth2 error codes as defined in RFC 6749 and RFC 8628.
+/// `OAuth2` error codes as defined in RFC 6749 and RFC 8628.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OAuthErrorCode {
@@ -65,11 +65,11 @@ impl std::fmt::Display for OAuthErrorCode {
             Self::SlowDown => "slow_down",
             Self::ExpiredToken => "expired_token",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
-/// OAuth2 error response following RFC 6749 Section 5.2.
+/// `OAuth2` error response following RFC 6749 Section 5.2.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OAuthErrorResponse {
     /// Error code.
@@ -171,6 +171,7 @@ pub enum OAuthError {
 
 impl OAuthError {
     /// Get the HTTP status code for this error.
+    #[must_use] 
     pub fn status_code(&self) -> StatusCode {
         match self {
             Self::InvalidRequest(_) => StatusCode::BAD_REQUEST,
@@ -194,7 +195,8 @@ impl OAuthError {
         }
     }
 
-    /// Get the OAuth2 error code for this error.
+    /// Get the `OAuth2` error code for this error.
+    #[must_use] 
     pub fn error_code(&self) -> OAuthErrorCode {
         match self {
             Self::InvalidRequest(_) => OAuthErrorCode::InvalidRequest,
@@ -215,7 +217,8 @@ impl OAuthError {
         }
     }
 
-    /// Convert to OAuth2 error response.
+    /// Convert to `OAuth2` error response.
+    #[must_use] 
     pub fn to_response(&self) -> OAuthErrorResponse {
         OAuthErrorResponse::new(self.error_code(), self.to_string())
     }

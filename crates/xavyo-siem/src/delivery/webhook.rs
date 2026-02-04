@@ -32,7 +32,7 @@ impl WebhookWorker {
     pub fn new(url: String, headers: HashMap<String, String>) -> Result<Self, DeliveryError> {
         // SECURITY: Validate URL to prevent SSRF attacks
         validate_webhook_url(&url)
-            .map_err(|e| DeliveryError::SendFailed(format!("SSRF validation failed: {}", e)))?;
+            .map_err(|e| DeliveryError::SendFailed(format!("SSRF validation failed: {e}")))?;
 
         let client = reqwest::Client::builder()
             .timeout(WEBHOOK_TIMEOUT)
@@ -81,7 +81,7 @@ impl DeliveryWorker for WebhookWorker {
 
         let response = request.send().await.map_err(|e| {
             if e.is_timeout() {
-                DeliveryError::Timeout(format!("Webhook timeout after {:?}", WEBHOOK_TIMEOUT))
+                DeliveryError::Timeout(format!("Webhook timeout after {WEBHOOK_TIMEOUT:?}"))
             } else if e.is_connect() {
                 DeliveryError::ConnectionFailed(format!(
                     "Webhook connect to {} failed: {}",

@@ -88,11 +88,10 @@ fn extract_client_credentials(
             let parts: Vec<&str> = decoded_str.splitn(2, ':').collect();
             if parts.len() == 2 {
                 return Ok((parts[0].to_string(), Some(parts[1].to_string())));
-            } else {
-                return Err(OAuthError::InvalidClient(
-                    "Invalid credential format".to_string(),
-                ));
             }
+            return Err(OAuthError::InvalidClient(
+                "Invalid credential format".to_string(),
+            ));
         }
     }
 
@@ -105,9 +104,9 @@ fn extract_client_credentials(
     Ok((client_id, request.client_secret.clone()))
 }
 
-/// Handle authorization_code grant type.
+/// Handle `authorization_code` grant type.
 ///
-/// This flow extracts tenant_id from the authorization code stored in the database,
+/// This flow extracts `tenant_id` from the authorization code stored in the database,
 /// eliminating the need for an X-Tenant-ID header in the token exchange request.
 async fn handle_authorization_code_grant(
     state: &OAuthState,
@@ -186,9 +185,9 @@ struct AuthCodeInfo {
     tenant_id: Uuid,
 }
 
-/// Look up authorization code to get client_id and tenant_id.
+/// Look up authorization code to get `client_id` and `tenant_id`.
 ///
-/// This query runs WITHOUT tenant context (no RLS) to retrieve the tenant_id
+/// This query runs WITHOUT tenant context (no RLS) to retrieve the `tenant_id`
 /// from the authorization code itself. This allows the token endpoint to work
 /// without requiring an X-Tenant-ID header.
 async fn lookup_authorization_code(
@@ -204,13 +203,13 @@ async fn lookup_authorization_code(
 
     // Query WITHOUT setting RLS context - we need to find the tenant_id
     let result: Option<(Uuid, Uuid)> = sqlx::query_as(
-        r#"
+        r"
         SELECT client_id, tenant_id
         FROM authorization_codes
         WHERE code_hash = $1
           AND used = FALSE
           AND expires_at > NOW()
-        "#,
+        ",
     )
     .bind(&code_hash)
     .fetch_optional(state.authorization_service.pool())
@@ -231,16 +230,16 @@ async fn lookup_authorization_code(
     }
 }
 
-/// Handle client_credentials grant type.
+/// Handle `client_credentials` grant type.
 ///
 /// This grant is for service-to-service authentication where there is no user.
 /// Only confidential clients can use this grant type.
 ///
 /// # Flow
 ///
-/// 1. Extract tenant_id from X-Tenant-ID header (required)
-/// 2. Verify client credentials (client_id + client_secret)
-/// 3. Validate the client is allowed to use client_credentials grant
+/// 1. Extract `tenant_id` from X-Tenant-ID header (required)
+/// 2. Verify client credentials (`client_id` + `client_secret`)
+/// 3. Validate the client is allowed to use `client_credentials` grant
 /// 4. Issue access token (no ID token, no refresh token)
 async fn handle_client_credentials_grant(
     state: &OAuthState,
@@ -285,8 +284,7 @@ async fn handle_client_credentials_grant(
             for scope in &requested {
                 if !client.scopes.contains(&scope.to_string()) {
                     return Err(OAuthError::InvalidScope(format!(
-                        "Scope '{}' is not allowed for this client",
-                        scope
+                        "Scope '{scope}' is not allowed for this client"
                     )));
                 }
             }
@@ -313,7 +311,7 @@ async fn handle_client_credentials_grant(
     Ok(Json(token_response))
 }
 
-/// Extract tenant_id from X-Tenant-ID header.
+/// Extract `tenant_id` from X-Tenant-ID header.
 fn extract_tenant_id_from_headers(headers: &HeaderMap) -> Result<Uuid, OAuthError> {
     let tenant_header = headers
         .get("X-Tenant-ID")
@@ -327,19 +325,19 @@ fn extract_tenant_id_from_headers(headers: &HeaderMap) -> Result<Uuid, OAuthErro
         .map_err(|_| OAuthError::InvalidRequest("X-Tenant-ID must be a valid UUID".to_string()))
 }
 
-/// Handle device_code grant type (RFC 8628).
+/// Handle `device_code` grant type (RFC 8628).
 ///
 /// This grant is used by CLI/headless clients to obtain tokens after user authorization.
-/// The client polls this endpoint with the device_code until the user completes authorization.
+/// The client polls this endpoint with the `device_code` until the user completes authorization.
 ///
 /// # Flow
 ///
-/// 1. Extract tenant_id from X-Tenant-ID header (required)
+/// 1. Extract `tenant_id` from X-Tenant-ID header (required)
 /// 2. Check device code authorization status
 /// 3. If authorized, exchange for tokens
-/// 4. If pending, return authorization_pending error
-/// 5. If denied, return access_denied error
-/// 6. If expired, return expired_token error
+/// 4. If pending, return `authorization_pending` error
+/// 5. If denied, return `access_denied` error
+/// 6. If expired, return `expired_token` error
 async fn handle_device_code_grant(
     state: &OAuthState,
     headers: &HeaderMap,
@@ -390,7 +388,7 @@ async fn handle_device_code_grant(
     }
 }
 
-/// Handle refresh_token grant type.
+/// Handle `refresh_token` grant type.
 ///
 /// This grant is used to obtain new access tokens without re-authenticating.
 /// Implements refresh token rotation: the old token is invalidated and a new one is issued.
@@ -402,7 +400,7 @@ async fn handle_device_code_grant(
 ///
 /// # Flow
 ///
-/// 1. Extract tenant_id from X-Tenant-ID header (required)
+/// 1. Extract `tenant_id` from X-Tenant-ID header (required)
 /// 2. Validate and rotate the refresh token
 /// 3. Issue new access token and refresh token
 async fn handle_refresh_token_grant(

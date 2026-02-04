@@ -22,12 +22,12 @@ pub struct GovEscalationRule {
     pub step_id: Uuid,
 
     /// Timeout for this step.
-    /// Note: PgInterval doesn't implement Serialize/Deserialize, use timeout_secs() accessor.
+    /// Note: `PgInterval` doesn't implement Serialize/Deserialize, use `timeout_secs()` accessor.
     #[serde(skip)]
     pub timeout: sqlx::postgres::types::PgInterval,
 
     /// Time before timeout to send warning.
-    /// Note: PgInterval doesn't implement Serialize/Deserialize, use warning_threshold_secs() accessor.
+    /// Note: `PgInterval` doesn't implement Serialize/Deserialize, use `warning_threshold_secs()` accessor.
     #[serde(skip)]
     pub warning_threshold: Option<sqlx::postgres::types::PgInterval>,
 
@@ -81,10 +81,10 @@ impl GovEscalationRule {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_escalation_rules
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -99,10 +99,10 @@ impl GovEscalationRule {
         step_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_escalation_rules
             WHERE tenant_id = $1 AND step_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(step_id)
@@ -117,12 +117,12 @@ impl GovEscalationRule {
         workflow_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT r.* FROM gov_escalation_rules r
             JOIN gov_approval_steps s ON s.id = r.step_id
             WHERE r.tenant_id = $1 AND s.workflow_id = $2
             ORDER BY s.step_order
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(workflow_id)
@@ -138,7 +138,7 @@ impl GovEscalationRule {
         input: CreateEscalationRule,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_escalation_rules (
                 tenant_id, step_id, timeout, warning_threshold, final_fallback
             )
@@ -155,7 +155,7 @@ impl GovEscalationRule {
                 is_enabled = true,
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(step_id)
@@ -177,22 +177,21 @@ impl GovEscalationRule {
         let mut param_idx = 3;
 
         if input.timeout_secs.is_some() {
-            updates.push(format!("timeout = make_interval(secs => ${})", param_idx));
+            updates.push(format!("timeout = make_interval(secs => ${param_idx})"));
             param_idx += 1;
         }
         if input.warning_threshold_secs.is_some() {
             updates.push(format!(
-                "warning_threshold = make_interval(secs => ${})",
-                param_idx
+                "warning_threshold = make_interval(secs => ${param_idx})"
             ));
             param_idx += 1;
         }
         if input.final_fallback.is_some() {
-            updates.push(format!("final_fallback = ${}", param_idx));
+            updates.push(format!("final_fallback = ${param_idx}"));
             param_idx += 1;
         }
         if input.is_enabled.is_some() {
-            updates.push(format!("is_enabled = ${}", param_idx));
+            updates.push(format!("is_enabled = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -226,12 +225,12 @@ impl GovEscalationRule {
         step_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_escalation_rules
             SET is_enabled = true, updated_at = NOW()
             WHERE tenant_id = $1 AND step_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(step_id)
@@ -246,12 +245,12 @@ impl GovEscalationRule {
         step_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_escalation_rules
             SET is_enabled = false, updated_at = NOW()
             WHERE tenant_id = $1 AND step_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(step_id)
@@ -266,10 +265,10 @@ impl GovEscalationRule {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_escalation_rules
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -286,10 +285,10 @@ impl GovEscalationRule {
         step_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_escalation_rules
             WHERE tenant_id = $1 AND step_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(step_id)
@@ -300,30 +299,33 @@ impl GovEscalationRule {
     }
 
     /// Get timeout as Duration.
+    #[must_use] 
     pub fn timeout_duration(&self) -> chrono::Duration {
         let microseconds = self.timeout.microseconds;
-        let days = self.timeout.days as i64;
-        let months = self.timeout.months as i64;
+        let days = i64::from(self.timeout.days);
+        let months = i64::from(self.timeout.months);
         let total_days = days + (months * 30);
         let total_microseconds = microseconds + (total_days * 24 * 60 * 60 * 1_000_000);
         chrono::Duration::microseconds(total_microseconds)
     }
 
     /// Get timeout in seconds (for serialization).
+    #[must_use] 
     pub fn timeout_secs(&self) -> i64 {
         let microseconds = self.timeout.microseconds;
-        let days = self.timeout.days as i64;
-        let months = self.timeout.months as i64;
+        let days = i64::from(self.timeout.days);
+        let months = i64::from(self.timeout.months);
         let total_days = days + (months * 30);
         (microseconds / 1_000_000) + (total_days * 24 * 60 * 60)
     }
 
     /// Get warning threshold as Duration.
+    #[must_use] 
     pub fn warning_duration(&self) -> Option<chrono::Duration> {
         self.warning_threshold.as_ref().map(|interval| {
             let microseconds = interval.microseconds;
-            let days = interval.days as i64;
-            let months = interval.months as i64;
+            let days = i64::from(interval.days);
+            let months = i64::from(interval.months);
             let total_days = days + (months * 30);
             let total_microseconds = microseconds + (total_days * 24 * 60 * 60 * 1_000_000);
             chrono::Duration::microseconds(total_microseconds)
@@ -331,11 +333,12 @@ impl GovEscalationRule {
     }
 
     /// Get warning threshold in seconds (for serialization).
+    #[must_use] 
     pub fn warning_threshold_secs(&self) -> Option<i64> {
         self.warning_threshold.as_ref().map(|interval| {
             let microseconds = interval.microseconds;
-            let days = interval.days as i64;
-            let months = interval.months as i64;
+            let days = i64::from(interval.days);
+            let months = i64::from(interval.months);
             let total_days = days + (months * 30);
             (microseconds / 1_000_000) + (total_days * 24 * 60 * 60)
         })

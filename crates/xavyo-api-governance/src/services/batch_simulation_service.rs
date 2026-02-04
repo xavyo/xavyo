@@ -42,6 +42,7 @@ pub struct BatchSimulationService {
 
 impl BatchSimulationService {
     /// Create a new batch simulation service with default limits.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -50,11 +51,13 @@ impl BatchSimulationService {
     }
 
     /// Create a new batch simulation service with custom limits.
+    #[must_use] 
     pub fn with_limits(pool: PgPool, limits: BatchSimulationLimits) -> Self {
         Self { pool, limits }
     }
 
     /// Get the configured limits.
+    #[must_use] 
     pub fn limits(&self) -> &BatchSimulationLimits {
         &self.limits
     }
@@ -222,7 +225,7 @@ impl BatchSimulationService {
         let total_users = user_ids.len() as i32;
         let mut all_results = Vec::new();
         let mut impact_summary = BatchImpactSummary {
-            total_users: total_users as i64,
+            total_users: i64::from(total_users),
             ..Default::default()
         };
 
@@ -481,18 +484,18 @@ impl BatchSimulationService {
     ) -> Result<Vec<Uuid>> {
         // Build dynamic query based on filter criteria
         let mut query = String::from(
-            r#"
+            r"
             SELECT DISTINCT u.id
             FROM users u
             WHERE u.tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         // Filter by status
         if let Some(ref _status) = filter.status {
             param_count += 1;
-            query.push_str(&format!(" AND u.status = ${}", param_count));
+            query.push_str(&format!(" AND u.status = ${param_count}"));
         }
 
         // Filter by department (using attributes JSONB)
@@ -500,8 +503,7 @@ impl BatchSimulationService {
             if !departments.is_empty() {
                 param_count += 1;
                 query.push_str(&format!(
-                    " AND u.attributes->>'department' = ANY(${})",
-                    param_count
+                    " AND u.attributes->>'department' = ANY(${param_count})"
                 ));
             }
         }
@@ -510,8 +512,7 @@ impl BatchSimulationService {
         if let Some(ref _title) = filter.title {
             param_count += 1;
             query.push_str(&format!(
-                " AND u.attributes->>'title' ILIKE ${}",
-                param_count
+                " AND u.attributes->>'title' ILIKE ${param_count}"
             ));
         }
 
@@ -522,9 +523,8 @@ impl BatchSimulationService {
                 query.push_str(&format!(
                     " AND EXISTS (
                         SELECT 1 FROM user_roles ur
-                        WHERE ur.user_id = u.id AND ur.role_id = ANY(${})
-                    )",
-                    param_count
+                        WHERE ur.user_id = u.id AND ur.role_id = ANY(${param_count})
+                    )"
                 ));
             }
         }
@@ -537,10 +537,9 @@ impl BatchSimulationService {
                     " AND EXISTS (
                         SELECT 1 FROM gov_entitlement_assignments ea
                         WHERE ea.user_id = u.id
-                          AND ea.entitlement_id = ANY(${})
+                          AND ea.entitlement_id = ANY(${param_count})
                           AND ea.status = 'active'
-                    )",
-                    param_count
+                    )"
                 ));
             }
         }
@@ -561,7 +560,7 @@ impl BatchSimulationService {
         }
 
         if let Some(ref title) = filter.title {
-            q = q.bind(format!("%{}%", title));
+            q = q.bind(format!("%{title}%"));
         }
 
         if let Some(ref role_ids) = filter.role_ids {
@@ -669,7 +668,7 @@ impl BatchSimulationService {
                                 id: ent_id,
                                 name: ent_name,
                                 item_type: "entitlement".to_string(),
-                                source: Some(format!("via role '{}'", role_name)),
+                                source: Some(format!("via role '{role_name}'")),
                             });
                         }
 
@@ -716,7 +715,7 @@ impl BatchSimulationService {
                                 id: ent_id,
                                 name: ent_name,
                                 item_type: "entitlement".to_string(),
-                                source: Some(format!("via role '{}'", role_name)),
+                                source: Some(format!("via role '{role_name}'")),
                             });
                         }
 
@@ -803,25 +802,25 @@ impl BatchSimulationService {
 
     /// Get role name by ID.
     async fn get_role_name(&self, _tenant_id: Uuid, role_id: Uuid) -> Result<String> {
-        let name: Option<String> = sqlx::query_scalar(r#"SELECT name FROM roles WHERE id = $1"#)
+        let name: Option<String> = sqlx::query_scalar(r"SELECT name FROM roles WHERE id = $1")
             .bind(role_id)
             .fetch_optional(&self.pool)
             .await
             .unwrap_or(None);
 
-        Ok(name.unwrap_or_else(|| format!("Role {}", role_id)))
+        Ok(name.unwrap_or_else(|| format!("Role {role_id}")))
     }
 
     /// Get entitlement name by ID.
     async fn get_entitlement_name(&self, _tenant_id: Uuid, entitlement_id: Uuid) -> Result<String> {
         let name: Option<String> =
-            sqlx::query_scalar(r#"SELECT name FROM gov_entitlements WHERE id = $1"#)
+            sqlx::query_scalar(r"SELECT name FROM gov_entitlements WHERE id = $1")
                 .bind(entitlement_id)
                 .fetch_optional(&self.pool)
                 .await
                 .unwrap_or(None);
 
-        Ok(name.unwrap_or_else(|| format!("Entitlement {}", entitlement_id)))
+        Ok(name.unwrap_or_else(|| format!("Entitlement {entitlement_id}")))
     }
 
     /// Get entitlements associated with a role, with names.
@@ -831,12 +830,12 @@ impl BatchSimulationService {
         role_id: Uuid,
     ) -> Result<Vec<(Uuid, String)>> {
         let entitlements: Vec<(Uuid, String)> = sqlx::query_as(
-            r#"
+            r"
             SELECT e.id, e.name
             FROM gov_entitlements e
             JOIN gov_role_entitlements re ON re.entitlement_id = e.id
             WHERE re.role_id = $1
-            "#,
+            ",
         )
         .bind(role_id)
         .fetch_all(&self.pool)
@@ -849,11 +848,11 @@ impl BatchSimulationService {
     /// Check if user has a specific role.
     async fn user_has_role(&self, tenant_id: Uuid, user_id: Uuid, role_id: Uuid) -> Result<bool> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM user_roles
             WHERE user_id = $1 AND role_id = $2
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(role_id)
@@ -863,14 +862,14 @@ impl BatchSimulationService {
 
         // Also check if user has role via assignments
         let assignment_count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_entitlement_assignments
             WHERE user_id = $1
               AND target_type = 'role'
               AND target_id = $2
               AND status = 'active'
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(role_id)
@@ -890,13 +889,13 @@ impl BatchSimulationService {
         entitlement_id: Uuid,
     ) -> Result<bool> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*)
             FROM gov_entitlement_assignments
             WHERE user_id = $1
               AND entitlement_id = $2
               AND status = 'active'
-            "#,
+            ",
         )
         .bind(user_id)
         .bind(entitlement_id)
@@ -910,11 +909,11 @@ impl BatchSimulationService {
     /// Get entitlements associated with a role.
     async fn get_role_entitlements(&self, _tenant_id: Uuid, role_id: Uuid) -> Result<Vec<Uuid>> {
         let entitlements: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT entitlement_id
             FROM gov_role_entitlements
             WHERE role_id = $1
-            "#,
+            ",
         )
         .bind(role_id)
         .fetch_all(&self.pool)
@@ -924,7 +923,7 @@ impl BatchSimulationService {
         Ok(entitlements)
     }
 
-    /// Check for SoD violations if a role is added.
+    /// Check for `SoD` violations if a role is added.
     async fn check_sod_violations_for_role_add(
         &self,
         tenant_id: Uuid,
@@ -940,11 +939,11 @@ impl BatchSimulationService {
 
         // Get user's current entitlements
         let current_entitlements: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT entitlement_id
             FROM gov_entitlement_assignments
             WHERE user_id = $1 AND status = 'active'
-            "#,
+            ",
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -957,7 +956,7 @@ impl BatchSimulationService {
         for new_ent in &new_entitlements {
             for current_ent in &current_entitlements {
                 let conflicting_rules: Vec<Uuid> = sqlx::query_scalar(
-                    r#"
+                    r"
                     SELECT id FROM gov_sod_rules
                     WHERE tenant_id = $1
                       AND is_enabled = true
@@ -965,7 +964,7 @@ impl BatchSimulationService {
                         (first_entitlement_id = $2 AND second_entitlement_id = $3)
                         OR (first_entitlement_id = $3 AND second_entitlement_id = $2)
                       )
-                    "#,
+                    ",
                 )
                 .bind(tenant_id)
                 .bind(new_ent)
@@ -981,7 +980,7 @@ impl BatchSimulationService {
         Ok(violations)
     }
 
-    /// Check for SoD violations if an entitlement is added.
+    /// Check for `SoD` violations if an entitlement is added.
     async fn check_sod_violations_for_entitlement_add(
         &self,
         tenant_id: Uuid,
@@ -990,11 +989,11 @@ impl BatchSimulationService {
     ) -> Result<Vec<Uuid>> {
         // Get user's current entitlements
         let current_entitlements: Vec<Uuid> = sqlx::query_scalar(
-            r#"
+            r"
             SELECT DISTINCT entitlement_id
             FROM gov_entitlement_assignments
             WHERE user_id = $1 AND status = 'active'
-            "#,
+            ",
         )
         .bind(user_id)
         .fetch_all(&self.pool)
@@ -1006,7 +1005,7 @@ impl BatchSimulationService {
 
         for current_ent in &current_entitlements {
             let conflicting_rules: Vec<Uuid> = sqlx::query_scalar(
-                r#"
+                r"
                 SELECT id FROM gov_sod_rules
                 WHERE tenant_id = $1
                   AND is_enabled = true
@@ -1014,7 +1013,7 @@ impl BatchSimulationService {
                     (first_entitlement_id = $2 AND second_entitlement_id = $3)
                     OR (first_entitlement_id = $3 AND second_entitlement_id = $2)
                   )
-                "#,
+                ",
             )
             .bind(tenant_id)
             .bind(entitlement_id)

@@ -55,7 +55,7 @@ impl std::str::FromStr for NhiEntityType {
         match s {
             "service_account" => Ok(NhiEntityType::ServiceAccount),
             "agent" => Ok(NhiEntityType::Agent),
-            _ => Err(format!("Unknown NHI entity type: {}", s)),
+            _ => Err(format!("Unknown NHI entity type: {s}")),
         }
     }
 }
@@ -93,7 +93,7 @@ pub struct GovNhiCredential {
     /// When the credential was created.
     pub created_at: DateTime<Utc>,
 
-    /// Type of NHI entity (service_account or agent).
+    /// Type of NHI entity (`service_account` or agent).
     #[sqlx(default)]
     pub nhi_type: NhiEntityType,
 }
@@ -107,7 +107,7 @@ pub struct CreateGovNhiCredential {
     pub valid_from: DateTime<Utc>,
     pub valid_until: DateTime<Utc>,
     pub rotated_by: Option<Uuid>,
-    /// Type of NHI entity (service_account or agent).
+    /// Type of NHI entity (`service_account` or agent).
     #[serde(default)]
     pub nhi_type: NhiEntityType,
 }
@@ -122,12 +122,14 @@ pub struct NhiCredentialFilter {
 
 impl GovNhiCredential {
     /// Check if this credential is currently valid.
+    #[must_use] 
     pub fn is_valid(&self) -> bool {
         let now = Utc::now();
         self.is_active && self.valid_from <= now && self.valid_until > now
     }
 
     /// Get days until expiration.
+    #[must_use] 
     pub fn days_until_expiry(&self) -> i64 {
         let duration = self.valid_until.signed_duration_since(Utc::now());
         duration.num_days()
@@ -138,6 +140,7 @@ impl GovNhiCredential {
     /// Uses Argon2id for password hashing verification.
     /// Returns true if the credential matches the stored hash.
     #[cfg(feature = "argon2")]
+    #[must_use] 
     pub fn verify_credential(&self, credential: &str) -> bool {
         use argon2::{Argon2, PasswordHash, PasswordVerifier};
 
@@ -164,10 +167,10 @@ impl GovNhiCredential {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_nhi_credentials
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -181,10 +184,10 @@ impl GovNhiCredential {
         credential_hash: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_nhi_credentials
             WHERE credential_hash = $1 AND is_active = true
-            "#,
+            ",
         )
         .bind(credential_hash)
         .fetch_optional(pool)
@@ -198,11 +201,11 @@ impl GovNhiCredential {
         nhi_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_nhi_credentials
             WHERE tenant_id = $1 AND nhi_id = $2
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(nhi_id)
@@ -217,11 +220,11 @@ impl GovNhiCredential {
         nhi_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_nhi_credentials
             WHERE tenant_id = $1 AND nhi_id = $2 AND is_active = true
             ORDER BY valid_from DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(nhi_id)
@@ -236,14 +239,14 @@ impl GovNhiCredential {
         data: CreateGovNhiCredential,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_nhi_credentials (
                 tenant_id, nhi_id, credential_type, credential_hash,
                 valid_from, valid_until, rotated_by, nhi_type
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.nhi_id)
@@ -264,12 +267,12 @@ impl GovNhiCredential {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_nhi_credentials
             SET is_active = false
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -284,11 +287,11 @@ impl GovNhiCredential {
         nhi_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_nhi_credentials
             SET is_active = false
             WHERE tenant_id = $1 AND nhi_id = $2 AND is_active = true
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(nhi_id)
@@ -304,12 +307,12 @@ impl GovNhiCredential {
         tenant_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM gov_nhi_credentials
             WHERE tenant_id = $1
                 AND is_active = false
                 AND valid_until < NOW() - INTERVAL '7 days'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(pool)
@@ -325,14 +328,14 @@ impl GovNhiCredential {
         days: i32,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_nhi_credentials
             WHERE tenant_id = $1
                 AND is_active = true
                 AND valid_until > NOW()
                 AND valid_until < NOW() + ($2 || ' days')::INTERVAL
             ORDER BY valid_until ASC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(days)
@@ -344,12 +347,12 @@ impl GovNhiCredential {
     /// Returns credentials that are active and within their validity window.
     pub async fn find_all_active_for_auth(pool: &sqlx::PgPool) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_nhi_credentials
             WHERE is_active = true
                 AND valid_from <= NOW()
                 AND valid_until > NOW()
-            "#,
+            ",
         )
         .fetch_all(pool)
         .await
@@ -361,13 +364,13 @@ impl GovNhiCredential {
         nhi_type: NhiEntityType,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_nhi_credentials
             WHERE is_active = true
                 AND valid_from <= NOW()
                 AND valid_until > NOW()
                 AND nhi_type = $1
-            "#,
+            ",
         )
         .bind(nhi_type.to_string())
         .fetch_all(pool)

@@ -54,7 +54,7 @@ pub enum XavyoError {
     ///
     /// Use when a user is not authenticated or lacks permission.
     /// Maps to HTTP 401 Unauthorized.
-    #[error("Unauthorized{}", message.as_ref().map(|m| format!(": {}", m)).unwrap_or_default())]
+    #[error("Unauthorized{}", message.as_ref().map(|m| format!(": {m}")).unwrap_or_default())]
     Unauthorized {
         /// Optional message providing more context
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -65,7 +65,7 @@ pub enum XavyoError {
     ///
     /// Use when a database lookup returns no results.
     /// Maps to HTTP 404 Not Found.
-    #[error("{resource} not found{}", id.as_ref().map(|i| format!(": {}", i)).unwrap_or_default())]
+    #[error("{resource} not found{}", id.as_ref().map(|i| format!(": {i}")).unwrap_or_default())]
     NotFound {
         /// The type of resource that was not found (e.g., "User", "Document")
         resource: String,
@@ -99,7 +99,7 @@ pub enum XavyoError {
     },
 }
 
-/// Type alias for Results using XavyoError.
+/// Type alias for Results using `XavyoError`.
 ///
 /// This provides a convenient shorthand for function signatures:
 ///
@@ -165,8 +165,7 @@ mod tests {
 
         #[test]
         fn test_different_resource_types() {
-            let errors = vec![
-                XavyoError::NotFound {
+            let errors = [XavyoError::NotFound {
                     resource: "User".to_string(),
                     id: None,
                 },
@@ -177,8 +176,7 @@ mod tests {
                 XavyoError::NotFound {
                     resource: "Tenant".to_string(),
                     id: None,
-                },
-            ];
+                }];
 
             assert!(errors[0].to_string().contains("User"));
             assert!(errors[1].to_string().contains("Session"));

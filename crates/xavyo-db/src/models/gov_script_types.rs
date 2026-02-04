@@ -16,10 +16,12 @@ use uuid::Uuid;
 pub struct ProvisioningScriptId(pub Uuid);
 
 impl ProvisioningScriptId {
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
+    #[must_use] 
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -49,10 +51,12 @@ impl From<ProvisioningScriptId> for Uuid {
 pub struct ScriptVersionId(pub Uuid);
 
 impl ScriptVersionId {
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
+    #[must_use] 
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -82,10 +86,12 @@ impl From<ScriptVersionId> for Uuid {
 pub struct ScriptHookBindingId(pub Uuid);
 
 impl ScriptHookBindingId {
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
+    #[must_use] 
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -115,10 +121,12 @@ impl From<ScriptHookBindingId> for Uuid {
 pub struct ScriptExecutionLogId(pub Uuid);
 
 impl ScriptExecutionLogId {
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
+    #[must_use] 
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -148,10 +156,12 @@ impl From<ScriptExecutionLogId> for Uuid {
 pub struct ScriptTemplateId(pub Uuid);
 
 impl ScriptTemplateId {
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
+    #[must_use] 
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -181,10 +191,12 @@ impl From<ScriptTemplateId> for Uuid {
 pub struct ScriptAuditEventId(pub Uuid);
 
 impl ScriptAuditEventId {
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
+    #[must_use] 
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -262,7 +274,7 @@ pub enum FailurePolicy {
     Abort,
     /// Log the error and proceed without script modifications.
     Continue,
-    /// Re-attempt script execution up to max_retries times.
+    /// Re-attempt script execution up to `max_retries` times.
     Retry,
 }
 
@@ -339,7 +351,7 @@ pub const MAX_TIMEOUT_SECONDS: i32 = 300;
 /// Maximum retries for retry failure policy.
 pub const MAX_RETRIES: i32 = 10;
 
-/// Maximum bindings per connector per hook_phase per operation_type.
+/// Maximum bindings per connector per `hook_phase` per `operation_type`.
 pub const MAX_BINDINGS_PER_HOOK: i32 = 10;
 
 /// Default max retries.

@@ -10,7 +10,7 @@ use uuid::Uuid;
 /// Request to rotate an OAuth client secret.
 ///
 /// Note: Unlike API keys, OAuth client secrets do not support a grace period.
-/// The old secret is immediately invalidated per OAuth2 security best practices.
+/// The old secret is immediately invalidated per `OAuth2` security best practices.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct RotateOAuthSecretRequest {
     // Currently no options - OAuth2 spec requires immediate rotation
@@ -23,7 +23,7 @@ pub struct RotateOAuthSecretResponse {
     /// Internal ID of the OAuth client.
     pub client_id: Uuid,
 
-    /// Public client_id string (used in OAuth flows).
+    /// Public `client_id` string (used in OAuth flows).
     pub public_client_id: String,
 
     /// The new client secret in plaintext.
@@ -44,7 +44,7 @@ pub struct OAuthClientDetails {
     /// Internal unique identifier for the OAuth client.
     pub id: Uuid,
 
-    /// Public client_id string (used in OAuth flows).
+    /// Public `client_id` string (used in OAuth flows).
     pub client_id: String,
 
     /// Human-readable name for the OAuth client.

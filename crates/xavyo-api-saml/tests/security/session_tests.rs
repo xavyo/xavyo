@@ -1,4 +1,4 @@
-//! Session storage and InResponseTo validation tests
+//! Session storage and `InResponseTo` validation tests
 
 #[cfg(test)]
 mod tests {

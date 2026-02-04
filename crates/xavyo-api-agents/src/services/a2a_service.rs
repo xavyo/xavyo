@@ -26,6 +26,7 @@ pub struct A2aService {
 
 impl A2aService {
     /// Create a new A2A service.
+    #[must_use] 
     pub fn new(pool: PgPool, webhook_service: Arc<WebhookService>) -> Self {
         Self {
             pool,
@@ -85,12 +86,10 @@ impl A2aService {
 
         match agent {
             None => Err(ApiAgentsError::NotFound(format!(
-                "Target agent {} not found",
-                target_agent_id
+                "Target agent {target_agent_id} not found"
             ))),
             Some(a) if a.status != "active" => Err(ApiAgentsError::BadRequest(format!(
-                "Target agent {} is not active",
-                target_agent_id
+                "Target agent {target_agent_id} is not active"
             ))),
             Some(_) => Ok(()),
         }
@@ -119,7 +118,7 @@ impl A2aService {
     ) -> Result<A2aTaskResponse, ApiAgentsError> {
         let task = A2aTask::get_by_id(&self.pool, tenant_id, task_id)
             .await?
-            .ok_or_else(|| ApiAgentsError::NotFound(format!("Task {} not found", task_id)))?;
+            .ok_or_else(|| ApiAgentsError::NotFound(format!("Task {task_id} not found")))?;
 
         Ok(self.task_to_response(&task))
     }
@@ -162,7 +161,7 @@ impl A2aService {
         // Get current task state
         let task = A2aTask::get_by_id(&self.pool, tenant_id, task_id)
             .await?
-            .ok_or_else(|| ApiAgentsError::NotFound(format!("Task {} not found", task_id)))?;
+            .ok_or_else(|| ApiAgentsError::NotFound(format!("Task {task_id} not found")))?;
 
         // Check if already cancelled (idempotent)
         if task.state == "cancelled" {

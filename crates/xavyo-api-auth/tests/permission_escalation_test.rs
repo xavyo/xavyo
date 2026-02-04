@@ -8,7 +8,7 @@
 //! - P-005: Scope violation returns 403, not 404 (enumeration prevention)
 //!
 //! Run with:
-//! cargo test -p xavyo-api-auth --test permission_escalation_test
+//! cargo test -p xavyo-api-auth --test `permission_escalation_test`
 
 mod common;
 
@@ -208,7 +208,7 @@ mod permission_escalation {
         assert_eq!(assignment_not_found.status_code(), StatusCode::NOT_FOUND);
     }
 
-    /// Verify super_admin role is the only bypass.
+    /// Verify `super_admin` role is the only bypass.
     #[test]
     fn test_only_super_admin_bypasses() {
         // Various role names that might be confused with super_admin
@@ -233,13 +233,12 @@ mod permission_escalation {
 
             assert!(
                 !is_super_admin(&claims),
-                "Role '{}' should NOT be treated as super_admin",
-                role
+                "Role '{role}' should NOT be treated as super_admin"
             );
         }
     }
 
-    /// Verify empty roles list doesn't grant super_admin.
+    /// Verify empty roles list doesn't grant `super_admin`.
     #[test]
     fn test_empty_roles_no_super_admin() {
         let claims = JwtClaims::builder()
@@ -270,7 +269,7 @@ mod claims_security {
     use xavyo_auth::JwtClaims;
     use xavyo_core::TenantId;
 
-    /// Missing tenant_id should be handled safely.
+    /// Missing `tenant_id` should be handled safely.
     #[test]
     fn test_missing_tenant_id() {
         let claims = JwtClaims::builder()

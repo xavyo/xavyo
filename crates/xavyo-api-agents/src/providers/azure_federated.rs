@@ -180,7 +180,7 @@ impl AzureFederatedProvider {
         }
 
         serde_json::from_str(&body).map_err(|e| {
-            CloudProviderError::ProviderError(format!("Failed to parse Azure response: {}", e))
+            CloudProviderError::ProviderError(format!("Failed to parse Azure response: {e}"))
         })
     }
 
@@ -238,7 +238,7 @@ impl CloudIdentityProvider for AzureFederatedProvider {
             .await
             .map_err(|e| {
                 warn!(error = %e, "Azure AD health check failed");
-                CloudProviderError::NotAvailable(format!("Azure AD not reachable: {}", e))
+                CloudProviderError::NotAvailable(format!("Azure AD not reachable: {e}"))
             })?;
 
         if !response.status().is_success() {
@@ -331,6 +331,7 @@ impl AzureFederatedConfigBuilder {
     }
 
     /// Build the configuration.
+    #[must_use] 
     pub fn build(self) -> AzureFederatedConfig {
         AzureFederatedConfig {
             tenant_id: self.tenant_id,

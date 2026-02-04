@@ -107,7 +107,7 @@ pub struct ResourceAccessCount {
 }
 
 impl GovNhiUsageEvent {
-    /// Get the source IP as parsed IpAddr (if present and valid).
+    /// Get the source IP as parsed `IpAddr` (if present and valid).
     #[must_use]
     pub fn source_ip_addr(&self) -> Option<IpAddr> {
         self.source_ip.as_ref().and_then(|s| s.parse().ok())
@@ -120,14 +120,14 @@ impl GovNhiUsageEvent {
         data: CreateGovNhiUsageEvent,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_nhi_usage_events (
                 tenant_id, nhi_id, target_resource, action, outcome,
                 source_ip, user_agent, duration_ms, metadata
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.nhi_id)
@@ -151,36 +151,36 @@ impl GovNhiUsageEvent {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_nhi_usage_events
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.nhi_id.is_some() {
-            query.push_str(&format!(" AND nhi_id = ${}", param_idx));
+            query.push_str(&format!(" AND nhi_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.target_resource.is_some() {
-            query.push_str(&format!(" AND target_resource ILIKE ${}", param_idx));
+            query.push_str(&format!(" AND target_resource ILIKE ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.outcome.is_some() {
-            query.push_str(&format!(" AND outcome = ${}", param_idx));
+            query.push_str(&format!(" AND outcome = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.start_date.is_some() {
-            query.push_str(&format!(" AND timestamp >= ${}", param_idx));
+            query.push_str(&format!(" AND timestamp >= ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.end_date.is_some() {
-            query.push_str(&format!(" AND timestamp <= ${}", param_idx));
+            query.push_str(&format!(" AND timestamp <= ${param_idx}"));
             param_idx += 1;
         }
 
@@ -197,7 +197,7 @@ impl GovNhiUsageEvent {
         }
 
         if let Some(ref resource) = filter.target_resource {
-            q = q.bind(format!("%{}%", resource));
+            q = q.bind(format!("%{resource}%"));
         }
 
         if let Some(outcome) = filter.outcome {
@@ -224,36 +224,36 @@ impl GovNhiUsageEvent {
         filter: &NhiUsageEventFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_nhi_usage_events
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_idx = 2;
 
         if filter.nhi_id.is_some() {
-            query.push_str(&format!(" AND nhi_id = ${}", param_idx));
+            query.push_str(&format!(" AND nhi_id = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.target_resource.is_some() {
-            query.push_str(&format!(" AND target_resource ILIKE ${}", param_idx));
+            query.push_str(&format!(" AND target_resource ILIKE ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.outcome.is_some() {
-            query.push_str(&format!(" AND outcome = ${}", param_idx));
+            query.push_str(&format!(" AND outcome = ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.start_date.is_some() {
-            query.push_str(&format!(" AND timestamp >= ${}", param_idx));
+            query.push_str(&format!(" AND timestamp >= ${param_idx}"));
             param_idx += 1;
         }
 
         if filter.end_date.is_some() {
-            query.push_str(&format!(" AND timestamp <= ${}", param_idx));
+            query.push_str(&format!(" AND timestamp <= ${param_idx}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -263,7 +263,7 @@ impl GovNhiUsageEvent {
         }
 
         if let Some(ref resource) = filter.target_resource {
-            q = q.bind(format!("%{}%", resource));
+            q = q.bind(format!("%{resource}%"));
         }
 
         if let Some(outcome) = filter.outcome {
@@ -289,7 +289,7 @@ impl GovNhiUsageEvent {
         period_days: i32,
     ) -> Result<NhiUsageSummary, sqlx::Error> {
         let row: (i64, i64, i64, i64, i64, Option<DateTime<Utc>>) = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE outcome = 'success') as success,
@@ -301,7 +301,7 @@ impl GovNhiUsageEvent {
             WHERE tenant_id = $1
                 AND nhi_id = $2
                 AND timestamp >= NOW() - ($3 || ' days')::interval
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(nhi_id)
@@ -330,7 +330,7 @@ impl GovNhiUsageEvent {
         limit: i64,
     ) -> Result<Vec<ResourceAccessCount>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT
                 target_resource,
                 COUNT(*) as access_count,
@@ -342,7 +342,7 @@ impl GovNhiUsageEvent {
             GROUP BY target_resource
             ORDER BY access_count DESC
             LIMIT $4
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(nhi_id)
@@ -359,10 +359,10 @@ impl GovNhiUsageEvent {
         nhi_id: Uuid,
     ) -> Result<Option<DateTime<Utc>>, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT MAX(timestamp) FROM gov_nhi_usage_events
             WHERE tenant_id = $1 AND nhi_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(nhi_id)

@@ -30,7 +30,7 @@ pub struct ListAccessRequestsQuery {
     /// Filter by status.
     pub status: Option<GovRequestStatus>,
 
-    /// Filter by SoD warning presence.
+    /// Filter by `SoD` warning presence.
     pub has_sod_warning: Option<bool>,
 
     /// Maximum number of results (default: 50, max: 100).
@@ -81,10 +81,10 @@ pub struct AccessRequestResponse {
     /// Requested access expiration.
     pub requested_expires_at: Option<DateTime<Utc>>,
 
-    /// Whether SoD violations were detected.
+    /// Whether `SoD` violations were detected.
     pub has_sod_warning: bool,
 
-    /// SoD violation details.
+    /// `SoD` violation details.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sod_violations: Option<Vec<SodViolationSummary>>,
 
@@ -103,7 +103,7 @@ pub struct AccessRequestResponse {
     pub expires_at: Option<DateTime<Utc>>,
 }
 
-/// Summary of an SoD violation for display.
+/// Summary of an `SoD` violation for display.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SodViolationSummary {
     /// Rule that would be violated.
@@ -168,7 +168,7 @@ pub struct AccessRequestCreatedResponse {
     #[serde(flatten)]
     pub request: AccessRequestResponse,
 
-    /// Message about SoD warnings if any.
+    /// Message about `SoD` warnings if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sod_warning_message: Option<String>,
 }

@@ -14,7 +14,8 @@ pub struct UnifiedListService {
 }
 
 impl UnifiedListService {
-    /// Creates a new UnifiedListService.
+    /// Creates a new `UnifiedListService`.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

@@ -7,7 +7,7 @@ use uuid::Uuid;
 pub struct TestUser {
     /// User email (userName in SCIM).
     pub email: String,
-    /// External ID from IdP.
+    /// External ID from `IdP`.
     pub external_id: String,
     /// Given name.
     pub first_name: String,
@@ -24,7 +24,7 @@ impl TestUser {
     pub fn generate() -> Self {
         let id = Uuid::new_v4();
         Self {
-            email: format!("test-{}@example.com", id),
+            email: format!("test-{id}@example.com"),
             external_id: id.to_string(),
             first_name: "Test".to_string(),
             last_name: "User".to_string(),
@@ -58,7 +58,7 @@ impl TestUser {
 pub struct TestGroup {
     /// Group display name.
     pub display_name: String,
-    /// External ID from IdP.
+    /// External ID from `IdP`.
     pub external_id: String,
     /// Member user IDs.
     pub members: Vec<String>,

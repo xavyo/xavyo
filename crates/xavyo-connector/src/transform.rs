@@ -16,11 +16,13 @@ pub struct TransformEngine;
 
 impl TransformEngine {
     /// Create a new transformation engine.
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
 
     /// Evaluate a complete mapping configuration against input attributes.
+    #[must_use] 
     pub fn evaluate(
         &self,
         config: &MappingConfiguration,
@@ -171,15 +173,14 @@ impl TransformEngine {
                 Ok(chars[start..end].iter().collect())
             }
             Transform::Regex { pattern, group } => {
-                let re = Regex::new(pattern).map_err(|e| format!("Invalid regex: {}", e))?;
+                let re = Regex::new(pattern).map_err(|e| format!("Invalid regex: {e}"))?;
                 if let Some(caps) = re.captures(value) {
                     if *group == 0 {
-                        Ok(caps.get(0).map(|m| m.as_str()).unwrap_or("").to_string())
+                        Ok(caps.get(0).map_or("", |m| m.as_str()).to_string())
                     } else {
                         Ok(caps
                             .get(*group)
-                            .map(|m| m.as_str())
-                            .unwrap_or("")
+                            .map_or("", |m| m.as_str())
                             .to_string())
                     }
                 } else {
@@ -197,7 +198,7 @@ impl TransformEngine {
                 if value.contains('@') {
                     Ok(value.to_string())
                 } else {
-                    Ok(format!("{}{}", value, domain))
+                    Ok(format!("{value}{domain}"))
                 }
             }
             Transform::DnFormat { template } => Ok(template.replace("{value}", value)),

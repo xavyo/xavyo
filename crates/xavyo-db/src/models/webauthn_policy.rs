@@ -1,13 +1,13 @@
-//! WebAuthn policy model.
+//! `WebAuthn` policy model.
 //!
-//! Stores tenant-level WebAuthn configuration and policies.
+//! Stores tenant-level `WebAuthn` configuration and policies.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgExecutor};
 use uuid::Uuid;
 
-/// User verification requirement for WebAuthn ceremonies.
+/// User verification requirement for `WebAuthn` ceremonies.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum UserVerification {
@@ -38,7 +38,7 @@ impl std::str::FromStr for UserVerification {
             "discouraged" => Ok(Self::Discouraged),
             "preferred" => Ok(Self::Preferred),
             "required" => Ok(Self::Required),
-            _ => Err(format!("Invalid user verification: {}", s)),
+            _ => Err(format!("Invalid user verification: {s}")),
         }
     }
 }
@@ -46,13 +46,13 @@ impl std::str::FromStr for UserVerification {
 /// Default maximum credentials per user.
 pub const DEFAULT_MAX_CREDENTIALS: i32 = 10;
 
-/// Tenant-level WebAuthn policy configuration.
+/// Tenant-level `WebAuthn` policy configuration.
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct TenantWebAuthnPolicy {
     /// The tenant this policy applies to.
     pub tenant_id: Uuid,
 
-    /// Whether WebAuthn registration is enabled for this tenant.
+    /// Whether `WebAuthn` registration is enabled for this tenant.
     pub webauthn_enabled: bool,
 
     /// Whether attestation verification is required.
@@ -74,7 +74,7 @@ pub struct TenantWebAuthnPolicy {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Data for creating or updating a WebAuthn policy.
+/// Data for creating or updating a `WebAuthn` policy.
 #[derive(Debug, Clone, Deserialize)]
 pub struct UpsertWebAuthnPolicy {
     pub webauthn_enabled: Option<bool>,
@@ -86,11 +86,13 @@ pub struct UpsertWebAuthnPolicy {
 
 impl TenantWebAuthnPolicy {
     /// Get the user verification requirement as an enum.
+    #[must_use] 
     pub fn user_verification_requirement(&self) -> UserVerification {
         self.user_verification.parse().unwrap_or_default()
     }
 
     /// Check if a specific authenticator type is allowed.
+    #[must_use] 
     pub fn is_authenticator_type_allowed(&self, auth_type: &str) -> bool {
         match &self.allowed_authenticator_types {
             None => true, // All types allowed
@@ -104,12 +106,12 @@ impl TenantWebAuthnPolicy {
         E: PgExecutor<'e>,
     {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_webauthn_policies (tenant_id)
             VALUES ($1)
             ON CONFLICT (tenant_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(executor)
@@ -138,7 +140,7 @@ impl TenantWebAuthnPolicy {
     {
         // Use upsert pattern to create if not exists and update
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO tenant_webauthn_policies (
                 tenant_id, webauthn_enabled, require_attestation, user_verification,
                 allowed_authenticator_types, max_credentials_per_user
@@ -153,7 +155,7 @@ impl TenantWebAuthnPolicy {
                 max_credentials_per_user = COALESCE($6, tenant_webauthn_policies.max_credentials_per_user),
                 updated_at = NOW()
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(data.webauthn_enabled)
@@ -165,7 +167,7 @@ impl TenantWebAuthnPolicy {
         .await
     }
 
-    /// Check if WebAuthn is enabled for a tenant.
+    /// Check if `WebAuthn` is enabled for a tenant.
     pub async fn is_enabled<'e, E>(executor: E, tenant_id: Uuid) -> Result<bool, sqlx::Error>
     where
         E: PgExecutor<'e>,
@@ -178,7 +180,7 @@ impl TenantWebAuthnPolicy {
         .await?;
 
         // Default to enabled if no policy exists
-        Ok(result.map(|r| r.0).unwrap_or(true))
+        Ok(result.is_none_or(|r| r.0))
     }
 
     /// Delete the policy for a tenant (resets to defaults).

@@ -1,12 +1,12 @@
 //! Remediation Executor Tests
 //!
-//! Comprehensive tests for the RemediationExecutor covering:
-//! - US1: Account creation (execute_create)
-//! - US2: Account updates (execute_update)
-//! - US3: Account deletion (execute_delete)
-//! - US4: Shadow link management (execute_link, execute_unlink)
+//! Comprehensive tests for the `RemediationExecutor` covering:
+//! - US1: Account creation (`execute_create`)
+//! - US2: Account updates (`execute_update`)
+//! - US3: Account deletion (`execute_delete`)
+//! - US4: Shadow link management (`execute_link`, `execute_unlink`)
 //! - US5: Transaction rollback support
-//! - US6: Identity inactivation (execute_inactivate_identity)
+//! - US6: Identity inactivation (`execute_inactivate_identity`)
 
 use async_trait::async_trait;
 use serde_json::json;
@@ -53,6 +53,7 @@ pub struct TestConnector {
 }
 
 impl TestConnector {
+    #[must_use] 
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -198,7 +199,14 @@ pub struct MockConnectorProvider {
     connector: Option<Arc<TestConnector>>,
 }
 
+impl Default for MockConnectorProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockConnectorProvider {
+    #[must_use] 
     pub fn new() -> Self {
         Self { connector: None }
     }
@@ -283,7 +291,14 @@ pub struct MockIdentityService {
     created_identity_id: std::sync::Mutex<Option<Uuid>>,
 }
 
+impl Default for MockIdentityService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockIdentityService {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             attributes: Some(AttributeSet::new()),
@@ -935,7 +950,7 @@ mod us4_link_tests {
         let result = RemediationResult::failure(
             discrepancy_id,
             ActionType::Link,
-            format!("Shadow already linked to identity: {}", existing_user),
+            format!("Shadow already linked to identity: {existing_user}"),
             false,
         );
 

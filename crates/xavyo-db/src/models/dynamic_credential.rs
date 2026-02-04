@@ -1,7 +1,7 @@
 //! Dynamic Credential model for ephemeral secrets provisioning.
 //!
 //! Represents credentials issued to AI agents with TTL-based expiration.
-//! Part of the SecretlessAI feature (F120).
+//! Part of the `SecretlessAI` feature (F120).
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -38,7 +38,7 @@ impl std::str::FromStr for CredentialStatus {
             "active" => Ok(CredentialStatus::Active),
             "expired" => Ok(CredentialStatus::Expired),
             "revoked" => Ok(CredentialStatus::Revoked),
-            _ => Err(format!("Invalid credential status: {}", s)),
+            _ => Err(format!("Invalid credential status: {s}")),
         }
     }
 }
@@ -47,7 +47,7 @@ impl std::str::FromStr for CredentialStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SecretProviderType {
-    /// OpenBao (HashiCorp Vault fork, MPL 2.0).
+    /// `OpenBao` (`HashiCorp` Vault fork, MPL 2.0).
     Openbao,
     /// Infisical (MIT licensed).
     Infisical,
@@ -77,7 +77,7 @@ impl std::str::FromStr for SecretProviderType {
             "infisical" => Ok(SecretProviderType::Infisical),
             "internal" => Ok(SecretProviderType::Internal),
             "aws" => Ok(SecretProviderType::Aws),
-            _ => Err(format!("Invalid provider type: {}", s)),
+            _ => Err(format!("Invalid provider type: {s}")),
         }
     }
 }
@@ -113,7 +113,7 @@ pub struct DynamicCredential {
     /// Provider that generated this credential.
     pub provider_type: String,
 
-    /// Provider-specific lease ID (for OpenBao revocation).
+    /// Provider-specific lease ID (for `OpenBao` revocation).
     pub provider_lease_id: Option<String>,
 
     /// Record creation timestamp.
@@ -132,16 +132,19 @@ impl DynamicCredential {
     }
 
     /// Check if the credential is currently valid.
+    #[must_use] 
     pub fn is_valid(&self) -> bool {
         self.status == "active" && self.expires_at > Utc::now()
     }
 
     /// Check if the credential has expired.
+    #[must_use] 
     pub fn is_expired(&self) -> bool {
         self.expires_at <= Utc::now() || self.status == "expired"
     }
 
     /// Get TTL in seconds from now (0 if expired).
+    #[must_use] 
     pub fn ttl_seconds(&self) -> i64 {
         let remaining = self.expires_at.signed_duration_since(Utc::now());
         remaining.num_seconds().max(0)
@@ -197,10 +200,10 @@ impl DynamicCredential {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM dynamic_credentials
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -217,31 +220,31 @@ impl DynamicCredential {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM dynamic_credentials
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.agent_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND agent_id = ${}", param_count));
+            query.push_str(&format!(" AND agent_id = ${param_count}"));
         }
 
         if filter.secret_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND secret_type = ${}", param_count));
+            query.push_str(&format!(" AND secret_type = ${param_count}"));
         }
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         if filter.provider_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND provider_type = ${}", param_count));
+            query.push_str(&format!(" AND provider_type = ${param_count}"));
         }
 
         if filter.active_only {
@@ -279,14 +282,14 @@ impl DynamicCredential {
         input: CreateDynamicCredential,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO dynamic_credentials (
                 tenant_id, agent_id, secret_type, credential_value,
                 expires_at, provider_type, provider_lease_id
             )
             VALUES ($1, $2, $3, $4, NOW() + ($5 || ' seconds')::interval, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.agent_id)
@@ -306,12 +309,12 @@ impl DynamicCredential {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE dynamic_credentials
             SET status = 'revoked'
             WHERE id = $1 AND tenant_id = $2 AND status = 'active'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -322,11 +325,11 @@ impl DynamicCredential {
     /// Mark expired credentials as expired.
     pub async fn expire_stale(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE dynamic_credentials
             SET status = 'expired'
             WHERE tenant_id = $1 AND status = 'active' AND expires_at <= NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .execute(pool)
@@ -342,10 +345,10 @@ impl DynamicCredential {
         agent_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM dynamic_credentials
             WHERE tenant_id = $1 AND agent_id = $2 AND status = 'active' AND expires_at > NOW()
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(agent_id)
@@ -360,10 +363,10 @@ impl DynamicCredential {
         lease_id: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM dynamic_credentials
             WHERE tenant_id = $1 AND provider_lease_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(lease_id)

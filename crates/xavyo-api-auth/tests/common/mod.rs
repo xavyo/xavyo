@@ -37,11 +37,11 @@ pub async fn create_test_tenant(pool: &PgPool) -> TenantId {
     let slug = format!("test-tenant-{}", &id.to_string()[..8]);
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO tenants (id, name, slug, settings, created_at)
         VALUES ($1, $2, $3, '{}', NOW())
         ON CONFLICT (id) DO NOTHING
-        "#,
+        ",
     )
     .bind(id)
     .bind(&slug)
@@ -63,7 +63,7 @@ pub async fn create_test_user(
     create_test_user_with_options(pool, tenant_id, email, password_hash, true, true).await
 }
 
-/// Create a test user with custom options for is_active and email_verified.
+/// Create a test user with custom options for `is_active` and `email_verified`.
 pub async fn create_test_user_with_options(
     pool: &PgPool,
     tenant_id: TenantId,
@@ -80,10 +80,10 @@ pub async fn create_test_user_with_options(
     };
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO users (id, tenant_id, email, password_hash, is_active, email_verified, email_verified_at, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-        "#,
+        ",
     )
     .bind(id)
     .bind(tenant_id.as_uuid())
@@ -204,14 +204,14 @@ pub fn invalid_test_email() -> &'static str {
     "not-an-email"
 }
 
-/// Create a test password reset token and return (raw_token, token_hash).
+/// Create a test password reset token and return (`raw_token`, `token_hash`).
 pub fn create_test_password_reset_token() -> (String, String) {
     let token = generate_secure_token();
     let hash = hash_token(&token);
     (token, hash)
 }
 
-/// Create a test email verification token and return (raw_token, token_hash).
+/// Create a test email verification token and return (`raw_token`, `token_hash`).
 pub fn create_test_verification_token() -> (String, String) {
     let token = generate_secure_token();
     let hash = hash_token(&token);
@@ -229,10 +229,10 @@ pub async fn insert_password_reset_token(
     let id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO password_reset_tokens (id, tenant_id, user_id, token_hash, expires_at, created_at)
         VALUES ($1, $2, $3, $4, $5, NOW())
-        "#,
+        ",
     )
     .bind(id)
     .bind(tenant_id.as_uuid())
@@ -257,10 +257,10 @@ pub async fn insert_email_verification_token(
     let id = Uuid::new_v4();
 
     sqlx::query(
-        r#"
+        r"
         INSERT INTO email_verification_tokens (id, tenant_id, user_id, token_hash, expires_at, created_at)
         VALUES ($1, $2, $3, $4, $5, NOW())
-        "#,
+        ",
     )
     .bind(id)
     .bind(tenant_id.as_uuid())
@@ -336,7 +336,7 @@ pub async fn insert_valid_verification_token(
     insert_email_verification_token(pool, tenant_id, user_id, token_hash, expires_at).await
 }
 
-/// Update user to set email_verified status.
+/// Update user to set `email_verified` status.
 pub async fn set_user_email_verified(pool: &PgPool, user_id: UserId, verified: bool) {
     if verified {
         sqlx::query(

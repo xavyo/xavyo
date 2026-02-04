@@ -4,12 +4,12 @@
 //! When no OTLP endpoint is configured, telemetry is silently disabled and the
 //! system operates normally without any collector.
 //!
-//! SQLx 0.7 already emits `tracing` spans for database queries. With the
-//! `tracing-opentelemetry` bridge layer, these automatically become OTel child spans.
+//! `SQLx` 0.7 already emits `tracing` spans for database queries. With the
+//! `tracing-opentelemetry` bridge layer, these automatically become `OTel` child spans.
 //!
 //! ## Automatic Database Instrumentation (FR-003)
 //!
-//! SQLx 0.7 emits `tracing` spans (e.g., `sqlx::query`) for every database
+//! `SQLx` 0.7 emits `tracing` spans (e.g., `sqlx::query`) for every database
 //! operation. Because the `OpenTelemetryLayer` is added to the tracing subscriber
 //! stack, these spans are automatically bridged to OpenTelemetry child spans
 //! without any additional instrumentation code. Database query traces will appear

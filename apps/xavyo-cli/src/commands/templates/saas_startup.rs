@@ -1,4 +1,4 @@
-//! SaaS Startup template - Basic setup for SaaS applications
+//! `SaaS` Startup template - Basic setup for `SaaS` applications
 
 use super::{object_schema, Template};
 use crate::models::config::{AgentConfig, ToolConfig, XavyoConfig};

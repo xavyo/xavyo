@@ -27,7 +27,7 @@ pub struct CreateBatchSimulationRequest {
     /// How users are selected.
     pub selection_mode: SelectionMode,
 
-    /// Explicit user IDs (required for user_list mode).
+    /// Explicit user IDs (required for `user_list` mode).
     #[serde(default)]
     pub user_ids: Vec<Uuid>,
 

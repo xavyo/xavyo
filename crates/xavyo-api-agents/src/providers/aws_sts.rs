@@ -1,6 +1,6 @@
 //! AWS STS Provider for Workload Identity Federation (F121).
 //!
-//! Implements AssumeRoleWithWebIdentity to exchange agent JWTs
+//! Implements `AssumeRoleWithWebIdentity` to exchange agent JWTs
 //! for short-lived AWS credentials.
 
 use async_trait::async_trait;
@@ -15,7 +15,7 @@ use super::{
 
 /// AWS STS provider for obtaining temporary AWS credentials.
 ///
-/// Uses AssumeRoleWithWebIdentity to exchange agent JWTs for AWS credentials.
+/// Uses `AssumeRoleWithWebIdentity` to exchange agent JWTs for AWS credentials.
 pub struct AwsStsProvider {
     /// AWS STS client.
     #[cfg(feature = "aws-federation")]
@@ -248,12 +248,14 @@ impl AwsStsConfigBuilder {
     }
 
     /// Set the maximum session duration.
+    #[must_use] 
     pub fn max_duration_seconds(mut self, duration: i32) -> Self {
         self.max_duration_seconds = duration.clamp(900, 43200);
         self
     }
 
     /// Build the configuration.
+    #[must_use] 
     pub fn build(self) -> AwsStsConfig {
         AwsStsConfig {
             region: self.region,

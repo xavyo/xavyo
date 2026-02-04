@@ -25,16 +25,19 @@ pub enum CertItemStatus {
 
 impl CertItemStatus {
     /// Check if the item is pending decision.
+    #[must_use] 
     pub fn is_pending(&self) -> bool {
         matches!(self, Self::Pending)
     }
 
     /// Check if the item has been decided.
+    #[must_use] 
     pub fn is_decided(&self) -> bool {
         matches!(self, Self::Approved | Self::Revoked)
     }
 
     /// Check if the item is in a terminal state.
+    #[must_use] 
     pub fn is_terminal(&self) -> bool {
         !self.is_pending()
     }
@@ -120,10 +123,10 @@ impl GovCertificationItem {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_certification_items
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -137,10 +140,10 @@ impl GovCertificationItem {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM gov_certification_items
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .fetch_optional(pool)
@@ -155,10 +158,10 @@ impl GovCertificationItem {
         entitlement_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_certification_items
             WHERE tenant_id = $1 AND user_id = $2 AND entitlement_id = $3 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -178,32 +181,32 @@ impl GovCertificationItem {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT * FROM gov_certification_items
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.campaign_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND campaign_id = ${}", param_count));
+            query.push_str(&format!(" AND campaign_id = ${param_count}"));
         }
         if filter.reviewer_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND reviewer_id = ${}", param_count));
+            query.push_str(&format!(" AND reviewer_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.entitlement_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND entitlement_id = ${}", param_count));
+            query.push_str(&format!(" AND entitlement_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -240,32 +243,32 @@ impl GovCertificationItem {
         filter: &CertItemFilter,
     ) -> Result<i64, sqlx::Error> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_certification_items
             WHERE tenant_id = $1
-            "#,
+            ",
         );
         let mut param_count = 1;
 
         if filter.campaign_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND campaign_id = ${}", param_count));
+            query.push_str(&format!(" AND campaign_id = ${param_count}"));
         }
         if filter.reviewer_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND reviewer_id = ${}", param_count));
+            query.push_str(&format!(" AND reviewer_id = ${param_count}"));
         }
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
         if filter.entitlement_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND entitlement_id = ${}", param_count));
+            query.push_str(&format!(" AND entitlement_id = ${param_count}"));
         }
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ${}", param_count));
+            query.push_str(&format!(" AND status = ${param_count}"));
         }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
@@ -296,7 +299,7 @@ impl GovCertificationItem {
         campaign_id: Uuid,
     ) -> Result<CertItemSummary, sqlx::Error> {
         let row: (i64, i64, i64, i64, i64) = sqlx::query_as(
-            r#"
+            r"
             SELECT
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE status = 'pending') as pending,
@@ -305,7 +308,7 @@ impl GovCertificationItem {
                 COUNT(*) FILTER (WHERE status = 'skipped') as skipped
             FROM gov_certification_items
             WHERE tenant_id = $1 AND campaign_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(campaign_id)
@@ -328,10 +331,10 @@ impl GovCertificationItem {
         reviewer_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar(
-            r#"
+            r"
             SELECT COUNT(*) FROM gov_certification_items
             WHERE tenant_id = $1 AND reviewer_id = $2 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(reviewer_id)
@@ -346,14 +349,14 @@ impl GovCertificationItem {
         input: CreateCertificationItem,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO gov_certification_items (
                 tenant_id, campaign_id, assignment_id, user_id,
                 entitlement_id, reviewer_id, assignment_snapshot
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(input.campaign_id)
@@ -378,12 +381,12 @@ impl GovCertificationItem {
 
         // Build bulk insert query
         let mut query = String::from(
-            r#"
+            r"
             INSERT INTO gov_certification_items (
                 tenant_id, campaign_id, assignment_id, user_id,
                 entitlement_id, reviewer_id, assignment_snapshot
             ) VALUES
-            "#,
+            ",
         );
 
         let mut params: Vec<String> = Vec::with_capacity(items.len());
@@ -430,14 +433,14 @@ impl GovCertificationItem {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_certification_items
             SET status = 'approved',
                 decided_at = NOW(),
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -452,14 +455,14 @@ impl GovCertificationItem {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_certification_items
             SET status = 'revoked',
                 decided_at = NOW(),
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -474,13 +477,13 @@ impl GovCertificationItem {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_certification_items
             SET status = 'skipped',
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -496,13 +499,13 @@ impl GovCertificationItem {
         new_reviewer_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE gov_certification_items
             SET reviewer_id = $3,
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -518,11 +521,11 @@ impl GovCertificationItem {
         assignment_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE gov_certification_items
             SET status = 'skipped', updated_at = NOW()
             WHERE tenant_id = $1 AND assignment_id = $2 AND status = 'pending'
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(assignment_id)
@@ -533,6 +536,7 @@ impl GovCertificationItem {
     }
 
     /// Check if the item is pending.
+    #[must_use] 
     pub fn is_pending(&self) -> bool {
         self.status.is_pending()
     }

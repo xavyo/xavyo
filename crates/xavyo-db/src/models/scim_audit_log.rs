@@ -67,7 +67,7 @@ pub struct ScimAuditLog {
     /// The target resource ID (None for LIST operations).
     pub resource_id: Option<Uuid>,
 
-    /// Client IP address (stored as string for SQLx compatibility).
+    /// Client IP address (stored as string for `SQLx` compatibility).
     pub source_ip: String,
 
     /// Client user agent.
@@ -105,14 +105,14 @@ impl ScimAuditLog {
     /// Create a new audit log entry.
     pub async fn create(pool: &sqlx::PgPool, log: CreateAuditLog) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO scim_audit_logs (
                 tenant_id, token_id, operation, resource_type, resource_id,
                 source_ip, user_agent, request_body, response_code, error_message
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
-            "#,
+            ",
         )
         .bind(log.tenant_id)
         .bind(log.token_id)
@@ -136,12 +136,12 @@ impl ScimAuditLog {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_audit_logs
             WHERE tenant_id = $1
             ORDER BY created_at DESC
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -158,11 +158,11 @@ impl ScimAuditLog {
         resource_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM scim_audit_logs
             WHERE tenant_id = $1 AND resource_type = $2 AND resource_id = $3
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(resource_type)
@@ -174,10 +174,10 @@ impl ScimAuditLog {
     /// Count audit logs for a tenant.
     pub async fn count_by_tenant(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM scim_audit_logs
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -189,10 +189,10 @@ impl ScimAuditLog {
     /// Delete old audit logs (retention policy).
     pub async fn delete_older_than(pool: &sqlx::PgPool, days: i32) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM scim_audit_logs
             WHERE created_at < NOW() - ($1 || ' days')::INTERVAL
-            "#,
+            ",
         )
         .bind(days)
         .execute(pool)

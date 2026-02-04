@@ -16,7 +16,7 @@ use super::gov_license_types::{
 ///
 /// Reclamation can be triggered by:
 /// - Inactivity: User hasn't logged in for N days
-/// - Lifecycle state: User enters a specific state (e.g., terminated, on_leave)
+/// - Lifecycle state: User enters a specific state (e.g., terminated, `on_leave`)
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct GovLicenseReclamationRule {
     /// Unique identifier for the rule.
@@ -28,13 +28,13 @@ pub struct GovLicenseReclamationRule {
     /// The license pool this rule applies to.
     pub license_pool_id: Uuid,
 
-    /// Type of trigger (inactivity or lifecycle_state).
+    /// Type of trigger (inactivity or `lifecycle_state`).
     pub trigger_type: LicenseReclamationTrigger,
 
     /// Days of inactivity before reclamation (for inactivity trigger).
     pub threshold_days: Option<i32>,
 
-    /// Lifecycle state that triggers reclamation (for lifecycle_state trigger).
+    /// Lifecycle state that triggers reclamation (for `lifecycle_state` trigger).
     pub lifecycle_state: Option<String>,
 
     /// Days before reclamation to notify the user.
@@ -65,7 +65,7 @@ pub struct CreateGovLicenseReclamationRule {
     /// Days of inactivity (required for inactivity trigger).
     pub threshold_days: Option<i32>,
 
-    /// Lifecycle state (required for lifecycle_state trigger).
+    /// Lifecycle state (required for `lifecycle_state` trigger).
     pub lifecycle_state: Option<String>,
 
     /// Days before reclamation to notify user (default: 7).

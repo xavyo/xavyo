@@ -42,7 +42,7 @@ pub struct SlaNotificationConfig {
     pub email_enabled: bool,
     /// Whether webhook notifications are enabled.
     pub webhook_enabled: bool,
-    /// Webhook URL for notifications (if webhook_enabled).
+    /// Webhook URL for notifications (if `webhook_enabled`).
     pub webhook_url: Option<String>,
     /// Webhook authentication token (optional).
     pub webhook_auth_token: Option<String>,
@@ -121,6 +121,7 @@ pub struct SlaNotificationService {
 
 impl SlaNotificationService {
     /// Create a new SLA notification service.
+    #[must_use] 
     pub fn new(pool: PgPool, config: SlaNotificationConfig) -> Self {
         Self {
             pool,
@@ -145,11 +146,13 @@ impl SlaNotificationService {
     }
 
     /// Create with default configuration.
+    #[must_use] 
     pub fn with_defaults(pool: PgPool) -> Self {
         Self::new(pool, SlaNotificationConfig::default())
     }
 
     /// Get database pool reference.
+    #[must_use] 
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -288,7 +291,7 @@ impl SlaNotificationService {
         );
 
         let body = format!(
-            r#"SLA Warning: Manual Provisioning Task Approaching Deadline
+            r"SLA Warning: Manual Provisioning Task Approaching Deadline
 
 A manual provisioning task is approaching its SLA deadline and requires attention.
 
@@ -305,7 +308,7 @@ Please complete this task before the deadline to avoid SLA breach.
 
 ---
 This is an automated notification from xavyo. Do not reply to this email.
-"#,
+",
             notification.task_id,
             notification.application_name,
             notification.entitlement_name,
@@ -387,7 +390,7 @@ This is an automated notification from xavyo. Do not reply to this email.
         );
 
         let body = format!(
-            r#"SLA BREACH: Manual Provisioning Task Overdue
+            r"SLA BREACH: Manual Provisioning Task Overdue
 
 A manual provisioning task has exceeded its SLA deadline and requires immediate attention.
 
@@ -404,7 +407,7 @@ This task has breached its SLA. Please complete it immediately and investigate t
 
 ---
 This is an automated notification from xavyo. Do not reply to this email.
-"#,
+",
             notification.task_id,
             notification.application_name,
             notification.entitlement_name,
@@ -557,11 +560,13 @@ pub struct NotificationSendResult {
 
 impl NotificationSendResult {
     /// Check if all notifications were sent successfully.
+    #[must_use] 
     pub fn is_success(&self) -> bool {
         self.email_error.is_none() && self.webhook_error.is_none()
     }
 
     /// Check if any notifications were sent.
+    #[must_use] 
     pub fn any_sent(&self) -> bool {
         self.emails_sent > 0 || self.webhook_sent
     }

@@ -26,7 +26,7 @@ use crate::{
 // Helper functions to convert DB models to API models
 // ============================================================================
 
-/// Convert a DB GovProvisioningScript to an API ScriptResponse.
+/// Convert a DB `GovProvisioningScript` to an API `ScriptResponse`.
 fn map_script(
     script: xavyo_db::models::gov_provisioning_script::GovProvisioningScript,
 ) -> ScriptResponse {
@@ -49,7 +49,7 @@ fn map_script(
     }
 }
 
-/// Convert a DB GovScriptVersion to an API ScriptVersionResponse.
+/// Convert a DB `GovScriptVersion` to an API `ScriptVersionResponse`.
 fn map_version(
     version: xavyo_db::models::gov_script_version::GovScriptVersion,
 ) -> ScriptVersionResponse {
@@ -64,7 +64,7 @@ fn map_version(
     }
 }
 
-/// Parse a status string to GovScriptStatus.
+/// Parse a status string to `GovScriptStatus`.
 fn parse_status(status: &str) -> Option<GovScriptStatus> {
     serde_json::from_value(serde_json::Value::String(status.to_string())).ok()
 }

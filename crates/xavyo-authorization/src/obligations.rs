@@ -43,7 +43,7 @@ pub struct PolicyObligation {
     pub policy_id: Uuid,
     /// Tenant identifier
     pub tenant_id: Uuid,
-    /// When to execute (on_permit or on_deny)
+    /// When to execute (`on_permit` or `on_deny`)
     pub trigger: ObligationTrigger,
     /// Handler type identifier
     pub obligation_type: String,
@@ -134,6 +134,7 @@ impl Default for ObligationRegistry {
 
 impl ObligationRegistry {
     /// Create a new empty registry.
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             handlers: RwLock::new(HashMap::new()),
@@ -246,7 +247,7 @@ pub struct LogAccessHandler;
 
 #[async_trait::async_trait]
 impl ObligationHandler for LogAccessHandler {
-    fn obligation_type(&self) -> &str {
+    fn obligation_type(&self) -> &'static str {
         "log_access"
     }
 

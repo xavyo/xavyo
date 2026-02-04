@@ -16,7 +16,7 @@ mod azure_fixtures {
     pub fn issuer_v2(base_url: &str, tenant_id: &str) -> String {
         // In production: https://login.microsoftonline.com/{tenant}/v2.0
         // For testing, we use the mock server URL
-        format!("{}/{}/v2.0", base_url, tenant_id)
+        format!("{base_url}/{tenant_id}/v2.0")
     }
 
     /// Azure AD discovery document (v2.0)
@@ -79,7 +79,7 @@ mod azure_fixtures {
             issuer,
             vec!["https://graph.microsoft.com/.default".to_string()],
         )
-        .with_email(&format!("{}@contoso.onmicrosoft.com", sub))
+        .with_email(&format!("{sub}@contoso.onmicrosoft.com"))
         .with_claim("tid", json!(tenant_id))
         .with_claim("oid", json!(object_id))
         .with_claim("ver", json!("2.0"));

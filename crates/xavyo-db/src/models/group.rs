@@ -28,7 +28,7 @@ pub struct Group {
     /// Parent group ID for hierarchy (NULL = root group).
     pub parent_id: Option<Uuid>,
 
-    /// Group type classification (organizational_unit, department, team, security_group, distribution_list, custom).
+    /// Group type classification (`organizational_unit`, department, team, `security_group`, `distribution_list`, custom).
     pub group_type: String,
 
     /// When the group was created.
@@ -67,10 +67,10 @@ impl Group {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM groups
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id)
         .fetch_optional(pool)
@@ -84,10 +84,10 @@ impl Group {
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM groups
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -102,10 +102,10 @@ impl Group {
         display_name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM groups
             WHERE tenant_id = $1 AND display_name = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(display_name)
@@ -120,10 +120,10 @@ impl Group {
         external_id: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM groups
             WHERE tenant_id = $1 AND external_id = $2
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(external_id)
@@ -139,12 +139,12 @@ impl Group {
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             SELECT * FROM groups
             WHERE tenant_id = $1
             ORDER BY display_name
             LIMIT $2 OFFSET $3
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(limit)
@@ -156,10 +156,10 @@ impl Group {
     /// Count groups in a tenant.
     pub async fn count_by_tenant(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
         let result: (i64,) = sqlx::query_as(
-            r#"
+            r"
             SELECT COUNT(*) FROM groups
             WHERE tenant_id = $1
-            "#,
+            ",
         )
         .bind(tenant_id)
         .fetch_one(pool)
@@ -179,11 +179,11 @@ impl Group {
         group_type: Option<&str>,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             INSERT INTO groups (tenant_id, display_name, external_id, description, parent_id, group_type)
             VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'security_group'))
             RETURNING *
-            "#,
+            ",
         )
         .bind(tenant_id)
         .bind(display_name)
@@ -208,23 +208,23 @@ impl Group {
 
         if update.display_name.is_some() {
             param_count += 1;
-            query.push_str(&format!(", display_name = ${}", param_count));
+            query.push_str(&format!(", display_name = ${param_count}"));
         }
         if update.external_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(", external_id = ${}", param_count));
+            query.push_str(&format!(", external_id = ${param_count}"));
         }
         if update.description.is_some() {
             param_count += 1;
-            query.push_str(&format!(", description = ${}", param_count));
+            query.push_str(&format!(", description = ${param_count}"));
         }
         if update.parent_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(", parent_id = ${}", param_count));
+            query.push_str(&format!(", parent_id = ${param_count}"));
         }
         if update.group_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(", group_type = ${}", param_count));
+            query.push_str(&format!(", group_type = ${param_count}"));
         }
 
         query.push_str(" WHERE id = $1 AND tenant_id = $2 RETURNING *");
@@ -263,7 +263,7 @@ impl Group {
         group_type: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
-            r#"
+            r"
             UPDATE groups SET
                 display_name = $3,
                 external_id = $4,
@@ -273,7 +273,7 @@ impl Group {
                 updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             RETURNING *
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)
@@ -293,10 +293,10 @@ impl Group {
         id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM groups
             WHERE id = $1 AND tenant_id = $2
-            "#,
+            ",
         )
         .bind(id)
         .bind(tenant_id)

@@ -1,6 +1,6 @@
-//! Microsoft OAuth2 (Azure AD) Integration Tests
+//! Microsoft `OAuth2` (Azure AD) Integration Tests
 //!
-//! Tests for Microsoft OAuth2 flow including:
+//! Tests for Microsoft `OAuth2` flow including:
 //! - Authorization URL with v2.0 endpoint
 //! - Token exchange
 //! - Graph API userinfo
@@ -19,7 +19,7 @@ use super::mock_server::{
     setup_token_endpoint_success, OAuthError,
 };
 
-/// Microsoft OAuth2 endpoints (v2.0)
+/// Microsoft `OAuth2` endpoints (v2.0)
 const MICROSOFT_AUTH_ENDPOINT: &str =
     "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
 #[allow(dead_code)]
@@ -43,7 +43,7 @@ async fn test_microsoft_authorization_url_with_v2_endpoint() {
     assert!(auth_url.contains("oauth2/v2.0/authorize"));
     assert!(auth_url.contains(&format!("client_id={}", fixture.client_id)));
     assert!(auth_url.contains("response_type=code"));
-    assert!(auth_url.contains(&format!("state={}", TEST_STATE)));
+    assert!(auth_url.contains(&format!("state={TEST_STATE}")));
 
     // Verify Microsoft-specific scopes
     assert!(auth_url.contains("openid"));

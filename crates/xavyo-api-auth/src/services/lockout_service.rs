@@ -34,6 +34,7 @@ pub struct LockoutService {
 
 impl LockoutService {
     /// Create a new lockout service.
+    #[must_use] 
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -96,11 +97,11 @@ impl LockoutService {
             i32,
             Option<String>,
         )> = sqlx::query_as(
-            r#"
+            r"
                 SELECT locked_at, locked_until, failed_login_count, lockout_reason
                 FROM users
                 WHERE id = $1
-                "#,
+                ",
         )
         .bind(user_id)
         .fetch_optional(&mut *conn)
@@ -198,14 +199,14 @@ impl LockoutService {
 
         // Atomic increment with FOR UPDATE SKIP LOCKED
         let row: (i32,) = sqlx::query_as(
-            r#"
+            r"
             UPDATE users
             SET failed_login_count = failed_login_count + 1,
                 last_failed_login_at = NOW(),
                 updated_at = NOW()
             WHERE id = $1
             RETURNING failed_login_count
-            "#,
+            ",
         )
         .bind(user_id)
         .fetch_one(&mut *tx)
@@ -224,14 +225,14 @@ impl LockoutService {
 
             // Lock the account
             sqlx::query(
-                r#"
+                r"
                 UPDATE users
                 SET locked_at = NOW(),
                     locked_until = $2,
                     lockout_reason = 'max_attempts',
                     updated_at = NOW()
                 WHERE id = $1
-                "#,
+                ",
             )
             .bind(user_id)
             .bind(locked_until)
@@ -290,13 +291,13 @@ impl LockoutService {
             .map_err(ApiAuthError::DatabaseInternal)?;
 
         sqlx::query(
-            r#"
+            r"
             UPDATE users
             SET failed_login_count = 0,
                 last_failed_login_at = NULL,
                 updated_at = NOW()
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(user_id)
         .execute(&mut *conn)
@@ -335,7 +336,7 @@ impl LockoutService {
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
     {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE users
             SET locked_at = NULL,
                 locked_until = NULL,
@@ -344,7 +345,7 @@ impl LockoutService {
                 last_failed_login_at = NULL,
                 updated_at = NOW()
             WHERE id = $1 AND locked_at IS NOT NULL
-            "#,
+            ",
         )
         .bind(user_id)
         .execute(executor)
