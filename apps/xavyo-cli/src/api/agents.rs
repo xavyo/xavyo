@@ -99,6 +99,33 @@ impl ApiClient {
         }
     }
 
+    /// Update an existing agent
+    pub async fn update_agent(
+        &self,
+        id: Uuid,
+        request: CreateAgentRequest,
+    ) -> CliResult<AgentResponse> {
+        let url = format!("{}/nhi/agents/{}", self.config().api_url, id);
+
+        let response = self.put_json(&url, &request).await?;
+
+        if response.status().is_success() {
+            response.json().await.map_err(Into::into)
+        } else if response.status() == reqwest::StatusCode::NOT_FOUND {
+            Err(CliError::NotFound(format!("Agent not found: {}", id)))
+        } else if response.status() == reqwest::StatusCode::BAD_REQUEST {
+            let body = response.text().await.unwrap_or_default();
+            Err(CliError::Validation(body))
+        } else {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            Err(CliError::Api {
+                status: status.as_u16(),
+                message: body,
+            })
+        }
+    }
+
     // =========================================================================
     // Agent Credential Methods (F110)
     // =========================================================================

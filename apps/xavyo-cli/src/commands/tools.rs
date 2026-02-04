@@ -1,11 +1,17 @@
 //! Tool management CLI commands
 
 use crate::api::ApiClient;
+use crate::batch::executor::{print_batch_summary, BatchExecutor, BatchOptions};
+use crate::batch::file::BatchFile;
+use crate::batch::filter::Filter;
+use crate::cache::store::CACHE_KEY_TOOLS;
+use crate::cache::{CacheStore, FileCacheStore};
 use crate::config::{Config, ConfigPaths};
 use crate::error::{CliError, CliResult};
-use crate::models::tool::{CreateToolRequest, ToolResponse};
+use crate::models::tool::{CreateToolRequest, ToolListResponse, ToolResponse};
 use clap::{Args, Subcommand};
 use dialoguer::{Confirm, Select};
+use std::path::PathBuf;
 use uuid::Uuid;
 
 /// Tool management commands
@@ -19,11 +25,13 @@ pub struct ToolsArgs {
 pub enum ToolsCommands {
     /// List all tools in the current tenant
     List(ListArgs),
-    /// Create a new tool
+    /// Create a new tool (supports --batch for bulk creation)
     Create(CreateArgs),
     /// Get details of a specific tool
     Get(GetArgs),
-    /// Delete a tool
+    /// Update an existing tool (supports --batch for bulk updates)
+    Update(UpdateArgs),
+    /// Delete a tool (supports --filter and --all for bulk deletion)
     Delete(DeleteArgs),
 }
 
@@ -41,13 +49,23 @@ pub struct ListArgs {
     /// Offset for pagination
     #[arg(long, default_value = "0")]
     pub offset: i32,
+
+    /// Force offline mode (use cached data only)
+    #[arg(long)]
+    pub offline: bool,
+
+    /// Force refresh from server (bypass cache)
+    #[arg(long)]
+    pub refresh: bool,
 }
 
 /// Arguments for the create command
 #[derive(Args, Debug)]
 pub struct CreateArgs {
     /// Tool name (alphanumeric, hyphens, underscores, 1-64 chars)
-    pub name: String,
+    /// Required for single tool creation, ignored when using --batch
+    #[arg(required_unless_present = "batch")]
+    pub name: Option<String>,
 
     /// Risk level: low, medium, high, critical
     #[arg(long, short = 'r')]
@@ -72,6 +90,19 @@ pub struct CreateArgs {
     /// Output as JSON
     #[arg(long)]
     pub json: bool,
+
+    // Batch operation flags
+    /// Create multiple tools from a YAML file
+    #[arg(long, value_name = "FILE", conflicts_with = "name")]
+    pub batch: Option<PathBuf>,
+
+    /// Preview changes without making them (for batch operations)
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Stop on first error during batch operations
+    #[arg(long)]
+    pub stop_on_error: bool,
 }
 
 /// Arguments for the get command
@@ -85,15 +116,78 @@ pub struct GetArgs {
     pub json: bool,
 }
 
+/// Arguments for the update command
+#[derive(Args, Debug)]
+pub struct UpdateArgs {
+    /// Tool ID (UUID) - required for single tool update
+    #[arg(required_unless_present = "batch")]
+    pub id: Option<String>,
+
+    /// Risk level: low, medium, high, critical
+    #[arg(long, short = 'r')]
+    pub risk_level: Option<String>,
+
+    /// Tool description
+    #[arg(long, short = 'd')]
+    pub description: Option<String>,
+
+    /// Tool category
+    #[arg(long, short = 'c')]
+    pub category: Option<String>,
+
+    /// Require approval for invocation
+    #[arg(long)]
+    pub requires_approval: Option<bool>,
+
+    /// Output as JSON
+    #[arg(long)]
+    pub json: bool,
+
+    // Batch operation flags
+    /// Update multiple tools from a YAML file
+    #[arg(long, value_name = "FILE", conflicts_with = "id")]
+    pub batch: Option<PathBuf>,
+
+    /// Preview changes without making them
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Stop on first error during batch operations
+    #[arg(long)]
+    pub stop_on_error: bool,
+}
+
 /// Arguments for the delete command
 #[derive(Args, Debug)]
 pub struct DeleteArgs {
-    /// Tool ID (UUID)
-    pub id: String,
+    /// Tool ID (UUID) - required for single tool deletion
+    #[arg(required_unless_present_any = ["filter", "all"])]
+    pub id: Option<String>,
 
     /// Skip confirmation prompt
     #[arg(long, short = 'f')]
     pub force: bool,
+
+    // Batch delete flags
+    /// Delete tools matching a filter (e.g., "name=test-*")
+    #[arg(long, value_name = "FILTER", conflicts_with_all = ["id", "all"])]
+    pub filter: Option<String>,
+
+    /// Delete ALL tools in the tenant (requires confirmation)
+    #[arg(long, conflicts_with_all = ["id", "filter"])]
+    pub all: bool,
+
+    /// Preview deletion without making changes
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Output results as JSON
+    #[arg(long)]
+    pub json: bool,
+
+    /// Stop on first error during batch delete
+    #[arg(long)]
+    pub stop_on_error: bool,
 }
 
 /// Execute tool commands
@@ -102,6 +196,7 @@ pub async fn execute(args: ToolsArgs) -> CliResult<()> {
         ToolsCommands::List(list_args) => execute_list(list_args).await,
         ToolsCommands::Create(create_args) => execute_create(create_args).await,
         ToolsCommands::Get(get_args) => execute_get(get_args).await,
+        ToolsCommands::Update(update_args) => execute_update(update_args).await,
         ToolsCommands::Delete(delete_args) => execute_delete(delete_args).await,
     }
 }
@@ -110,33 +205,109 @@ pub async fn execute(args: ToolsArgs) -> CliResult<()> {
 async fn execute_list(args: ListArgs) -> CliResult<()> {
     let paths = ConfigPaths::new()?;
     let config = Config::load(&paths)?;
-    let client = ApiClient::new(config, paths)?;
+    let cache = FileCacheStore::new(&paths)?;
 
-    let response = client.list_tools(args.limit, args.offset).await?;
+    // Handle forced offline mode
+    if args.offline {
+        return execute_list_offline(&cache, &args);
+    }
 
-    if args.json {
-        println!("{}", serde_json::to_string_pretty(&response)?);
-    } else if response.tools.is_empty() {
-        println!("No tools found.");
-        println!();
-        println!("Create your first tool with: xavyo tools create <name> --risk-level <level> --schema '<json>'");
-    } else {
-        print_tool_table(&response.tools);
-        println!();
-        println!(
-            "Showing {} of {} tools",
-            response.tools.len(),
-            response.total
-        );
+    // Try to fetch from API
+    let client = ApiClient::new(config, paths.clone())?;
+    let result = client.list_tools(args.limit, args.offset).await;
+
+    match result {
+        Ok(response) => {
+            // Cache the response for offline use
+            let ttl = cache.default_ttl();
+            if let Err(e) = cache.set(CACHE_KEY_TOOLS, &response, ttl) {
+                eprintln!("Warning: Failed to cache tools: {}", e);
+            }
+
+            print_tools_output(&response, args.json, false);
+            Ok(())
+        }
+        Err(e) if !args.refresh => {
+            // Try to fall back to cache on network errors
+            if is_network_error(&e) {
+                eprintln!("Network error, attempting to use cached data...");
+                match execute_list_offline(&cache, &args) {
+                    Ok(()) => Ok(()),
+                    Err(_) => Err(e), // Return original error if cache fails
+                }
+            } else {
+                Err(e)
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Execute list command using cached data
+fn execute_list_offline(cache: &FileCacheStore, args: &ListArgs) -> CliResult<()> {
+    let entry = cache
+        .get::<ToolListResponse>(CACHE_KEY_TOOLS)?
+        .ok_or_else(|| CliError::NoCacheAvailable("tools".to_string()))?;
+
+    let is_stale = entry.is_expired();
+    print_tools_output(&entry.data, args.json, true);
+
+    if is_stale && !args.json {
+        eprintln!();
+        eprintln!("Warning: Cached data is stale. Run without --offline to refresh.");
     }
 
     Ok(())
 }
 
+/// Print tools output with optional offline indicator
+fn print_tools_output(response: &ToolListResponse, json: bool, offline: bool) {
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
+    } else {
+        if offline {
+            println!("(offline - using cached data)");
+            println!();
+        }
+
+        if response.tools.is_empty() {
+            println!("No tools found.");
+            println!();
+            println!("Create your first tool with: xavyo tools create <name> --risk-level <level> --schema '<json>'");
+        } else {
+            print_tool_table(&response.tools);
+            println!();
+            println!(
+                "Showing {} of {} tools",
+                response.tools.len(),
+                response.total
+            );
+        }
+    }
+}
+
+/// Check if an error is a network-related error
+fn is_network_error(e: &CliError) -> bool {
+    matches!(e, CliError::Network(_) | CliError::ConnectionFailed(_))
+}
+
 /// Execute create command
 async fn execute_create(args: CreateArgs) -> CliResult<()> {
+    // Check for batch mode
+    if let Some(ref batch_path) = args.batch {
+        return execute_batch_create(batch_path.clone(), &args).await;
+    }
+
+    // Single tool creation - name is required
+    let name = args.name.ok_or_else(|| {
+        CliError::Validation("Tool name is required for single tool creation".to_string())
+    })?;
+
     // Validate tool name
-    validate_tool_name(&args.name)?;
+    validate_tool_name(&name)?;
 
     let paths = ConfigPaths::new()?;
     let config = Config::load(&paths)?;
@@ -158,7 +329,7 @@ async fn execute_create(args: CreateArgs) -> CliResult<()> {
     };
 
     // Build the request
-    let mut request = CreateToolRequest::new(args.name.clone(), input_schema, risk_level);
+    let mut request = CreateToolRequest::new(name.clone(), input_schema, risk_level);
 
     if let Some(desc) = args.description {
         request = request.with_description(Some(desc));
@@ -172,8 +343,14 @@ async fn execute_create(args: CreateArgs) -> CliResult<()> {
         request = request.with_requires_approval(true);
     }
 
-    // Create the tool
-    let tool = client.create_tool(request).await?;
+    // Create the tool (with improved offline error message)
+    let tool = match client.create_tool(request).await {
+        Ok(tool) => tool,
+        Err(e) if is_network_error(&e) => {
+            return Err(CliError::OfflineWriteRejected("create tool".to_string()));
+        }
+        Err(e) => return Err(e),
+    };
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&tool)?);
@@ -181,6 +358,38 @@ async fn execute_create(args: CreateArgs) -> CliResult<()> {
         println!("✓ Tool created successfully!");
         println!();
         print_tool_details(&tool);
+    }
+
+    Ok(())
+}
+
+/// Execute batch create for tools
+async fn execute_batch_create(batch_path: PathBuf, args: &CreateArgs) -> CliResult<()> {
+    let batch = BatchFile::from_path(&batch_path)?;
+
+    if batch.tools.is_empty() {
+        return Err(CliError::Validation(
+            "Batch file contains no tool definitions".to_string(),
+        ));
+    }
+
+    let paths = ConfigPaths::new()?;
+    let config = Config::load(&paths)?;
+    let client = ApiClient::new(config, paths)?;
+
+    let executor = BatchExecutor::new(client);
+    let options = BatchOptions {
+        dry_run: args.dry_run,
+        stop_on_error: args.stop_on_error,
+        force: false,
+        json: args.json,
+    };
+
+    let result = executor.create_tools(&batch, &options).await?;
+    print_batch_summary(&result, args.json);
+
+    if result.has_failures() && !args.json {
+        std::process::exit(1);
     }
 
     Ok(())
@@ -205,9 +414,121 @@ async fn execute_get(args: GetArgs) -> CliResult<()> {
     Ok(())
 }
 
+/// Execute update command
+async fn execute_update(args: UpdateArgs) -> CliResult<()> {
+    // Check for batch mode
+    if let Some(ref batch_path) = args.batch {
+        return execute_batch_update(batch_path.clone(), &args).await;
+    }
+
+    // Single tool update - id is required
+    let id_str = args.id.as_ref().ok_or_else(|| {
+        CliError::Validation("Tool ID is required for single tool update".to_string())
+    })?;
+
+    let id = parse_tool_id(id_str)?;
+
+    let paths = ConfigPaths::new()?;
+    let config = Config::load(&paths)?;
+    let client = ApiClient::new(config, paths)?;
+
+    // Get existing tool
+    let existing = client.get_tool(id).await?;
+
+    // Build update request with changed fields
+    let mut request = CreateToolRequest::new(
+        existing.name.clone(),
+        existing.input_schema.clone(),
+        args.risk_level.unwrap_or(existing.risk_level.clone()),
+    );
+
+    if let Some(ref desc) = args.description {
+        request = request.with_description(Some(desc.clone()));
+    } else if let Some(ref desc) = existing.description {
+        request = request.with_description(Some(desc.clone()));
+    }
+
+    if let Some(ref cat) = args.category {
+        request = request.with_category(Some(cat.clone()));
+    } else if let Some(ref cat) = existing.category {
+        request = request.with_category(Some(cat.clone()));
+    }
+
+    if let Some(requires_approval) = args.requires_approval {
+        request = request.with_requires_approval(requires_approval);
+    }
+
+    // Update the tool
+    let tool = match client.update_tool(id, request).await {
+        Ok(tool) => tool,
+        Err(e) if is_network_error(&e) => {
+            return Err(CliError::OfflineWriteRejected("update tool".to_string()));
+        }
+        Err(e) => return Err(e),
+    };
+
+    if args.json {
+        println!("{}", serde_json::to_string_pretty(&tool)?);
+    } else {
+        println!("✓ Tool updated successfully!");
+        println!();
+        print_tool_details(&tool);
+    }
+
+    Ok(())
+}
+
+/// Execute batch update for tools
+async fn execute_batch_update(batch_path: PathBuf, args: &UpdateArgs) -> CliResult<()> {
+    let batch = BatchFile::from_path(&batch_path)?;
+
+    if batch.tools.is_empty() {
+        return Err(CliError::Validation(
+            "Batch file contains no tool definitions".to_string(),
+        ));
+    }
+
+    let paths = ConfigPaths::new()?;
+    let config = Config::load(&paths)?;
+    let client = ApiClient::new(config, paths)?;
+
+    let executor = BatchExecutor::new(client);
+    let options = BatchOptions {
+        dry_run: args.dry_run,
+        stop_on_error: args.stop_on_error,
+        force: false,
+        json: args.json,
+    };
+
+    let result = executor.update_tools(&batch, &options).await?;
+    print_batch_summary(&result, args.json);
+
+    if result.has_failures() && !args.json {
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
 /// Execute delete command
 async fn execute_delete(args: DeleteArgs) -> CliResult<()> {
-    let id = parse_tool_id(&args.id)?;
+    // Check for batch delete modes
+    if args.all {
+        return execute_delete_all(&args).await;
+    }
+
+    if let Some(ref filter_str) = args.filter {
+        return execute_delete_by_filter(filter_str, &args).await;
+    }
+
+    // Single tool deletion - id is required
+    let id_str = args.id.as_ref().ok_or_else(|| {
+        CliError::Validation(
+            "Tool ID is required. Use --filter or --all for batch deletion.".to_string(),
+        )
+    })?;
+
+    let id = parse_tool_id(id_str)?;
 
     let paths = ConfigPaths::new()?;
     let config = Config::load(&paths)?;
@@ -240,10 +561,70 @@ async fn execute_delete(args: DeleteArgs) -> CliResult<()> {
         }
     }
 
-    // Delete the tool
-    client.delete_tool(id).await?;
+    // Delete the tool (with improved offline error message)
+    match client.delete_tool(id).await {
+        Ok(()) => {}
+        Err(e) if is_network_error(&e) => {
+            return Err(CliError::OfflineWriteRejected("delete tool".to_string()));
+        }
+        Err(e) => return Err(e),
+    }
 
     println!("✓ Tool deleted: {}", tool.name);
+
+    Ok(())
+}
+
+/// Execute delete by filter for tools
+async fn execute_delete_by_filter(filter_str: &str, args: &DeleteArgs) -> CliResult<()> {
+    let filter = Filter::parse(filter_str)?;
+
+    let paths = ConfigPaths::new()?;
+    let config = Config::load(&paths)?;
+    let client = ApiClient::new(config, paths)?;
+
+    let executor = BatchExecutor::new(client);
+    let options = BatchOptions {
+        dry_run: args.dry_run,
+        stop_on_error: args.stop_on_error,
+        force: args.force,
+        json: args.json,
+    };
+
+    let result = executor.delete_tools_by_filter(&filter, &options).await?;
+    print_batch_summary(&result, args.json);
+
+    if result.has_failures() && !args.json {
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
+/// Execute delete all tools
+async fn execute_delete_all(args: &DeleteArgs) -> CliResult<()> {
+    let paths = ConfigPaths::new()?;
+    let config = Config::load(&paths)?;
+    let client = ApiClient::new(config, paths)?;
+
+    let executor = BatchExecutor::new(client);
+    let options = BatchOptions {
+        dry_run: args.dry_run,
+        stop_on_error: args.stop_on_error,
+        force: args.force,
+        json: args.json,
+    };
+
+    let result = executor.delete_all_tools(&options).await?;
+
+    if !args.dry_run && result.success_count > 0 {
+        if args.json {
+            print_batch_summary(&result, true);
+        } else {
+            println!();
+            println!("✓ All tools deleted!");
+        }
+    }
 
     Ok(())
 }
@@ -577,14 +958,24 @@ mod tests {
     fn test_delete_args_force_flag() {
         // Test that DeleteArgs can be constructed with force flag
         let args_without_force = DeleteArgs {
-            id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890".to_string(),
+            id: Some("a1b2c3d4-e5f6-7890-abcd-ef1234567890".to_string()),
             force: false,
+            filter: None,
+            all: false,
+            dry_run: false,
+            json: false,
+            stop_on_error: false,
         };
         assert!(!args_without_force.force);
 
         let args_with_force = DeleteArgs {
-            id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890".to_string(),
+            id: Some("a1b2c3d4-e5f6-7890-abcd-ef1234567890".to_string()),
             force: true,
+            filter: None,
+            all: false,
+            dry_run: false,
+            json: false,
+            stop_on_error: false,
         };
         assert!(args_with_force.force);
     }
@@ -611,17 +1002,22 @@ mod tests {
     #[test]
     fn test_delete_args_struct() {
         // Verify DeleteArgs has expected fields and types
-        fn _verify_delete_args_fields(args: &DeleteArgs) -> (&str, bool) {
-            (&args.id, args.force)
+        fn _verify_delete_args_fields(args: &DeleteArgs) -> (Option<&str>, bool) {
+            (args.id.as_deref(), args.force)
         }
 
         let args = DeleteArgs {
-            id: "test-id".to_string(),
+            id: Some("test-id".to_string()),
             force: true,
+            filter: None,
+            all: false,
+            dry_run: false,
+            json: false,
+            stop_on_error: false,
         };
 
         let (id, force) = _verify_delete_args_fields(&args);
-        assert_eq!(id, "test-id");
+        assert_eq!(id, Some("test-id"));
         assert!(force);
     }
 }

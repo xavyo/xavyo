@@ -10,12 +10,15 @@
 use clap::{Parser, Subcommand};
 
 mod api;
+mod batch;
+mod cache;
 mod commands;
 mod config;
 mod credentials;
 mod error;
 mod models;
 mod output;
+mod webauthn;
 
 use error::CliResult;
 
@@ -55,6 +58,9 @@ enum Commands {
     /// Manage AI agents
     Agents(commands::agents::AgentsArgs),
 
+    /// Manage active login sessions
+    Sessions(commands::sessions::SessionsArgs),
+
     /// Manage tools
     Tools(commands::tools::ToolsArgs),
 
@@ -81,6 +87,9 @@ enum Commands {
 
     /// Check for updates and upgrade the CLI
     Upgrade(commands::upgrade::UpgradeArgs),
+
+    /// Manage local cache for offline mode
+    Cache(commands::cache::CacheArgs),
 }
 
 #[tokio::main]
@@ -108,6 +117,7 @@ async fn run(cli: Cli) -> CliResult<()> {
         Commands::Init(args) => commands::init::execute(args).await,
         Commands::Status(args) => commands::status::execute(args).await,
         Commands::Agents(args) => commands::agents::execute(args).await,
+        Commands::Sessions(args) => commands::sessions::execute(args).await,
         Commands::Tools(args) => commands::tools::execute(args).await,
         Commands::Authorize(args) => commands::authorize::execute(args).await,
         Commands::Doctor(args) => commands::doctor::execute(args).await,
@@ -117,5 +127,6 @@ async fn run(cli: Cli) -> CliResult<()> {
         Commands::Watch(args) => commands::watch::execute(args).await,
         Commands::Templates(args) => commands::templates::execute(args).await,
         Commands::Upgrade(args) => commands::upgrade::execute(args).await,
+        Commands::Cache(args) => commands::cache::execute(args).await,
     }
 }

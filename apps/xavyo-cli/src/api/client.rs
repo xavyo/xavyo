@@ -128,6 +128,35 @@ impl ApiClient {
             .await
             .map_err(Into::into)
     }
+
+    /// Make an authenticated POST request without a body
+    pub async fn post_empty(&self, url: &str) -> CliResult<reqwest::Response> {
+        let credentials = self.get_valid_credentials().await?;
+
+        self.client
+            .post(url)
+            .bearer_auth(&credentials.access_token)
+            .send()
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Make an authenticated PUT request with JSON body
+    pub async fn put_json<T: serde::Serialize>(
+        &self,
+        url: &str,
+        body: &T,
+    ) -> CliResult<reqwest::Response> {
+        let credentials = self.get_valid_credentials().await?;
+
+        self.client
+            .put(url)
+            .bearer_auth(&credentials.access_token)
+            .json(body)
+            .send()
+            .await
+            .map_err(Into::into)
+    }
 }
 
 #[cfg(test)]
@@ -142,6 +171,7 @@ mod tests {
             config_file: std::path::PathBuf::from("/tmp/xavyo-test/config.json"),
             session_file: std::path::PathBuf::from("/tmp/xavyo-test/session.json"),
             credentials_file: std::path::PathBuf::from("/tmp/xavyo-test/credentials.enc"),
+            cache_dir: std::path::PathBuf::from("/tmp/xavyo-test/cache"),
         };
 
         let client = ApiClient::new(config, paths).unwrap();
