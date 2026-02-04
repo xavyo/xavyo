@@ -14,6 +14,10 @@ pub struct ConfigPaths {
     pub session_file: PathBuf,
     /// Path to credentials.enc (fallback encrypted file)
     pub credentials_file: PathBuf,
+    /// Path to cache directory for offline mode
+    pub cache_dir: PathBuf,
+    /// Path to command history file for interactive shell
+    pub history_file: PathBuf,
 }
 
 impl ConfigPaths {
@@ -26,10 +30,14 @@ impl ConfigPaths {
     pub fn new() -> CliResult<Self> {
         let config_dir = Self::get_config_dir()?;
 
+        let cache_dir = config_dir.join("cache");
+
         Ok(Self {
             config_file: config_dir.join("config.json"),
             session_file: config_dir.join("session.json"),
             credentials_file: config_dir.join("credentials.enc"),
+            history_file: config_dir.join("history"),
+            cache_dir,
             config_dir,
         })
     }
@@ -56,6 +64,14 @@ impl ConfigPaths {
         }
         Ok(())
     }
+
+    /// Ensure the cache directory exists
+    pub fn ensure_cache_dir_exists(&self) -> CliResult<()> {
+        if !self.cache_dir.exists() {
+            std::fs::create_dir_all(&self.cache_dir)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -70,6 +86,8 @@ mod tests {
             assert!(paths.config_file.ends_with("config.json"));
             assert!(paths.session_file.ends_with("session.json"));
             assert!(paths.credentials_file.ends_with("credentials.enc"));
+            assert!(paths.cache_dir.ends_with("cache"));
+            assert!(paths.history_file.ends_with("history"));
         }
     }
 

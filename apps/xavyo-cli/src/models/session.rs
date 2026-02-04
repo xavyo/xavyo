@@ -132,6 +132,8 @@ mod tests {
             config_file: temp_dir.path().join("config.json"),
             session_file: temp_dir.path().join("session.json"),
             credentials_file: temp_dir.path().join("credentials.enc"),
+            cache_dir: temp_dir.path().join("cache"),
+            history_file: temp_dir.path().join("history"),
         };
 
         let session = create_test_session();
@@ -150,6 +152,8 @@ mod tests {
             config_file: temp_dir.path().join("config.json"),
             session_file: temp_dir.path().join("session.json"),
             credentials_file: temp_dir.path().join("credentials.enc"),
+            cache_dir: temp_dir.path().join("cache"),
+            history_file: temp_dir.path().join("history"),
         };
 
         let result = Session::load(&paths).unwrap();
@@ -164,6 +168,8 @@ mod tests {
             config_file: temp_dir.path().join("config.json"),
             session_file: temp_dir.path().join("session.json"),
             credentials_file: temp_dir.path().join("credentials.enc"),
+            cache_dir: temp_dir.path().join("cache"),
+            history_file: temp_dir.path().join("history"),
         };
 
         let session = create_test_session();

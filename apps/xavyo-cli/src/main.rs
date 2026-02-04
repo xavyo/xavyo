@@ -18,6 +18,7 @@ mod credentials;
 mod error;
 mod models;
 mod output;
+mod repl;
 mod webauthn;
 
 use error::CliResult;
@@ -90,6 +91,9 @@ enum Commands {
 
     /// Manage local cache for offline mode
     Cache(commands::cache::CacheArgs),
+
+    /// Start an interactive shell session
+    Shell(commands::shell::ShellArgs),
 }
 
 #[tokio::main]
@@ -128,5 +132,6 @@ async fn run(cli: Cli) -> CliResult<()> {
         Commands::Templates(args) => commands::templates::execute(args).await,
         Commands::Upgrade(args) => commands::upgrade::execute(args).await,
         Commands::Cache(args) => commands::cache::execute(args).await,
+        Commands::Shell(args) => commands::shell::execute(args).await,
     }
 }

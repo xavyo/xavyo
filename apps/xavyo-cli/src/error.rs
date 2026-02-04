@@ -81,6 +81,66 @@ pub enum CliError {
 
     #[error("Input error: {0}")]
     InputError(String),
+
+    // MFA-specific errors
+    #[error("MFA verification required")]
+    MfaRequired,
+
+    #[error("Invalid MFA code. Please check your authenticator app and try again.")]
+    MfaInvalidCode,
+
+    #[error("MFA session timed out. Please run 'xavyo login' again.")]
+    MfaTimeout,
+
+    #[error("Too many incorrect MFA codes. Please wait and try again.")]
+    MfaRetriesExceeded,
+
+    #[error("MFA is not configured for this account.\n\nTo set up MFA, visit your account settings in the web interface.")]
+    MfaNotConfigured,
+
+    #[error("MFA verification failed: {0}\n\nIf this persists, check that your device's clock is synchronized.")]
+    MfaClockSkew(String),
+
+    #[allow(dead_code)]
+    #[error("MFA verification cancelled")]
+    MfaCancelled,
+
+    // WebAuthn/Passkey errors
+    #[allow(dead_code)]
+    #[error("Passkey authentication timed out. Please try again.")]
+    PasskeyTimeout,
+
+    #[allow(dead_code)]
+    #[error("No passkeys configured for this account.\n\nTo set up passkeys, visit your account settings in the web interface.")]
+    PasskeyNotConfigured,
+
+    #[allow(dead_code)]
+    #[error("Passkey authentication was cancelled.")]
+    PasskeyCancelled,
+
+    #[allow(dead_code)]
+    #[error("Hardware security key error: {0}")]
+    PasskeyHardwareError(String),
+
+    #[allow(dead_code)]
+    #[error("Passkey authentication failed: {0}")]
+    PasskeyError(String),
+
+    // Cache/Offline mode errors
+    #[error("Cache error: {0}")]
+    Cache(String),
+
+    #[error(
+        "No cached data available for {0}.\nRun this command while online to populate the cache."
+    )]
+    NoCacheAvailable(String),
+
+    #[error("Cannot {0} while offline.\nWrite operations require network connectivity.")]
+    OfflineWriteRejected(String),
+
+    #[allow(dead_code)]
+    #[error("Offline mode: {0}")]
+    OfflineMode(String),
 }
 
 impl CliError {
@@ -93,7 +153,19 @@ impl CliError {
             CliError::Server(_) => 5,
             CliError::AuthenticationFailed(_)
             | CliError::DeviceCodeExpired
-            | CliError::AuthorizationDenied => 2,
+            | CliError::AuthorizationDenied
+            | CliError::MfaRequired
+            | CliError::MfaInvalidCode
+            | CliError::MfaTimeout
+            | CliError::MfaRetriesExceeded
+            | CliError::MfaNotConfigured
+            | CliError::MfaClockSkew(_)
+            | CliError::MfaCancelled
+            | CliError::PasskeyTimeout
+            | CliError::PasskeyNotConfigured
+            | CliError::PasskeyCancelled
+            | CliError::PasskeyHardwareError(_)
+            | CliError::PasskeyError(_) => 2,
             CliError::TenantExists(_) | CliError::Conflict(_) => 4,
             CliError::NotFound(_) => 4,
             CliError::Api { status, .. } => {
@@ -107,6 +179,10 @@ impl CliError {
             }
             CliError::Io(_) => 1,
             CliError::Config(_) => 1,
+            CliError::Cache(_) => 1,
+            CliError::NoCacheAvailable(_) => 1,
+            CliError::OfflineWriteRejected(_) => 1,
+            CliError::OfflineMode(_) => 1,
             CliError::CredentialStorage(_) => 1,
             CliError::ChecksumMismatch { .. } => 1,
             CliError::PermissionDenied(_) => 1,
@@ -188,5 +264,90 @@ impl From<keyring::Error> for CliError {
 impl From<serde_yaml::Error> for CliError {
     fn from(e: serde_yaml::Error) -> Self {
         CliError::Config(format!("YAML error: {}", e))
+    }
+}
+
+impl From<dialoguer::Error> for CliError {
+    fn from(e: dialoguer::Error) -> Self {
+        CliError::InputError(format!("Dialog error: {}", e))
+    }
+}
+
+impl From<rustyline::error::ReadlineError> for CliError {
+    fn from(e: rustyline::error::ReadlineError) -> Self {
+        CliError::InputError(format!("Readline error: {}", e))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_exit_code_not_authenticated() {
+        assert_eq!(CliError::NotAuthenticated.exit_code(), 2);
+    }
+
+    #[test]
+    fn test_exit_code_token_expired() {
+        assert_eq!(CliError::TokenExpired.exit_code(), 2);
+    }
+
+    #[test]
+    fn test_exit_code_network_error() {
+        assert_eq!(CliError::Network("test".to_string()).exit_code(), 3);
+    }
+
+    #[test]
+    fn test_exit_code_connection_failed() {
+        assert_eq!(
+            CliError::ConnectionFailed("test".to_string()).exit_code(),
+            3
+        );
+    }
+
+    #[test]
+    fn test_exit_code_validation_error() {
+        assert_eq!(CliError::Validation("test".to_string()).exit_code(), 4);
+    }
+
+    #[test]
+    fn test_exit_code_server_error() {
+        assert_eq!(CliError::Server("test".to_string()).exit_code(), 5);
+    }
+
+    #[test]
+    fn test_exit_code_api_error_5xx() {
+        assert_eq!(
+            CliError::Api {
+                status: 500,
+                message: "test".to_string()
+            }
+            .exit_code(),
+            5
+        );
+    }
+
+    #[test]
+    fn test_exit_code_api_error_401() {
+        assert_eq!(
+            CliError::Api {
+                status: 401,
+                message: "test".to_string()
+            }
+            .exit_code(),
+            2
+        );
+    }
+
+    #[test]
+    fn test_exit_code_upgrade_aborted() {
+        assert_eq!(CliError::UpgradeAborted.exit_code(), 0);
+    }
+
+    #[test]
+    fn test_error_display_not_authenticated() {
+        let error = CliError::NotAuthenticated;
+        assert!(error.to_string().contains("Not logged in"));
     }
 }

@@ -172,6 +172,7 @@ mod tests {
             session_file: std::path::PathBuf::from("/tmp/xavyo-test/session.json"),
             credentials_file: std::path::PathBuf::from("/tmp/xavyo-test/credentials.enc"),
             cache_dir: std::path::PathBuf::from("/tmp/xavyo-test/cache"),
+            history_file: std::path::PathBuf::from("/tmp/xavyo-test/history"),
         };
 
         let client = ApiClient::new(config, paths).unwrap();

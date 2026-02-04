@@ -65,6 +65,9 @@ indicatif = "0.17"
 # Interactive prompts
 dialoguer = "0.11"
 
+# Interactive REPL/readline support
+rustyline = "14"
+
 # Signal handling for Ctrl+C
 ctrlc = "3.4"
 
