@@ -59,7 +59,7 @@ impl From<TenantContext> for TenantId {
 /// Extract tenant ID from the HTTP request.
 ///
 /// This function tries to extract the tenant ID from:
-/// 1. JWT claims (if auth middleware has set them in extensions)
+/// 1. Request extensions (if auth middleware has already set TenantId)
 /// 2. X-Tenant-ID header (or custom header from config)
 ///
 /// Returns `Err(TenantError::Missing)` if no tenant context is found.
@@ -77,13 +77,11 @@ pub fn extract_tenant_id<B>(
     req: &Request<B>,
     config: &TenantConfig,
 ) -> Result<TenantId, TenantError> {
-    // 1. Try to extract from JWT claims (if present in extensions)
-    // Note: This assumes a prior auth middleware has decoded the JWT
-    // and placed the claims in extensions. We look for a simple string claim.
-    // In a real implementation, you'd have a JwtClaims struct.
-
-    // For now, we only support header extraction since JWT parsing
-    // will be handled by xavyo-auth in F005
+    // 1. Check if TenantId was already set by auth middleware (e.g., API key auth)
+    // F113: API key middleware sets TenantId in extensions before TenantLayer runs
+    if let Some(tenant_id) = req.extensions().get::<TenantId>() {
+        return Ok(*tenant_id);
+    }
 
     // 2. Fall back to header extraction
     extract_from_header(req, &config.header_name)

@@ -141,7 +141,7 @@ fn is_api_key(token: &str) -> bool {
 fn compute_key_hash(api_key: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(api_key.as_bytes());
-    format!("{:x}", hasher.finalize())
+    hex::encode(hasher.finalize())
 }
 
 /// Extract tenant ID from X-Tenant-ID header if present.
