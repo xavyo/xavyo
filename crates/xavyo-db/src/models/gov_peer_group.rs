@@ -394,7 +394,7 @@ impl GovPeerGroup {
     }
 
     /// Check if a user count is an outlier compared to group statistics.
-    #[must_use] 
+    #[must_use]
     pub fn check_outlier(
         &self,
         user_entitlement_count: i32,

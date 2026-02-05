@@ -16,12 +16,12 @@ use uuid::Uuid;
 pub struct ProvisioningScriptId(pub Uuid);
 
 impl ProvisioningScriptId {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -51,12 +51,12 @@ impl From<ProvisioningScriptId> for Uuid {
 pub struct ScriptVersionId(pub Uuid);
 
 impl ScriptVersionId {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -86,12 +86,12 @@ impl From<ScriptVersionId> for Uuid {
 pub struct ScriptHookBindingId(pub Uuid);
 
 impl ScriptHookBindingId {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -121,12 +121,12 @@ impl From<ScriptHookBindingId> for Uuid {
 pub struct ScriptExecutionLogId(pub Uuid);
 
 impl ScriptExecutionLogId {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -156,12 +156,12 @@ impl From<ScriptExecutionLogId> for Uuid {
 pub struct ScriptTemplateId(pub Uuid);
 
 impl ScriptTemplateId {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -191,12 +191,12 @@ impl From<ScriptTemplateId> for Uuid {
 pub struct ScriptAuditEventId(pub Uuid);
 
 impl ScriptAuditEventId {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn inner(&self) -> Uuid {
         self.0
     }

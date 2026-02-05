@@ -103,37 +103,37 @@ impl AgentCertificate {
     }
 
     /// Check if the certificate is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         self.status == "active"
     }
 
     /// Check if the certificate is revoked.
-    #[must_use] 
+    #[must_use]
     pub fn is_revoked(&self) -> bool {
         self.status == "revoked"
     }
 
     /// Check if the certificate has expired (by date).
-    #[must_use] 
+    #[must_use]
     pub fn is_expired_by_date(&self) -> bool {
         self.not_after < Utc::now()
     }
 
     /// Check if the certificate is not yet valid.
-    #[must_use] 
+    #[must_use]
     pub fn is_not_yet_valid(&self) -> bool {
         self.not_before > Utc::now()
     }
 
     /// Check if the certificate is currently valid for use.
-    #[must_use] 
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         self.is_active() && !self.is_expired_by_date() && !self.is_not_yet_valid()
     }
 
     /// Get remaining validity in seconds.
-    #[must_use] 
+    #[must_use]
     pub fn remaining_validity_seconds(&self) -> i64 {
         (self.not_after - Utc::now()).num_seconds().max(0)
     }

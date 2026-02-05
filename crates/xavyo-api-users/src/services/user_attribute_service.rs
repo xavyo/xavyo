@@ -25,7 +25,7 @@ pub struct UserAttributeService {
 
 impl UserAttributeService {
     /// Create a new user attribute service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,

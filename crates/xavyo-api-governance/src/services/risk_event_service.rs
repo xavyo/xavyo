@@ -20,7 +20,7 @@ pub struct RiskEventService {
 
 impl RiskEventService {
     /// Create a new risk event service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

@@ -57,7 +57,10 @@ mod tests {
         assert_eq!(parsed.department.as_ref().map(std::vec::Vec::len), Some(2));
         assert_eq!(parsed.status, Some("active".to_string()));
         assert!(parsed.role_ids.is_some());
-        assert_eq!(parsed.entitlement_ids.as_ref().map(std::vec::Vec::len), Some(2));
+        assert_eq!(
+            parsed.entitlement_ids.as_ref().map(std::vec::Vec::len),
+            Some(2)
+        );
     }
 
     /// Test change spec validation for role operations

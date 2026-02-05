@@ -17,7 +17,7 @@ pub struct PasswordlessInitResponse {
 
 impl PasswordlessInitResponse {
     /// Create a response for magic link initiation.
-    #[must_use] 
+    #[must_use]
     pub fn magic_link(expires_in_minutes: i32) -> Self {
         Self {
             message: "If an account exists with this email, you will receive a sign-in link."
@@ -27,7 +27,7 @@ impl PasswordlessInitResponse {
     }
 
     /// Create a response for email OTP initiation.
-    #[must_use] 
+    #[must_use]
     pub fn email_otp(expires_in_minutes: i32) -> Self {
         Self {
             message: "If an account exists with this email, you will receive a verification code."
@@ -52,7 +52,7 @@ pub struct PasswordlessMfaRequiredResponse {
 
 impl PasswordlessMfaRequiredResponse {
     /// Create a new MFA required response.
-    #[must_use] 
+    #[must_use]
     pub fn new(partial_token: String, expires_in: i64) -> Self {
         Self {
             partial_token,

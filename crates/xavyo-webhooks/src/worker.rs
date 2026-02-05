@@ -29,7 +29,7 @@ pub struct WebhookWorker {
 
 impl WebhookWorker {
     /// Create a new webhook worker.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         delivery_service: DeliveryService,
         event_rx: broadcast::Receiver<WebhookEvent>,

@@ -218,7 +218,7 @@ pub struct LicenseReclamationService {
 
 impl LicenseReclamationService {
     /// Create a new license reclamation service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: LicenseAuditService::new(pool.clone()),
@@ -682,7 +682,8 @@ impl LicenseReclamationService {
                 // Get pool name for audit
                 let pool_name =
                     GovLicensePool::find_by_id(&self.pool, tenant_id, rule.license_pool_id)
-                        .await?.map_or_else(|| "Unknown Pool".to_string(), |p| p.name);
+                        .await?
+                        .map_or_else(|| "Unknown Pool".to_string(), |p| p.name);
 
                 rule_assignment_pairs.push((
                     rule.id,
@@ -722,13 +723,13 @@ impl LicenseReclamationService {
     }
 
     /// Get the underlying database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get the audit service reference.
-    #[must_use] 
+    #[must_use]
     pub fn audit_service(&self) -> &LicenseAuditService {
         &self.audit_service
     }

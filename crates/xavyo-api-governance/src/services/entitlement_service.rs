@@ -4,8 +4,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use xavyo_db::models::{
-    CreateGovEntitlement, EntitlementFilter, GovApplication, GovEntitlement, GovEntitlementStatus,
-    GovRiskLevel, UpdateGovEntitlement,
+    CreateGovEntitlement, DataProtectionClassification, EntitlementFilter, GovApplication,
+    GovEntitlement, GovEntitlementStatus, GovRiskLevel, UpdateGovEntitlement,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -16,7 +16,7 @@ pub struct EntitlementService {
 
 impl EntitlementService {
     /// Create a new entitlement service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -30,6 +30,7 @@ impl EntitlementService {
         status: Option<GovEntitlementStatus>,
         risk_level: Option<GovRiskLevel>,
         owner_id: Option<Uuid>,
+        classification: Option<DataProtectionClassification>,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<GovEntitlement>, i64)> {
@@ -39,6 +40,7 @@ impl EntitlementService {
             risk_level,
             owner_id,
             is_delegable: None,
+            data_protection_classification: classification,
         };
 
         let entitlements =

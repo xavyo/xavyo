@@ -127,7 +127,7 @@ pub struct InMemoryAssignmentStore {
 
 impl InMemoryAssignmentStore {
     /// Create a new in-memory store.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             assignments: Arc::new(RwLock::new(HashMap::new())),

@@ -15,7 +15,7 @@ pub struct SiemDestinationService {
 }
 
 impl SiemDestinationService {
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -127,7 +127,8 @@ impl SiemDestinationService {
 
         let dest_type = dest_type.unwrap();
         let port = destination
-            .endpoint_port.map_or_else(|| dest_type.default_port(), |p| p as u16);
+            .endpoint_port
+            .map_or_else(|| dest_type.default_port(), |p| p as u16);
 
         // Decrypt auth_config if present
         let decrypted_auth = if let Some(ref encrypted) = destination.auth_config {

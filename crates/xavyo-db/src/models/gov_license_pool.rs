@@ -72,31 +72,31 @@ pub struct GovLicensePool {
 
 impl GovLicensePool {
     /// Get the number of available (unallocated) licenses.
-    #[must_use] 
+    #[must_use]
     pub fn available_count(&self) -> i32 {
         self.total_capacity - self.allocated_count
     }
 
     /// Check if the pool has available capacity.
-    #[must_use] 
+    #[must_use]
     pub fn has_capacity(&self) -> bool {
         self.available_count() > 0
     }
 
     /// Check if the pool is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self.status, LicensePoolStatus::Active)
     }
 
     /// Check if the pool is expired.
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         matches!(self.status, LicensePoolStatus::Expired)
     }
 
     /// Check if new allocations are blocked (expired with `block_new` policy or no capacity).
-    #[must_use] 
+    #[must_use]
     pub fn is_allocation_blocked(&self) -> bool {
         if self.is_expired() && self.expiration_policy == LicenseExpirationPolicy::BlockNew {
             return true;
@@ -105,7 +105,7 @@ impl GovLicensePool {
     }
 
     /// Get utilization percentage.
-    #[must_use] 
+    #[must_use]
     pub fn utilization_percent(&self) -> f64 {
         if self.total_capacity == 0 {
             return 0.0;
@@ -114,7 +114,7 @@ impl GovLicensePool {
     }
 
     /// Calculate monthly cost based on allocated licenses.
-    #[must_use] 
+    #[must_use]
     pub fn monthly_allocated_cost(&self) -> Option<Decimal> {
         self.cost_per_license.map(|cost| {
             let count = Decimal::from(self.allocated_count);
@@ -127,11 +127,12 @@ impl GovLicensePool {
     }
 
     /// Check if expiration warning should be shown.
-    #[must_use] 
+    #[must_use]
     pub fn should_show_expiration_warning(&self) -> bool {
         if let Some(expiration) = self.expiration_date {
             let now = Utc::now();
-            let warning_threshold = expiration - chrono::Duration::days(i64::from(self.warning_days));
+            let warning_threshold =
+                expiration - chrono::Duration::days(i64::from(self.warning_days));
             now >= warning_threshold && now < expiration
         } else {
             false

@@ -78,7 +78,7 @@ pub struct ConflictService {
 
 impl ConflictService {
     /// Create a new conflict service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: sqlx::PgPool) -> Self {
         Self { pool }
     }

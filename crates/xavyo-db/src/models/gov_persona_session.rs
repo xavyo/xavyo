@@ -225,19 +225,19 @@ impl GovPersonaSession {
     }
 
     /// Check if session is still valid.
-    #[must_use] 
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         Utc::now() < self.expires_at
     }
 
     /// Check if user is operating as a persona.
-    #[must_use] 
+    #[must_use]
     pub fn is_persona_active(&self) -> bool {
         self.active_persona_id.is_some() && self.is_valid()
     }
 
     /// Get remaining time until expiration.
-    #[must_use] 
+    #[must_use]
     pub fn time_until_expiration(&self) -> chrono::Duration {
         self.expires_at - Utc::now()
     }

@@ -26,7 +26,7 @@ pub struct EmailTemplateService {
 
 impl EmailTemplateService {
     /// Create a new email template service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         let mut handlebars = Handlebars::new();
         // SECURITY: Enable strict mode to catch missing variables and prevent

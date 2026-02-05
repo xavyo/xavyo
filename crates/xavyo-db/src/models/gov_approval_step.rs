@@ -215,7 +215,7 @@ impl GovApprovalStep {
     }
 
     /// Validate that `specific_approvers` is properly set based on `approver_type`.
-    #[must_use] 
+    #[must_use]
     pub fn validate(&self) -> bool {
         match self.approver_type {
             GovApproverType::SpecificUsers => self

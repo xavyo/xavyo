@@ -23,7 +23,7 @@ pub enum ConsolidationStatus {
 
 impl ConsolidationStatus {
     /// Check if suggestion can be updated.
-    #[must_use] 
+    #[must_use]
     pub fn can_update(&self) -> bool {
         matches!(self, Self::Pending)
     }

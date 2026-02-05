@@ -108,7 +108,7 @@ pub enum BinaryOperator {
 
 impl BinaryOperator {
     /// Parse an operator from its string representation.
-    #[must_use] 
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "+" => Some(Self::Add),
@@ -128,7 +128,7 @@ impl BinaryOperator {
     }
 
     /// Get the precedence of this operator (higher = binds tighter).
-    #[must_use] 
+    #[must_use]
     pub fn precedence(&self) -> u8 {
         match self {
             Self::Or => 1,
@@ -149,7 +149,7 @@ pub struct Expression {
 
 impl Expression {
     /// Create a new expression from a token.
-    #[must_use] 
+    #[must_use]
     pub fn new(token: Token) -> Self {
         Self { token }
     }
@@ -173,7 +173,7 @@ impl Expression {
     }
 
     /// Create a binary operation expression.
-    #[must_use] 
+    #[must_use]
     pub fn binary_op(op: BinaryOperator, left: Expression, right: Expression) -> Self {
         Self::new(Token::BinaryOp {
             op,
@@ -183,25 +183,25 @@ impl Expression {
     }
 
     /// Create a number expression.
-    #[must_use] 
+    #[must_use]
     pub fn number(n: f64) -> Self {
         Self::new(Token::Number(n))
     }
 
     /// Create a boolean expression.
-    #[must_use] 
+    #[must_use]
     pub fn boolean(b: bool) -> Self {
         Self::new(Token::Boolean(b))
     }
 
     /// Create a null expression.
-    #[must_use] 
+    #[must_use]
     pub fn null() -> Self {
         Self::new(Token::Null)
     }
 
     /// Create a unary NOT expression.
-    #[must_use] 
+    #[must_use]
     pub fn unary_not(operand: Expression) -> Self {
         Self::new(Token::UnaryNot {
             operand: Box::new(operand),
@@ -209,7 +209,7 @@ impl Expression {
     }
 
     /// Get all attribute references in this expression.
-    #[must_use] 
+    #[must_use]
     pub fn get_references(&self) -> HashSet<String> {
         let mut refs = HashSet::new();
         self.collect_references(&mut refs);
@@ -298,7 +298,7 @@ impl Default for TemplateExpressionService {
 
 impl TemplateExpressionService {
     /// Create a new expression service.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             regex_cache: std::sync::RwLock::new(HashMap::new()),
@@ -598,9 +598,7 @@ impl TemplateExpressionService {
             BinaryOperator::Add => {
                 // String concatenation or numeric addition
                 match (&left, &right) {
-                    (Value::String(l), Value::String(r)) => {
-                        Ok(Value::String(format!("{l}{r}")))
-                    }
+                    (Value::String(l), Value::String(r)) => Ok(Value::String(format!("{l}{r}"))),
                     (Value::String(l), r) => {
                         Ok(Value::String(format!("{}{}", l, value_to_string(r))))
                     }

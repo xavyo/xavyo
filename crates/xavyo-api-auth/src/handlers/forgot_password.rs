@@ -110,7 +110,9 @@ async fn process_forgot_password(
     .fetch_optional(pool)
     .await?;
 
-    let (user_id, is_active) = if let Some((id, active)) = user_row { (id, active) } else {
+    let (user_id, is_active) = if let Some((id, active)) = user_row {
+        (id, active)
+    } else {
         tracing::debug!(
             email = %email,
             tenant_id = %tenant_id,

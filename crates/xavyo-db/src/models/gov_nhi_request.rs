@@ -112,7 +112,7 @@ pub struct NhiRequestFilter {
 
 impl GovNhiRequest {
     /// Check if the request can still be actioned.
-    #[must_use] 
+    #[must_use]
     pub fn is_actionable(&self) -> bool {
         self.status == NhiRequestStatus::Pending && self.expires_at > Utc::now()
     }

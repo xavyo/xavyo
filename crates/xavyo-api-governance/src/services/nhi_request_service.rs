@@ -41,7 +41,7 @@ pub struct NhiRequestService {
 
 impl NhiRequestService {
     /// Create a new NHI request service.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         pool: PgPool,
         nhi_service: Arc<NhiService>,

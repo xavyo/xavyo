@@ -19,8 +19,14 @@ fn test_templates_help() {
     assert!(output.status.success(), "Help should succeed");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("list"), "Help should mention list subcommand");
-    assert!(stdout.contains("show"), "Help should mention show subcommand");
+    assert!(
+        stdout.contains("list"),
+        "Help should mention list subcommand"
+    );
+    assert!(
+        stdout.contains("show"),
+        "Help should mention show subcommand"
+    );
     assert!(stdout.contains("use"), "Help should mention use subcommand");
 }
 
@@ -119,8 +125,5 @@ fn test_templates_use_requires_name() {
         .expect("Failed to execute command");
 
     // Should fail or prompt for required argument
-    assert!(
-        !output.status.success(),
-        "Should require template name"
-    );
+    assert!(!output.status.success(), "Should require template name");
 }

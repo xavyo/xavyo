@@ -26,7 +26,7 @@ pub struct A2aService {
 
 impl A2aService {
     /// Create a new A2A service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, webhook_service: Arc<WebhookService>) -> Self {
         Self {
             pool,

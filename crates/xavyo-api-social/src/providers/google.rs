@@ -45,7 +45,7 @@ pub struct GoogleProvider {
 
 impl GoogleProvider {
     /// Create a new Google provider.
-    #[must_use] 
+    #[must_use]
     pub fn new(client_id: String, client_secret: String) -> Self {
         Self {
             client_id,

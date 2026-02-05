@@ -34,7 +34,7 @@ pub struct LockoutService {
 
 impl LockoutService {
     /// Create a new lockout service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

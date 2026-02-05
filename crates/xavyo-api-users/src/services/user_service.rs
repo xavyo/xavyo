@@ -854,7 +854,7 @@ fn build_custom_attr_filter_clauses(filters: &[CustomAttributeFilter]) -> Vec<Fi
 /// Convert a User entity and roles to a `UserResponse`.
 ///
 /// This is a helper function to build API responses from database entities.
-#[must_use] 
+#[must_use]
 pub fn user_to_response(
     user: &User,
     roles: Vec<String>,

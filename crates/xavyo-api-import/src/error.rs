@@ -37,7 +37,7 @@ pub struct ProblemDetails {
 
 impl ProblemDetails {
     /// Create a new `ProblemDetails` instance.
-    #[must_use] 
+    #[must_use]
     pub fn new(error_type: &str, title: &str, status: StatusCode) -> Self {
         Self {
             error_type: format!("{ERROR_BASE_URL}/{error_type}"),
@@ -230,7 +230,7 @@ impl ImportError {
     }
 
     /// Get the HTTP status code for this error.
-    #[must_use] 
+    #[must_use]
     pub fn status_code(&self) -> StatusCode {
         match self {
             ImportError::FileTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,

@@ -37,7 +37,7 @@ pub enum RevocationReasonCode {
 
 impl RevocationReasonCode {
     /// Convert from i16 to `RevocationReasonCode`.
-    #[must_use] 
+    #[must_use]
     pub fn from_i16(value: i16) -> Option<Self> {
         match value {
             0 => Some(RevocationReasonCode::Unspecified),
@@ -56,7 +56,7 @@ impl RevocationReasonCode {
     }
 
     /// Get a human-readable description of the reason.
-    #[must_use] 
+    #[must_use]
     pub fn description(&self) -> &'static str {
         match self {
             RevocationReasonCode::Unspecified => "Unspecified",
@@ -114,13 +114,13 @@ pub struct CertificateRevocation {
 
 impl CertificateRevocation {
     /// Get the revocation reason as an enum.
-    #[must_use] 
+    #[must_use]
     pub fn reason(&self) -> Option<RevocationReasonCode> {
         RevocationReasonCode::from_i16(self.reason_code)
     }
 
     /// Get a human-readable reason description.
-    #[must_use] 
+    #[must_use]
     pub fn reason_description(&self) -> &'static str {
         self.reason().map_or("Unknown", |r| r.description())
     }

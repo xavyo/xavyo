@@ -33,13 +33,13 @@ pub enum GovRequestStatus {
 
 impl GovRequestStatus {
     /// Check if the request is in a pending state (can be actioned).
-    #[must_use] 
+    #[must_use]
     pub fn is_pending(&self) -> bool {
         matches!(self, Self::Pending | Self::PendingApproval)
     }
 
     /// Check if the request is in a terminal state.
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,

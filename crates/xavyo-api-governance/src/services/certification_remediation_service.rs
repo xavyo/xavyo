@@ -15,7 +15,7 @@ pub struct CertificationRemediationService {
 
 impl CertificationRemediationService {
     /// Create a new certification remediation service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -114,7 +114,7 @@ impl CertificationRemediationService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

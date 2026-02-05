@@ -61,19 +61,19 @@ pub enum ConnectorReconciliationStatus {
 
 impl ConnectorReconciliationStatus {
     /// Check if this status is terminal (run has ended).
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
     }
 
     /// Check if run can be cancelled.
-    #[must_use] 
+    #[must_use]
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Pending | Self::Running)
     }
 
     /// Check if run can be resumed.
-    #[must_use] 
+    #[must_use]
     pub fn can_resume(&self) -> bool {
         matches!(self, Self::Failed | Self::Cancelled)
     }
@@ -126,13 +126,13 @@ pub struct ConnectorReconciliationRun {
 
 impl ConnectorReconciliationRun {
     /// Get the mode enum.
-    #[must_use] 
+    #[must_use]
     pub fn mode(&self) -> ConnectorReconciliationMode {
         self.mode.parse().unwrap_or_default()
     }
 
     /// Get the status enum.
-    #[must_use] 
+    #[must_use]
     pub fn status(&self) -> ConnectorReconciliationStatus {
         self.status
             .parse()
@@ -482,24 +482,24 @@ pub struct ConnectorReconciliationRunFilter {
 }
 
 impl ConnectorReconciliationRunFilter {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn for_connector(mut self, connector_id: Uuid) -> Self {
         self.connector_id = Some(connector_id);
         self
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn with_mode(mut self, mode: ConnectorReconciliationMode) -> Self {
         self.mode = Some(mode);
         self
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn with_status(mut self, status: ConnectorReconciliationStatus) -> Self {
         self.status = Some(status);
         self

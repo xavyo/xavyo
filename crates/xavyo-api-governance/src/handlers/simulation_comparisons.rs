@@ -90,8 +90,10 @@ pub async fn list_simulation_comparisons(
         )
         .await?;
 
-    let items: Vec<SimulationComparisonResponse> =
-        comparisons.into_iter().map(std::convert::Into::into).collect();
+    let items: Vec<SimulationComparisonResponse> = comparisons
+        .into_iter()
+        .map(std::convert::Into::into)
+        .collect();
 
     Ok(Json(PaginatedResponse {
         items,

@@ -64,7 +64,9 @@ pub async fn provision_rate_limit_middleware(
             Ok(ip) => ip,
             Err(_) => {
                 // If IP parsing fails, fall back to connection info
-                if let Some(ConnectInfo(addr)) = connect_info { addr.ip() } else {
+                if let Some(ConnectInfo(addr)) = connect_info {
+                    addr.ip()
+                } else {
                     // Cannot determine IP - fail open but log
                     tracing::warn!(
                         "Cannot determine client IP for rate limiting, allowing request"
@@ -75,10 +77,10 @@ pub async fn provision_rate_limit_middleware(
         },
         None => {
             // Fall back to connection info
-            if let Some(ConnectInfo(addr)) = connect_info { addr.ip() } else {
-                tracing::warn!(
-                    "Cannot determine client IP for rate limiting, allowing request"
-                );
+            if let Some(ConnectInfo(addr)) = connect_info {
+                addr.ip()
+            } else {
+                tracing::warn!("Cannot determine client IP for rate limiting, allowing request");
                 return next.run(request).await;
             }
         }

@@ -71,7 +71,7 @@ pub struct QuotaService {
 
 impl QuotaService {
     /// Create a new quota service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -157,8 +157,12 @@ impl QuotaService {
         let limits_obj = settings.get("limits").cloned().unwrap_or_default();
 
         TenantLimits {
-            max_mau: limits_obj.get("max_mau").and_then(serde_json::Value::as_i64),
-            max_api_calls: limits_obj.get("max_api_calls").and_then(serde_json::Value::as_i64),
+            max_mau: limits_obj
+                .get("max_mau")
+                .and_then(serde_json::Value::as_i64),
+            max_api_calls: limits_obj
+                .get("max_api_calls")
+                .and_then(serde_json::Value::as_i64),
             max_agent_invocations: limits_obj
                 .get("max_agent_invocations")
                 .and_then(serde_json::Value::as_i64),

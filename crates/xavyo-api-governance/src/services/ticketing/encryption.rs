@@ -2,6 +2,9 @@
 //!
 //! Provides AES-GCM encryption for storing sensitive credentials.
 
+// TODO: Update to generic-array 1.x when aes-gcm is updated
+#![allow(deprecated)]
+
 use aes_gcm::{
     aead::{Aead, KeyInit, OsRng},
     Aes256Gcm, Nonce,
@@ -63,9 +66,8 @@ pub fn encrypt_credentials(plaintext: &serde_json::Value) -> Result<String, Tick
     let nonce = Nonce::from_slice(&nonce_bytes);
 
     // Serialize and encrypt
-    let plaintext_bytes = serde_json::to_vec(plaintext).map_err(|e| {
-        TicketingError::EncryptionError(format!("JSON serialization failed: {e}"))
-    })?;
+    let plaintext_bytes = serde_json::to_vec(plaintext)
+        .map_err(|e| TicketingError::EncryptionError(format!("JSON serialization failed: {e}")))?;
 
     let ciphertext = cipher
         .encrypt(nonce, plaintext_bytes.as_slice())

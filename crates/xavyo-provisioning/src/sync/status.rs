@@ -40,7 +40,7 @@ pub struct SyncStatus {
 
 impl SyncStatus {
     /// Create a new sync status for a connector.
-    #[must_use] 
+    #[must_use]
     pub fn new(tenant_id: Uuid, connector_id: Uuid) -> Self {
         Self {
             connector_id,
@@ -59,13 +59,13 @@ impl SyncStatus {
     }
 
     /// Check if sync is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_syncing(&self) -> bool {
         self.current_state.is_active()
     }
 
     /// Check if there was an error.
-    #[must_use] 
+    #[must_use]
     pub fn has_error(&self) -> bool {
         self.current_state == SyncState::Error
     }
@@ -79,7 +79,7 @@ pub struct SyncStatusManager {
 
 impl SyncStatusManager {
     /// Create a new sync status manager.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

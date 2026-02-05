@@ -29,7 +29,7 @@ impl Default for InternalSecretProvider {
 
 impl InternalSecretProvider {
     /// Create a new `InternalSecretProvider`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             username_prefix: "dynamic_".to_string(),

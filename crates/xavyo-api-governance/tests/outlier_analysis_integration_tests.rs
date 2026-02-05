@@ -6,9 +6,9 @@ mod common;
 
 use common::{
     cleanup_outlier_data, cleanup_test_tenant, create_test_application, create_test_assignment,
-    create_test_entitlement, create_test_outlier_analysis,
-    create_test_outlier_config, create_test_outlier_result, create_test_peer_group,
-    create_test_pool, create_test_tenant, create_test_user,
+    create_test_entitlement, create_test_outlier_analysis, create_test_outlier_config,
+    create_test_outlier_result, create_test_peer_group, create_test_pool, create_test_tenant,
+    create_test_user,
 };
 use xavyo_api_governance::services::OutlierScoringService;
 use xavyo_db::OutlierTriggerType;

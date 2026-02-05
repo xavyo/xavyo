@@ -31,7 +31,7 @@ pub struct InMemoryRiskThresholdStore {
 
 impl InMemoryRiskThresholdStore {
     /// Create a new in-memory threshold store.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             thresholds: RwLock::new(HashMap::new()),

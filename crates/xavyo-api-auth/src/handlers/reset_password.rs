@@ -66,7 +66,11 @@ pub async fn reset_password_handler(
 
     let validation = PasswordPolicyService::validate_password(&request.new_password, &policy);
     if !validation.is_valid {
-        let errors: Vec<String> = validation.errors.iter().map(std::string::ToString::to_string).collect();
+        let errors: Vec<String> = validation
+            .errors
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
         return Err(ApiAuthError::WeakPassword(errors));
     }
 

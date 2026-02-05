@@ -51,7 +51,7 @@ pub struct GithubProvider {
 
 impl GithubProvider {
     /// Create a new GitHub provider.
-    #[must_use] 
+    #[must_use]
     pub fn new(client_id: String, client_secret: String) -> Self {
         Self {
             client_id,

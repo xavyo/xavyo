@@ -22,6 +22,10 @@ pub enum TenantError {
     #[error("Validation error: {0}")]
     Validation(String),
 
+    /// F-056: Validation error with required field information.
+    #[error("{message}")]
+    ValidationWithField { field: String, message: String },
+
     /// Authentication required (with optional message).
     #[error("{0}")]
     Unauthorized(String),
@@ -49,6 +53,10 @@ pub enum TenantError {
     /// General conflict error (e.g., resource already in requested state).
     #[error("{0}")]
     Conflict(String),
+
+    /// F-057: Resource is gone (expired, cancelled, or already used).
+    #[error("{0}")]
+    Gone(String),
 
     /// Database error.
     #[error("Database error: {0}")]
@@ -116,6 +124,12 @@ impl IntoResponse for TenantError {
                 msg.clone(),
                 None,
             ),
+            TenantError::ValidationWithField { field, message } => (
+                StatusCode::BAD_REQUEST,
+                "validation",
+                message.clone(),
+                Some(field.clone()),
+            ),
             TenantError::Unauthorized(msg) => {
                 (StatusCode::UNAUTHORIZED, "unauthorized", msg.clone(), None)
             }
@@ -142,6 +156,7 @@ impl IntoResponse for TenantError {
                 None,
             ),
             TenantError::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg.clone(), None),
+            TenantError::Gone(msg) => (StatusCode::GONE, "gone", msg.clone(), None),
             TenantError::Database(e) => {
                 tracing::error!("Database error: {}", e);
                 (

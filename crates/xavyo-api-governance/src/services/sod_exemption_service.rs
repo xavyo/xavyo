@@ -21,7 +21,7 @@ pub struct SodExemptionService {
 
 impl SodExemptionService {
     /// Create a new `SoD` exemption service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -233,7 +233,7 @@ impl SodExemptionService {
     }
 
     /// Convert database model to API response format.
-    #[must_use] 
+    #[must_use]
     pub fn to_api_response(exemption: &GovSodExemption) -> SodExemptionResponse {
         SodExemptionResponse {
             id: exemption.id,
@@ -252,7 +252,7 @@ impl SodExemptionService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

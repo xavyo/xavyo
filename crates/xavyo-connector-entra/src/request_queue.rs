@@ -43,7 +43,7 @@ pub struct RequestQueue<T: Send + 'static> {
 
 impl<T: Send + 'static> RequestQueue<T> {
     /// Creates a new request queue with the given capacity.
-    #[must_use] 
+    #[must_use]
     pub fn new(max_depth: usize) -> (Self, mpsc::Receiver<QueuedRequest<T>>) {
         let (tx, rx) = mpsc::channel(max_depth);
         let queue = Self {

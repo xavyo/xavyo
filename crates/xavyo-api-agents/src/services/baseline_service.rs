@@ -26,7 +26,7 @@ pub struct BaselineService {
 
 impl BaselineService {
     /// Create a new `BaselineService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -457,7 +457,7 @@ impl BaselineService {
     ///
     /// This spawns a tokio task that computes baselines for all active agents.
     /// Returns immediately with a job handle.
-    #[must_use] 
+    #[must_use]
     pub fn spawn_baseline_job(
         &self,
         tenant_id: Uuid,
@@ -470,7 +470,7 @@ impl BaselineService {
     ///
     /// This spawns a tokio task that runs baseline computation at the specified interval.
     /// The interval should typically be 1 hour.
-    #[must_use] 
+    #[must_use]
     pub fn start_periodic_baseline_job(
         &self,
         tenant_id: Uuid,

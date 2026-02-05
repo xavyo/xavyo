@@ -190,19 +190,19 @@ impl GovApprovalDecision {
     }
 
     /// Check if decision is an approval.
-    #[must_use] 
+    #[must_use]
     pub fn is_approved(&self) -> bool {
         matches!(self.decision, GovDecisionType::Approved)
     }
 
     /// Check if decision is a rejection.
-    #[must_use] 
+    #[must_use]
     pub fn is_rejected(&self) -> bool {
         matches!(self.decision, GovDecisionType::Rejected)
     }
 
     /// Check if this decision was made by a delegate.
-    #[must_use] 
+    #[must_use]
     pub fn is_delegated(&self) -> bool {
         self.delegate_id.is_some()
     }

@@ -203,13 +203,9 @@ async fn test_group_hierarchy_max_depth_enforced() {
 
     // Create groups up to depth 9 (max depth is 10)
     for i in 1..10 {
-        current_parent = create_test_group_with_parent(
-            &pool,
-            tenant_id,
-            &format!("Level {i}"),
-            current_parent,
-        )
-        .await;
+        current_parent =
+            create_test_group_with_parent(&pool, tenant_id, &format!("Level {i}"), current_parent)
+                .await;
     }
 
     // Verify depth at level 9

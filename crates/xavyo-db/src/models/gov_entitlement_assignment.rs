@@ -439,13 +439,13 @@ impl GovEntitlementAssignment {
     }
 
     /// Check if assignment is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self.status, GovAssignmentStatus::Active)
     }
 
     /// Check if assignment is expired.
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
             expires_at < Utc::now()
@@ -631,7 +631,7 @@ impl GovEntitlementAssignment {
     }
 
     /// Check if assignment is temporally active (within `valid_from/valid_to` window).
-    #[must_use] 
+    #[must_use]
     pub fn is_temporally_active(&self) -> bool {
         let now = Utc::now();
         let from_ok = self.valid_from.is_none_or(|from| from <= now);
@@ -640,13 +640,13 @@ impl GovEntitlementAssignment {
     }
 
     /// Check if this is a parametric assignment.
-    #[must_use] 
+    #[must_use]
     pub fn is_parametric(&self) -> bool {
         self.parameter_hash.is_some()
     }
 
     /// Check if assignment is fully active (status + temporal validity).
-    #[must_use] 
+    #[must_use]
     pub fn is_fully_active(&self) -> bool {
         self.is_active() && self.is_temporally_active()
     }

@@ -22,7 +22,7 @@ pub struct CertificationCampaignService {
 
 impl CertificationCampaignService {
     /// Create a new certification campaign service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -50,7 +50,9 @@ impl CertificationCampaignService {
 
         // Validate specific reviewers if reviewer type requires them
         if reviewer_type == CertReviewerType::SpecificUsers
-            && specific_reviewers.as_ref().is_none_or(std::vec::Vec::is_empty)
+            && specific_reviewers
+                .as_ref()
+                .is_none_or(std::vec::Vec::is_empty)
         {
             return Err(GovernanceError::SpecificReviewersRequired);
         }
@@ -567,7 +569,7 @@ impl CertificationCampaignService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

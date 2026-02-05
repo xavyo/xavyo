@@ -37,7 +37,7 @@ pub struct NhiUsageService {
 
 impl NhiUsageService {
     /// Create a new usage service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -263,7 +263,9 @@ impl NhiUsageService {
         for nhi in nhis {
             let days_inactive = nhi
                 .last_used_at
-                .map_or((now - nhi.created_at).num_days(), |last| (now - last).num_days());
+                .map_or((now - nhi.created_at).num_days(), |last| {
+                    (now - last).num_days()
+                });
 
             let individual_threshold = nhi.inactivity_threshold_days.unwrap_or(90);
 

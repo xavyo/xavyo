@@ -9,9 +9,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use serde_json::json;
 use uuid::Uuid;
-use xavyo_authorization::types::{
-    AuthorizationRequest, ConditionData, PolicyWithConditions,
-};
+use xavyo_authorization::types::{AuthorizationRequest, ConditionData, PolicyWithConditions};
 use xavyo_authorization::PolicyEvaluator;
 
 /// Create a test authorization request.
@@ -170,12 +168,7 @@ fn bench_worst_case(c: &mut Criterion) {
     // Create policies that won't match the request
     let policies: Vec<PolicyWithConditions> = (0..20)
         .map(|_| {
-            let mut policy = create_policy_with_conditions(
-                Uuid::new_v4(),
-                tenant_id,
-                "deny",
-                3,
-            );
+            let mut policy = create_policy_with_conditions(Uuid::new_v4(), tenant_id, "deny", 3);
             // Make policy not match by changing resource type
             policy.resource_type = Some("other_resource".to_string());
             policy

@@ -168,7 +168,9 @@ async fn swagger_ui() -> impl IntoResponse {
 async fn openapi_spec(State(state): State<Arc<DocsState>>) -> impl IntoResponse {
     let spec = state.merged_spec.read().await;
 
-    if let Some(spec) = spec.as_ref() { Json(spec.clone()).into_response() } else {
+    if let Some(spec) = spec.as_ref() {
+        Json(spec.clone()).into_response()
+    } else {
         // Return a minimal spec if not yet loaded
         let empty_spec = serde_json::json!({
             "openapi": "3.1.0",

@@ -169,13 +169,13 @@ impl SiemEventConsumer {
     }
 
     /// Get the number of active destination pipelines.
-    #[must_use] 
+    #[must_use]
     pub fn destination_count(&self) -> usize {
         self.pipelines.len()
     }
 
     /// Check if a specific destination pipeline exists.
-    #[must_use] 
+    #[must_use]
     pub fn has_destination(&self, id: &Uuid) -> bool {
         self.pipelines.contains_key(id)
     }

@@ -148,7 +148,7 @@ pub struct StepCaProvider {
 
 impl StepCaProvider {
     /// Create a new Step-CA provider.
-    #[must_use] 
+    #[must_use]
     pub fn new(config: StepCaConfig) -> Self {
         let http_client = Client::builder()
             .timeout(StdDuration::from_millis(config.timeout_ms))
@@ -163,7 +163,7 @@ impl StepCaProvider {
     }
 
     /// Create a provider with pre-loaded provisioner password.
-    #[must_use] 
+    #[must_use]
     pub fn with_password(config: StepCaConfig, password: String) -> Self {
         let http_client = Client::builder()
             .timeout(StdDuration::from_millis(config.timeout_ms))
@@ -178,7 +178,7 @@ impl StepCaProvider {
     }
 
     /// Get the provider configuration.
-    #[must_use] 
+    #[must_use]
     pub fn config(&self) -> &StepCaConfig {
         &self.config
     }
@@ -316,9 +316,8 @@ impl StepCaProvider {
     /// Extract serial number from a PEM certificate.
     fn extract_serial_number(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
-        })?;
+        let (_, cert) = X509Certificate::from_der(&der)
+            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}")))?;
 
         Ok(cert
             .serial
@@ -331,9 +330,8 @@ impl StepCaProvider {
     /// Extract subject DN from a PEM certificate.
     fn extract_subject_dn(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
-        })?;
+        let (_, cert) = X509Certificate::from_der(&der)
+            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}")))?;
 
         Ok(cert.subject().to_string())
     }
@@ -341,9 +339,8 @@ impl StepCaProvider {
     /// Extract issuer DN from a PEM certificate.
     fn extract_issuer_dn(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
-        })?;
+        let (_, cert) = X509Certificate::from_der(&der)
+            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}")))?;
 
         Ok(cert.issuer().to_string())
     }
@@ -351,9 +348,8 @@ impl StepCaProvider {
     /// Extract validity timestamps from a PEM certificate.
     fn extract_validity(cert_pem: &str) -> CaResult<(i64, i64)> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
-        })?;
+        let (_, cert) = X509Certificate::from_der(&der)
+            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}")))?;
 
         let not_before = cert.validity().not_before.timestamp();
         let not_after = cert.validity().not_after.timestamp();
@@ -371,10 +367,12 @@ impl CaProvider for StepCaProvider {
     async fn health_check(&self) -> CaResult<()> {
         let url = format!("{}/health", self.config.base_url);
 
-        let response =
-            self.http_client.get(&url).send().await.map_err(|e| {
-                CaProviderError::NetworkError(format!("Health check failed: {e}"))
-            })?;
+        let response = self
+            .http_client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| CaProviderError::NetworkError(format!("Health check failed: {e}")))?;
 
         if !response.status().is_success() {
             return Err(CaProviderError::NotAvailable(format!(
@@ -460,9 +458,10 @@ impl CaProvider for StepCaProvider {
             )));
         }
 
-        let sign_response: StepCaSignResponse = response.json().await.map_err(|e| {
-            CaProviderError::ExternalCaError(format!("Invalid sign response: {e}"))
-        })?;
+        let sign_response: StepCaSignResponse = response
+            .json()
+            .await
+            .map_err(|e| CaProviderError::ExternalCaError(format!("Invalid sign response: {e}")))?;
 
         // Parse the issued certificate
         let cert_der = Self::parse_pem_to_der(&sign_response.crt)?;

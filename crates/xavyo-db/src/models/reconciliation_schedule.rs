@@ -80,13 +80,13 @@ pub struct ReconciliationSchedule {
 
 impl ReconciliationSchedule {
     /// Get mode enum.
-    #[must_use] 
+    #[must_use]
     pub fn mode(&self) -> ConnectorReconciliationMode {
         self.mode.parse().unwrap_or_default()
     }
 
     /// Get frequency enum.
-    #[must_use] 
+    #[must_use]
     pub fn frequency(&self) -> ReconciliationScheduleFrequency {
         self.frequency.parse().unwrap_or_default()
     }
@@ -340,9 +340,7 @@ impl UpsertReconciliationSchedule {
                 Err("day_of_week is required for weekly schedule".to_string())
             }
             ReconciliationScheduleFrequency::Weekly
-                if self
-                    .day_of_week
-                    .is_some_and(|d| !(0..=6).contains(&d)) =>
+                if self.day_of_week.is_some_and(|d| !(0..=6).contains(&d)) =>
             {
                 Err("day_of_week must be between 0 (Sunday) and 6 (Saturday)".to_string())
             }
@@ -350,9 +348,7 @@ impl UpsertReconciliationSchedule {
                 Err("day_of_month is required for monthly schedule".to_string())
             }
             ReconciliationScheduleFrequency::Monthly
-                if self
-                    .day_of_month
-                    .is_some_and(|d| !(1..=28).contains(&d)) =>
+                if self.day_of_month.is_some_and(|d| !(1..=28).contains(&d)) =>
             {
                 Err("day_of_month must be between 1 and 28".to_string())
             }

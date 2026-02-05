@@ -21,7 +21,7 @@ pub enum CertDecisionType {
 
 impl CertDecisionType {
     /// Check if this is a revocation decision.
-    #[must_use] 
+    #[must_use]
     pub fn is_revoked(&self) -> bool {
         matches!(self, Self::Revoked)
     }
@@ -214,7 +214,7 @@ impl GovCertificationDecision {
     }
 
     /// Check if this is a revocation decision.
-    #[must_use] 
+    #[must_use]
     pub fn is_revoked(&self) -> bool {
         self.decision_type.is_revoked()
     }

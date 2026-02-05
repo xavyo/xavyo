@@ -309,6 +309,10 @@ pub async fn api_key_auth_middleware(
         roles: vec!["api_key".to_string()], // Special role to indicate API key auth
         purpose: None,
         email: None,
+        // F-061 Power of Attorney: API keys don't support identity assumption
+        acting_as_poa_id: None,
+        acting_as_user_id: None,
+        acting_as_session_id: None,
     };
 
     request.extensions_mut().insert(synthetic_claims);

@@ -98,7 +98,7 @@ pub struct IdTokenClaims {
 
 impl AuthFlowService {
     /// Create a new authorization flow service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, encryption: EncryptionService, callback_base_url: String) -> Self {
         Self {
             pool,

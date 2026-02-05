@@ -27,7 +27,7 @@ pub struct ComparisonResult {
 
 impl ComparisonResult {
     /// Create a result indicating a match (no discrepancy).
-    #[must_use] 
+    #[must_use]
     pub fn matched(external_uid: String, identity_id: Uuid) -> Self {
         Self {
             discrepancy_type: None,
@@ -39,7 +39,7 @@ impl ComparisonResult {
     }
 
     /// Create a result indicating a discrepancy.
-    #[must_use] 
+    #[must_use]
     pub fn discrepancy(
         discrepancy_type: DiscrepancyType,
         external_uid: String,
@@ -55,7 +55,7 @@ impl ComparisonResult {
     }
 
     /// Create a result indicating a mismatch with attribute differences.
-    #[must_use] 
+    #[must_use]
     pub fn mismatch(
         external_uid: String,
         identity_id: Uuid,
@@ -71,13 +71,13 @@ impl ComparisonResult {
     }
 
     /// Check if this is a match (no discrepancy).
-    #[must_use] 
+    #[must_use]
     pub fn is_match(&self) -> bool {
         self.discrepancy_type.is_none()
     }
 
     /// Check if this is a collision (multiple matches).
-    #[must_use] 
+    #[must_use]
     pub fn is_collision(&self) -> bool {
         matches!(self.discrepancy_type, Some(DiscrepancyType::Collision))
     }
@@ -93,7 +93,7 @@ pub struct MismatchedAttributes {
 
 impl MismatchedAttributes {
     /// Create new empty mismatched attributes.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             attributes: HashMap::new(),
@@ -112,19 +112,19 @@ impl MismatchedAttributes {
     }
 
     /// Check if there are any mismatches.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.attributes.is_empty()
     }
 
     /// Get the number of mismatched attributes.
-    #[must_use] 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.attributes.len()
     }
 
     /// Get attribute names.
-    #[must_use] 
+    #[must_use]
     pub fn attribute_names(&self) -> Vec<&String> {
         self.attributes.keys().collect()
     }
@@ -166,7 +166,7 @@ pub struct AccountComparator {
 
 impl AccountComparator {
     /// Create a new comparator.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             comparison_attributes: HashSet::new(),
@@ -175,14 +175,14 @@ impl AccountComparator {
     }
 
     /// Add attributes to compare.
-    #[must_use] 
+    #[must_use]
     pub fn with_attributes(mut self, attributes: Vec<String>) -> Self {
         self.comparison_attributes = attributes.into_iter().collect();
         self
     }
 
     /// Set case sensitivity.
-    #[must_use] 
+    #[must_use]
     pub fn with_case_sensitivity(mut self, case_sensitive: bool) -> Self {
         self.ignore_case = !case_sensitive;
         self
@@ -191,7 +191,7 @@ impl AccountComparator {
     /// Compare target account attributes with xavyo identity attributes.
     ///
     /// Returns None if attributes match, Some(MismatchedAttributes) if they differ.
-    #[must_use] 
+    #[must_use]
     pub fn compare_attributes(
         &self,
         xavyo_attrs: &JsonValue,

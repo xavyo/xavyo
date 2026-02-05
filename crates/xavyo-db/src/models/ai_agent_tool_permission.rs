@@ -25,7 +25,7 @@ pub struct AiAgentToolPermission {
 
 impl AiAgentToolPermission {
     /// Check if the permission has expired.
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
             expires_at < Utc::now()
@@ -35,7 +35,7 @@ impl AiAgentToolPermission {
     }
 
     /// Check if the permission is currently valid.
-    #[must_use] 
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         !self.is_expired()
     }

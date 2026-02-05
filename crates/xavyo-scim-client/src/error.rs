@@ -49,7 +49,7 @@ pub type ScimClientResult<T> = Result<T, ScimClientError>;
 
 impl ScimClientError {
     /// Returns true if this error should be retried.
-    #[must_use] 
+    #[must_use]
     pub fn is_retryable(&self) -> bool {
         matches!(
             self,
@@ -61,7 +61,7 @@ impl ScimClientError {
     }
 
     /// Returns true if this is a SCIM server error (5xx) that may be retried.
-    #[must_use] 
+    #[must_use]
     pub fn is_server_error(&self) -> bool {
         matches!(self, ScimClientError::ScimError { status, .. } if *status >= 500)
     }

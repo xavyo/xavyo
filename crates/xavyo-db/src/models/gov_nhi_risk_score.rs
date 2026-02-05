@@ -70,7 +70,7 @@ pub struct NhiRiskScoreFilter {
 
 impl GovNhiRiskScore {
     /// Determine risk level from score.
-    #[must_use] 
+    #[must_use]
     pub fn level_from_score(score: i32) -> RiskLevel {
         match score {
             0..=25 => RiskLevel::Low,
@@ -81,7 +81,7 @@ impl GovNhiRiskScore {
     }
 
     /// Check if recalculation is needed.
-    #[must_use] 
+    #[must_use]
     pub fn needs_recalculation(&self) -> bool {
         match self.next_calculation_at {
             Some(next) => next <= Utc::now(),

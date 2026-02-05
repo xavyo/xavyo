@@ -79,7 +79,7 @@ pub struct IdTokenClaims {
 
 impl IdTokenClaims {
     /// Create a new builder for ID token claims.
-    #[must_use] 
+    #[must_use]
     pub fn builder() -> IdTokenClaimsBuilder {
         IdTokenClaimsBuilder::default()
     }
@@ -186,7 +186,7 @@ pub struct TokenService {
 
 impl TokenService {
     /// Create a new token service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, issuer: String, private_key: Vec<u8>, key_id: String) -> Self {
         Self {
             pool,
@@ -197,13 +197,13 @@ impl TokenService {
     }
 
     /// Get the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get the issuer.
-    #[must_use] 
+    #[must_use]
     pub fn issuer(&self) -> &str {
         &self.issuer
     }
@@ -928,9 +928,8 @@ xxU7T7aU32bKZLygCDtwsN8=
 
             let claims = claims_builder.build();
 
-            encode_token_with_kid(&claims, &self.private_key, &self.key_id).map_err(|e| {
-                OAuthError::Internal(format!("Failed to generate access token: {e}"))
-            })
+            encode_token_with_kid(&claims, &self.private_key, &self.key_id)
+                .map_err(|e| OAuthError::Internal(format!("Failed to generate access token: {e}")))
         }
 
         fn generate_id_token(

@@ -37,7 +37,7 @@ pub enum ManualTaskEventType {
 
 impl ManualTaskEventType {
     /// Get the string representation for storage.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::TaskCreated => "task_created",
@@ -98,7 +98,7 @@ pub struct CreateManualTaskAuditEvent {
 
 impl GovManualTaskAuditEvent {
     /// Get the typed event type.
-    #[must_use] 
+    #[must_use]
     pub fn typed_event_type(&self) -> Option<ManualTaskEventType> {
         match self.event_type.as_str() {
             "task_created" => Some(ManualTaskEventType::TaskCreated),

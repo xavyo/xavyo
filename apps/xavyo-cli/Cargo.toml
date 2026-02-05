@@ -37,7 +37,10 @@ serde_json = "1"
 serde_yaml = "0.9"
 
 # Secure credential storage
-keyring = "3"
+# On Linux: uses sync-secret-service for GNOME/KDE keyring
+# On macOS: uses apple-native for Keychain
+# On Windows: uses windows-native for Credential Manager
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 
 # Browser opening
 open = "5"

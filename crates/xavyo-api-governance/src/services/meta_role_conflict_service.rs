@@ -36,7 +36,7 @@ pub struct MetaRoleConflictService {
 
 impl MetaRoleConflictService {
     /// Create a new conflict service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

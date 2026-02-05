@@ -46,13 +46,13 @@ impl EntraConnector {
     }
 
     /// Returns the connector configuration.
-    #[must_use] 
+    #[must_use]
     pub fn config(&self) -> &EntraConfig {
         &self.config
     }
 
     /// Returns a reference to the Graph client.
-    #[must_use] 
+    #[must_use]
     pub fn graph_client(&self) -> &GraphClient {
         &self.graph_client
     }

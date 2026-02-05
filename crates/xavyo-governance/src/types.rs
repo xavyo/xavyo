@@ -17,13 +17,13 @@ pub struct ApplicationId(pub Uuid);
 
 impl ApplicationId {
     /// Create a new random `ApplicationId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -60,13 +60,13 @@ pub struct EntitlementId(pub Uuid);
 
 impl EntitlementId {
     /// Create a new random `EntitlementId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -103,13 +103,13 @@ pub struct AssignmentId(pub Uuid);
 
 impl AssignmentId {
     /// Create a new random `AssignmentId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -469,13 +469,13 @@ pub struct LifecycleConfigId(pub Uuid);
 
 impl LifecycleConfigId {
     /// Create a new random `LifecycleConfigId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -512,13 +512,13 @@ pub struct LifecycleStateId(pub Uuid);
 
 impl LifecycleStateId {
     /// Create a new random `LifecycleStateId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -555,13 +555,13 @@ pub struct LifecycleTransitionId(pub Uuid);
 
 impl LifecycleTransitionId {
     /// Create a new random `LifecycleTransitionId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -598,13 +598,13 @@ pub struct TransitionRequestId(pub Uuid);
 
 impl TransitionRequestId {
     /// Create a new random `TransitionRequestId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -641,13 +641,13 @@ pub struct BulkOperationId(pub Uuid);
 
 impl BulkOperationId {
     /// Create a new random `BulkOperationId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -688,13 +688,13 @@ pub struct SodRuleId(pub Uuid);
 
 impl SodRuleId {
     /// Create a new random `SodRuleId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -731,13 +731,13 @@ pub struct SodViolationId(pub Uuid);
 
 impl SodViolationId {
     /// Create a new random `SodViolationId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -774,13 +774,13 @@ pub struct SodExemptionId(pub Uuid);
 
 impl SodExemptionId {
     /// Create a new random `SodExemptionId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -909,13 +909,13 @@ pub struct RiskHistoryId(pub Uuid);
 
 impl RiskHistoryId {
     /// Create a new random `RiskHistoryId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn into_inner(self) -> Uuid {
         self.0
     }
@@ -999,7 +999,7 @@ pub struct RiskScore {
 
 impl RiskScore {
     /// Create a new risk score.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         tenant_id: Uuid,
         user_id: Uuid,
@@ -1037,7 +1037,7 @@ pub struct RiskThresholds {
 
 impl RiskThresholds {
     /// Create new thresholds with custom values.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         tenant_id: Uuid,
         low_max: u8,
@@ -1056,7 +1056,7 @@ impl RiskThresholds {
     }
 
     /// Create default thresholds for a tenant.
-    #[must_use] 
+    #[must_use]
     pub fn default_for_tenant(tenant_id: Uuid, updated_by: Uuid) -> Self {
         Self {
             tenant_id,
@@ -1097,7 +1097,7 @@ impl RiskThresholds {
     }
 
     /// Get the risk level for a given score.
-    #[must_use] 
+    #[must_use]
     pub fn get_level(&self, score: u8) -> RiskLevel {
         if score <= self.low_max {
             RiskLevel::Low
@@ -1143,7 +1143,7 @@ pub struct RiskHistory {
 
 impl RiskHistory {
     /// Create a new risk history record.
-    #[must_use] 
+    #[must_use]
     pub fn new(tenant_id: Uuid, user_id: Uuid, score: u8, level: RiskLevel) -> Self {
         Self {
             id: RiskHistoryId::new(),
@@ -1156,7 +1156,7 @@ impl RiskHistory {
     }
 
     /// Create from a `RiskScore`.
-    #[must_use] 
+    #[must_use]
     pub fn from_score(score: &RiskScore) -> Self {
         Self {
             id: RiskHistoryId::new(),

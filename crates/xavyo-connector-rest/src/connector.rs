@@ -388,7 +388,8 @@ impl RestConnector {
         // Try to extract error message from response
         let error_message = if let Ok(json) = serde_json::from_str::<Value>(body) {
             json.get(&self.config.response.error_message_path)
-                .and_then(|v| v.as_str()).map_or_else(|| body.to_string(), std::string::ToString::to_string)
+                .and_then(|v| v.as_str())
+                .map_or_else(|| body.to_string(), std::string::ToString::to_string)
         } else {
             body.to_string()
         };
@@ -511,8 +512,9 @@ impl RestConnector {
             AttributeValue::String(s) => Value::String(s.clone()),
             AttributeValue::Integer(i) => Value::Number(serde_json::Number::from(*i)),
             AttributeValue::Boolean(b) => Value::Bool(*b),
-            AttributeValue::Float(f) => serde_json::Number::from_f64(*f)
-                .map_or(Value::Null, Value::Number),
+            AttributeValue::Float(f) => {
+                serde_json::Number::from_f64(*f).map_or(Value::Null, Value::Number)
+            }
             AttributeValue::Binary(b) => Value::String(base64_encode(b)),
             AttributeValue::Array(arr) => {
                 Value::Array(arr.iter().map(Self::attribute_value_to_json).collect())
@@ -802,9 +804,7 @@ impl RestConnector {
             "http" | "https" => {}
             scheme => {
                 return Err(ConnectorError::InvalidConfiguration {
-                    message: format!(
-                        "URL scheme '{scheme}' not allowed; only HTTP(S) permitted"
-                    ),
+                    message: format!("URL scheme '{scheme}' not allowed; only HTTP(S) permitted"),
                 });
             }
         }
@@ -842,9 +842,7 @@ impl RestConnector {
 
             if is_blocked {
                 return Err(ConnectorError::InvalidConfiguration {
-                    message: format!(
-                        "URL host '{host}' is not allowed (internal/private address)"
-                    ),
+                    message: format!("URL host '{host}' is not allowed (internal/private address)"),
                 });
             }
         } else {

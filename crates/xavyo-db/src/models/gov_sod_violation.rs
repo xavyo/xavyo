@@ -421,19 +421,19 @@ impl GovSodViolation {
     }
 
     /// Check if a violation is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self.status, GovViolationStatus::Active)
     }
 
     /// Check if a violation is exempted.
-    #[must_use] 
+    #[must_use]
     pub fn is_exempted(&self) -> bool {
         matches!(self.status, GovViolationStatus::Exempted)
     }
 
     /// Check if a violation is remediated.
-    #[must_use] 
+    #[must_use]
     pub fn is_remediated(&self) -> bool {
         matches!(self.status, GovViolationStatus::Remediated)
     }

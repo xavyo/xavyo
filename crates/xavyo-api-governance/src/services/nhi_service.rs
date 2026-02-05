@@ -42,7 +42,7 @@ pub struct NhiService {
 
 impl NhiService {
     /// Create a new NHI service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -52,7 +52,7 @@ impl NhiService {
     }
 
     /// Get the database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

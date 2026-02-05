@@ -14,7 +14,7 @@ api
 
 🟢 **stable**
 
-Production-ready with comprehensive test coverage (121 tests). Multi-tenant bootstrap and management complete.
+Production-ready with comprehensive test coverage (126 tests). Multi-tenant bootstrap and management complete.
 
 ## Dependencies
 
@@ -49,9 +49,29 @@ pub fn api_keys_router() -> Router<TenantsState>;
 | GET | `/tenants/:id/settings` | Get settings |
 | PATCH | `/tenants/:id/settings` | Update settings |
 | GET | `/tenants/:id/api-keys` | List API keys |
-| POST | `/tenants/:id/api-keys` | Create API key |
+| POST | `/tenants/:id/api-keys` | Create API key (F-049) |
 | DELETE | `/tenants/:id/api-keys/:key_id` | Revoke key |
 | POST | `/tenants/:id/api-keys/:key_id/rotate` | Rotate key |
+
+### API Key Creation (F-049)
+
+Create a new API key with optional scopes and expiration:
+
+```json
+POST /tenants/{tenant_id}/api-keys
+{
+  "name": "ci-pipeline",
+  "scopes": ["nhi:agents:*", "nhi:credentials:rotate"],
+  "expires_at": "2026-03-04T00:00:00Z"
+}
+```
+
+**Scopes**: Hierarchical format `prefix:resource:action` or `prefix:*`
+- Valid prefixes: `nhi`, `agents`, `users`, `groups`, `audit`
+- Valid actions: `read`, `create`, `update`, `delete`, `rotate`, `*`
+- Empty scopes = full access (backward compatible)
+
+**Security**: Plaintext API key is returned only once in the response.
 
 ## Usage Example
 

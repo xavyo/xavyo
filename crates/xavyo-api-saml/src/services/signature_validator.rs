@@ -318,9 +318,7 @@ fn verify_reference_digest(xml: &str, sig_info: &SignatureInfo) -> SamlResult<()
     // Find element with this ID
     let id_pattern = format!("ID=\"{element_id}\"");
     let element_start = xml.find(&id_pattern).ok_or_else(|| {
-        SamlError::SignatureValidationFailed(format!(
-            "Referenced element not found: {element_id}"
-        ))
+        SamlError::SignatureValidationFailed(format!("Referenced element not found: {element_id}"))
     })?;
 
     // Find the element boundaries (this is a simplified approach)

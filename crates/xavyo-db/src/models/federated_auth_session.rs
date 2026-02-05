@@ -130,13 +130,13 @@ impl FederatedAuthSession {
     }
 
     /// Check if session is expired.
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         Utc::now() > self.expires_at
     }
 
     /// Check if session has been used.
-    #[must_use] 
+    #[must_use]
     pub fn is_used(&self) -> bool {
         self.is_used
     }

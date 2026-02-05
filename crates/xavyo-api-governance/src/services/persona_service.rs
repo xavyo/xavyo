@@ -38,7 +38,7 @@ pub struct PersonaService {
 
 impl PersonaService {
     /// Create a new persona service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         let handlebars = Handlebars::new();
         Self {
@@ -51,13 +51,13 @@ impl PersonaService {
     }
 
     /// Get reference to authorization service.
-    #[must_use] 
+    #[must_use]
     pub fn authorization_service(&self) -> &PersonaAuthorizationService {
         &self.authorization_service
     }
 
     /// Get reference to validation service.
-    #[must_use] 
+    #[must_use]
     pub fn validation_service(&self) -> &PersonaValidationService {
         &self.validation_service
     }
@@ -495,9 +495,9 @@ impl PersonaService {
         user: &User,
         overrides: Option<serde_json::Map<String, serde_json::Value>>,
     ) -> Result<(PersonaAttributes, String)> {
-        let mappings = archetype.parse_attribute_mappings().map_err(|e| {
-            GovernanceError::Validation(format!("Invalid attribute mappings: {e}"))
-        })?;
+        let mappings = archetype
+            .parse_attribute_mappings()
+            .map_err(|e| GovernanceError::Validation(format!("Invalid attribute mappings: {e}")))?;
 
         // Build user attributes map from User struct fields
         let mut user_attrs = serde_json::Map::new();
@@ -591,9 +591,9 @@ impl PersonaService {
             .ok_or(GovernanceError::UserNotFound(persona.physical_user_id))?;
 
         // Parse mappings
-        let mappings = archetype.parse_attribute_mappings().map_err(|e| {
-            GovernanceError::Validation(format!("Invalid attribute mappings: {e}"))
-        })?;
+        let mappings = archetype
+            .parse_attribute_mappings()
+            .map_err(|e| GovernanceError::Validation(format!("Invalid attribute mappings: {e}")))?;
 
         // Build user attributes map from User struct fields
         let mut user_attrs = serde_json::Map::new();
@@ -770,13 +770,13 @@ impl PersonaService {
     }
 
     /// Get reference to the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get reference to archetype service.
-    #[must_use] 
+    #[must_use]
     pub fn archetype_service(&self) -> &PersonaArchetypeService {
         &self.archetype_service
     }

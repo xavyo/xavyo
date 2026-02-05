@@ -94,7 +94,7 @@ pub fn decrypt_secret(encoded: &str, key: &[u8]) -> Result<String, WebhookError>
 ///
 /// The signature covers `{timestamp}.{body}` to prevent replay attacks.
 /// Returns hex-encoded signature string.
-#[must_use] 
+#[must_use]
 pub fn compute_hmac_signature(secret: &str, timestamp: &str, body: &[u8]) -> String {
     let mut mac = <HmacSha256 as Mac>::new_from_slice(secret.as_bytes())
         .expect("HMAC can take key of any size");
@@ -109,7 +109,7 @@ pub fn compute_hmac_signature(secret: &str, timestamp: &str, body: &[u8]) -> Str
 /// Verify an HMAC-SHA256 signature using constant-time comparison.
 ///
 /// Returns true if the expected signature matches the computed one.
-#[must_use] 
+#[must_use]
 pub fn verify_hmac_signature(
     expected_hex: &str,
     secret: &str,

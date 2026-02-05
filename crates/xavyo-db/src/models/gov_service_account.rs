@@ -26,7 +26,7 @@ pub enum ServiceAccountStatus {
 
 impl ServiceAccountStatus {
     /// Check if this status allows normal operations.
-    #[must_use] 
+    #[must_use]
     pub fn is_operational(&self) -> bool {
         matches!(self, Self::Active)
     }
@@ -153,7 +153,7 @@ pub struct ServiceAccountFilter {
 
 impl GovServiceAccount {
     /// Check if this account is expired.
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
             expires_at < Utc::now()
@@ -163,7 +163,7 @@ impl GovServiceAccount {
     }
 
     /// Get days until expiration (negative if expired).
-    #[must_use] 
+    #[must_use]
     pub fn days_until_expiry(&self) -> Option<i64> {
         self.expires_at.map(|exp| {
             let duration = exp.signed_duration_since(Utc::now());
@@ -172,7 +172,7 @@ impl GovServiceAccount {
     }
 
     /// Check if certification is due (more than 365 days since last cert).
-    #[must_use] 
+    #[must_use]
     pub fn needs_certification(&self) -> bool {
         match self.last_certified_at {
             Some(certified_at) => {
@@ -184,7 +184,7 @@ impl GovServiceAccount {
     }
 
     /// Check if credential rotation is needed.
-    #[must_use] 
+    #[must_use]
     pub fn needs_rotation(&self) -> bool {
         let interval = self.rotation_interval_days.unwrap_or(90);
         match self.last_rotation_at {
@@ -197,14 +197,14 @@ impl GovServiceAccount {
     }
 
     /// Get days since last use.
-    #[must_use] 
+    #[must_use]
     pub fn days_since_last_use(&self) -> Option<i64> {
         self.last_used_at
             .map(|used| Utc::now().signed_duration_since(used).num_days())
     }
 
     /// Check if NHI is inactive (not used within threshold).
-    #[must_use] 
+    #[must_use]
     pub fn is_inactive(&self) -> bool {
         let threshold = self.inactivity_threshold_days.unwrap_or(90);
         match self.days_since_last_use() {
@@ -214,7 +214,7 @@ impl GovServiceAccount {
     }
 
     /// Check if NHI is in grace period before suspension.
-    #[must_use] 
+    #[must_use]
     pub fn is_in_grace_period(&self) -> bool {
         match self.grace_period_ends_at {
             Some(ends_at) => ends_at > Utc::now(),

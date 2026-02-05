@@ -23,7 +23,7 @@ pub struct ApprovalService {
 
 impl ApprovalService {
     /// Create a new approval service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -563,7 +563,7 @@ impl ApprovalService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

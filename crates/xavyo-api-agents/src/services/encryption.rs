@@ -79,9 +79,8 @@ fn get_encryption_key() -> Result<[u8; KEY_LENGTH], EncryptionError> {
 /// Use this for encrypting credential values before storing in the database.
 pub fn encrypt_credential_value(plaintext: &str) -> Result<String, EncryptionError> {
     let key = get_encryption_key()?;
-    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| {
-        EncryptionError::EncryptionFailed(format!("Failed to create cipher: {e}"))
-    })?;
+    let cipher = Aes256Gcm::new_from_slice(&key)
+        .map_err(|e| EncryptionError::EncryptionFailed(format!("Failed to create cipher: {e}")))?;
 
     // Generate random nonce
     let mut nonce_bytes = [0u8; NONCE_LENGTH];
@@ -107,9 +106,8 @@ pub fn encrypt_credential_value(plaintext: &str) -> Result<String, EncryptionErr
 /// Use this for decrypting credential values retrieved from the database.
 pub fn decrypt_credential_value(encrypted: &str) -> Result<String, EncryptionError> {
     let key = get_encryption_key()?;
-    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| {
-        EncryptionError::DecryptionFailed(format!("Failed to create cipher: {e}"))
-    })?;
+    let cipher = Aes256Gcm::new_from_slice(&key)
+        .map_err(|e| EncryptionError::DecryptionFailed(format!("Failed to create cipher: {e}")))?;
 
     // Decode from base64
     let combined = BASE64

@@ -40,7 +40,7 @@ pub struct UpsertCircuitBreakerState {
 
 impl WebhookCircuitBreakerState {
     /// Get the circuit state as an enum.
-    #[must_use] 
+    #[must_use]
     pub fn circuit_state(&self) -> CircuitState {
         self.state.parse().unwrap_or(CircuitState::Closed)
     }

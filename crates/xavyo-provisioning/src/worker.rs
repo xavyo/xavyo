@@ -125,7 +125,7 @@ impl<P: OperationProcessor + Send + Sync + 'static> ProvisioningWorker<P> {
     }
 
     /// Check if shutdown was requested.
-    #[must_use] 
+    #[must_use]
     pub fn is_shutdown(&self) -> bool {
         self.shutdown.load(Ordering::Relaxed)
     }
@@ -152,7 +152,9 @@ impl<P: OperationProcessor + Send + Sync + 'static> ProvisioningWorker<P> {
 
         for operation in operations {
             // Try to acquire a permit
-            let permit = if let Ok(p) = semaphore.clone().try_acquire_owned() { p } else {
+            let permit = if let Ok(p) = semaphore.clone().try_acquire_owned() {
+                p
+            } else {
                 debug!("All worker slots busy, skipping remaining operations");
                 return;
             };

@@ -44,7 +44,7 @@ impl Default for MtlsConfig {
 
 impl MtlsConfig {
     /// Create a new mTLS configuration with required mTLS.
-    #[must_use] 
+    #[must_use]
     pub fn required() -> Self {
         Self {
             required: true,
@@ -53,7 +53,7 @@ impl MtlsConfig {
     }
 
     /// Create a new mTLS configuration with optional mTLS.
-    #[must_use] 
+    #[must_use]
     pub fn optional() -> Self {
         Self {
             required: false,
@@ -62,7 +62,7 @@ impl MtlsConfig {
     }
 
     /// Enable or disable revocation checking.
-    #[must_use] 
+    #[must_use]
     pub fn with_revocation_check(mut self, check: bool) -> Self {
         self.check_revocation = check;
         self
@@ -109,7 +109,7 @@ pub struct MtlsLayer {
 
 impl MtlsLayer {
     /// Create a new mTLS layer with the given configuration and database pool.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         config: MtlsConfig,
         pool: PgPool,
@@ -123,7 +123,7 @@ impl MtlsLayer {
     }
 
     /// Create a new mTLS layer with an existing validation service.
-    #[must_use] 
+    #[must_use]
     pub fn with_service(
         config: MtlsConfig,
         validation_service: Arc<MtlsValidationService>,
@@ -272,7 +272,8 @@ fn extract_client_certificate(req: &Request) -> Option<String> {
             if let Ok(cert_str) = value.to_str() {
                 // URL-decode if needed (some proxies URL-encode the PEM)
                 let decoded = if cert_str.contains('%') {
-                    urlencoding::decode(cert_str).map_or_else(|_| cert_str.to_string(), std::borrow::Cow::into_owned)
+                    urlencoding::decode(cert_str)
+                        .map_or_else(|_| cert_str.to_string(), std::borrow::Cow::into_owned)
                 } else {
                     cert_str.to_string()
                 };
@@ -293,7 +294,8 @@ fn extract_client_certificate(req: &Request) -> Option<String> {
                 let part = part.trim();
                 if let Some(cert_part) = part.strip_prefix("Cert=\"") {
                     if let Some(cert) = cert_part.strip_suffix('"') {
-                        let decoded = urlencoding::decode(cert).map_or_else(|_| cert.to_string(), std::borrow::Cow::into_owned);
+                        let decoded = urlencoding::decode(cert)
+                            .map_or_else(|_| cert.to_string(), std::borrow::Cow::into_owned);
                         if decoded.contains("-----BEGIN CERTIFICATE-----") {
                             return Some(decoded);
                         }

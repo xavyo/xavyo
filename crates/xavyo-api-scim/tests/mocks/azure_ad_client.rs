@@ -85,9 +85,7 @@ impl MockScimClient for AzureAdClient {
     }
 
     fn build_patch_user_payload(&self, operations: Vec<Value>) -> Value {
-        let ops: Vec<Value> = operations
-            .into_iter()
-            .collect();
+        let ops: Vec<Value> = operations.into_iter().collect();
 
         json!({
             "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],

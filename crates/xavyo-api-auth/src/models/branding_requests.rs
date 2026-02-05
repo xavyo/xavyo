@@ -212,7 +212,7 @@ impl From<xavyo_db::models::BrandingAsset> for AssetResponse {
 
 impl BrandingResponse {
     /// Create a default branding response for a tenant with no branding configured.
-    #[must_use] 
+    #[must_use]
     pub fn default_for_tenant(_tenant_id: Uuid) -> Self {
         Self {
             logo_url: None,

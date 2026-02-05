@@ -36,7 +36,7 @@ pub enum CircuitState {
 
 impl CircuitState {
     /// Convert to database string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Closed => "closed",
@@ -46,7 +46,7 @@ impl CircuitState {
     }
 
     /// Parse from database string representation.
-    #[must_use] 
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "closed" => Some(Self::Closed),
@@ -57,7 +57,7 @@ impl CircuitState {
     }
 
     /// Convert from database `CircuitState`.
-    #[must_use] 
+    #[must_use]
     pub fn from_db(db_state: DbCircuitState) -> Self {
         match db_state {
             DbCircuitState::Closed => Self::Closed,
@@ -67,7 +67,7 @@ impl CircuitState {
     }
 
     /// Convert to database `CircuitState`.
-    #[must_use] 
+    #[must_use]
     pub fn to_db(self) -> DbCircuitState {
         match self {
             Self::Closed => DbCircuitState::Closed,
@@ -100,21 +100,21 @@ impl Default for CircuitBreakerConfig {
 
 impl CircuitBreakerConfig {
     /// Create a new configuration with custom failure threshold.
-    #[must_use] 
+    #[must_use]
     pub fn with_failure_threshold(mut self, threshold: u32) -> Self {
         self.failure_threshold = threshold;
         self
     }
 
     /// Create a new configuration with custom recovery timeout.
-    #[must_use] 
+    #[must_use]
     pub fn with_recovery_timeout(mut self, secs: u64) -> Self {
         self.recovery_timeout_secs = secs;
         self
     }
 
     /// Create a new configuration with custom failure history size.
-    #[must_use] 
+    #[must_use]
     pub fn with_max_failure_history(mut self, size: usize) -> Self {
         self.max_failure_history = size;
         self
@@ -136,7 +136,7 @@ pub struct FailureRecord {
 
 impl FailureRecord {
     /// Create a new failure record.
-    #[must_use] 
+    #[must_use]
     pub fn new(error: String, response_code: Option<i16>, latency_ms: Option<i32>) -> Self {
         Self {
             timestamp: Utc::now(),
@@ -163,7 +163,7 @@ pub struct CircuitBreaker {
 
 impl CircuitBreaker {
     /// Create a new circuit breaker with default closed state.
-    #[must_use] 
+    #[must_use]
     pub fn new(subscription_id: Uuid, tenant_id: Uuid, config: CircuitBreakerConfig) -> Self {
         Self {
             subscription_id,
@@ -179,7 +179,7 @@ impl CircuitBreaker {
     }
 
     /// Create a circuit breaker from persisted state.
-    #[must_use] 
+    #[must_use]
     pub fn from_persisted(
         state: &WebhookCircuitBreakerState,
         config: CircuitBreakerConfig,
@@ -202,49 +202,49 @@ impl CircuitBreaker {
     }
 
     /// Get the subscription ID this circuit breaker is for.
-    #[must_use] 
+    #[must_use]
     pub fn subscription_id(&self) -> Uuid {
         self.subscription_id
     }
 
     /// Get the tenant ID.
-    #[must_use] 
+    #[must_use]
     pub fn tenant_id(&self) -> Uuid {
         self.tenant_id
     }
 
     /// Get the current circuit state.
-    #[must_use] 
+    #[must_use]
     pub fn state(&self) -> CircuitState {
         self.state
     }
 
     /// Get the current failure count.
-    #[must_use] 
+    #[must_use]
     pub fn failure_count(&self) -> u32 {
         self.failure_count
     }
 
     /// Get recent failure records.
-    #[must_use] 
+    #[must_use]
     pub fn recent_failures(&self) -> &[FailureRecord] {
         &self.recent_failures
     }
 
     /// Get the last failure timestamp.
-    #[must_use] 
+    #[must_use]
     pub fn last_failure_at(&self) -> Option<DateTime<Utc>> {
         self.last_failure_at
     }
 
     /// Get the last success timestamp.
-    #[must_use] 
+    #[must_use]
     pub fn last_success_at(&self) -> Option<DateTime<Utc>> {
         self.last_success_at
     }
 
     /// Get the timestamp when the circuit was opened.
-    #[must_use] 
+    #[must_use]
     pub fn opened_at(&self) -> Option<DateTime<Utc>> {
         self.opened_at
     }
@@ -432,7 +432,7 @@ pub struct CircuitBreakerRegistry {
 
 impl CircuitBreakerRegistry {
     /// Create a new registry with the given configuration.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, config: CircuitBreakerConfig) -> Self {
         Self {
             breakers: Arc::new(RwLock::new(HashMap::new())),

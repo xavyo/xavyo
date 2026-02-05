@@ -84,10 +84,7 @@ fn test_completions_invalid_shell() {
         .output()
         .expect("Failed to execute command");
 
-    assert!(
-        !output.status.success(),
-        "Should fail for invalid shell"
-    );
+    assert!(!output.status.success(), "Should fail for invalid shell");
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(

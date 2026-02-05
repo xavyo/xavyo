@@ -83,13 +83,13 @@ impl SecretProviderConfig {
     }
 
     /// Check if the provider is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         self.status == "active"
     }
 
     /// Check if the provider is in error state.
-    #[must_use] 
+    #[must_use]
     pub fn is_error(&self) -> bool {
         self.status == "error"
     }

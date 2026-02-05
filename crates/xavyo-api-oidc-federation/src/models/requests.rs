@@ -133,13 +133,13 @@ pub struct CallbackParams {
 
 impl ClaimMappingConfig {
     /// Convert to JSON value.
-    #[must_use] 
+    #[must_use]
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 
     /// Create default claim mapping.
-    #[must_use] 
+    #[must_use]
     pub fn default_mapping() -> Self {
         Self {
             mappings: vec![

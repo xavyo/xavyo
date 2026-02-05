@@ -96,7 +96,7 @@ pub struct LicenseAssignmentService {
 
 impl LicenseAssignmentService {
     /// Create a new license assignment service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: LicenseAuditService::new(pool.clone()),
@@ -447,13 +447,13 @@ impl LicenseAssignmentService {
     }
 
     /// Get the underlying database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get the audit service reference.
-    #[must_use] 
+    #[must_use]
     pub fn audit_service(&self) -> &LicenseAuditService {
         &self.audit_service
     }

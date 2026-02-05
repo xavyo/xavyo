@@ -96,7 +96,7 @@ impl Default for InMemoryVersionStore {
 }
 
 impl InMemoryVersionStore {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             versions: RwLock::new(HashMap::new()),
@@ -208,7 +208,7 @@ impl PolicyVersionService {
         Self { store }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn in_memory() -> Self {
         Self::new(Arc::new(InMemoryVersionStore::new()))
     }
@@ -285,7 +285,7 @@ impl PolicyVersionService {
         .await
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn compare_versions(v1: &PolicyVersion, v2: &PolicyVersion) -> VersionDiff {
         VersionDiff {
             version_a: v1.version,

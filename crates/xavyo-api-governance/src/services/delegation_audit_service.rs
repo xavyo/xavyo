@@ -48,7 +48,7 @@ pub struct ListAuditParams {
 
 impl DelegationAuditService {
     /// Create a new delegation audit service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -193,7 +193,7 @@ impl DelegationAuditService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

@@ -19,7 +19,7 @@ pub struct AssertionBuilder {
 
 impl AssertionBuilder {
     /// Create a new assertion builder
-    #[must_use] 
+    #[must_use]
     pub fn new(idp_entity_id: String, credentials: SigningCredentials) -> Self {
         Self {
             idp_entity_id,

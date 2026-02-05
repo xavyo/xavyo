@@ -67,7 +67,7 @@ pub struct PreventiveValidationResult {
 
 impl PreventiveValidationResult {
     /// Create a successful validation result.
-    #[must_use] 
+    #[must_use]
     pub fn success() -> Self {
         Self {
             is_valid: true,
@@ -76,7 +76,7 @@ impl PreventiveValidationResult {
     }
 
     /// Create a failed validation result.
-    #[must_use] 
+    #[must_use]
     pub fn failure(violations: Vec<SodViolationInfo>) -> Self {
         Self {
             is_valid: violations.is_empty(),
@@ -180,7 +180,7 @@ pub struct InMemorySodViolationStore {
 
 impl InMemorySodViolationStore {
     /// Create a new in-memory store.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             violations: Arc::new(RwLock::new(HashMap::new())),

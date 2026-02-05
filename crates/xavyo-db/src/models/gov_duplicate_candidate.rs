@@ -395,7 +395,7 @@ impl GovDuplicateCandidate {
     }
 
     /// Check if candidate is pending.
-    #[must_use] 
+    #[must_use]
     pub fn is_pending(&self) -> bool {
         matches!(self.status, GovDuplicateStatus::Pending)
     }
@@ -406,7 +406,7 @@ impl GovDuplicateCandidate {
     }
 
     /// Get the other identity ID given one of the pair.
-    #[must_use] 
+    #[must_use]
     pub fn get_other_identity(&self, identity_id: Uuid) -> Option<Uuid> {
         if self.identity_a_id == identity_id {
             Some(self.identity_b_id)

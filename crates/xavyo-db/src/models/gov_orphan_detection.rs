@@ -59,7 +59,7 @@ pub enum RemediationAction {
 
 impl OrphanStatus {
     /// Check if this status allows remediation actions.
-    #[must_use] 
+    #[must_use]
     pub fn can_remediate(&self) -> bool {
         matches!(self, Self::Pending | Self::UnderReview)
     }

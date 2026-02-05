@@ -134,7 +134,7 @@ impl Default for ObligationRegistry {
 
 impl ObligationRegistry {
     /// Create a new empty registry.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             handlers: RwLock::new(HashMap::new()),

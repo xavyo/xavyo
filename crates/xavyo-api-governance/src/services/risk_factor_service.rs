@@ -21,7 +21,7 @@ pub struct RiskFactorService {
 
 impl RiskFactorService {
     /// Create a new risk factor service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

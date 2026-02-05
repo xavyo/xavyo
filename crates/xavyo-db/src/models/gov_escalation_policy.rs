@@ -337,13 +337,13 @@ impl GovEscalationPolicy {
     }
 
     /// Get timeout as Duration.
-    #[must_use] 
+    #[must_use]
     pub fn timeout_duration(&self) -> chrono::Duration {
         interval_to_duration(&self.default_timeout)
     }
 
     /// Get timeout in seconds (for serialization).
-    #[must_use] 
+    #[must_use]
     pub fn timeout_secs(&self) -> i64 {
         interval_to_secs(&self.default_timeout)
     }

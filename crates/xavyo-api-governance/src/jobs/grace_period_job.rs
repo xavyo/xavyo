@@ -30,7 +30,7 @@ pub struct GracePeriodExpirationJob {
 
 impl GracePeriodExpirationJob {
     /// Create a new grace period expiration job.
-    #[must_use] 
+    #[must_use]
     pub fn new(state_transition_service: StateTransitionService) -> Self {
         Self {
             state_transition_service: Arc::new(state_transition_service),
@@ -39,7 +39,7 @@ impl GracePeriodExpirationJob {
     }
 
     /// Create from an Arc-wrapped service.
-    #[must_use] 
+    #[must_use]
     pub fn from_arc(state_transition_service: Arc<StateTransitionService>) -> Self {
         Self {
             state_transition_service,

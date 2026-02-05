@@ -111,7 +111,7 @@ mod persona_creation {
 }
 
 mod persona_status_transitions {
-    
+
     use xavyo_db::models::PersonaStatus;
 
     #[test]
@@ -226,7 +226,7 @@ mod persona_attribute_inheritance {
 }
 
 mod persona_link_management {
-    
+
     use xavyo_db::models::PersonaLinkType;
 
     #[test]

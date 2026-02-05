@@ -45,7 +45,7 @@ pub struct IdempotencyService;
 
 impl IdempotencyService {
     /// Create a new idempotency service.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
@@ -79,14 +79,10 @@ impl IdempotencyService {
         let payload_hash = self.hash_string(&canonical_payload);
 
         // Build the composite string to hash
-        let mut composite = format!(
-            "{tenant_id}:{connector_id}:{operation_type}:{payload_hash}"
-        );
+        let mut composite = format!("{tenant_id}:{connector_id}:{operation_type}:{payload_hash}");
 
         if let Some(uid) = user_id {
-            composite = format!(
-                "{tenant_id}:{connector_id}:{uid}:{operation_type}:{payload_hash}"
-            );
+            composite = format!("{tenant_id}:{connector_id}:{uid}:{operation_type}:{payload_hash}");
         }
 
         // Generate final hash

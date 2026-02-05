@@ -78,7 +78,8 @@ impl AdminInviteService {
         if !email_result.is_valid {
             return Err(ApiAuthError::Validation(
                 email_result
-                    .error.map_or_else(|| "Invalid email".to_string(), |e| e.to_string()),
+                    .error
+                    .map_or_else(|| "Invalid email".to_string(), |e| e.to_string()),
             ));
         }
 
@@ -229,9 +230,10 @@ If you didn't expect this invitation, you can safely ignore this email.
         // Validate password
         let password_result = validate_password(password);
         if !password_result.is_valid {
-            let error_msg = password_result
-                .errors
-                .first().map_or_else(|| "Invalid password".to_string(), std::string::ToString::to_string);
+            let error_msg = password_result.errors.first().map_or_else(
+                || "Invalid password".to_string(),
+                std::string::ToString::to_string,
+            );
             return Err(ApiAuthError::Validation(error_msg));
         }
 

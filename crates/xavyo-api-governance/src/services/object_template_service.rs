@@ -21,7 +21,7 @@ pub struct ObjectTemplateService {
 
 impl ObjectTemplateService {
     /// Create a new object template service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

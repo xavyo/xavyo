@@ -58,7 +58,7 @@ pub enum SyncSituation {
 
 impl SyncSituation {
     /// Convert to string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             SyncSituation::Linked => "linked",
@@ -105,7 +105,7 @@ pub enum ShadowState {
 }
 
 impl ShadowState {
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             ShadowState::Active => "active",
@@ -181,7 +181,7 @@ pub struct Shadow {
 
 impl Shadow {
     /// Create a new shadow for a linked account.
-    #[must_use] 
+    #[must_use]
     pub fn new_linked(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -211,7 +211,7 @@ impl Shadow {
     }
 
     /// Create a new unlinked shadow (discovered but not matched).
-    #[must_use] 
+    #[must_use]
     pub fn new_unlinked(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -240,7 +240,7 @@ impl Shadow {
     }
 
     /// Check if attributes have diverged from expected.
-    #[must_use] 
+    #[must_use]
     pub fn has_diverged(&self) -> bool {
         self.attributes != self.expected_attributes
     }
@@ -304,7 +304,7 @@ pub struct ShadowRepository {
 
 impl ShadowRepository {
     /// Create a new shadow repository.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

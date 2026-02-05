@@ -51,7 +51,7 @@ pub struct DevicePolicyService {
 
 impl DevicePolicyService {
     /// Create a new device policy service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

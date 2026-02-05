@@ -137,6 +137,11 @@ impl RotateCredentialsRequest {
         self.grace_period_hours = Some(hours);
         self
     }
+
+    pub fn with_expires_at(mut self, expires_at: DateTime<Utc>) -> Self {
+        self.expires_at = Some(expires_at);
+        self
+    }
 }
 
 /// Request to revoke a credential
@@ -145,6 +150,57 @@ pub struct RevokeCredentialRequest {
     pub reason: String,
     #[serde(default = "default_immediate")]
     pub immediate: bool,
+}
+
+// =============================================================================
+// Update Agent Models (F-051)
+// =============================================================================
+
+/// Request to update an existing agent
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateAgentRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+}
+
+impl UpdateAgentRequest {
+    pub fn new() -> Self {
+        Self {
+            name: None,
+            description: None,
+            status: None,
+        }
+    }
+
+    pub fn with_name(mut self, name: String) -> Self {
+        self.name = Some(name);
+        self
+    }
+
+    pub fn with_description(mut self, description: String) -> Self {
+        self.description = Some(description);
+        self
+    }
+
+    pub fn with_status(mut self, status: String) -> Self {
+        self.status = Some(status);
+        self
+    }
+
+    /// Check if at least one field is set
+    pub fn has_changes(&self) -> bool {
+        self.name.is_some() || self.description.is_some() || self.status.is_some()
+    }
+}
+
+impl Default for UpdateAgentRequest {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn default_immediate() -> bool {
@@ -158,6 +214,49 @@ impl RevokeCredentialRequest {
             immediate: true,
         }
     }
+}
+
+// =============================================================================
+// Credential Rotation Dry Run Models (F110)
+// =============================================================================
+
+/// Planned changes for credential rotation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlannedRotationChanges {
+    /// Number of credentials that will be created
+    pub credentials_to_create: i32,
+    /// Number of credentials that will be revoked
+    pub credentials_to_revoke: i32,
+    /// Details about affected NHIs
+    pub affected_nhis: Vec<AffectedNhi>,
+}
+
+/// Details about an NHI affected by rotation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AffectedNhi {
+    /// NHI identifier
+    pub nhi_id: Uuid,
+    /// NHI name
+    pub nhi_name: String,
+    /// Current credential count
+    pub current_credentials: i32,
+    /// Actions to be taken
+    pub actions: Vec<String>,
+}
+
+/// Preview of a dry-run credential rotation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DryRunRotationPreview {
+    /// Whether the dry run was successful
+    pub success: bool,
+    /// Planned changes summary
+    pub planned_changes: PlannedRotationChanges,
+    /// Warning messages
+    #[serde(default)]
+    pub warnings: Vec<String>,
+    /// Error messages (if any)
+    #[serde(default)]
+    pub errors: Vec<String>,
 }
 
 #[cfg(test)]
@@ -268,5 +367,45 @@ mod tests {
         // Optional fields should not be present when None
         assert!(json.get("model_provider").is_none());
         assert!(json.get("risk_level").is_none());
+    }
+
+    // F-051: Update agent request tests
+
+    #[test]
+    fn test_update_agent_request_serialization() {
+        let request = UpdateAgentRequest::new()
+            .with_name("new-name".to_string())
+            .with_status("inactive".to_string());
+
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["name"], "new-name");
+        assert_eq!(json["status"], "inactive");
+        // Description not set, should not be present
+        assert!(json.get("description").is_none());
+    }
+
+    #[test]
+    fn test_update_agent_request_has_changes() {
+        let empty = UpdateAgentRequest::new();
+        assert!(!empty.has_changes());
+
+        let with_name = UpdateAgentRequest::new().with_name("test".to_string());
+        assert!(with_name.has_changes());
+
+        let with_desc = UpdateAgentRequest::new().with_description("desc".to_string());
+        assert!(with_desc.has_changes());
+
+        let with_status = UpdateAgentRequest::new().with_status("active".to_string());
+        assert!(with_status.has_changes());
+    }
+
+    #[test]
+    fn test_update_agent_request_minimal_serialization() {
+        let request = UpdateAgentRequest::new();
+        let json = serde_json::to_value(&request).unwrap();
+        // All fields are None, so JSON should be empty object
+        assert!(json.get("name").is_none());
+        assert!(json.get("description").is_none());
+        assert!(json.get("status").is_none());
     }
 }

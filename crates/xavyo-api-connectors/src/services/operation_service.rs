@@ -301,21 +301,21 @@ pub struct OperationService {
 
 impl OperationService {
     /// Create a new operation service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         let queue = Arc::new(OperationQueue::new(pool.clone()));
         Self { pool, queue }
     }
 
     /// Create with custom queue configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_queue_config(pool: PgPool, config: QueueConfig) -> Self {
         let queue = Arc::new(OperationQueue::with_config(pool.clone(), config));
         Self { pool, queue }
     }
 
     /// Get the underlying queue for the processor.
-    #[must_use] 
+    #[must_use]
     pub fn queue(&self) -> Arc<OperationQueue> {
         self.queue.clone()
     }

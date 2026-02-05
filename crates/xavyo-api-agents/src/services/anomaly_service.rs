@@ -29,7 +29,7 @@ pub struct AnomalyService {
 
 impl AnomalyService {
     /// Create a new `AnomalyService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -278,9 +278,7 @@ impl AnomalyService {
         let score = if tool_freq == 0.0 { 80 } else { 60 };
 
         let description = if tool_freq == 0.0 {
-            format!(
-                "Unknown tool '{tool_name}' used - not in historical baseline"
-            )
+            format!("Unknown tool '{tool_name}' used - not in historical baseline")
         } else {
             format!(
                 "Unusual tool '{}' used - historical frequency {:.1}% (threshold: {:.1}%)",
@@ -411,7 +409,9 @@ impl AnomalyService {
 
         let aggregation_window = threshold
             .as_ref()
-            .map_or(DEFAULT_AGGREGATION_WINDOW_SECS, |t| t.aggregation_window_secs);
+            .map_or(DEFAULT_AGGREGATION_WINDOW_SECS, |t| {
+                t.aggregation_window_secs
+            });
 
         // Check if we should send (respecting aggregation window)
         if !self
@@ -704,7 +704,9 @@ impl AnomalyService {
         let hour_start = now
             .date_naive()
             .and_hms_opt(now.hour(), 0, 0)
-            .map_or(now, |dt| DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc));
+            .map_or(now, |dt| {
+                DateTime::<Utc>::from_naive_utc_and_offset(dt, Utc)
+            });
 
         let count: i64 = sqlx::query_scalar(
             r"
@@ -726,7 +728,7 @@ impl AnomalyService {
     }
 
     /// Calculate severity based on z-score.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_severity(z_score: f64) -> Severity {
         let abs_z = z_score.abs();
         if abs_z >= 5.0 {
@@ -741,7 +743,7 @@ impl AnomalyService {
     }
 
     /// Calculate anomaly score (0-100) based on z-score.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_score(z_score: f64) -> i32 {
         // Map z-score to 0-100 scale
         // z=3 -> 60, z=4 -> 75, z=5 -> 90, z>=6 -> 100

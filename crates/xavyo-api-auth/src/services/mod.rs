@@ -55,7 +55,7 @@ pub use ip_restriction_service::{
 };
 pub use lockout_service::{LockoutService, LockoutStatus};
 pub use mfa_service::{
-    MfaService, MfaStatus, TotpSetupData, LOCKOUT_MINUTES, MAX_FAILED_ATTEMPTS,
+    MfaRequirement, MfaService, MfaStatus, TotpSetupData, LOCKOUT_MINUTES, MAX_FAILED_ATTEMPTS,
     SETUP_EXPIRY_MINUTES,
 };
 pub use password_policy_service::{
@@ -95,3 +95,9 @@ pub use security_audit::{SecurityAudit, SecurityEventType};
 
 // Admin Invitation exports (F-ADMIN-INVITE)
 pub use admin_invite_service::AdminInviteService;
+
+// Organization Security Policy service (F-066)
+pub mod org_policy_service;
+
+// Organization Security Policy exports (F-066)
+pub use org_policy_service::{OrgPolicyError, OrgPolicyService};

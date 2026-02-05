@@ -22,7 +22,7 @@ pub enum A2aTaskState {
 
 impl A2aTaskState {
     /// Returns the string representation of the state.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -34,13 +34,13 @@ impl A2aTaskState {
     }
 
     /// Check if this is a terminal state.
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
     }
 
     /// Parse a state from string.
-    #[must_use] 
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "pending" => Some(Self::Pending),
@@ -70,7 +70,7 @@ pub enum CallbackStatus {
 }
 
 impl CallbackStatus {
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -104,13 +104,13 @@ pub struct A2aTask {
 
 impl A2aTask {
     /// Get the parsed task state.
-    #[must_use] 
+    #[must_use]
     pub fn get_state(&self) -> Option<A2aTaskState> {
         A2aTaskState::parse(&self.state)
     }
 
     /// Check if the task is in a terminal state.
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         self.get_state().is_some_and(|s| s.is_terminal())
     }

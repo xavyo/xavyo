@@ -100,7 +100,7 @@ pub struct AttributeMapping {
 
 impl SpProfile {
     /// Create a Salesforce SP profile
-    #[must_use] 
+    #[must_use]
     pub fn salesforce() -> Self {
         Self {
             name: "Salesforce".to_string(),
@@ -132,7 +132,7 @@ impl SpProfile {
     }
 
     /// Create a `ServiceNow` SP profile
-    #[must_use] 
+    #[must_use]
     pub fn servicenow() -> Self {
         Self {
             name: "ServiceNow".to_string(),
@@ -172,7 +172,7 @@ impl SpProfile {
     }
 
     /// Create a Workday SP profile
-    #[must_use] 
+    #[must_use]
     pub fn workday() -> Self {
         Self {
             name: "Workday".to_string(),
@@ -192,7 +192,7 @@ impl SpProfile {
     }
 
     /// Create an AWS SSO SP profile
-    #[must_use] 
+    #[must_use]
     pub fn aws_sso() -> Self {
         Self {
             name: "AWS SSO".to_string(),
@@ -234,7 +234,7 @@ impl SpProfile {
 
 /// Generate mock signing credentials for testing
 /// Returns a tuple of (`certificate_pem`, `private_key_pem`)
-#[must_use] 
+#[must_use]
 pub fn mock_signing_credentials() -> (String, String) {
     // Use pre-generated test certificates (self-signed, for testing only)
     // These are NOT real certificates and should never be used in production
@@ -474,7 +474,7 @@ pub fn parse_saml_xml(xml: &str) -> Result<ParsedAssertion, String> {
 }
 
 /// Validate that an assertion has all required elements for a given SP
-#[must_use] 
+#[must_use]
 pub fn validate_assertion_structure(assertion: &ParsedAssertion, sp: &SpProfile) -> Vec<String> {
     let mut errors = Vec::new();
 
@@ -520,13 +520,13 @@ pub fn validate_assertion_structure(assertion: &ParsedAssertion, sp: &SpProfile)
 }
 
 /// Extract attribute values by name
-#[must_use] 
+#[must_use]
 pub fn get_attribute_values(assertion: &ParsedAssertion, name: &str) -> Option<Vec<String>> {
     assertion.attributes.get(name).cloned()
 }
 
 /// Validate `NameID` format matches expected format
-#[must_use] 
+#[must_use]
 pub fn validate_nameid_format(assertion: &ParsedAssertion, expected_format: &str) -> bool {
     assertion
         .name_id_format
@@ -566,7 +566,7 @@ pub fn validate_assertion_timing(
 }
 
 /// Validate signature algorithm is RSA-SHA256
-#[must_use] 
+#[must_use]
 pub fn validate_signature_algorithm(assertion: &ParsedAssertion) -> bool {
     assertion
         .signature_algorithm
@@ -575,7 +575,7 @@ pub fn validate_signature_algorithm(assertion: &ParsedAssertion) -> bool {
 }
 
 /// Validate canonicalization method is Exclusive C14N
-#[must_use] 
+#[must_use]
 pub fn validate_canonicalization_method(assertion: &ParsedAssertion) -> bool {
     assertion
         .canonicalization_method
@@ -588,7 +588,7 @@ pub fn validate_canonicalization_method(assertion: &ParsedAssertion) -> bool {
 // ============================================================================
 
 /// Build a test SAML response XML for validation testing
-#[must_use] 
+#[must_use]
 pub fn build_test_response(
     sp: &SpProfile,
     user: &StandardTestUser,
@@ -669,13 +669,13 @@ pub fn build_test_response(
     }
 
     let attribute_statement = if attrs_xml.is_empty() {
-            String::new()
-        } else {
-            format!(
-                r"        <saml:AttributeStatement>
+        String::new()
+    } else {
+        format!(
+            r"        <saml:AttributeStatement>
     {attrs_xml}        </saml:AttributeStatement>"
-            )
-        };
+        )
+    };
 
     let signature_xml = if sp.sign_assertions {
         r#"
@@ -749,7 +749,7 @@ pub fn build_test_response(
 }
 
 /// Build a test SAML response for AWS SSO with role attributes
-#[must_use] 
+#[must_use]
 pub fn build_aws_test_response(sp: &SpProfile, user: &AwsRoleTestUser) -> String {
     let response_id = format!("_resp_{}", Uuid::new_v4());
     let assertion_id = format!("_assert_{}", Uuid::new_v4());

@@ -63,7 +63,7 @@ impl Default for FuzzyMatchingService {
 
 impl FuzzyMatchingService {
     /// Create a new fuzzy matching service with default configuration.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: FuzzyMatchConfig::default(),
@@ -71,13 +71,13 @@ impl FuzzyMatchingService {
     }
 
     /// Create a new fuzzy matching service with custom configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_config(config: FuzzyMatchConfig) -> Self {
         Self { config }
     }
 
     /// Compare two strings using all fuzzy matching algorithms.
-    #[must_use] 
+    #[must_use]
     pub fn compare(&self, original: &str, candidate: &str) -> FuzzyMatchResult {
         let original_normalized = self.normalize(original);
         let candidate_normalized = self.normalize(candidate);
@@ -115,32 +115,32 @@ impl FuzzyMatchingService {
     }
 
     /// Check if two strings are a match based on threshold.
-    #[must_use] 
+    #[must_use]
     pub fn is_match(&self, original: &str, candidate: &str) -> bool {
         let result = self.compare(original, candidate);
         result.combined_score >= self.config.threshold
     }
 
     /// Get the raw Levenshtein distance (edit distance).
-    #[must_use] 
+    #[must_use]
     pub fn levenshtein_distance(&self, a: &str, b: &str) -> usize {
         levenshtein(&self.normalize(a), &self.normalize(b))
     }
 
     /// Get the normalized Levenshtein similarity (0.0 to 1.0).
-    #[must_use] 
+    #[must_use]
     pub fn levenshtein_similarity(&self, a: &str, b: &str) -> f64 {
         normalized_levenshtein(&self.normalize(a), &self.normalize(b))
     }
 
     /// Get the Jaro-Winkler similarity (0.0 to 1.0).
-    #[must_use] 
+    #[must_use]
     pub fn jaro_winkler_similarity(&self, a: &str, b: &str) -> f64 {
         jaro_winkler(&self.normalize(a), &self.normalize(b))
     }
 
     /// Check if two strings match phonetically using Soundex.
-    #[must_use] 
+    #[must_use]
     pub fn soundex_match(&self, a: &str, b: &str) -> bool {
         let soundex_a = self.soundex(&self.normalize(a));
         let soundex_b = self.soundex(&self.normalize(b));
@@ -151,7 +151,7 @@ impl FuzzyMatchingService {
     ///
     /// Soundex is a phonetic algorithm that encodes names by sound.
     /// Format: First letter + 3 digits (e.g., "Robert" -> "R163")
-    #[must_use] 
+    #[must_use]
     pub fn soundex(&self, s: &str) -> String {
         if s.is_empty() {
             return String::new();
@@ -210,7 +210,7 @@ impl FuzzyMatchingService {
     }
 
     /// Compare multiple fields and return an aggregate score.
-    #[must_use] 
+    #[must_use]
     pub fn compare_fields(
         &self,
         fields: &[((&str, &str), f64)], // ((original, candidate), weight)

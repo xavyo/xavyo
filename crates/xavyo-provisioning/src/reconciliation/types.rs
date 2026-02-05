@@ -54,19 +54,19 @@ pub enum RunStatus {
 
 impl RunStatus {
     /// Check if the run is in a terminal state.
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
     }
 
     /// Check if the run can be cancelled.
-    #[must_use] 
+    #[must_use]
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Pending | Self::Running)
     }
 
     /// Check if the run can be resumed.
-    #[must_use] 
+    #[must_use]
     pub fn can_resume(&self) -> bool {
         matches!(self, Self::Failed)
     }
@@ -119,7 +119,7 @@ pub enum DiscrepancyType {
 
 impl DiscrepancyType {
     /// Get the suggested remediation actions for this discrepancy type.
-    #[must_use] 
+    #[must_use]
     pub fn suggested_actions(&self) -> Vec<ActionType> {
         match self {
             Self::Missing => vec![ActionType::Create],
@@ -136,7 +136,7 @@ impl DiscrepancyType {
     }
 
     /// Check if this discrepancy type requires an identity reference.
-    #[must_use] 
+    #[must_use]
     pub fn requires_identity(&self) -> bool {
         matches!(self, Self::Missing | Self::Mismatch | Self::Unlinked)
     }

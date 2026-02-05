@@ -75,9 +75,7 @@ pub async fn suspend_tenant_handler(
     let target_tenant = Tenant::find_by_id(&state.pool, tenant_id)
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
-        .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
-        })?;
+        .ok_or_else(|| TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found")))?;
 
     if target_tenant.is_system() {
         return Err(TenantError::Forbidden(
@@ -187,9 +185,7 @@ pub async fn reactivate_tenant_handler(
     let target_tenant = Tenant::find_by_id(&state.pool, tenant_id)
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
-        .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
-        })?;
+        .ok_or_else(|| TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found")))?;
 
     // FR-010: Idempotent operation - if not suspended, return success
     if !target_tenant.is_suspended() {
@@ -288,9 +284,7 @@ pub async fn get_tenant_status_handler(
     let tenant = Tenant::find_by_id(&state.pool, tenant_id)
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
-        .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
-        })?;
+        .ok_or_else(|| TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found")))?;
 
     let is_suspended = tenant.is_suspended();
     let is_deleted = tenant.is_deleted();

@@ -21,7 +21,7 @@ pub struct RiskThresholdService {
 
 impl RiskThresholdService {
     /// Create a new risk threshold service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

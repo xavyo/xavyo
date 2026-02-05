@@ -64,7 +64,7 @@ impl MicroCertExpirationStats {
 
 impl MicroCertExpirationJob {
     /// Create a new micro-certification expiration job.
-    #[must_use] 
+    #[must_use]
     pub fn new(service: MicroCertificationService) -> Self {
         Self {
             service: Arc::new(service),
@@ -73,7 +73,7 @@ impl MicroCertExpirationJob {
     }
 
     /// Create with existing Arc service.
-    #[must_use] 
+    #[must_use]
     pub fn with_arc_service(service: Arc<MicroCertificationService>) -> Self {
         Self {
             service,

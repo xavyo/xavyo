@@ -43,8 +43,7 @@ impl Platform {
     pub fn is_supported(&self) -> bool {
         matches!(
             (self.os.as_str(), self.arch.as_str()),
-            ("linux" | "macos" | "windows", "x86_64") | ("linux", "aarch64") |
-("macos", "arm64")
+            ("linux" | "macos" | "windows", "x86_64") | ("linux", "aarch64") | ("macos", "arm64")
         )
     }
 }

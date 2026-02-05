@@ -46,7 +46,7 @@ pub enum SyncAction {
 
 impl SyncAction {
     /// Get string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             SyncAction::AddFocus => "add_focus",
@@ -60,7 +60,7 @@ impl SyncAction {
     }
 
     /// Check if this action creates or modifies the identity.
-    #[must_use] 
+    #[must_use]
     pub fn modifies_focus(&self) -> bool {
         matches!(
             self,
@@ -72,7 +72,7 @@ impl SyncAction {
     }
 
     /// Check if this action modifies links.
-    #[must_use] 
+    #[must_use]
     pub fn modifies_link(&self) -> bool {
         matches!(self, SyncAction::Link | SyncAction::Unlink)
     }
@@ -116,7 +116,7 @@ pub struct SyncReaction {
 
 impl SyncReaction {
     /// Create a new reaction.
-    #[must_use] 
+    #[must_use]
     pub fn new(situation: SyncSituation, actions: Vec<SyncAction>) -> Self {
         Self {
             situation,
@@ -127,7 +127,7 @@ impl SyncReaction {
     }
 
     /// Create a simple reaction with a single action.
-    #[must_use] 
+    #[must_use]
     pub fn simple(situation: SyncSituation, action: SyncAction) -> Self {
         Self::new(situation, vec![action])
     }
@@ -139,7 +139,7 @@ impl SyncReaction {
     }
 
     /// Disable this reaction.
-    #[must_use] 
+    #[must_use]
     pub fn disabled(mut self) -> Self {
         self.enabled = false;
         self
@@ -159,7 +159,7 @@ pub struct SyncReactionConfig {
 
 impl SyncReactionConfig {
     /// Create a new reaction config with default reactions.
-    #[must_use] 
+    #[must_use]
     pub fn default_for(tenant_id: Uuid, connector_id: Uuid) -> Self {
         Self {
             tenant_id,
@@ -169,7 +169,7 @@ impl SyncReactionConfig {
     }
 
     /// Get the default reactions for each situation (following IGA conventions).
-    #[must_use] 
+    #[must_use]
     pub fn default_reactions() -> Vec<SyncReaction> {
         vec![
             // Linked: synchronize attributes
@@ -194,7 +194,7 @@ impl SyncReactionConfig {
     }
 
     /// Get reaction for a specific situation.
-    #[must_use] 
+    #[must_use]
     pub fn get_reaction(&self, situation: SyncSituation) -> Option<&SyncReaction> {
         self.reactions
             .iter()
@@ -202,9 +202,10 @@ impl SyncReactionConfig {
     }
 
     /// Get actions for a specific situation.
-    #[must_use] 
+    #[must_use]
     pub fn get_actions(&self, situation: SyncSituation) -> Vec<SyncAction> {
-        self.get_reaction(situation).map_or_else(|| vec![SyncAction::None], |r| r.actions.clone())
+        self.get_reaction(situation)
+            .map_or_else(|| vec![SyncAction::None], |r| r.actions.clone())
     }
 
     /// Set reaction for a situation (replaces existing).
@@ -243,7 +244,7 @@ pub struct ActionResult {
 
 impl ActionResult {
     /// Create a successful result.
-    #[must_use] 
+    #[must_use]
     pub fn success(action: SyncAction) -> Self {
         Self {
             action,
@@ -255,7 +256,7 @@ impl ActionResult {
     }
 
     /// Create a successful result with affected identity.
-    #[must_use] 
+    #[must_use]
     pub fn success_with_identity(action: SyncAction, identity_id: Uuid) -> Self {
         Self {
             action,

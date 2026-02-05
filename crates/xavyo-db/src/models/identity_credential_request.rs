@@ -114,7 +114,7 @@ pub struct IdentityCredentialRequestFilter {
 
 impl IdentityCredentialRequest {
     /// Get the source IP as parsed `IpAddr` (if present and valid).
-    #[must_use] 
+    #[must_use]
     pub fn source_ip_addr(&self) -> Option<IpAddr> {
         self.source_ip.as_ref().and_then(|s| s.parse().ok())
     }

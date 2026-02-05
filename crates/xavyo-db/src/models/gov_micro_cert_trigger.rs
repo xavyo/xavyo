@@ -609,21 +609,22 @@ impl GovMicroCertTrigger {
     }
 
     /// Calculate the deadline timestamp from now.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_deadline(&self) -> DateTime<Utc> {
         Utc::now() + chrono::Duration::seconds(i64::from(self.timeout_secs))
     }
 
     /// Calculate the reminder time based on threshold.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_reminder_time(&self) -> DateTime<Utc> {
-        let threshold_secs =
-            (f64::from(self.timeout_secs) * (f64::from(self.reminder_threshold_percent) / 100.0)) as i64;
+        let threshold_secs = (f64::from(self.timeout_secs)
+            * (f64::from(self.reminder_threshold_percent) / 100.0))
+            as i64;
         Utc::now() + chrono::Duration::seconds(threshold_secs)
     }
 
     /// Calculate escalation deadline (75% of timeout by default, or 50% if specified).
-    #[must_use] 
+    #[must_use]
     pub fn calculate_escalation_deadline(&self) -> Option<DateTime<Utc>> {
         if self.fallback_reviewer_id.is_some() {
             // Escalate at 50% of timeout

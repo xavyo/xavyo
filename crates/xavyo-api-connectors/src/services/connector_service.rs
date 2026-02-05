@@ -62,7 +62,10 @@ impl ConnectorService {
             ConnectorConfiguration::list_by_tenant(&self.pool, tenant_id, &filter, limit, offset)
                 .await?;
 
-        let summaries: Vec<ConnectorSummary> = connectors.iter().map(xavyo_db::models::ConnectorConfiguration::to_summary).collect();
+        let summaries: Vec<ConnectorSummary> = connectors
+            .iter()
+            .map(xavyo_db::models::ConnectorConfiguration::to_summary)
+            .collect();
 
         let total = ConnectorConfiguration::count_by_tenant(&self.pool, tenant_id, &filter).await?;
 
@@ -115,9 +118,7 @@ impl ConnectorService {
 
         // Encrypt credentials
         let credentials_json = serde_json::to_vec(&input.credentials).map_err(|e| {
-            ConnectorApiError::InvalidConfiguration(format!(
-                "Failed to serialize credentials: {e}"
-            ))
+            ConnectorApiError::InvalidConfiguration(format!("Failed to serialize credentials: {e}"))
         })?;
 
         let credentials_encrypted = self
@@ -645,7 +646,9 @@ impl ConnectorService {
                             .and_then(|v| v.as_array())
                             .map(|arr| {
                                 arr.iter()
-                                    .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
+                                    .filter_map(|v| {
+                                        v.as_str().map(std::string::ToString::to_string)
+                                    })
                                     .collect()
                             })
                             .unwrap_or_else(|| vec!["all".to_string()]),

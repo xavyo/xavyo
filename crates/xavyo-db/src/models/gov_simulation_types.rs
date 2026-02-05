@@ -16,13 +16,13 @@ pub enum PolicySimulationType {
 
 impl PolicySimulationType {
     /// Check if this is an `SoD` rule simulation.
-    #[must_use] 
+    #[must_use]
     pub fn is_sod_rule(&self) -> bool {
         matches!(self, Self::SodRule)
     }
 
     /// Check if this is a birthright policy simulation.
-    #[must_use] 
+    #[must_use]
     pub fn is_birthright_policy(&self) -> bool {
         matches!(self, Self::BirthrightPolicy)
     }
@@ -46,25 +46,25 @@ pub enum BatchSimulationType {
 
 impl BatchSimulationType {
     /// Check if this is a role operation.
-    #[must_use] 
+    #[must_use]
     pub fn is_role_operation(&self) -> bool {
         matches!(self, Self::RoleAdd | Self::RoleRemove)
     }
 
     /// Check if this is an entitlement operation.
-    #[must_use] 
+    #[must_use]
     pub fn is_entitlement_operation(&self) -> bool {
         matches!(self, Self::EntitlementAdd | Self::EntitlementRemove)
     }
 
     /// Check if this is an add operation.
-    #[must_use] 
+    #[must_use]
     pub fn is_add(&self) -> bool {
         matches!(self, Self::RoleAdd | Self::EntitlementAdd)
     }
 
     /// Check if this is a remove operation.
-    #[must_use] 
+    #[must_use]
     pub fn is_remove(&self) -> bool {
         matches!(self, Self::RoleRemove | Self::EntitlementRemove)
     }
@@ -84,13 +84,13 @@ pub enum SelectionMode {
 
 impl SelectionMode {
     /// Check if this is user list mode.
-    #[must_use] 
+    #[must_use]
     pub fn is_user_list(&self) -> bool {
         matches!(self, Self::UserList)
     }
 
     /// Check if this is filter mode.
-    #[must_use] 
+    #[must_use]
     pub fn is_filter(&self) -> bool {
         matches!(self, Self::Filter)
     }
@@ -116,31 +116,31 @@ pub enum ImpactType {
 
 impl ImpactType {
     /// Check if this is a violation.
-    #[must_use] 
+    #[must_use]
     pub fn is_violation(&self) -> bool {
         matches!(self, Self::Violation)
     }
 
     /// Check if this represents an access gain.
-    #[must_use] 
+    #[must_use]
     pub fn is_gain(&self) -> bool {
         matches!(self, Self::EntitlementGain)
     }
 
     /// Check if this represents an access loss.
-    #[must_use] 
+    #[must_use]
     pub fn is_loss(&self) -> bool {
         matches!(self, Self::EntitlementLoss)
     }
 
     /// Check if this is a warning.
-    #[must_use] 
+    #[must_use]
     pub fn is_warning(&self) -> bool {
         matches!(self, Self::Warning)
     }
 
     /// Check if this indicates no change.
-    #[must_use] 
+    #[must_use]
     pub fn is_no_change(&self) -> bool {
         matches!(self, Self::NoChange)
     }
@@ -160,13 +160,13 @@ pub enum ComparisonType {
 
 impl ComparisonType {
     /// Check if this compares two simulations.
-    #[must_use] 
+    #[must_use]
     pub fn is_simulation_vs_simulation(&self) -> bool {
         matches!(self, Self::SimulationVsSimulation)
     }
 
     /// Check if this compares simulation to current state.
-    #[must_use] 
+    #[must_use]
     pub fn is_simulation_vs_current(&self) -> bool {
         matches!(self, Self::SimulationVsCurrent)
     }

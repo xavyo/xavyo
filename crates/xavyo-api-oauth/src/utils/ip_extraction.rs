@@ -20,7 +20,7 @@ use std::net::SocketAddr;
 ///
 /// # Returns
 /// The extracted IP address as a string, or `None` if unavailable.
-#[must_use] 
+#[must_use]
 pub fn extract_origin_ip(headers: &HeaderMap, socket_addr: Option<&SocketAddr>) -> Option<String> {
     // 1. CloudFlare: CF-Connecting-IP
     if let Some(cf_ip) = headers.get("CF-Connecting-IP") {

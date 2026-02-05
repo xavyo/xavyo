@@ -67,7 +67,7 @@ pub struct IdentityMergeService {
 
 impl IdentityMergeService {
     /// Create a new identity merge service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             sod_enforcement_service: Arc::new(SodEnforcementService::new(pool.clone())),
@@ -76,7 +76,7 @@ impl IdentityMergeService {
     }
 
     /// Create a new identity merge service with a custom `SoD` service.
-    #[must_use] 
+    #[must_use]
     pub fn with_sod_service(pool: PgPool, sod_service: Arc<SodEnforcementService>) -> Self {
         Self {
             pool,
@@ -85,7 +85,7 @@ impl IdentityMergeService {
     }
 
     /// Get the database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

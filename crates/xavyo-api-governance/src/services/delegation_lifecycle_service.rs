@@ -36,7 +36,7 @@ pub struct LifecycleProcessingResult {
 
 impl DelegationLifecycleService {
     /// Create a new delegation lifecycle service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -218,7 +218,7 @@ impl DelegationLifecycleService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

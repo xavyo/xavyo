@@ -149,13 +149,13 @@ pub struct TransformEngine {
 
 impl TransformEngine {
     /// Create a new transformation engine with default configuration.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::with_config(TransformConfig::default())
     }
 
     /// Create a new transformation engine with custom configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_config(config: TransformConfig) -> Self {
         Self { config }
     }
@@ -182,9 +182,7 @@ impl TransformEngine {
     fn register_builtin_functions(engine: &mut Engine) {
         // String concatenation
         engine.register_fn("concat2", |a: &str, b: &str| format!("{a}{b}"));
-        engine.register_fn("concat3", |a: &str, b: &str, c: &str| {
-            format!("{a}{b}{c}")
-        });
+        engine.register_fn("concat3", |a: &str, b: &str, c: &str| format!("{a}{b}{c}"));
         engine.register_fn("concat4", |a: &str, b: &str, c: &str, d: &str| {
             format!("{a}{b}{c}{d}")
         });
@@ -417,7 +415,7 @@ impl TransformEngine {
     }
 
     /// Validate a transformation expression.
-    #[must_use] 
+    #[must_use]
     pub fn validate_expression(&self, expression: &str) -> Vec<ValidationError> {
         let engine = self.create_engine();
 
@@ -440,7 +438,7 @@ impl TransformEngine {
     }
 
     /// Validate a mapping configuration.
-    #[must_use] 
+    #[must_use]
     pub fn validate_mapping(&self, mapping: &MappingConfig) -> Vec<ValidationError> {
         let mut errors = vec![];
 
@@ -505,7 +503,7 @@ impl TransformEngine {
     }
 
     /// Apply attribute mappings to transform source attributes.
-    #[must_use] 
+    #[must_use]
     pub fn apply_mappings(
         &self,
         source: &serde_json::Value,

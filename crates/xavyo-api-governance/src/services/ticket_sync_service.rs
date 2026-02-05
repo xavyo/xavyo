@@ -23,7 +23,7 @@ pub struct TicketSyncService {
 
 impl TicketSyncService {
     /// Create a new ticket sync service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         let ticketing_config_service = TicketingConfigService::new(pool.clone());
         Self {
@@ -33,7 +33,7 @@ impl TicketSyncService {
     }
 
     /// Get the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -539,7 +539,9 @@ impl TicketSyncService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        let ticket = if let Some(t) = ticket { t } else {
+        let ticket = if let Some(t) = ticket {
+            t
+        } else {
             tracing::warn!(
                 tenant_id = %tenant_id,
                 external_reference = %payload.ticket_id,

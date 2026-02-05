@@ -25,7 +25,7 @@ impl EncryptionService {
     /// Create a new encryption service with a master key.
     ///
     /// The master key should be loaded from environment or a secrets manager.
-    #[must_use] 
+    #[must_use]
     pub fn new(master_key: [u8; 32]) -> Self {
         Self { master_key }
     }
@@ -130,7 +130,7 @@ impl EncryptionService {
 /// Generate a random master key for testing/initialization.
 ///
 /// SECURITY: Uses `OsRng` (CSPRNG) for cryptographic key generation.
-#[must_use] 
+#[must_use]
 pub fn generate_master_key() -> [u8; 32] {
     let mut key = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut key);
@@ -138,7 +138,7 @@ pub fn generate_master_key() -> [u8; 32] {
 }
 
 /// Generate a random master key as base64 string.
-#[must_use] 
+#[must_use]
 pub fn generate_master_key_base64() -> String {
     BASE64.encode(generate_master_key())
 }

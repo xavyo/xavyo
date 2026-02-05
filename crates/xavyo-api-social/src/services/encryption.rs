@@ -138,7 +138,7 @@ impl EncryptionService {
 }
 
 /// Generate a new random master key and return it base64-encoded.
-#[must_use] 
+#[must_use]
 pub fn generate_master_key() -> String {
     let mut key = [0u8; KEY_SIZE];
     OsRng.fill_bytes(&mut key);

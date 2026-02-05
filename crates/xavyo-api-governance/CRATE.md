@@ -1,10 +1,10 @@
 # xavyo-api-governance
 
-> IGA API: access requests, certification campaigns, SoD rules, compliance reporting.
+> IGA API: access requests, certification campaigns, SoD rules, compliance reporting, identity archetypes.
 
 ## Purpose
 
-Provides REST endpoints for Identity Governance and Administration (IGA) operations. Includes access request workflows, certification campaigns, Separation of Duties (SoD) rule enforcement, entitlement management, compliance reporting, and orphan account detection.
+Provides REST endpoints for Identity Governance and Administration (IGA) operations. Includes access request workflows, certification campaigns, Separation of Duties (SoD) rule enforcement, entitlement management, compliance reporting, orphan account detection, and identity archetype management.
 
 ## Layer
 
@@ -14,7 +14,7 @@ api
 
 🟢 **stable**
 
-Production-ready with extensive test coverage (1058 tests). 135K LOC comprehensive IGA platform with full workflow support.
+Production-ready with extensive test coverage (1076+ tests). 135K LOC comprehensive IGA platform with full workflow support. Includes F-193 lifecycle state machine extensions for transition conditions and state actions. Includes F-067 GDPR/Data Protection metadata on entitlements with classification filtering and compliance reporting.
 
 ## Dependencies
 
@@ -42,6 +42,7 @@ pub fn entitlements_router() -> Router<GovState>;
 pub fn applications_router() -> Router<GovState>;
 pub fn compliance_router() -> Router<GovState>;
 pub fn risk_router() -> Router<GovState>;
+pub fn archetypes_router() -> Router<GovState>;  // F-058 Identity Archetypes
 ```
 
 ### Key Endpoints
@@ -64,6 +65,30 @@ pub fn risk_router() -> Router<GovState>;
 | Compliance | POST | `/reports/:id/generate` | Generate report |
 | Risk | GET | `/risk/scores` | List risk scores |
 | Risk | GET | `/risk/alerts` | List risk alerts |
+| Archetypes | GET | `/archetypes` | List identity archetypes |
+| Archetypes | POST | `/archetypes` | Create archetype |
+| Archetypes | GET | `/archetypes/:id` | Get archetype |
+| Archetypes | PUT | `/archetypes/:id` | Update archetype |
+| Archetypes | DELETE | `/archetypes/:id` | Delete archetype |
+| Archetypes | GET | `/archetypes/:id/ancestry` | Get archetype ancestry chain |
+| Archetypes | GET | `/archetypes/:id/policies` | List policy bindings |
+| Archetypes | POST | `/archetypes/:id/policies` | Bind policy to archetype |
+| Archetypes | DELETE | `/archetypes/:id/policies/:type` | Unbind policy |
+| Archetypes | GET | `/archetypes/:id/effective-policies` | Get effective policies |
+| Archetypes | GET | `/users/:id/archetype` | Get user's archetype |
+| Archetypes | PUT | `/users/:id/archetype` | Assign archetype to user |
+| Archetypes | DELETE | `/users/:id/archetype` | Remove user's archetype |
+| Archetypes | GET | `/archetypes/:id/lifecycle` | Get archetype lifecycle model (F-193) |
+| Archetypes | PUT | `/archetypes/:id/lifecycle` | Assign lifecycle to archetype (F-193) |
+| Archetypes | DELETE | `/archetypes/:id/lifecycle` | Remove lifecycle assignment (F-193) |
+| Lifecycle | GET | `/lifecycle/configs/:id/transitions/:tid/conditions` | Get transition conditions (F-193) |
+| Lifecycle | PUT | `/lifecycle/configs/:id/transitions/:tid/conditions` | Update transition conditions (F-193) |
+| Lifecycle | POST | `/lifecycle/configs/:id/transitions/:tid/conditions/evaluate` | Evaluate conditions (F-193) |
+| Lifecycle | GET | `/lifecycle/configs/:id/states/:sid/actions` | Get state entry/exit actions (F-193) |
+| Lifecycle | PUT | `/lifecycle/configs/:id/states/:sid/actions` | Update state actions (F-193) |
+| Lifecycle | GET | `/users/:id/lifecycle/status` | Get user lifecycle status (F-193) |
+| GDPR | GET | `/gdpr/report` | Generate tenant GDPR compliance report (F-067) |
+| GDPR | GET | `/gdpr/users/:user_id/data-protection` | Per-user data protection summary (F-067) |
 
 ## Usage Example
 

@@ -40,7 +40,7 @@ pub struct DeviceService {
 
 impl DeviceService {
     /// Create a new device service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

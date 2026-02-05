@@ -4,10 +4,11 @@ use crate::config::Config;
 use crate::config::ConfigPaths;
 use crate::credentials::{get_credential_store, CredentialStore};
 use crate::error::{CliError, CliResult};
-use crate::models::Credentials;
+use crate::models::{Credentials, Session};
 use chrono::Utc;
 use reqwest::Client;
 use std::time::Duration;
+use uuid::Uuid;
 
 /// API client for making authenticated requests
 pub struct ApiClient {
@@ -34,6 +35,19 @@ impl ApiClient {
     /// Get a reference to the config
     pub fn config(&self) -> &Config {
         &self.config
+    }
+
+    /// Get a reference to the paths
+    pub fn paths(&self) -> &ConfigPaths {
+        &self.paths
+    }
+
+    /// Get the current tenant ID from the session (if set)
+    fn get_tenant_id(&self) -> Option<Uuid> {
+        Session::load(&self.paths)
+            .ok()
+            .flatten()
+            .and_then(|s| s.tenant_id)
     }
 
     /// Get credentials, refreshing if needed
@@ -90,14 +104,18 @@ impl ApiClient {
         body: &T,
     ) -> CliResult<reqwest::Response> {
         let credentials = self.get_valid_credentials().await?;
-
-        self.client
+        let mut request = self
+            .client
             .post(url)
             .bearer_auth(&credentials.access_token)
-            .json(body)
-            .send()
-            .await
-            .map_err(Into::into)
+            .json(body);
+
+        // Add tenant header if available
+        if let Some(tenant_id) = self.get_tenant_id() {
+            request = request.header("X-Tenant-ID", tenant_id.to_string());
+        }
+
+        request.send().await.map_err(Into::into)
     }
 
     /// Make an unauthenticated GET request
@@ -108,25 +126,72 @@ impl ApiClient {
     /// Make an authenticated GET request
     pub async fn get_authenticated(&self, url: &str) -> CliResult<reqwest::Response> {
         let credentials = self.get_valid_credentials().await?;
+        let mut request = self.client.get(url).bearer_auth(&credentials.access_token);
 
-        self.client
-            .get(url)
-            .bearer_auth(&credentials.access_token)
-            .send()
-            .await
-            .map_err(Into::into)
+        // Add tenant header if available
+        if let Some(tenant_id) = self.get_tenant_id() {
+            request = request.header("X-Tenant-ID", tenant_id.to_string());
+        }
+
+        request.send().await.map_err(Into::into)
     }
 
     /// Make an authenticated DELETE request
     pub async fn delete_authenticated(&self, url: &str) -> CliResult<reqwest::Response> {
         let credentials = self.get_valid_credentials().await?;
-
-        self.client
+        let mut request = self
+            .client
             .delete(url)
+            .bearer_auth(&credentials.access_token);
+
+        // Add tenant header if available
+        if let Some(tenant_id) = self.get_tenant_id() {
+            request = request.header("X-Tenant-ID", tenant_id.to_string());
+        }
+
+        request.send().await.map_err(Into::into)
+    }
+
+    /// Make an authenticated PUT request with JSON body
+    pub async fn put_json<T: serde::Serialize>(
+        &self,
+        url: &str,
+        body: &T,
+    ) -> CliResult<reqwest::Response> {
+        let credentials = self.get_valid_credentials().await?;
+        let mut request = self
+            .client
+            .put(url)
             .bearer_auth(&credentials.access_token)
-            .send()
-            .await
-            .map_err(Into::into)
+            .json(body);
+
+        // Add tenant header if available
+        if let Some(tenant_id) = self.get_tenant_id() {
+            request = request.header("X-Tenant-ID", tenant_id.to_string());
+        }
+
+        request.send().await.map_err(Into::into)
+    }
+
+    /// Make an authenticated PATCH request with JSON body (F-051)
+    pub async fn patch_json<T: serde::Serialize>(
+        &self,
+        url: &str,
+        body: &T,
+    ) -> CliResult<reqwest::Response> {
+        let credentials = self.get_valid_credentials().await?;
+        let mut request = self
+            .client
+            .patch(url)
+            .bearer_auth(&credentials.access_token)
+            .json(body);
+
+        // Add tenant header if available
+        if let Some(tenant_id) = self.get_tenant_id() {
+            request = request.header("X-Tenant-ID", tenant_id.to_string());
+        }
+
+        request.send().await.map_err(Into::into)
     }
 }
 

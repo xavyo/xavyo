@@ -52,7 +52,7 @@ pub struct ReconciliationService {
 
 impl ReconciliationService {
     /// Create a new reconciliation service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

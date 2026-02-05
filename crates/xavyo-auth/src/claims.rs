@@ -77,6 +77,19 @@ pub struct JwtClaims {
     /// User email address (optional, included in user tokens).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
+
+    // Power of Attorney claims (F-061)
+    /// PoA grant ID when acting on behalf of another user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acting_as_poa_id: Option<Uuid>,
+
+    /// User ID of the donor when acting on their behalf.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acting_as_user_id: Option<Uuid>,
+
+    /// Session ID of the assumed identity session.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acting_as_session_id: Option<Uuid>,
 }
 
 impl JwtClaims {
@@ -109,6 +122,36 @@ impl JwtClaims {
     pub fn has_any_role(&self, roles: &[&str]) -> bool {
         roles.iter().any(|r| self.has_role(r))
     }
+
+    /// Check if the token represents an assumed identity (F-061).
+    #[must_use]
+    pub fn is_acting_as(&self) -> bool {
+        self.acting_as_poa_id.is_some()
+            && self.acting_as_user_id.is_some()
+            && self.acting_as_session_id.is_some()
+    }
+
+    /// Get the actual actor's user ID (F-061).
+    ///
+    /// If acting on behalf of someone, returns the attorney's ID (sub).
+    /// Otherwise returns the user's own ID (sub).
+    #[must_use]
+    pub fn actual_actor_id(&self) -> &str {
+        &self.sub
+    }
+
+    /// Get the effective user ID (F-061).
+    ///
+    /// If acting on behalf of someone, returns the donor's ID.
+    /// Otherwise returns the user's own ID (sub).
+    #[must_use]
+    pub fn effective_user_id(&self) -> Option<Uuid> {
+        if self.is_acting_as() {
+            self.acting_as_user_id
+        } else {
+            self.sub.parse().ok()
+        }
+    }
 }
 
 /// Builder for constructing JWT claims.
@@ -124,6 +167,10 @@ pub struct JwtClaimsBuilder {
     roles: Vec<String>,
     purpose: Option<String>,
     email: Option<String>,
+    // Power of Attorney fields (F-061)
+    acting_as_poa_id: Option<Uuid>,
+    acting_as_user_id: Option<Uuid>,
+    acting_as_session_id: Option<Uuid>,
 }
 
 impl JwtClaimsBuilder {
@@ -225,6 +272,36 @@ impl JwtClaimsBuilder {
         self
     }
 
+    /// Set the Power of Attorney grant ID for identity assumption (F-061).
+    #[must_use]
+    pub fn acting_as_poa_id(mut self, poa_id: Uuid) -> Self {
+        self.acting_as_poa_id = Some(poa_id);
+        self
+    }
+
+    /// Set the donor's user ID when acting on their behalf (F-061).
+    #[must_use]
+    pub fn acting_as_user_id(mut self, user_id: Uuid) -> Self {
+        self.acting_as_user_id = Some(user_id);
+        self
+    }
+
+    /// Set the assumed identity session ID (F-061).
+    #[must_use]
+    pub fn acting_as_session_id(mut self, session_id: Uuid) -> Self {
+        self.acting_as_session_id = Some(session_id);
+        self
+    }
+
+    /// Set all acting_as fields for identity assumption (F-061).
+    #[must_use]
+    pub fn acting_as(mut self, poa_id: Uuid, user_id: Uuid, session_id: Uuid) -> Self {
+        self.acting_as_poa_id = Some(poa_id);
+        self.acting_as_user_id = Some(user_id);
+        self.acting_as_session_id = Some(session_id);
+        self
+    }
+
     /// Build the JWT claims.
     ///
     /// # Defaults
@@ -250,6 +327,9 @@ impl JwtClaimsBuilder {
             roles: self.roles,
             purpose: self.purpose,
             email: self.email,
+            acting_as_poa_id: self.acting_as_poa_id,
+            acting_as_user_id: self.acting_as_user_id,
+            acting_as_session_id: self.acting_as_session_id,
         }
     }
 }
@@ -361,5 +441,46 @@ mod tests {
         assert_eq!(claims.roles.len(), 2);
         assert!(claims.has_role("admin"));
         assert!(claims.has_role("user"));
+    }
+
+    #[test]
+    fn test_claims_acting_as() {
+        let poa_id = Uuid::new_v4();
+        let donor_id = Uuid::new_v4();
+        let session_id = Uuid::new_v4();
+
+        let claims = JwtClaims::builder()
+            .subject("attorney-123")
+            .acting_as(poa_id, donor_id, session_id)
+            .build();
+
+        assert!(claims.is_acting_as());
+        assert_eq!(claims.acting_as_poa_id, Some(poa_id));
+        assert_eq!(claims.acting_as_user_id, Some(donor_id));
+        assert_eq!(claims.acting_as_session_id, Some(session_id));
+        assert_eq!(claims.actual_actor_id(), "attorney-123");
+        assert_eq!(claims.effective_user_id(), Some(donor_id));
+    }
+
+    #[test]
+    fn test_claims_not_acting_as() {
+        let user_id = Uuid::new_v4();
+        let claims = JwtClaims::builder().subject(user_id.to_string()).build();
+
+        assert!(!claims.is_acting_as());
+        assert_eq!(claims.actual_actor_id(), &user_id.to_string());
+        assert_eq!(claims.effective_user_id(), Some(user_id));
+    }
+
+    #[test]
+    fn test_acting_as_claims_not_serialized_when_none() {
+        let claims = JwtClaims::builder().subject("user-123").build();
+
+        let json = serde_json::to_string(&claims).unwrap();
+
+        // acting_as fields should not be present in JSON when None
+        assert!(!json.contains("acting_as_poa_id"));
+        assert!(!json.contains("acting_as_user_id"));
+        assert!(!json.contains("acting_as_session_id"));
     }
 }

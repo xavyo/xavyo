@@ -13,7 +13,7 @@ pub struct DefaultTemplate {
 }
 
 /// Get the default template for a given type.
-#[must_use] 
+#[must_use]
 pub fn get_default_template(template_type: TemplateType) -> DefaultTemplate {
     match template_type {
         TemplateType::Welcome => DefaultTemplate {
@@ -501,7 +501,7 @@ If you didn't attempt to log in, please contact support immediately as someone m
 }
 
 /// Get all template types.
-#[must_use] 
+#[must_use]
 pub fn get_all_template_types() -> Vec<TemplateType> {
     vec![
         TemplateType::Welcome,

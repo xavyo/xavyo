@@ -23,13 +23,13 @@ pub enum LifecycleEventType {
 
 impl LifecycleEventType {
     /// Check if this event type requires `attributes_before`.
-    #[must_use] 
+    #[must_use]
     pub fn requires_attributes_before(&self) -> bool {
         matches!(self, Self::Mover)
     }
 
     /// Check if this event type requires `attributes_after`.
-    #[must_use] 
+    #[must_use]
     pub fn requires_attributes_after(&self) -> bool {
         matches!(self, Self::Joiner | Self::Mover)
     }
@@ -271,7 +271,7 @@ impl GovLifecycleEvent {
     }
 
     /// Check if event is processed.
-    #[must_use] 
+    #[must_use]
     pub fn is_processed(&self) -> bool {
         self.processed_at.is_some()
     }

@@ -205,19 +205,19 @@ pub const SUPPORTED_CONSTRAINT_TYPES: &[&str] = &[
 
 impl CriteriaOperator {
     /// Returns true if this operator requires a list value.
-    #[must_use] 
+    #[must_use]
     pub fn requires_list(&self) -> bool {
         matches!(self, Self::In | Self::NotIn)
     }
 
     /// Returns true if this operator is for numeric comparison.
-    #[must_use] 
+    #[must_use]
     pub fn is_numeric(&self) -> bool {
         matches!(self, Self::Gt | Self::Gte | Self::Lt | Self::Lte)
     }
 
     /// Returns true if this operator is for string matching.
-    #[must_use] 
+    #[must_use]
     pub fn is_string_match(&self) -> bool {
         matches!(self, Self::Contains | Self::StartsWith)
     }

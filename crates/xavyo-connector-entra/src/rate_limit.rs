@@ -50,13 +50,13 @@ impl Default for RateLimitConfig {
 
 impl RateLimitConfig {
     /// Creates a new configuration with all defaults.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Creates a configuration optimized for testing (shorter delays).
-    #[must_use] 
+    #[must_use]
     pub fn for_testing() -> Self {
         Self {
             base_delay_ms: 10,
@@ -119,7 +119,7 @@ impl RateLimitState {
     }
 
     /// Checks if still within retry-after period.
-    #[must_use] 
+    #[must_use]
     pub fn is_within_retry_after(&self) -> bool {
         self.retry_after_until
             .is_some_and(|until| Instant::now() < until)
@@ -162,13 +162,13 @@ impl RateLimiter {
     }
 
     /// Creates a rate limiter with default configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_defaults() -> Self {
         Self::new(RateLimitConfig::default()).expect("default config should be valid")
     }
 
     /// Returns the current configuration.
-    #[must_use] 
+    #[must_use]
     pub fn config(&self) -> &RateLimitConfig {
         &self.config
     }
@@ -194,7 +194,7 @@ impl RateLimiter {
     }
 
     /// Parses the Retry-After header value.
-    #[must_use] 
+    #[must_use]
     pub fn parse_retry_after(header_value: &str) -> Option<u64> {
         // Retry-After can be either seconds or HTTP-date
         // We only support seconds format for simplicity
@@ -202,7 +202,7 @@ impl RateLimiter {
     }
 
     /// Calculates backoff delay with exponential growth.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_backoff_delay(&self, attempt: u32) -> Duration {
         let base = self.config.base_delay_ms as f64;
         let max = self.config.max_delay_ms as f64;
@@ -214,7 +214,7 @@ impl RateLimiter {
     }
 
     /// Adds jitter to a delay using the configured factor.
-    #[must_use] 
+    #[must_use]
     pub fn add_jitter(&self, delay: Duration) -> Duration {
         use rand::Rng;
 
@@ -502,10 +502,7 @@ mod tests {
 
         assert!(result.is_ok());
         // Should complete quickly with Retry-After: 0
-        assert!(
-            elapsed < Duration::from_millis(100),
-            "elapsed {elapsed:?}"
-        );
+        assert!(elapsed < Duration::from_millis(100), "elapsed {elapsed:?}");
     }
 
     #[tokio::test]
@@ -541,14 +538,8 @@ mod tests {
 
         assert!(result.is_ok());
         // Should have waited approximately base_delay (50ms)
-        assert!(
-            elapsed >= Duration::from_millis(45),
-            "elapsed {elapsed:?}"
-        );
-        assert!(
-            elapsed < Duration::from_millis(200),
-            "elapsed {elapsed:?}"
-        );
+        assert!(elapsed >= Duration::from_millis(45), "elapsed {elapsed:?}");
+        assert!(elapsed < Duration::from_millis(200), "elapsed {elapsed:?}");
     }
 
     #[tokio::test]

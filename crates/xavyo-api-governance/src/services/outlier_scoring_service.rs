@@ -72,7 +72,7 @@ pub struct OutlierScoringService {
 }
 
 impl OutlierScoringService {
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -81,7 +81,7 @@ impl OutlierScoringService {
     ///
     /// Z-score = (value - mean) / `std_dev`
     /// Returns 0 if `std_dev` is 0 (no variation in data).
-    #[must_use] 
+    #[must_use]
     pub fn calculate_z_score(value: f64, mean: f64, std_dev: f64) -> f64 {
         if std_dev <= 0.0 {
             return 0.0;
@@ -96,7 +96,7 @@ impl OutlierScoringService {
     /// - Z-score of 2 maps to ~88
     /// - Z-score of 3 maps to ~95
     /// - Negative Z-scores map below 50
-    #[must_use] 
+    #[must_use]
     pub fn normalize_z_score_to_percentage(z_score: f64) -> f64 {
         // Use logistic function to map z-score to 0-100
         // Adjusted so z=0 -> 50, z=2 -> ~88, z=-2 -> ~12
@@ -105,7 +105,7 @@ impl OutlierScoringService {
     }
 
     /// Calculate deviation factor from Z-score (0-100 scale).
-    #[must_use] 
+    #[must_use]
     pub fn z_score_to_deviation_factor(z_score: f64) -> f64 {
         // Absolute value since we care about magnitude of deviation
         Self::normalize_z_score_to_percentage(z_score.abs())
@@ -115,7 +115,7 @@ impl OutlierScoringService {
     ///
     /// Each factor contributes: `raw_value` * weight
     /// Sum is clamped to 0-100.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_weighted_score(factors: &FactorBreakdown, weights: &ScoringWeights) -> f64 {
         let mut total = 0.0;
 
@@ -143,7 +143,7 @@ impl OutlierScoringService {
     /// - Normal: Score below threshold or no peer groups flag as outlier
     /// - Outlier: At least one peer group Z-score exceeds confidence threshold
     /// - Unclassifiable: No valid peer groups for comparison
-    #[must_use] 
+    #[must_use]
     pub fn classify_user(
         peer_scores: &[PeerGroupScore],
         _confidence_threshold: f64,
@@ -164,7 +164,7 @@ impl OutlierScoringService {
     }
 
     /// Score a user against a single peer group.
-    #[must_use] 
+    #[must_use]
     pub fn score_against_peer_group(
         &self,
         user: &UserAccessProfile,
@@ -209,7 +209,7 @@ impl OutlierScoringService {
     ///
     /// Measures how many of the user's roles are uncommon in their peer groups.
     /// Higher score = more unusual roles.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_role_frequency_factor(
         user: &UserAccessProfile,
         peer_stats: &[PeerGroupStats],
@@ -263,7 +263,7 @@ impl OutlierScoringService {
     ///
     /// Compares user's entitlement count to peer average.
     /// Uses highest deviation across peer groups.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_entitlement_count_factor(
         user: &UserAccessProfile,
         peer_stats: &[PeerGroupStats],
@@ -312,7 +312,7 @@ impl OutlierScoringService {
     ///
     /// Analyzes how user's role assignments differ from typical patterns.
     /// Placeholder: Uses role count deviation as proxy.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_assignment_pattern_factor(
         user: &UserAccessProfile,
         peer_stats: &[PeerGroupStats],
@@ -361,7 +361,7 @@ impl OutlierScoringService {
     ///
     /// Measures how many peer groups the user belongs to.
     /// Users in very few groups may be harder to classify.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_peer_group_coverage_factor(
         user: &UserAccessProfile,
         total_applicable_groups: i32,
@@ -393,7 +393,7 @@ impl OutlierScoringService {
     ///
     /// Compares current score to previous score.
     /// Large increases are more concerning.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_historical_deviation_factor(
         current_score: f64,
         previous_score: Option<f64>,
@@ -423,7 +423,7 @@ impl OutlierScoringService {
     }
 
     /// Score a user against all their peer groups.
-    #[must_use] 
+    #[must_use]
     pub fn score_user(
         &self,
         user: &UserAccessProfile,

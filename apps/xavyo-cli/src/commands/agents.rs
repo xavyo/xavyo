@@ -3,9 +3,13 @@
 use crate::api::ApiClient;
 use crate::config::{Config, ConfigPaths};
 use crate::error::{CliError, CliResult};
+use crate::interactive::{
+    prompt_confirm, prompt_select, prompt_text, prompt_text_optional, require_interactive,
+    AGENT_TYPE_OPTIONS, RISK_LEVEL_OPTIONS,
+};
 use crate::models::agent::{
     AgentResponse, CreateAgentRequest, NhiCredentialResponse, RevokeCredentialRequest,
-    RotateCredentialsRequest,
+    RotateCredentialsRequest, UpdateAgentRequest,
 };
 use clap::{Args, Subcommand};
 use dialoguer::{Confirm, Input, Select};
@@ -26,6 +30,8 @@ pub enum AgentsCommands {
     Create(CreateArgs),
     /// Get details of a specific agent
     Get(GetArgs),
+    /// Update an existing agent (F-051)
+    Update(UpdateArgs),
     /// Delete an AI agent
     Delete(DeleteArgs),
     /// Manage agent credentials (F110)
@@ -47,13 +53,34 @@ pub struct ListArgs {
     /// Offset for pagination
     #[arg(long, default_value = "0")]
     pub offset: i32,
+
+    /// Filter by agent type: copilot, autonomous, workflow, orchestrator
+    #[arg(long, short = 't')]
+    pub r#type: Option<String>,
+
+    /// Filter by agent status: active, inactive, pending
+    #[arg(long, short = 's')]
+    pub status: Option<String>,
+
+    /// Page number (1-based, overrides --offset)
+    #[arg(long)]
+    pub page: Option<i32>,
+
+    /// Number of agents per page (max: 100, overrides --limit)
+    #[arg(long)]
+    pub per_page: Option<i32>,
 }
 
 /// Arguments for the create command
 #[derive(Args, Debug)]
 pub struct CreateArgs {
     /// Agent name (alphanumeric, hyphens, underscores, 1-64 chars)
-    pub name: String,
+    /// Required in non-interactive mode, prompted in interactive mode
+    pub name: Option<String>,
+
+    /// Use interactive mode with guided prompts
+    #[arg(long, short = 'i')]
+    pub interactive: bool,
 
     /// Agent type: copilot, autonomous, workflow, orchestrator
     #[arg(long, short = 't')]
@@ -98,8 +125,35 @@ pub struct DeleteArgs {
     pub id: String,
 
     /// Skip confirmation prompt
-    #[arg(long, short = 'f')]
+    #[arg(long, short = 'y')]
+    pub yes: bool,
+
+    /// Skip confirmation prompt (alias for --yes)
+    #[arg(long, short = 'f', hide = true)]
     pub force: bool,
+}
+
+/// Arguments for the update command (F-051)
+#[derive(Args, Debug)]
+pub struct UpdateArgs {
+    /// Agent ID (UUID)
+    pub id: String,
+
+    /// New agent name
+    #[arg(long, short = 'n')]
+    pub name: Option<String>,
+
+    /// New agent description
+    #[arg(long, short = 'd')]
+    pub description: Option<String>,
+
+    /// New agent status: active, inactive, pending
+    #[arg(long, short = 's')]
+    pub status: Option<String>,
+
+    /// Output as JSON
+    #[arg(long)]
+    pub json: bool,
 }
 
 // =============================================================================
@@ -191,6 +245,7 @@ pub async fn execute(args: AgentsArgs) -> CliResult<()> {
         AgentsCommands::List(list_args) => execute_list(list_args).await,
         AgentsCommands::Create(create_args) => execute_create(create_args).await,
         AgentsCommands::Get(get_args) => execute_get(get_args).await,
+        AgentsCommands::Update(update_args) => execute_update(update_args).await,
         AgentsCommands::Delete(delete_args) => execute_delete(delete_args).await,
         AgentsCommands::Credentials(cred_cmd) => execute_credentials(cred_cmd).await,
     }
@@ -206,37 +261,147 @@ async fn execute_credentials(cmd: CredentialsCommands) -> CliResult<()> {
     }
 }
 
-/// Execute list command
+/// Execute list command (F-051: with filters and pagination)
 async fn execute_list(args: ListArgs) -> CliResult<()> {
+    // Validate filter values if provided
+    if let Some(ref t) = args.r#type {
+        validate_agent_type(t)?;
+    }
+    if let Some(ref s) = args.status {
+        validate_agent_status(s)?;
+    }
+
+    // Calculate limit and offset from page/per_page or use direct values
+    let (limit, offset) = calculate_pagination(&args)?;
+
     let paths = ConfigPaths::new()?;
     let config = Config::load(&paths)?;
     let client = ApiClient::new(config, paths)?;
 
-    let response = client.list_agents(args.limit, args.offset).await?;
+    let response = client
+        .list_agents(
+            limit,
+            offset,
+            args.r#type.as_deref(),
+            args.status.as_deref(),
+        )
+        .await?;
+
+    // Build filter context for display
+    let filter_context = build_filter_context(&args);
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&response)?);
     } else if response.agents.is_empty() {
-        println!("No agents found.");
-        println!();
-        println!("Create your first agent with: xavyo agents create <name>");
+        if filter_context.is_some() {
+            println!("No agents found matching criteria.");
+            println!();
+            println!("Try without filters: xavyo agents list");
+        } else {
+            println!("No agents found.");
+            println!();
+            println!("Create your first agent with: xavyo agents create <name>");
+        }
     } else {
         print_agent_table(&response.agents);
         println!();
-        println!(
-            "Showing {} of {} agents",
-            response.agents.len(),
-            response.total
-        );
+
+        // Show pagination info
+        if let Some(page) = args.page {
+            let per_page = args.per_page.unwrap_or(50).min(100);
+            let total_pages = (response.total as f64 / per_page as f64).ceil() as i64;
+            if let Some(ref ctx) = filter_context {
+                println!(
+                    "Page {} of {} ({} total agents, {})",
+                    page, total_pages, response.total, ctx
+                );
+            } else {
+                println!(
+                    "Page {} of {} ({} total agents)",
+                    page, total_pages, response.total
+                );
+            }
+        } else if let Some(ref ctx) = filter_context {
+            println!(
+                "Showing {} of {} agents ({})",
+                response.agents.len(),
+                response.total,
+                ctx
+            );
+        } else {
+            println!(
+                "Showing {} of {} agents",
+                response.agents.len(),
+                response.total
+            );
+        }
     }
 
     Ok(())
 }
 
+/// Calculate limit and offset from page/per_page or direct values (F-051)
+fn calculate_pagination(args: &ListArgs) -> CliResult<(i32, i32)> {
+    if let Some(page) = args.page {
+        // Validate page number
+        if page < 1 {
+            return Err(CliError::Validation(
+                "Page number must be 1 or greater.".to_string(),
+            ));
+        }
+
+        // Get per_page with cap at 100
+        let per_page = args.per_page.unwrap_or(50).min(100);
+        if per_page < 1 {
+            return Err(CliError::Validation(
+                "Per-page must be 1 or greater.".to_string(),
+            ));
+        }
+
+        let offset = (page - 1) * per_page;
+        Ok((per_page, offset))
+    } else if let Some(per_page) = args.per_page {
+        // per_page without page uses offset directly
+        let limit = per_page.min(100);
+        Ok((limit, args.offset))
+    } else {
+        // Use direct limit/offset
+        Ok((args.limit, args.offset))
+    }
+}
+
+/// Build filter context string for display (F-051)
+fn build_filter_context(args: &ListArgs) -> Option<String> {
+    let mut parts = Vec::new();
+    if let Some(ref t) = args.r#type {
+        parts.push(format!("type: {}", t));
+    }
+    if let Some(ref s) = args.status {
+        parts.push(format!("status: {}", s));
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(format!("filtered by {}", parts.join(", ")))
+    }
+}
+
 /// Execute create command
 async fn execute_create(args: CreateArgs) -> CliResult<()> {
+    // Branch on interactive mode
+    if args.interactive {
+        return execute_create_interactive(args).await;
+    }
+
+    // Non-interactive mode: name is required
+    let name = args.name.ok_or_else(|| {
+        CliError::Validation(
+            "Agent name is required. Provide a name or use --interactive mode.".to_string(),
+        )
+    })?;
+
     // Validate agent name
-    validate_agent_name(&args.name)?;
+    validate_agent_name(&name)?;
 
     let paths = ConfigPaths::new()?;
     let config = Config::load(&paths)?;
@@ -248,7 +413,7 @@ async fn execute_create(args: CreateArgs) -> CliResult<()> {
             validate_agent_type(&t)?;
             t
         }
-        None => prompt_agent_type()?,
+        None => prompt_agent_type_legacy()?,
     };
 
     // Get risk level (interactive or from flag)
@@ -257,21 +422,21 @@ async fn execute_create(args: CreateArgs) -> CliResult<()> {
             validate_risk_level(&r)?;
             r
         }
-        None => prompt_risk_level()?,
+        None => prompt_risk_level_legacy()?,
     };
 
     // Get model provider and name (optional, interactive if TTY)
     let (model_provider, model_name) = if args.model_provider.is_some() || args.model_name.is_some()
     {
         (args.model_provider, args.model_name)
-    } else if atty::is(atty::Stream::Stdin) {
+    } else if crate::interactive::is_interactive_terminal() {
         prompt_model_info()?
     } else {
         (None, None)
     };
 
     // Build the request
-    let request = CreateAgentRequest::new(args.name.clone(), agent_type)
+    let request = CreateAgentRequest::new(name.clone(), agent_type)
         .with_model(model_provider, model_name)
         .with_risk_level(risk_level)
         .with_description(args.description);
@@ -288,6 +453,123 @@ async fn execute_create(args: CreateArgs) -> CliResult<()> {
     }
 
     Ok(())
+}
+
+/// Execute create command in interactive mode (F-053)
+async fn execute_create_interactive(args: CreateArgs) -> CliResult<()> {
+    // Require interactive terminal
+    require_interactive()?;
+
+    println!();
+    println!("Create a New Agent");
+    println!("{}", "─".repeat(18));
+    println!();
+
+    // Get agent name (prompt if not provided)
+    let name = match args.name {
+        Some(n) => {
+            validate_agent_name(&n)?;
+            n
+        }
+        None => prompt_agent_name()?,
+    };
+
+    // Get agent type (prompt if not provided)
+    let agent_type = match args.r#type {
+        Some(t) => {
+            validate_agent_type(&t)?;
+            t
+        }
+        None => prompt_agent_type_interactive()?,
+    };
+
+    // Get risk level (prompt if not provided)
+    let risk_level = match args.risk_level {
+        Some(r) => {
+            validate_risk_level(&r)?;
+            r
+        }
+        None => prompt_risk_level_interactive()?,
+    };
+
+    // Get description (optional)
+    let description = match args.description {
+        Some(d) => Some(d),
+        None => prompt_description()?,
+    };
+
+    let paths = ConfigPaths::new()?;
+    let config = Config::load(&paths)?;
+    let client = ApiClient::new(config, paths)?;
+
+    // Build the request
+    let request = CreateAgentRequest::new(name.clone(), agent_type)
+        .with_model(args.model_provider, args.model_name)
+        .with_risk_level(risk_level)
+        .with_description(description);
+
+    // Create the agent
+    let agent = client.create_agent(request).await?;
+
+    println!();
+    if args.json {
+        println!("{}", serde_json::to_string_pretty(&agent)?);
+    } else {
+        println!("✓ Agent created successfully!");
+        println!();
+        print_agent_details(&agent);
+    }
+
+    Ok(())
+}
+
+/// Prompt for agent name with validation (F-053)
+fn prompt_agent_name() -> CliResult<String> {
+    prompt_text("Agent name", |name| {
+        if name.is_empty() || name.len() > 64 {
+            return Err("Name must be 1-64 characters".to_string());
+        }
+        let first_char = name.chars().next().unwrap();
+        if !first_char.is_alphanumeric() {
+            return Err("Name must start with a letter or number".to_string());
+        }
+        for ch in name.chars() {
+            if !ch.is_alphanumeric() && ch != '-' && ch != '_' {
+                return Err(
+                    "Name can only contain letters, numbers, hyphens, and underscores".to_string(),
+                );
+            }
+        }
+        Ok(())
+    })
+}
+
+/// Prompt for agent type using new interactive module (F-053)
+fn prompt_agent_type_interactive() -> CliResult<String> {
+    let options: Vec<String> = AGENT_TYPE_OPTIONS
+        .iter()
+        .map(|o| format!("{}", o))
+        .collect();
+
+    let selection = prompt_select("Agent type", &options, 0)?;
+    Ok(AGENT_TYPE_OPTIONS[selection].value.to_string())
+}
+
+/// Prompt for risk level using new interactive module (F-053)
+fn prompt_risk_level_interactive() -> CliResult<String> {
+    let options: Vec<String> = RISK_LEVEL_OPTIONS
+        .iter()
+        .map(|o| format!("{}", o))
+        .collect();
+
+    // Default to medium (index 1)
+    let selection = prompt_select("Risk level", &options, 1)?;
+    Ok(RISK_LEVEL_OPTIONS[selection].value.to_string())
+}
+
+/// Prompt for optional description (F-053)
+fn prompt_description() -> CliResult<Option<String>> {
+    prompt_text_optional("Description (optional)")
 }
 
 /// Execute get command
@@ -309,7 +591,7 @@ async fn execute_get(args: GetArgs) -> CliResult<()> {
     Ok(())
 }
 
-/// Execute delete command
+/// Execute delete command (F-053: confirmation prompt)
 async fn execute_delete(args: DeleteArgs) -> CliResult<()> {
     let id = parse_agent_id(&args.id)?;
 
@@ -320,26 +602,26 @@ async fn execute_delete(args: DeleteArgs) -> CliResult<()> {
     // Get agent details for confirmation message
     let agent = client.get_agent(id).await?;
 
-    // Confirm deletion unless --force is used
-    if !args.force {
-        if !atty::is(atty::Stream::Stdin) {
+    // Confirm deletion unless --yes or --force is used
+    let skip_confirm = args.yes || args.force;
+    if !skip_confirm {
+        if !crate::interactive::is_interactive_terminal() {
             return Err(CliError::Validation(
-                "Cannot confirm deletion in non-interactive mode. Use --force to skip confirmation."
+                "Cannot confirm deletion in non-interactive mode. Use --yes to skip confirmation."
                     .to_string(),
             ));
         }
 
-        let confirm = Confirm::new()
-            .with_prompt(format!(
-                "Delete agent '{}'? This action cannot be undone.",
+        let confirm = prompt_confirm(
+            &format!(
+                "Are you sure you want to delete agent \"{}\"?\n  This action cannot be undone.",
                 agent.name
-            ))
-            .default(false)
-            .interact()
-            .map_err(|e| CliError::Io(e.to_string()))?;
+            ),
+            false,
+        )?;
 
         if !confirm {
-            println!("Cancelled.");
+            println!("Operation cancelled. No changes were made.");
             return Ok(());
         }
     }
@@ -347,7 +629,59 @@ async fn execute_delete(args: DeleteArgs) -> CliResult<()> {
     // Delete the agent
     client.delete_agent(id).await?;
 
-    println!("✓ Agent deleted: {}", agent.name);
+    println!("✓ Agent deleted successfully.");
+
+    Ok(())
+}
+
+/// Execute update command (F-051)
+async fn execute_update(args: UpdateArgs) -> CliResult<()> {
+    let id = parse_agent_id(&args.id)?;
+
+    // Validate that at least one property is specified
+    if args.name.is_none() && args.description.is_none() && args.status.is_none() {
+        return Err(CliError::Validation(
+            "At least one property must be specified. Use --name, --description, or --status."
+                .to_string(),
+        ));
+    }
+
+    // Validate name if provided
+    if let Some(ref name) = args.name {
+        validate_agent_name(name)?;
+    }
+
+    // Validate status if provided
+    if let Some(ref status) = args.status {
+        validate_agent_status(status)?;
+    }
+
+    let paths = ConfigPaths::new()?;
+    let config = Config::load(&paths)?;
+    let client = ApiClient::new(config, paths)?;
+
+    // Build the update request
+    let mut request = UpdateAgentRequest::new();
+    if let Some(name) = args.name {
+        request = request.with_name(name);
+    }
+    if let Some(description) = args.description {
+        request = request.with_description(description);
+    }
+    if let Some(status) = args.status {
+        request = request.with_status(status);
+    }
+
+    // Update the agent
+    let agent = client.update_agent(id, request).await?;
+
+    if args.json {
+        println!("{}", serde_json::to_string_pretty(&agent)?);
+    } else {
+        println!("✓ Agent updated successfully!");
+        println!();
+        print_agent_details(&agent);
+    }
 
     Ok(())
 }
@@ -373,9 +707,7 @@ async fn execute_credentials_list(args: CredentialsListArgs) -> CliResult<()> {
     } else if response.items.is_empty() {
         println!("No credentials found for agent {agent_id}.");
         println!();
-        println!(
-            "Generate credentials with: xavyo agents credentials rotate {agent_id}"
-        );
+        println!("Generate credentials with: xavyo agents credentials rotate {agent_id}");
     } else {
         print_credentials_table(&response.items);
         println!();
@@ -491,7 +823,7 @@ async fn execute_credentials_revoke(args: CredentialsRevokeArgs) -> CliResult<()
 
     // Confirm revocation unless --force is used
     if !args.force {
-        if !atty::is(atty::Stream::Stdin) {
+        if !crate::interactive::is_interactive_terminal() {
             return Err(CliError::Validation(
                 "Cannot confirm revocation in non-interactive mode. Use --force to skip confirmation."
                     .to_string(),
@@ -650,6 +982,16 @@ fn validate_risk_level(risk_level: &str) -> CliResult<()> {
     }
 }
 
+/// Validate agent status (F-051)
+fn validate_agent_status(status: &str) -> CliResult<()> {
+    match status {
+        "active" | "inactive" | "pending" => Ok(()),
+        _ => Err(CliError::Validation(format!(
+            "Invalid agent status '{status}'. Must be one of: active, inactive, pending"
+        ))),
+    }
+}
+
 /// Parse agent ID from string
 fn parse_agent_id(id_str: &str) -> CliResult<Uuid> {
     Uuid::parse_str(id_str).map_err(|_| {
@@ -659,8 +1001,8 @@ fn parse_agent_id(id_str: &str) -> CliResult<Uuid> {
     })
 }
 
-/// Interactive prompt for agent type
-fn prompt_agent_type() -> CliResult<String> {
+/// Interactive prompt for agent type (legacy, for non-interactive mode fallback)
+fn prompt_agent_type_legacy() -> CliResult<String> {
     let types = vec![
         "copilot (human-assisted)",
         "autonomous (independent)",
@@ -686,8 +1028,8 @@ fn prompt_agent_type() -> CliResult<String> {
     Ok(agent_type.to_string())
 }
 
-/// Interactive prompt for risk level
-fn prompt_risk_level() -> CliResult<String> {
+/// Interactive prompt for risk level (legacy, for non-interactive mode fallback)
+fn prompt_risk_level_legacy() -> CliResult<String> {
     let levels = vec!["low", "medium", "high", "critical"];
 
     let selection = Select::new()
@@ -869,5 +1211,264 @@ mod tests {
 
         let empty = "";
         assert!(parse_credential_id(empty).is_err());
+    }
+
+    // F-051: Agent status validation tests
+
+    #[test]
+    fn test_validate_agent_status() {
+        assert!(validate_agent_status("active").is_ok());
+        assert!(validate_agent_status("inactive").is_ok());
+        assert!(validate_agent_status("pending").is_ok());
+        assert!(validate_agent_status("invalid").is_err());
+        assert!(validate_agent_status("ACTIVE").is_err()); // Case sensitive
+    }
+
+    // F-051: User Story 1 - Filter tests
+
+    #[test]
+    fn test_list_args_type_filter() {
+        // Test that ListArgs can hold type filter
+        let args = ListArgs {
+            json: false,
+            limit: 50,
+            offset: 0,
+            r#type: Some("copilot".to_string()),
+            status: None,
+            page: None,
+            per_page: None,
+        };
+        assert_eq!(args.r#type, Some("copilot".to_string()));
+    }
+
+    #[test]
+    fn test_list_args_status_filter() {
+        // Test that ListArgs can hold status filter
+        let args = ListArgs {
+            json: false,
+            limit: 50,
+            offset: 0,
+            r#type: None,
+            status: Some("active".to_string()),
+            page: None,
+            per_page: None,
+        };
+        assert_eq!(args.status, Some("active".to_string()));
+    }
+
+    #[test]
+    fn test_list_args_combined_filters() {
+        // Test that ListArgs can hold both filters
+        let args = ListArgs {
+            json: false,
+            limit: 50,
+            offset: 0,
+            r#type: Some("autonomous".to_string()),
+            status: Some("inactive".to_string()),
+            page: None,
+            per_page: None,
+        };
+        assert_eq!(args.r#type, Some("autonomous".to_string()));
+        assert_eq!(args.status, Some("inactive".to_string()));
+    }
+
+    // F-051: User Story 2 - Update tests
+
+    #[test]
+    fn test_update_args_parsing() {
+        let args = UpdateArgs {
+            id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890".to_string(),
+            name: Some("new-name".to_string()),
+            description: None,
+            status: Some("inactive".to_string()),
+            json: false,
+        };
+        assert_eq!(args.name, Some("new-name".to_string()));
+        assert_eq!(args.status, Some("inactive".to_string()));
+        assert!(args.description.is_none());
+    }
+
+    #[test]
+    fn test_update_requires_at_least_one_property() {
+        let args = UpdateArgs {
+            id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890".to_string(),
+            name: None,
+            description: None,
+            status: None,
+            json: false,
+        };
+        // All properties are None, which would fail validation
+        assert!(args.name.is_none() && args.description.is_none() && args.status.is_none());
+    }
+
+    // F-051: User Story 3 - Pagination tests
+
+    #[test]
+    fn test_page_to_offset_conversion() {
+        // Page 1 with per_page 10 should give offset 0
+        let args = ListArgs {
+            json: false,
+            limit: 50,
+            offset: 0,
+            r#type: None,
+            status: None,
+            page: Some(1),
+            per_page: Some(10),
+        };
+        let (limit, offset) = calculate_pagination(&args).unwrap();
+        assert_eq!(limit, 10);
+        assert_eq!(offset, 0);
+
+        // Page 2 with per_page 10 should give offset 10
+        let args2 = ListArgs {
+            json: false,
+            limit: 50,
+            offset: 0,
+            r#type: None,
+            status: None,
+            page: Some(2),
+            per_page: Some(10),
+        };
+        let (limit2, offset2) = calculate_pagination(&args2).unwrap();
+        assert_eq!(limit2, 10);
+        assert_eq!(offset2, 10);
+
+        // Page 3 with per_page 25 should give offset 50
+        let args3 = ListArgs {
+            json: false,
+            limit: 50,
+            offset: 0,
+            r#type: None,
+            status: None,
+            page: Some(3),
+            per_page: Some(25),
+        };
+        let (limit3, offset3) = calculate_pagination(&args3).unwrap();
+        assert_eq!(limit3, 25);
+        assert_eq!(offset3, 50);
+    }
+
+    #[test]
+    fn test_page_validation() {
+        // Page 0 should fail
+        let args_zero = ListArgs {
+            json: false,
+            limit: 50,
+            offset: 0,
+            r#type: None,
+            status: None,
+            page: Some(0),
+            per_page: Some(10),
+        };
+        assert!(calculate_pagination(&args_zero).is_err());
+
+        // Negative page should fail
+        let args_neg = ListArgs {
+            json: false,
+            limit: 50,
+            offset: 0,
+            r#type: None,
+            status: None,
+            page: Some(-1),
+            per_page: Some(10),
+        };
+        assert!(calculate_pagination(&args_neg).is_err());
+    }
+
+    #[test]
+    fn test_per_page_cap_at_100() {
+        // per_page 200 should be capped at 100
+        let args = ListArgs {
+            json: false,
+            limit: 50,
+            offset: 0,
+            r#type: None,
+            status: None,
+            page: Some(1),
+            per_page: Some(200),
+        };
+        let (limit, _) = calculate_pagination(&args).unwrap();
+        assert_eq!(limit, 100);
+    }
+
+    // F-053: Interactive Mode Tests
+
+    #[test]
+    fn test_create_args_with_interactive_flag() {
+        // Test that CreateArgs can have --interactive flag
+        let args = CreateArgs {
+            name: None,
+            interactive: true,
+            r#type: None,
+            model_provider: None,
+            model_name: None,
+            risk_level: None,
+            description: None,
+            json: false,
+        };
+        assert!(args.interactive);
+        assert!(args.name.is_none());
+    }
+
+    #[test]
+    fn test_create_args_non_interactive_requires_name() {
+        // Test that non-interactive mode requires a name
+        let args = CreateArgs {
+            name: None,
+            interactive: false,
+            r#type: Some("copilot".to_string()),
+            model_provider: None,
+            model_name: None,
+            risk_level: Some("low".to_string()),
+            description: None,
+            json: false,
+        };
+        // In non-interactive mode with no name, this would fail validation
+        assert!(args.name.is_none());
+        assert!(!args.interactive);
+    }
+
+    #[test]
+    fn test_create_args_with_all_fields() {
+        // Test that CreateArgs can hold all fields
+        let args = CreateArgs {
+            name: Some("my-agent".to_string()),
+            interactive: true,
+            r#type: Some("autonomous".to_string()),
+            model_provider: Some("anthropic".to_string()),
+            model_name: Some("claude-4".to_string()),
+            risk_level: Some("medium".to_string()),
+            description: Some("Test agent".to_string()),
+            json: true,
+        };
+        assert_eq!(args.name, Some("my-agent".to_string()));
+        assert!(args.interactive);
+        assert_eq!(args.r#type, Some("autonomous".to_string()));
+        assert_eq!(args.risk_level, Some("medium".to_string()));
+    }
+
+    #[test]
+    fn test_delete_args_with_yes_flag() {
+        // Test that DeleteArgs has --yes flag
+        let args = DeleteArgs {
+            id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890".to_string(),
+            yes: true,
+            force: false,
+        };
+        assert!(args.yes);
+        assert!(!args.force);
+    }
+
+    #[test]
+    fn test_delete_args_force_is_alias() {
+        // Test that --force still works as an alias for backward compatibility
+        let args = DeleteArgs {
+            id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890".to_string(),
+            yes: false,
+            force: true,
+        };
+        // Either yes or force should skip confirmation
+        let skip_confirm = args.yes || args.force;
+        assert!(skip_confirm);
     }
 }

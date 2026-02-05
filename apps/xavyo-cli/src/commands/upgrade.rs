@@ -230,9 +230,7 @@ fn create_http_client() -> CliResult<Client> {
 
 /// Fetch the latest release from GitHub
 async fn fetch_latest_release(client: &Client) -> CliResult<Release> {
-    let url = format!(
-        "https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
-    );
+    let url = format!("https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest");
 
     let response = client
         .get(&url)

@@ -237,31 +237,31 @@ impl GovBatchSimulationResult {
     }
 
     /// Parse access gained.
-    #[must_use] 
+    #[must_use]
     pub fn parse_access_gained(&self) -> Vec<AccessItem> {
         serde_json::from_value(self.access_gained.clone()).unwrap_or_default()
     }
 
     /// Parse access lost.
-    #[must_use] 
+    #[must_use]
     pub fn parse_access_lost(&self) -> Vec<AccessItem> {
         serde_json::from_value(self.access_lost.clone()).unwrap_or_default()
     }
 
     /// Parse warnings.
-    #[must_use] 
+    #[must_use]
     pub fn parse_warnings(&self) -> Vec<String> {
         serde_json::from_value(self.warnings.clone()).unwrap_or_default()
     }
 
     /// Check if this result has any warnings.
-    #[must_use] 
+    #[must_use]
     pub fn has_warnings(&self) -> bool {
         !self.parse_warnings().is_empty()
     }
 
     /// Check if this result has any access changes.
-    #[must_use] 
+    #[must_use]
     pub fn has_changes(&self) -> bool {
         !self.parse_access_gained().is_empty() || !self.parse_access_lost().is_empty()
     }

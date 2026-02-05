@@ -11,10 +11,7 @@ mod common;
 
 mod persona_workflow_integration {
     use super::*;
-    use xavyo_db::models::{
-        PersonaAuditEventType,
-        PersonaLinkType, PersonaStatus,
-    };
+    use xavyo_db::models::{PersonaAuditEventType, PersonaLinkType, PersonaStatus};
 
     /// T014: Integration test for persona creation workflow
     #[test]
@@ -153,7 +150,7 @@ mod persona_workflow_integration {
 }
 
 mod persona_activation_integration {
-    
+
     use xavyo_db::models::{PersonaAuditEventType, PersonaStatus};
 
     #[test]
@@ -245,7 +242,7 @@ mod persona_deactivation_integration {
 }
 
 mod persona_archive_integration {
-    
+
     use xavyo_db::models::{PersonaAuditEventType, PersonaStatus};
 
     #[test]
@@ -327,7 +324,6 @@ mod duplicate_prevention_integration {
 }
 
 mod archetype_deletion_prevention {
-    
 
     #[test]
     fn test_cannot_delete_archetype_with_active_personas() {

@@ -42,7 +42,7 @@ pub struct GovLicenseAuditEvent {
 
 impl GovLicenseAuditEvent {
     /// Get the action as an enum (if it's a known action type).
-    #[must_use] 
+    #[must_use]
     pub fn action_type(&self) -> Option<LicenseAuditAction> {
         LicenseAuditAction::parse(&self.action)
     }
@@ -350,7 +350,7 @@ fn default_details() -> serde_json::Value {
 
 impl CreateGovLicenseAuditEvent {
     /// Create a pool-related event.
-    #[must_use] 
+    #[must_use]
     pub fn pool_event(
         pool_id: Uuid,
         action: LicenseAuditAction,
@@ -368,7 +368,7 @@ impl CreateGovLicenseAuditEvent {
     }
 
     /// Create an assignment-related event.
-    #[must_use] 
+    #[must_use]
     pub fn assignment_event(
         pool_id: Uuid,
         assignment_id: Uuid,
@@ -388,7 +388,7 @@ impl CreateGovLicenseAuditEvent {
     }
 
     /// Create a bulk operation event.
-    #[must_use] 
+    #[must_use]
     pub fn bulk_event(
         pool_id: Uuid,
         action: LicenseAuditAction,

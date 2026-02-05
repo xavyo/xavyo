@@ -47,7 +47,7 @@ pub struct StateAccessRuleService {
 
 impl StateAccessRuleService {
     /// Create a new state access rule service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

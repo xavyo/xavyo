@@ -250,13 +250,13 @@ impl GovAccessSnapshot {
     }
 
     /// Parse the assignments JSON.
-    #[must_use] 
+    #[must_use]
     pub fn parse_assignments(&self) -> SnapshotContent {
         serde_json::from_value(self.assignments.clone()).unwrap_or_default()
     }
 
     /// Get the total count of assignments in the snapshot.
-    #[must_use] 
+    #[must_use]
     pub fn assignment_count(&self) -> i32 {
         self.parse_assignments().total_count
     }

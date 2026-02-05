@@ -78,7 +78,8 @@ pub async fn otel_trace_middleware(
     let method = request.method().to_string();
     let target = request.uri().path().to_string();
     let route = matched_path
-        .as_ref().map_or_else(|| "unmatched".to_string(), |m| m.as_str().to_string());
+        .as_ref()
+        .map_or_else(|| "unmatched".to_string(), |m| m.as_str().to_string());
 
     // Extract W3C trace context from incoming headers (FR-002)
     let otel_cx = extract_otel_context(request.headers());
@@ -184,7 +185,10 @@ pub async fn request_timeout_middleware(
         std::time::Duration::from_secs(timeout_secs),
         next.run(request),
     )
-    .await { response } else {
+    .await
+    {
+        response
+    } else {
         let mut response = Response::new(Body::from(
             serde_json::json!({
                 "error": "request_timeout",
@@ -672,7 +676,9 @@ pub async fn idempotency_middleware_jwt(
     request: axum::http::Request<Body>,
     next: Next,
 ) -> Response {
-    let tenant_uuid = if let Some(tid) = claims.tenant_id() { *tid.as_uuid() } else {
+    let tenant_uuid = if let Some(tid) = claims.tenant_id() {
+        *tid.as_uuid()
+    } else {
         tracing::error!("Idempotency middleware: JWT claims missing tenant_id");
         return IdempotencyError::Database(sqlx::Error::Protocol(
             "Missing tenant context".to_string(),

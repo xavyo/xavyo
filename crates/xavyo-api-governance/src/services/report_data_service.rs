@@ -24,7 +24,7 @@ pub struct ReportData {
 
 impl ReportDataService {
     /// Create a new report data service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -340,12 +340,17 @@ impl ReportDataService {
         let from_date = parameters
             .and_then(|p| p.get("from_date"))
             .and_then(|v| v.as_str())
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map_or_else(|| chrono::Utc::now() - chrono::Duration::days(30), |dt| dt.with_timezone(&chrono::Utc));
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map_or_else(
+                || chrono::Utc::now() - chrono::Duration::days(30),
+                |dt| dt.with_timezone(&chrono::Utc),
+            );
 
         let to_date = parameters
             .and_then(|p| p.get("to_date"))
             .and_then(|v| v.as_str())
-            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()).map_or_else(chrono::Utc::now, |dt| dt.with_timezone(&chrono::Utc));
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map_or_else(chrono::Utc::now, |dt| dt.with_timezone(&chrono::Utc));
 
         // Query admin audit logs for governance events
         let rows: Vec<(

@@ -82,7 +82,7 @@ pub struct NhiCertificationService {
 
 impl NhiCertificationService {
     /// Create a new NHI certification service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             credential_service: NhiCredentialService::new(pool.clone()),
@@ -139,7 +139,9 @@ impl NhiCertificationService {
 
         // Validate specific reviewers if required
         if reviewer_type == NhiCertReviewerType::SpecificUsers
-            && specific_reviewers.as_ref().is_none_or(std::vec::Vec::is_empty)
+            && specific_reviewers
+                .as_ref()
+                .is_none_or(std::vec::Vec::is_empty)
         {
             return Err(GovernanceError::SpecificReviewersRequired);
         }
@@ -1544,7 +1546,7 @@ impl NhiCertificationService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

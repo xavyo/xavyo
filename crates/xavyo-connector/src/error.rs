@@ -190,7 +190,7 @@ impl ConnectorError {
     ///
     /// Transient errors are those caused by temporary conditions that may resolve
     /// themselves, such as network issues or temporary unavailability.
-    #[must_use] 
+    #[must_use]
     pub fn is_transient(&self) -> bool {
         matches!(
             self,
@@ -205,13 +205,13 @@ impl ConnectorError {
     /// Check if this error is permanent and retry won't help.
     ///
     /// Permanent errors require human intervention or configuration changes.
-    #[must_use] 
+    #[must_use]
     pub fn is_permanent(&self) -> bool {
         !self.is_transient()
     }
 
     /// Get an error code for classification.
-    #[must_use] 
+    #[must_use]
     pub fn error_code(&self) -> &'static str {
         match self {
             ConnectorError::ConnectionFailed { .. } => "CONNECTION_FAILED",

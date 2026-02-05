@@ -616,25 +616,25 @@ impl GovCorrelationRule {
     }
 
     /// Check if rule is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         self.is_active
     }
 
     /// Check if this is a fuzzy match rule.
-    #[must_use] 
+    #[must_use]
     pub fn is_fuzzy(&self) -> bool {
         matches!(self.match_type, GovMatchType::Fuzzy)
     }
 
     /// Check if this is an expression-based rule (F067).
-    #[must_use] 
+    #[must_use]
     pub fn is_expression(&self) -> bool {
         matches!(self.match_type, GovMatchType::Expression)
     }
 
     /// Check if this is a connector-scoped rule (F067).
-    #[must_use] 
+    #[must_use]
     pub fn is_connector_scoped(&self) -> bool {
         self.connector_id.is_some()
     }

@@ -160,9 +160,10 @@ pub async fn bulk_check_handler(
     }
 
     // Determine subject: explicit user_id or caller
-    let (subject_id, roles) = if let Some(uid) = request.user_id { (uid, vec![]) } else {
-        let uid =
-            Uuid::parse_str(&claims.sub).map_err(|_| ApiAuthorizationError::Unauthorized)?;
+    let (subject_id, roles) = if let Some(uid) = request.user_id {
+        (uid, vec![])
+    } else {
+        let uid = Uuid::parse_str(&claims.sub).map_err(|_| ApiAuthorizationError::Unauthorized)?;
         (uid, claims.roles.clone())
     };
 

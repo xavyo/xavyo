@@ -1,6 +1,7 @@
 //! Data models for the xavyo CLI
 
 pub mod agent;
+pub mod api_key;
 pub mod authorize;
 pub mod config;
 mod credentials;

@@ -331,7 +331,7 @@ impl AzureFederatedConfigBuilder {
     }
 
     /// Build the configuration.
-    #[must_use] 
+    #[must_use]
     pub fn build(self) -> AzureFederatedConfig {
         AzureFederatedConfig {
             tenant_id: self.tenant_id,

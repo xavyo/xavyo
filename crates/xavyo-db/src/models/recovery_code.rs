@@ -44,7 +44,10 @@ impl UserRecoveryCode {
         E: PgExecutor<'e>,
     {
         // Use unnest for bulk insert
-        let code_hashes_vec: Vec<&str> = code_hashes.iter().map(std::string::String::as_str).collect();
+        let code_hashes_vec: Vec<&str> = code_hashes
+            .iter()
+            .map(std::string::String::as_str)
+            .collect();
 
         sqlx::query_as(
             r"

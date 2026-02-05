@@ -123,8 +123,10 @@ pub async fn call_tool(
     Path(tool_name): Path<String>,
     Json(request): Json<McpCallRequest>,
 ) -> Result<Json<McpCallResponse>, Response> {
-    let tenant_id = extract_tenant_id(&claims).map_err(axum::response::IntoResponse::into_response)?;
-    let agent_id = extract_agent_id(&claims).map_err(axum::response::IntoResponse::into_response)?;
+    let tenant_id =
+        extract_tenant_id(&claims).map_err(axum::response::IntoResponse::into_response)?;
+    let agent_id =
+        extract_agent_id(&claims).map_err(axum::response::IntoResponse::into_response)?;
 
     debug!(
         tenant_id = %tenant_id,

@@ -32,13 +32,13 @@ pub struct SemiManualResourceService {
 
 impl SemiManualResourceService {
     /// Create a new semi-manual resource service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

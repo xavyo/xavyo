@@ -86,13 +86,13 @@ pub struct UpsertWebAuthnPolicy {
 
 impl TenantWebAuthnPolicy {
     /// Get the user verification requirement as an enum.
-    #[must_use] 
+    #[must_use]
     pub fn user_verification_requirement(&self) -> UserVerification {
         self.user_verification.parse().unwrap_or_default()
     }
 
     /// Check if a specific authenticator type is allowed.
-    #[must_use] 
+    #[must_use]
     pub fn is_authenticator_type_allowed(&self, auth_type: &str) -> bool {
         match &self.allowed_authenticator_types {
             None => true, // All types allowed

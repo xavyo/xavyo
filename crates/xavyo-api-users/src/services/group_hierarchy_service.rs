@@ -31,7 +31,7 @@ pub struct GroupHierarchyService {
 
 impl GroupHierarchyService {
     /// Create a new hierarchy service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

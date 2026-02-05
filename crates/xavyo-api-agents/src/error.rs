@@ -37,7 +37,7 @@ pub struct ProblemDetails {
 
 impl ProblemDetails {
     /// Create a new `ProblemDetails` instance.
-    #[must_use] 
+    #[must_use]
     pub fn new(error_type: &str, title: &str, status: StatusCode) -> Self {
         Self {
             error_type: format!("{ERROR_BASE_URL}/{error_type}"),
@@ -487,7 +487,7 @@ pub enum ApiAgentsError {
 
 impl ApiAgentsError {
     /// Convert to `ProblemDetails`.
-    #[must_use] 
+    #[must_use]
     pub fn to_problem_details(&self) -> ProblemDetails {
         match self {
             // Agent errors
@@ -1125,7 +1125,7 @@ impl ApiAgentsError {
     }
 
     /// Get the HTTP status code for this error.
-    #[must_use] 
+    #[must_use]
     pub fn status_code(&self) -> StatusCode {
         match self {
             // Not Found

@@ -303,13 +303,13 @@ impl GovApprovalGroup {
     }
 
     /// Get member count.
-    #[must_use] 
+    #[must_use]
     pub fn member_count(&self) -> usize {
         self.member_ids.len()
     }
 
     /// Check if a user is a member.
-    #[must_use] 
+    #[must_use]
     pub fn has_member(&self, user_id: Uuid) -> bool {
         self.member_ids.contains(&user_id)
     }

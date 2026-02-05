@@ -48,7 +48,8 @@ pub async fn request_id_middleware(mut request: Request, next: Next) -> Response
         .headers()
         .get(REQUEST_ID_HEADER)
         .and_then(|v| v.to_str().ok())
-        .and_then(|s| Uuid::parse_str(s).ok()).map_or_else(RequestId::new, RequestId);
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .map_or_else(RequestId::new, RequestId);
 
     // Insert request ID as extension
     request.extensions_mut().insert(request_id);

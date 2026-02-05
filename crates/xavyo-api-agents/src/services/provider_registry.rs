@@ -45,7 +45,7 @@ pub struct ProviderRegistry {
 
 impl ProviderRegistry {
     /// Create a new `ProviderRegistry`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, encryption: Arc<EncryptionService>) -> Self {
         Self {
             pool,

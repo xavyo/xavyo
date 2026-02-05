@@ -96,9 +96,8 @@ pub async fn authorize_handler(
     );
 
     // F082-US6: Set CSRF token as HttpOnly cookie (double-submit cookie pattern)
-    let cookie_value = format!(
-        "csrf_token={csrf_token}; HttpOnly; SameSite=Strict; Path=/oauth; Max-Age=600"
-    );
+    let cookie_value =
+        format!("csrf_token={csrf_token}; HttpOnly; SameSite=Strict; Path=/oauth; Max-Age=600");
     let mut response = Redirect::to(&consent_url).into_response();
     if let Ok(header_val) = cookie_value.parse() {
         response.headers_mut().insert(SET_COOKIE, header_val);
@@ -136,7 +135,8 @@ pub async fn consent_handler(
             .and_then(|cookies| {
                 cookies.split(';').find_map(|c| {
                     let c = c.trim();
-                    c.strip_prefix("csrf_token=").map(std::string::ToString::to_string)
+                    c.strip_prefix("csrf_token=")
+                        .map(std::string::ToString::to_string)
                 })
             })
             .unwrap_or_default();

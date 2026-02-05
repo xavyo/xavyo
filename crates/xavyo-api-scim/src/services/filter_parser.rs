@@ -135,7 +135,7 @@ pub struct FilterParser<'a> {
 
 impl<'a> FilterParser<'a> {
     /// Create a new parser.
-    #[must_use] 
+    #[must_use]
     pub fn new(input: &'a str) -> Self {
         Self { input, pos: 0 }
     }
@@ -388,7 +388,7 @@ pub struct AttributeMapper {
 
 impl AttributeMapper {
     /// Create a new mapper with default user mappings.
-    #[must_use] 
+    #[must_use]
     pub fn for_users() -> Self {
         Self {
             mappings: vec![
@@ -404,7 +404,7 @@ impl AttributeMapper {
     }
 
     /// Create a new mapper with default group mappings.
-    #[must_use] 
+    #[must_use]
     pub fn for_groups() -> Self {
         Self {
             mappings: vec![
@@ -415,7 +415,7 @@ impl AttributeMapper {
     }
 
     /// Map a SCIM attribute to a SQL column.
-    #[must_use] 
+    #[must_use]
     pub fn map(&self, scim_attr: &str) -> Option<&str> {
         self.mappings
             .iter()

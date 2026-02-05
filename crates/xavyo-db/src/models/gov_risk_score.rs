@@ -25,7 +25,7 @@ pub enum RiskLevel {
 
 impl RiskLevel {
     /// Determine risk level from a score (0-100).
-    #[must_use] 
+    #[must_use]
     pub fn from_score(score: i32) -> Self {
         match score {
             0..=25 => Self::Low,
@@ -36,19 +36,19 @@ impl RiskLevel {
     }
 
     /// Check if this is a high or critical risk level.
-    #[must_use] 
+    #[must_use]
     pub fn is_elevated(&self) -> bool {
         matches!(self, Self::High | Self::Critical)
     }
 
     /// Check if this is critical risk.
-    #[must_use] 
+    #[must_use]
     pub fn is_critical(&self) -> bool {
         matches!(self, Self::Critical)
     }
 
     /// Get the minimum score for this level.
-    #[must_use] 
+    #[must_use]
     pub fn min_score(&self) -> i32 {
         match self {
             Self::Low => 0,
@@ -59,7 +59,7 @@ impl RiskLevel {
     }
 
     /// Get the maximum score for this level.
-    #[must_use] 
+    #[must_use]
     pub fn max_score(&self) -> i32 {
         match self {
             Self::Low => 25,

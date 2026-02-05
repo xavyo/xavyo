@@ -32,7 +32,7 @@ pub const CSRF_COOKIE_MAX_AGE: i64 = 3600;
 /// # Returns
 ///
 /// The cookie header value as a string.
-#[must_use] 
+#[must_use]
 pub fn create_session_cookie(session_id: Uuid, secure: bool) -> String {
     let secure_flag = if secure { "; Secure" } else { "" };
     format!(
@@ -93,7 +93,7 @@ pub fn extract_session_cookie(headers: &HeaderMap) -> Option<Uuid> {
 /// # Returns
 ///
 /// The cookie header value for clearing the cookie.
-#[must_use] 
+#[must_use]
 pub fn clear_session_cookie(secure: bool) -> String {
     let secure_flag = if secure { "; Secure" } else { "" };
     format!(
@@ -112,7 +112,7 @@ pub fn clear_session_cookie(secure: bool) -> String {
 /// # Returns
 ///
 /// A random CSRF token string (43 characters).
-#[must_use] 
+#[must_use]
 pub fn generate_csrf_token() -> String {
     let mut bytes = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut bytes);
@@ -132,7 +132,7 @@ pub fn generate_csrf_token() -> String {
 /// # Returns
 ///
 /// The cookie header value as a string.
-#[must_use] 
+#[must_use]
 pub fn create_csrf_cookie(token: &str, secure: bool) -> String {
     let secure_flag = if secure { "; Secure" } else { "" };
     format!(
@@ -175,7 +175,7 @@ pub fn extract_csrf_cookie(headers: &HeaderMap) -> Option<String> {
 /// # Returns
 ///
 /// True if the tokens match, false otherwise.
-#[must_use] 
+#[must_use]
 pub fn validate_csrf_token(cookie_token: &str, form_token: &str) -> bool {
     // Use constant-time comparison
     if cookie_token.len() != form_token.len() {
@@ -198,12 +198,10 @@ pub fn validate_csrf_token(cookie_token: &str, form_token: &str) -> bool {
 /// # Returns
 ///
 /// The cookie header value for clearing the cookie.
-#[must_use] 
+#[must_use]
 pub fn clear_csrf_cookie(secure: bool) -> String {
     let secure_flag = if secure { "; Secure" } else { "" };
-    format!(
-        "{CSRF_COOKIE_NAME}={secure_flag}; SameSite=Strict; Path=/device; Max-Age=0"
-    )
+    format!("{CSRF_COOKIE_NAME}={secure_flag}; SameSite=Strict; Path=/device; Max-Age=0")
 }
 
 // ============================================================================

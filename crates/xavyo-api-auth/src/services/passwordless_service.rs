@@ -56,7 +56,7 @@ pub struct PasswordlessRateLimiter {
 
 impl PasswordlessRateLimiter {
     /// Create a new rate limiter.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             email_requests: HashMap::new(),

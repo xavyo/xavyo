@@ -38,7 +38,7 @@ impl CredentialEncryption {
     ///
     /// # Arguments
     /// * `master_key` - 32-byte master key for deriving tenant keys.
-    #[must_use] 
+    #[must_use]
     pub fn new(master_key: [u8; KEY_LENGTH]) -> Self {
         Self { master_key }
     }
@@ -224,7 +224,7 @@ impl std::fmt::Debug for CredentialEncryption {
 /// This should only be used for initial setup or testing.
 ///
 /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
-#[must_use] 
+#[must_use]
 pub fn generate_master_key() -> [u8; KEY_LENGTH] {
     use rand::rngs::OsRng;
     use rand::RngCore;
@@ -234,7 +234,7 @@ pub fn generate_master_key() -> [u8; KEY_LENGTH] {
 }
 
 /// Generate a random master key as a hex string.
-#[must_use] 
+#[must_use]
 pub fn generate_master_key_hex() -> String {
     hex::encode(generate_master_key())
 }

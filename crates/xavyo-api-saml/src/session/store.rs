@@ -48,7 +48,7 @@ pub struct InMemorySessionStore {
 }
 
 impl InMemorySessionStore {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -129,7 +129,7 @@ pub struct PostgresSessionStore {
 }
 
 impl PostgresSessionStore {
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

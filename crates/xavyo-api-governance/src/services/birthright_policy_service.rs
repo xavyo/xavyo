@@ -23,7 +23,7 @@ pub struct BirthrightPolicyService {
 
 impl BirthrightPolicyService {
     /// Create a new birthright policy service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

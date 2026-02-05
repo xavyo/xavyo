@@ -23,7 +23,7 @@ pub enum SyncMode {
 
 impl SyncMode {
     /// Convert to string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             SyncMode::Polling => "polling",
@@ -68,7 +68,7 @@ pub enum ConflictResolution {
 
 impl ConflictResolution {
     /// Convert to resolution strategy.
-    #[must_use] 
+    #[must_use]
     pub fn to_strategy(&self) -> ResolutionStrategy {
         match self {
             ConflictResolution::InboundWins => ResolutionStrategy::InboundWins,
@@ -79,7 +79,7 @@ impl ConflictResolution {
     }
 
     /// Convert to string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             ConflictResolution::InboundWins => "inbound_wins",
@@ -137,7 +137,7 @@ pub struct SyncConfig {
 
 impl SyncConfig {
     /// Get polling interval as Duration.
-    #[must_use] 
+    #[must_use]
     pub fn polling_interval(&self) -> Duration {
         Duration::from_secs(self.polling_interval_secs as u64)
     }
@@ -193,7 +193,7 @@ pub struct SyncConfigService {
 
 impl SyncConfigService {
     /// Create a new sync config service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

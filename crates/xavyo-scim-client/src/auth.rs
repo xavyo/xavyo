@@ -92,7 +92,7 @@ pub struct ScimAuth {
 
 impl ScimAuth {
     /// Create a new auth handler from decrypted credentials.
-    #[must_use] 
+    #[must_use]
     pub fn new(credentials: ScimCredentials, http_client: reqwest::Client) -> Self {
         Self {
             credentials,

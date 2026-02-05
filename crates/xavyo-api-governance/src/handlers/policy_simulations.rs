@@ -93,7 +93,10 @@ pub async fn list_policy_simulations(
         )
         .await?;
 
-    let items: Vec<PolicySimulationResponse> = simulations.into_iter().map(std::convert::Into::into).collect();
+    let items: Vec<PolicySimulationResponse> = simulations
+        .into_iter()
+        .map(std::convert::Into::into)
+        .collect();
 
     Ok(Json(PaginatedResponse {
         items,

@@ -18,7 +18,7 @@ use uuid::Uuid;
 use xavyo_auth::JwtClaims;
 
 /// Check if the user is a super admin based on their JWT claims.
-#[must_use] 
+#[must_use]
 pub fn is_super_admin(claims: &JwtClaims) -> bool {
     claims.roles.contains(&"super_admin".to_string())
 }
@@ -59,13 +59,17 @@ pub async fn permission_guard_middleware(
     }
 
     // Extract tenant_id from claims (tid field)
-    let tenant_id = if let Some(id) = claims.tid { id } else {
+    let tenant_id = if let Some(id) = claims.tid {
+        id
+    } else {
         warn!("Missing tenant_id in claims");
         return ApiAuthError::Unauthorized.into_response();
     };
 
     // Extract user_id from claims (sub field)
-    let user_id = if let Ok(id) = Uuid::parse_str(&claims.sub) { id } else {
+    let user_id = if let Ok(id) = Uuid::parse_str(&claims.sub) {
+        id
+    } else {
         warn!("Invalid user_id in claims");
         return ApiAuthError::Unauthorized.into_response();
     };

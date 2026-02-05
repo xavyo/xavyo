@@ -202,9 +202,9 @@ impl AssetStorage for LocalAssetStorage {
         let file_path = self.validate_storage_path(storage_path)?;
 
         if file_path.exists() {
-            fs::remove_file(&file_path).await.map_err(|e| {
-                ApiAuthError::Internal(format!("Failed to delete asset file: {e}"))
-            })?;
+            fs::remove_file(&file_path)
+                .await
+                .map_err(|e| ApiAuthError::Internal(format!("Failed to delete asset file: {e}")))?;
         }
 
         Ok(())

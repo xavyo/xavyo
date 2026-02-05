@@ -27,19 +27,19 @@ pub enum MiningJobStatus {
 
 impl MiningJobStatus {
     /// Check if job can be started.
-    #[must_use] 
+    #[must_use]
     pub fn can_start(&self) -> bool {
         matches!(self, Self::Pending)
     }
 
     /// Check if job can be cancelled.
-    #[must_use] 
+    #[must_use]
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Running)
     }
 
     /// Check if job is terminal (completed, failed, or cancelled).
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
     }
@@ -470,7 +470,7 @@ impl GovRoleMiningJob {
     }
 
     /// Parse the job parameters.
-    #[must_use] 
+    #[must_use]
     pub fn parse_parameters(&self) -> MiningJobParameters {
         serde_json::from_value(self.parameters.clone()).unwrap_or_default()
     }

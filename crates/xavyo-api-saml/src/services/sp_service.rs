@@ -15,7 +15,7 @@ pub struct SpService {
 
 impl SpService {
     /// Create a new `SpService`
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -118,12 +118,10 @@ impl SpService {
             .fetch_one(&self.pool)
             .await?
         } else {
-            sqlx::query_scalar(
-                r"SELECT COUNT(*) FROM saml_service_providers WHERE tenant_id = $1",
-            )
-            .bind(tenant_id)
-            .fetch_one(&self.pool)
-            .await?
+            sqlx::query_scalar(r"SELECT COUNT(*) FROM saml_service_providers WHERE tenant_id = $1")
+                .bind(tenant_id)
+                .fetch_one(&self.pool)
+                .await?
         };
 
         Ok((sps, total))

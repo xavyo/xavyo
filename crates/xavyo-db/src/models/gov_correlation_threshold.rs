@@ -143,7 +143,7 @@ impl GovCorrelationThreshold {
     ///
     /// This is a pure in-memory helper that does not perform any database call.
     /// Uses `Uuid::nil()` for the `id` field to indicate it is not persisted.
-    #[must_use] 
+    #[must_use]
     pub fn find_or_default(tenant_id: Uuid, connector_id: Uuid) -> Self {
         Self {
             id: Uuid::nil(),

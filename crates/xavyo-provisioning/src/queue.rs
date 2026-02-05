@@ -25,7 +25,7 @@ pub enum EnqueueResult {
 
 impl EnqueueResult {
     /// Get the operation ID (either new or existing).
-    #[must_use] 
+    #[must_use]
     pub fn operation_id(&self) -> Uuid {
         match self {
             EnqueueResult::Enqueued { id } => *id,
@@ -34,13 +34,13 @@ impl EnqueueResult {
     }
 
     /// Check if this was a new operation.
-    #[must_use] 
+    #[must_use]
     pub fn is_new(&self) -> bool {
         matches!(self, EnqueueResult::Enqueued { .. })
     }
 
     /// Check if this was a duplicate.
-    #[must_use] 
+    #[must_use]
     pub fn is_duplicate(&self) -> bool {
         matches!(self, EnqueueResult::Duplicate { .. })
     }
@@ -141,7 +141,7 @@ pub struct QueuedOperation {
 
 impl QueuedOperation {
     /// Create a new queued operation.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -184,14 +184,14 @@ impl QueuedOperation {
     }
 
     /// Set the priority.
-    #[must_use] 
+    #[must_use]
     pub fn with_priority(mut self, priority: i32) -> Self {
         self.priority = priority;
         self
     }
 
     /// Set max retries.
-    #[must_use] 
+    #[must_use]
     pub fn with_max_retries(mut self, max: i32) -> Self {
         self.max_retries = max;
         self
@@ -204,13 +204,13 @@ impl QueuedOperation {
     }
 
     /// Check if the operation can be retried.
-    #[must_use] 
+    #[must_use]
     pub fn can_retry(&self) -> bool {
         self.retry_count < self.max_retries
     }
 
     /// Check if the operation is ready for processing.
-    #[must_use] 
+    #[must_use]
     pub fn is_ready(&self) -> bool {
         match self.status {
             OperationStatus::Pending => true,
@@ -271,19 +271,19 @@ pub struct OperationBatch {
 
 impl OperationBatch {
     /// Get the number of operations in this batch.
-    #[must_use] 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.operations.len()
     }
 
     /// Check if this batch is empty.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.operations.is_empty()
     }
 
     /// Get operation IDs in this batch.
-    #[must_use] 
+    #[must_use]
     pub fn operation_ids(&self) -> Vec<Uuid> {
         self.operations.iter().map(|op| op.id).collect()
     }
@@ -297,7 +297,7 @@ pub struct OperationQueue {
 
 impl OperationQueue {
     /// Create a new operation queue.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -306,7 +306,7 @@ impl OperationQueue {
     }
 
     /// Create with custom configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_config(pool: PgPool, config: QueueConfig) -> Self {
         Self { pool, config }
     }
@@ -1130,13 +1130,13 @@ pub struct QueueStats {
 
 impl QueueStats {
     /// Total operations in the queue (excluding completed).
-    #[must_use] 
+    #[must_use]
     pub fn total_queued(&self) -> u64 {
         self.pending + self.in_progress + self.failed + self.awaiting_system
     }
 
     /// Calculate success rate as percentage.
-    #[must_use] 
+    #[must_use]
     pub fn success_rate(&self) -> f64 {
         let total = self.completed + self.dead_letter;
         if total == 0 {

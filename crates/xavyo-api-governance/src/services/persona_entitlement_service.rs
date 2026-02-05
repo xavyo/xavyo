@@ -60,7 +60,7 @@ pub struct PersonaEntitlementService {
 
 impl PersonaEntitlementService {
     /// Create a new persona entitlement service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             effective_access_service: EffectiveAccessService::new(pool.clone()),
@@ -203,7 +203,7 @@ impl PersonaEntitlementService {
     ///
     /// This is called when a persona is deactivated to ensure
     /// all pending access checks fail immediately.
-    #[must_use] 
+    #[must_use]
     pub fn is_persona_deactivated(&self, persona: &GovPersona) -> bool {
         !persona.status.can_switch_to()
     }

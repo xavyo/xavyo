@@ -117,13 +117,13 @@ pub enum NhiType {
 
 impl NhiType {
     /// Returns all known NHI types.
-    #[must_use] 
+    #[must_use]
     pub fn all() -> &'static [NhiType] {
         &[NhiType::ServiceAccount, NhiType::AiAgent]
     }
 
     /// Returns the string representation used in database queries.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             NhiType::ServiceAccount => "service_account",
@@ -278,7 +278,7 @@ pub enum NhiStatus {
 
 impl NhiStatus {
     /// Returns the string representation used in database queries.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             NhiStatus::Active => "active",
@@ -291,13 +291,13 @@ impl NhiStatus {
     }
 
     /// Returns true if this status allows the identity to be used.
-    #[must_use] 
+    #[must_use]
     pub fn is_usable(&self) -> bool {
         matches!(self, NhiStatus::Active)
     }
 
     /// Returns true if this status requires attention from administrators.
-    #[must_use] 
+    #[must_use]
     pub fn requires_attention(&self) -> bool {
         matches!(
             self,
@@ -451,7 +451,7 @@ pub enum NhiRiskLevel {
 
 impl NhiRiskLevel {
     /// Returns the minimum score for this risk level.
-    #[must_use] 
+    #[must_use]
     pub fn min_score(&self) -> u32 {
         match self {
             NhiRiskLevel::Low => 0,
@@ -462,7 +462,7 @@ impl NhiRiskLevel {
     }
 
     /// Returns the maximum score for this risk level.
-    #[must_use] 
+    #[must_use]
     pub fn max_score(&self) -> u32 {
         match self {
             NhiRiskLevel::Low => 25,
@@ -473,7 +473,7 @@ impl NhiRiskLevel {
     }
 
     /// Returns the string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             NhiRiskLevel::Low => "low",
@@ -484,7 +484,7 @@ impl NhiRiskLevel {
     }
 
     /// Returns true if this risk level should trigger alerts.
-    #[must_use] 
+    #[must_use]
     pub fn should_alert(&self) -> bool {
         matches!(self, NhiRiskLevel::High | NhiRiskLevel::Critical)
     }

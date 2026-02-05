@@ -84,7 +84,7 @@ pub struct ScheduleConfig {
 
 impl ScheduleConfig {
     /// Create a new schedule configuration.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -107,21 +107,21 @@ impl ScheduleConfig {
     }
 
     /// Set day of week for weekly schedule.
-    #[must_use] 
+    #[must_use]
     pub fn with_day_of_week(mut self, day: u8) -> Self {
         self.day_of_week = Some(day.min(6));
         self
     }
 
     /// Set day of month for monthly schedule.
-    #[must_use] 
+    #[must_use]
     pub fn with_day_of_month(mut self, day: u8) -> Self {
         self.day_of_month = Some(day.clamp(1, 28));
         self
     }
 
     /// Set hour of day.
-    #[must_use] 
+    #[must_use]
     pub fn with_hour(mut self, hour: u8) -> Self {
         self.hour_of_day = hour.min(23);
         self
@@ -146,7 +146,7 @@ pub struct ReconciliationScheduler;
 
 impl ReconciliationScheduler {
     /// Calculate the next run time based on schedule configuration.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_next_run(
         config: &ScheduleConfig,
         from: DateTime<Utc>,
@@ -254,7 +254,7 @@ impl ReconciliationScheduler {
     }
 
     /// Check if a schedule is due for execution.
-    #[must_use] 
+    #[must_use]
     pub fn is_due(config: &ScheduleConfig, now: DateTime<Utc>, tolerance: Duration) -> bool {
         if !config.enabled {
             return false;

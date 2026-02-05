@@ -57,7 +57,7 @@ pub struct JwksCacheStats {
 
 impl JwksCache {
     /// Create a new JWKS cache with default TTL.
-    #[must_use] 
+    #[must_use]
     pub fn new(default_ttl: Duration) -> Self {
         Self {
             cache: Arc::new(RwLock::new(HashMap::new())),
@@ -70,7 +70,7 @@ impl JwksCache {
     }
 
     /// Create a new JWKS cache with custom HTTP client.
-    #[must_use] 
+    #[must_use]
     pub fn with_client(default_ttl: Duration, http_client: reqwest::Client) -> Self {
         Self {
             cache: Arc::new(RwLock::new(HashMap::new())),

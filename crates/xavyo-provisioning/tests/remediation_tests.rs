@@ -53,7 +53,7 @@ pub struct TestConnector {
 }
 
 impl TestConnector {
-    #[must_use] 
+    #[must_use]
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -206,7 +206,7 @@ impl Default for MockConnectorProvider {
 }
 
 impl MockConnectorProvider {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self { connector: None }
     }
@@ -298,7 +298,7 @@ impl Default for MockIdentityService {
 }
 
 impl MockIdentityService {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             attributes: Some(AttributeSet::new()),

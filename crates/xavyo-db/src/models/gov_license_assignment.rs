@@ -62,7 +62,7 @@ pub struct GovLicenseAssignment {
 
 impl GovLicenseAssignment {
     /// Check if the assignment is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self.status, LicenseAssignmentStatus::Active)
     }

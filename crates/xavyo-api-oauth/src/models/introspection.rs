@@ -79,7 +79,7 @@ impl IntrospectionResponse {
     /// Create an inactive response (token is invalid, expired, or revoked).
     ///
     /// Per RFC 7662: inactive tokens return only `{ "active": false }`.
-    #[must_use] 
+    #[must_use]
     pub fn inactive() -> Self {
         Self {
             active: false,

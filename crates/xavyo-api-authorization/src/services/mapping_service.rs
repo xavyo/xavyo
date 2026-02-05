@@ -19,7 +19,7 @@ pub struct MappingService {
 
 impl MappingService {
     /// Create a new mapping service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, mapping_cache: std::sync::Arc<MappingCache>) -> Self {
         Self {
             pool,

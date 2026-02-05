@@ -323,13 +323,13 @@ impl GovTemplateApplicationEvent {
     }
 
     /// Check if this event had validation errors.
-    #[must_use] 
+    #[must_use]
     pub fn has_validation_errors(&self) -> bool {
         self.validation_errors.is_some()
     }
 
     /// Get the rules applied as a Vec of UUIDs.
-    #[must_use] 
+    #[must_use]
     pub fn get_rules_applied(&self) -> Option<Vec<Uuid>> {
         serde_json::from_value(self.rules_applied.clone()).ok()
     }

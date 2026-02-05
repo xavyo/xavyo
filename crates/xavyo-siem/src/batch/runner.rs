@@ -28,7 +28,7 @@ pub struct BatchJobRunner {
 
 impl BatchJobRunner {
     /// Create a new runner with the given DB pool and config.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, config: BatchExporterConfig) -> Self {
         Self {
             pool,
@@ -38,7 +38,7 @@ impl BatchJobRunner {
     }
 
     /// Override the poll interval (default: 10 seconds).
-    #[must_use] 
+    #[must_use]
     pub fn with_poll_interval(mut self, interval: Duration) -> Self {
         self.poll_interval = interval;
         self

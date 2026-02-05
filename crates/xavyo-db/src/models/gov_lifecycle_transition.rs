@@ -37,6 +37,11 @@ pub struct GovLifecycleTransition {
     /// Grace period in hours for rollback (0-720).
     pub grace_period_hours: i32,
 
+    /// Conditions that must be satisfied for this transition.
+    /// Format: [{"type": "termination_date_set", "config": {}}]
+    #[sqlx(default)]
+    pub conditions: Option<serde_json::Value>,
+
     /// When the transition was created.
     pub created_at: DateTime<Utc>,
 }
@@ -84,6 +89,8 @@ pub struct GovLifecycleTransitionWithStates {
     pub requires_approval: bool,
     pub approval_workflow_id: Option<Uuid>,
     pub grace_period_hours: i32,
+    #[sqlx(default)]
+    pub conditions: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -434,5 +441,45 @@ impl GovLifecycleTransition {
         .await?;
 
         Ok(result.rows_affected())
+    }
+
+    /// Get conditions for a transition.
+    pub async fn get_conditions(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<serde_json::Value>, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT conditions FROM gov_lifecycle_transitions
+            WHERE id = $1 AND tenant_id = $2
+            ",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Update conditions for a transition.
+    pub async fn update_conditions(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+        conditions: &serde_json::Value,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            UPDATE gov_lifecycle_transitions
+            SET conditions = $3
+            WHERE id = $1 AND tenant_id = $2
+            RETURNING *
+            ",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .bind(conditions)
+        .fetch_optional(pool)
+        .await
     }
 }

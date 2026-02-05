@@ -20,7 +20,7 @@ pub enum TokenType {
 
 impl TokenType {
     /// Convert to string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             TokenType::Precise => "precise",
@@ -74,7 +74,7 @@ pub struct SyncToken {
 
 impl SyncToken {
     /// Create a new sync token.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         tenant_id: Uuid,
         connector_id: Uuid,
@@ -97,7 +97,7 @@ impl SyncToken {
     }
 
     /// Check if this token can be used for resumable sync.
-    #[must_use] 
+    #[must_use]
     pub fn can_resume(&self) -> bool {
         self.is_valid && !self.token_value.is_empty()
     }
@@ -117,7 +117,7 @@ pub struct SyncTokenManager {
 
 impl SyncTokenManager {
     /// Create a new sync token manager.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

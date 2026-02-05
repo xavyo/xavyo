@@ -112,25 +112,25 @@ impl CertificateAuthority {
     }
 
     /// Check if the CA is internal.
-    #[must_use] 
+    #[must_use]
     pub fn is_internal(&self) -> bool {
         self.ca_type == "internal"
     }
 
     /// Check if the CA certificate has expired.
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         self.not_after < Utc::now()
     }
 
     /// Check if the CA certificate is not yet valid.
-    #[must_use] 
+    #[must_use]
     pub fn is_not_yet_valid(&self) -> bool {
         self.not_before > Utc::now()
     }
 
     /// Check if the CA is usable (active, not expired, valid).
-    #[must_use] 
+    #[must_use]
     pub fn is_usable(&self) -> bool {
         self.is_active && !self.is_expired() && !self.is_not_yet_valid()
     }

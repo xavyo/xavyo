@@ -192,7 +192,7 @@ impl ListAssignmentsQuery {
     /// Validate and clamp pagination values.
     ///
     /// SECURITY: Prevents `DoS` via unbounded pagination.
-    #[must_use] 
+    #[must_use]
     pub fn validated(self) -> Self {
         Self {
             limit: self.limit.clamp(1, MAX_LIMIT),
@@ -265,7 +265,7 @@ impl AuditLogQuery {
     /// Validate and clamp pagination values.
     ///
     /// SECURITY: Prevents `DoS` via unbounded pagination.
-    #[must_use] 
+    #[must_use]
     pub fn validated(self) -> Self {
         Self {
             limit: self.limit.clamp(1, MAX_LIMIT),
@@ -296,7 +296,7 @@ pub struct ScopeAssignment {
 
 impl EffectivePermissions {
     /// Check if user has a specific permission (with wildcard support).
-    #[must_use] 
+    #[must_use]
     pub fn has_permission(&self, required: &str) -> bool {
         // Direct match
         if self.permissions.contains(required) {
@@ -316,7 +316,7 @@ impl EffectivePermissions {
 
     /// Check if a resource is within any of the user's scopes.
     /// If user has no scopes, they have global access for their permissions.
-    #[must_use] 
+    #[must_use]
     pub fn is_in_scope(&self, scope_type: &str, resource_scope: &str) -> bool {
         // If no scopes defined, user has global access
         if self.scopes.is_empty() {

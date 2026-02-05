@@ -37,7 +37,7 @@ pub fn normalize_hex_color(color: &str) -> Option<String> {
 /// Validate URL format (basic validation).
 ///
 /// Allows absolute URLs (http/https) or relative paths starting with /.
-#[must_use] 
+#[must_use]
 pub fn validate_url(url: &str) -> bool {
     if url.is_empty() {
         return false;
@@ -55,7 +55,7 @@ pub fn validate_url(url: &str) -> bool {
 /// Validate font family name.
 ///
 /// Allows common safe font names and Google Fonts style names.
-#[must_use] 
+#[must_use]
 pub fn validate_font_family(font: &str) -> bool {
     if font.is_empty() || font.len() > 200 {
         return false;

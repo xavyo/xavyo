@@ -71,7 +71,7 @@ impl FilterOp {
     /// Convert operator to SQL fragment.
     ///
     /// Returns the SQL operator and whether it needs special handling.
-    #[must_use] 
+    #[must_use]
     pub fn to_sql_fragment(&self, param_index: usize) -> String {
         match self {
             FilterOp::Eq => format!("= ${param_index}"),
@@ -220,13 +220,13 @@ pub struct SearchQuery {
 
 impl SearchQuery {
     /// Create a new empty search query.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Add a filter to the query.
-    #[must_use] 
+    #[must_use]
     pub fn with_filter(mut self, filter: SearchFilter) -> Self {
         self.filters.push(filter);
         self
@@ -240,7 +240,7 @@ impl SearchQuery {
     }
 
     /// Set pagination parameters.
-    #[must_use] 
+    #[must_use]
     pub fn with_pagination(mut self, limit: i64, offset: i64) -> Self {
         self.limit = Some(limit);
         self.offset = Some(offset);
@@ -322,7 +322,7 @@ impl SearchQuery {
     }
 
     /// Build the LIMIT/OFFSET clause.
-    #[must_use] 
+    #[must_use]
     pub fn build_pagination_clause(&self) -> String {
         let mut clause = String::new();
 
@@ -359,7 +359,7 @@ pub struct SearchResult<T> {
 
 impl<T> SearchResult<T> {
     /// Create a new search result.
-    #[must_use] 
+    #[must_use]
     pub fn new(items: Vec<T>, total: i64, limit: Option<i64>, offset: Option<i64>) -> Self {
         Self {
             items,
@@ -370,7 +370,7 @@ impl<T> SearchResult<T> {
     }
 
     /// Check if there are more results available.
-    #[must_use] 
+    #[must_use]
     pub fn has_more(&self) -> bool {
         let offset = self.offset.unwrap_or(0);
         let limit = self.limit.unwrap_or(i64::MAX);
@@ -378,7 +378,7 @@ impl<T> SearchResult<T> {
     }
 
     /// Get the number of items returned.
-    #[must_use] 
+    #[must_use]
     pub fn count(&self) -> usize {
         self.items.len()
     }

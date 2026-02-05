@@ -69,7 +69,7 @@ pub struct NhiRiskService {
 
 impl NhiRiskService {
     /// Create a new risk service with default configuration.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -80,7 +80,7 @@ impl NhiRiskService {
     }
 
     /// Create with custom configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_config(pool: PgPool, config: RiskFactorConfig) -> Self {
         Self {
             pool,
@@ -194,7 +194,9 @@ impl NhiRiskService {
         // Calculate days since last use (or since creation if never used)
         let days_inactive = nhi
             .last_used_at
-            .map_or((now - nhi.created_at).num_days(), |last| (now - last).num_days()) as i32;
+            .map_or((now - nhi.created_at).num_days(), |last| {
+                (now - last).num_days()
+            }) as i32;
 
         // Linear scaling: 0 days = 0 points, max_days = max_points
         let factor = if days_inactive >= self.config.staleness_max_days {

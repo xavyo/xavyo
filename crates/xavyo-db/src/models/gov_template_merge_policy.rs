@@ -277,7 +277,7 @@ impl GovTemplateMergePolicy {
     }
 
     /// Get the source precedence as a Vec<String>.
-    #[must_use] 
+    #[must_use]
     pub fn get_source_precedence(&self) -> Option<Vec<String>> {
         self.source_precedence
             .as_ref()
@@ -285,31 +285,31 @@ impl GovTemplateMergePolicy {
     }
 
     /// Check if this policy uses source precedence strategy.
-    #[must_use] 
+    #[must_use]
     pub fn is_source_precedence(&self) -> bool {
         self.strategy == TemplateMergeStrategy::SourcePrecedence
     }
 
     /// Check if this policy uses timestamp wins strategy.
-    #[must_use] 
+    #[must_use]
     pub fn is_timestamp_wins(&self) -> bool {
         self.strategy == TemplateMergeStrategy::TimestampWins
     }
 
     /// Check if this policy uses concatenate unique strategy.
-    #[must_use] 
+    #[must_use]
     pub fn is_concatenate_unique(&self) -> bool {
         self.strategy == TemplateMergeStrategy::ConcatenateUnique
     }
 
     /// Check if this policy uses first wins strategy.
-    #[must_use] 
+    #[must_use]
     pub fn is_first_wins(&self) -> bool {
         self.strategy == TemplateMergeStrategy::FirstWins
     }
 
     /// Check if this policy uses manual only strategy.
-    #[must_use] 
+    #[must_use]
     pub fn is_manual_only(&self) -> bool {
         self.strategy == TemplateMergeStrategy::ManualOnly
     }

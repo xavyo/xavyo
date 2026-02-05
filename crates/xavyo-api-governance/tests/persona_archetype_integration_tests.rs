@@ -249,7 +249,8 @@ mod persona_validity_from_archetype {
 
         let now = Utc::now();
         let valid_until = now + Duration::days(i64::from(policy.default_validity_days));
-        let notify_at = valid_until - Duration::days(i64::from(policy.notification_before_expiry_days));
+        let notify_at =
+            valid_until - Duration::days(i64::from(policy.notification_before_expiry_days));
 
         // Notification should be 7 days before expiration
         assert_eq!(

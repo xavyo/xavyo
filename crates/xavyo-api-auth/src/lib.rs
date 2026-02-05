@@ -1,4 +1,6 @@
 //! Authentication API endpoints for xavyo.
+// TODO: Upgrade generic-array to 1.x when aes-gcm supports it
+#![allow(deprecated)]
 //!
 //! This crate provides REST API endpoints for user authentication:
 //! - Registration (POST /auth/register)

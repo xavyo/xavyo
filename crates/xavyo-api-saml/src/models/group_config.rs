@@ -20,7 +20,7 @@ pub enum GroupValueFormat {
 
 impl GroupValueFormat {
     /// Parse from string representation
-    #[must_use] 
+    #[must_use]
     pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "id" | "identifier" => Self::Identifier,
@@ -30,7 +30,7 @@ impl GroupValueFormat {
     }
 
     /// Convert to string representation
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Name => "name",
@@ -69,7 +69,7 @@ pub struct GroupFilter {
 
 impl GroupFilter {
     /// Create a filter that includes all groups
-    #[must_use] 
+    #[must_use]
     pub fn none() -> Self {
         Self {
             filter_type: GroupFilterType::None,
@@ -79,7 +79,7 @@ impl GroupFilter {
     }
 
     /// Create a pattern-based filter
-    #[must_use] 
+    #[must_use]
     pub fn with_patterns(patterns: Vec<String>) -> Self {
         Self {
             filter_type: GroupFilterType::Pattern,
@@ -89,7 +89,7 @@ impl GroupFilter {
     }
 
     /// Create an allowlist filter
-    #[must_use] 
+    #[must_use]
     pub fn with_allowlist(allowlist: Vec<String>) -> Self {
         Self {
             filter_type: GroupFilterType::Allowlist,
@@ -99,7 +99,7 @@ impl GroupFilter {
     }
 
     /// Check if a group name matches the filter
-    #[must_use] 
+    #[must_use]
     pub fn matches(&self, group_name: &str) -> bool {
         match self.filter_type {
             GroupFilterType::None => true,
@@ -226,7 +226,7 @@ impl GroupAttributeConfig {
     }
 
     /// Create a config with ID format
-    #[must_use] 
+    #[must_use]
     pub fn with_id_format() -> Self {
         Self {
             value_format: GroupValueFormat::Identifier,
@@ -244,7 +244,7 @@ impl GroupAttributeConfig {
     }
 
     /// Create a config that disables groups
-    #[must_use] 
+    #[must_use]
     pub fn disabled() -> Self {
         Self {
             include_groups: false,

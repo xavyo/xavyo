@@ -136,7 +136,7 @@ impl SchemaService {
     }
 
     /// Create a new schema service with custom TTL.
-    #[must_use] 
+    #[must_use]
     pub fn with_ttl(mut self, ttl_seconds: i64) -> Self {
         self.cache_ttl_seconds = ttl_seconds;
         self
@@ -531,9 +531,11 @@ impl SchemaService {
 
         // Build response from cached schemas
         let discovered_at = cached_schemas
-            .first().map_or_else(Utc::now, |s| s.discovered_at);
+            .first()
+            .map_or_else(Utc::now, |s| s.discovered_at);
         let expires_at = cached_schemas
-            .first().map_or_else(Utc::now, |s| s.expires_at);
+            .first()
+            .map_or_else(Utc::now, |s| s.expires_at);
 
         let object_classes = cached_schemas
             .into_iter()

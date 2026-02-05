@@ -27,7 +27,7 @@ pub struct EmailChangeService {
 
 impl EmailChangeService {
     /// Create a new email change service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

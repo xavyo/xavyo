@@ -38,7 +38,7 @@ pub struct SecretCache {
 
 impl SecretCache {
     /// Create a new cache with the given TTL in seconds.
-    #[must_use] 
+    #[must_use]
     pub fn new(ttl_seconds: u64) -> Self {
         Self {
             entries: RwLock::new(HashMap::new()),

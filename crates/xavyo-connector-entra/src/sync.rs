@@ -172,7 +172,9 @@ impl EntraConnector {
     /// Performs a delta (incremental) user sync.
     #[instrument(skip(self))]
     pub async fn delta_user_sync(&self) -> EntraResult<UserSyncResult> {
-        let delta_link = if let Some(link) = &self.config().delta_link_user { link.clone() } else {
+        let delta_link = if let Some(link) = &self.config().delta_link_user {
+            link.clone()
+        } else {
             info!("No delta link available, performing full sync");
             return self.full_user_sync().await;
         };

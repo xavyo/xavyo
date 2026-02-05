@@ -22,7 +22,7 @@ pub struct IdentityAuditService {
 
 impl IdentityAuditService {
     /// Create a new identity audit service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

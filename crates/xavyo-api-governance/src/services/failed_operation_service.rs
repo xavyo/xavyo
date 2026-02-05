@@ -101,7 +101,7 @@ pub struct FailedOperationService {
 
 impl FailedOperationService {
     /// Create a new failed operation service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, access_rule_service: Arc<StateAccessRuleService>) -> Self {
         Self {
             pool,

@@ -349,7 +349,7 @@ impl GovOutlierAnalysis {
     }
 
     /// Get the config snapshot as a struct.
-    #[must_use] 
+    #[must_use]
     pub fn get_config(&self) -> &ConfigSnapshot {
         &self.config_snapshot.0
     }

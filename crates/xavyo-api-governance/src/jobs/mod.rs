@@ -6,11 +6,13 @@
 //! - Failed operation retry - processes retry queue with exponential backoff
 //! - Escalation processing (F054) - polls for timeout escalations and warnings
 //! - Micro-certification expiration (F055) - reminders, escalation, auto-revoke
+//! - Bulk action processing (F-064) - processes bulk actions in batches with progress tracking
 //! - Ticket sync (F064) - polls external ticketing systems for status updates
 //! - SLA monitoring (F064) - monitors manual tasks for SLA warnings and breaches
 //! - Ticket retry (F064) - processes retry queue for failed ticket creation
 //! - License expiration (F065) - daily check for expired/expiring license pools
 
+pub mod bulk_action_job;
 pub mod escalation_job;
 pub mod failed_operation_retry_job;
 pub mod grace_period_job;
@@ -21,6 +23,7 @@ pub mod sla_monitoring_job;
 pub mod ticket_retry_job;
 pub mod ticket_sync_job;
 
+pub use bulk_action_job::{BulkActionJob, BulkActionJobError, BulkActionJobStats};
 pub use escalation_job::{EscalationJob, EscalationJobError, EscalationStats};
 pub use failed_operation_retry_job::FailedOperationRetryJob;
 pub use grace_period_job::GracePeriodExpirationJob;

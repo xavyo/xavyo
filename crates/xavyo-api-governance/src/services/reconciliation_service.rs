@@ -39,7 +39,7 @@ pub struct ReconciliationService {
 
 impl ReconciliationService {
     /// Create a new reconciliation service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -48,7 +48,7 @@ impl ReconciliationService {
     }
 
     /// Create with custom batch size.
-    #[must_use] 
+    #[must_use]
     pub fn with_batch_size(pool: PgPool, batch_size: i64) -> Self {
         Self { pool, batch_size }
     }
@@ -209,8 +209,8 @@ impl ReconciliationService {
             }
 
             // Update progress
-            let progress =
-                ((offset + i64::from(batch_count)) * 100 / (offset + batch_size).max(1)).min(99) as i32;
+            let progress = ((offset + i64::from(batch_count)) * 100 / (offset + batch_size).max(1))
+                .min(99) as i32;
 
             GovReconciliationRun::update_progress(
                 &pool,
@@ -380,8 +380,7 @@ impl ReconciliationService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        Ok(last_logins
-            .first().map_or_else(Utc::now, |l| l.created_at))
+        Ok(last_logins.first().map_or_else(Utc::now, |l| l.created_at))
     }
 
     /// Check for orphans that have been resolved.

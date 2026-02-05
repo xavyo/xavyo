@@ -32,7 +32,7 @@ pub struct CaService {
 
 impl CaService {
     /// Create a new `CaService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, encryption: Arc<EncryptionService>) -> Self {
         Self {
             pool,
@@ -76,9 +76,10 @@ impl CaService {
                 ))
             })?;
 
-            secret_value.as_str().map(std::string::ToString::to_string).map_err(|e| {
-                ApiAgentsError::CaCreationFailed(format!("Invalid secret value: {e}"))
-            })
+            secret_value
+                .as_str()
+                .map(std::string::ToString::to_string)
+                .map_err(|e| ApiAgentsError::CaCreationFailed(format!("Invalid secret value: {e}")))
         } else {
             // No secret provider configured - return as-is (development mode)
             if secret_ref.starts_with("secret://") {

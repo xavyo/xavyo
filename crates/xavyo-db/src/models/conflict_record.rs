@@ -390,7 +390,7 @@ impl ConflictRecord {
     }
 
     /// Check if the conflict is pending resolution.
-    #[must_use] 
+    #[must_use]
     pub fn is_pending(&self) -> bool {
         self.resolution_outcome.is_none()
             || matches!(self.resolution_outcome, Some(ResolutionOutcome::Pending))

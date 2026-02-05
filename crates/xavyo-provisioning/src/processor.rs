@@ -117,7 +117,7 @@ pub struct BatchProcessingResult {
 
 impl BatchProcessingResult {
     /// Get the success rate as a percentage.
-    #[must_use] 
+    #[must_use]
     pub fn success_rate(&self) -> f64 {
         if self.total_operations == 0 {
             100.0
@@ -127,13 +127,13 @@ impl BatchProcessingResult {
     }
 
     /// Check if all operations succeeded.
-    #[must_use] 
+    #[must_use]
     pub fn all_succeeded(&self) -> bool {
         self.failed_operations == 0
     }
 
     /// Get connectors that had failures.
-    #[must_use] 
+    #[must_use]
     pub fn failed_connectors(&self) -> Vec<Uuid> {
         self.connector_results
             .iter()
@@ -158,7 +158,7 @@ pub struct ConnectorBatchResult {
 
 impl ConnectorBatchResult {
     /// Get the success rate for this connector.
-    #[must_use] 
+    #[must_use]
     pub fn success_rate(&self) -> f64 {
         if self.operations_processed == 0 {
             100.0
@@ -287,7 +287,7 @@ impl DefaultOperationProcessor {
     }
 
     /// Create with custom configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_config(mut self, config: ProcessorConfig) -> Self {
         self.config = config;
         self
@@ -300,14 +300,14 @@ impl DefaultOperationProcessor {
     }
 
     /// Set the health monitoring service.
-    #[must_use] 
+    #[must_use]
     pub fn with_health_service(mut self, service: Arc<HealthService>) -> Self {
         self.health_service = Some(service);
         self
     }
 
     /// Set the conflict detection service.
-    #[must_use] 
+    #[must_use]
     pub fn with_conflict_service(mut self, service: Arc<ConflictService>) -> Self {
         self.conflict_service = Some(service);
         self

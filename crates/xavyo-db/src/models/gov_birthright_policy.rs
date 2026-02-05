@@ -23,25 +23,25 @@ pub enum BirthrightPolicyStatus {
 
 impl BirthrightPolicyStatus {
     /// Check if the policy is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self, Self::Active)
     }
 
     /// Check if the policy can be enabled.
-    #[must_use] 
+    #[must_use]
     pub fn can_enable(&self) -> bool {
         matches!(self, Self::Inactive)
     }
 
     /// Check if the policy can be disabled.
-    #[must_use] 
+    #[must_use]
     pub fn can_disable(&self) -> bool {
         matches!(self, Self::Active)
     }
 
     /// Check if the policy can be archived.
-    #[must_use] 
+    #[must_use]
     pub fn can_archive(&self) -> bool {
         !matches!(self, Self::Archived)
     }
@@ -62,13 +62,13 @@ pub enum EvaluationMode {
 
 impl EvaluationMode {
     /// Check if this is first-match mode.
-    #[must_use] 
+    #[must_use]
     pub fn is_first_match(&self) -> bool {
         matches!(self, Self::FirstMatch)
     }
 
     /// Check if this is all-match mode.
-    #[must_use] 
+    #[must_use]
     pub fn is_all_match(&self) -> bool {
         matches!(self, Self::AllMatch)
     }
@@ -94,7 +94,7 @@ pub enum ConditionOperator {
 
 impl ConditionOperator {
     /// Parse operator from string.
-    #[must_use] 
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "equals" => Some(Self::Equals),
@@ -108,7 +108,7 @@ impl ConditionOperator {
     }
 
     /// Convert operator to string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Equals => "equals",
@@ -121,7 +121,7 @@ impl ConditionOperator {
     }
 
     /// Evaluate the condition against a user value.
-    #[must_use] 
+    #[must_use]
     pub fn evaluate(&self, user_value: Option<&str>, condition_value: &serde_json::Value) -> bool {
         let user_value = match user_value {
             Some(v) => v,
@@ -188,7 +188,7 @@ impl PolicyCondition {
     }
 
     /// Evaluate this condition against user attributes.
-    #[must_use] 
+    #[must_use]
     pub fn evaluate(&self, user_attrs: &serde_json::Value) -> bool {
         let operator = match ConditionOperator::parse(&self.operator) {
             Some(op) => op,
@@ -592,14 +592,14 @@ impl GovBirthrightPolicy {
     }
 
     /// Parse conditions from JSON.
-    #[must_use] 
+    #[must_use]
     pub fn parse_conditions(&self) -> Vec<PolicyCondition> {
         serde_json::from_value(self.conditions.clone()).unwrap_or_default()
     }
 
     /// Evaluate this policy against user attributes.
     /// Returns true if all conditions match (AND logic).
-    #[must_use] 
+    #[must_use]
     pub fn evaluate(&self, user_attrs: &serde_json::Value) -> bool {
         if !self.status.is_active() {
             return false;

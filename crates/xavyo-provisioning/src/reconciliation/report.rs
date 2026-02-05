@@ -69,7 +69,7 @@ pub struct DiscrepancySummary {
 
 impl DiscrepancySummary {
     /// Create empty summary.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             total: 0,
@@ -98,7 +98,7 @@ pub struct ActionSummary {
 
 impl ActionSummary {
     /// Create empty summary.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             total: 0,
@@ -134,7 +134,7 @@ pub struct PerformanceMetrics {
 
 impl PerformanceMetrics {
     /// Calculate from statistics.
-    #[must_use] 
+    #[must_use]
     pub fn from_statistics(stats: &RunStatistics) -> Self {
         let accounts_per_second = if stats.duration_seconds > 0 {
             f64::from(stats.accounts_processed) / stats.duration_seconds as f64
@@ -154,7 +154,7 @@ pub struct ReportGenerator;
 
 impl ReportGenerator {
     /// Generate a report from run data.
-    #[must_use] 
+    #[must_use]
     pub fn generate(
         run_info: RunInfo,
         discrepancy_summary: DiscrepancySummary,
@@ -173,7 +173,7 @@ impl ReportGenerator {
     }
 
     /// Generate CSV export of discrepancies.
-    #[must_use] 
+    #[must_use]
     pub fn generate_csv(discrepancies: &[DiscrepancyCsvRow]) -> String {
         let mut csv = String::new();
 

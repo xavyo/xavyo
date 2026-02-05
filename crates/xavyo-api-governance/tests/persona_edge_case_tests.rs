@@ -12,10 +12,8 @@ use uuid::Uuid;
 mod common;
 
 mod authorization_tests {
-    
-    use xavyo_api_governance::services::{
-        AuthorizationResult, PersonaPermission,
-    };
+
+    use xavyo_api_governance::services::{AuthorizationResult, PersonaPermission};
 
     #[test]
     fn test_authorization_result_allowed() {
@@ -44,11 +42,13 @@ mod authorization_tests {
     #[test]
     fn test_persona_permission_variants() {
         // Verify all permission types exist
-        let permissions = [PersonaPermission::CreatePersona,
+        let permissions = [
+            PersonaPermission::CreatePersona,
             PersonaPermission::ManageOwnPersonas,
             PersonaPermission::ManageAllPersonas,
             PersonaPermission::DeletePersona,
-            PersonaPermission::ManageArchetype];
+            PersonaPermission::ManageArchetype,
+        ];
 
         assert_eq!(permissions.len(), 5);
     }
@@ -68,9 +68,7 @@ mod authorization_tests {
 
 mod validation_tests {
     use super::*;
-    use xavyo_api_governance::services::{
-        ConflictCheckResult, MultiPersonaOperationResult,
-    };
+    use xavyo_api_governance::services::{ConflictCheckResult, MultiPersonaOperationResult};
 
     #[test]
     fn test_conflict_check_result_no_conflict() {
@@ -137,7 +135,7 @@ mod validation_tests {
 }
 
 mod archetype_conflict_scenarios {
-    
+
     use xavyo_db::models::{AttributeMappings, ComputedMapping, PropagateMapping};
 
     /// Test: Two archetypes with same computed target should conflict.

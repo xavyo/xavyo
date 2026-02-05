@@ -105,10 +105,13 @@ use crate::handlers::{
     create_invitation_handler,
     // F028 handlers
     create_ip_rule,
+    // F-066 Organization policy handlers
+    create_org_policy,
     create_role_template,
     // F030 handlers
     delete_asset,
     delete_ip_rule,
+    delete_org_policy,
     delete_role_template,
     // F032 WebAuthn handlers
     delete_webauthn_credential,
@@ -124,6 +127,9 @@ use crate::handlers::{
     get_available_methods_handler,
     get_branding,
     get_device_policy,
+    // F-066 Organization policy handlers
+    get_effective_org_policy,
+    get_effective_user_policy,
     get_ip_rule,
     get_ip_settings,
     get_lockout_policy,
@@ -135,6 +141,7 @@ use crate::handlers::{
     get_me_sessions,
     get_mfa_policy,
     get_mfa_status,
+    get_org_policy,
     get_password_policy,
     get_passwordless_policy_handler,
     get_permissions_by_category,
@@ -154,6 +161,7 @@ use crate::handlers::{
     list_devices,
     list_invitations_handler,
     list_ip_rules,
+    list_org_policies,
     list_permissions,
     list_role_templates,
     list_sessions,
@@ -201,7 +209,9 @@ use crate::handlers::{
     update_webauthn_credential,
     update_webauthn_policy,
     upload_asset,
+    upsert_org_policy,
     validate_ip,
+    validate_org_policy,
     verify_email_change,
     verify_email_handler,
     verify_email_otp_handler,
@@ -931,6 +941,56 @@ pub fn admin_invite_public_router(state: AuthState) -> Router {
     Router::new()
         .route("/invitations/accept", post(accept_invitation_handler))
         .with_state(invite_state)
+}
+
+/// Organization security policy router (F-066).
+///
+/// Provides routes for managing organization-level security policies
+/// with inheritance from parent organizations.
+///
+/// # Endpoints
+///
+/// Policy CRUD:
+/// - `GET /organizations/:org_id/security-policies` — List policies for organization
+/// - `POST /organizations/:org_id/security-policies` — Create policy for organization
+/// - `GET /organizations/:org_id/security-policies/:policy_type` — Get specific policy
+/// - `PUT /organizations/:org_id/security-policies/:policy_type` — Upsert policy
+/// - `DELETE /organizations/:org_id/security-policies/:policy_type` — Delete policy
+///
+/// Effective Policy Resolution:
+/// - `GET /organizations/:org_id/effective-policy/:policy_type` — Get effective policy with source
+/// - `GET /users/:user_id/effective-policy/:policy_type` — Get effective policy for user
+///
+/// Validation:
+/// - `POST /organizations/:org_id/security-policies/validate` — Validate policy for conflicts
+pub fn org_security_policy_router(state: AuthState) -> Router {
+    Router::new()
+        // Policy CRUD endpoints
+        .route(
+            "/organizations/:org_id/security-policies",
+            get(list_org_policies).post(create_org_policy),
+        )
+        .route(
+            "/organizations/:org_id/security-policies/validate",
+            post(validate_org_policy),
+        )
+        .route(
+            "/organizations/:org_id/security-policies/:policy_type",
+            get(get_org_policy)
+                .put(upsert_org_policy)
+                .delete(delete_org_policy),
+        )
+        // Effective policy resolution endpoints
+        .route(
+            "/organizations/:org_id/effective-policy/:policy_type",
+            get(get_effective_org_policy),
+        )
+        .route(
+            "/users/:user_id/effective-policy/:policy_type",
+            get(get_effective_user_policy),
+        )
+        .layer(Extension(state.pool.clone()))
+        .with_state(state)
 }
 
 #[cfg(test)]

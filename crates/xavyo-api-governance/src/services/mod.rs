@@ -60,7 +60,10 @@ pub mod privilege_detector;
 pub mod simulation_service;
 
 // Object Lifecycle States services (F052)
+pub mod action_executor;
+pub mod archetype_lifecycle_service;
 pub mod bulk_operation_service;
+pub mod condition_evaluator;
 pub mod failed_operation_service;
 pub mod lifecycle_config_service;
 pub mod scheduled_transition_service;
@@ -91,8 +94,10 @@ pub mod parameter_validation_service;
 pub mod object_template_service;
 pub mod template_application_service;
 pub mod template_expression_service;
+pub mod template_merge_service;
 pub mod template_rule_service;
 pub mod template_scope_service;
+pub mod template_simulation_service;
 
 // Outlier detection services (F059)
 pub mod outlier_config_service;
@@ -128,6 +133,9 @@ pub mod persona_expiration_service;
 pub mod persona_service;
 pub mod persona_session_service;
 pub mod persona_validation_service;
+
+// Power of Attorney services (F-061)
+pub mod poa_service;
 
 // Semi-manual Resources services (F064)
 pub mod manual_task_service;
@@ -204,6 +212,10 @@ pub use privilege_detector::{
 pub use simulation_service::SimulationService;
 
 // Object Lifecycle States exports (F052)
+pub use action_executor::{
+    ActionBatchResult, ActionExecutionContext, ActionExecutionResult, ActionExecutor,
+};
+pub use archetype_lifecycle_service::{ArchetypeLifecycleService, EffectiveLifecycleModel};
 pub use bulk_operation_service::BulkOperationService;
 pub use failed_operation_service::{
     AuditRecordPayload, EntitlementActionPayload, FailedOperationService, RetryResult, RetryStats,
@@ -250,8 +262,13 @@ pub use template_application_service::{
 pub use template_expression_service::{
     BinaryOperator, Expression, ExpressionError, ExpressionResult, TemplateExpressionService, Token,
 };
+pub use template_merge_service::{MergeError, MergeResolution, MergeValue, TemplateMergeService};
 pub use template_rule_service::TemplateRuleService;
 pub use template_scope_service::TemplateScopeService;
+pub use template_simulation_service::{
+    RuleSimResult, SimValidationError, SimulationResult as TemplateSimulationResult,
+    TemplateSimulationService,
+};
 
 // Outlier detection exports (F059)
 pub use outlier_config_service::OutlierConfigService;
@@ -309,6 +326,9 @@ pub use persona_session_service::{ContextInfo, PersonaClaims, PersonaSessionServ
 pub use persona_validation_service::{
     ConflictCheckResult, MultiPersonaOperationResult, PersonaValidationService,
 };
+
+// Power of Attorney exports (F-061)
+pub use poa_service::PoaService;
 
 // Semi-manual Resources exports (F064)
 pub use manual_task_service::ManualTaskService;
@@ -419,3 +439,44 @@ pub mod role_hierarchy_service;
 
 // Business Role Hierarchy exports (F088)
 pub use role_hierarchy_service::RoleHierarchyService;
+
+// Self-Service Request Catalog services (F-062)
+pub mod catalog_service;
+
+// Role Inducements & Constructions services (F-063)
+pub mod inducement_trigger_service;
+pub mod role_assignment_service;
+pub mod role_construction_service;
+pub mod role_inducement_service;
+
+// Self-Service Request Catalog exports (F-062)
+pub use catalog_service::{
+    CartSodViolation, CartSubmissionResult, CartValidationIssue, CartValidationResult,
+    CatalogService, RequestContext, RequestabilityResult, SubmittedItemResult,
+};
+
+// Role Inducements & Constructions exports (F-063)
+pub use inducement_trigger_service::InducementTriggerService;
+pub use role_assignment_service::{
+    RoleAssignmentResult, RoleAssignmentService, RoleRevocationResult,
+};
+pub use role_construction_service::RoleConstructionService;
+pub use role_inducement_service::RoleInducementService;
+
+// Bulk Action Engine services (F-064 Bulk Actions)
+pub mod action_executors;
+pub mod bulk_action_service;
+
+// Bulk Action Engine exports (F-064 Bulk Actions)
+pub use action_executors::{
+    ActionExecutor as BulkActionExecutor, AssignRoleExecutor, DisableUserExecutor,
+    EnableUserExecutor, ExecutionContext as BulkExecutionContext,
+    ExecutionResult as BulkExecutionResult, ModifyAttributeExecutor, RevokeRoleExecutor,
+};
+pub use bulk_action_service::BulkActionService;
+
+// GDPR Report services (F-067 Data Protection)
+pub mod gdpr_report_service;
+
+// GDPR Report exports (F-067 Data Protection)
+pub use gdpr_report_service::GdprReportService;

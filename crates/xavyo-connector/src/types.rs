@@ -20,7 +20,7 @@ pub enum ConnectorType {
 
 impl ConnectorType {
     /// Get all available connector types.
-    #[must_use] 
+    #[must_use]
     pub fn all() -> &'static [ConnectorType] {
         &[
             ConnectorType::Ldap,
@@ -30,7 +30,7 @@ impl ConnectorType {
     }
 
     /// Get the string representation used in the database.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             ConnectorType::Ldap => "ldap",
@@ -90,7 +90,7 @@ pub enum ConnectorStatus {
 
 impl ConnectorStatus {
     /// Get the string representation used in the database.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             ConnectorStatus::Active => "active",
@@ -100,7 +100,7 @@ impl ConnectorStatus {
     }
 
     /// Check if the connector is usable for provisioning.
-    #[must_use] 
+    #[must_use]
     pub fn is_usable(&self) -> bool {
         matches!(self, ConnectorStatus::Active)
     }
@@ -155,7 +155,7 @@ pub enum OperationType {
 
 impl OperationType {
     /// Get the string representation used in the database.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             OperationType::Create => "create",
@@ -225,7 +225,7 @@ pub enum OperationStatus {
 
 impl OperationStatus {
     /// Get the string representation used in the database.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             OperationStatus::Pending => "pending",
@@ -240,7 +240,7 @@ impl OperationStatus {
     }
 
     /// Check if the operation is in a terminal state.
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
@@ -252,7 +252,7 @@ impl OperationStatus {
     }
 
     /// Check if the operation can be retried.
-    #[must_use] 
+    #[must_use]
     pub fn is_retryable(&self) -> bool {
         matches!(
             self,
@@ -261,7 +261,7 @@ impl OperationStatus {
     }
 
     /// Check if the operation is actively being processed.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(
             self,
@@ -273,7 +273,7 @@ impl OperationStatus {
     }
 
     /// Check if the operation is waiting for external system.
-    #[must_use] 
+    #[must_use]
     pub fn is_waiting(&self) -> bool {
         matches!(self, OperationStatus::AwaitingSystem)
     }
@@ -334,7 +334,7 @@ pub enum HealthStatus {
 
 impl HealthStatus {
     /// Get the string representation used in the database.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             HealthStatus::Connected => "connected",
@@ -344,7 +344,7 @@ impl HealthStatus {
     }
 
     /// Check if the connector is healthy enough to process operations.
-    #[must_use] 
+    #[must_use]
     pub fn is_healthy(&self) -> bool {
         matches!(self, HealthStatus::Connected | HealthStatus::Degraded)
     }
@@ -400,7 +400,7 @@ pub enum CircuitState {
 
 impl CircuitState {
     /// Get the string representation used in the database.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             CircuitState::Closed => "closed",
@@ -410,7 +410,7 @@ impl CircuitState {
     }
 
     /// Check if operations should be allowed through.
-    #[must_use] 
+    #[must_use]
     pub fn allows_operations(&self) -> bool {
         matches!(self, CircuitState::Closed | CircuitState::HalfOpen)
     }
@@ -470,7 +470,7 @@ pub enum DeprovisionAction {
 
 impl DeprovisionAction {
     /// Get the string representation used in the database.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             DeprovisionAction::None => "none",

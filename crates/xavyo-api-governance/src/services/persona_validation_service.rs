@@ -22,7 +22,7 @@ pub struct ConflictCheckResult {
 }
 
 impl ConflictCheckResult {
-    #[must_use] 
+    #[must_use]
     pub fn no_conflict() -> Self {
         Self {
             has_conflict: false,
@@ -31,7 +31,7 @@ impl ConflictCheckResult {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn conflict(archetypes: Vec<Uuid>, details: Vec<String>) -> Self {
         Self {
             has_conflict: true,
@@ -50,7 +50,7 @@ pub struct MultiPersonaOperationResult {
 }
 
 impl MultiPersonaOperationResult {
-    #[must_use] 
+    #[must_use]
     pub fn all_succeeded(ids: Vec<Uuid>) -> Self {
         Self {
             succeeded: ids,
@@ -59,7 +59,7 @@ impl MultiPersonaOperationResult {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn partial_failure(succeeded: Vec<Uuid>, failed: Vec<(Uuid, String)>) -> Self {
         Self {
             succeeded,
@@ -68,7 +68,7 @@ impl MultiPersonaOperationResult {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn all_rolled_back(failed: Vec<(Uuid, String)>) -> Self {
         Self {
             succeeded: vec![],
@@ -85,7 +85,7 @@ pub struct PersonaValidationService {
 
 impl PersonaValidationService {
     /// Create a new validation service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

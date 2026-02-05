@@ -114,7 +114,7 @@ impl GovDelegationScope {
 
     /// Check if the scope is empty (no restrictions defined).
     /// An empty scope is equivalent to full delegation.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.application_ids.is_empty()
             && self.entitlement_ids.is_empty()
@@ -127,7 +127,7 @@ impl GovDelegationScope {
     /// Returns true if:
     /// - The scope is empty (full delegation), OR
     /// - The work item matches at least one criterion (OR semantics)
-    #[must_use] 
+    #[must_use]
     pub fn matches_work_item(
         &self,
         application_id: Option<Uuid>,

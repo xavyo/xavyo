@@ -61,7 +61,7 @@ pub struct EnforcementDecision {
 
 impl EnforcementDecision {
     /// Create a skip decision for disabled enforcement mode.
-    #[must_use] 
+    #[must_use]
     pub fn skip() -> Self {
         Self {
             action: EnforcementAction::None,
@@ -74,7 +74,7 @@ impl EnforcementDecision {
     }
 
     /// Returns true if the action requires blocking or MFA challenge.
-    #[must_use] 
+    #[must_use]
     pub fn is_action_required(&self) -> bool {
         self.enforced
             && matches!(
@@ -84,13 +84,13 @@ impl EnforcementDecision {
     }
 
     /// Returns true if the decision requires blocking login.
-    #[must_use] 
+    #[must_use]
     pub fn is_blocked(&self) -> bool {
         self.enforced && self.action == EnforcementAction::Block
     }
 
     /// Returns true if the decision requires step-up MFA.
-    #[must_use] 
+    #[must_use]
     pub fn requires_mfa(&self) -> bool {
         self.enforced && self.action == EnforcementAction::RequireMfa
     }
@@ -103,7 +103,7 @@ pub struct RiskEnforcementService {
 
 impl RiskEnforcementService {
     /// Create a new risk enforcement service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

@@ -96,7 +96,7 @@ impl ScimGroup {
     }
 
     /// Set the resource ID and generate metadata.
-    #[must_use] 
+    #[must_use]
     pub fn with_meta(
         mut self,
         id: Uuid,
@@ -116,7 +116,7 @@ impl ScimGroup {
     }
 
     /// Get member IDs.
-    #[must_use] 
+    #[must_use]
     pub fn member_ids(&self) -> Vec<Uuid> {
         self.members.iter().map(|m| m.value).collect()
     }

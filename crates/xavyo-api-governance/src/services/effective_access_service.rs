@@ -63,7 +63,7 @@ pub struct EffectiveAccessService {
 
 impl EffectiveAccessService {
     /// Create a new effective access service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

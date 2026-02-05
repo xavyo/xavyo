@@ -350,7 +350,7 @@ impl TenantIdentityProvider {
 
     /// Create a default instance for testing.
     /// Available in all builds for downstream crate tests.
-    #[must_use] 
+    #[must_use]
     pub fn default_for_test() -> Self {
         Self {
             id: Uuid::new_v4(),

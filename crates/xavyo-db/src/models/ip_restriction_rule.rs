@@ -290,7 +290,7 @@ impl IpRestrictionRule {
     /// - scope is "all"
     /// - scope is "admin" and roles contains "admin"
     /// - scope is "role:X" and roles contains "X"
-    #[must_use] 
+    #[must_use]
     pub fn scope_applies(&self, roles: &[String]) -> bool {
         match self.scope.as_str() {
             "all" => true,

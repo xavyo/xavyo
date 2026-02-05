@@ -25,7 +25,7 @@ pub enum PrivilegeFlagStatus {
 
 impl PrivilegeFlagStatus {
     /// Check if flag can be updated.
-    #[must_use] 
+    #[must_use]
     pub fn can_update(&self) -> bool {
         matches!(self, Self::Pending)
     }

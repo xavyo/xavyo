@@ -35,7 +35,7 @@ pub struct SyncService {
 
 impl SyncService {
     /// Create a new sync service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             status_manager: SyncStatusManager::new(pool.clone()),

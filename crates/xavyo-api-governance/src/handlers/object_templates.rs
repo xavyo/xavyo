@@ -19,12 +19,18 @@ use xavyo_db::models::{
 };
 
 use crate::error::{ApiGovernanceError, ApiResult};
+use xavyo_db::models::{
+    CreateGovTemplateExclusion, CreateGovTemplateMergePolicy, UpdateGovTemplateMergePolicy,
+};
+
 use crate::models::{
-    ApplicationEventListResponse, ApplicationEventResponse, CreateRuleRequest, CreateScopeRequest,
-    CreateTemplateRequest, ListApplicationEventsQuery, ListObjectTemplatesQuery,
-    ListTemplateEventsQuery, ListTemplateRulesQuery, ListVersionsQuery, MergePolicyResponse,
-    RuleListResponse, RuleResponse, ScopeListResponse, ScopeResponse, TemplateDetailResponse,
-    TemplateEventListResponse, TemplateEventResponse, TemplateListResponse, TemplateResponse,
+    ApplicationEventListResponse, ApplicationEventResponse, CreateExclusionRequest,
+    CreateMergePolicyRequest, CreateRuleRequest, CreateScopeRequest, CreateTemplateRequest,
+    ExclusionListResponse, ExclusionResponse, ListApplicationEventsQuery, ListObjectTemplatesQuery,
+    ListTemplateEventsQuery, ListTemplateRulesQuery, ListVersionsQuery, MergePolicyListResponse,
+    MergePolicyResponse, RuleListResponse, RuleResponse, ScopeListResponse, ScopeResponse,
+    SimulationRequest, TemplateDetailResponse, TemplateEventListResponse, TemplateEventResponse,
+    TemplateListResponse, TemplateResponse, TemplateSimulationResponse, UpdateMergePolicyRequest,
     UpdateRuleRequest, UpdateTemplateRequest, VersionListResponse, VersionResponse,
 };
 use crate::router::GovernanceState;
@@ -962,5 +968,464 @@ pub async fn list_application_events_by_object(
         total: 0, // Events don't have pagination yet
         limit: 100,
         offset: 0,
+    }))
+}
+
+// ============================================================================
+// Merge Policy Operations
+// ============================================================================
+
+/// List merge policies for a template.
+#[utoipa::path(
+    get,
+    path = "/governance/object-templates/{template_id}/merge-policies",
+    tag = "Governance - Object Templates",
+    params(
+        ("template_id" = Uuid, Path, description = "Template ID")
+    ),
+    responses(
+        (status = 200, description = "List of merge policies", body = MergePolicyListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Template not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn list_merge_policies(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(template_id): Path<Uuid>,
+) -> ApiResult<Json<MergePolicyListResponse>> {
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    // Verify template exists
+    state
+        .object_template_service
+        .get(tenant_id, template_id)
+        .await?;
+
+    let policies = state
+        .template_merge_service
+        .list_by_template(tenant_id, template_id)
+        .await?;
+
+    let items: Vec<MergePolicyResponse> = policies
+        .into_iter()
+        .map(MergePolicyResponse::from)
+        .collect();
+
+    Ok(Json(MergePolicyListResponse { items }))
+}
+
+/// Create a merge policy for a template.
+#[utoipa::path(
+    post,
+    path = "/governance/object-templates/{template_id}/merge-policies",
+    tag = "Governance - Object Templates",
+    params(
+        ("template_id" = Uuid, Path, description = "Template ID")
+    ),
+    request_body = CreateMergePolicyRequest,
+    responses(
+        (status = 201, description = "Merge policy created", body = MergePolicyResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Template not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn create_merge_policy(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(template_id): Path<Uuid>,
+    Json(request): Json<CreateMergePolicyRequest>,
+) -> ApiResult<Json<MergePolicyResponse>> {
+    request.validate()?;
+
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    // Verify template exists
+    state
+        .object_template_service
+        .get(tenant_id, template_id)
+        .await?;
+
+    let input = CreateGovTemplateMergePolicy {
+        attribute: request.attribute,
+        strategy: request.strategy,
+        source_precedence: request.source_precedence,
+        null_handling: Some(request.null_handling),
+    };
+
+    let result = state
+        .template_merge_service
+        .create(tenant_id, template_id, input)
+        .await?;
+
+    Ok(Json(MergePolicyResponse::from(result)))
+}
+
+/// Get a specific merge policy.
+#[utoipa::path(
+    get,
+    path = "/governance/object-templates/{template_id}/merge-policies/{policy_id}",
+    tag = "Governance - Object Templates",
+    params(
+        ("template_id" = Uuid, Path, description = "Template ID"),
+        ("policy_id" = Uuid, Path, description = "Policy ID")
+    ),
+    responses(
+        (status = 200, description = "Merge policy details", body = MergePolicyResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Template or policy not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn get_merge_policy(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path((template_id, policy_id)): Path<(Uuid, Uuid)>,
+) -> ApiResult<Json<MergePolicyResponse>> {
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    // Verify template exists
+    state
+        .object_template_service
+        .get(tenant_id, template_id)
+        .await?;
+
+    let policy = state
+        .template_merge_service
+        .get(tenant_id, policy_id)
+        .await?;
+
+    if policy.template_id != template_id {
+        return Err(ApiGovernanceError::NotFound(
+            "Merge policy not found".to_string(),
+        ));
+    }
+
+    Ok(Json(MergePolicyResponse::from(policy)))
+}
+
+/// Update a merge policy.
+#[utoipa::path(
+    put,
+    path = "/governance/object-templates/{template_id}/merge-policies/{policy_id}",
+    tag = "Governance - Object Templates",
+    params(
+        ("template_id" = Uuid, Path, description = "Template ID"),
+        ("policy_id" = Uuid, Path, description = "Policy ID")
+    ),
+    request_body = UpdateMergePolicyRequest,
+    responses(
+        (status = 200, description = "Merge policy updated", body = MergePolicyResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Template or policy not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn update_merge_policy(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path((template_id, policy_id)): Path<(Uuid, Uuid)>,
+    Json(request): Json<UpdateMergePolicyRequest>,
+) -> ApiResult<Json<MergePolicyResponse>> {
+    request.validate()?;
+
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    // Verify template exists
+    state
+        .object_template_service
+        .get(tenant_id, template_id)
+        .await?;
+
+    let input = UpdateGovTemplateMergePolicy {
+        strategy: request.strategy,
+        source_precedence: request.source_precedence,
+        null_handling: request.null_handling,
+    };
+
+    let result = state
+        .template_merge_service
+        .update(tenant_id, policy_id, input)
+        .await?;
+
+    Ok(Json(MergePolicyResponse::from(result)))
+}
+
+/// Delete a merge policy.
+#[utoipa::path(
+    delete,
+    path = "/governance/object-templates/{template_id}/merge-policies/{policy_id}",
+    tag = "Governance - Object Templates",
+    params(
+        ("template_id" = Uuid, Path, description = "Template ID"),
+        ("policy_id" = Uuid, Path, description = "Policy ID")
+    ),
+    responses(
+        (status = 204, description = "Merge policy deleted"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Template or policy not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn delete_merge_policy(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path((template_id, policy_id)): Path<(Uuid, Uuid)>,
+) -> ApiResult<()> {
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    // Verify template exists
+    state
+        .object_template_service
+        .get(tenant_id, template_id)
+        .await?;
+
+    state
+        .template_merge_service
+        .delete(tenant_id, policy_id)
+        .await?;
+
+    Ok(())
+}
+
+// ============================================================================
+// Exclusion Operations
+// ============================================================================
+
+/// List exclusions for a template.
+#[utoipa::path(
+    get,
+    path = "/governance/object-templates/{template_id}/exclusions",
+    tag = "Governance - Object Templates",
+    params(
+        ("template_id" = Uuid, Path, description = "Template ID")
+    ),
+    responses(
+        (status = 200, description = "List of exclusions", body = ExclusionListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Template not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn list_exclusions(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(template_id): Path<Uuid>,
+) -> ApiResult<Json<ExclusionListResponse>> {
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    // Verify template exists
+    state
+        .object_template_service
+        .get(tenant_id, template_id)
+        .await?;
+
+    let exclusions = xavyo_db::models::GovTemplateExclusion::list_by_template(
+        state.pool(),
+        tenant_id,
+        template_id,
+    )
+    .await
+    .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?;
+
+    let items: Vec<ExclusionResponse> = exclusions
+        .into_iter()
+        .map(ExclusionResponse::from)
+        .collect();
+
+    Ok(Json(ExclusionListResponse { items }))
+}
+
+/// Add an exclusion to a template (exclude a parent's rule).
+#[utoipa::path(
+    post,
+    path = "/governance/object-templates/{template_id}/exclusions",
+    tag = "Governance - Object Templates",
+    params(
+        ("template_id" = Uuid, Path, description = "Template ID")
+    ),
+    request_body = CreateExclusionRequest,
+    responses(
+        (status = 201, description = "Exclusion created", body = ExclusionResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Template not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn create_exclusion(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(template_id): Path<Uuid>,
+    Json(request): Json<CreateExclusionRequest>,
+) -> ApiResult<Json<ExclusionResponse>> {
+    request.validate()?;
+
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    // Verify template exists
+    state
+        .object_template_service
+        .get(tenant_id, template_id)
+        .await?;
+
+    let input = CreateGovTemplateExclusion {
+        excluded_rule_id: request.excluded_rule_id,
+    };
+
+    let result =
+        xavyo_db::models::GovTemplateExclusion::create(state.pool(), tenant_id, template_id, input)
+            .await
+            .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?;
+
+    Ok(Json(ExclusionResponse::from(result)))
+}
+
+/// Remove an exclusion from a template.
+#[utoipa::path(
+    delete,
+    path = "/governance/object-templates/{template_id}/exclusions/{exclusion_id}",
+    tag = "Governance - Object Templates",
+    params(
+        ("template_id" = Uuid, Path, description = "Template ID"),
+        ("exclusion_id" = Uuid, Path, description = "Exclusion ID")
+    ),
+    responses(
+        (status = 204, description = "Exclusion removed"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Template or exclusion not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn delete_exclusion(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path((template_id, exclusion_id)): Path<(Uuid, Uuid)>,
+) -> ApiResult<()> {
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    // Verify template exists
+    state
+        .object_template_service
+        .get(tenant_id, template_id)
+        .await?;
+
+    let deleted =
+        xavyo_db::models::GovTemplateExclusion::delete(state.pool(), tenant_id, exclusion_id)
+            .await
+            .map_err(|e| ApiGovernanceError::Internal(e.to_string()))?;
+
+    if !deleted {
+        return Err(ApiGovernanceError::NotFound(
+            "Exclusion not found".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// Simulation Operations
+// ============================================================================
+
+/// Simulate template application on a sample object.
+#[utoipa::path(
+    post,
+    path = "/governance/object-templates/{template_id}/simulate",
+    tag = "Governance - Object Templates",
+    params(
+        ("template_id" = Uuid, Path, description = "Template ID")
+    ),
+    request_body = SimulationRequest,
+    responses(
+        (status = 200, description = "Simulation result", body = TemplateSimulationResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Template not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn simulate_template(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(template_id): Path<Uuid>,
+    Json(request): Json<SimulationRequest>,
+) -> ApiResult<Json<TemplateSimulationResponse>> {
+    request.validate()?;
+
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    let result = state
+        .template_simulation_service
+        .simulate_template(tenant_id, template_id, request.sample_object, request.limit)
+        .await?;
+
+    Ok(Json(TemplateSimulationResponse {
+        template_id: result.template_id,
+        rules_applied: result
+            .rules_applied
+            .into_iter()
+            .map(|r| crate::models::RuleApplicationResult {
+                rule_id: r.rule_id,
+                target_attribute: r.target_attribute,
+                rule_type: r.rule_type,
+                before_value: r.before_value,
+                after_value: r.after_value,
+                applied: r.applied,
+                skip_reason: r.skip_reason,
+            })
+            .collect(),
+        validation_errors: result
+            .validation_errors
+            .into_iter()
+            .map(|e| crate::models::ValidationError {
+                rule_id: e.rule_id,
+                target_attribute: e.target_attribute,
+                message: e.message,
+                expression: e.expression,
+            })
+            .collect(),
+        computed_values: result.computed_values,
+        affected_count: result.affected_count,
     }))
 }

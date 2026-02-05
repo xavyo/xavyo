@@ -190,7 +190,7 @@ pub struct InMemoryEntitlementStore {
 
 impl InMemoryEntitlementStore {
     /// Create a new in-memory store.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             entitlements: Arc::new(RwLock::new(HashMap::new())),

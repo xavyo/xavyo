@@ -25,13 +25,13 @@ pub enum ReconciliationStatus {
 
 impl ReconciliationStatus {
     /// Check if this status indicates the run is finished.
-    #[must_use] 
+    #[must_use]
     pub fn is_finished(&self) -> bool {
         !matches!(self, Self::Running)
     }
 
     /// Check if this status indicates success.
-    #[must_use] 
+    #[must_use]
     pub fn is_success(&self) -> bool {
         matches!(self, Self::Completed)
     }

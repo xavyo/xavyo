@@ -106,7 +106,7 @@ pub struct ReconciliationRunInfo {
 
 impl ReconciliationRunInfo {
     /// Calculate progress percentage.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_progress(&self) -> f64 {
         self.statistics.progress_percentage()
     }
@@ -121,7 +121,7 @@ pub struct ReconciliationEngine {
 
 impl ReconciliationEngine {
     /// Create a new reconciliation engine.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             checkpoint_manager: CheckpointManager::new(pool.clone()),
@@ -131,7 +131,7 @@ impl ReconciliationEngine {
     }
 
     /// Create with custom configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_config(pool: PgPool, config: ReconciliationConfig) -> Self {
         Self {
             checkpoint_manager: CheckpointManager::new(pool.clone()),
@@ -454,7 +454,7 @@ impl ReconciliationEngine {
     }
 
     /// Get configuration.
-    #[must_use] 
+    #[must_use]
     pub fn config(&self) -> &ReconciliationConfig {
         &self.config
     }

@@ -32,7 +32,7 @@ pub struct HrdService {
 
 impl HrdService {
     /// Create a new HRD service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -42,7 +42,7 @@ impl HrdService {
     }
 
     /// Create a new HRD service with custom cache TTL.
-    #[must_use] 
+    #[must_use]
     pub fn with_cache_ttl(pool: PgPool, cache_ttl_secs: i64) -> Self {
         Self {
             pool,

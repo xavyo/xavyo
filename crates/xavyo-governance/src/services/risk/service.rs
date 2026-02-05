@@ -114,9 +114,7 @@ impl RiskAssessmentService {
 
         factors.push(
             RiskFactorResult::new("sod_violations", Self::SOD_WEIGHT, sod_factor).with_description(
-                format!(
-                    "{sod_violation_count} active SoD violation(s) (25 points each, max 100)"
-                ),
+                format!("{sod_violation_count} active SoD violation(s) (25 points each, max 100)"),
             ),
         );
 

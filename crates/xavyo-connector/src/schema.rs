@@ -51,7 +51,7 @@ pub struct SchemaConfig {
 
 impl Schema {
     /// Create a new empty schema.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             object_classes: Vec::new(),
@@ -60,7 +60,7 @@ impl Schema {
     }
 
     /// Create a schema with the given object classes.
-    #[must_use] 
+    #[must_use]
     pub fn with_object_classes(object_classes: Vec<ObjectClass>) -> Self {
         Self {
             object_classes,
@@ -69,14 +69,14 @@ impl Schema {
     }
 
     /// Set schema configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_config(mut self, config: SchemaConfig) -> Self {
         self.config = Some(config);
         self
     }
 
     /// Get the schema configuration, or defaults if not set.
-    #[must_use] 
+    #[must_use]
     pub fn config(&self) -> SchemaConfig {
         self.config.clone().unwrap_or_default()
     }
@@ -87,13 +87,13 @@ impl Schema {
     }
 
     /// Find an object class by name.
-    #[must_use] 
+    #[must_use]
     pub fn get_object_class(&self, name: &str) -> Option<&ObjectClass> {
         self.object_classes.iter().find(|oc| oc.name == name)
     }
 
     /// Find an object class by name, with case-insensitive matching if configured.
-    #[must_use] 
+    #[must_use]
     pub fn get_object_class_case_aware(&self, name: &str) -> Option<&ObjectClass> {
         let case_ignore = self
             .config
@@ -109,19 +109,19 @@ impl Schema {
     }
 
     /// Check if an object class exists.
-    #[must_use] 
+    #[must_use]
     pub fn has_object_class(&self, name: &str) -> bool {
         self.object_classes.iter().any(|oc| oc.name == name)
     }
 
     /// Check if an object class exists (case-aware matching).
-    #[must_use] 
+    #[must_use]
     pub fn has_object_class_case_aware(&self, name: &str) -> bool {
         self.get_object_class_case_aware(name).is_some()
     }
 
     /// Get all volatile attributes across all object classes.
-    #[must_use] 
+    #[must_use]
     pub fn volatile_attributes(&self) -> Vec<&SchemaAttribute> {
         self.object_classes
             .iter()
@@ -131,7 +131,7 @@ impl Schema {
     }
 
     /// Get all primary identifier attributes across all object classes.
-    #[must_use] 
+    #[must_use]
     pub fn primary_identifiers(&self) -> Vec<&SchemaAttribute> {
         self.object_classes
             .iter()
@@ -141,7 +141,7 @@ impl Schema {
     }
 
     /// Get all object class names.
-    #[must_use] 
+    #[must_use]
     pub fn object_class_names(&self) -> Vec<&str> {
         self.object_classes
             .iter()
@@ -254,20 +254,20 @@ impl ObjectClass {
     }
 
     /// Add an attribute using builder pattern.
-    #[must_use] 
+    #[must_use]
     pub fn with_attribute(mut self, attribute: SchemaAttribute) -> Self {
         self.attributes.push(attribute);
         self
     }
 
     /// Find an attribute by name.
-    #[must_use] 
+    #[must_use]
     pub fn get_attribute(&self, name: &str) -> Option<&SchemaAttribute> {
         self.attributes.iter().find(|a| a.name == name)
     }
 
     /// Find an attribute by name with case-insensitive matching.
-    #[must_use] 
+    #[must_use]
     pub fn get_attribute_case_insensitive(&self, name: &str) -> Option<&SchemaAttribute> {
         self.attributes
             .iter()
@@ -275,31 +275,31 @@ impl ObjectClass {
     }
 
     /// Find an attribute by name respecting each attribute's `case_insensitive` flag.
-    #[must_use] 
+    #[must_use]
     pub fn get_attribute_case_aware(&self, name: &str) -> Option<&SchemaAttribute> {
         self.attributes.iter().find(|a| a.name_matches(name))
     }
 
     /// Check if an attribute exists.
-    #[must_use] 
+    #[must_use]
     pub fn has_attribute(&self, name: &str) -> bool {
         self.attributes.iter().any(|a| a.name == name)
     }
 
     /// Check if an attribute exists (case-insensitive).
-    #[must_use] 
+    #[must_use]
     pub fn has_attribute_case_insensitive(&self, name: &str) -> bool {
         self.get_attribute_case_insensitive(name).is_some()
     }
 
     /// Get the primary identifier attribute for this object class.
-    #[must_use] 
+    #[must_use]
     pub fn primary_identifier(&self) -> Option<&SchemaAttribute> {
         self.attributes.iter().find(|a| a.is_primary_identifier())
     }
 
     /// Get all identifier attributes (primary and secondary).
-    #[must_use] 
+    #[must_use]
     pub fn identifiers(&self) -> Vec<&SchemaAttribute> {
         self.attributes
             .iter()
@@ -308,19 +308,19 @@ impl ObjectClass {
     }
 
     /// Get all volatile attributes.
-    #[must_use] 
+    #[must_use]
     pub fn volatile_attributes(&self) -> Vec<&SchemaAttribute> {
         self.attributes.iter().filter(|a| a.volatile).collect()
     }
 
     /// Get all required attributes.
-    #[must_use] 
+    #[must_use]
     pub fn required_attributes(&self) -> Vec<&SchemaAttribute> {
         self.attributes.iter().filter(|a| a.required).collect()
     }
 
     /// Get all writable attributes.
-    #[must_use] 
+    #[must_use]
     pub fn writable_attributes(&self) -> Vec<&SchemaAttribute> {
         self.attributes.iter().filter(|a| a.writable).collect()
     }
@@ -332,28 +332,28 @@ impl ObjectClass {
     }
 
     /// Set parent classes for hierarchy.
-    #[must_use] 
+    #[must_use]
     pub fn with_parent_classes(mut self, parents: Vec<String>) -> Self {
         self.parent_classes = parents;
         self
     }
 
     /// Set the object class type.
-    #[must_use] 
+    #[must_use]
     pub fn with_object_class_type(mut self, class_type: ObjectClassType) -> Self {
         self.object_class_type = class_type;
         self
     }
 
     /// Add inherited attributes from parent classes.
-    #[must_use] 
+    #[must_use]
     pub fn with_inherited_attributes(mut self, attrs: Vec<SchemaAttribute>) -> Self {
         self.inherited_attributes = attrs;
         self
     }
 
     /// Get an attribute by name (including inherited).
-    #[must_use] 
+    #[must_use]
     pub fn get_attribute_including_inherited(&self, name: &str) -> Option<&SchemaAttribute> {
         self.attributes
             .iter()
@@ -362,7 +362,7 @@ impl ObjectClass {
     }
 
     /// Get all attributes (direct + inherited).
-    #[must_use] 
+    #[must_use]
     pub fn all_attributes(&self) -> Vec<&SchemaAttribute> {
         self.attributes
             .iter()
@@ -371,7 +371,7 @@ impl ObjectClass {
     }
 
     /// Total attribute count (direct + inherited).
-    #[must_use] 
+    #[must_use]
     pub fn total_attribute_count(&self) -> usize {
         self.attributes.len() + self.inherited_attributes.len()
     }
@@ -392,7 +392,7 @@ pub enum ObjectClassType {
 
 impl ObjectClassType {
     /// Get the string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             ObjectClassType::Structural => "structural",
@@ -402,7 +402,7 @@ impl ObjectClassType {
     }
 
     /// Parse from string.
-    #[must_use] 
+    #[must_use]
     pub fn parse_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "structural" => Some(ObjectClassType::Structural),
@@ -533,28 +533,28 @@ impl SchemaAttribute {
     }
 
     /// Mark this attribute as multi-valued.
-    #[must_use] 
+    #[must_use]
     pub fn multi_valued(mut self) -> Self {
         self.multi_valued = true;
         self
     }
 
     /// Mark this attribute as required.
-    #[must_use] 
+    #[must_use]
     pub fn required(mut self) -> Self {
         self.required = true;
         self
     }
 
     /// Mark this attribute as read-only.
-    #[must_use] 
+    #[must_use]
     pub fn read_only(mut self) -> Self {
         self.writable = false;
         self
     }
 
     /// Mark this attribute as write-only (e.g., passwords).
-    #[must_use] 
+    #[must_use]
     pub fn write_only(mut self) -> Self {
         self.readable = false;
         self.returned_by_default = false;
@@ -574,14 +574,14 @@ impl SchemaAttribute {
     }
 
     /// Set allowed values for enumerated attributes.
-    #[must_use] 
+    #[must_use]
     pub fn with_allowed_values(mut self, values: Vec<String>) -> Self {
         self.allowed_values = values;
         self
     }
 
     /// Set string length constraints.
-    #[must_use] 
+    #[must_use]
     pub fn with_length(mut self, min: Option<usize>, max: Option<usize>) -> Self {
         self.min_length = min;
         self.max_length = max;
@@ -589,14 +589,14 @@ impl SchemaAttribute {
     }
 
     /// Set minimum length constraint only.
-    #[must_use] 
+    #[must_use]
     pub fn with_min_length(mut self, min: usize) -> Self {
         self.min_length = Some(min);
         self
     }
 
     /// Set maximum length constraint only.
-    #[must_use] 
+    #[must_use]
     pub fn with_max_length(mut self, max: usize) -> Self {
         self.max_length = Some(max);
         self
@@ -610,7 +610,7 @@ impl SchemaAttribute {
 
     /// Mark this attribute as a primary identifier (IGA edge case).
     /// Primary identifiers are immutable and used for correlation.
-    #[must_use] 
+    #[must_use]
     pub fn as_primary_identifier(mut self) -> Self {
         self.identifier_type = Some(IdentifierType::Primary);
         self
@@ -618,7 +618,7 @@ impl SchemaAttribute {
 
     /// Mark this attribute as a secondary identifier (IGA edge case).
     /// Secondary identifiers may change during object lifecycle.
-    #[must_use] 
+    #[must_use]
     pub fn as_secondary_identifier(mut self) -> Self {
         self.identifier_type = Some(IdentifierType::Secondary);
         self
@@ -626,7 +626,7 @@ impl SchemaAttribute {
 
     /// Mark this attribute as volatile (IGA edge case).
     /// Volatile attributes may change unexpectedly on the target system.
-    #[must_use] 
+    #[must_use]
     pub fn volatile(mut self) -> Self {
         self.volatile = true;
         self
@@ -634,26 +634,26 @@ impl SchemaAttribute {
 
     /// Mark this attribute as case-insensitive (IGA edge case).
     /// Common for LDAP attributes like uid, cn, sn.
-    #[must_use] 
+    #[must_use]
     pub fn case_insensitive(mut self) -> Self {
         self.case_insensitive = true;
         self
     }
 
     /// Check if this attribute is a primary identifier.
-    #[must_use] 
+    #[must_use]
     pub fn is_primary_identifier(&self) -> bool {
         matches!(self.identifier_type, Some(IdentifierType::Primary))
     }
 
     /// Check if this attribute is any type of identifier.
-    #[must_use] 
+    #[must_use]
     pub fn is_identifier(&self) -> bool {
         self.identifier_type.is_some()
     }
 
     /// Compare attribute name respecting case sensitivity setting.
-    #[must_use] 
+    #[must_use]
     pub fn name_matches(&self, name: &str) -> bool {
         if self.case_insensitive {
             self.name.eq_ignore_ascii_case(name)
@@ -663,7 +663,7 @@ impl SchemaAttribute {
     }
 
     /// Compare native name respecting case sensitivity setting.
-    #[must_use] 
+    #[must_use]
     pub fn native_name_matches(&self, name: &str) -> bool {
         if self.case_insensitive {
             self.native_name.eq_ignore_ascii_case(name)
@@ -707,7 +707,7 @@ pub enum AttributeDataType {
 
 impl AttributeDataType {
     /// Get the string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             AttributeDataType::String => "string",
@@ -727,7 +727,7 @@ impl AttributeDataType {
     }
 
     /// Parse from string.
-    #[must_use] 
+    #[must_use]
     pub fn parse_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "string" | "varchar" | "text" | "char" => Some(AttributeDataType::String),
@@ -777,7 +777,7 @@ pub enum DiscoveryState {
 
 impl DiscoveryState {
     /// Get the string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             DiscoveryState::Idle => "idle",
@@ -823,7 +823,7 @@ pub struct DiscoveryStatus {
 
 impl DiscoveryStatus {
     /// Create a new idle status.
-    #[must_use] 
+    #[must_use]
     pub fn idle(connector_id: Uuid) -> Self {
         Self {
             connector_id,
@@ -838,7 +838,7 @@ impl DiscoveryStatus {
     }
 
     /// Create a new in-progress status.
-    #[must_use] 
+    #[must_use]
     pub fn in_progress(connector_id: Uuid) -> Self {
         Self {
             connector_id,
@@ -853,7 +853,7 @@ impl DiscoveryStatus {
     }
 
     /// Update progress.
-    #[must_use] 
+    #[must_use]
     pub fn with_progress(mut self, percent: i32, current_class: Option<String>) -> Self {
         self.progress_percent = Some(percent.clamp(0, 100));
         self.current_object_class = current_class;
@@ -861,7 +861,7 @@ impl DiscoveryStatus {
     }
 
     /// Mark as completed.
-    #[must_use] 
+    #[must_use]
     pub fn completed(mut self, version: i32) -> Self {
         self.state = DiscoveryState::Completed;
         self.completed_at = Some(Utc::now());
@@ -871,7 +871,7 @@ impl DiscoveryStatus {
     }
 
     /// Mark as failed.
-    #[must_use] 
+    #[must_use]
     pub fn failed(mut self, error: String) -> Self {
         self.state = DiscoveryState::Failed;
         self.completed_at = Some(Utc::now());
@@ -905,7 +905,7 @@ pub struct SchemaDiff {
 
 impl SchemaDiff {
     /// Create a new diff between two schemas.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         from_version: i32,
         to_version: i32,
@@ -924,7 +924,7 @@ impl SchemaDiff {
     }
 
     /// Compute the diff between two schemas.
-    #[must_use] 
+    #[must_use]
     pub fn compute(
         from: &Schema,
         to: &Schema,
@@ -1108,7 +1108,7 @@ impl SchemaDiff {
     }
 
     /// Check if there are any changes.
-    #[must_use] 
+    #[must_use]
     pub fn has_changes(&self) -> bool {
         self.summary.object_classes_added > 0
             || self.summary.object_classes_removed > 0

@@ -62,6 +62,12 @@ pub use models::{
     // Lifecycle Workflow models (F037)
     AccessSnapshotFilter,
     AccessSnapshotType,
+    // Lifecycle Action Execution models (F052/F193)
+    ActionExecutionFilter,
+    ActionExecutionStatus,
+    ActionTriggerType,
+    // Self-Service Request Catalog models (F-062)
+    AddCartItem,
     // Delegated admin models (F029)
     AdminAction,
     AdminAuditLog,
@@ -77,14 +83,20 @@ pub use models::{
     // Risk Scoring models (F039)
     AlertSeverity,
     AlertType,
+    // Identity Archetype models (F058)
+    AncestryNode,
     ApprovalDetails,
     // Workflow Escalation models (F054)
     ApprovalGroupFilter,
     ApproveGovNhiRequest,
     ArchetypeEventData,
+    ArchetypePolicyBinding,
+    ArchetypeWithAncestry,
     AssignmentFilter,
     // Parametric Role models (F057)
     AssignmentParameterWithDefinition,
+    // Power of Attorney models (F061)
+    AssumedSessionFilter,
     // SAML models
     AttributeMap,
     AttributeMapping,
@@ -119,6 +131,12 @@ pub use models::{
     // Certification Campaign models (F036)
     CampaignFilter,
     CandidatePromotionStatus,
+    CartItemWithDetails,
+    CatalogCategory,
+    CatalogCategoryFilter,
+    CatalogItem,
+    CatalogItemFilter,
+    CatalogItemType,
     CategorySummary,
     CeremonyType,
     CertCampaignStatus,
@@ -159,6 +177,8 @@ pub use models::{
     CreateBatchSimulation,
     CreateBatchSimulationResult,
     CreateBirthrightPolicy,
+    CreateCatalogCategory,
+    CreateCatalogItem,
     CreateCertificationCampaign,
     CreateCertificationDecision,
     CreateCertificationItem,
@@ -192,6 +212,7 @@ pub use models::{
     // Orphan Account Detection models (F040)
     CreateGovDetectionRule,
     CreateGovEntitlement,
+    CreateGovLifecycleActionExecution,
     CreateGovLifecycleConfig,
     CreateGovLifecycleState,
     CreateGovLifecycleTransition,
@@ -226,6 +247,7 @@ pub use models::{
     CreateGovSodViolation,
     CreateGovStateTransitionAudit,
     CreateGovStateTransitionRequest,
+    CreateIdentityArchetype,
     CreateLifecycleAction,
     CreateLifecycleEvent,
     CreateLoginAttempt,
@@ -245,10 +267,15 @@ pub use models::{
     CreatePersonaArchetype,
     CreatePersonaAuditEvent,
     CreatePersonaLink,
+    CreatePoaAssumedSession,
+    CreatePoaAuditEvent,
+    CreatePolicyBinding,
     CreatePolicySimulation,
     CreatePolicySimulationResult,
+    CreatePowerOfAttorney,
     CreateReportSchedule,
     CreateReportTemplate,
+    CreateRequestCart,
     CreateRoleCandidate,
     CreateRoleMetrics,
     CreateRoleSimulation,
@@ -281,6 +308,7 @@ pub use models::{
     DetectionRuleType,
     DispositionFilter,
     DispositionSummary,
+    EffectivePolicy,
     // Self-service profile models (F027)
     EmailChangeRequest,
     // Auth models
@@ -314,6 +342,7 @@ pub use models::{
     FilterCriteria,
     FilterDefinition,
     FinalFallbackAction,
+    FormField,
     GenerateReportRequest,
     GeneratedReportFilter,
     GovAccessPattern,
@@ -366,6 +395,7 @@ pub use models::{
     GovFuzzyAlgorithm,
     GovGeneratedReport,
     GovLifecycleAction,
+    GovLifecycleActionExecution,
     GovLifecycleConfig,
     GovLifecycleEvent,
     GovLifecycleFailedOperation,
@@ -443,6 +473,7 @@ pub use models::{
     GovStateTransitionRequestWithStates,
     GovTicketingConfiguration,
     GovViolationStatus,
+    IdentityArchetype,
     ImpactSummary,
     ImpactType,
     ImpactTypeCounts,
@@ -549,10 +580,18 @@ pub use models::{
     PersonaFilter,
     PersonaLinkType,
     PersonaStatus,
+    PoaAssumedSession,
+    PoaAuditEvent,
+    PoaAuditEventFilter,
+    PoaEventType,
+    PoaFilter,
+    PoaStatus,
     PolicyCondition,
     PolicySimulationFilter,
     PolicySimulationResultFilter,
     PolicySimulationType,
+    PolicyType,
+    PowerOfAttorney,
     PrivilegeFlagStatus,
     PropagateMapping,
     ReconciliationRunFilter,
@@ -567,6 +606,9 @@ pub use models::{
     ReportStatus,
     ReportTemplateFilter,
     ReportTemplateType,
+    RequestCart,
+    RequestCartItem,
+    RequestabilityRules,
     ResolutionStatus,
     ResolveGovMetaRoleConflict,
     RetryQueueItem,
@@ -637,6 +679,9 @@ pub use models::{
     UpdateAiAgent,
     UpdateApprovalGroup,
     UpdateBirthrightPolicy,
+    UpdateCartItem,
+    UpdateCatalogCategory,
+    UpdateCatalogItem,
     UpdateCertificationCampaign,
     UpdateDisposition,
     UpdateEscalationLevel,
@@ -663,6 +708,7 @@ pub use models::{
     UpdateGovSodRule,
     UpdateGovStateTransitionAudit,
     UpdateGovStateTransitionRequest,
+    UpdateIdentityArchetype,
     UpdateJobProgress,
     UpdateMicroCertTrigger,
     UpdatePersona,
@@ -715,9 +761,26 @@ pub use models::{
 pub use pool::{DbPool, DbPoolOptions};
 pub use tenant::{clear_tenant_context, get_current_tenant, set_tenant_context, TenantConnection};
 
+// Role Inducements (Construction Pattern) exports (F-063)
+pub use models::{
+    AttributeMappingType, ConstructionAttributeMapping, ConstructionAttributeMappings,
+    ConstructionCondition, ConstructionConditionOperator, ConstructionSourceRole,
+    CreateRoleConstruction, CreateRoleInducement, DeprovisioningPolicy, EffectiveConstruction,
+    InducedRoleInfo, RoleConstruction, RoleConstructionFilter, RoleConstructionWithDetails,
+    RoleInducement, RoleInducementFilter, RoleInducementWithNames, UpdateRoleConstruction,
+    UserEffectiveConstruction,
+};
+
 // Bootstrap exports (F095)
 pub use bootstrap::{
     run_bootstrap, BootstrapError, BootstrapResult, CLI_OAUTH_CLIENT_ID, CLI_OAUTH_CLIENT_NAME,
     CLI_OAUTH_CLIENT_UUID, CLI_OAUTH_GRANT_TYPES, CLI_OAUTH_SCOPES, SYSTEM_TENANT_ID,
     SYSTEM_TENANT_NAME, SYSTEM_TENANT_SLUG,
+};
+
+// Bulk Action Engine exports (F-064)
+pub use models::{
+    CreateGovBulkAction, GovBulkAction, GovBulkActionFilter, GovBulkActionProgress,
+    GovBulkActionResultItem, GovBulkActionStatus, GovBulkActionType, UpdateGovBulkAction,
+    MAX_BULK_ACTION_SIZE, MIN_JUSTIFICATION_LENGTH,
 };

@@ -62,7 +62,7 @@ impl SyncProgress {
 
 impl SyncEngine {
     /// Create a new sync engine backed by the given database pool.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

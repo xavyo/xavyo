@@ -41,7 +41,7 @@ use super::token::DEVICE_CODE_GRANT_TYPE;
 
 impl OpenIdConfiguration {
     /// Create a new discovery document for the given issuer.
-    #[must_use] 
+    #[must_use]
     pub fn new(issuer: &str) -> Self {
         Self {
             issuer: issuer.to_string(),
@@ -117,13 +117,13 @@ pub struct JwkSet {
 
 impl JwkSet {
     /// Create a new empty JWKS.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self { keys: Vec::new() }
     }
 
     /// Add a key to the set.
-    #[must_use] 
+    #[must_use]
     pub fn add_key(mut self, key: Jwk) -> Self {
         self.keys.push(key);
         self

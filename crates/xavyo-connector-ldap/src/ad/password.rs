@@ -37,10 +37,7 @@ pub fn encode_ad_password(password: &str) -> ConnectorResult<Vec<u8>> {
     let quoted = format!("\"{password}\"");
 
     // Encode as UTF-16LE
-    let encoded: Vec<u8> = quoted
-        .encode_utf16()
-        .flat_map(u16::to_le_bytes)
-        .collect();
+    let encoded: Vec<u8> = quoted.encode_utf16().flat_map(u16::to_le_bytes).collect();
 
     Ok(encoded)
 }
@@ -102,7 +99,7 @@ pub fn build_password_change(
 ///
 /// New accounts are created with `NORMAL_ACCOUNT` (0x200) flag.
 /// Optionally, the account can be created in disabled state (ACCOUNTDISABLE 0x2).
-#[must_use] 
+#[must_use]
 pub fn new_account_uac(disabled: bool) -> u32 {
     let mut uac: u32 = 0x200; // NORMAL_ACCOUNT
     if disabled {

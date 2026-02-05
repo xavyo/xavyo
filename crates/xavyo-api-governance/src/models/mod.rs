@@ -189,3 +189,37 @@ pub mod correlation;
 // SIEM Integration models (F078)
 pub mod siem;
 // Note: siem types are NOT glob-exported. Use `crate::models::siem::` qualified paths.
+
+// Identity Archetype models (F-058)
+pub mod archetype;
+pub mod identity_archetype;
+
+// Power of Attorney models (F-061)
+pub mod power_of_attorney;
+
+// Self-Service Request Catalog models (F-062)
+pub mod catalog;
+
+// Identity Archetype exports (F-058)
+pub use archetype::*;
+pub use identity_archetype::*;
+
+// Power of Attorney exports (F-061)
+pub use power_of_attorney::*;
+
+// Self-Service Request Catalog exports (F-062)
+pub use catalog::*;
+
+// Role Inducements & Constructions models (F-063)
+pub mod role_construction;
+pub mod role_inducement;
+
+// Role Inducements & Constructions exports (F-063)
+pub use role_construction::*;
+pub use role_inducement::*;
+
+// Bulk Action Engine models (F-064)
+pub mod bulk_action;
+
+// Bulk Action Engine exports (F-064)
+pub use bulk_action::*;

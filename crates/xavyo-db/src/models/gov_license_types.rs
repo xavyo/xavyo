@@ -17,13 +17,13 @@ pub struct LicensePoolId(pub Uuid);
 
 impl LicensePoolId {
     /// Create a new random license pool ID.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -54,13 +54,13 @@ pub struct LicenseAssignmentId(pub Uuid);
 
 impl LicenseAssignmentId {
     /// Create a new random license assignment ID.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -91,13 +91,13 @@ pub struct LicenseEntitlementLinkId(pub Uuid);
 
 impl LicenseEntitlementLinkId {
     /// Create a new random link ID.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -128,13 +128,13 @@ pub struct LicenseReclamationRuleId(pub Uuid);
 
 impl LicenseReclamationRuleId {
     /// Create a new random rule ID.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -165,13 +165,13 @@ pub struct LicenseIncompatibilityId(pub Uuid);
 
 impl LicenseIncompatibilityId {
     /// Create a new random incompatibility ID.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -202,13 +202,13 @@ pub struct LicenseAuditEventId(pub Uuid);
 
 impl LicenseAuditEventId {
     /// Create a new random audit event ID.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Get the inner UUID.
-    #[must_use] 
+    #[must_use]
     pub fn inner(&self) -> Uuid {
         self.0
     }
@@ -391,7 +391,7 @@ pub enum LicenseAuditAction {
 
 impl LicenseAuditAction {
     /// Get the string representation for database storage.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::PoolCreated => "pool_created",
@@ -417,7 +417,7 @@ impl LicenseAuditAction {
     }
 
     /// Parse from string.
-    #[must_use] 
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "pool_created" => Some(Self::PoolCreated),

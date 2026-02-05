@@ -11,7 +11,7 @@ pub struct SlugService {
 
 impl SlugService {
     /// Create a new slug service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -26,7 +26,7 @@ impl SlugService {
     /// - Trimming leading/trailing hyphens
     ///
     /// This is a pure function that doesn't require database access.
-    #[must_use] 
+    #[must_use]
     pub fn generate_slug(name: &str) -> String {
         let slug: String = name
             .to_lowercase()

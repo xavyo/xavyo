@@ -97,7 +97,7 @@ pub struct LicenseIncompatibilityService {
 
 impl LicenseIncompatibilityService {
     /// Create a new incompatibility service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: LicenseAuditService::new(pool.clone()),
@@ -262,12 +262,8 @@ impl LicenseIncompatibilityService {
                     rule_id,
                     rule.pool_a_id,
                     rule.pool_b_id,
-                    pool_a
-                        .as_ref()
-                        .map_or("unknown", |p| p.name.as_str()),
-                    pool_b
-                        .as_ref()
-                        .map_or("unknown", |p| p.name.as_str()),
+                    pool_a.as_ref().map_or("unknown", |p| p.name.as_str()),
+                    pool_b.as_ref().map_or("unknown", |p| p.name.as_str()),
                     actor_id,
                 )
                 .await?;
@@ -307,7 +303,7 @@ impl LicenseIncompatibilityService {
     }
 
     /// Get the underlying database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }

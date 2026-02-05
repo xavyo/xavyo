@@ -621,13 +621,13 @@ impl GovPersona {
     }
 
     /// Check if persona can be switched to.
-    #[must_use] 
+    #[must_use]
     pub fn can_switch_to(&self) -> bool {
         self.status.can_switch_to()
     }
 
     /// Check if persona has expired.
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         if let Some(valid_until) = self.valid_until {
             Utc::now() > valid_until
@@ -637,7 +637,7 @@ impl GovPersona {
     }
 
     /// Get remaining time until expiration.
-    #[must_use] 
+    #[must_use]
     pub fn time_until_expiration(&self) -> Option<chrono::Duration> {
         self.valid_until.map(|until| until - Utc::now())
     }

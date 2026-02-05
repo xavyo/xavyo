@@ -411,7 +411,10 @@ impl TicketingProvider for JiraProvider {
             })
         } else {
             let error_response: Result<JiraErrorResponse, _> = response.json().await;
-            let message = error_response.map_or_else(|_| "Unknown error".to_string(), |e| e.error_messages.join(", "));
+            let message = error_response.map_or_else(
+                |_| "Unknown error".to_string(),
+                |e| e.error_messages.join(", "),
+            );
             Err(TicketingError::ApiError {
                 status: status.as_u16(),
                 message,

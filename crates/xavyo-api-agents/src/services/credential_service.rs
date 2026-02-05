@@ -63,7 +63,7 @@ pub struct DynamicCredentialService {
 
 impl DynamicCredentialService {
     /// Create a new `DynamicCredentialService` with provider registry.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, encryption_service: Arc<EncryptionService>) -> Self {
         let provider_registry = Arc::new(ProviderRegistry::new(pool.clone(), encryption_service));
         Self {

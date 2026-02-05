@@ -4,6 +4,8 @@
 
 use crate::crypto::{TotpEncryption, TotpEncryptionError};
 use crate::error::ApiAuthError;
+use crate::models::MfaPolicyConfig;
+use crate::services::org_policy_service::OrgPolicyService;
 use chrono::{DateTime, Utc};
 use data_encoding::BASE32;
 use image::Luma;
@@ -12,11 +14,12 @@ use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use std::io::Cursor;
 use std::net::IpAddr;
+use std::sync::Arc;
 use totp_rs::{Algorithm, Secret, TOTP};
 use uuid::Uuid;
 use xavyo_db::{
-    set_tenant_context, CreateMfaAuditLog, CreateTotpSecret, MfaAuditAction, MfaAuditLog,
-    UserRecoveryCode, UserTotpSecret,
+    models::org_security_policy::OrgPolicyType, set_tenant_context, CreateMfaAuditLog,
+    CreateTotpSecret, MfaAuditAction, MfaAuditLog, UserRecoveryCode, UserTotpSecret,
 };
 
 /// Length of recovery codes (16 alphanumeric characters).
@@ -57,6 +60,19 @@ pub struct MfaStatus {
     pub last_used_at: Option<DateTime<Utc>>,
 }
 
+/// Result of MFA requirement check based on org/tenant policies.
+#[derive(Debug, Clone)]
+pub struct MfaRequirement {
+    /// Whether MFA is required for this user.
+    pub required: bool,
+    /// Allowed MFA methods.
+    pub allowed_methods: Vec<String>,
+    /// Grace period in hours for new users to set up MFA.
+    pub grace_period_hours: i32,
+    /// Days to remember device before requiring MFA again.
+    pub remember_device_days: i32,
+}
+
 /// MFA Service for handling TOTP and recovery codes.
 #[derive(Clone)]
 pub struct MfaService {
@@ -67,7 +83,7 @@ pub struct MfaService {
 
 impl MfaService {
     /// Create a new MFA service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, encryption: TotpEncryption, issuer: String) -> Self {
         Self {
             pool,
@@ -640,6 +656,44 @@ impl MfaService {
         tx.commit().await.map_err(ApiAuthError::Database)?;
 
         Ok(())
+    }
+
+    /// Check if MFA is required for a user based on organization security policies.
+    ///
+    /// Returns the effective MFA requirement by resolving org-level MFA policies
+    /// for all groups the user belongs to, using the most restrictive combination.
+    pub async fn get_mfa_requirement(
+        &self,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<MfaRequirement, ApiAuthError> {
+        let org_service = OrgPolicyService::new(Arc::new(self.pool.clone()));
+
+        match org_service
+            .get_effective_policy_for_user(tenant_id, user_id, OrgPolicyType::Mfa)
+            .await
+        {
+            Ok((config, _sources)) => {
+                let mfa_config: MfaPolicyConfig =
+                    serde_json::from_value(config).unwrap_or_default();
+
+                Ok(MfaRequirement {
+                    required: mfa_config.required,
+                    allowed_methods: mfa_config.allowed_methods,
+                    grace_period_hours: mfa_config.grace_period_hours,
+                    remember_device_days: mfa_config.remember_device_days,
+                })
+            }
+            Err(_) => {
+                // If org policy resolution fails, return non-required default
+                Ok(MfaRequirement {
+                    required: false,
+                    allowed_methods: vec!["totp".to_string(), "webauthn".to_string()],
+                    grace_period_hours: 0,
+                    remember_device_days: 0,
+                })
+            }
+        }
     }
 
     /// Get MFA status for a user.

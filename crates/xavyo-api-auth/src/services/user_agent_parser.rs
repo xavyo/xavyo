@@ -23,7 +23,7 @@ pub struct DeviceInfo {
 }
 
 /// Parse a user-agent string to extract device information.
-#[must_use] 
+#[must_use]
 pub fn parse_user_agent(user_agent: &str) -> DeviceInfo {
     let ua = user_agent.to_lowercase();
 

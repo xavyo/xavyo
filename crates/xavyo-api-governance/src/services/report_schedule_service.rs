@@ -16,7 +16,7 @@ pub struct ReportScheduleService {
 
 impl ReportScheduleService {
     /// Create a new report schedule service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

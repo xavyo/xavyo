@@ -21,9 +21,8 @@ impl SigningCredentials {
             SamlError::CertificateParseError(format!("Failed to parse certificate: {e}"))
         })?;
 
-        let private_key = PKey::private_key_from_pem(key_pem.as_bytes()).map_err(|e| {
-            SamlError::PrivateKeyError(format!("Failed to parse private key: {e}"))
-        })?;
+        let private_key = PKey::private_key_from_pem(key_pem.as_bytes())
+            .map_err(|e| SamlError::PrivateKeyError(format!("Failed to parse private key: {e}")))?;
 
         // Compute key_id as SHA-256 thumbprint of certificate
         let key_id = compute_certificate_thumbprint(&certificate)?;
@@ -56,13 +55,13 @@ impl SigningCredentials {
     }
 
     /// Get the key ID (certificate thumbprint)
-    #[must_use] 
+    #[must_use]
     pub fn key_id(&self) -> &str {
         &self.key_id
     }
 
     /// Get the subject DN
-    #[must_use] 
+    #[must_use]
     pub fn subject_dn(&self) -> String {
         self.certificate
             .subject_name()
@@ -82,7 +81,7 @@ impl SigningCredentials {
     }
 
     /// Get the issuer DN
-    #[must_use] 
+    #[must_use]
     pub fn issuer_dn(&self) -> String {
         self.certificate
             .issuer_name()
@@ -102,13 +101,13 @@ impl SigningCredentials {
     }
 
     /// Get certificate validity start
-    #[must_use] 
+    #[must_use]
     pub fn not_before(&self) -> chrono::DateTime<chrono::Utc> {
         asn1_time_to_datetime(self.certificate.not_before())
     }
 
     /// Get certificate validity end
-    #[must_use] 
+    #[must_use]
     pub fn not_after(&self) -> chrono::DateTime<chrono::Utc> {
         asn1_time_to_datetime(self.certificate.not_after())
     }
@@ -152,7 +151,10 @@ fn asn1_time_to_datetime(time: &openssl::asn1::Asn1TimeRef) -> chrono::DateTime<
         .map(|dt| dt.with_timezone(&chrono::Utc))
         .unwrap_or_else(|_| {
             // Try common ASN1 format: "Mon DD HH:MM:SS YYYY GMT"
-            chrono::NaiveDateTime::parse_from_str(&time_str, "%b %d %H:%M:%S %Y GMT").map_or_else(|_| chrono::Utc::now(), |ndt| chrono::DateTime::from_naive_utc_and_offset(ndt, chrono::Utc))
+            chrono::NaiveDateTime::parse_from_str(&time_str, "%b %d %H:%M:%S %Y GMT").map_or_else(
+                |_| chrono::Utc::now(),
+                |ndt| chrono::DateTime::from_naive_utc_and_offset(ndt, chrono::Utc),
+            )
         })
 }
 

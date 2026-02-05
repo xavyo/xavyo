@@ -80,7 +80,7 @@ pub struct UpsertSessionPolicy {
 
 impl TenantSessionPolicy {
     /// Get default policy for a tenant (doesn't persist).
-    #[must_use] 
+    #[must_use]
     pub fn default_for_tenant(tenant_id: Uuid) -> Self {
         Self {
             tenant_id,

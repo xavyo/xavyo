@@ -111,7 +111,9 @@ async fn process_resend_verification(
     .fetch_optional(pool)
     .await?;
 
-    let (user_id, is_active, email_verified) = if let Some((id, active, verified)) = user_row { (id, active, verified) } else {
+    let (user_id, is_active, email_verified) = if let Some((id, active, verified)) = user_row {
+        (id, active, verified)
+    } else {
         tracing::debug!(
             email = %email,
             tenant_id = %tenant_id,

@@ -37,7 +37,7 @@ pub struct AttemptCompletion {
 
 impl AttemptCompletion {
     /// Create a successful completion.
-    #[must_use] 
+    #[must_use]
     pub fn success() -> Self {
         Self {
             success: true,
@@ -48,7 +48,7 @@ impl AttemptCompletion {
     }
 
     /// Create a successful completion with response data.
-    #[must_use] 
+    #[must_use]
     pub fn success_with_data(response_data: serde_json::Value) -> Self {
         Self {
             success: true,
@@ -92,7 +92,7 @@ pub struct AttemptService;
 
 impl AttemptService {
     /// Create a new attempt service.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self
     }

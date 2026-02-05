@@ -34,7 +34,7 @@ pub struct ServiceAccountsState {
 
 impl ServiceAccountsState {
     /// Create a new `ServiceAccountsState` with the given database pool.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         let nhi_service = Arc::new(NhiService::new(pool.clone()));
         let credential_service = Arc::new(NhiCredentialService::new(pool.clone()));
@@ -67,7 +67,7 @@ pub struct ToolsState {
 
 impl ToolsState {
     /// Create a new `ToolsState` with the given agents state.
-    #[must_use] 
+    #[must_use]
     pub fn new(agents_state: AgentsState) -> Self {
         Self { agents_state }
     }
@@ -95,7 +95,7 @@ pub struct ApprovalsState {
 
 impl ApprovalsState {
     /// Create a new `ApprovalsState` with the given agents state.
-    #[must_use] 
+    #[must_use]
     pub fn new(agents_state: AgentsState) -> Self {
         Self { agents_state }
     }

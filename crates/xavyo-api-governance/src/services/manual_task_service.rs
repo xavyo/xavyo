@@ -23,13 +23,13 @@ pub struct ManualTaskService {
 
 impl ManualTaskService {
     /// Create a new manual task service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

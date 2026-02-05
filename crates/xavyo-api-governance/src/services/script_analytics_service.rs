@@ -115,7 +115,7 @@ pub struct ScriptAnalyticsService {
 
 impl ScriptAnalyticsService {
     /// Create a new script analytics service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

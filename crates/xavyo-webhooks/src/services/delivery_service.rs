@@ -77,35 +77,35 @@ impl DeliveryService {
     }
 
     /// Set the maximum delivery attempts.
-    #[must_use] 
+    #[must_use]
     pub fn with_max_attempts(mut self, max: i32) -> Self {
         self.max_attempts = max;
         self
     }
 
     /// Set the consecutive failure threshold for auto-disable.
-    #[must_use] 
+    #[must_use]
     pub fn with_disable_threshold(mut self, threshold: i32) -> Self {
         self.disable_threshold = threshold;
         self
     }
 
     /// Set the circuit breaker registry for endpoint health tracking.
-    #[must_use] 
+    #[must_use]
     pub fn with_circuit_breaker(mut self, registry: Arc<CircuitBreakerRegistry>) -> Self {
         self.circuit_breaker_registry = Some(registry);
         self
     }
 
     /// Set the DLQ service for storing failed webhooks.
-    #[must_use] 
+    #[must_use]
     pub fn with_dlq_service(mut self, service: Arc<DlqService>) -> Self {
         self.dlq_service = Some(service);
         self
     }
 
     /// Set the rate limiter registry for per-destination throttling.
-    #[must_use] 
+    #[must_use]
     pub fn with_rate_limiter(mut self, registry: Arc<RateLimiterRegistry>) -> Self {
         self.rate_limiter_registry = Some(registry);
         self
@@ -735,7 +735,7 @@ impl DeliveryService {
     }
 
     /// Get a reference to the connection pool (for the worker).
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -744,7 +744,7 @@ impl DeliveryService {
 /// Calculate the next retry timestamp based on attempt number and backoff schedule.
 ///
 /// Returns None if all retries are exhausted.
-#[must_use] 
+#[must_use]
 pub fn calculate_next_attempt_at(
     attempt_number: i32,
     max_attempts: i32,

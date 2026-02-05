@@ -43,7 +43,7 @@ pub struct ParameterValidationService;
 
 impl ParameterValidationService {
     /// Create a new validation service instance.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
@@ -53,7 +53,7 @@ impl ParameterValidationService {
     /// # Arguments
     /// * `parameters` - The parameter definitions for the role
     /// * `values` - Map of `parameter_id` -> value to validate
-    #[must_use] 
+    #[must_use]
     pub fn validate(
         &self,
         parameters: &[GovRoleParameter],
@@ -97,7 +97,7 @@ impl ParameterValidationService {
     }
 
     /// Validate a single parameter value.
-    #[must_use] 
+    #[must_use]
     pub fn validate_parameter(
         &self,
         param: &GovRoleParameter,
@@ -218,10 +218,14 @@ impl ParameterValidationService {
                     return (false, errors, None);
                 }
             }
-            Value::String(s) => if let Ok(i) = s.parse::<i64>() { i } else {
-                errors.push("String value could not be parsed as integer".to_string());
-                return (false, errors, None);
-            },
+            Value::String(s) => {
+                if let Ok(i) = s.parse::<i64>() {
+                    i
+                } else {
+                    errors.push("String value could not be parsed as integer".to_string());
+                    return (false, errors, None);
+                }
+            }
             _ => {
                 errors.push("Value must be an integer".to_string());
                 return (false, errors, None);
@@ -231,9 +235,7 @@ impl ParameterValidationService {
         // Check min value
         if let Some(min_value) = constraints.min_value {
             if int_val < min_value {
-                errors.push(format!(
-                    "Value {int_val} is less than minimum {min_value}"
-                ));
+                errors.push(format!("Value {int_val} is less than minimum {min_value}"));
             }
         }
 
@@ -298,13 +300,17 @@ impl ParameterValidationService {
         let mut errors = Vec::new();
 
         // Dates must be strings in YYYY-MM-DD format
-        let date_str = if let Some(s) = value.as_str() { s } else {
+        let date_str = if let Some(s) = value.as_str() {
+            s
+        } else {
             errors.push("Date must be a string in YYYY-MM-DD format".to_string());
             return (false, errors, None);
         };
 
         // Parse the date
-        let date = if let Ok(d) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") { d } else {
+        let date = if let Ok(d) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+            d
+        } else {
             errors.push(format!(
                 "Invalid date format '{date_str}', expected YYYY-MM-DD"
             ));
@@ -352,7 +358,9 @@ impl ParameterValidationService {
         let mut errors = Vec::new();
 
         // Enum values must be strings
-        let string_val = if let Some(s) = value.as_str() { s.to_string() } else {
+        let string_val = if let Some(s) = value.as_str() {
+            s.to_string()
+        } else {
             errors.push("Enum value must be a string".to_string());
             return (false, errors, None);
         };
@@ -383,7 +391,7 @@ impl ParameterValidationService {
     /// The hash is computed by sorting the parameters by name and hashing
     /// the concatenation of name=value pairs. This ensures that the same
     /// parameters always produce the same hash regardless of input order.
-    #[must_use] 
+    #[must_use]
     pub fn compute_parameter_hash(
         parameters: &[GovRoleParameter],
         values: &HashMap<Uuid, Value>,
@@ -420,7 +428,7 @@ impl ParameterValidationService {
     /// Check if a parameter schema is compatible with existing values.
     ///
     /// Returns a list of violations if the schema has changed in incompatible ways.
-    #[must_use] 
+    #[must_use]
     pub fn check_schema_compatibility(
         current_params: &[GovRoleParameter],
         existing_values: &HashMap<Uuid, Value>,
@@ -454,7 +462,7 @@ impl ParameterValidationService {
     }
 
     /// Convert a `GovernanceError` for parameter validation failures.
-    #[must_use] 
+    #[must_use]
     pub fn validation_error(param_name: &str, reason: &str) -> GovernanceError {
         GovernanceError::ParameterValidationFailed {
             parameter_name: param_name.to_string(),

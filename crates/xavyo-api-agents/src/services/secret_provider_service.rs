@@ -24,7 +24,7 @@ pub struct SecretProviderService {
 
 impl SecretProviderService {
     /// Create a new `SecretProviderService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, encryption: Arc<EncryptionService>) -> Self {
         Self { pool, encryption }
     }
@@ -290,9 +290,7 @@ impl SecretProviderService {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
-            .map_err(|e| {
-                ApiAgentsError::Internal(format!("Failed to create HTTP client: {e}"))
-            })?;
+            .map_err(|e| ApiAgentsError::Internal(format!("Failed to create HTTP client: {e}")))?;
 
         let url = format!("{}/v1/sys/health", settings.addr.trim_end_matches('/'));
         let resp = client.get(&url).send().await.map_err(|e| {
@@ -306,16 +304,13 @@ impl SecretProviderService {
 
     /// Check Infisical health.
     async fn check_infisical_health(&self, settings_json: &str) -> Result<bool, ApiAgentsError> {
-        let settings: InfisicalSettings = serde_json::from_str(settings_json).map_err(|e| {
-            ApiAgentsError::BadRequest(format!("Invalid Infisical settings: {e}"))
-        })?;
+        let settings: InfisicalSettings = serde_json::from_str(settings_json)
+            .map_err(|e| ApiAgentsError::BadRequest(format!("Invalid Infisical settings: {e}")))?;
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
-            .map_err(|e| {
-                ApiAgentsError::Internal(format!("Failed to create HTTP client: {e}"))
-            })?;
+            .map_err(|e| ApiAgentsError::Internal(format!("Failed to create HTTP client: {e}")))?;
 
         // Try to get workspace info
         let url = format!(

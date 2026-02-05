@@ -290,9 +290,7 @@ fn validate_risk_level(risk_level: &str) -> CliResult<()> {
 /// Parse tool ID from string
 fn parse_tool_id(id_str: &str) -> CliResult<Uuid> {
     Uuid::parse_str(id_str).map_err(|_| {
-        CliError::Validation(format!(
-            "Invalid tool ID '{id_str}'. Must be a valid UUID."
-        ))
+        CliError::Validation(format!("Invalid tool ID '{id_str}'. Must be a valid UUID."))
     })
 }
 

@@ -59,25 +59,25 @@ pub enum CertCampaignStatus {
 
 impl CertCampaignStatus {
     /// Check if the campaign is in an active state (can accept decisions).
-    #[must_use] 
+    #[must_use]
     pub fn can_decide(&self) -> bool {
         matches!(self, Self::Active | Self::Overdue)
     }
 
     /// Check if the campaign is in a terminal state.
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Completed | Self::Cancelled)
     }
 
     /// Check if the campaign can be cancelled.
-    #[must_use] 
+    #[must_use]
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Draft | Self::Active | Self::Overdue)
     }
 
     /// Check if the campaign can be launched.
-    #[must_use] 
+    #[must_use]
     pub fn can_launch(&self) -> bool {
         matches!(self, Self::Draft)
     }
@@ -470,13 +470,13 @@ impl GovCertificationCampaign {
     }
 
     /// Check if the campaign is in draft status.
-    #[must_use] 
+    #[must_use]
     pub fn is_draft(&self) -> bool {
         matches!(self.status, CertCampaignStatus::Draft)
     }
 
     /// Check if the campaign can accept decisions.
-    #[must_use] 
+    #[must_use]
     pub fn can_decide(&self) -> bool {
         self.status.can_decide()
     }

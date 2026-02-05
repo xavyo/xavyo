@@ -50,8 +50,7 @@ pub(crate) fn is_entitlement_linked_to_assignment(
     assignment_link_id: Option<Uuid>,
     valid_ids: &[Uuid],
 ) -> bool {
-    assignment_link_id
-        .is_some_and(|lid| valid_ids.contains(&lid))
+    assignment_link_id.is_some_and(|lid| valid_ids.contains(&lid))
 }
 
 /// Sort links by priority ascending (lower number = higher priority).
@@ -90,7 +89,7 @@ pub struct LicenseEntitlementService {
 
 impl LicenseEntitlementService {
     /// Create a new license entitlement service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: LicenseAuditService::new(pool.clone()),
@@ -503,13 +502,13 @@ impl LicenseEntitlementService {
     }
 
     /// Get the underlying database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get the audit service reference.
-    #[must_use] 
+    #[must_use]
     pub fn audit_service(&self) -> &LicenseAuditService {
         &self.audit_service
     }

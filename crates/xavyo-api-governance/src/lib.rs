@@ -30,8 +30,8 @@ pub mod services;
 pub use consumers::{AssignmentCreatedConsumer, ManagerChangeConsumer, SodViolationConsumer};
 pub use error::{ApiGovernanceError, ApiResult, ErrorResponse};
 pub use jobs::{
-    EscalationJob, EscalationJobError, EscalationStats, FailedOperationRetryJob,
-    GracePeriodExpirationJob, MicroCertExpirationJob, MicroCertExpirationJobError,
-    MicroCertExpirationStats, ScheduledTransitionJob,
+    BulkActionJob, BulkActionJobError, BulkActionJobStats, EscalationJob, EscalationJobError,
+    EscalationStats, FailedOperationRetryJob, GracePeriodExpirationJob, MicroCertExpirationJob,
+    MicroCertExpirationJobError, MicroCertExpirationStats, ScheduledTransitionJob,
 };
 pub use router::governance_router;

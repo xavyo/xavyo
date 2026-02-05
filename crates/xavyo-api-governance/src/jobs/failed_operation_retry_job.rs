@@ -27,7 +27,7 @@ pub struct FailedOperationRetryJob {
 
 impl FailedOperationRetryJob {
     /// Create a new failed operation retry job.
-    #[must_use] 
+    #[must_use]
     pub fn new(failed_operation_service: FailedOperationService) -> Self {
         Self {
             failed_operation_service: Arc::new(failed_operation_service),
@@ -36,7 +36,7 @@ impl FailedOperationRetryJob {
     }
 
     /// Create from an Arc-wrapped service.
-    #[must_use] 
+    #[must_use]
     pub fn from_arc(failed_operation_service: Arc<FailedOperationService>) -> Self {
         Self {
             failed_operation_service,

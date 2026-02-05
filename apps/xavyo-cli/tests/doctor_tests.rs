@@ -64,8 +64,5 @@ fn test_doctor_help() {
         stdout.contains("Diagnose") || stdout.contains("diagnose"),
         "Help should mention diagnostics"
     );
-    assert!(
-        stdout.contains("--json"),
-        "Help should mention --json flag"
-    );
+    assert!(stdout.contains("--json"), "Help should mention --json flag");
 }

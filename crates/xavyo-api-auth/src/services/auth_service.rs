@@ -18,7 +18,7 @@ pub struct AuthService {
 
 impl AuthService {
     /// Create a new authentication service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -52,10 +52,10 @@ impl AuthService {
         // Validate email
         let email_result = validate_email(email);
         if !email_result.is_valid {
-            return Err(ApiAuthError::InvalidEmail(
-                email_result
-                    .error.map_or_else(|| "Invalid email format".to_string(), |e| e.to_string()),
-            ));
+            return Err(ApiAuthError::InvalidEmail(email_result.error.map_or_else(
+                || "Invalid email format".to_string(),
+                |e| e.to_string(),
+            )));
         }
 
         // Validate password

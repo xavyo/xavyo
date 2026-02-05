@@ -29,7 +29,7 @@ pub struct LifecycleEventService {
 
 impl LifecycleEventService {
     /// Create a new lifecycle event service.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         pool: PgPool,
         birthright_policy_service: Arc<BirthrightPolicyService>,
@@ -43,7 +43,7 @@ impl LifecycleEventService {
     }
 
     /// Get a reference to the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

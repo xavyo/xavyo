@@ -48,7 +48,7 @@ pub struct MetaRoleSimulationService {
 
 impl MetaRoleSimulationService {
     /// Create a new simulation service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: Arc<PgPool>, matching_service: Arc<MetaRoleMatchingService>) -> Self {
         Self {
             pool,
@@ -747,7 +747,8 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name = affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
+            let affected_role_name =
+                affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
 
             let other_inheritances = GovMetaRoleInheritance::list_by_child_role(
                 &self.pool,
@@ -834,7 +835,8 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name = affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
+            let affected_role_name =
+                affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
 
             let other_inheritances = GovMetaRoleInheritance::list_by_child_role(
                 &self.pool,
@@ -920,7 +922,8 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name = affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
+            let affected_role_name =
+                affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
 
             let other_inheritances = GovMetaRoleInheritance::list_by_child_role(
                 &self.pool,
@@ -1003,7 +1006,8 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name = affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
+            let affected_role_name =
+                affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
 
             let conflicts: Vec<GovMetaRoleConflict> = sqlx::query_as(
                 r"
@@ -1082,7 +1086,8 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name = affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
+            let affected_role_name =
+                affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
 
             let meta_role_a =
                 GovMetaRole::find_by_id(&self.pool, tenant_id, conflict.meta_role_a_id)
@@ -1139,7 +1144,8 @@ impl MetaRoleSimulationService {
                     .await
                     .map_err(GovernanceError::Database)?;
 
-            let affected_role_name = affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
+            let affected_role_name =
+                affected_role.map_or_else(|| "Unknown".to_string(), |r| r.name);
 
             let meta_role_a =
                 GovMetaRole::find_by_id(&self.pool, tenant_id, conflict.meta_role_a_id)

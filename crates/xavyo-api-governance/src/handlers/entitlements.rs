@@ -13,8 +13,9 @@ use xavyo_db::models::{CreateGovEntitlement, UpdateGovEntitlement};
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
-    CreateEntitlementRequest, EntitlementListResponse, EntitlementResponse, ListEntitlementsQuery,
-    UpdateEntitlementRequest,
+    validate_gdpr_create, validate_gdpr_update, CreateEntitlementRequest, EntitlementListResponse,
+    EntitlementResponse, GdprReport, ListEntitlementsQuery, UpdateEntitlementRequest,
+    UserDataProtectionSummary,
 };
 use crate::router::GovernanceState;
 
@@ -49,6 +50,7 @@ pub async fn list_entitlements(
             query.status,
             query.risk_level,
             query.owner_id,
+            query.classification,
             query.limit,
             query.offset,
         )
@@ -120,6 +122,14 @@ pub async fn create_entitlement(
 ) -> ApiResult<(StatusCode, Json<EntitlementResponse>)> {
     request.validate()?;
 
+    // Validate GDPR business rules
+    validate_gdpr_create(
+        request.data_protection_classification,
+        request.legal_basis,
+        request.retention_period_days,
+    )
+    .map_err(ApiGovernanceError::Validation)?;
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -134,6 +144,12 @@ pub async fn create_entitlement(
         external_id: request.external_id,
         metadata: request.metadata,
         is_delegable: request.is_delegable.unwrap_or(true),
+        data_protection_classification: request.data_protection_classification.unwrap_or_default(),
+        legal_basis: request.legal_basis,
+        retention_period_days: request.retention_period_days,
+        data_controller: request.data_controller,
+        data_processor: request.data_processor,
+        purposes: request.purposes,
     };
 
     let entitlement = state
@@ -176,6 +192,21 @@ pub async fn update_entitlement(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
+    // Fetch existing entitlement to get current classification for validation
+    let existing = state
+        .entitlement_service
+        .get_entitlement(tenant_id, id)
+        .await?;
+
+    // Validate GDPR business rules against effective classification
+    validate_gdpr_update(
+        request.data_protection_classification,
+        existing.data_protection_classification,
+        request.legal_basis,
+        request.retention_period_days,
+    )
+    .map_err(ApiGovernanceError::Validation)?;
+
     let input = UpdateGovEntitlement {
         name: request.name,
         description: request.description,
@@ -185,6 +216,12 @@ pub async fn update_entitlement(
         external_id: request.external_id,
         metadata: request.metadata,
         is_delegable: request.is_delegable,
+        data_protection_classification: request.data_protection_classification,
+        legal_basis: request.legal_basis,
+        retention_period_days: request.retention_period_days,
+        data_controller: request.data_controller,
+        data_processor: request.data_processor,
+        purposes: request.purposes,
     };
 
     let entitlement = state
@@ -228,4 +265,63 @@ pub async fn delete_entitlement(
         .await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Generate a GDPR compliance report for the tenant.
+#[utoipa::path(
+    get,
+    path = "/governance/gdpr/report",
+    tag = "Governance - GDPR",
+    responses(
+        (status = 200, description = "GDPR compliance report", body = GdprReport),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn gdpr_report(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+) -> ApiResult<Json<GdprReport>> {
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    let report = state.gdpr_report_service.generate_report(tenant_id).await?;
+
+    Ok(Json(report))
+}
+
+/// Get per-user data protection summary.
+#[utoipa::path(
+    get,
+    path = "/governance/gdpr/users/{user_id}/data-protection",
+    tag = "Governance - GDPR",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID")
+    ),
+    responses(
+        (status = 200, description = "User data protection summary", body = UserDataProtectionSummary),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn user_data_protection(
+    State(state): State<GovernanceState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(user_id): Path<Uuid>,
+) -> ApiResult<Json<UserDataProtectionSummary>> {
+    let tenant_id = *claims
+        .tenant_id()
+        .ok_or(ApiGovernanceError::Unauthorized)?
+        .as_uuid();
+
+    let summary = state
+        .gdpr_report_service
+        .get_user_data_protection_summary(tenant_id, user_id)
+        .await?;
+
+    Ok(Json(summary))
 }

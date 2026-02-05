@@ -1,6 +1,7 @@
 //! API client modules for xavyo
 
 mod agents;
+mod api_keys;
 mod auth;
 mod authorize;
 mod client;

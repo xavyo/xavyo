@@ -218,7 +218,9 @@ async fn handle_sso<'a>(
     }
 
     // Check if user is authenticated
-    let user = if let Some(u) = user { u } else {
+    let user = if let Some(u) = user {
+        u
+    } else {
         // User not authenticated - would redirect to login
         // For now, return unauthorized
         // TODO: In a full implementation, store the AuthnRequest in session

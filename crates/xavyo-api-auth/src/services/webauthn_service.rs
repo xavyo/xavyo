@@ -265,19 +265,14 @@ impl WebAuthnService {
         // T066: Enforce allowed_authenticator_types policy
         // Determine authenticator type from attachment hint
         // Platform authenticators (Touch ID, Windows Hello) use "internal" transport
-        let auth_type = if reg_response
-            .response
-            .transports
-            .as_ref()
-            .is_some_and(|t| {
-                t.iter().any(|transport| {
-                    matches!(
-                        transport,
-                        webauthn_rs_proto::AuthenticatorTransport::Internal
-                    )
-                })
+        let auth_type = if reg_response.response.transports.as_ref().is_some_and(|t| {
+            t.iter().any(|transport| {
+                matches!(
+                    transport,
+                    webauthn_rs_proto::AuthenticatorTransport::Internal
+                )
             })
-        {
+        }) {
             "platform"
         } else {
             "cross-platform"

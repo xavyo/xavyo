@@ -345,13 +345,13 @@ impl GovSodExemption {
     }
 
     /// Check if exemption is active (status and not expired).
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self.status, GovExemptionStatus::Active) && self.expires_at > Utc::now()
     }
 
     /// Check if exemption is expired (by time, not status).
-    #[must_use] 
+    #[must_use]
     pub fn is_expired_by_time(&self) -> bool {
         self.expires_at <= Utc::now()
     }

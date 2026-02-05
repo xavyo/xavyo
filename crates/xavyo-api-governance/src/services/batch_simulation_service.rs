@@ -42,7 +42,7 @@ pub struct BatchSimulationService {
 
 impl BatchSimulationService {
     /// Create a new batch simulation service with default limits.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -51,13 +51,13 @@ impl BatchSimulationService {
     }
 
     /// Create a new batch simulation service with custom limits.
-    #[must_use] 
+    #[must_use]
     pub fn with_limits(pool: PgPool, limits: BatchSimulationLimits) -> Self {
         Self { pool, limits }
     }
 
     /// Get the configured limits.
-    #[must_use] 
+    #[must_use]
     pub fn limits(&self) -> &BatchSimulationLimits {
         &self.limits
     }
@@ -511,9 +511,7 @@ impl BatchSimulationService {
         // Filter by title (using attributes JSONB)
         if let Some(ref _title) = filter.title {
             param_count += 1;
-            query.push_str(&format!(
-                " AND u.attributes->>'title' ILIKE ${param_count}"
-            ));
+            query.push_str(&format!(" AND u.attributes->>'title' ILIKE ${param_count}"));
         }
 
         // Filter by role membership

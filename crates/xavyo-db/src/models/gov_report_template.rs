@@ -55,7 +55,7 @@ pub enum TemplateStatus {
 
 impl TemplateStatus {
     /// Check if the template is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self, Self::Active)
     }
@@ -471,19 +471,19 @@ impl GovReportTemplate {
     }
 
     /// Parse the template definition.
-    #[must_use] 
+    #[must_use]
     pub fn parse_definition(&self) -> TemplateDefinition {
         serde_json::from_value(self.definition.clone()).unwrap_or_default()
     }
 
     /// Check if this is a system template.
-    #[must_use] 
+    #[must_use]
     pub fn is_system_template(&self) -> bool {
         self.is_system
     }
 
     /// Check if the template can be modified.
-    #[must_use] 
+    #[must_use]
     pub fn can_modify(&self) -> bool {
         !self.is_system && self.status.is_active()
     }

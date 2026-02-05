@@ -27,7 +27,7 @@ pub struct CreateDomain {
 
 impl IdentityProviderDomain {
     /// Validate domain format.
-    #[must_use] 
+    #[must_use]
     pub fn validate_domain(domain: &str) -> bool {
         // Domain must start and end with alphanumeric, contain only alphanumeric, dots, and hyphens
         let domain = domain.to_lowercase();

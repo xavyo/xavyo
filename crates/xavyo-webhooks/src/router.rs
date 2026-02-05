@@ -24,7 +24,7 @@ pub struct WebhooksState {
 
 impl WebhooksState {
     /// Create a new webhooks state.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, encryption_key: Vec<u8>) -> Self {
         Self {
             subscription_service: Arc::new(SubscriptionService::new(pool.clone(), encryption_key)),
@@ -38,7 +38,7 @@ impl WebhooksState {
     }
 
     /// Create a new webhooks state with custom circuit breaker config.
-    #[must_use] 
+    #[must_use]
     pub fn with_circuit_breaker_config(
         pool: PgPool,
         encryption_key: Vec<u8>,
@@ -56,7 +56,7 @@ impl WebhooksState {
     }
 
     /// Get a reference to the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

@@ -156,7 +156,7 @@ pub struct MappingService {
 
 impl MappingService {
     /// Create a new mapping service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -423,9 +423,8 @@ impl MappingService {
     fn parse_mapping_config(&self, mapping: &AttributeMapping) -> Result<MappingConfiguration> {
         // Try to parse mappings as array of MappingRule
         let attribute_mappings: Vec<MappingRule> = if mapping.mappings.is_array() {
-            serde_json::from_value(mapping.mappings.clone()).map_err(|e| {
-                ConnectorApiError::Validation(format!("Invalid mapping rules: {e}"))
-            })?
+            serde_json::from_value(mapping.mappings.clone())
+                .map_err(|e| ConnectorApiError::Validation(format!("Invalid mapping rules: {e}")))?
         } else if mapping.mappings.is_object() {
             // Simple format: {source_attr: target_attr}
             let obj = mapping.mappings.as_object().unwrap();

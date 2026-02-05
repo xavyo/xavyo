@@ -197,7 +197,7 @@ impl AgentsState {
     }
 
     /// Get the anomaly state for F094 handlers.
-    #[must_use] 
+    #[must_use]
     pub fn anomaly_state(&self) -> AnomalyState {
         AnomalyState {
             anomaly_service: AnomalyService::new(self.pool.clone()),
@@ -206,7 +206,7 @@ impl AgentsState {
     }
 
     /// Get optional reference to credential service for error logging.
-    #[must_use] 
+    #[must_use]
     pub fn credential_service_opt(&self) -> Option<&DynamicCredentialService> {
         Some(&self.credential_service)
     }

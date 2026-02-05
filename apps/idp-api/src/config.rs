@@ -546,7 +546,10 @@ impl Config {
         // Optional variables with defaults
         let rust_log = env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
 
-        let cors_origins = env::var("CORS_ORIGINS").map_or_else(|_| vec!["*".to_string()], |s| s.split(',').map(|o| o.trim().to_string()).collect());
+        let cors_origins = env::var("CORS_ORIGINS").map_or_else(
+            |_| vec!["*".to_string()],
+            |s| s.split(',').map(|o| o.trim().to_string()).collect(),
+        );
 
         // F082-US3: Validate CORS origin URL formats at startup
         validate_cors_origins(&cors_origins, &app_env)?;

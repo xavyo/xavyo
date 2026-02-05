@@ -369,7 +369,7 @@ impl GovPolicySimulation {
     }
 
     /// Parse the impact summary.
-    #[must_use] 
+    #[must_use]
     pub fn parse_impact_summary(&self) -> ImpactSummary {
         serde_json::from_value(self.impact_summary.clone()).unwrap_or_default()
     }

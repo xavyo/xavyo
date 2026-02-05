@@ -68,7 +68,7 @@ pub struct RhaiScriptExecutor {
 
 impl RhaiScriptExecutor {
     /// Create a new Rhai script executor with default configuration.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: RhaiExecutorConfig::default(),
@@ -76,7 +76,7 @@ impl RhaiScriptExecutor {
     }
 
     /// Create a new Rhai script executor with custom configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_config(config: RhaiExecutorConfig) -> Self {
         Self { config }
     }
@@ -121,7 +121,7 @@ impl RhaiScriptExecutor {
     }
 
     /// Validate a Rhai script for syntax errors.
-    #[must_use] 
+    #[must_use]
     pub fn validate_script(&self, script_body: &str) -> Vec<ScriptValidationError> {
         let engine = self.create_engine();
         match engine.compile(script_body) {
@@ -137,7 +137,7 @@ impl RhaiScriptExecutor {
     }
 
     /// Execute a script in dry-run mode with sample context.
-    #[must_use] 
+    #[must_use]
     pub fn dry_run(
         &self,
         script_body: &str,

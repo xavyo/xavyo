@@ -42,7 +42,7 @@ impl EndpointConfig {
     /// - `API_BASE_URL`: Base URL for API (default: "<https://api.xavyo.net>")
     /// - `AUTH_BASE_URL`: Base URL for auth (default: "<https://auth.xavyo.net>")
     /// - `DOCS_BASE_URL`: Base URL for docs (default: "<https://docs.xavyo.net>")
-    #[must_use] 
+    #[must_use]
     pub fn from_env() -> Self {
         Self {
             api_url: std::env::var("API_BASE_URL")
@@ -77,7 +77,7 @@ pub struct ProvisioningService {
 
 impl ProvisioningService {
     /// Create a new provisioning service.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         pool: PgPool,
         slug_service: Arc<SlugService>,
@@ -92,7 +92,7 @@ impl ProvisioningService {
     }
 
     /// Create a new provisioning service with custom endpoint configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_endpoint_config(
         pool: PgPool,
         slug_service: Arc<SlugService>,

@@ -37,7 +37,7 @@ pub struct SecretPermissionService {
 
 impl SecretPermissionService {
     /// Create a new `SecretPermissionService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

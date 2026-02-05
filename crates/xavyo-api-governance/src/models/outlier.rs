@@ -368,7 +368,7 @@ pub struct PaginatedResponse<T> {
 }
 
 impl<T> PaginatedResponse<T> {
-    #[must_use] 
+    #[must_use]
     pub fn new(items: Vec<T>, total: i64, limit: i64, offset: i64) -> Self {
         Self {
             items,

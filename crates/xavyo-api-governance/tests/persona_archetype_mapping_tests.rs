@@ -208,7 +208,7 @@ mod attribute_inheritance_tests {
 }
 
 mod naming_pattern_validation {
-    
+
     use xavyo_api_governance::services::validate_naming_pattern;
 
     #[test]

@@ -30,13 +30,13 @@ pub struct FederationClaims {
 
 impl FederationClaims {
     /// Create a new builder for federation claims.
-    #[must_use] 
+    #[must_use]
     pub fn builder() -> FederationClaimsBuilder {
         FederationClaimsBuilder::default()
     }
 
     /// Check if any federation claims are set.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.idp_id.is_none()
             && self.idp_issuer.is_none()
@@ -56,7 +56,7 @@ pub struct FederationClaimsBuilder {
 
 impl FederationClaimsBuilder {
     /// Set the `IdP` identifier.
-    #[must_use] 
+    #[must_use]
     pub fn idp_id(mut self, id: Uuid) -> Self {
         self.idp_id = Some(id);
         self
@@ -69,14 +69,14 @@ impl FederationClaimsBuilder {
     }
 
     /// Set the federation timestamp.
-    #[must_use] 
+    #[must_use]
     pub fn federated_at(mut self, timestamp: i64) -> Self {
         self.federated_at = Some(timestamp);
         self
     }
 
     /// Set the federation timestamp to now.
-    #[must_use] 
+    #[must_use]
     pub fn federated_now(mut self) -> Self {
         self.federated_at = Some(chrono::Utc::now().timestamp());
         self
@@ -89,7 +89,7 @@ impl FederationClaimsBuilder {
     }
 
     /// Build the federation claims.
-    #[must_use] 
+    #[must_use]
     pub fn build(self) -> FederationClaims {
         FederationClaims {
             idp_id: self.idp_id,

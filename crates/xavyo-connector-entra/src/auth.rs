@@ -45,7 +45,7 @@ pub struct TokenCache {
 
 impl TokenCache {
     /// Creates a new token cache.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         credentials: EntraCredentials,
         cloud_environment: EntraCloudEnvironment,

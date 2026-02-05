@@ -14,7 +14,7 @@ pub struct AttributeAuditService {
 
 impl AttributeAuditService {
     /// Create a new attribute audit service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -141,9 +141,7 @@ impl AttributeAuditService {
 
                 let mut missing = Vec::new();
                 for name in &required_names {
-                    let has_value = obj
-                        .and_then(|o| o.get(*name))
-                        .is_some_and(|v| !v.is_null());
+                    let has_value = obj.and_then(|o| o.get(*name)).is_some_and(|v| !v.is_null());
                     if !has_value {
                         missing.push(name.to_string());
                     }

@@ -122,9 +122,8 @@ pub async fn create_archetype(
 
     let lifecycle_policy = if let Some(policy) = request.lifecycle_policy {
         policy.validate()?;
-        serde_json::to_value(&policy).map_err(|e| {
-            ApiGovernanceError::Validation(format!("Invalid lifecycle policy: {e}"))
-        })?
+        serde_json::to_value(&policy)
+            .map_err(|e| ApiGovernanceError::Validation(format!("Invalid lifecycle policy: {e}")))?
     } else {
         serde_json::json!({
             "default_validity_days": 365,
@@ -244,9 +243,7 @@ pub async fn update_archetype(
         .attribute_mappings
         .map(serde_json::to_value)
         .transpose()
-        .map_err(|e| {
-            ApiGovernanceError::Validation(format!("Invalid attribute mappings: {e}"))
-        })?;
+        .map_err(|e| ApiGovernanceError::Validation(format!("Invalid attribute mappings: {e}")))?;
     let lifecycle_policy = if let Some(policy) = request.lifecycle_policy {
         policy.validate()?;
         Some(serde_json::to_value(&policy).map_err(|e| {
@@ -1151,7 +1148,8 @@ pub async fn list_context_sessions(
         .await?;
 
     let total = sessions.len() as i64;
-    let items: Vec<ContextSessionSummary> = sessions.into_iter().map(std::convert::Into::into).collect();
+    let items: Vec<ContextSessionSummary> =
+        sessions.into_iter().map(std::convert::Into::into).collect();
 
     Ok(Json(ContextSessionListResponse {
         items,

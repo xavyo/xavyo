@@ -29,7 +29,7 @@ pub enum TransactionStatus {
 
 impl TransactionStatus {
     /// Convert to string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             TransactionStatus::InProgress => "in_progress",
@@ -80,28 +80,28 @@ impl CompletedStep {
     }
 
     /// Set the connector ID.
-    #[must_use] 
+    #[must_use]
     pub fn with_connector(mut self, connector_id: Uuid) -> Self {
         self.connector_id = Some(connector_id);
         self
     }
 
     /// Set the before state for rollback.
-    #[must_use] 
+    #[must_use]
     pub fn with_before_state(mut self, state: JsonValue) -> Self {
         self.before_state = Some(state);
         self
     }
 
     /// Set the rollback action.
-    #[must_use] 
+    #[must_use]
     pub fn with_rollback(mut self, action: ActionType) -> Self {
         self.rollback_action = Some(action);
         self
     }
 
     /// Set additional rollback context.
-    #[must_use] 
+    #[must_use]
     pub fn with_rollback_context(mut self, context: JsonValue) -> Self {
         self.rollback_context = Some(context);
         self
@@ -140,7 +140,7 @@ pub struct RemediationTransaction {
 
 impl RemediationTransaction {
     /// Create a new transaction.
-    #[must_use] 
+    #[must_use]
     pub fn new(tenant_id: Uuid) -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -159,31 +159,31 @@ impl RemediationTransaction {
     }
 
     /// Get the number of completed steps.
-    #[must_use] 
+    #[must_use]
     pub fn step_count(&self) -> usize {
         self.steps.len()
     }
 
     /// Check if the transaction is still in progress.
-    #[must_use] 
+    #[must_use]
     pub fn is_in_progress(&self) -> bool {
         self.status == TransactionStatus::InProgress
     }
 
     /// Check if the transaction completed successfully.
-    #[must_use] 
+    #[must_use]
     pub fn is_committed(&self) -> bool {
         self.status == TransactionStatus::Committed
     }
 
     /// Check if the transaction was rolled back.
-    #[must_use] 
+    #[must_use]
     pub fn is_rolled_back(&self) -> bool {
         self.status == TransactionStatus::RolledBack
     }
 
     /// Check if the transaction failed (including rollback failure).
-    #[must_use] 
+    #[must_use]
     pub fn is_failed(&self) -> bool {
         self.status == TransactionStatus::Failed
     }
@@ -201,7 +201,7 @@ impl RemediationTransaction {
     }
 
     /// Get the inverse action for rollback.
-    #[must_use] 
+    #[must_use]
     pub fn get_inverse_action(action: ActionType) -> Option<ActionType> {
         match action {
             ActionType::Create => Some(ActionType::Delete),

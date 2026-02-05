@@ -506,7 +506,7 @@ impl From<LicenseIncompatibilityWithDetails> for LicenseIncompatibilityResponse 
 
 impl LicenseIncompatibilityResponse {
     /// Create a response from a model with pool names.
-    #[must_use] 
+    #[must_use]
     pub fn from_model_with_names(
         model: GovLicenseIncompatibility,
         pool_a_name: Option<String>,

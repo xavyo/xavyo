@@ -156,7 +156,7 @@ pub struct InboundChange {
 
 impl InboundChange {
     /// Get the change type enum.
-    #[must_use] 
+    #[must_use]
     pub fn change_type(&self) -> InboundChangeType {
         self.change_type
             .parse()
@@ -164,7 +164,7 @@ impl InboundChange {
     }
 
     /// Get the sync situation enum.
-    #[must_use] 
+    #[must_use]
     pub fn sync_situation(&self) -> SyncSituation {
         self.sync_situation
             .parse()
@@ -172,7 +172,7 @@ impl InboundChange {
     }
 
     /// Get the processing status enum.
-    #[must_use] 
+    #[must_use]
     pub fn processing_status(&self) -> InboundProcessingStatus {
         self.processing_status
             .parse()

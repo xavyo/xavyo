@@ -85,7 +85,7 @@ pub struct RiskAssessment {
 
 impl RiskAssessment {
     /// Create a new risk assessment.
-    #[must_use] 
+    #[must_use]
     pub fn new(factors: Vec<RiskFactor>, is_first_login: bool) -> Self {
         let score = factors.iter().map(|f| f.points).sum::<i32>().clamp(0, 100);
         let action = RiskAction::from_score(score);
@@ -101,7 +101,7 @@ impl RiskAssessment {
     }
 
     /// Set the country information.
-    #[must_use] 
+    #[must_use]
     pub fn with_countries(
         mut self,
         approver_country: Option<String>,
@@ -181,7 +181,7 @@ pub struct DeviceRiskService {
 
 impl DeviceRiskService {
     /// Create a new device risk service with the default log-only notifier.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,

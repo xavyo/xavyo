@@ -20,7 +20,7 @@ pub struct SimulationComparisonService {
 
 impl SimulationComparisonService {
     /// Create a new simulation comparison service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -420,10 +420,16 @@ impl SimulationComparisonService {
         let mut total_removals = 0i64;
 
         for impact in simulation_impacts.values() {
-            if let Some(gained) = impact.get("entitlements_gained").and_then(serde_json::Value::as_i64) {
+            if let Some(gained) = impact
+                .get("entitlements_gained")
+                .and_then(serde_json::Value::as_i64)
+            {
                 total_additions += gained;
             }
-            if let Some(lost) = impact.get("entitlements_lost").and_then(serde_json::Value::as_i64) {
+            if let Some(lost) = impact
+                .get("entitlements_lost")
+                .and_then(serde_json::Value::as_i64)
+            {
                 total_removals += lost;
             }
             // Also count access_gained/access_lost for batch simulations

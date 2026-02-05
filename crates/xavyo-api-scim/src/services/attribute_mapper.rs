@@ -14,7 +14,7 @@ pub struct AttributeMapperService {
 
 impl AttributeMapperService {
     /// Create a mapper from a list of mappings.
-    #[must_use] 
+    #[must_use]
     pub fn new(mappings: Vec<ScimAttributeMapping>) -> Self {
         let map = mappings
             .into_iter()
@@ -28,7 +28,7 @@ impl AttributeMapperService {
     /// Maps standard SCIM Enterprise User extension attributes to well-known
     /// custom attribute slugs, enabling out-of-the-box SCIM provisioning
     /// without explicit tenant-level mapping configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_defaults() -> Self {
         let enterprise_uri = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User";
         let defaults = [
@@ -77,9 +77,7 @@ impl AttributeMapperService {
 
     /// Check if an attribute is required.
     fn is_required(&self, scim_path: &str) -> bool {
-        self.mappings
-            .get(scim_path)
-            .is_some_and(|m| m.required)
+        self.mappings.get(scim_path).is_some_and(|m| m.required)
     }
 
     /// Extract user data from a SCIM user request.
@@ -138,7 +136,8 @@ impl AttributeMapperService {
                 {
                     let transformed = mapping.apply_transform(
                         &value
-                            .as_str().map_or_else(|| value.to_string(), std::string::ToString::to_string),
+                            .as_str()
+                            .map_or_else(|| value.to_string(), std::string::ToString::to_string),
                     );
                     custom_attributes.insert(
                         custom_attr_name.to_string(),
@@ -171,7 +170,7 @@ impl AttributeMapperService {
     }
 
     /// Convert a Xavyo User to a SCIM User response.
-    #[must_use] 
+    #[must_use]
     pub fn to_scim_user(
         &self,
         user: &User,

@@ -101,13 +101,13 @@ pub struct SyncConfiguration {
 
 impl SyncConfiguration {
     /// Get the sync mode enum.
-    #[must_use] 
+    #[must_use]
     pub fn sync_mode(&self) -> SyncMode {
         self.sync_mode.parse().unwrap_or(SyncMode::Polling)
     }
 
     /// Get the conflict resolution enum.
-    #[must_use] 
+    #[must_use]
     pub fn conflict_resolution(&self) -> SyncConflictResolution {
         self.conflict_resolution
             .parse()

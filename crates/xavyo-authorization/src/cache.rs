@@ -32,7 +32,7 @@ pub struct PolicyCache {
 
 impl PolicyCache {
     /// Create a new policy cache.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         let cache = Cache::builder()
             .max_capacity(1000)
@@ -135,7 +135,7 @@ pub struct MappingCache {
 
 impl MappingCache {
     /// Create a new mapping cache.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         let cache = Cache::builder()
             .max_capacity(1000)

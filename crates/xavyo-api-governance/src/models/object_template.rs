@@ -906,10 +906,12 @@ pub struct ApplicationEventResponse {
     pub id: Uuid,
 
     /// Template ID.
-    pub template_id: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template_id: Option<Uuid>,
 
     /// Template version ID.
-    pub template_version_id: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template_version_id: Option<Uuid>,
 
     /// Type of object affected.
     pub object_type: TemplateObjectType,
@@ -942,8 +944,8 @@ impl From<GovTemplateApplicationEvent> for ApplicationEventResponse {
     fn from(e: GovTemplateApplicationEvent) -> Self {
         Self {
             id: e.id,
-            template_id: e.template_id.unwrap_or(Uuid::nil()),
-            template_version_id: e.template_version_id.unwrap_or(Uuid::nil()),
+            template_id: e.template_id,
+            template_version_id: e.template_version_id,
             object_type: e.object_type,
             object_id: e.object_id,
             operation: e.operation.to_string(),
@@ -970,6 +972,51 @@ pub struct ApplicationEventListResponse {
 
     /// Current offset.
     pub offset: i64,
+}
+
+// ============================================================================
+// Exclusion Models
+// ============================================================================
+
+/// Request to create a template exclusion (exclude a parent's rule from a child template).
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
+pub struct CreateExclusionRequest {
+    /// ID of the parent's rule to exclude from this child template.
+    pub excluded_rule_id: Uuid,
+}
+
+/// Exclusion response.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ExclusionResponse {
+    /// Unique identifier.
+    pub id: Uuid,
+
+    /// Child template ID that defines this exclusion.
+    pub template_id: Uuid,
+
+    /// ID of the parent's rule being excluded.
+    pub excluded_rule_id: Uuid,
+
+    /// Creation timestamp.
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<xavyo_db::models::GovTemplateExclusion> for ExclusionResponse {
+    fn from(e: xavyo_db::models::GovTemplateExclusion) -> Self {
+        Self {
+            id: e.id,
+            template_id: e.template_id,
+            excluded_rule_id: e.excluded_rule_id,
+            created_at: e.created_at,
+        }
+    }
+}
+
+/// List of exclusions.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ExclusionListResponse {
+    /// List of exclusions.
+    pub items: Vec<ExclusionResponse>,
 }
 
 // ============================================================================

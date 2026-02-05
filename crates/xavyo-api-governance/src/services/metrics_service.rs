@@ -15,7 +15,7 @@ pub struct MetricsService {
 
 impl MetricsService {
     /// Create a new metrics service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -81,7 +81,7 @@ impl MetricsService {
     /// Calculate utilization rate for a role.
     ///
     /// Utilization = `active_users` / `total_users`
-    #[must_use] 
+    #[must_use]
     pub fn calculate_utilization_rate(total_users: i32, active_users: i32) -> f64 {
         if total_users == 0 {
             return 0.0;
@@ -92,7 +92,7 @@ impl MetricsService {
     /// Calculate coverage rate for a role.
     ///
     /// Coverage = `used_entitlements` / `total_entitlements`
-    #[must_use] 
+    #[must_use]
     pub fn calculate_coverage_rate(entitlement_usage: &[EntitlementUsage]) -> f64 {
         if entitlement_usage.is_empty() {
             return 0.0;
@@ -107,7 +107,7 @@ impl MetricsService {
     }
 
     /// Calculate trend direction by comparing current to previous metrics.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_trend(
         current_utilization: f64,
         previous_utilization: Option<f64>,

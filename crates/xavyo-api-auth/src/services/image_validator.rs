@@ -176,7 +176,7 @@ fn validate_svg(data: &[u8]) -> Result<(), ApiAuthError> {
 }
 
 /// Calculate SHA-256 checksum of data.
-#[must_use] 
+#[must_use]
 pub fn calculate_checksum(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data);
@@ -184,13 +184,13 @@ pub fn calculate_checksum(data: &[u8]) -> String {
 }
 
 /// Get file extension from filename.
-#[must_use] 
+#[must_use]
 pub fn get_extension(filename: &str) -> Option<String> {
     filename.rsplit('.').next().map(str::to_lowercase)
 }
 
 /// Get content type from file extension.
-#[must_use] 
+#[must_use]
 pub fn content_type_from_extension(ext: &str) -> Option<&'static str> {
     match ext.to_lowercase().as_str() {
         "png" => Some("image/png"),

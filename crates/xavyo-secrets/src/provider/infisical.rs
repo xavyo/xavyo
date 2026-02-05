@@ -327,9 +327,7 @@ impl DynamicSecretProvider for InfisicalSecretProvider {
             .await
             .map_err(|e| SecretError::ProviderUnavailable {
                 provider: "infisical".to_string(),
-                detail: format!(
-                    "Failed to generate credentials for '{secret_name}': {e}"
-                ),
+                detail: format!("Failed to generate credentials for '{secret_name}': {e}"),
             })?;
 
         if resp.status() == reqwest::StatusCode::NOT_FOUND {

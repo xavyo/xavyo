@@ -22,7 +22,7 @@ pub type ProvisioningResult = (User, UserIdentityLink);
 
 impl ProvisioningService {
     /// Create a new provisioning service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,

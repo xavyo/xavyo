@@ -431,7 +431,7 @@ impl GcpWorkloadIdentityConfigBuilder {
     }
 
     /// Build the configuration.
-    #[must_use] 
+    #[must_use]
     pub fn build(self) -> GcpWorkloadIdentityConfig {
         GcpWorkloadIdentityConfig {
             project_id: self.project_id,

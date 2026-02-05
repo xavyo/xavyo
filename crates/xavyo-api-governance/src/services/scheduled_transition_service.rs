@@ -24,7 +24,7 @@ pub struct ScheduledTransitionService {
 
 impl ScheduledTransitionService {
     /// Create a new scheduled transition service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -391,9 +391,12 @@ impl ScheduledTransitionService {
         tenant_id: Uuid,
         batch_size: i32,
     ) -> Result<usize> {
-        let due_schedules =
-            GovScheduledTransition::find_due_for_tenant(&self.pool, tenant_id, i64::from(batch_size))
-                .await?;
+        let due_schedules = GovScheduledTransition::find_due_for_tenant(
+            &self.pool,
+            tenant_id,
+            i64::from(batch_size),
+        )
+        .await?;
 
         let mut processed = 0;
 

@@ -93,7 +93,10 @@ pub async fn list_batch_simulations(
         )
         .await?;
 
-    let items: Vec<BatchSimulationResponse> = simulations.into_iter().map(std::convert::Into::into).collect();
+    let items: Vec<BatchSimulationResponse> = simulations
+        .into_iter()
+        .map(std::convert::Into::into)
+        .collect();
 
     Ok(Json(PaginatedResponse {
         items,
@@ -414,7 +417,8 @@ pub async fn get_batch_simulation_results(
         )
         .await?;
 
-    let items: Vec<BatchSimulationResultResponse> = results.into_iter().map(std::convert::Into::into).collect();
+    let items: Vec<BatchSimulationResultResponse> =
+        results.into_iter().map(std::convert::Into::into).collect();
 
     Ok(Json(PaginatedResponse {
         items,

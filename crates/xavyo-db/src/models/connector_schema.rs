@@ -239,7 +239,7 @@ impl ConnectorSchema {
     }
 
     /// Check if schema is expired.
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         self.expires_at < Utc::now()
     }

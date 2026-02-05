@@ -254,7 +254,7 @@ pub async fn fetch_current_state(
     Vec<crate::models::tool::ToolResponse>,
 )> {
     // Fetch all agents (using large limit to get all)
-    let agents_response = client.list_agents(1000, 0).await?;
+    let agents_response = client.list_agents(1000, 0, None, None).await?;
     let agents = agents_response.agents;
 
     // Fetch all tools
@@ -514,9 +514,7 @@ pub fn print_planned_changes(changes: &[ApplyChange], dry_run: bool) {
         .count();
 
     println!();
-    println!(
-        "Summary: {creates} to create, {updates} to update, {unchanged} unchanged"
-    );
+    println!("Summary: {creates} to create, {updates} to update, {unchanged} unchanged");
     println!();
 }
 

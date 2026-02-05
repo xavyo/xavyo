@@ -41,7 +41,7 @@ pub struct RoleCache {
 
 impl RoleCache {
     /// Create a new role cache with the specified TTL.
-    #[must_use] 
+    #[must_use]
     pub fn new(ttl: Duration) -> Self {
         let cache = Cache::builder()
             .time_to_live(ttl)
@@ -73,7 +73,7 @@ impl RoleCache {
     }
 
     /// Get the configured TTL.
-    #[must_use] 
+    #[must_use]
     pub fn ttl(&self) -> Duration {
         self.ttl
     }
@@ -111,7 +111,7 @@ impl Default for InMemoryRoleResolver {
 }
 
 impl InMemoryRoleResolver {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             roles: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),

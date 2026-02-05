@@ -125,7 +125,7 @@ pub struct AttributeDefinitionService {
 
 impl AttributeDefinitionService {
     /// Create a new attribute definition service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -268,8 +268,10 @@ impl AttributeDefinitionService {
                 .await?;
 
         let total_count = definitions.len() as i64;
-        let definitions: Vec<AttributeDefinitionResponse> =
-            definitions.into_iter().map(std::convert::Into::into).collect();
+        let definitions: Vec<AttributeDefinitionResponse> = definitions
+            .into_iter()
+            .map(std::convert::Into::into)
+            .collect();
 
         Ok(AttributeDefinitionListResponse {
             definitions,

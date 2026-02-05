@@ -26,7 +26,7 @@ pub struct PolicyDecisionPoint {
 
 impl PolicyDecisionPoint {
     /// Create a new PDP with the given caches.
-    #[must_use] 
+    #[must_use]
     pub fn new(policy_cache: Arc<PolicyCache>, mapping_cache: Arc<MappingCache>) -> Self {
         Self {
             policy_cache,

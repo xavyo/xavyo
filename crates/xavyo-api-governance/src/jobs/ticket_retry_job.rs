@@ -78,7 +78,7 @@ pub enum TicketRetryJobError {
 
 impl TicketRetryJob {
     /// Create a new ticket retry job.
-    #[must_use] 
+    #[must_use]
     pub fn new(task_service: ManualTaskService) -> Self {
         Self {
             task_service: Arc::new(task_service),
@@ -94,7 +94,7 @@ impl TicketRetryJob {
     }
 
     /// Calculate next retry time based on retry count.
-    #[must_use] 
+    #[must_use]
     pub fn calculate_next_retry(retry_count: i32) -> Option<chrono::DateTime<Utc>> {
         if retry_count >= MAX_RETRY_ATTEMPTS {
             return None; // Exhausted retries

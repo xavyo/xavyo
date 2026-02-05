@@ -17,6 +17,8 @@ use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
 
 use crate::error::ProblemDetails;
+use crate::models::IpRestrictionPolicyConfig;
+use crate::services::org_policy_service::OrgPolicyService;
 use crate::services::IpRestrictionService;
 
 /// Extract client IP address from request headers and connection info.
@@ -76,7 +78,9 @@ pub async fn ip_filter_middleware(
     next: Next,
 ) -> Response {
     // Extract client IP
-    let ip_address = if let Some(ip) = extract_client_ip(&req) { ip } else {
+    let ip_address = if let Some(ip) = extract_client_ip(&req) {
+        ip
+    } else {
         // If we can't determine the IP, log and continue (fail-open for IP detection)
         warn!("Could not determine client IP, skipping IP filter");
         return next.run(req).await;
@@ -133,6 +137,89 @@ pub async fn ip_filter_middleware(
 
             // Fail-open on errors to avoid blocking all traffic on DB issues
             next.run(req).await
+        }
+    }
+}
+
+/// Check org-level IP restrictions for an authenticated user.
+///
+/// This function checks if the client IP is allowed by the user's
+/// organization-level IP restriction policies. Returns `Ok(())` if allowed,
+/// or an error message if blocked.
+pub async fn check_org_ip_restriction(
+    pool: &sqlx::PgPool,
+    tenant_id: uuid::Uuid,
+    user_id: uuid::Uuid,
+    ip_address: &str,
+) -> Result<(), String> {
+    let ip: IpAddr = match ip_address.parse() {
+        Ok(ip) => ip,
+        Err(_) => return Ok(()), // Can't parse IP, skip org check
+    };
+
+    let org_service = OrgPolicyService::new(Arc::new(pool.clone()));
+
+    let result = org_service
+        .get_effective_policy_for_user(
+            tenant_id,
+            user_id,
+            xavyo_db::models::org_security_policy::OrgPolicyType::IpRestriction,
+        )
+        .await;
+
+    match result {
+        Ok((config, sources)) => {
+            // Only enforce if we got an actual org policy (not tenant default)
+            let has_org_policy = sources.iter().any(|s| {
+                !matches!(
+                    s,
+                    xavyo_db::models::org_security_policy::PolicySource::TenantDefault
+                )
+            });
+
+            if !has_org_policy {
+                return Ok(());
+            }
+
+            let ip_config: IpRestrictionPolicyConfig =
+                serde_json::from_value(config).unwrap_or_default();
+
+            if !ip_config.has_restrictions() {
+                return Ok(());
+            }
+
+            if ip_config.is_ip_allowed(ip) {
+                Ok(())
+            } else {
+                match ip_config.action_on_violation.as_str() {
+                    "deny" => Err(format!(
+                        "IP address {ip_address} is not allowed by organization policy"
+                    )),
+                    "warn" => {
+                        warn!(
+                            tenant_id = %tenant_id,
+                            user_id = %user_id,
+                            ip = %ip_address,
+                            "IP address violates org policy (warn mode)"
+                        );
+                        Ok(())
+                    }
+                    _ => {
+                        // "log" mode - just log and allow
+                        debug!(
+                            tenant_id = %tenant_id,
+                            user_id = %user_id,
+                            ip = %ip_address,
+                            "IP address logged by org policy"
+                        );
+                        Ok(())
+                    }
+                }
+            }
+        }
+        Err(_) => {
+            // If org policy resolution fails, allow (fail-open)
+            Ok(())
         }
     }
 }

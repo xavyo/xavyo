@@ -23,8 +23,14 @@ fn test_upgrade_help() {
         stdout.contains("Check") || stdout.contains("update"),
         "Help should describe update checking"
     );
-    assert!(stdout.contains("--check"), "Help should mention --check flag");
-    assert!(stdout.contains("--force"), "Help should mention --force flag");
+    assert!(
+        stdout.contains("--check"),
+        "Help should mention --check flag"
+    );
+    assert!(
+        stdout.contains("--force"),
+        "Help should mention --force flag"
+    );
     assert!(stdout.contains("--yes"), "Help should mention --yes flag");
     assert!(stdout.contains("--json"), "Help should mention --json flag");
 }
@@ -43,10 +49,7 @@ fn test_upgrade_check_only() {
     let combined = format!("{}{}", stdout, stderr);
 
     // Should produce output about version status
-    assert!(
-        !combined.is_empty(),
-        "Should produce output about version"
-    );
+    assert!(!combined.is_empty(), "Should produce output about version");
 }
 
 /// Test that upgrade --check --json produces JSON
@@ -85,10 +88,7 @@ fn test_upgrade_requires_confirmation() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let combined = format!("{}{}", stdout, stderr);
 
-    assert!(
-        !combined.is_empty(),
-        "Should produce output"
-    );
+    assert!(!combined.is_empty(), "Should produce output");
 }
 
 /// Test short flags work
@@ -104,8 +104,5 @@ fn test_upgrade_short_flags() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let combined = format!("{}{}", stdout, stderr);
 
-    assert!(
-        !combined.is_empty(),
-        "-c should work as --check"
-    );
+    assert!(!combined.is_empty(), "-c should work as --check");
 }

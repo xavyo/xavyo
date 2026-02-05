@@ -64,13 +64,13 @@ pub struct TenantActiveUser {
 
 impl TenantUsageMetrics {
     /// Calculate the period start for a given date (first day of month).
-    #[must_use] 
+    #[must_use]
     pub fn period_start_for(date: NaiveDate) -> NaiveDate {
         NaiveDate::from_ymd_opt(date.year(), date.month(), 1).unwrap()
     }
 
     /// Calculate the period end for a given date (last day of month).
-    #[must_use] 
+    #[must_use]
     pub fn period_end_for(date: NaiveDate) -> NaiveDate {
         let next_month = if date.month() == 12 {
             NaiveDate::from_ymd_opt(date.year() + 1, 1, 1).unwrap()

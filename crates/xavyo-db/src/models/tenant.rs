@@ -100,13 +100,13 @@ impl Tenant {
     ///
     /// The system tenant is used for platform-level operations such as
     /// CLI authentication before users have their own tenant.
-    #[must_use] 
+    #[must_use]
     pub fn is_system(&self) -> bool {
         self.tenant_type == TenantType::System
     }
 
     /// Returns `true` if this is a regular user tenant.
-    #[must_use] 
+    #[must_use]
     pub fn is_user(&self) -> bool {
         self.tenant_type == TenantType::User
     }
@@ -114,7 +114,7 @@ impl Tenant {
     /// Returns `true` if this tenant is currently suspended.
     ///
     /// F-SUSPEND: Suspended tenants cannot access any API endpoints.
-    #[must_use] 
+    #[must_use]
     pub fn is_suspended(&self) -> bool {
         self.suspended_at.is_some()
     }
@@ -122,13 +122,13 @@ impl Tenant {
     /// Returns `true` if this tenant has been soft deleted.
     ///
     /// F-DELETE: Deleted tenants cannot access any API endpoints.
-    #[must_use] 
+    #[must_use]
     pub fn is_deleted(&self) -> bool {
         self.deleted_at.is_some()
     }
 
     /// Returns `true` if this tenant is inaccessible (suspended or deleted).
-    #[must_use] 
+    #[must_use]
     pub fn is_inaccessible(&self) -> bool {
         self.is_suspended() || self.is_deleted()
     }

@@ -19,8 +19,10 @@ mod persona_entitlement_service_tests {
         let _persona_id = Uuid::new_v4();
 
         // User has entitlements: [E1, E2]
-        let _user_entitlements = [Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap(),
-            Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap()];
+        let _user_entitlements = [
+            Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap(),
+            Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap(),
+        ];
 
         // Persona has entitlements: [E2, E3]
         let persona_entitlements = vec![

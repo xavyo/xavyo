@@ -28,7 +28,7 @@ impl Default for RetryPolicy {
 impl RetryPolicy {
     /// Create a new retry policy with the given max retries and base delay.
     /// The maximum delay cap defaults to 60 seconds.
-    #[must_use] 
+    #[must_use]
     pub fn new(max_retries: u32, base_delay_secs: u64) -> Self {
         Self {
             max_retries,
@@ -42,7 +42,7 @@ impl RetryPolicy {
     /// Returns `true` if the attempt number is within the configured maximum
     /// and the error is either retryable (network/rate-limit/timeout) or a
     /// server-side 5xx error.
-    #[must_use] 
+    #[must_use]
     pub fn should_retry(&self, attempt: u32, error: &ScimClientError) -> bool {
         if attempt >= self.max_retries {
             return false;
@@ -55,11 +55,14 @@ impl RetryPolicy {
     /// If the error is [`ScimClientError::RateLimited`] with a `retry_after_secs`
     /// value, that value is used directly (capped at `max_delay_secs`).
     /// Otherwise the delay is `min(base_delay_secs * 2^attempt, max_delay_secs)`.
-    #[must_use] 
+    #[must_use]
     pub fn delay_for(&self, attempt: u32, error: &ScimClientError) -> Duration {
         let secs = if let ScimClientError::RateLimited {
-                retry_after_secs: Some(retry_after),
-            } = error { (*retry_after).min(self.max_delay_secs) } else {
+            retry_after_secs: Some(retry_after),
+        } = error
+        {
+            (*retry_after).min(self.max_delay_secs)
+        } else {
             let exponential = self
                 .base_delay_secs
                 .saturating_mul(2u64.saturating_pow(attempt));

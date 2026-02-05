@@ -100,13 +100,13 @@ impl AdConnector {
     }
 
     /// Get the AD configuration.
-    #[must_use] 
+    #[must_use]
     pub fn config(&self) -> &ActiveDirectoryConfig {
         &self.config
     }
 
     /// Get the underlying LDAP connector for direct operations.
-    #[must_use] 
+    #[must_use]
     pub fn ldap(&self) -> &LdapConnector {
         &self.ldap
     }
@@ -176,7 +176,7 @@ impl AdConnector {
     ///
     /// If no search bases are configured, yields a single entry using the
     /// base DN from the LDAP config with subtree scope.
-    #[must_use] 
+    #[must_use]
     pub fn iterate_search_bases<'a>(
         &'a self,
         object_type: &'a str,
@@ -204,19 +204,19 @@ impl AdConnector {
     }
 
     /// Get the user LDAP filter for AD.
-    #[must_use] 
+    #[must_use]
     pub fn user_filter(&self) -> &str {
         &self.config.user_filter
     }
 
     /// Get the group LDAP filter for AD.
-    #[must_use] 
+    #[must_use]
     pub fn group_filter(&self) -> &str {
         &self.config.group_filter
     }
 
     /// Get the maximum nested group depth.
-    #[must_use] 
+    #[must_use]
     pub fn max_nesting_depth(&self) -> u32 {
         self.config.max_nesting_depth
     }
@@ -318,7 +318,10 @@ impl CreateOp for AdConnector {
             }
 
             // Handle password if provided — encode as unicodePwd
-            if let Some(password) = attributes.get_string("password").map(std::string::ToString::to_string) {
+            if let Some(password) = attributes
+                .get_string("password")
+                .map(std::string::ToString::to_string)
+            {
                 validate_password_connection(self.config.ldap.use_ssl)?;
                 let encoded = encode_ad_password(&password)?;
                 attributes.remove("password");
@@ -476,9 +479,7 @@ impl AdConnector {
         let uac_str = entry.get_string("userAccountControl").unwrap_or("512"); // Default: NORMAL_ACCOUNT
 
         uac_str.parse::<u32>().map_err(|_| {
-            ConnectorError::operation_failed(format!(
-                "Invalid userAccountControl value: {uac_str}"
-            ))
+            ConnectorError::operation_failed(format!("Invalid userAccountControl value: {uac_str}"))
         })
     }
 }

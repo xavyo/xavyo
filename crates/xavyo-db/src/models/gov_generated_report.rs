@@ -25,25 +25,25 @@ pub enum ReportStatus {
 
 impl ReportStatus {
     /// Check if the report is complete.
-    #[must_use] 
+    #[must_use]
     pub fn is_completed(&self) -> bool {
         matches!(self, Self::Completed)
     }
 
     /// Check if the report is in progress.
-    #[must_use] 
+    #[must_use]
     pub fn is_in_progress(&self) -> bool {
         matches!(self, Self::Pending | Self::Generating)
     }
 
     /// Check if the report failed.
-    #[must_use] 
+    #[must_use]
     pub fn is_failed(&self) -> bool {
         matches!(self, Self::Failed)
     }
 
     /// Check if the report is final (no more changes expected).
-    #[must_use] 
+    #[must_use]
     pub fn is_final(&self) -> bool {
         matches!(self, Self::Completed | Self::Failed)
     }
@@ -63,7 +63,7 @@ pub enum OutputFormat {
 
 impl OutputFormat {
     /// Get the MIME type for this format.
-    #[must_use] 
+    #[must_use]
     pub fn mime_type(&self) -> &'static str {
         match self {
             Self::Json => "application/json",
@@ -72,7 +72,7 @@ impl OutputFormat {
     }
 
     /// Get the file extension for this format.
-    #[must_use] 
+    #[must_use]
     pub fn extension(&self) -> &'static str {
         match self {
             Self::Json => "json",
@@ -496,14 +496,14 @@ impl GovGeneratedReport {
     }
 
     /// Check if the report can be downloaded.
-    #[must_use] 
+    #[must_use]
     pub fn can_download(&self) -> bool {
         self.status.is_completed()
             && (self.output_data.is_some() || self.output_file_path.is_some())
     }
 
     /// Get the generation duration in seconds.
-    #[must_use] 
+    #[must_use]
     pub fn generation_duration_secs(&self) -> Option<i64> {
         match (self.started_at, self.completed_at) {
             (Some(started), Some(completed)) => Some((completed - started).num_seconds()),

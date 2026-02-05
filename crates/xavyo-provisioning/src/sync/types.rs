@@ -17,7 +17,7 @@ pub enum ChangeType {
 
 impl ChangeType {
     /// Convert to string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             ChangeType::Create => "create",
@@ -64,7 +64,7 @@ pub enum ProcessingStatus {
 
 impl ProcessingStatus {
     /// Convert to string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             ProcessingStatus::Pending => "pending",
@@ -76,7 +76,7 @@ impl ProcessingStatus {
     }
 
     /// Check if this is a terminal status.
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
@@ -85,7 +85,7 @@ impl ProcessingStatus {
     }
 
     /// Check if this status allows retry.
-    #[must_use] 
+    #[must_use]
     pub fn is_retriable(&self) -> bool {
         matches!(self, ProcessingStatus::Failed)
     }
@@ -128,7 +128,7 @@ pub enum ConflictType {
 
 impl ConflictType {
     /// Convert to string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             ConflictType::ConcurrentUpdate => "concurrent_update",
@@ -177,7 +177,7 @@ pub enum ResolutionStrategy {
 
 impl ResolutionStrategy {
     /// Convert to string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             ResolutionStrategy::InboundWins => "inbound_wins",
@@ -189,7 +189,7 @@ impl ResolutionStrategy {
     }
 
     /// Check if this is a final resolution.
-    #[must_use] 
+    #[must_use]
     pub fn is_resolved(&self) -> bool {
         !matches!(self, ResolutionStrategy::Pending)
     }
@@ -234,7 +234,7 @@ pub enum SyncState {
 
 impl SyncState {
     /// Convert to string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             SyncState::Idle => "idle",
@@ -246,13 +246,13 @@ impl SyncState {
     }
 
     /// Check if sync is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self, SyncState::Syncing)
     }
 
     /// Check if sync can be started.
-    #[must_use] 
+    #[must_use]
     pub fn can_start(&self) -> bool {
         matches!(self, SyncState::Idle | SyncState::Error)
     }

@@ -23,13 +23,13 @@ pub enum CandidatePromotionStatus {
 
 impl CandidatePromotionStatus {
     /// Check if candidate can be promoted.
-    #[must_use] 
+    #[must_use]
     pub fn can_promote(&self) -> bool {
         matches!(self, Self::Pending)
     }
 
     /// Check if candidate can be dismissed.
-    #[must_use] 
+    #[must_use]
     pub fn can_dismiss(&self) -> bool {
         matches!(self, Self::Pending)
     }

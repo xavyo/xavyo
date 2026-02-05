@@ -50,7 +50,7 @@ impl MicrosoftProvider {
     /// * `client_id` - Azure AD application client ID
     /// * `client_secret` - Azure AD application client secret
     /// * `tenant` - Azure tenant ID or "common"/"organizations"/"consumers"
-    #[must_use] 
+    #[must_use]
     pub fn new(client_id: String, client_secret: String, tenant: Option<String>) -> Self {
         Self {
             client_id,

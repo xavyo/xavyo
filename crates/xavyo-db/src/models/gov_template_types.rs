@@ -390,7 +390,7 @@ pub const APPLICATION_ATTRIBUTES: &[&str] = &[
 
 impl TemplateObjectType {
     /// Returns the standard attributes for this object type.
-    #[must_use] 
+    #[must_use]
     pub fn standard_attributes(&self) -> &'static [&'static str] {
         match self {
             Self::User => USER_ATTRIBUTES,
@@ -401,7 +401,7 @@ impl TemplateObjectType {
     }
 
     /// Validates that an attribute is valid for this object type.
-    #[must_use] 
+    #[must_use]
     pub fn is_valid_attribute(&self, attr: &str) -> bool {
         self.standard_attributes().contains(&attr)
     }
@@ -409,7 +409,7 @@ impl TemplateObjectType {
 
 impl TemplateStrength {
     /// Returns the precedence of this strength (higher = stronger).
-    #[must_use] 
+    #[must_use]
     pub fn precedence(&self) -> i32 {
         match self {
             Self::Strong => 3,
@@ -419,7 +419,7 @@ impl TemplateStrength {
     }
 
     /// Returns true if this strength overrides another.
-    #[must_use] 
+    #[must_use]
     pub fn overrides(&self, other: &Self) -> bool {
         self.precedence() > other.precedence()
     }

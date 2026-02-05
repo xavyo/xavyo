@@ -10,13 +10,16 @@ use std::sync::Arc;
 use xavyo_api_auth::middleware::RateLimiter;
 
 use crate::handlers::{
-    cancel_downgrade_handler, deactivate_api_key_handler, deactivate_oauth_client_handler,
-    delete_tenant_handler, downgrade_plan_handler, get_plan_history_handler, get_settings_handler,
+    accept_invitation_handler, cancel_downgrade_handler, cancel_invitation_handler,
+    create_api_key_handler, create_invitation_handler, deactivate_api_key_handler,
+    deactivate_oauth_client_handler, delete_tenant_handler, downgrade_plan_handler,
+    get_api_key_usage_handler, get_plan_history_handler, get_settings_handler,
     get_tenant_status_handler, get_tenant_usage_handler, get_tenant_usage_history_handler,
-    list_api_keys_handler, list_deleted_tenants_handler, list_oauth_clients_handler,
+    get_tenant_user_settings_handler, introspect_api_key_handler, list_api_keys_handler,
+    list_deleted_tenants_handler, list_invitations_handler, list_oauth_clients_handler,
     list_plans_handler, provision_handler, reactivate_tenant_handler, restore_tenant_handler,
     rotate_api_key_handler, rotate_oauth_secret_handler, suspend_tenant_handler,
-    update_settings_handler, upgrade_plan_handler,
+    update_settings_handler, update_tenant_user_settings_handler, upgrade_plan_handler,
 };
 use crate::middleware::{provision_rate_limit_middleware, provision_rate_limiter};
 use crate::services::{ApiKeyService, PlanService, ProvisioningService, SlugService};
@@ -138,14 +141,20 @@ pub fn system_admin_router(pool: PgPool) -> Router {
 ///
 /// Provides:
 /// - GET /tenants/{tenant_id}/api-keys - List all API keys
+/// - POST /tenants/{tenant_id}/api-keys - Create a new API key (F-049)
 /// - POST /tenants/{tenant_id}/api-keys/{key_id}/rotate - Rotate an API key
 /// - DELETE /tenants/{tenant_id}/api-keys/{key_id} - Deactivate an API key
+/// - GET /tenants/{tenant_id}/api-keys/{key_id}/usage - Get API key usage statistics (F-054)
+/// - GET /api-keys/introspect - Introspect the current API key (F-055)
+/// - GET /tenants/{tenant_id}/settings - Get tenant settings (F-056)
+/// - PATCH /tenants/{tenant_id}/settings - Update tenant settings (F-056)
 ///
 /// ## Authorization
 ///
 /// Endpoints are accessible by:
 /// - System tenant administrators (can access any tenant)
-/// - Tenant's own users (can only access their tenant's keys)
+/// - Tenant's own users (can only access their tenant's keys/settings)
+/// - /api-keys/introspect requires a valid API key (introspects itself)
 pub fn api_keys_router(pool: PgPool) -> Router {
     let slug_service = Arc::new(SlugService::new(pool.clone()));
     let api_key_service = Arc::new(ApiKeyService::new());
@@ -166,7 +175,10 @@ pub fn api_keys_router(pool: PgPool) -> Router {
     };
 
     Router::new()
-        .route("/tenants/:tenant_id/api-keys", get(list_api_keys_handler))
+        .route(
+            "/tenants/:tenant_id/api-keys",
+            get(list_api_keys_handler).post(create_api_key_handler),
+        )
         .route(
             "/tenants/:tenant_id/api-keys/:key_id/rotate",
             post(rotate_api_key_handler),
@@ -175,6 +187,29 @@ pub fn api_keys_router(pool: PgPool) -> Router {
             "/tenants/:tenant_id/api-keys/:key_id",
             delete(deactivate_api_key_handler),
         )
+        // F-054: API Key Usage Statistics
+        .route(
+            "/tenants/:tenant_id/api-keys/:key_id/usage",
+            get(get_api_key_usage_handler),
+        )
+        // F-055: API Key Introspection
+        .route("/api-keys/introspect", get(introspect_api_key_handler))
+        // F-056: Tenant User Settings
+        .route(
+            "/tenants/:tenant_id/settings",
+            get(get_tenant_user_settings_handler).patch(update_tenant_user_settings_handler),
+        )
+        // F-057: Tenant Invitations
+        .route(
+            "/tenants/:tenant_id/invitations",
+            get(list_invitations_handler).post(create_invitation_handler),
+        )
+        .route(
+            "/tenants/:tenant_id/invitations/:invitation_id",
+            delete(cancel_invitation_handler),
+        )
+        // F-057: Accept invitation (public endpoint)
+        .route("/invitations/accept", post(accept_invitation_handler))
         .with_state(state)
 }
 

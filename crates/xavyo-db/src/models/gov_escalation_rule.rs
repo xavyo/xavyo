@@ -299,7 +299,7 @@ impl GovEscalationRule {
     }
 
     /// Get timeout as Duration.
-    #[must_use] 
+    #[must_use]
     pub fn timeout_duration(&self) -> chrono::Duration {
         let microseconds = self.timeout.microseconds;
         let days = i64::from(self.timeout.days);
@@ -310,7 +310,7 @@ impl GovEscalationRule {
     }
 
     /// Get timeout in seconds (for serialization).
-    #[must_use] 
+    #[must_use]
     pub fn timeout_secs(&self) -> i64 {
         let microseconds = self.timeout.microseconds;
         let days = i64::from(self.timeout.days);
@@ -320,7 +320,7 @@ impl GovEscalationRule {
     }
 
     /// Get warning threshold as Duration.
-    #[must_use] 
+    #[must_use]
     pub fn warning_duration(&self) -> Option<chrono::Duration> {
         self.warning_threshold.as_ref().map(|interval| {
             let microseconds = interval.microseconds;
@@ -333,7 +333,7 @@ impl GovEscalationRule {
     }
 
     /// Get warning threshold in seconds (for serialization).
-    #[must_use] 
+    #[must_use]
     pub fn warning_threshold_secs(&self) -> Option<i64> {
         self.warning_threshold.as_ref().map(|interval| {
             let microseconds = interval.microseconds;

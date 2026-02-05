@@ -24,7 +24,7 @@ impl PolicyEvaluator {
     /// - All its conditions are satisfied (AND-combined)
     ///
     /// Policies are assumed to be pre-sorted (deny-first, then by priority ascending).
-    #[must_use] 
+    #[must_use]
     pub fn evaluate_policies(
         policies: &[PolicyWithConditions],
         request: &AuthorizationRequest,

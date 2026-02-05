@@ -198,7 +198,7 @@ impl ScimUser {
     }
 
     /// Get the primary email address.
-    #[must_use] 
+    #[must_use]
     pub fn primary_email(&self) -> Option<&str> {
         self.emails
             .iter()
@@ -208,7 +208,7 @@ impl ScimUser {
     }
 
     /// Set the resource ID and generate metadata.
-    #[must_use] 
+    #[must_use]
     pub fn with_meta(
         mut self,
         id: Uuid,

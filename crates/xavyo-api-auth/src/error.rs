@@ -37,7 +37,7 @@ pub struct ProblemDetails {
 
 impl ProblemDetails {
     /// Create a new `ProblemDetails` instance.
-    #[must_use] 
+    #[must_use]
     pub fn new(error_type: &str, title: &str, status: StatusCode) -> Self {
         Self {
             error_type: format!("{ERROR_BASE_URL}/{error_type}"),
@@ -441,11 +441,36 @@ pub enum ApiAuthError {
     /// Maximum pending invitations reached.
     #[error("Maximum invitations reached: {0}")]
     MaxInvitationsReached(String),
+
+    // Organization security policy errors (F-066)
+    /// Organization not found.
+    #[error("Organization not found")]
+    OrgNotFound,
+
+    /// Organization security policy not found.
+    #[error("Organization policy not found")]
+    OrgPolicyNotFound,
+
+    /// Organization policy already exists for this type.
+    #[error("Policy already exists for this organization and type")]
+    OrgPolicyAlreadyExists,
+
+    /// Invalid policy configuration.
+    #[error("Invalid policy configuration: {0}")]
+    InvalidPolicyConfig(String),
+
+    /// Invalid policy type.
+    #[error("Invalid policy type: {0}")]
+    InvalidPolicyType(String),
+
+    /// Organization policy service error.
+    #[error("Organization policy error: {0}")]
+    OrgPolicyError(String),
 }
 
 impl ApiAuthError {
     /// Convert to `ProblemDetails`.
-    #[must_use] 
+    #[must_use]
     pub fn to_problem_details(&self) -> ProblemDetails {
         match self {
             ApiAuthError::InvalidCredentials => ProblemDetails::new(
@@ -1006,11 +1031,49 @@ impl ApiAuthError {
                 StatusCode::TOO_MANY_REQUESTS,
             )
             .with_detail(msg.clone()),
+
+            // Organization security policy errors (F-066)
+            ApiAuthError::OrgNotFound => ProblemDetails::new(
+                "organization-not-found",
+                "Organization Not Found",
+                StatusCode::NOT_FOUND,
+            )
+            .with_detail("The requested organization was not found."),
+            ApiAuthError::OrgPolicyNotFound => ProblemDetails::new(
+                "org-policy-not-found",
+                "Organization Policy Not Found",
+                StatusCode::NOT_FOUND,
+            )
+            .with_detail("No policy found for this organization and policy type."),
+            ApiAuthError::OrgPolicyAlreadyExists => ProblemDetails::new(
+                "org-policy-already-exists",
+                "Policy Already Exists",
+                StatusCode::CONFLICT,
+            )
+            .with_detail("A policy of this type already exists for this organization."),
+            ApiAuthError::InvalidPolicyConfig(msg) => ProblemDetails::new(
+                "invalid-policy-config",
+                "Invalid Policy Configuration",
+                StatusCode::UNPROCESSABLE_ENTITY,
+            )
+            .with_detail(msg.clone()),
+            ApiAuthError::InvalidPolicyType(msg) => ProblemDetails::new(
+                "invalid-policy-type",
+                "Invalid Policy Type",
+                StatusCode::BAD_REQUEST,
+            )
+            .with_detail(msg.clone()),
+            ApiAuthError::OrgPolicyError(msg) => ProblemDetails::new(
+                "org-policy-error",
+                "Organization Policy Error",
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )
+            .with_detail(msg.clone()),
         }
     }
 
     /// Get the HTTP status code for this error.
-    #[must_use] 
+    #[must_use]
     pub fn status_code(&self) -> StatusCode {
         match self {
             ApiAuthError::InvalidCredentials => StatusCode::UNAUTHORIZED,
@@ -1116,6 +1179,13 @@ impl ApiAuthError {
             ApiAuthError::UserAlreadyExists(_) => StatusCode::CONFLICT,
             ApiAuthError::PendingInvitationExists(_) => StatusCode::CONFLICT,
             ApiAuthError::MaxInvitationsReached(_) => StatusCode::TOO_MANY_REQUESTS,
+            // Organization security policy errors (F-066)
+            ApiAuthError::OrgNotFound => StatusCode::NOT_FOUND,
+            ApiAuthError::OrgPolicyNotFound => StatusCode::NOT_FOUND,
+            ApiAuthError::OrgPolicyAlreadyExists => StatusCode::CONFLICT,
+            ApiAuthError::InvalidPolicyConfig(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            ApiAuthError::InvalidPolicyType(_) => StatusCode::BAD_REQUEST,
+            ApiAuthError::OrgPolicyError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

@@ -43,19 +43,19 @@ pub enum SimulationStatus {
 
 impl SimulationStatus {
     /// Check if simulation can be executed.
-    #[must_use] 
+    #[must_use]
     pub fn can_execute(&self) -> bool {
         matches!(self, Self::Draft)
     }
 
     /// Check if simulation can be applied.
-    #[must_use] 
+    #[must_use]
     pub fn can_apply(&self) -> bool {
         matches!(self, Self::Executed)
     }
 
     /// Check if simulation can be cancelled.
-    #[must_use] 
+    #[must_use]
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Draft | Self::Executed)
     }
@@ -404,19 +404,19 @@ impl GovRoleSimulation {
     }
 
     /// Parse the simulation changes.
-    #[must_use] 
+    #[must_use]
     pub fn parse_changes(&self) -> SimulationChanges {
         serde_json::from_value(self.changes.clone()).unwrap_or_default()
     }
 
     /// Parse access gained.
-    #[must_use] 
+    #[must_use]
     pub fn parse_access_gained(&self) -> Vec<AccessChange> {
         serde_json::from_value(self.access_gained.clone()).unwrap_or_default()
     }
 
     /// Parse access lost.
-    #[must_use] 
+    #[must_use]
     pub fn parse_access_lost(&self) -> Vec<AccessChange> {
         serde_json::from_value(self.access_lost.clone()).unwrap_or_default()
     }

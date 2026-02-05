@@ -21,13 +21,13 @@ pub enum RiskFactorCategory {
 
 impl RiskFactorCategory {
     /// Check if this is a static factor.
-    #[must_use] 
+    #[must_use]
     pub fn is_static(&self) -> bool {
         matches!(self, Self::Static)
     }
 
     /// Check if this is a dynamic factor.
-    #[must_use] 
+    #[must_use]
     pub fn is_dynamic(&self) -> bool {
         matches!(self, Self::Dynamic)
     }

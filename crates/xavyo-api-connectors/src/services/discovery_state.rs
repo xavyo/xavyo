@@ -41,7 +41,7 @@ pub struct DiscoveryStateManager {
 
 impl DiscoveryStateManager {
     /// Create a new discovery state manager with default timeout.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self::with_timeout(pool, Duration::from_secs(DEFAULT_DISCOVERY_TIMEOUT_SECS))
     }
@@ -68,7 +68,7 @@ impl DiscoveryStateManager {
     }
 
     /// Get the configured timeout duration.
-    #[must_use] 
+    #[must_use]
     pub fn timeout(&self) -> Duration {
         self.timeout
     }

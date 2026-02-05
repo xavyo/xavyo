@@ -41,7 +41,7 @@ pub struct MtlsValidationResult {
 
 impl MtlsValidationResult {
     /// Create a successful validation result.
-    #[must_use] 
+    #[must_use]
     pub fn success(
         tenant_id: Uuid,
         agent_id: Uuid,
@@ -83,7 +83,7 @@ pub struct MtlsService {
 
 impl MtlsService {
     /// Create a new `MtlsService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, certificate_service: Arc<CertificateService>) -> Self {
         Self {
             pool,

@@ -107,7 +107,7 @@ pub struct UserDevice {
 
 impl UserDevice {
     /// Check if the device trust is currently valid.
-    #[must_use] 
+    #[must_use]
     pub fn is_trust_valid(&self) -> bool {
         if !self.is_trusted {
             return false;

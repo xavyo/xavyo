@@ -9,7 +9,7 @@ use serde_json::json;
 pub struct JsonFormatter;
 
 impl JsonFormatter {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self
     }

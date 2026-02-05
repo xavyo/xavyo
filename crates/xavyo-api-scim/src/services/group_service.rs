@@ -66,9 +66,7 @@ impl GroupService {
         // Check parent exists and is in the same tenant
         let parent = Group::find_by_id(&self.pool, tenant_id, parent_id)
             .await?
-            .ok_or_else(|| {
-                ScimError::Validation(format!("Parent group {parent_id} not found"))
-            })?;
+            .ok_or_else(|| ScimError::Validation(format!("Parent group {parent_id} not found")))?;
 
         // Ensure parent is in the same tenant (defense-in-depth)
         if parent.tenant_id != tenant_id {
@@ -253,7 +251,11 @@ impl GroupService {
 
             // Resolve parent by external_id if provided
             let parent_id = if let Some(ref parent_ext_id) = ext.parent_external_id {
-                if let Some(parent) = Group::find_by_external_id(&self.pool, tenant_id, parent_ext_id).await? { Some(parent.id) } else {
+                if let Some(parent) =
+                    Group::find_by_external_id(&self.pool, tenant_id, parent_ext_id).await?
+                {
+                    Some(parent.id)
+                } else {
                     tracing::warn!(
                         tenant_id = %tenant_id,
                         parent_external_id = %parent_ext_id,
@@ -404,7 +406,11 @@ impl GroupService {
             }
 
             let parent_id = if let Some(ref parent_ext_id) = ext.parent_external_id {
-                if let Some(parent) = Group::find_by_external_id(&self.pool, tenant_id, parent_ext_id).await? { Some(parent.id) } else {
+                if let Some(parent) =
+                    Group::find_by_external_id(&self.pool, tenant_id, parent_ext_id).await?
+                {
+                    Some(parent.id)
+                } else {
                     tracing::warn!(
                         tenant_id = %tenant_id,
                         parent_external_id = %parent_ext_id,

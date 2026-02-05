@@ -89,40 +89,40 @@ impl Default for ConnectionSettings {
 
 impl ConnectionSettings {
     /// Create new connection settings with default values.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Set the connection timeout.
-    #[must_use] 
+    #[must_use]
     pub fn with_connection_timeout(mut self, secs: u64) -> Self {
         self.connection_timeout_secs = secs;
         self
     }
 
     /// Set the read timeout.
-    #[must_use] 
+    #[must_use]
     pub fn with_read_timeout(mut self, secs: u64) -> Self {
         self.read_timeout_secs = secs;
         self
     }
 
     /// Set the pool size.
-    #[must_use] 
+    #[must_use]
     pub fn with_pool_size(mut self, size: u32) -> Self {
         self.pool_size = size;
         self
     }
 
     /// Get connection timeout as Duration.
-    #[must_use] 
+    #[must_use]
     pub fn connection_timeout(&self) -> std::time::Duration {
         std::time::Duration::from_secs(self.connection_timeout_secs)
     }
 
     /// Get read timeout as Duration.
-    #[must_use] 
+    #[must_use]
     pub fn read_timeout(&self) -> std::time::Duration {
         std::time::Duration::from_secs(self.read_timeout_secs)
     }
@@ -198,7 +198,7 @@ impl TlsConfig {
     }
 
     /// Create a new TLS config with SSL enabled.
-    #[must_use] 
+    #[must_use]
     pub fn enabled() -> Self {
         Self {
             enabled: true,
@@ -346,7 +346,7 @@ impl AuthConfig {
     }
 
     /// Get credentials that need to be encrypted.
-    #[must_use] 
+    #[must_use]
     pub fn get_credentials(&self) -> Vec<(&'static str, String)> {
         match self {
             AuthConfig::None => vec![],
@@ -362,7 +362,7 @@ impl AuthConfig {
     }
 
     /// Create a redacted version.
-    #[must_use] 
+    #[must_use]
     pub fn redacted(&self) -> Self {
         match self {
             AuthConfig::None => AuthConfig::None,
