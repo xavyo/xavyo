@@ -836,6 +836,13 @@ async fn main() {
 
     // Unified NHI routes (F108 - Unified Non-Human Identity Architecture)
     // F113: Support both API key and JWT authentication for programmatic access
+    //
+    // Layer order (outermost runs first on request):
+    // 1. Extension(pool) - makes PgPool available for API key lookups
+    // 2. Extension(JwtPublicKey) - makes JWT public key available
+    // 3. api_key_auth_middleware - validates API keys, sets TenantId/UserId/JwtClaims
+    // 4. jwt_auth_middleware - validates JWTs if not API key
+    // 5. TenantLayer - validates tenant context (checks extensions first, then header)
     let nhi_routes = match nhi_router(pool.clone()) {
         Ok(r) => r,
         Err(e) => {
@@ -843,17 +850,18 @@ async fn main() {
             std::process::exit(1);
         }
     }
+    // F113: TenantLayer runs last - can see TenantId set by API key auth
+    .layer(TenantLayer::with_config(
+        xavyo_tenant::TenantConfig::builder()
+            .require_tenant(true)
+            .build(),
+    ))
     .layer(axum::middleware::from_fn(jwt_auth_middleware))
     // F113: API key middleware runs before JWT - if API key, validates; if not, passes through
     .layer(axum::middleware::from_fn(api_key_auth_middleware))
     .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
     // F113: PgPool required for API key validation lookups
-    .layer(axum::Extension(pool.clone()))
-    .layer(TenantLayer::with_config(
-        xavyo_tenant::TenantConfig::builder()
-            .require_tenant(true)
-            .build(),
-    ));
+    .layer(axum::Extension(pool.clone()));
 
     // Tenant provisioning routes (F097 - Self-service tenant creation)
     // Requires JWT authentication against the system tenant
