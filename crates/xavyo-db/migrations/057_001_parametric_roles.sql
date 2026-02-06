@@ -32,7 +32,7 @@ CREATE TYPE gov_parameter_event_type AS ENUM (
 CREATE TABLE gov_role_parameters (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    role_id UUID NOT NULL REFERENCES gov_entitlements(id) ON DELETE CASCADE,
+    role_id UUID NOT NULL REFERENCES gov_roles(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
     display_name VARCHAR(255),
     description TEXT,

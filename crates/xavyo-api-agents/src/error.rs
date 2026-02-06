@@ -37,7 +37,7 @@ pub struct ProblemDetails {
 
 impl ProblemDetails {
     /// Create a new `ProblemDetails` instance.
-    #[must_use] 
+    #[must_use]
     pub fn new(error_type: &str, title: &str, status: StatusCode) -> Self {
         Self {
             error_type: format!("{ERROR_BASE_URL}/{error_type}"),
@@ -487,7 +487,7 @@ pub enum ApiAgentsError {
 
 impl ApiAgentsError {
     /// Convert to `ProblemDetails`.
-    #[must_use] 
+    #[must_use]
     pub fn to_problem_details(&self) -> ProblemDetails {
         match self {
             // Agent errors
@@ -621,18 +621,24 @@ impl ApiAgentsError {
                 ProblemDetails::new("unauthorized", "Unauthorized", StatusCode::UNAUTHORIZED)
                     .with_detail("Authentication required.")
             }
-            ApiAgentsError::Internal(msg) => ProblemDetails::new(
-                "internal-error",
-                "Internal Server Error",
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )
-            .with_detail(msg.clone()),
-            ApiAgentsError::Database(err) => ProblemDetails::new(
-                "database-error",
-                "Database Error",
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )
-            .with_detail(err.to_string()),
+            ApiAgentsError::Internal(ref msg) => {
+                tracing::error!("Internal error: {}", msg);
+                ProblemDetails::new(
+                    "internal-error",
+                    "Internal Server Error",
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .with_detail("An internal error occurred")
+            }
+            ApiAgentsError::Database(ref err) => {
+                tracing::error!("Database error: {:?}", err);
+                ProblemDetails::new(
+                    "database-error",
+                    "Database Error",
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .with_detail("A database error occurred")
+            }
             ApiAgentsError::InvalidRiskLevel(level) => ProblemDetails::new(
                 "invalid-risk-level",
                 "Invalid Risk Level",
@@ -809,12 +815,15 @@ impl ApiAgentsError {
                 StatusCode::GONE,
             )
             .with_detail("The credential has been revoked and is no longer valid."),
-            ApiAgentsError::EncryptionError(msg) => ProblemDetails::new(
-                "encryption-error",
-                "Encryption Error",
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )
-            .with_detail(msg.clone()),
+            ApiAgentsError::EncryptionError(ref msg) => {
+                tracing::error!("Encryption error: {}", msg);
+                ProblemDetails::new(
+                    "encryption-error",
+                    "Encryption Error",
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .with_detail("An encryption error occurred")
+            }
             ApiAgentsError::ProviderAuthFailed(msg) => ProblemDetails::new(
                 "provider-auth-failed",
                 "Provider Authentication Failed",
@@ -1125,7 +1134,7 @@ impl ApiAgentsError {
     }
 
     /// Get the HTTP status code for this error.
-    #[must_use] 
+    #[must_use]
     pub fn status_code(&self) -> StatusCode {
         match self {
             // Not Found

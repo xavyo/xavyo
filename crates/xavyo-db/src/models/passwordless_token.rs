@@ -29,7 +29,7 @@ impl PasswordlessTokenType {
     }
 
     /// Parse from database string representation.
-    #[must_use] 
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "magic_link" => Some(Self::MagicLink),

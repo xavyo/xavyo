@@ -22,7 +22,7 @@ pub struct CertificationCampaignService {
 
 impl CertificationCampaignService {
     /// Create a new certification campaign service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -50,7 +50,9 @@ impl CertificationCampaignService {
 
         // Validate specific reviewers if reviewer type requires them
         if reviewer_type == CertReviewerType::SpecificUsers
-            && specific_reviewers.as_ref().is_none_or(std::vec::Vec::is_empty)
+            && specific_reviewers
+                .as_ref()
+                .is_none_or(std::vec::Vec::is_empty)
         {
             return Err(GovernanceError::SpecificReviewersRequired);
         }
@@ -335,6 +337,7 @@ impl CertificationCampaignService {
     }
 
     /// Get all active user assignments.
+    /// Safety limit of 50,000 to prevent unbounded memory growth.
     async fn get_all_active_assignments(
         &self,
         tenant_id: Uuid,
@@ -347,6 +350,7 @@ impl CertificationCampaignService {
               AND target_type = 'user'
               AND status = 'active'
             ORDER BY created_at
+            LIMIT 50000
             ",
         )
         .bind(tenant_id)
@@ -370,6 +374,7 @@ impl CertificationCampaignService {
               AND a.target_type = 'user'
               AND a.status = 'active'
             ORDER BY a.created_at
+            LIMIT 50000
             ",
         )
         .bind(tenant_id)
@@ -393,6 +398,7 @@ impl CertificationCampaignService {
               AND target_type = 'user'
               AND status = 'active'
             ORDER BY created_at
+            LIMIT 50000
             ",
         )
         .bind(tenant_id)
@@ -418,6 +424,7 @@ impl CertificationCampaignService {
               AND a.target_type = 'user'
               AND a.status = 'active'
             ORDER BY a.created_at
+            LIMIT 50000
             ",
         )
         .bind(tenant_id)
@@ -567,7 +574,7 @@ impl CertificationCampaignService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

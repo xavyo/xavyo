@@ -36,7 +36,7 @@ impl FromStr for SecurityProtocol {
 
 impl SecurityProtocol {
     /// Convert to rdkafka string value.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Plaintext => "PLAINTEXT",
@@ -73,7 +73,7 @@ impl FromStr for SaslMechanism {
 
 impl SaslMechanism {
     /// Convert to rdkafka string value.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Plain => "PLAIN",
@@ -166,7 +166,7 @@ impl KafkaConfig {
     }
 
     /// Create a new configuration builder.
-    #[must_use] 
+    #[must_use]
     pub fn builder() -> KafkaConfigBuilder {
         KafkaConfigBuilder::new()
     }
@@ -183,7 +183,7 @@ pub struct KafkaConfigBuilder {
 
 impl KafkaConfigBuilder {
     /// Create a new builder.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -195,14 +195,14 @@ impl KafkaConfigBuilder {
     }
 
     /// Set security protocol.
-    #[must_use] 
+    #[must_use]
     pub fn security_protocol(mut self, protocol: SecurityProtocol) -> Self {
         self.security_protocol = Some(protocol);
         self
     }
 
     /// Set SASL credentials.
-    #[must_use] 
+    #[must_use]
     pub fn sasl(mut self, mechanism: SaslMechanism, username: String, password: String) -> Self {
         self.sasl = Some(SaslCredentials {
             mechanism,

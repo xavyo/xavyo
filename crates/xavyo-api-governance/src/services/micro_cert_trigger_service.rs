@@ -21,7 +21,7 @@ pub struct MicroCertTriggerService {
 
 impl MicroCertTriggerService {
     /// Create a new trigger service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -372,7 +372,7 @@ impl MicroCertTriggerService {
     }
 
     /// Get reference to the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

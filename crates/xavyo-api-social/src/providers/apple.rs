@@ -216,10 +216,7 @@ impl SocialProvider for AppleProvider {
 
         let claims = self.decode_id_token(id_token)?;
 
-        let email_verified = claims
-            .email_verified
-            .as_ref()
-            .is_some_and(|v| v == "true");
+        let email_verified = claims.email_verified.as_ref().is_some_and(|v| v == "true");
 
         let is_private_email = claims
             .is_private_email

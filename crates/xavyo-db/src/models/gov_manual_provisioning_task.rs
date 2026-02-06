@@ -95,14 +95,14 @@ pub struct ManualTaskFilter {
 
 impl GovManualProvisioningTask {
     /// Calculate time remaining until SLA breach.
-    #[must_use] 
+    #[must_use]
     pub fn time_remaining_seconds(&self, now: DateTime<Utc>) -> Option<i64> {
         self.sla_deadline
             .map(|deadline| (deadline - now).num_seconds())
     }
 
     /// Check if task is approaching SLA warning threshold.
-    #[must_use] 
+    #[must_use]
     pub fn is_approaching_warning(&self, warning_time: DateTime<Utc>, now: DateTime<Utc>) -> bool {
         if self.sla_warning_sent || self.status.is_terminal() {
             return false;

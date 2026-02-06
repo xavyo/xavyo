@@ -58,9 +58,11 @@ impl FileSecretProvider {
     }
 
     /// Get a receiver for file change notifications.
-    #[must_use] 
+    #[must_use]
     pub fn change_receiver(&self) -> Option<tokio::sync::broadcast::Receiver<String>> {
-        self.change_tx.as_ref().map(tokio::sync::broadcast::Sender::subscribe)
+        self.change_tx
+            .as_ref()
+            .map(tokio::sync::broadcast::Sender::subscribe)
     }
 
     /// Setup file watcher for rotation detection.

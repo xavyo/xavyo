@@ -48,7 +48,7 @@ pub struct ValidationResult {
 
 impl ValidationResult {
     /// Create a successful validation result.
-    #[must_use] 
+    #[must_use]
     pub fn success() -> Self {
         Self {
             is_valid: true,
@@ -57,7 +57,7 @@ impl ValidationResult {
     }
 
     /// Create a failed validation result with a single error.
-    #[must_use] 
+    #[must_use]
     pub fn failure(error: ValidationError) -> Self {
         Self {
             is_valid: false,
@@ -66,7 +66,7 @@ impl ValidationResult {
     }
 
     /// Create a failed validation result with multiple errors.
-    #[must_use] 
+    #[must_use]
     pub fn failures(errors: Vec<ValidationError>) -> Self {
         Self {
             is_valid: errors.is_empty(),
@@ -165,7 +165,7 @@ pub struct DuplicateAssignmentValidator;
 
 impl DuplicateAssignmentValidator {
     /// Create a new duplicate assignment validator.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
@@ -198,7 +198,7 @@ pub struct PrerequisiteValidator {
 
 impl PrerequisiteValidator {
     /// Create a new prerequisite validator.
-    #[must_use] 
+    #[must_use]
     pub fn new(prerequisite_entitlement_id: Uuid) -> Self {
         Self {
             prerequisite_entitlement_id,
@@ -263,7 +263,7 @@ impl Default for ValidationService {
 
 impl ValidationService {
     /// Create a new validation service.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self { validators: vec![] }
     }
@@ -274,7 +274,7 @@ impl ValidationService {
     }
 
     /// Create with default validators (expiry date only).
-    #[must_use] 
+    #[must_use]
     pub fn with_defaults() -> Self {
         let mut service = Self::new();
         service.add_validator(Box::new(ExpiryDateValidator));

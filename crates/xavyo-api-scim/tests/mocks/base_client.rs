@@ -8,15 +8,13 @@ use super::quirks::QuirkDefinition;
 use crate::common::TestApp;
 
 /// Configuration for mock client behavior.
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct MockClientConfig {
     /// Simulated network delay.
     pub delay: Option<Duration>,
     /// Which quirks to simulate.
     pub enabled_quirks: Vec<String>,
 }
-
 
 impl MockClientConfig {
     /// Create config with all quirks enabled.

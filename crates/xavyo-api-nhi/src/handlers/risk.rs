@@ -31,7 +31,7 @@ pub struct RiskState {
 
 impl RiskState {
     /// Create a new `RiskState` with risk service only.
-    #[must_use] 
+    #[must_use]
     pub fn new(risk_service: UnifiedRiskService) -> Self {
         Self {
             risk_service,
@@ -40,7 +40,7 @@ impl RiskState {
     }
 
     /// Create a `RiskState` with both services for staleness report.
-    #[must_use] 
+    #[must_use]
     pub fn with_usage_service(mut self, usage_service: Arc<NhiUsageService>) -> Self {
         self.usage_service = Some(usage_service);
         self

@@ -18,7 +18,7 @@ pub struct AuthService {
 
 impl AuthService {
     /// Create a new authentication service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -52,10 +52,10 @@ impl AuthService {
         // Validate email
         let email_result = validate_email(email);
         if !email_result.is_valid {
-            return Err(ApiAuthError::InvalidEmail(
-                email_result
-                    .error.map_or_else(|| "Invalid email format".to_string(), |e| e.to_string()),
-            ));
+            return Err(ApiAuthError::InvalidEmail(email_result.error.map_or_else(
+                || "Invalid email format".to_string(),
+                |e| e.to_string(),
+            )));
         }
 
         // Validate password
@@ -153,7 +153,7 @@ impl AuthService {
 
         let user = user.ok_or_else(|| {
             // Use generic error to prevent email enumeration
-            tracing::debug!(email = %normalized_email, "Login attempt for non-existent user");
+            tracing::debug!("Login attempt for non-existent user");
             ApiAuthError::InvalidCredentials
         })?;
 
@@ -173,10 +173,7 @@ impl AuthService {
         let valid = self
             .password_hasher
             .verify(password, &user.password_hash)
-            .map_err(|e| {
-                tracing::error!("Password verification error: {}", e);
-                ApiAuthError::Internal(format!("Password verification failed: {e}"))
-            })?;
+            .map_err(|_| ApiAuthError::InvalidCredentials)?;
 
         if !valid {
             tracing::debug!(user_id = %user.id, "Invalid password attempt");
@@ -203,16 +200,21 @@ impl AuthService {
         Ok(count > 0)
     }
 
-    /// Get a user by ID.
-    pub async fn get_user(&self, user_id: UserId) -> Result<Option<User>, ApiAuthError> {
+    /// Get a user by ID within a tenant.
+    pub async fn get_user(
+        &self,
+        tenant_id: uuid::Uuid,
+        user_id: UserId,
+    ) -> Result<Option<User>, ApiAuthError> {
         let user: Option<User> = sqlx::query_as(
             r"
             SELECT *
             FROM users
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             ",
         )
         .bind(user_id.as_uuid())
+        .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await?;
 

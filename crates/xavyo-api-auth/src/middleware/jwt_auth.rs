@@ -199,7 +199,9 @@ pub async fn jwt_auth_middleware(
     // Extract user ID from sub claim
     // For client_credentials tokens, sub is the client_id (not a UUID)
     // In that case, we mark it as a service account token
-    let (user_uuid, is_service_account) = if let Ok(uuid) = claims.sub.parse::<uuid::Uuid>() { (uuid, false) } else {
+    let (user_uuid, is_service_account) = if let Ok(uuid) = claims.sub.parse::<uuid::Uuid>() {
+        (uuid, false)
+    } else {
         // This is likely a client_credentials token where sub is the client_id
         // Use a nil UUID for service accounts - handlers should check ServiceAccountMarker
         tracing::debug!(
@@ -269,7 +271,7 @@ pub struct ServiceAccountMarker(pub bool);
 
 impl ServiceAccountMarker {
     /// Returns true if this is a service account (`client_credentials`) token.
-    #[must_use] 
+    #[must_use]
     pub fn is_service_account(&self) -> bool {
         self.0
     }

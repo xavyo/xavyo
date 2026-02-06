@@ -22,7 +22,7 @@ pub struct AvailableProvider {
 }
 
 impl AvailableProvider {
-    #[must_use] 
+    #[must_use]
     pub fn new(provider: ProviderType, base_url: &str) -> Self {
         let (name, provider_str) = match provider {
             ProviderType::Google => ("Google", "google"),

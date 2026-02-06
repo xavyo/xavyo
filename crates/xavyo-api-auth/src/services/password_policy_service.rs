@@ -3,11 +3,17 @@
 //! Handles password validation against tenant policies, history checking, and expiration.
 
 use crate::error::ApiAuthError;
+use crate::models::PasswordPolicyConfig;
+use crate::services::org_policy_service::{OrgPolicyError, OrgPolicyService};
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
+use std::sync::Arc;
 use tracing::{info, warn};
 use uuid::Uuid;
-use xavyo_db::{set_tenant_context, PasswordHistory, TenantPasswordPolicy, UpsertPasswordPolicy};
+use xavyo_db::{
+    models::org_security_policy::OrgPolicyType, set_tenant_context, PasswordHistory,
+    TenantPasswordPolicy, UpsertPasswordPolicy,
+};
 
 /// Special characters allowed in passwords.
 pub const SPECIAL_CHARS: &str = "!@#$%^&*()_+-=[]{}|;:,.<>?";
@@ -121,7 +127,7 @@ pub struct PasswordPolicyService {
 
 impl PasswordPolicyService {
     /// Create a new password policy service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -186,6 +192,71 @@ impl PasswordPolicyService {
         TenantPasswordPolicy::get_or_default(&mut *conn, tenant_id)
             .await
             .map_err(ApiAuthError::Database)
+    }
+
+    /// Get the effective password policy for a user, considering org-level overrides.
+    ///
+    /// Resolves the user's organization memberships and returns the most restrictive
+    /// combination of org-level policies. Falls back to tenant-level policy if the
+    /// user has no org memberships or no org policies exist.
+    pub async fn get_effective_password_policy(
+        &self,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<TenantPasswordPolicy, ApiAuthError> {
+        let org_service = OrgPolicyService::new(Arc::new(self.pool.clone()));
+
+        match org_service
+            .get_effective_policy_for_user(tenant_id, user_id, OrgPolicyType::Password)
+            .await
+        {
+            Ok((config, sources)) => {
+                // Check if we got an actual org policy (not just tenant default)
+                let has_org_policy = sources.iter().any(|s| {
+                    !matches!(
+                        s,
+                        xavyo_db::models::org_security_policy::PolicySource::TenantDefault
+                    )
+                });
+
+                if has_org_policy {
+                    // Parse org config and convert to TenantPasswordPolicy
+                    let org_config: PasswordPolicyConfig =
+                        serde_json::from_value(config).map_err(|e| {
+                            ApiAuthError::Internal(format!(
+                                "Invalid org password policy config: {e}"
+                            ))
+                        })?;
+
+                    // Build a TenantPasswordPolicy from the org config
+                    Ok(TenantPasswordPolicy {
+                        tenant_id,
+                        min_length: org_config.min_length,
+                        max_length: org_config.max_length,
+                        require_uppercase: org_config.require_uppercase,
+                        require_lowercase: org_config.require_lowercase,
+                        require_digit: org_config.require_digit,
+                        require_special: org_config.require_special,
+                        expiration_days: org_config.expiration_days,
+                        history_count: org_config.history_count,
+                        min_age_hours: org_config.min_age_hours,
+                        created_at: Utc::now(),
+                        updated_at: Utc::now(),
+                    })
+                } else {
+                    // No org-level policy, use tenant default
+                    self.get_password_policy(tenant_id).await
+                }
+            }
+            Err(OrgPolicyError::OrgNotFound(_) | OrgPolicyError::PolicyNotFound) => {
+                // No org policy exists, fall back to tenant policy
+                self.get_password_policy(tenant_id).await
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to resolve org password policy, falling back to tenant");
+                self.get_password_policy(tenant_id).await
+            }
+        }
     }
 
     /// Update the password policy for a tenant.
@@ -284,7 +355,7 @@ impl PasswordPolicyService {
     }
 
     /// Check if a user's password has expired.
-    #[must_use] 
+    #[must_use]
     pub fn check_password_expired(
         password_changed_at: Option<chrono::DateTime<chrono::Utc>>,
         expiration_days: i32,

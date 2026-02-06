@@ -41,7 +41,7 @@ pub struct AuthorizationService {
 
 impl AuthorizationService {
     /// Create a new `AuthorizationService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         pool: PgPool,
         permission_service: Arc<PermissionService>,
@@ -61,7 +61,7 @@ impl AuthorizationService {
     }
 
     /// Create with explicit anomaly service (for testing or custom configuration).
-    #[must_use] 
+    #[must_use]
     pub fn with_anomaly_service(
         pool: PgPool,
         permission_service: Arc<PermissionService>,
@@ -204,7 +204,10 @@ impl AuthorizationService {
         let (permission, tool) = if let Some((p, t)) = self
             .permission_service
             .check_permission_by_tool_name(tenant_id, request.agent_id, &request.tool)
-            .await? { (p, t) } else {
+            .await?
+        {
+            (p, t)
+        } else {
             let reason = format!("Agent does not have permission for tool '{}'", request.tool);
             let latency_ms = start.elapsed().as_secs_f64() * 1000.0;
 

@@ -66,7 +66,7 @@ pub struct CorrelationMatch {
 
 impl CorrelationMatch {
     /// Create a new correlation match.
-    #[must_use] 
+    #[must_use]
     pub fn new(uid: Uid, confidence: f64) -> Self {
         Self {
             uid,
@@ -77,14 +77,14 @@ impl CorrelationMatch {
     }
 
     /// Add a matched rule.
-    #[must_use] 
+    #[must_use]
     pub fn with_rule(mut self, rule_name: &str) -> Self {
         self.matched_rules.push(rule_name.to_string());
         self
     }
 
     /// Add a matched attribute.
-    #[must_use] 
+    #[must_use]
     pub fn with_attribute(mut self, name: &str, value: &str) -> Self {
         self.matched_attributes
             .insert(name.to_string(), value.to_string());
@@ -149,7 +149,7 @@ pub struct DefaultCorrelationService {
 
 impl DefaultCorrelationService {
     /// Create a new correlation service with default config.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: CorrelationConfig::default(),
@@ -157,7 +157,7 @@ impl DefaultCorrelationService {
     }
 
     /// Create with custom configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_config(config: CorrelationConfig) -> Self {
         Self { config }
     }
@@ -281,7 +281,8 @@ impl DefaultCorrelationService {
                 .get("__uid__")
                 .or_else(|| candidate.get("dn"))
                 .or_else(|| candidate.get("id"))
-                .and_then(attribute_value_to_string).map_or_else(|| Uid::from_id("unknown"), Uid::from_id);
+                .and_then(attribute_value_to_string)
+                .map_or_else(|| Uid::from_id("unknown"), Uid::from_id);
 
             for (idx, rule) in rules.iter().enumerate() {
                 if let Some(score) = self.evaluate_rule(rule, source_attrs, &candidate) {
@@ -420,7 +421,7 @@ fn attribute_value_to_string(value: &AttributeValue) -> Option<String> {
 }
 
 /// Create a correlation service with default settings.
-#[must_use] 
+#[must_use]
 pub fn default_correlation_service() -> Arc<dyn CorrelationService> {
     Arc::new(DefaultCorrelationService::new())
 }

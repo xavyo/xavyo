@@ -45,13 +45,13 @@ impl Uid {
     }
 
     /// Get the attribute name.
-    #[must_use] 
+    #[must_use]
     pub fn attribute_name(&self) -> &str {
         &self.attribute_name
     }
 
     /// Get the value.
-    #[must_use] 
+    #[must_use]
     pub fn value(&self) -> &str {
         &self.value
     }
@@ -73,7 +73,7 @@ pub struct AttributeSet {
 
 impl AttributeSet {
     /// Create a new empty attribute set.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             attributes: HashMap::new(),
@@ -92,25 +92,25 @@ impl AttributeSet {
     }
 
     /// Get an attribute value.
-    #[must_use] 
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&AttributeValue> {
         self.attributes.get(name)
     }
 
     /// Get a single-valued string attribute.
-    #[must_use] 
+    #[must_use]
     pub fn get_string(&self, name: &str) -> Option<&str> {
         self.get(name).and_then(|v| v.as_string())
     }
 
     /// Get a multi-valued string attribute.
-    #[must_use] 
+    #[must_use]
     pub fn get_strings(&self, name: &str) -> Option<Vec<&str>> {
         self.get(name).map(|v| v.as_strings())
     }
 
     /// Check if an attribute exists.
-    #[must_use] 
+    #[must_use]
     pub fn has(&self, name: &str) -> bool {
         self.attributes.contains_key(name)
     }
@@ -126,13 +126,13 @@ impl AttributeSet {
     }
 
     /// Get the number of attributes.
-    #[must_use] 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.attributes.len()
     }
 
     /// Check if the set is empty.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.attributes.is_empty()
     }
@@ -143,7 +143,7 @@ impl AttributeSet {
     }
 
     /// Convert to a `HashMap`.
-    #[must_use] 
+    #[must_use]
     pub fn into_map(self) -> HashMap<String, AttributeValue> {
         self.attributes
     }
@@ -181,19 +181,19 @@ pub enum AttributeValue {
 
 impl AttributeValue {
     /// Create a null value.
-    #[must_use] 
+    #[must_use]
     pub fn null() -> Self {
         AttributeValue::Null
     }
 
     /// Check if this is a null value.
-    #[must_use] 
+    #[must_use]
     pub fn is_null(&self) -> bool {
         matches!(self, AttributeValue::Null)
     }
 
     /// Get as a string if this is a single string value.
-    #[must_use] 
+    #[must_use]
     pub fn as_string(&self) -> Option<&str> {
         match self {
             AttributeValue::String(s) => Some(s),
@@ -202,7 +202,7 @@ impl AttributeValue {
     }
 
     /// Get as strings (works for both single and multi-valued).
-    #[must_use] 
+    #[must_use]
     pub fn as_strings(&self) -> Vec<&str> {
         match self {
             AttributeValue::String(s) => vec![s.as_str()],
@@ -212,7 +212,7 @@ impl AttributeValue {
     }
 
     /// Get as an integer if this is an integer value.
-    #[must_use] 
+    #[must_use]
     pub fn as_integer(&self) -> Option<i64> {
         match self {
             AttributeValue::Integer(i) => Some(*i),
@@ -221,7 +221,7 @@ impl AttributeValue {
     }
 
     /// Get as a boolean if this is a boolean value.
-    #[must_use] 
+    #[must_use]
     pub fn as_boolean(&self) -> Option<bool> {
         match self {
             AttributeValue::Boolean(b) => Some(*b),
@@ -230,7 +230,7 @@ impl AttributeValue {
     }
 
     /// Get as an array if this is multi-valued.
-    #[must_use] 
+    #[must_use]
     pub fn as_array(&self) -> Option<&Vec<AttributeValue>> {
         match self {
             AttributeValue::Array(arr) => Some(arr),
@@ -239,7 +239,7 @@ impl AttributeValue {
     }
 
     /// Check if this is multi-valued.
-    #[must_use] 
+    #[must_use]
     pub fn is_multi_valued(&self) -> bool {
         matches!(self, AttributeValue::Array(_))
     }
@@ -315,7 +315,7 @@ pub struct AttributeDelta {
 
 impl AttributeDelta {
     /// Create a new empty delta.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -353,7 +353,7 @@ impl AttributeDelta {
     }
 
     /// Check if this delta has any changes.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.add.is_empty()
             && self.remove.is_empty()
@@ -362,7 +362,7 @@ impl AttributeDelta {
     }
 
     /// Get all affected attribute names.
-    #[must_use] 
+    #[must_use]
     pub fn affected_attributes(&self) -> Vec<&str> {
         let mut names: Vec<&str> = Vec::new();
         names.extend(self.add.keys().map(std::string::String::as_str));
@@ -449,19 +449,19 @@ impl Filter {
     }
 
     /// Create an AND filter.
-    #[must_use] 
+    #[must_use]
     pub fn and(filters: Vec<Filter>) -> Self {
         Filter::And { filters }
     }
 
     /// Create an OR filter.
-    #[must_use] 
+    #[must_use]
     pub fn or(filters: Vec<Filter>) -> Self {
         Filter::Or { filters }
     }
 
     /// Create a NOT filter (negation).
-    #[must_use] 
+    #[must_use]
     pub fn negate(filter: Filter) -> Self {
         Filter::Not {
             filter: Box::new(filter),
@@ -469,7 +469,7 @@ impl Filter {
     }
 
     /// Combine this filter with another using AND.
-    #[must_use] 
+    #[must_use]
     pub fn and_with(self, other: Filter) -> Self {
         match self {
             Filter::And { mut filters } => {
@@ -483,7 +483,7 @@ impl Filter {
     }
 
     /// Combine this filter with another using OR.
-    #[must_use] 
+    #[must_use]
     pub fn or_with(self, other: Filter) -> Self {
         match self {
             Filter::Or { mut filters } => {
@@ -522,7 +522,7 @@ pub struct PageRequest {
 
 impl PageRequest {
     /// Create a new page request with the given page size.
-    #[must_use] 
+    #[must_use]
     pub fn new(page_size: u32) -> Self {
         Self {
             offset: 0,
@@ -534,7 +534,7 @@ impl PageRequest {
     }
 
     /// Set the offset.
-    #[must_use] 
+    #[must_use]
     pub fn with_offset(mut self, offset: u32) -> Self {
         self.offset = offset;
         self
@@ -580,7 +580,7 @@ pub struct SearchResult {
 
 impl SearchResult {
     /// Create a new search result.
-    #[must_use] 
+    #[must_use]
     pub fn new(objects: Vec<AttributeSet>) -> Self {
         Self {
             has_more: false,
@@ -591,13 +591,13 @@ impl SearchResult {
     }
 
     /// Create an empty search result.
-    #[must_use] 
+    #[must_use]
     pub fn empty() -> Self {
         Self::new(Vec::new())
     }
 
     /// Set the total count.
-    #[must_use] 
+    #[must_use]
     pub fn with_total_count(mut self, count: u64) -> Self {
         self.total_count = Some(count);
         self
@@ -611,7 +611,7 @@ impl SearchResult {
     }
 
     /// Get the number of objects in this page.
-    #[must_use] 
+    #[must_use]
     pub fn count(&self) -> usize {
         self.objects.len()
     }
@@ -637,8 +637,16 @@ mod tests {
             .with("active", true);
 
         assert_eq!(attrs.get_string("email"), Some("john@example.com"));
-        assert_eq!(attrs.get("age").and_then(super::AttributeValue::as_integer), Some(30));
-        assert_eq!(attrs.get("active").and_then(super::AttributeValue::as_boolean), Some(true));
+        assert_eq!(
+            attrs.get("age").and_then(super::AttributeValue::as_integer),
+            Some(30)
+        );
+        assert_eq!(
+            attrs
+                .get("active")
+                .and_then(super::AttributeValue::as_boolean),
+            Some(true)
+        );
         assert!(!attrs.has("nonexistent"));
     }
 

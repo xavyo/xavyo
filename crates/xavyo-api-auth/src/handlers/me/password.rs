@@ -77,7 +77,7 @@ pub async fn me_password_change(
 
     // Verify current password
     let valid = verify_password(&request.current_password, &user.password_hash)
-        .map_err(|e| ApiAuthError::Internal(format!("Password verification failed: {e}")))?;
+        .map_err(|_| ApiAuthError::InvalidCredentials)?;
 
     if !valid {
         tracing::debug!(user_id = %user_id, "Invalid current password during password change");
@@ -100,7 +100,11 @@ pub async fn me_password_change(
     // Validate new password against policy
     let validation = PasswordPolicyService::validate_password(&request.new_password, &policy);
     if !validation.is_valid {
-        let errors: Vec<String> = validation.errors.iter().map(std::string::ToString::to_string).collect();
+        let errors: Vec<String> = validation
+            .errors
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
         return Err(ApiAuthError::WeakPassword(errors));
     }
 

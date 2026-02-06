@@ -26,7 +26,7 @@ async fn test_create_group() {
 
     // Verify group was created
     let row: Option<(Uuid, String)> =
-        sqlx::query_as("SELECT id, name FROM groups WHERE id = $1 AND tenant_id = $2")
+        sqlx::query_as("SELECT id, display_name FROM groups WHERE id = $1 AND tenant_id = $2")
             .bind(group_id)
             .bind(tenant_id)
             .fetch_optional(&pool)
@@ -54,7 +54,7 @@ async fn test_add_member_to_group() {
 
     // Verify membership
     let count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM group_members WHERE group_id = $1 AND user_id = $2 AND tenant_id = $3",
+        "SELECT COUNT(*) FROM group_memberships WHERE group_id = $1 AND user_id = $2 AND tenant_id = $3",
     )
     .bind(group_id)
     .bind(user_id)
@@ -70,7 +70,7 @@ async fn test_add_member_to_group() {
 
 #[tokio::test]
 #[ignore = "Requires database - run locally with DATABASE_URL"]
-async fn test_list_group_members() {
+async fn test_list_group_memberships() {
     let pool = create_test_pool().await;
     let tenant_id = create_test_tenant(&pool).await;
 
@@ -84,13 +84,14 @@ async fn test_list_group_members() {
     add_user_to_group(&pool, tenant_id, group_id, user3).await;
 
     // Query members
-    let members: Vec<(Uuid,)> =
-        sqlx::query_as("SELECT user_id FROM group_members WHERE group_id = $1 AND tenant_id = $2")
-            .bind(group_id)
-            .bind(tenant_id)
-            .fetch_all(&pool)
-            .await
-            .expect("Query should succeed");
+    let members: Vec<(Uuid,)> = sqlx::query_as(
+        "SELECT user_id FROM group_memberships WHERE group_id = $1 AND tenant_id = $2",
+    )
+    .bind(group_id)
+    .bind(tenant_id)
+    .fetch_all(&pool)
+    .await
+    .expect("Query should succeed");
 
     assert_eq!(members.len(), 3, "Group should have 3 members");
     let member_ids: Vec<Uuid> = members.iter().map(|m| m.0).collect();
@@ -114,7 +115,7 @@ async fn test_remove_member_from_group() {
 
     // Remove membership
     sqlx::query(
-        "DELETE FROM group_members WHERE group_id = $1 AND user_id = $2 AND tenant_id = $3",
+        "DELETE FROM group_memberships WHERE group_id = $1 AND user_id = $2 AND tenant_id = $3",
     )
     .bind(group_id)
     .bind(user_id)
@@ -125,7 +126,7 @@ async fn test_remove_member_from_group() {
 
     // Verify removal
     let count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM group_members WHERE group_id = $1 AND user_id = $2 AND tenant_id = $3",
+        "SELECT COUNT(*) FROM group_memberships WHERE group_id = $1 AND user_id = $2 AND tenant_id = $3",
     )
     .bind(group_id)
     .bind(user_id)
@@ -203,13 +204,9 @@ async fn test_group_hierarchy_max_depth_enforced() {
 
     // Create groups up to depth 9 (max depth is 10)
     for i in 1..10 {
-        current_parent = create_test_group_with_parent(
-            &pool,
-            tenant_id,
-            &format!("Level {i}"),
-            current_parent,
-        )
-        .await;
+        current_parent =
+            create_test_group_with_parent(&pool, tenant_id, &format!("Level {i}"), current_parent)
+                .await;
     }
 
     // Verify depth at level 9
@@ -249,7 +246,7 @@ async fn test_delete_group_with_members() {
 
     // Delete group (should cascade to memberships or fail depending on FK constraints)
     // First remove memberships
-    sqlx::query("DELETE FROM group_members WHERE group_id = $1 AND tenant_id = $2")
+    sqlx::query("DELETE FROM group_memberships WHERE group_id = $1 AND tenant_id = $2")
         .bind(group_id)
         .bind(tenant_id)
         .execute(&pool)

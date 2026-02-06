@@ -83,12 +83,12 @@ impl TotpEncryption {
         // Generate random IV
         let mut iv = [0u8; NONCE_SIZE];
         OsRng.fill_bytes(&mut iv);
-        let nonce = Nonce::from_slice(&iv);
+        let nonce = Nonce::from(iv);
 
         // Encrypt
         let ciphertext = self
             .cipher
-            .encrypt(nonce, plaintext)
+            .encrypt(&nonce, plaintext)
             .map_err(|e| TotpEncryptionError::EncryptionFailed(e.to_string()))?;
 
         Ok((ciphertext, iv.to_vec()))
@@ -100,11 +100,14 @@ impl TotpEncryption {
             return Err(TotpEncryptionError::InvalidIvLength(iv.len()));
         }
 
-        let nonce = Nonce::from_slice(iv);
+        let nonce_array: [u8; NONCE_SIZE] = iv
+            .try_into()
+            .map_err(|_| TotpEncryptionError::InvalidIvLength(iv.len()))?;
+        let nonce = Nonce::from(nonce_array);
 
         let plaintext = self
             .cipher
-            .decrypt(nonce, ciphertext)
+            .decrypt(&nonce, ciphertext)
             .map_err(|e| TotpEncryptionError::DecryptionFailed(e.to_string()))?;
 
         Ok(plaintext)

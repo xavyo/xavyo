@@ -3,17 +3,19 @@
 //! Handles session creation, validation, and revocation with policy enforcement.
 
 use crate::error::ApiAuthError;
+use crate::models::SessionPolicyConfig;
+use crate::services::org_policy_service::OrgPolicyService;
 use crate::services::user_agent_parser::{parse_user_agent, DeviceInfo};
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::time::Instant;
 use tracing::{info, warn};
 use uuid::Uuid;
 use xavyo_db::{
-    set_tenant_context, CreateSession, RevokeReason, Session, SessionInfo, TenantSessionPolicy,
-    UpsertSessionPolicy,
+    models::org_security_policy::OrgPolicyType, set_tenant_context, CreateSession, RevokeReason,
+    Session, SessionInfo, TenantSessionPolicy, UpsertSessionPolicy,
 };
 
 /// Throttle interval for activity updates (in seconds).
@@ -29,7 +31,7 @@ pub struct SessionService {
 
 impl SessionService {
     /// Create a new session service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -251,7 +253,10 @@ impl SessionService {
     ) -> Result<(), ApiAuthError> {
         // Check throttle
         {
-            let cache = self.activity_cache.read().unwrap();
+            let cache = self
+                .activity_cache
+                .read()
+                .unwrap_or_else(|e| e.into_inner());
             if let Some(last_update) = cache.get(&session_id) {
                 if last_update.elapsed().as_secs() < ACTIVITY_UPDATE_THROTTLE_SECONDS {
                     return Ok(()); // Skip update, too recent
@@ -271,12 +276,19 @@ impl SessionService {
 
         // Update throttle cache
         {
-            let mut cache = self.activity_cache.write().unwrap();
+            let mut cache = self
+                .activity_cache
+                .write()
+                .unwrap_or_else(|e| e.into_inner());
             cache.insert(session_id, Instant::now());
 
             // Cleanup old entries periodically (every 1000 inserts)
             if cache.len() > 10000 {
-                let threshold = Instant::now().checked_sub(std::time::Duration::from_secs(ACTIVITY_UPDATE_THROTTLE_SECONDS * 2)).unwrap();
+                let threshold = Instant::now()
+                    .checked_sub(std::time::Duration::from_secs(
+                        ACTIVITY_UPDATE_THROTTLE_SECONDS * 2,
+                    ))
+                    .unwrap_or_else(Instant::now);
                 cache.retain(|_, v| *v > threshold);
             }
         }
@@ -329,6 +341,74 @@ impl SessionService {
         TenantSessionPolicy::get_or_default(&mut *conn, tenant_id)
             .await
             .map_err(ApiAuthError::Database)
+    }
+
+    /// Get the effective session policy for a user, considering org-level overrides.
+    ///
+    /// Resolves the user's organization memberships and returns a session policy
+    /// that combines tenant-level and org-level settings using the most restrictive
+    /// combination.
+    pub async fn get_effective_session_policy(
+        &self,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<TenantSessionPolicy, ApiAuthError> {
+        let tenant_policy = self.get_tenant_policy(tenant_id).await?;
+        let org_service = OrgPolicyService::new(Arc::new(self.pool.clone()));
+
+        match org_service
+            .get_effective_policy_for_user(tenant_id, user_id, OrgPolicyType::Session)
+            .await
+        {
+            Ok((config, sources)) => {
+                // Check if we got an actual org policy (not just tenant default)
+                let has_org_policy = sources.iter().any(|s| {
+                    !matches!(
+                        s,
+                        xavyo_db::models::org_security_policy::PolicySource::TenantDefault
+                    )
+                });
+
+                if has_org_policy {
+                    let org_config: SessionPolicyConfig =
+                        serde_json::from_value(config).map_err(|e| {
+                            ApiAuthError::Internal(format!(
+                                "Invalid org session policy config: {e}"
+                            ))
+                        })?;
+
+                    // Apply org overrides using most-restrictive logic
+                    Ok(TenantSessionPolicy {
+                        absolute_timeout_hours: tenant_policy
+                            .absolute_timeout_hours
+                            .min(org_config.max_duration_hours),
+                        idle_timeout_minutes: match (
+                            tenant_policy.idle_timeout_minutes,
+                            org_config.idle_timeout_minutes,
+                        ) {
+                            (0, 0) => 0,
+                            (0, m) | (m, 0) => m,
+                            (a, b) => a.min(b),
+                        },
+                        max_concurrent_sessions: match (
+                            tenant_policy.max_concurrent_sessions,
+                            org_config.concurrent_session_limit,
+                        ) {
+                            (0, 0) => 0,
+                            (0, l) | (l, 0) => l,
+                            (a, b) => a.min(b),
+                        },
+                        ..tenant_policy
+                    })
+                } else {
+                    Ok(tenant_policy)
+                }
+            }
+            Err(_) => {
+                // If org policy resolution fails, fall back to tenant policy
+                Ok(tenant_policy)
+            }
+        }
     }
 
     /// Update session policy for a tenant.

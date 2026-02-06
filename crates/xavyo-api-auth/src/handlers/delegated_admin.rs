@@ -329,6 +329,7 @@ pub async fn list_assignments(
     Query(query): Query<ListAssignmentsQuery>,
 ) -> Result<Json<AssignmentListResponse>, ApiAuthError> {
     let tenant_uuid = *tenant_id.as_uuid();
+    let query = query.validated();
 
     let filter = AssignmentFilter {
         user_id: query.user_id,
@@ -532,6 +533,7 @@ pub async fn get_audit_log(
     Query(query): Query<AuditLogQuery>,
 ) -> Result<Json<AuditLogResponse>, ApiAuthError> {
     let tenant_uuid = *tenant_id.as_uuid();
+    let query = query.validated();
 
     let filter = AuditLogFilter {
         admin_user_id: query.admin_user_id,

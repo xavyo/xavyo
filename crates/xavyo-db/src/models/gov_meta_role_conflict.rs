@@ -439,7 +439,7 @@ impl GovMetaRoleConflict {
     }
 
     /// Check if conflict is unresolved.
-    #[must_use] 
+    #[must_use]
     pub fn is_unresolved(&self) -> bool {
         self.resolution_status == ResolutionStatus::Unresolved
     }

@@ -28,7 +28,7 @@ pub enum IdempotentState {
 
 impl IdempotentState {
     /// Convert from database string representation.
-    #[must_use] 
+    #[must_use]
     pub fn from_db(s: &str) -> Option<Self> {
         match s {
             "processing" => Some(Self::Processing),
@@ -39,7 +39,7 @@ impl IdempotentState {
     }
 
     /// Convert to database string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Processing => "processing",
@@ -82,13 +82,13 @@ pub struct IdempotentRequest {
 
 impl IdempotentRequest {
     /// Get the typed state.
-    #[must_use] 
+    #[must_use]
     pub fn state(&self) -> IdempotentState {
         IdempotentState::from_db(&self.state).unwrap_or(IdempotentState::Processing)
     }
 
     /// Check if this request has timed out while processing.
-    #[must_use] 
+    #[must_use]
     pub fn is_processing_timed_out(&self) -> bool {
         if self.state() != IdempotentState::Processing {
             return false;
@@ -148,7 +148,9 @@ impl IdempotentRequest {
         .fetch_optional(pool)
         .await?;
 
-        if let Some(record) = inserted { Ok(InsertResult::Inserted(record)) } else {
+        if let Some(record) = inserted {
+            Ok(InsertResult::Inserted(record))
+        } else {
             // Conflict - fetch the existing record
             let existing = Self::find_by_key(pool, data.tenant_id, &data.idempotency_key)
                 .await?

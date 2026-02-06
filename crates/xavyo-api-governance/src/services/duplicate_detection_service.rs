@@ -77,7 +77,7 @@ pub struct DuplicateDetectionService {
 
 impl DuplicateDetectionService {
     /// Create a new duplicate detection service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -86,7 +86,7 @@ impl DuplicateDetectionService {
     }
 
     /// Create with custom fuzzy matching configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_fuzzy_config(pool: PgPool, fuzzy_config: FuzzyMatchConfig) -> Self {
         Self {
             pool,
@@ -316,7 +316,7 @@ impl DuplicateDetectionService {
     /// These rules compare standard user fields. Additional custom fields
     /// can be compared by providing custom `CorrelationRuleConfig` entries
     /// that reference `custom_attributes` keys.
-    #[must_use] 
+    #[must_use]
     pub fn default_rules() -> Vec<CorrelationRuleConfig> {
         vec![
             CorrelationRuleConfig {

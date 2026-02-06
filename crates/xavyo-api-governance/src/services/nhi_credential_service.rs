@@ -57,7 +57,7 @@ pub struct NhiCredentialService {
 
 impl NhiCredentialService {
     /// Create a new credential service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -699,9 +699,7 @@ impl NhiCredentialService {
             // Note: Using NhiRiskCalculationFailed as there's no generic internal error variant.
             // This error should never occur in practice (Argon2 only fails on OOM).
             .map_err(|e| {
-                GovernanceError::NhiRiskCalculationFailed(format!(
-                    "Credential hashing failed: {e}"
-                ))
+                GovernanceError::NhiRiskCalculationFailed(format!("Credential hashing failed: {e}"))
             })
     }
 

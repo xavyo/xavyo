@@ -30,7 +30,7 @@ pub enum ConnectionResult {
 
 impl ConnectionService {
     /// Create a new connection service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, encryption: EncryptionService) -> Self {
         Self { pool, encryption }
     }

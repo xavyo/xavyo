@@ -134,7 +134,7 @@ impl ScimClient {
     }
 
     /// Create a client with a pre-built `reqwest::Client` (for testing).
-    #[must_use] 
+    #[must_use]
     pub fn with_http_client(base_url: String, auth: ScimAuth, http_client: Client) -> Self {
         let base_url = base_url.trim_end_matches('/').to_string();
         Self {
@@ -151,13 +151,13 @@ impl ScimClient {
     }
 
     /// Whether the target supports PATCH operations.
-    #[must_use] 
+    #[must_use]
     pub fn patch_supported(&self) -> bool {
         self.patch_supported
     }
 
     /// Get the base URL.
-    #[must_use] 
+    #[must_use]
     pub fn base_url(&self) -> &str {
         &self.base_url
     }

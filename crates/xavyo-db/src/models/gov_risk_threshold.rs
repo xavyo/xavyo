@@ -23,13 +23,13 @@ pub enum AlertSeverity {
 
 impl AlertSeverity {
     /// Check if this is a critical severity.
-    #[must_use] 
+    #[must_use]
     pub fn is_critical(&self) -> bool {
         matches!(self, Self::Critical)
     }
 
     /// Check if this severity requires immediate attention.
-    #[must_use] 
+    #[must_use]
     pub fn requires_attention(&self) -> bool {
         matches!(self, Self::Warning | Self::Critical)
     }
@@ -51,13 +51,13 @@ pub enum ThresholdAction {
 
 impl ThresholdAction {
     /// Check if this action blocks access.
-    #[must_use] 
+    #[must_use]
     pub fn blocks_access(&self) -> bool {
         matches!(self, Self::Block)
     }
 
     /// Check if this action requires MFA.
-    #[must_use] 
+    #[must_use]
     pub fn requires_mfa(&self) -> bool {
         matches!(self, Self::RequireMfa | Self::Block)
     }

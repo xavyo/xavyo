@@ -27,7 +27,7 @@ pub struct EmailChangeService {
 
 impl EmailChangeService {
     /// Create a new email change service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -71,7 +71,7 @@ impl EmailChangeService {
 
         // Verify current password
         if !verify_password(current_password, &user.password_hash)
-            .map_err(|_| ApiAuthError::Internal("Password verification failed".to_string()))?
+            .map_err(|_| ApiAuthError::InvalidCredentials)?
         {
             warn!(
                 user_id = %user_id,

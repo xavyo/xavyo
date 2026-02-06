@@ -61,7 +61,7 @@ pub struct IssuedTokens {
 
 impl TokenIssuerService {
     /// Create a new token issuer service with configuration.
-    #[must_use] 
+    #[must_use]
     pub fn new(config: TokenIssuerConfig) -> Self {
         Self { config }
     }
@@ -70,7 +70,7 @@ impl TokenIssuerService {
     ///
     /// Note: This creates a service without a private key, which will fail
     /// when attempting to issue tokens. Use `new()` with proper config in production.
-    #[must_use] 
+    #[must_use]
     pub fn new_default() -> Self {
         Self {
             config: TokenIssuerConfig::default(),
@@ -78,7 +78,7 @@ impl TokenIssuerService {
     }
 
     /// Create with custom TTLs (legacy API for backward compatibility).
-    #[must_use] 
+    #[must_use]
     pub fn with_ttl(access_token_ttl: i64, refresh_token_ttl: i64) -> Self {
         Self {
             config: TokenIssuerConfig {
@@ -243,19 +243,19 @@ impl TokenIssuerService {
     }
 
     /// Get the configured issuer.
-    #[must_use] 
+    #[must_use]
     pub fn issuer(&self) -> &str {
         &self.config.issuer
     }
 
     /// Get the access token TTL in seconds.
-    #[must_use] 
+    #[must_use]
     pub fn access_token_ttl(&self) -> i64 {
         self.config.access_token_ttl
     }
 
     /// Get the refresh token TTL in seconds.
-    #[must_use] 
+    #[must_use]
     pub fn refresh_token_ttl(&self) -> i64 {
         self.config.refresh_token_ttl
     }

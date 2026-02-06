@@ -36,7 +36,7 @@ pub struct Provisioner {
 
 impl Provisioner {
     /// Create a new provisioner with the given database pool and retry policy.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, retry_policy: RetryPolicy) -> Self {
         Self { pool, retry_policy }
     }
@@ -233,8 +233,7 @@ impl Provisioner {
             .await?;
 
         if let Some(found_user) = existing {
-            let external_resource_id =
-                found_user.id.map(|id| id.to_string()).unwrap_or_default();
+            let external_resource_id = found_user.id.map(|id| id.to_string()).unwrap_or_default();
 
             // Link the existing resource by updating state.
             ScimProvisioningState::update_synced(
@@ -371,7 +370,9 @@ impl Provisioner {
         })?;
 
         // 2. Build SCIM patch from changed fields.
-        let patch = if let Some(p) = AttributeMapper::build_user_patch(changed_fields, mappings) { p } else {
+        let patch = if let Some(p) = AttributeMapper::build_user_patch(changed_fields, mappings) {
+            p
+        } else {
             info!(
                 tenant_id = %tenant_id,
                 user_id = %user_id,
@@ -441,7 +442,8 @@ impl Provisioner {
                         }
                         "displayName" => {
                             if let Some(ref v) = op.value {
-                                updated.display_name = v.as_str().map(std::string::ToString::to_string);
+                                updated.display_name =
+                                    v.as_str().map(std::string::ToString::to_string);
                             }
                         }
                         "userName" => {

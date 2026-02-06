@@ -15,7 +15,7 @@ pub struct SuspendTenantRequest {
 
 impl SuspendTenantRequest {
     /// Validate the request.
-    #[must_use] 
+    #[must_use]
     pub fn validate(&self) -> Option<String> {
         if self.reason.trim().is_empty() {
             return Some("reason is required".to_string());

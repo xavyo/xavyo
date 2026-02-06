@@ -98,7 +98,7 @@ pub struct IdTokenClaims {
 
 impl AuthFlowService {
     /// Create a new authorization flow service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, encryption: EncryptionService, callback_base_url: String) -> Self {
         Self {
             pool,
@@ -247,7 +247,7 @@ impl AuthFlowService {
             .await?;
 
         // Mark session as used
-        FederatedAuthSession::mark_used(&self.pool, session.id).await?;
+        FederatedAuthSession::mark_used(&self.pool, session.tenant_id, session.id).await?;
 
         tracing::info!(
             tenant_id = %session.tenant_id,

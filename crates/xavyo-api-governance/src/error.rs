@@ -102,6 +102,31 @@ pub enum ApiGovernanceError {
     #[error("SLA breach detected for task {0}")]
     SlaBreached(Uuid),
 
+    // Identity Archetype errors (F-058)
+    /// Identity archetype not found.
+    #[error("Identity archetype not found: {0}")]
+    ArchetypeNotFound(Uuid),
+
+    /// Archetype name already exists.
+    #[error("Archetype name already exists: {0}")]
+    ArchetypeNameExists(String),
+
+    /// Circular inheritance detected.
+    #[error("Circular inheritance detected: setting parent would create a cycle")]
+    CircularInheritance,
+
+    /// Cannot delete archetype with assigned users.
+    #[error("Cannot delete archetype: {count} users are assigned to archetype {id}")]
+    ArchetypeHasAssignedUsers { id: Uuid, count: i64 },
+
+    /// Invalid schema extension.
+    #[error("Invalid schema extension: {0}")]
+    InvalidSchemaExtension(String),
+
+    /// Invalid archetype custom attributes.
+    #[error("Invalid archetype custom attributes: {0}")]
+    InvalidArchetypeCustomAttrs(String),
+
     /// Conflict (duplicate resource).
     #[error("Conflict: {0}")]
     Conflict(String),
@@ -113,6 +138,31 @@ pub enum ApiGovernanceError {
     /// Database error.
     #[error("Database error")]
     Database(#[from] sqlx::Error),
+
+    // Bulk Action Engine errors (F-064)
+    /// Bulk action not found.
+    #[error("Bulk action not found: {0}")]
+    BulkActionNotFound(Uuid),
+
+    /// Invalid filter expression.
+    #[error("Invalid filter expression: {0}")]
+    InvalidExpression(String),
+
+    /// Bulk action already executed.
+    #[error("Bulk action already executed or cancelled: {0}")]
+    BulkActionAlreadyExecuted(Uuid),
+
+    /// Bulk action cannot be cancelled.
+    #[error("Bulk action cannot be cancelled (status: {status}): {id}")]
+    BulkActionCannotCancel { id: Uuid, status: String },
+
+    /// Bulk action cannot be cancelled (simple version).
+    #[error("Bulk action cannot be cancelled: {0}")]
+    BulkActionCannotBeCancelled(Uuid),
+
+    /// Bulk action cannot be deleted.
+    #[error("Bulk action cannot be deleted (status: {status}): {id}")]
+    BulkActionCannotDelete { id: Uuid, status: String },
 }
 
 impl IntoResponse for ApiGovernanceError {
@@ -159,16 +209,22 @@ impl IntoResponse for ApiGovernanceError {
                         | GovernanceError::PersonaExtensionExceedsMax { .. } => {
                             (StatusCode::BAD_REQUEST, "validation_error", e.to_string())
                         }
-                        GovernanceError::Database(_) => (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            "database_error",
-                            "Database error".to_string(),
-                        ),
-                        _ => (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            "internal_error",
-                            e.to_string(),
-                        ),
+                        GovernanceError::Database(ref db_err) => {
+                            tracing::error!("GovernanceError::Database: {:?}", db_err);
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                "database_error",
+                                "Database error".to_string(),
+                            )
+                        }
+                        _ => {
+                            tracing::error!("Unhandled governance error: {:?}", e);
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                "internal_error",
+                                "An internal error occurred".to_string(),
+                            )
+                        }
                     }
                 }
             }
@@ -238,9 +294,7 @@ impl IntoResponse for ApiGovernanceError {
             Self::ApplicationNotSemiManual(id) => (
                 StatusCode::BAD_REQUEST,
                 "application_not_semi_manual",
-                format!(
-                    "Application {id} is not configured for semi-manual provisioning"
-                ),
+                format!("Application {id} is not configured for semi-manual provisioning"),
             ),
             Self::TicketCreationFailed(msg) => (
                 StatusCode::BAD_GATEWAY,
@@ -255,16 +309,82 @@ impl IntoResponse for ApiGovernanceError {
                 "sla_breached",
                 format!("SLA breach detected for task {id}"),
             ),
-            Self::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg.clone()),
-            Self::Internal(msg) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "internal_error",
+            // Identity Archetype errors (F-058)
+            Self::ArchetypeNotFound(id) => (
+                StatusCode::NOT_FOUND,
+                "archetype_not_found",
+                format!("Identity archetype not found: {id}"),
+            ),
+            Self::ArchetypeNameExists(name) => (
+                StatusCode::CONFLICT,
+                "archetype_name_exists",
+                format!("Archetype name already exists: {name}"),
+            ),
+            Self::CircularInheritance => (
+                StatusCode::BAD_REQUEST,
+                "circular_inheritance",
+                "Circular inheritance detected: setting parent would create a cycle".to_string(),
+            ),
+            Self::ArchetypeHasAssignedUsers { id, count } => (
+                StatusCode::CONFLICT,
+                "archetype_has_assigned_users",
+                format!("Cannot delete archetype: {count} users are assigned to archetype {id}"),
+            ),
+            Self::InvalidSchemaExtension(msg) => (
+                StatusCode::BAD_REQUEST,
+                "invalid_schema_extension",
                 msg.clone(),
             ),
-            Self::Database(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "database_error",
-                "Database error".to_string(),
+            Self::InvalidArchetypeCustomAttrs(msg) => (
+                StatusCode::BAD_REQUEST,
+                "invalid_archetype_custom_attrs",
+                msg.clone(),
+            ),
+            Self::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg.clone()),
+            Self::Internal(msg) => {
+                tracing::error!("Internal error: {}", msg);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal_error",
+                    "An internal error occurred".to_string(),
+                )
+            }
+            Self::Database(ref e) => {
+                tracing::error!("Database error in governance: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "database_error",
+                    "Database error".to_string(),
+                )
+            }
+            // Bulk Action Engine errors (F-064)
+            Self::BulkActionNotFound(id) => (
+                StatusCode::NOT_FOUND,
+                "bulk_action_not_found",
+                format!("Bulk action not found: {id}"),
+            ),
+            Self::InvalidExpression(msg) => {
+                (StatusCode::BAD_REQUEST, "invalid_expression", msg.clone())
+            }
+            Self::BulkActionAlreadyExecuted(id) => (
+                StatusCode::BAD_REQUEST,
+                "bulk_action_already_executed",
+                format!("Bulk action already executed or cancelled: {id}"),
+            ),
+            Self::BulkActionCannotCancel { id, status } => (
+                StatusCode::BAD_REQUEST,
+                "bulk_action_cannot_cancel",
+                format!("Bulk action cannot be cancelled (status: {status}): {id}"),
+            ),
+            Self::BulkActionCannotDelete { id, status } => (
+                StatusCode::BAD_REQUEST,
+                "bulk_action_cannot_delete",
+                format!("Bulk action cannot be deleted (status: {status}): {id}"),
+            ),
+            Self::BulkActionCannotBeCancelled(id) => (
+                StatusCode::BAD_REQUEST,
+                "bulk_action_cannot_cancel",
+                format!("Bulk action cannot be cancelled: {id}"),
             ),
         };
 

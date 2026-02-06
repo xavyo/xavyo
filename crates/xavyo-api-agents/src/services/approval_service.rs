@@ -32,7 +32,7 @@ pub struct ApprovalService {
 
 impl ApprovalService {
     /// Create a new `ApprovalService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         pool: PgPool,
         audit_service: Arc<AuditService>,
@@ -92,12 +92,14 @@ impl ApprovalService {
                     AiAgent::find_by_id(&pool_clone, tenant_id, approval_clone.agent_id)
                         .await
                         .ok()
-                        .flatten().map_or_else(|| "unknown".to_string(), |a| a.name);
+                        .flatten()
+                        .map_or_else(|| "unknown".to_string(), |a| a.name);
 
                 let tool_name = AiTool::find_by_id(&pool_clone, tenant_id, approval_clone.tool_id)
                     .await
                     .ok()
-                    .flatten().map_or_else(|| "unknown".to_string(), |t| t.name);
+                    .flatten()
+                    .map_or_else(|| "unknown".to_string(), |t| t.name);
 
                 let payload = ApprovalWebhookPayload {
                     event: "approval_requested".to_string(),
@@ -161,10 +163,12 @@ impl ApprovalService {
         let mut summaries = Vec::with_capacity(approvals.len());
         for approval in approvals {
             let agent_name = AiAgent::find_by_id(&self.pool, tenant_id, approval.agent_id)
-                .await?.map_or_else(|| "unknown".to_string(), |a| a.name);
+                .await?
+                .map_or_else(|| "unknown".to_string(), |a| a.name);
 
             let tool_name = AiTool::find_by_id(&self.pool, tenant_id, approval.tool_id)
-                .await?.map_or_else(|| "unknown".to_string(), |t| t.name);
+                .await?
+                .map_or_else(|| "unknown".to_string(), |t| t.name);
 
             summaries.push(ApprovalSummary {
                 id: approval.id,
@@ -198,10 +202,12 @@ impl ApprovalService {
             .ok_or(ApiAgentsError::ApprovalNotFound)?;
 
         let agent_name = AiAgent::find_by_id(&self.pool, tenant_id, approval.agent_id)
-            .await?.map_or_else(|| "unknown".to_string(), |a| a.name);
+            .await?
+            .map_or_else(|| "unknown".to_string(), |a| a.name);
 
         let tool_name = AiTool::find_by_id(&self.pool, tenant_id, approval.tool_id)
-            .await?.map_or_else(|| "unknown".to_string(), |t| t.name);
+            .await?
+            .map_or_else(|| "unknown".to_string(), |t| t.name);
 
         Ok(self.to_response(approval, agent_name, tool_name))
     }
@@ -297,10 +303,12 @@ impl ApprovalService {
             .await;
 
         let agent_name = AiAgent::find_by_id(&self.pool, tenant_id, updated.agent_id)
-            .await?.map_or_else(|| "unknown".to_string(), |a| a.name);
+            .await?
+            .map_or_else(|| "unknown".to_string(), |a| a.name);
 
         let tool_name = AiTool::find_by_id(&self.pool, tenant_id, updated.tool_id)
-            .await?.map_or_else(|| "unknown".to_string(), |t| t.name);
+            .await?
+            .map_or_else(|| "unknown".to_string(), |t| t.name);
 
         Ok(self.to_response(updated, agent_name, tool_name))
     }
@@ -367,10 +375,12 @@ impl ApprovalService {
             .await;
 
         let agent_name = AiAgent::find_by_id(&self.pool, tenant_id, updated.agent_id)
-            .await?.map_or_else(|| "unknown".to_string(), |a| a.name);
+            .await?
+            .map_or_else(|| "unknown".to_string(), |a| a.name);
 
         let tool_name = AiTool::find_by_id(&self.pool, tenant_id, updated.tool_id)
-            .await?.map_or_else(|| "unknown".to_string(), |t| t.name);
+            .await?
+            .map_or_else(|| "unknown".to_string(), |t| t.name);
 
         Ok(self.to_response(updated, agent_name, tool_name))
     }

@@ -45,7 +45,7 @@ pub struct FederationConfig {
 
 impl FederationState {
     /// Create a new federation state.
-    #[must_use] 
+    #[must_use]
     pub fn new(config: &FederationConfig) -> Self {
         let encryption = EncryptionService::new(config.master_key);
         let idp_config = IdpConfigService::new(config.pool.clone(), encryption.clone());

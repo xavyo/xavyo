@@ -150,7 +150,7 @@ pub struct UnifiedCertificationService {
 
 impl UnifiedCertificationService {
     /// Creates a new `UnifiedCertificationService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

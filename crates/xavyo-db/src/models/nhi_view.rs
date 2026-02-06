@@ -60,25 +60,25 @@ pub struct NonHumanIdentityView {
 
 impl NonHumanIdentityView {
     /// Check if this is a service account.
-    #[must_use] 
+    #[must_use]
     pub fn is_service_account(&self) -> bool {
         self.nhi_type == "service_account"
     }
 
     /// Check if this is an AI agent.
-    #[must_use] 
+    #[must_use]
     pub fn is_ai_agent(&self) -> bool {
         self.nhi_type == "ai_agent"
     }
 
     /// Check if the identity is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         self.status == "active" || self.status == "Active"
     }
 
     /// Check if the identity has expired.
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         if let Some(expires) = self.expires_at {
             expires < Utc::now()
@@ -88,7 +88,7 @@ impl NonHumanIdentityView {
     }
 
     /// Check if certification is due within the given days.
-    #[must_use] 
+    #[must_use]
     pub fn certification_due_within_days(&self, days: i64) -> bool {
         if let Some(next_cert) = self.next_certification_at {
             let threshold = Utc::now() + chrono::Duration::days(days);
@@ -99,7 +99,7 @@ impl NonHumanIdentityView {
     }
 
     /// Get the risk level category.
-    #[must_use] 
+    #[must_use]
     pub fn risk_level(&self) -> &'static str {
         match self.risk_score {
             0..=25 => "low",
@@ -110,7 +110,7 @@ impl NonHumanIdentityView {
     }
 
     /// Check if the identity has been inactive for the given days.
-    #[must_use] 
+    #[must_use]
     pub fn inactive_for_days(&self, days: i64) -> bool {
         if let Some(last_activity) = self.last_activity_at {
             let threshold = Utc::now() - chrono::Duration::days(days);

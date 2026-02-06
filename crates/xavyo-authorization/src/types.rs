@@ -70,7 +70,7 @@ pub enum PolicyEffect {
 
 impl PolicyEffect {
     /// Parse from a string value (case-insensitive).
-    #[must_use] 
+    #[must_use]
     pub fn from_effect_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "allow" => PolicyEffect::Allow,

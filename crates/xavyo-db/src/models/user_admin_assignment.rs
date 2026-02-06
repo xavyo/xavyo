@@ -87,7 +87,7 @@ pub struct AssignmentFilter {
 
 impl UserAdminAssignment {
     /// Check if the assignment is currently active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         if self.revoked_at.is_some() {
             return false;
@@ -101,7 +101,7 @@ impl UserAdminAssignment {
     }
 
     /// Get the scope type as enum.
-    #[must_use] 
+    #[must_use]
     pub fn scope_type_enum(&self) -> Option<ScopeType> {
         self.scope_type.as_ref().and_then(|s| s.parse().ok())
     }

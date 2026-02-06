@@ -469,13 +469,13 @@ impl GovOutlierAlert {
     }
 
     /// Check if this is a critical alert.
-    #[must_use] 
+    #[must_use]
     pub fn is_critical(&self) -> bool {
         matches!(self.severity, OutlierAlertSeverity::Critical)
     }
 
     /// Check if this requires immediate attention.
-    #[must_use] 
+    #[must_use]
     pub fn requires_attention(&self) -> bool {
         !self.is_read && !self.is_dismissed
     }

@@ -307,7 +307,7 @@ impl OperationLog {
     }
 
     /// Check if operation was successful.
-    #[must_use] 
+    #[must_use]
     pub fn is_success(&self) -> bool {
         matches!(self.status, LogStatus::Success)
     }

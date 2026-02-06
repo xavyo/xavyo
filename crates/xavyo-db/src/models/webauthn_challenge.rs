@@ -111,6 +111,7 @@ impl WebAuthnChallenge {
     /// Find an active challenge by user ID and ceremony type.
     pub async fn find_active<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
         ceremony_type: CeremonyType,
     ) -> Result<Option<Self>, sqlx::Error>
@@ -120,12 +121,13 @@ impl WebAuthnChallenge {
         sqlx::query_as(
             r"
             SELECT * FROM webauthn_challenges
-            WHERE user_id = $1 AND ceremony_type = $2 AND expires_at > NOW()
+            WHERE user_id = $1 AND tenant_id = $2 AND ceremony_type = $3 AND expires_at > NOW()
             ORDER BY created_at DESC
             LIMIT 1
             ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .bind(ceremony_type.to_string())
         .fetch_optional(executor)
         .await
@@ -143,20 +145,23 @@ impl WebAuthnChallenge {
     }
 
     /// Delete a challenge after use (prevents replay).
-    pub async fn delete<'e, E>(executor: E, id: Uuid) -> Result<bool, sqlx::Error>
+    pub async fn delete<'e, E>(executor: E, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
-        let result = sqlx::query("DELETE FROM webauthn_challenges WHERE id = $1")
-            .bind(id)
-            .execute(executor)
-            .await?;
+        let result =
+            sqlx::query("DELETE FROM webauthn_challenges WHERE id = $1 AND tenant_id = $2")
+                .bind(id)
+                .bind(tenant_id)
+                .execute(executor)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 
     /// Delete all challenges for a user (cleanup on new ceremony start).
     pub async fn delete_by_user_and_type<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
         ceremony_type: CeremonyType,
     ) -> Result<u64, sqlx::Error>
@@ -164,9 +169,10 @@ impl WebAuthnChallenge {
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            "DELETE FROM webauthn_challenges WHERE user_id = $1 AND ceremony_type = $2",
+            "DELETE FROM webauthn_challenges WHERE user_id = $1 AND tenant_id = $2 AND ceremony_type = $3",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .bind(ceremony_type.to_string())
         .execute(executor)
         .await?;
@@ -187,6 +193,7 @@ impl WebAuthnChallenge {
     /// Check if a user has a pending challenge of a specific type.
     pub async fn has_pending<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
         ceremony_type: CeremonyType,
     ) -> Result<bool, sqlx::Error>
@@ -197,11 +204,12 @@ impl WebAuthnChallenge {
             r"
             SELECT EXISTS(
                 SELECT 1 FROM webauthn_challenges
-                WHERE user_id = $1 AND ceremony_type = $2 AND expires_at > NOW()
+                WHERE user_id = $1 AND tenant_id = $2 AND ceremony_type = $3 AND expires_at > NOW()
             )
             ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .bind(ceremony_type.to_string())
         .fetch_one(executor)
         .await?;

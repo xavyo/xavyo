@@ -57,12 +57,7 @@ ALTER TABLE gov_policy_simulations ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY tenant_isolation_policy_simulations ON gov_policy_simulations
     FOR ALL
-    USING (
-        tenant_id = COALESCE(
-            NULLIF(current_setting('app.current_tenant', TRUE), '')::uuid,
-            '00000000-0000-0000-0000-000000000000'::uuid
-        )
-    );
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- =============================================================================
 -- Policy Simulation Results Table (per-user details)
@@ -122,12 +117,7 @@ ALTER TABLE gov_batch_simulations ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY tenant_isolation_batch_simulations ON gov_batch_simulations
     FOR ALL
-    USING (
-        tenant_id = COALESCE(
-            NULLIF(current_setting('app.current_tenant', TRUE), '')::uuid,
-            '00000000-0000-0000-0000-000000000000'::uuid
-        )
-    );
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- =============================================================================
 -- Batch Simulation Results Table (per-user details)
@@ -176,12 +166,7 @@ ALTER TABLE gov_simulation_comparisons ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY tenant_isolation_simulation_comparisons ON gov_simulation_comparisons
     FOR ALL
-    USING (
-        tenant_id = COALESCE(
-            NULLIF(current_setting('app.current_tenant', TRUE), '')::uuid,
-            '00000000-0000-0000-0000-000000000000'::uuid
-        )
-    );
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- =============================================================================
 -- Comments for documentation

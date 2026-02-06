@@ -1137,13 +1137,13 @@ pub enum NhiCertificationStatus {
 
 impl NhiCertificationStatus {
     /// Check if this status represents a final decision.
-    #[must_use] 
+    #[must_use]
     pub fn is_decided(&self) -> bool {
         !matches!(self, Self::Pending)
     }
 
     /// Check if this status represents a certified (approved) NHI.
-    #[must_use] 
+    #[must_use]
     pub fn is_certified(&self) -> bool {
         matches!(self, Self::Certified)
     }
@@ -1163,7 +1163,7 @@ pub enum NhiCertificationDecision {
 
 impl NhiCertificationDecision {
     /// Check if this decision is an approval.
-    #[must_use] 
+    #[must_use]
     pub fn is_approval(&self) -> bool {
         matches!(self, Self::Certify)
     }
@@ -1244,7 +1244,7 @@ pub struct NhiCertificationSummary {
 
 impl NhiCertificationSummary {
     /// Calculate completion rate as percentage.
-    #[must_use] 
+    #[must_use]
     pub fn completion_rate(&self) -> f64 {
         if self.total == 0 {
             0.0
@@ -1476,7 +1476,7 @@ pub enum NhiCertCampaignStatus {
 
 impl NhiCertCampaignStatus {
     /// Check if this campaign can be cancelled.
-    #[must_use] 
+    #[must_use]
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::Draft | Self::Active | Self::Overdue)
     }

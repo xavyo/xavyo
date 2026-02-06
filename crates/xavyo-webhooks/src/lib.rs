@@ -1,4 +1,6 @@
 //! Webhook delivery system for identity lifecycle event subscriptions.
+// TODO: Upgrade generic-array to 1.x when aes-gcm supports it
+#![allow(deprecated)]
 //!
 //! Provides tenant-scoped webhook subscription management, async delivery with
 //! HMAC-SHA256 signing, exponential backoff retries, and delivery tracking.

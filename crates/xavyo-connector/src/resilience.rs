@@ -49,7 +49,7 @@ pub struct CircuitBreaker {
 
 impl CircuitBreaker {
     /// Create a new circuit breaker with the given configuration.
-    #[must_use] 
+    #[must_use]
     pub fn new(connector_id: ConnectorId, config: CircuitBreakerConfig) -> Self {
         Self {
             connector_id,
@@ -62,7 +62,7 @@ impl CircuitBreaker {
     }
 
     /// Create a new circuit breaker with default configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_defaults(connector_id: ConnectorId) -> Self {
         Self::new(connector_id, CircuitBreakerConfig::default())
     }
@@ -253,13 +253,13 @@ pub struct RetryExecutor {
 
 impl RetryExecutor {
     /// Create a new retry executor with the given configuration.
-    #[must_use] 
+    #[must_use]
     pub fn new(config: RetryConfig) -> Self {
         Self { config }
     }
 
     /// Create a new retry executor with default configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_defaults() -> Self {
         Self::new(RetryConfig::default())
     }

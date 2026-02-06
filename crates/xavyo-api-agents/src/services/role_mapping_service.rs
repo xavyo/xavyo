@@ -22,7 +22,7 @@ pub struct RoleMappingService {
 
 impl RoleMappingService {
     /// Create a new role mapping service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, audit_service: IdentityAuditService) -> Self {
         Self {
             pool,
@@ -249,7 +249,7 @@ impl RoleMappingService {
     /// Get the effective TTL for a mapping request.
     ///
     /// Clamps the requested TTL to the mapping's max TTL.
-    #[must_use] 
+    #[must_use]
     pub fn get_effective_ttl(&self, mapping: &IamRoleMapping, requested_ttl: i32) -> i32 {
         requested_ttl
             .max(900) // Minimum 15 minutes

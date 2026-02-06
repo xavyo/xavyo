@@ -351,9 +351,7 @@ impl DynamicSecretProvider for OpenBaoSecretProvider {
             .await
             .map_err(|e| SecretError::ProviderUnavailable {
                 provider: "openbao".to_string(),
-                detail: format!(
-                    "Failed to generate credentials for role '{role_name}': {e}"
-                ),
+                detail: format!("Failed to generate credentials for role '{role_name}': {e}"),
             })?;
 
         if resp.status() == reqwest::StatusCode::NOT_FOUND {

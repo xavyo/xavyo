@@ -52,6 +52,16 @@ pub struct GovLifecycleState {
     /// Display order position.
     pub position: i32,
 
+    /// Actions to execute when entering this state.
+    /// Format: [{"type": "disable_access", "config": {}}]
+    #[sqlx(default)]
+    pub entry_actions: Option<serde_json::Value>,
+
+    /// Actions to execute when leaving this state.
+    /// Format: [{"type": "notify_manager", "config": {}}]
+    #[sqlx(default)]
+    pub exit_actions: Option<serde_json::Value>,
+
     /// When the state was created.
     pub created_at: DateTime<Utc>,
 }
@@ -354,5 +364,49 @@ impl GovLifecycleState {
         .await?;
 
         Ok(result.rows_affected() > 0)
+    }
+
+    /// Get entry and exit actions for a state.
+    pub async fn get_actions(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<(Option<serde_json::Value>, Option<serde_json::Value>)>, sqlx::Error> {
+        sqlx::query_as::<_, (Option<serde_json::Value>, Option<serde_json::Value>)>(
+            r"
+            SELECT entry_actions, exit_actions FROM gov_lifecycle_states
+            WHERE id = $1 AND tenant_id = $2
+            ",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Update entry and exit actions for a state.
+    pub async fn update_actions(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+        entry_actions: Option<&serde_json::Value>,
+        exit_actions: Option<&serde_json::Value>,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            UPDATE gov_lifecycle_states
+            SET
+                entry_actions = COALESCE($3, entry_actions),
+                exit_actions = COALESCE($4, exit_actions)
+            WHERE id = $1 AND tenant_id = $2
+            RETURNING *
+            ",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .bind(entry_actions)
+        .bind(exit_actions)
+        .fetch_optional(pool)
+        .await
     }
 }

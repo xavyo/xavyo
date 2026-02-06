@@ -15,7 +15,7 @@ pub struct SyslogFormatter {
 }
 
 impl SyslogFormatter {
-    #[must_use] 
+    #[must_use]
     pub fn new(facility: u8, hostname: Option<String>) -> Self {
         Self {
             facility,

@@ -64,6 +64,9 @@ pub async fn create_risk_factor(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateRiskFactorRequest>,
 ) -> ApiResult<(StatusCode, Json<RiskFactorResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -130,6 +133,9 @@ pub async fn update_risk_factor(
     Path(factor_id): Path<Uuid>,
     Json(request): Json<UpdateRiskFactorRequest>,
 ) -> ApiResult<Json<RiskFactorResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -164,6 +170,9 @@ pub async fn delete_risk_factor(
     Extension(claims): Extension<JwtClaims>,
     Path(factor_id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -198,6 +207,9 @@ pub async fn enable_risk_factor(
     Extension(claims): Extension<JwtClaims>,
     Path(factor_id): Path<Uuid>,
 ) -> ApiResult<Json<RiskFactorResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -232,6 +244,9 @@ pub async fn disable_risk_factor(
     Extension(claims): Extension<JwtClaims>,
     Path(factor_id): Path<Uuid>,
 ) -> ApiResult<Json<RiskFactorResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

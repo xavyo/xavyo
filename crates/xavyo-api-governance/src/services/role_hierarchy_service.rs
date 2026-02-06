@@ -24,7 +24,7 @@ pub struct RoleHierarchyService {
 
 impl RoleHierarchyService {
     /// Create a new role hierarchy service with default max depth.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -33,7 +33,7 @@ impl RoleHierarchyService {
     }
 
     /// Create a new role hierarchy service with custom max depth.
-    #[must_use] 
+    #[must_use]
     pub fn with_max_depth(pool: PgPool, max_depth: i32) -> Self {
         Self { pool, max_depth }
     }

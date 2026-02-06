@@ -59,7 +59,7 @@ pub enum SlaMonitoringJobError {
 
 impl SlaMonitoringJob {
     /// Create a new SLA monitoring job.
-    #[must_use] 
+    #[must_use]
     pub fn new(monitoring_service: SlaMonitoringService) -> Self {
         Self {
             monitoring_service: Arc::new(monitoring_service),

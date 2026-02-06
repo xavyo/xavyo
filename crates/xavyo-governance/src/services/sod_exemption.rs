@@ -71,7 +71,7 @@ pub struct SodExemption {
 
 impl SodExemption {
     /// Check if the exemption is currently valid.
-    #[must_use] 
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         if self.status != SodExemptionStatus::Active {
             return false;
@@ -162,7 +162,7 @@ pub struct InMemorySodExemptionStore {
 
 impl InMemorySodExemptionStore {
     /// Create a new in-memory store.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             exemptions: Arc::new(RwLock::new(HashMap::new())),

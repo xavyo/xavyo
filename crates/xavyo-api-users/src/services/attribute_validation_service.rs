@@ -19,7 +19,7 @@ pub enum AttributeDataType {
 
 impl AttributeDataType {
     /// Parse data type from string.
-    #[must_use] 
+    #[must_use]
     pub fn parse(s: &str) -> Option<Self> {
         match s {
             "string" => Some(Self::String),
@@ -80,7 +80,9 @@ impl AttributeValidationService {
         }
 
         // Attributes must be an object
-        let attrs = if let Some(obj) = attributes.as_object() { obj } else {
+        let attrs = if let Some(obj) = attributes.as_object() {
+            obj
+        } else {
             errors.push(AttributeFieldError {
                 attribute: "*".to_string(),
                 error: "Custom attributes must be a JSON object".to_string(),
@@ -124,7 +126,9 @@ impl AttributeValidationService {
                     continue;
                 }
 
-                let data_type = if let Some(dt) = AttributeDataType::parse(&def.data_type) { dt } else {
+                let data_type = if let Some(dt) = AttributeDataType::parse(&def.data_type) {
+                    dt
+                } else {
                     errors.push(AttributeFieldError {
                         attribute: def.name.clone(),
                         error: format!("Unknown data type '{}' in definition", def.data_type),
@@ -221,7 +225,10 @@ impl AttributeValidationService {
         if *data_type == AttributeDataType::String || *data_type == AttributeDataType::Date {
             if let Some(s) = value.as_str() {
                 // max_length
-                if let Some(max) = rules_obj.get("max_length").and_then(serde_json::Value::as_u64) {
+                if let Some(max) = rules_obj
+                    .get("max_length")
+                    .and_then(serde_json::Value::as_u64)
+                {
                     if s.len() as u64 > max {
                         errors.push(AttributeFieldError {
                             attribute: name.to_string(),
@@ -236,7 +243,10 @@ impl AttributeValidationService {
                 }
 
                 // min_length
-                if let Some(min) = rules_obj.get("min_length").and_then(serde_json::Value::as_u64) {
+                if let Some(min) = rules_obj
+                    .get("min_length")
+                    .and_then(serde_json::Value::as_u64)
+                {
                     if (s.len() as u64) < min {
                         errors.push(AttributeFieldError {
                             attribute: name.to_string(),
@@ -310,7 +320,8 @@ impl AttributeValidationService {
                 let allowed_strs: Vec<String> = allowed
                     .iter()
                     .map(|v| {
-                        v.as_str().map_or_else(|| v.to_string(), std::string::ToString::to_string)
+                        v.as_str()
+                            .map_or_else(|| v.to_string(), std::string::ToString::to_string)
                     })
                     .collect();
                 errors.push(AttributeFieldError {

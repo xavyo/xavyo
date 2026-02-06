@@ -156,19 +156,19 @@ impl AiAgentAuditEvent {
     }
 
     /// Returns the decision as an enum, if present.
-    #[must_use] 
+    #[must_use]
     pub fn decision_enum(&self) -> Option<Result<AiAuditDecision, String>> {
         self.decision.as_ref().map(|d| d.parse())
     }
 
     /// Returns the outcome as an enum, if present.
-    #[must_use] 
+    #[must_use]
     pub fn outcome_enum(&self) -> Option<Result<AiAuditOutcome, String>> {
         self.outcome.as_ref().map(|o| o.parse())
     }
 
     /// Get the source IP as parsed `IpAddr` (if present and valid).
-    #[must_use] 
+    #[must_use]
     pub fn source_ip_addr(&self) -> Option<IpAddr> {
         self.source_ip.as_ref().and_then(|s| s.parse().ok())
     }

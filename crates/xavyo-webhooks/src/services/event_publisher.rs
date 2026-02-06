@@ -24,7 +24,7 @@ pub struct EventPublisher {
 
 impl EventPublisher {
     /// Create a new event publisher with the given channel capacity.
-    #[must_use] 
+    #[must_use]
     pub fn new(capacity: usize) -> (Self, tokio::sync::broadcast::Receiver<WebhookEvent>) {
         let (sender, receiver) = tokio::sync::broadcast::channel(capacity);
         (Self { sender }, receiver)
@@ -42,7 +42,7 @@ impl EventPublisher {
     }
 
     /// Get a new receiver for the broadcast channel.
-    #[must_use] 
+    #[must_use]
     pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<WebhookEvent> {
         self.sender.subscribe()
     }

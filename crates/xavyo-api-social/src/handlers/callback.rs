@@ -230,7 +230,6 @@ async fn process_callback(
     info!(
         provider = %provider_type,
         provider_user_id = %user_info.provider_user_id,
-        email = ?user_info.email,
         "Retrieved user info from provider"
     );
 
@@ -262,8 +261,7 @@ async fn process_callback(
             .redirect_after
             .unwrap_or_else(|| format!("{}/settings", state.frontend_url));
         return Ok(
-            Redirect::temporary(&format!("{redirect_url}?linked={provider_type}"))
-                .into_response(),
+            Redirect::temporary(&format!("{redirect_url}?linked={provider_type}")).into_response(),
         );
     }
 
@@ -390,8 +388,10 @@ fn redirect_with_tokens(
     redirect_after: &Option<String>,
     tokens: &JwtTokens,
 ) -> Response {
-    let base = redirect_after
-        .as_ref().map_or_else(|| format!("{frontend_url}/"), |r| format!("{frontend_url}{r}"));
+    let base = redirect_after.as_ref().map_or_else(
+        || format!("{frontend_url}/"),
+        |r| format!("{frontend_url}{r}"),
+    );
 
     // Use fragment (#) instead of query (?) for token security
     let url = format!(

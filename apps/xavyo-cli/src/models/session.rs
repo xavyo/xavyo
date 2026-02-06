@@ -43,9 +43,7 @@ impl Session {
         // Decode the payload (second part)
         let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
             .decode(parts[1])
-            .map_err(|e| {
-                CliError::AuthenticationFailed(format!("Invalid token encoding: {e}"))
-            })?;
+            .map_err(|e| CliError::AuthenticationFailed(format!("Invalid token encoding: {e}")))?;
 
         let claims: JwtClaims = serde_json::from_slice(&payload)
             .map_err(|e| CliError::AuthenticationFailed(format!("Invalid token claims: {e}")))?;

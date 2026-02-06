@@ -92,7 +92,7 @@ pub enum MfaMethod {
 
 impl MfaRequiredResponse {
     /// Create a new MFA required response.
-    #[must_use] 
+    #[must_use]
     pub fn new(partial_token: String, expires_in: i64) -> Self {
         Self {
             partial_token,
@@ -103,7 +103,7 @@ impl MfaRequiredResponse {
     }
 
     /// Create a new MFA required response with specific methods.
-    #[must_use] 
+    #[must_use]
     pub fn with_methods(partial_token: String, expires_in: i64, methods: Vec<MfaMethod>) -> Self {
         Self {
             partial_token,

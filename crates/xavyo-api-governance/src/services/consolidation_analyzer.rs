@@ -45,7 +45,7 @@ pub struct ConsolidationAnalyzer {
 
 impl ConsolidationAnalyzer {
     /// Create a new consolidation analyzer.
-    #[must_use] 
+    #[must_use]
     pub fn new(params: MiningJobParameters) -> Self {
         Self { params }
     }
@@ -53,7 +53,7 @@ impl ConsolidationAnalyzer {
     /// Calculate Jaccard similarity between two sets.
     ///
     /// Jaccard(A, B) = |A ∩ B| / |A ∪ B|
-    #[must_use] 
+    #[must_use]
     pub fn calculate_jaccard_similarity(set_a: &HashSet<Uuid>, set_b: &HashSet<Uuid>) -> f64 {
         if set_a.is_empty() && set_b.is_empty() {
             return 0.0;
@@ -129,7 +129,7 @@ impl ConsolidationAnalyzer {
     }
 
     /// Convert suggestions to database creation requests.
-    #[must_use] 
+    #[must_use]
     pub fn suggestions_to_create_requests(
         &self,
         job_id: Uuid,

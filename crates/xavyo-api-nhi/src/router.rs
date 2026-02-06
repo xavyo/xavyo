@@ -107,7 +107,7 @@ pub struct NhiAppState {
 
 impl NhiAppState {
     /// Creates a new `NhiAppState` with the given database pool.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             list_service: UnifiedListService::new(pool.clone()),

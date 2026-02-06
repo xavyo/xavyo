@@ -106,7 +106,7 @@ fn default_limit() -> i32 {
 }
 
 /// SAML Response auto-submit form HTML
-#[must_use] 
+#[must_use]
 pub fn generate_auto_submit_form(
     acs_url: &str,
     saml_response: &str,

@@ -22,7 +22,7 @@ pub struct SyslogTcpWorker {
 }
 
 impl SyslogTcpWorker {
-    #[must_use] 
+    #[must_use]
     pub fn new(host: String, port: u16, tls_verify_cert: bool) -> Self {
         Self {
             host,

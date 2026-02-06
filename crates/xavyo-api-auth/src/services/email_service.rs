@@ -208,7 +208,7 @@ pub struct SmtpEmailSender {
 
 impl SmtpEmailSender {
     /// Create a new SMTP email sender.
-    #[must_use] 
+    #[must_use]
     pub fn new(config: EmailConfig) -> Self {
         Self { config }
     }
@@ -518,7 +518,7 @@ pub struct MockEmailSender {
 
 impl MockEmailSender {
     /// Create a new mock email sender.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -529,25 +529,25 @@ impl MockEmailSender {
     }
 
     /// Get all password reset emails sent.
-    #[must_use] 
+    #[must_use]
     pub fn get_password_resets(&self) -> Vec<(String, String, TenantId)> {
         self.password_resets.lock().clone()
     }
 
     /// Get all verification emails sent.
-    #[must_use] 
+    #[must_use]
     pub fn get_verifications(&self) -> Vec<(String, String, TenantId)> {
         self.verifications.lock().clone()
     }
 
     /// Get all magic link emails sent.
-    #[must_use] 
+    #[must_use]
     pub fn get_magic_links(&self) -> Vec<(String, String, TenantId)> {
         self.magic_links.lock().clone()
     }
 
     /// Get all email OTP emails sent.
-    #[must_use] 
+    #[must_use]
     pub fn get_email_otps(&self) -> Vec<(String, String, TenantId)> {
         self.email_otps.lock().clone()
     }
@@ -561,7 +561,7 @@ impl MockEmailSender {
     }
 
     /// Get the last password reset token sent to a specific email.
-    #[must_use] 
+    #[must_use]
     pub fn get_last_reset_token(&self, email: &str) -> Option<String> {
         self.password_resets
             .lock()
@@ -572,7 +572,7 @@ impl MockEmailSender {
     }
 
     /// Get the last verification token sent to a specific email.
-    #[must_use] 
+    #[must_use]
     pub fn get_last_verification_token(&self, email: &str) -> Option<String> {
         self.verifications
             .lock()

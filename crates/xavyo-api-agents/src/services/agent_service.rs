@@ -23,7 +23,7 @@ pub struct AgentService {
 
 impl AgentService {
     /// Create a new `AgentService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -424,7 +424,8 @@ impl AgentService {
             return Err(ApiAgentsError::AgentNotActive);
         }
 
-        let grace_period_ends_at = chrono::Utc::now() + chrono::Duration::days(i64::from(grace_days));
+        let grace_period_ends_at =
+            chrono::Utc::now() + chrono::Duration::days(i64::from(grace_days));
 
         let input = UpdateAiAgent {
             grace_period_ends_at: Some(Some(grace_period_ends_at)),

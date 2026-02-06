@@ -171,7 +171,7 @@ pub enum OAuthError {
 
 impl OAuthError {
     /// Get the HTTP status code for this error.
-    #[must_use] 
+    #[must_use]
     pub fn status_code(&self) -> StatusCode {
         match self {
             Self::InvalidRequest(_) => StatusCode::BAD_REQUEST,
@@ -196,7 +196,7 @@ impl OAuthError {
     }
 
     /// Get the `OAuth2` error code for this error.
-    #[must_use] 
+    #[must_use]
     pub fn error_code(&self) -> OAuthErrorCode {
         match self {
             Self::InvalidRequest(_) => OAuthErrorCode::InvalidRequest,
@@ -218,7 +218,7 @@ impl OAuthError {
     }
 
     /// Convert to `OAuth2` error response.
-    #[must_use] 
+    #[must_use]
     pub fn to_response(&self) -> OAuthErrorResponse {
         OAuthErrorResponse::new(self.error_code(), self.to_string())
     }

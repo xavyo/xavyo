@@ -23,7 +23,7 @@ pub enum TriggeredBy {
 
 impl TriggeredBy {
     /// Get the string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             TriggeredBy::Manual => "manual",
@@ -33,7 +33,7 @@ impl TriggeredBy {
     }
 
     /// Parse from string.
-    #[must_use] 
+    #[must_use]
     pub fn parse_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "manual" => Some(TriggeredBy::Manual),
@@ -316,7 +316,7 @@ impl ConnectorSchemaVersion {
     }
 
     /// Convert to summary.
-    #[must_use] 
+    #[must_use]
     pub fn to_summary(&self) -> SchemaVersionSummary {
         SchemaVersionSummary {
             version: self.version,

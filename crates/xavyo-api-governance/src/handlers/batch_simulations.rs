@@ -5,6 +5,7 @@ use axum::{
     Extension, Json,
 };
 use uuid::Uuid;
+use validator::Validate;
 
 use xavyo_auth::JwtClaims;
 
@@ -78,7 +79,7 @@ pub async fn list_batch_simulations(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(20).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (simulations, total) = state
         .batch_simulation_service
@@ -93,7 +94,10 @@ pub async fn list_batch_simulations(
         )
         .await?;
 
-    let items: Vec<BatchSimulationResponse> = simulations.into_iter().map(std::convert::Into::into).collect();
+    let items: Vec<BatchSimulationResponse> = simulations
+        .into_iter()
+        .map(std::convert::Into::into)
+        .collect();
 
     Ok(Json(PaginatedResponse {
         items,
@@ -212,6 +216,7 @@ pub async fn apply_batch_simulation(
     Path(simulation_id): Path<Uuid>,
     Json(request): Json<ApplyBatchSimulationRequest>,
 ) -> ApiResult<Json<BatchSimulationResponse>> {
+    request.validate()?;
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -358,6 +363,7 @@ pub async fn update_batch_simulation_notes(
     Path(simulation_id): Path<Uuid>,
     Json(request): Json<UpdateNotesRequest>,
 ) -> ApiResult<Json<BatchSimulationResponse>> {
+    request.validate()?;
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -400,7 +406,7 @@ pub async fn get_batch_simulation_results(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(20).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (results, total) = state
         .batch_simulation_service
@@ -414,7 +420,8 @@ pub async fn get_batch_simulation_results(
         )
         .await?;
 
-    let items: Vec<BatchSimulationResultResponse> = results.into_iter().map(std::convert::Into::into).collect();
+    let items: Vec<BatchSimulationResultResponse> =
+        results.into_iter().map(std::convert::Into::into).collect();
 
     Ok(Json(PaginatedResponse {
         items,

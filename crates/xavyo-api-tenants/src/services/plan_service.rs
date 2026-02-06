@@ -25,7 +25,7 @@ pub struct PlanService {
 
 impl PlanService {
     /// Create a new plan service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -389,7 +389,9 @@ impl PlanService {
 
         for change in due_changes {
             // Parse the new tier
-            let new_tier: PlanTier = if let Ok(tier) = change.new_plan.parse() { tier } else {
+            let new_tier: PlanTier = if let Ok(tier) = change.new_plan.parse() {
+                tier
+            } else {
                 tracing::error!(
                     change_id = %change.id,
                     new_plan = %change.new_plan,

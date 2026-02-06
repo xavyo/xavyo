@@ -112,7 +112,7 @@ pub enum TicketStatus {
 
 impl TicketStatus {
     /// Check if this status represents a terminal state.
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
@@ -121,13 +121,13 @@ impl TicketStatus {
     }
 
     /// Check if this status represents successful completion.
-    #[must_use] 
+    #[must_use]
     pub fn is_success(&self) -> bool {
         matches!(self, TicketStatus::Resolved)
     }
 
     /// Get the string representation of this status.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
             TicketStatus::Open => "open",
@@ -223,13 +223,13 @@ pub struct TicketingService {
 
 impl TicketingService {
     /// Create a new ticketing service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -283,9 +283,7 @@ impl TicketingService {
         let config =
             GovTicketingConfiguration::find_by_id(&self.pool, tenant_id, ticketing_config_id)
                 .await
-                .map_err(|e| {
-                    TicketingError::InvalidConfiguration(format!("Database error: {e}"))
-                })?
+                .map_err(|e| TicketingError::InvalidConfiguration(format!("Database error: {e}")))?
                 .ok_or_else(|| {
                     TicketingError::InvalidConfiguration(format!(
                         "Ticketing configuration {ticketing_config_id} not found"

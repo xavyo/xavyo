@@ -442,37 +442,37 @@ impl GovTemplateRule {
     }
 
     /// Check if rule is for validation.
-    #[must_use] 
+    #[must_use]
     pub fn is_validation(&self) -> bool {
         self.rule_type == TemplateRuleType::Validation
     }
 
     /// Check if rule is for computed values.
-    #[must_use] 
+    #[must_use]
     pub fn is_computed(&self) -> bool {
         self.rule_type == TemplateRuleType::Computed
     }
 
     /// Check if rule is for defaults.
-    #[must_use] 
+    #[must_use]
     pub fn is_default(&self) -> bool {
         self.rule_type == TemplateRuleType::Default
     }
 
     /// Check if rule is for normalization.
-    #[must_use] 
+    #[must_use]
     pub fn is_normalization(&self) -> bool {
         self.rule_type == TemplateRuleType::Normalization
     }
 
     /// Check if rule has strong strength.
-    #[must_use] 
+    #[must_use]
     pub fn is_strong(&self) -> bool {
         self.strength == TemplateStrength::Strong
     }
 
     /// Check if rule has weak strength.
-    #[must_use] 
+    #[must_use]
     pub fn is_weak(&self) -> bool {
         self.strength == TemplateStrength::Weak
     }

@@ -29,7 +29,7 @@ pub struct BulkOperationService {
 
 impl BulkOperationService {
     /// Create a new bulk operation service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, state_transition_service: Arc<StateTransitionService>) -> Self {
         Self {
             pool,
@@ -112,7 +112,10 @@ impl BulkOperationService {
         let total = GovBulkStateOperation::count_by_tenant(&self.pool, tenant_id, &filter).await?;
 
         Ok(BulkOperationListResponse {
-            items: operations.into_iter().map(std::convert::Into::into).collect(),
+            items: operations
+                .into_iter()
+                .map(std::convert::Into::into)
+                .collect(),
             total,
             limit,
             offset,

@@ -50,7 +50,7 @@ pub struct PatternAnalyzer {
 
 impl PatternAnalyzer {
     /// Create a new pattern analyzer with the given parameters.
-    #[must_use] 
+    #[must_use]
     pub fn new(params: MiningJobParameters) -> Self {
         Self { params }
     }
@@ -151,7 +151,7 @@ impl PatternAnalyzer {
     }
 
     /// Convert analyzed patterns to database creation requests.
-    #[must_use] 
+    #[must_use]
     pub fn patterns_to_create_requests(
         &self,
         job_id: Uuid,
@@ -170,7 +170,7 @@ impl PatternAnalyzer {
     }
 
     /// Convert discovered candidates to database creation requests.
-    #[must_use] 
+    #[must_use]
     pub fn candidates_to_create_requests(
         &self,
         job_id: Uuid,

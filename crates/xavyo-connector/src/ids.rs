@@ -14,19 +14,19 @@ pub struct ConnectorId(Uuid);
 
 impl ConnectorId {
     /// Create a new random `ConnectorId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Create a `ConnectorId` from an existing UUID.
-    #[must_use] 
+    #[must_use]
     pub fn from_uuid(uuid: Uuid) -> Self {
         Self(uuid)
     }
 
     /// Get the inner UUID value.
-    #[must_use] 
+    #[must_use]
     pub fn as_uuid(&self) -> Uuid {
         self.0
     }
@@ -76,19 +76,19 @@ pub struct OperationId(Uuid);
 
 impl OperationId {
     /// Create a new random `OperationId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Create an `OperationId` from an existing UUID.
-    #[must_use] 
+    #[must_use]
     pub fn from_uuid(uuid: Uuid) -> Self {
         Self(uuid)
     }
 
     /// Get the inner UUID value.
-    #[must_use] 
+    #[must_use]
     pub fn as_uuid(&self) -> Uuid {
         self.0
     }
@@ -138,19 +138,19 @@ pub struct SchemaId(Uuid);
 
 impl SchemaId {
     /// Create a new random `SchemaId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Create a `SchemaId` from an existing UUID.
-    #[must_use] 
+    #[must_use]
     pub fn from_uuid(uuid: Uuid) -> Self {
         Self(uuid)
     }
 
     /// Get the inner UUID value.
-    #[must_use] 
+    #[must_use]
     pub fn as_uuid(&self) -> Uuid {
         self.0
     }
@@ -200,19 +200,19 @@ pub struct MappingId(Uuid);
 
 impl MappingId {
     /// Create a new random `MappingId`.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
     /// Create a `MappingId` from an existing UUID.
-    #[must_use] 
+    #[must_use]
     pub fn from_uuid(uuid: Uuid) -> Self {
         Self(uuid)
     }
 
     /// Get the inner UUID value.
-    #[must_use] 
+    #[must_use]
     pub fn as_uuid(&self) -> Uuid {
         self.0
     }

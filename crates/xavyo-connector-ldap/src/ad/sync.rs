@@ -38,13 +38,13 @@ impl UsnCheckpoint {
     }
 
     /// Serialize to JSON string for storage as sync token.
-    #[must_use] 
+    #[must_use]
     pub fn to_token(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
     }
 
     /// Parse from a sync token string.
-    #[must_use] 
+    #[must_use]
     pub fn from_token(token: &str) -> Option<Self> {
         serde_json::from_str(token).ok()
     }
@@ -54,15 +54,13 @@ impl UsnCheckpoint {
     /// Combines with the base user or group filter using AND.
     ///
     /// SECURITY: The USN value is escaped to prevent LDAP injection attacks.
-    #[must_use] 
+    #[must_use]
     pub fn incremental_filter(&self, base_filter: &str, attribute: &str) -> String {
         // SECURITY: Escape the USN value to prevent LDAP injection.
         // While USN values from AD should be numeric, we escape them anyway
         // to protect against any potential manipulation of stored sync tokens.
         let escaped_usn = Self::escape_ldap_value(&self.usn);
-        format!(
-            "(&{base_filter}({attribute}>={escaped_usn})(!({attribute}={escaped_usn})))"
-        )
+        format!("(&{base_filter}({attribute}>={escaped_usn})(!({attribute}={escaped_usn})))")
     }
 
     /// Escape special characters in LDAP filter values (RFC 4515).
@@ -199,7 +197,9 @@ pub fn map_ad_user(entry: &AttributeSet) -> Option<MappedUser> {
     );
 
     // uSNChanged for checkpoint tracking
-    let usn_changed = entry.get_string("uSNChanged").map(std::string::ToString::to_string);
+    let usn_changed = entry
+        .get_string("uSNChanged")
+        .map(std::string::ToString::to_string);
 
     Some(MappedUser {
         external_id,
@@ -212,7 +212,7 @@ pub fn map_ad_user(entry: &AttributeSet) -> Option<MappedUser> {
 }
 
 /// Build a `SyncChange` from a `MappedUser`.
-#[must_use] 
+#[must_use]
 pub fn mapped_user_to_sync_change(user: &MappedUser, change_type: SyncChangeType) -> SyncChange {
     let mut attrs = AttributeSet::new();
 
@@ -288,7 +288,7 @@ pub fn build_sync_result(
 }
 
 /// Compute the highest uSNChanged value from a batch of mapped users.
-#[must_use] 
+#[must_use]
 pub fn highest_usn(users: &[MappedUser]) -> Option<String> {
     users
         .iter()
@@ -350,7 +350,7 @@ fn set_if_present(attrs: &mut HashMap<String, serde_json::Value>, key: &str, val
 /// Build the LDAP attribute list for AD user sync queries.
 ///
 /// Returns the list of LDAP attributes to request when searching for users.
-#[must_use] 
+#[must_use]
 pub fn user_sync_attributes() -> Vec<&'static str> {
     vec![
         "objectGUID",
@@ -445,7 +445,7 @@ pub fn resolve_manager_references(
 /// Build a `DN→external_id` lookup map from a batch of mapped users.
 ///
 /// Keys are lowercased for case-insensitive matching.
-#[must_use] 
+#[must_use]
 pub fn build_dn_lookup(users: &[MappedUser]) -> HashMap<String, String> {
     users
         .iter()
@@ -500,7 +500,7 @@ pub struct SyncRecordError {
 
 impl AdSyncStatistics {
     /// Create a new statistics tracker for a sync run.
-    #[must_use] 
+    #[must_use]
     pub fn new(sync_type: &str) -> Self {
         Self {
             sync_type: sync_type.to_string(),
@@ -535,13 +535,13 @@ impl AdSyncStatistics {
     }
 
     /// Whether the run completed at least partially (some records succeeded).
-    #[must_use] 
+    #[must_use]
     pub fn has_successes(&self) -> bool {
         self.processed > 0
     }
 
     /// Convert to a `serde_json::Value` for storage in `reconciliation_runs.statistics`.
-    #[must_use] 
+    #[must_use]
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or(serde_json::json!({}))
     }
@@ -619,7 +619,7 @@ impl AdRetryConfig {
     ///
     /// Uses exponential backoff: delay = initial * multiplier^attempt
     /// Capped at `max_delay`.
-    #[must_use] 
+    #[must_use]
     pub fn delay_for_attempt(&self, attempt: u32) -> std::time::Duration {
         let delay_secs =
             (self.initial_delay_secs as f64) * self.backoff_multiplier.powi(attempt as i32);
@@ -628,7 +628,7 @@ impl AdRetryConfig {
     }
 
     /// Check if a retry should be attempted.
-    #[must_use] 
+    #[must_use]
     pub fn should_retry(&self, attempt: u32) -> bool {
         attempt < self.max_retries
     }

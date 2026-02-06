@@ -47,16 +47,19 @@ pub async fn list_connectors(
         name_contains: query.name_contains,
     };
 
+    let limit = query.limit.min(100);
+    let offset = query.offset.max(0);
+
     let (connectors, total) = state
         .connector_service
-        .list_connectors(tenant_id, filter, query.limit, query.offset)
+        .list_connectors(tenant_id, filter, limit, offset)
         .await?;
 
     Ok(Json(ConnectorListResponse {
         items: connectors.into_iter().map(Into::into).collect(),
         total,
-        limit: query.limit,
-        offset: query.offset,
+        limit,
+        offset,
     }))
 }
 
@@ -108,6 +111,9 @@ pub async fn create_connector(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateConnectorRequest>,
 ) -> Result<(StatusCode, Json<ConnectorResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     let input = CreateConnectorConfiguration {
@@ -151,6 +157,9 @@ pub async fn update_connector(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateConnectorRequest>,
 ) -> Result<Json<ConnectorResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     let input = UpdateConnectorConfiguration {
@@ -190,6 +199,9 @@ pub async fn delete_connector(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     state

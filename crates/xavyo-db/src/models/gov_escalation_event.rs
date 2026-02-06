@@ -137,9 +137,7 @@ impl GovEscalationEvent {
         }
         if filter.escalation_target_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(
-                " AND ${param_count} = ANY(escalation_target_ids)"
-            ));
+            query.push_str(&format!(" AND ${param_count} = ANY(escalation_target_ids)"));
         }
         if filter.from_date.is_some() {
             param_count += 1;
@@ -204,9 +202,7 @@ impl GovEscalationEvent {
         }
         if filter.escalation_target_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(
-                " AND ${param_count} = ANY(escalation_target_ids)"
-            ));
+            query.push_str(&format!(" AND ${param_count} = ANY(escalation_target_ids)"));
         }
         if filter.from_date.is_some() {
             param_count += 1;

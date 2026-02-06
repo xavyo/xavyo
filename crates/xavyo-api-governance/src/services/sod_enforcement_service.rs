@@ -46,7 +46,7 @@ pub struct SodEnforcementService {
 
 impl SodEnforcementService {
     /// Create a new `SoD` enforcement service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             effective_access_service: EffectiveAccessService::new(pool.clone()),
@@ -238,7 +238,7 @@ impl SodEnforcementService {
     }
 
     /// Convert internal check result to API response format.
-    #[must_use] 
+    #[must_use]
     pub fn to_api_response(result: &SodCheckResult) -> SodCheckResponse {
         SodCheckResponse {
             allowed: result.allowed,
@@ -288,7 +288,7 @@ impl SodEnforcementService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

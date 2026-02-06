@@ -26,7 +26,7 @@ pub struct SlaMonitoringService {
 
 impl SlaMonitoringService {
     /// Create a new SLA monitoring service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         let notification_service = Arc::new(SlaNotificationService::with_defaults(pool.clone()));
         Self {
@@ -36,7 +36,7 @@ impl SlaMonitoringService {
     }
 
     /// Create with custom notification configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_notification_config(pool: PgPool, config: SlaNotificationConfig) -> Self {
         let notification_service = Arc::new(SlaNotificationService::new(pool.clone(), config));
         Self {
@@ -46,7 +46,7 @@ impl SlaMonitoringService {
     }
 
     /// Get the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -241,7 +241,8 @@ impl SlaMonitoringService {
                 (task.warning_threshold_percent, task.target_duration_seconds)
             {
                 // Warning when remaining time is less than warning_percent of total
-                let warning_seconds = (i64::from(target_seconds) * i64::from(warning_percent)) / 100;
+                let warning_seconds =
+                    (i64::from(target_seconds) * i64::from(warning_percent)) / 100;
                 let warning_time = deadline - Duration::seconds(warning_seconds);
                 if now > warning_time && !task.sla_warning_sent {
                     match self
@@ -403,10 +404,12 @@ impl SlaMonitoringService {
         ent_id: Uuid,
     ) -> Result<(String, String)> {
         let app = GovApplication::find_by_id(&self.pool, tenant_id, app_id)
-            .await?.map_or_else(|| "Unknown".to_string(), |a| a.name);
+            .await?
+            .map_or_else(|| "Unknown".to_string(), |a| a.name);
 
         let ent = GovEntitlement::find_by_id(&self.pool, tenant_id, ent_id)
-            .await?.map_or_else(|| "Unknown".to_string(), |e| e.name);
+            .await?
+            .map_or_else(|| "Unknown".to_string(), |e| e.name);
 
         Ok((app, ent))
     }

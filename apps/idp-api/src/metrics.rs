@@ -98,7 +98,8 @@ pub async fn metrics_middleware(
 ) -> Response {
     let method = request.method().to_string();
     let route = matched_path
-        .as_ref().map_or_else(|| "unmatched".to_string(), |m| m.as_str().to_string());
+        .as_ref()
+        .map_or_else(|| "unmatched".to_string(), |m| m.as_str().to_string());
 
     let start = std::time::Instant::now();
     let response = next.run(request).await;

@@ -25,7 +25,7 @@ pub struct SemiManualProvisioningService {
 
 impl SemiManualProvisioningService {
     /// Create a new semi-manual provisioning service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         let ticketing_service = TicketingService::new(pool.clone());
         Self {
@@ -35,7 +35,7 @@ impl SemiManualProvisioningService {
     }
 
     /// Get the database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

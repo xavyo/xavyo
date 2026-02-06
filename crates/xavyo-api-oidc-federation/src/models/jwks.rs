@@ -12,14 +12,14 @@ pub struct JwkSet {
 
 impl JwkSet {
     /// Find a key by its key ID (kid).
-    #[must_use] 
+    #[must_use]
     pub fn find_key(&self, kid: &str) -> Option<&Jwk> {
         self.keys.iter().find(|k| k.kid.as_deref() == Some(kid))
     }
 
     /// Find a key suitable for signature verification.
     /// If kid is provided, match by kid. Otherwise, return first RSA signing key.
-    #[must_use] 
+    #[must_use]
     pub fn find_signing_key(&self, kid: Option<&str>) -> Option<&Jwk> {
         if let Some(kid) = kid {
             self.find_key(kid)
@@ -67,13 +67,13 @@ pub struct Jwk {
 
 impl Jwk {
     /// Check if this key is an RSA key.
-    #[must_use] 
+    #[must_use]
     pub fn is_rsa(&self) -> bool {
         self.kty == "RSA"
     }
 
     /// Check if this key is suitable for signature verification.
-    #[must_use] 
+    #[must_use]
     pub fn is_signing_key(&self) -> bool {
         self.use_.is_none() || self.use_.as_deref() == Some("sig")
     }
@@ -81,7 +81,7 @@ impl Jwk {
     /// Convert RSA JWK to PEM-encoded public key.
     ///
     /// Returns None if the key is not an RSA key or required components are missing.
-    #[must_use] 
+    #[must_use]
     pub fn to_pem(&self) -> Option<Vec<u8>> {
         if !self.is_rsa() {
             return None;

@@ -68,7 +68,7 @@ impl GroupService {
     }
 
     /// Apply group filter to list of groups
-    #[must_use] 
+    #[must_use]
     pub fn apply_filter(groups: &[GroupInfo], filter: Option<&GroupFilter>) -> Vec<GroupInfo> {
         match filter {
             Some(f) => groups
@@ -81,7 +81,7 @@ impl GroupService {
     }
 
     /// Format groups according to configuration
-    #[must_use] 
+    #[must_use]
     pub fn format_groups(groups: &[GroupInfo], config: &GroupAttributeConfig) -> Vec<String> {
         groups
             .iter()
@@ -90,7 +90,7 @@ impl GroupService {
     }
 
     /// Format a single group value according to format specification
-    #[must_use] 
+    #[must_use]
     pub fn format_group_value(
         group: &GroupInfo,
         format: &GroupValueFormat,
@@ -137,7 +137,7 @@ impl GroupService {
     }
 
     /// Get the attribute name to use for groups
-    #[must_use] 
+    #[must_use]
     pub fn get_attribute_name(config: &GroupAttributeConfig) -> &str {
         &config.attribute_name
     }

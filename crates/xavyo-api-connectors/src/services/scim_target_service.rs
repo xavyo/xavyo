@@ -133,13 +133,13 @@ pub struct HealthCheckResponse {
 }
 
 impl ScimTargetService {
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, encryption: Arc<CredentialEncryption>) -> Self {
         Self { pool, encryption }
     }
 
     /// Get a reference to the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

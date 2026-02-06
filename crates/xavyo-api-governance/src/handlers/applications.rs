@@ -114,6 +114,9 @@ pub async fn create_application(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateApplicationRequest>,
 ) -> ApiResult<(StatusCode, Json<ApplicationResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -168,6 +171,9 @@ pub async fn update_application(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateApplicationRequest>,
 ) -> ApiResult<Json<ApplicationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -219,6 +225,9 @@ pub async fn delete_application(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

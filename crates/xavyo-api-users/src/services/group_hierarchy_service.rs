@@ -31,7 +31,7 @@ pub struct GroupHierarchyService {
 
 impl GroupHierarchyService {
     /// Create a new hierarchy service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -281,7 +281,7 @@ impl GroupHierarchyService {
 
         let has_more = children.len() as i64 > limit;
         let children = if has_more {
-            children.into_iter().take(limit as usize).collect()
+            children.into_iter().take(limit.max(0) as usize).collect()
         } else {
             children
         };
@@ -383,7 +383,10 @@ impl GroupHierarchyService {
 
         let has_more = descendants.len() as i64 > limit;
         let descendants = if has_more {
-            descendants.into_iter().take(limit as usize).collect()
+            descendants
+                .into_iter()
+                .take(limit.max(0) as usize)
+                .collect()
         } else {
             descendants
         };
@@ -414,7 +417,7 @@ impl GroupHierarchyService {
 
         let has_more = roots.len() as i64 > limit;
         let roots = if has_more {
-            roots.into_iter().take(limit as usize).collect()
+            roots.into_iter().take(limit.max(0) as usize).collect()
         } else {
             roots
         };
@@ -539,7 +542,7 @@ impl GroupHierarchyService {
 
         let has_more = groups.len() as i64 > limit;
         let groups = if has_more {
-            groups.into_iter().take(limit as usize).collect()
+            groups.into_iter().take(limit.max(0) as usize).collect()
         } else {
             groups
         };

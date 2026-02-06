@@ -849,7 +849,7 @@ impl GovMicroCertification {
     }
 
     /// Check if the user can decide on this certification.
-    #[must_use] 
+    #[must_use]
     pub fn can_decide(&self, user_id: Uuid) -> bool {
         if self.status != MicroCertStatus::Pending {
             return false;
@@ -873,13 +873,13 @@ impl GovMicroCertification {
     }
 
     /// Check if past deadline.
-    #[must_use] 
+    #[must_use]
     pub fn is_past_deadline(&self) -> bool {
         self.status == MicroCertStatus::Pending && Utc::now() > self.deadline
     }
 
     /// Check if needing escalation.
-    #[must_use] 
+    #[must_use]
     pub fn needs_escalation(&self) -> bool {
         if self.status != MicroCertStatus::Pending || self.escalated {
             return false;
@@ -894,7 +894,7 @@ impl GovMicroCertification {
     }
 
     /// Get remaining time until deadline.
-    #[must_use] 
+    #[must_use]
     pub fn time_until_deadline(&self) -> chrono::Duration {
         self.deadline - Utc::now()
     }

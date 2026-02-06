@@ -124,9 +124,7 @@ impl DuplicateChecker {
                             email: Some(email.to_string()),
                             column_name: Some("username".to_string()),
                             error_type: "duplicate_username_in_file".to_string(),
-                            error_message: format!(
-                                "Duplicate username '{uname}' within CSV file"
-                            ),
+                            error_message: format!("Duplicate username '{uname}' within CSV file"),
                         });
                     }
                     self.seen_usernames.insert(uname_lower);
@@ -256,7 +254,9 @@ pub fn parse_csv_with_config(
         };
 
         // Extract email (required)
-        let email_idx = if let Some(&idx) = known_columns.get("email") { idx } else {
+        let email_idx = if let Some(&idx) = known_columns.get("email") {
+            idx
+        } else {
             errors.push(RowError {
                 line_number,
                 email: None,

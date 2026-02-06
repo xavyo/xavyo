@@ -108,7 +108,7 @@ impl McpErrorResponse {
     }
 
     /// Add details to the error response.
-    #[must_use] 
+    #[must_use]
     pub fn with_details(mut self, details: serde_json::Value) -> Self {
         self.details = Some(details);
         self
@@ -144,7 +144,7 @@ pub enum McpErrorCode {
 
 impl McpErrorCode {
     /// Get the HTTP status code for this error.
-    #[must_use] 
+    #[must_use]
     pub fn status_code(&self) -> u16 {
         match self {
             Self::InvalidParameters => 400,

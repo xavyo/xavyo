@@ -218,7 +218,9 @@ impl CredentialTestContext {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration"), ignore)]
 async fn test_rate_limit_enforcement() {
-    let ctx = if let Some(c) = CredentialTestContext::new().await { c } else {
+    let ctx = if let Some(c) = CredentialTestContext::new().await {
+        c
+    } else {
         eprintln!("Skipping test: database not available");
         return;
     };
@@ -294,7 +296,9 @@ async fn test_rate_limit_enforcement() {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration"), ignore)]
 async fn test_permission_denied_without_grant() {
-    let ctx = if let Some(c) = CredentialTestContext::new().await { c } else {
+    let ctx = if let Some(c) = CredentialTestContext::new().await {
+        c
+    } else {
         eprintln!("Skipping test: database not available");
         return;
     };
@@ -344,7 +348,9 @@ async fn test_permission_denied_without_grant() {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration"), ignore)]
 async fn test_suspended_agent_denied() {
-    let ctx = if let Some(c) = CredentialTestContext::new().await { c } else {
+    let ctx = if let Some(c) = CredentialTestContext::new().await {
+        c
+    } else {
         eprintln!("Skipping test: database not available");
         return;
     };
@@ -404,7 +410,9 @@ async fn test_suspended_agent_denied() {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration"), ignore)]
 async fn test_secret_type_not_found() {
-    let ctx = if let Some(c) = CredentialTestContext::new().await { c } else {
+    let ctx = if let Some(c) = CredentialTestContext::new().await {
+        c
+    } else {
         eprintln!("Skipping test: database not available");
         return;
     };
@@ -449,7 +457,9 @@ async fn test_secret_type_not_found() {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration"), ignore)]
 async fn test_disabled_secret_type_denied() {
-    let ctx = if let Some(c) = CredentialTestContext::new().await { c } else {
+    let ctx = if let Some(c) = CredentialTestContext::new().await {
+        c
+    } else {
         eprintln!("Skipping test: database not available");
         return;
     };
@@ -515,7 +525,9 @@ async fn test_disabled_secret_type_denied() {
 #[tokio::test]
 #[cfg_attr(not(feature = "integration"), ignore)]
 async fn test_successful_credential_request() {
-    let ctx = if let Some(c) = CredentialTestContext::new().await { c } else {
+    let ctx = if let Some(c) = CredentialTestContext::new().await {
+        c
+    } else {
         eprintln!("Skipping test: database not available");
         return;
     };

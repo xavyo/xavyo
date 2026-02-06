@@ -127,7 +127,7 @@ pub struct LicenseReportService {
 
 impl LicenseReportService {
     /// Create a new license report service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -308,7 +308,7 @@ impl LicenseReportService {
     }
 
     /// Get the underlying database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }

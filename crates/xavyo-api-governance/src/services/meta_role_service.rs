@@ -31,7 +31,7 @@ pub struct MetaRoleService {
 
 impl MetaRoleService {
     /// Create a new meta-role service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,

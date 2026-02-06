@@ -79,7 +79,7 @@ pub fn validate_email(email: &str) -> Result<(), String> {
 /// Sanitize a display name by stripping HTML and script content.
 ///
 /// Uses the ammonia library for HTML sanitization, then trims whitespace.
-#[must_use] 
+#[must_use]
 pub fn sanitize_display_name(name: &str) -> String {
     let cleaned = ammonia::clean(name);
     cleaned.trim().to_string()
@@ -102,7 +102,7 @@ pub struct HeaderValidation {
 ///
 /// Returns a mapping of known column names to their 0-based indices,
 /// plus any unrecognized columns that may be custom attributes.
-#[must_use] 
+#[must_use]
 pub fn validate_csv_headers(headers: &[String]) -> HeaderValidation {
     let mut known_columns = std::collections::HashMap::new();
     let mut custom_columns = Vec::new();

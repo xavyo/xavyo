@@ -275,7 +275,7 @@ pub struct JobState {
 
 impl JobState {
     /// Create a new job state.
-    #[must_use] 
+    #[must_use]
     pub fn new(job_service: Arc<JobService>) -> Self {
         Self { job_service }
     }

@@ -257,25 +257,25 @@ impl GovTemplateScope {
     }
 
     /// Check if scope is global.
-    #[must_use] 
+    #[must_use]
     pub fn is_global(&self) -> bool {
         self.scope_type == TemplateScopeType::Global
     }
 
     /// Check if scope is organization-based.
-    #[must_use] 
+    #[must_use]
     pub fn is_organization(&self) -> bool {
         self.scope_type == TemplateScopeType::Organization
     }
 
     /// Check if scope is category-based.
-    #[must_use] 
+    #[must_use]
     pub fn is_category(&self) -> bool {
         self.scope_type == TemplateScopeType::Category
     }
 
     /// Check if scope is condition-based.
-    #[must_use] 
+    #[must_use]
     pub fn is_condition(&self) -> bool {
         self.scope_type == TemplateScopeType::Condition
     }

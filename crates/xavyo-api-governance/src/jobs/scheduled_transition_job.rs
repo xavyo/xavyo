@@ -29,7 +29,7 @@ pub use crate::services::scheduled_transition_service::ProcessingStats as JobPro
 
 impl ScheduledTransitionJob {
     /// Create a new scheduled transition job.
-    #[must_use] 
+    #[must_use]
     pub fn new(scheduled_transition_service: ScheduledTransitionService) -> Self {
         Self {
             scheduled_transition_service: Arc::new(scheduled_transition_service),

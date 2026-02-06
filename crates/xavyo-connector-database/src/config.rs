@@ -20,7 +20,7 @@ pub enum DatabaseDriver {
 
 impl DatabaseDriver {
     /// Get the default port for this driver.
-    #[must_use] 
+    #[must_use]
     pub fn default_port(&self) -> u16 {
         match self {
             DatabaseDriver::PostgreSQL => 5432,
@@ -28,7 +28,7 @@ impl DatabaseDriver {
     }
 
     /// Get the driver identifier string.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             DatabaseDriver::PostgreSQL => "postgresql",
@@ -55,7 +55,7 @@ pub enum SslMode {
 
 impl SslMode {
     /// Get the string representation for connection strings.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             SslMode::Disable => "disable",
@@ -173,7 +173,7 @@ impl DatabaseConfig {
     }
 
     /// Set port.
-    #[must_use] 
+    #[must_use]
     pub fn with_port(mut self, port: u16) -> Self {
         self.port = Some(port);
         self
@@ -186,7 +186,7 @@ impl DatabaseConfig {
     }
 
     /// Set SSL mode.
-    #[must_use] 
+    #[must_use]
     pub fn with_ssl_mode(mut self, mode: SslMode) -> Self {
         self.ssl_mode = mode;
         self
@@ -205,13 +205,13 @@ impl DatabaseConfig {
     }
 
     /// Get the effective port (default if not specified).
-    #[must_use] 
+    #[must_use]
     pub fn effective_port(&self) -> u16 {
         self.port.unwrap_or_else(|| self.driver.default_port())
     }
 
     /// Get the effective schema (default if not specified).
-    #[must_use] 
+    #[must_use]
     pub fn effective_schema(&self) -> &str {
         self.schema.as_deref().unwrap_or("public")
     }
@@ -220,7 +220,7 @@ impl DatabaseConfig {
     ///
     /// Note: This excludes the password for security. The password
     /// should be passed separately to the connection library.
-    #[must_use] 
+    #[must_use]
     pub fn connection_string(&self) -> String {
         // Only PostgreSQL is supported per Constitution Principle XI
         format!(

@@ -23,6 +23,7 @@ pub struct ScimToken {
     pub name: String,
 
     /// SHA-256 hash of the Bearer token.
+    #[serde(skip_serializing)]
     pub token_hash: String,
 
     /// Display prefix (e.g., "xscim_...XXXX").

@@ -98,7 +98,7 @@ pub struct BulkReplayRequest {
 
 impl DlqService {
     /// Create a new DLQ service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

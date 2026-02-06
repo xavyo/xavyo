@@ -69,7 +69,7 @@ pub struct InternalCaProvider {
 
 impl InternalCaProvider {
     /// Create a new internal CA provider.
-    #[must_use] 
+    #[must_use]
     pub fn new(config: InternalCaConfig) -> Self {
         Self {
             config,
@@ -78,7 +78,7 @@ impl InternalCaProvider {
     }
 
     /// Create a provider with pre-loaded key pair.
-    #[must_use] 
+    #[must_use]
     pub fn with_key_pair(config: InternalCaConfig, key_pair: KeyPair) -> Self {
         Self {
             config,
@@ -87,7 +87,7 @@ impl InternalCaProvider {
     }
 
     /// Get the CA configuration.
-    #[must_use] 
+    #[must_use]
     pub fn config(&self) -> &InternalCaConfig {
         &self.config
     }
@@ -154,9 +154,8 @@ impl InternalCaProvider {
 
     /// Convert a String to `Ia5String` for SAN.
     fn to_ia5string(s: &str) -> CaResult<Ia5String> {
-        Ia5String::try_from(s).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Invalid IA5String '{s}': {e}"))
-        })
+        Ia5String::try_from(s)
+            .map_err(|e| CaProviderError::InvalidFormat(format!("Invalid IA5String '{s}': {e}")))
     }
 
     /// Build `CertificateParams` from an X509 certificate.
@@ -255,9 +254,7 @@ impl CaProvider for InternalCaProvider {
         // Parse CA certificate to extract issuer DN for the CA params
         let ca_der = Self::parse_pem_to_der(&self.config.ca_certificate_pem)?;
         let (_, ca_x509) = X509Certificate::from_der(&ca_der).map_err(|e| {
-            CaProviderError::InvalidConfiguration(format!(
-                "Failed to parse CA certificate: {e:?}"
-            ))
+            CaProviderError::InvalidConfiguration(format!("Failed to parse CA certificate: {e:?}"))
         })?;
 
         // Build CA params with the issuer DN (needed for signed_by)
@@ -576,9 +573,7 @@ impl CaProvider for InternalCaProvider {
         // Parse CA certificate to get issuer info
         let ca_der = Self::parse_pem_to_der(&self.config.ca_certificate_pem)?;
         let (_, ca_x509) = X509Certificate::from_der(&ca_der).map_err(|e| {
-            CaProviderError::InvalidConfiguration(format!(
-                "Failed to parse CA certificate: {e:?}"
-            ))
+            CaProviderError::InvalidConfiguration(format!("Failed to parse CA certificate: {e:?}"))
         })?;
 
         // Build CA params for creating the issuer

@@ -26,13 +26,13 @@ pub struct CorrelationRuleService {
 
 impl CorrelationRuleService {
     /// Create a new correlation rule service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -58,7 +58,7 @@ impl CorrelationRuleService {
         };
 
         let limit = query.limit.unwrap_or(50).min(100);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         let rules = GovCorrelationRule::list_by_connector(
             &self.pool,
@@ -464,9 +464,7 @@ fn validate_expression_syntax(expression: &str) -> std::result::Result<(), Strin
             '(' | '[' | '{' => stack.push(ch),
             ')' => {
                 if stack.pop() != Some('(') {
-                    return Err(format!(
-                        "Unmatched closing parenthesis ')' at position {i}"
-                    ));
+                    return Err(format!("Unmatched closing parenthesis ')' at position {i}"));
                 }
             }
             ']' => {

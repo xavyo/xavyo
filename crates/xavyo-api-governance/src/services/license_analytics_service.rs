@@ -44,7 +44,7 @@ pub struct LicenseAnalyticsService {
 
 impl LicenseAnalyticsService {
     /// Create a new license analytics service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -64,8 +64,14 @@ impl LicenseAnalyticsService {
 
         // Build summary by aggregating pool data
         let total_pools = active_pools.len() as i64;
-        let total_capacity: i64 = active_pools.iter().map(|p| i64::from(p.total_capacity)).sum();
-        let total_allocated: i64 = active_pools.iter().map(|p| i64::from(p.allocated_count)).sum();
+        let total_capacity: i64 = active_pools
+            .iter()
+            .map(|p| i64::from(p.total_capacity))
+            .sum();
+        let total_allocated: i64 = active_pools
+            .iter()
+            .map(|p| i64::from(p.allocated_count))
+            .sum();
         let total_available = total_capacity - total_allocated;
 
         let overall_utilization = if total_capacity > 0 {
@@ -198,12 +204,10 @@ impl LicenseAnalyticsService {
 
             // Expiring soon check
             if pool.should_show_expiration_warning() {
-                let days_remaining = pool
-                    .expiration_date
-                    .map_or(0, |exp| {
-                        let diff = exp - Utc::now();
-                        diff.num_days()
-                    });
+                let days_remaining = pool.expiration_date.map_or(0, |exp| {
+                    let diff = exp - Utc::now();
+                    diff.num_days()
+                });
 
                 recommendations.push(LicenseRecommendation {
                     recommendation_type: RecommendationType::ExpiringSoon,
@@ -253,7 +257,7 @@ impl LicenseAnalyticsService {
     }
 
     /// Get the underlying database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn db_pool(&self) -> &PgPool {
         &self.pool
     }

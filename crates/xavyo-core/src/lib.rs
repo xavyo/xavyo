@@ -33,13 +33,13 @@ pub use ids::{SessionId, TenantId, UserId};
 pub use traits::TenantAware;
 
 /// Returns a greeting message (legacy - to be removed)
-#[must_use] 
+#[must_use]
 pub fn hello() -> String {
     "Hello from Xavyo Core!".to_string()
 }
 
 /// Adds two numbers (legacy - to be removed)
-#[must_use] 
+#[must_use]
 pub fn add(a: i32, b: i32) -> i32 {
     a + b
 }

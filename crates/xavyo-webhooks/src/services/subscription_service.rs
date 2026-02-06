@@ -30,7 +30,7 @@ pub struct SubscriptionService {
 
 impl SubscriptionService {
     /// Create a new subscription service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, encryption_key: Vec<u8>) -> Self {
         Self {
             pool,
@@ -41,14 +41,14 @@ impl SubscriptionService {
     }
 
     /// Set the maximum subscriptions per tenant.
-    #[must_use] 
+    #[must_use]
     pub fn with_max_subscriptions(mut self, max: i64) -> Self {
         self.max_subscriptions = max;
         self
     }
 
     /// Allow HTTP URLs (for development/testing).
-    #[must_use] 
+    #[must_use]
     pub fn with_allow_http(mut self, allow: bool) -> Self {
         self.allow_http = allow;
         self

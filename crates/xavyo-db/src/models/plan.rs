@@ -21,7 +21,7 @@ pub enum PlanTier {
 
 impl PlanTier {
     /// Get the numeric order of this tier (0 = lowest, 3 = highest).
-    #[must_use] 
+    #[must_use]
     pub fn tier_order(&self) -> i32 {
         match self {
             PlanTier::Free => 0,
@@ -32,19 +32,19 @@ impl PlanTier {
     }
 
     /// Check if this tier is higher than another.
-    #[must_use] 
+    #[must_use]
     pub fn is_higher_than(&self, other: &PlanTier) -> bool {
         self.tier_order() > other.tier_order()
     }
 
     /// Check if this tier is lower than another.
-    #[must_use] 
+    #[must_use]
     pub fn is_lower_than(&self, other: &PlanTier) -> bool {
         self.tier_order() < other.tier_order()
     }
 
     /// Get the plan name as a string.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             PlanTier::Free => "free",
@@ -55,7 +55,7 @@ impl PlanTier {
     }
 
     /// Get all available tiers in order.
-    #[must_use] 
+    #[must_use]
     pub fn all() -> Vec<PlanTier> {
         vec![
             PlanTier::Free,
@@ -103,7 +103,7 @@ pub struct PlanDefinition {
 
 impl PlanDefinition {
     /// Get the definition for a plan tier.
-    #[must_use] 
+    #[must_use]
     pub fn for_tier(tier: PlanTier) -> Self {
         match tier {
             PlanTier::Free => Self {
@@ -146,7 +146,7 @@ impl PlanDefinition {
     }
 
     /// Convert to settings JSON for tenant.
-    #[must_use] 
+    #[must_use]
     pub fn to_settings_json(&self) -> serde_json::Value {
         serde_json::json!({
             "plan": self.tier.as_str(),
@@ -235,7 +235,7 @@ pub struct TenantPlanChange {
 
 impl TenantPlanChange {
     /// Get the change type as enum.
-    #[must_use] 
+    #[must_use]
     pub fn change_type_enum(&self) -> Option<PlanChangeType> {
         match self.change_type.as_str() {
             "upgrade" => Some(PlanChangeType::Upgrade),
@@ -245,7 +245,7 @@ impl TenantPlanChange {
     }
 
     /// Get the status as enum.
-    #[must_use] 
+    #[must_use]
     pub fn status_enum(&self) -> Option<PlanChangeStatus> {
         self.status.parse().ok()
     }
@@ -376,7 +376,7 @@ impl TenantPlanChange {
 }
 
 /// Calculate the first day of the next month.
-#[must_use] 
+#[must_use]
 pub fn next_billing_cycle_date() -> DateTime<Utc> {
     let now = Utc::now();
     let next_month = if now.month() == 12 {

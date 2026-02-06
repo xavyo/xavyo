@@ -104,7 +104,7 @@ pub fn write_batch_to_file(
 }
 
 /// Generate a unique file name for a batch export.
-#[must_use] 
+#[must_use]
 pub fn export_file_name(export_id: Uuid, format: ExportFormat) -> String {
     let extension = match format {
         ExportFormat::Csv => "csv",
@@ -116,7 +116,7 @@ pub fn export_file_name(export_id: Uuid, format: ExportFormat) -> String {
 }
 
 /// Compute the expiry time for a completed export.
-#[must_use] 
+#[must_use]
 pub fn export_expires_at(retention_days: i64) -> DateTime<Utc> {
     Utc::now() + Duration::days(retention_days)
 }

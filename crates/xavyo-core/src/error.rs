@@ -165,7 +165,8 @@ mod tests {
 
         #[test]
         fn test_different_resource_types() {
-            let errors = [XavyoError::NotFound {
+            let errors = [
+                XavyoError::NotFound {
                     resource: "User".to_string(),
                     id: None,
                 },
@@ -176,7 +177,8 @@ mod tests {
                 XavyoError::NotFound {
                     resource: "Tenant".to_string(),
                     id: None,
-                }];
+                },
+            ];
 
             assert!(errors[0].to_string().contains("User"));
             assert!(errors[1].to_string().contains("Session"));

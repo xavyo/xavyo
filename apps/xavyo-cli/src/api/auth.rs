@@ -56,9 +56,10 @@ pub async fn poll_device_token(
         .await?;
 
     if response.status().is_success() {
-        let token: TokenResponse = response.json().await.map_err(|e| {
-            CliError::AuthenticationFailed(format!("Invalid token response: {e}"))
-        })?;
+        let token: TokenResponse = response
+            .json()
+            .await
+            .map_err(|e| CliError::AuthenticationFailed(format!("Invalid token response: {e}")))?;
         return Ok(Some(token));
     }
 
@@ -119,9 +120,10 @@ pub async fn signup(
         .await?;
 
     if response.status().is_success() {
-        let signup_response: SignupResponse = response.json().await.map_err(|e| {
-            CliError::AuthenticationFailed(format!("Invalid signup response: {e}"))
-        })?;
+        let signup_response: SignupResponse = response
+            .json()
+            .await
+            .map_err(|e| CliError::AuthenticationFailed(format!("Invalid signup response: {e}")))?;
         return Ok(signup_response);
     }
 

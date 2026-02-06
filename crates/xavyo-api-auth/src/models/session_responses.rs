@@ -64,7 +64,7 @@ pub struct RevokeAllSessionsResponse {
 }
 
 impl RevokeAllSessionsResponse {
-    #[must_use] 
+    #[must_use]
     pub fn new(revoked_count: u64) -> Self {
         Self {
             revoked_count,

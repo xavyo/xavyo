@@ -24,7 +24,7 @@ pub struct TemplateScopeService {
 
 impl TemplateScopeService {
     /// Create a new template scope service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,

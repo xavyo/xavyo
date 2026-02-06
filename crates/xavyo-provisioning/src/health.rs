@@ -89,7 +89,7 @@ pub struct HealthService {
 
 impl HealthService {
     /// Create a new health service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: sqlx::PgPool) -> Self {
         Self {
             pool,
@@ -99,7 +99,7 @@ impl HealthService {
     }
 
     /// Create with custom configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_config(pool: sqlx::PgPool, config: HealthConfig) -> Self {
         Self {
             pool,
@@ -126,7 +126,7 @@ impl HealthService {
 
         // Query database
         let health = self.get_health(tenant_id, connector_id).await?;
-        let is_online = health.map_or(true, |h| h.is_online); // Assume online if no record
+        let is_online = health.is_none_or(|h| h.is_online); // Assume online if no record
 
         // Update cache
         {
@@ -352,25 +352,25 @@ impl HealthService {
     }
 
     /// Get check interval as Duration.
-    #[must_use] 
+    #[must_use]
     pub fn check_interval(&self) -> Duration {
         Duration::from_secs(self.config.check_interval_secs)
     }
 
     /// Get check timeout as Duration.
-    #[must_use] 
+    #[must_use]
     pub fn check_timeout(&self) -> Duration {
         Duration::from_secs(self.config.check_timeout_secs)
     }
 
     /// Get the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &sqlx::PgPool {
         &self.pool
     }
 
     /// Get the configuration.
-    #[must_use] 
+    #[must_use]
     pub fn config(&self) -> &HealthConfig {
         &self.config
     }
@@ -389,7 +389,7 @@ pub struct HealthMonitor {
 
 impl HealthMonitor {
     /// Create a new health monitor.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         health_service: Arc<HealthService>,
         queue: Arc<crate::queue::OperationQueue>,

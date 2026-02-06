@@ -10,6 +10,7 @@ use axum::{
 };
 use std::sync::Arc;
 use uuid::Uuid;
+use validator::Validate;
 use xavyo_core::TenantId;
 
 use crate::{
@@ -94,6 +95,9 @@ pub async fn update_device_policy(
     Path(tenant_id): Path<Uuid>,
     Json(request): Json<UpdateDevicePolicyRequest>,
 ) -> Result<(StatusCode, Json<DevicePolicyResponse>), ApiAuthError> {
+    request
+        .validate()
+        .map_err(|e| ApiAuthError::Validation(e.to_string()))?;
     let policy = device_policy_service
         .update_device_policy(tenant_id, request)
         .await?;

@@ -28,7 +28,7 @@ pub struct KeyService {
 
 impl KeyService {
     /// Create a new key service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,

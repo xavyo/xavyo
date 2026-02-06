@@ -47,7 +47,7 @@ pub struct NhiCredentialService {
 
 impl NhiCredentialService {
     /// Create a new NHI credential service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

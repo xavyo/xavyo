@@ -35,7 +35,9 @@ pub async fn proxy_handler(
     let request_id = request.extensions().get::<RequestId>().copied();
 
     // Find matching backend
-    let backend = if let Some(b) = state.router.find_backend(&path) { b } else {
+    let backend = if let Some(b) = state.router.find_backend(&path) {
+        b
+    } else {
         warn!(path = %path, "No backend found for path");
         return error_response(
             GatewayError::NotFound { path: path.clone() },

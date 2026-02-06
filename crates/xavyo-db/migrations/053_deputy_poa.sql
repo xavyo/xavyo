@@ -72,10 +72,7 @@ ALTER TABLE gov_delegation_scopes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation_policy ON gov_delegation_scopes;
 CREATE POLICY tenant_isolation_policy ON gov_delegation_scopes
     FOR ALL
-    USING (tenant_id = COALESCE(
-        NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-        tenant_id
-    ));
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_delegation_scopes_tenant
@@ -121,10 +118,7 @@ ALTER TABLE gov_delegation_audit ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation_policy ON gov_delegation_audit;
 CREATE POLICY tenant_isolation_policy ON gov_delegation_audit
     FOR ALL
-    USING (tenant_id = COALESCE(
-        NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-        tenant_id
-    ));
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- Indexes for common query patterns
 CREATE INDEX IF NOT EXISTS idx_delegation_audit_tenant

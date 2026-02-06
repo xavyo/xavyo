@@ -103,7 +103,7 @@ impl std::str::FromStr for OperationStatus {
 
 impl OperationStatus {
     /// Check if the operation is in a terminal state.
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
@@ -115,7 +115,7 @@ impl OperationStatus {
     }
 
     /// Check if the operation is waiting for external system.
-    #[must_use] 
+    #[must_use]
     pub fn is_waiting(&self) -> bool {
         matches!(self, OperationStatus::AwaitingSystem)
     }
@@ -683,7 +683,7 @@ impl ProvisioningOperation {
     }
 
     /// Check if an operation can be cancelled.
-    #[must_use] 
+    #[must_use]
     pub fn can_cancel(&self) -> bool {
         matches!(
             self.status,
@@ -766,7 +766,7 @@ impl ProvisioningOperation {
     }
 
     /// Check if this operation can be retried.
-    #[must_use] 
+    #[must_use]
     pub fn can_retry(&self) -> bool {
         matches!(
             self.status,
@@ -775,13 +775,13 @@ impl ProvisioningOperation {
     }
 
     /// Check if this operation is in dead letter.
-    #[must_use] 
+    #[must_use]
     pub fn is_dead_letter(&self) -> bool {
         matches!(self.status, OperationStatus::DeadLetter)
     }
 
     /// Check if this operation is awaiting system.
-    #[must_use] 
+    #[must_use]
     pub fn is_awaiting_system(&self) -> bool {
         matches!(self.status, OperationStatus::AwaitingSystem)
     }

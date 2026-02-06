@@ -7,6 +7,46 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+/// GDPR data protection classification for entitlements (F-067).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[sqlx(
+    type_name = "data_protection_classification",
+    rename_all = "snake_case"
+)]
+#[serde(rename_all = "snake_case")]
+pub enum DataProtectionClassification {
+    /// No personal data involved.
+    #[default]
+    None,
+    /// Contains personal data (GDPR Art. 4).
+    Personal,
+    /// Contains sensitive personal data (GDPR Art. 9).
+    Sensitive,
+    /// Special category data requiring explicit consent.
+    SpecialCategory,
+}
+
+/// GDPR legal basis for data processing (F-067).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[sqlx(type_name = "gdpr_legal_basis", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum GdprLegalBasis {
+    /// Data subject has given consent (Art. 6(1)(a)).
+    Consent,
+    /// Processing necessary for contract performance (Art. 6(1)(b)).
+    Contract,
+    /// Processing necessary for legal obligation (Art. 6(1)(c)).
+    LegalObligation,
+    /// Processing necessary to protect vital interests (Art. 6(1)(d)).
+    VitalInterest,
+    /// Processing necessary for public interest task (Art. 6(1)(e)).
+    PublicTask,
+    /// Processing necessary for legitimate interests (Art. 6(1)(f)).
+    LegitimateInterest,
+}
+
 /// Risk level classification for entitlements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -74,6 +114,24 @@ pub struct GovEntitlement {
     /// Only delegable entitlements appear in deputy work items.
     pub is_delegable: bool,
 
+    /// GDPR data protection classification (F-067).
+    pub data_protection_classification: DataProtectionClassification,
+
+    /// GDPR legal basis for processing personal data (F-067).
+    pub legal_basis: Option<GdprLegalBasis>,
+
+    /// Data retention period in days (F-067).
+    pub retention_period_days: Option<i32>,
+
+    /// Name of the data controller organization (F-067).
+    pub data_controller: Option<String>,
+
+    /// Name of the data processor organization (F-067).
+    pub data_processor: Option<String>,
+
+    /// Processing purpose labels (F-067).
+    pub purposes: Option<Vec<String>>,
+
     /// When the entitlement was created.
     pub created_at: DateTime<Utc>,
 
@@ -94,6 +152,19 @@ pub struct CreateGovEntitlement {
     /// Whether this entitlement can be delegated. Defaults to true.
     #[serde(default = "default_delegable")]
     pub is_delegable: bool,
+    /// GDPR data protection classification. Defaults to None.
+    #[serde(default)]
+    pub data_protection_classification: DataProtectionClassification,
+    /// GDPR legal basis for processing personal data.
+    pub legal_basis: Option<GdprLegalBasis>,
+    /// Data retention period in days.
+    pub retention_period_days: Option<i32>,
+    /// Name of the data controller organization.
+    pub data_controller: Option<String>,
+    /// Name of the data processor organization.
+    pub data_processor: Option<String>,
+    /// Processing purpose labels.
+    pub purposes: Option<Vec<String>>,
 }
 
 fn default_delegable() -> bool {
@@ -112,6 +183,18 @@ pub struct UpdateGovEntitlement {
     pub metadata: Option<serde_json::Value>,
     /// Whether this entitlement can be delegated.
     pub is_delegable: Option<bool>,
+    /// GDPR data protection classification.
+    pub data_protection_classification: Option<DataProtectionClassification>,
+    /// GDPR legal basis for processing personal data.
+    pub legal_basis: Option<GdprLegalBasis>,
+    /// Data retention period in days.
+    pub retention_period_days: Option<i32>,
+    /// Name of the data controller organization.
+    pub data_controller: Option<String>,
+    /// Name of the data processor organization.
+    pub data_processor: Option<String>,
+    /// Processing purpose labels.
+    pub purposes: Option<Vec<String>>,
 }
 
 /// Filter options for listing entitlements.
@@ -123,6 +206,8 @@ pub struct EntitlementFilter {
     pub owner_id: Option<Uuid>,
     /// Filter by delegable flag.
     pub is_delegable: Option<bool>,
+    /// Filter by GDPR data protection classification (F-067).
+    pub data_protection_classification: Option<DataProtectionClassification>,
 }
 
 impl GovEntitlement {
@@ -200,6 +285,12 @@ impl GovEntitlement {
             param_count += 1;
             query.push_str(&format!(" AND is_delegable = ${param_count}"));
         }
+        if filter.data_protection_classification.is_some() {
+            param_count += 1;
+            query.push_str(&format!(
+                " AND data_protection_classification = ${param_count}"
+            ));
+        }
 
         query.push_str(&format!(
             " ORDER BY name LIMIT ${} OFFSET ${}",
@@ -223,6 +314,9 @@ impl GovEntitlement {
         }
         if let Some(is_delegable) = filter.is_delegable {
             q = q.bind(is_delegable);
+        }
+        if let Some(classification) = filter.data_protection_classification {
+            q = q.bind(classification);
         }
 
         q.bind(limit).bind(offset).fetch_all(pool).await
@@ -262,6 +356,12 @@ impl GovEntitlement {
             param_count += 1;
             query.push_str(&format!(" AND is_delegable = ${param_count}"));
         }
+        if filter.data_protection_classification.is_some() {
+            param_count += 1;
+            query.push_str(&format!(
+                " AND data_protection_classification = ${param_count}"
+            ));
+        }
 
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
 
@@ -280,6 +380,9 @@ impl GovEntitlement {
         if let Some(is_delegable) = filter.is_delegable {
             q = q.bind(is_delegable);
         }
+        if let Some(classification) = filter.data_protection_classification {
+            q = q.bind(classification);
+        }
 
         q.fetch_one(pool).await
     }
@@ -292,8 +395,8 @@ impl GovEntitlement {
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
             r"
-            INSERT INTO gov_entitlements (tenant_id, application_id, name, description, risk_level, owner_id, external_id, metadata, is_delegable)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO gov_entitlements (tenant_id, application_id, name, description, risk_level, owner_id, external_id, metadata, is_delegable, data_protection_classification, legal_basis, retention_period_days, data_controller, data_processor, purposes)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             RETURNING *
             ",
         )
@@ -306,6 +409,12 @@ impl GovEntitlement {
         .bind(&input.external_id)
         .bind(&input.metadata)
         .bind(input.is_delegable)
+        .bind(input.data_protection_classification)
+        .bind(input.legal_basis)
+        .bind(input.retention_period_days)
+        .bind(&input.data_controller)
+        .bind(&input.data_processor)
+        .bind(&input.purposes)
         .fetch_one(pool)
         .await
     }
@@ -350,6 +459,30 @@ impl GovEntitlement {
         }
         if input.is_delegable.is_some() {
             updates.push(format!("is_delegable = ${param_idx}"));
+            param_idx += 1;
+        }
+        if input.data_protection_classification.is_some() {
+            updates.push(format!("data_protection_classification = ${param_idx}"));
+            param_idx += 1;
+        }
+        if input.legal_basis.is_some() {
+            updates.push(format!("legal_basis = ${param_idx}"));
+            param_idx += 1;
+        }
+        if input.retention_period_days.is_some() {
+            updates.push(format!("retention_period_days = ${param_idx}"));
+            param_idx += 1;
+        }
+        if input.data_controller.is_some() {
+            updates.push(format!("data_controller = ${param_idx}"));
+            param_idx += 1;
+        }
+        if input.data_processor.is_some() {
+            updates.push(format!("data_processor = ${param_idx}"));
+            param_idx += 1;
+        }
+        if input.purposes.is_some() {
+            updates.push(format!("purposes = ${param_idx}"));
             // param_idx += 1;
         }
 
@@ -385,6 +518,24 @@ impl GovEntitlement {
         }
         if let Some(is_delegable) = input.is_delegable {
             q = q.bind(is_delegable);
+        }
+        if let Some(classification) = input.data_protection_classification {
+            q = q.bind(classification);
+        }
+        if let Some(legal_basis) = input.legal_basis {
+            q = q.bind(legal_basis);
+        }
+        if let Some(retention_period_days) = input.retention_period_days {
+            q = q.bind(retention_period_days);
+        }
+        if let Some(ref data_controller) = input.data_controller {
+            q = q.bind(data_controller);
+        }
+        if let Some(ref data_processor) = input.data_processor {
+            q = q.bind(data_processor);
+        }
+        if let Some(ref purposes) = input.purposes {
+            q = q.bind(purposes);
         }
 
         q.fetch_optional(pool).await
@@ -495,18 +646,20 @@ impl GovEntitlement {
     }
 
     /// Check if entitlement is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self.status, GovEntitlementStatus::Active)
     }
 
     /// List all active entitlements for a tenant (used by role mining).
+    /// Safety limit of 10,000 to prevent unbounded memory growth.
     pub async fn list_all(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
             SELECT * FROM gov_entitlements
             WHERE tenant_id = $1 AND status = 'active'
             ORDER BY name
+            LIMIT 10000
             ",
         )
         .bind(tenant_id)
@@ -530,6 +683,12 @@ mod tests {
             external_id: None,
             metadata: None,
             is_delegable: true,
+            data_protection_classification: DataProtectionClassification::default(),
+            legal_basis: None,
+            retention_period_days: None,
+            data_controller: None,
+            data_processor: None,
+            purposes: None,
         };
 
         assert_eq!(request.name, "Admin Access");

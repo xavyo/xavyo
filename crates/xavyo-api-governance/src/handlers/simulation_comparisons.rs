@@ -2,6 +2,7 @@
 
 use axum::{
     extract::{Path, Query, State},
+    http::StatusCode,
     Extension, Json,
 };
 use uuid::Uuid;
@@ -77,7 +78,7 @@ pub async fn list_simulation_comparisons(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(20).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (comparisons, total) = state
         .simulation_comparison_service
@@ -90,8 +91,10 @@ pub async fn list_simulation_comparisons(
         )
         .await?;
 
-    let items: Vec<SimulationComparisonResponse> =
-        comparisons.into_iter().map(std::convert::Into::into).collect();
+    let items: Vec<SimulationComparisonResponse> = comparisons
+        .into_iter()
+        .map(std::convert::Into::into)
+        .collect();
 
     Ok(Json(PaginatedResponse {
         items,
@@ -168,7 +171,7 @@ pub async fn delete_simulation_comparison(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(comparison_id): Path<Uuid>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -179,7 +182,7 @@ pub async fn delete_simulation_comparison(
         .delete(tenant_id, comparison_id)
         .await?;
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ============================================================================

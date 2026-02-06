@@ -59,6 +59,9 @@ pub async fn create_mapping(
     Path(connector_id): Path<Uuid>,
     Json(request): Json<CreateMappingRequest>,
 ) -> Result<(StatusCode, Json<MappingResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     // Get tenant_id from connector (validates connector exists)
@@ -162,6 +165,9 @@ pub async fn update_mapping(
     Path((_connector_id, mapping_id)): Path<(Uuid, Uuid)>,
     Json(request): Json<UpdateMappingRequest>,
 ) -> Result<Json<MappingResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     let mapping = state
@@ -193,6 +199,9 @@ pub async fn delete_mapping(
     Extension(claims): Extension<JwtClaims>,
     Path((_connector_id, mapping_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     state

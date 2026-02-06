@@ -28,12 +28,7 @@ ALTER TABLE gov_role_effective_entitlements ENABLE ROW LEVEL SECURITY;
 -- RLS policy for tenant isolation
 DROP POLICY IF EXISTS gov_role_eff_ent_tenant_isolation ON gov_role_effective_entitlements;
 CREATE POLICY gov_role_eff_ent_tenant_isolation ON gov_role_effective_entitlements
-    USING (
-        tenant_id = COALESCE(
-            NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-            tenant_id
-        )
-    );
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- Comments for documentation
 COMMENT ON TABLE gov_role_effective_entitlements IS 'Cached/denormalized effective entitlements for each role (direct + inherited) (F088)';

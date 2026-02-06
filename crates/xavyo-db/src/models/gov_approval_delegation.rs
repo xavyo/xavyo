@@ -27,13 +27,13 @@ pub enum DelegationStatus {
 
 impl DelegationStatus {
     /// Check if the delegation is in a state that can be acted upon.
-    #[must_use] 
+    #[must_use]
     pub fn is_actionable(&self) -> bool {
         matches!(self, Self::Active)
     }
 
     /// Check if the delegation is in a terminal state.
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Expired | Self::Revoked)
     }
@@ -536,7 +536,7 @@ impl GovApprovalDelegation {
     }
 
     /// Check if this delegation is currently active.
-    #[must_use] 
+    #[must_use]
     pub fn is_currently_active(&self, now: DateTime<Utc>) -> bool {
         self.is_active && self.starts_at <= now && self.ends_at > now
     }

@@ -39,19 +39,19 @@ pub enum ScheduleStatus {
 
 impl ScheduleStatus {
     /// Check if the schedule is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self, Self::Active)
     }
 
     /// Check if the schedule can be paused.
-    #[must_use] 
+    #[must_use]
     pub fn can_pause(&self) -> bool {
         matches!(self, Self::Active)
     }
 
     /// Check if the schedule can be resumed.
-    #[must_use] 
+    #[must_use]
     pub fn can_resume(&self) -> bool {
         matches!(self, Self::Paused | Self::Disabled)
     }
@@ -615,13 +615,13 @@ impl GovReportSchedule {
     }
 
     /// Parse recipients from JSON.
-    #[must_use] 
+    #[must_use]
     pub fn parse_recipients(&self) -> Vec<String> {
         serde_json::from_value(self.recipients.clone()).unwrap_or_default()
     }
 
     /// Check if the schedule should run now.
-    #[must_use] 
+    #[must_use]
     pub fn is_due(&self) -> bool {
         self.status.is_active() && self.next_run_at <= Utc::now()
     }

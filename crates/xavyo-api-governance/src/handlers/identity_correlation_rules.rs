@@ -84,7 +84,7 @@ pub async fn list_identity_correlation_rules(
     };
 
     let limit = query.limit.min(100);
-    let offset = query.offset;
+    let offset = query.offset.max(0);
 
     let (rules, total) = state
         .identity_correlation_rule_service

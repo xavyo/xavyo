@@ -19,7 +19,7 @@ pub enum EntraCloudEnvironment {
 
 impl EntraCloudEnvironment {
     /// Returns the `OAuth2` login endpoint for this cloud environment.
-    #[must_use] 
+    #[must_use]
     pub fn login_endpoint(&self) -> &'static str {
         match self {
             Self::Commercial => "https://login.microsoftonline.com",
@@ -30,7 +30,7 @@ impl EntraCloudEnvironment {
     }
 
     /// Returns the Microsoft Graph API endpoint for this cloud environment.
-    #[must_use] 
+    #[must_use]
     pub fn graph_endpoint(&self) -> &'static str {
         match self {
             Self::Commercial => "https://graph.microsoft.com",
@@ -129,7 +129,7 @@ fn default_page_size() -> u32 {
 
 impl EntraConfig {
     /// Creates a new configuration builder.
-    #[must_use] 
+    #[must_use]
     pub fn builder() -> EntraConfigBuilder {
         EntraConfigBuilder::default()
     }
@@ -173,7 +173,7 @@ impl EntraConfigBuilder {
     }
 
     /// Sets the cloud environment.
-    #[must_use] 
+    #[must_use]
     pub fn cloud_environment(mut self, env: EntraCloudEnvironment) -> Self {
         self.cloud_environment = env;
         self
@@ -192,35 +192,35 @@ impl EntraConfigBuilder {
     }
 
     /// Enables or disables group sync.
-    #[must_use] 
+    #[must_use]
     pub fn sync_groups(mut self, sync: bool) -> Self {
         self.sync_groups = sync;
         self
     }
 
     /// Enables or disables directory role sync.
-    #[must_use] 
+    #[must_use]
     pub fn sync_directory_roles(mut self, sync: bool) -> Self {
         self.sync_directory_roles = sync;
         self
     }
 
     /// Sets the page size for API requests.
-    #[must_use] 
+    #[must_use]
     pub fn page_size(mut self, size: u32) -> Self {
         self.page_size = size;
         self
     }
 
     /// Sets the conflict resolution strategy.
-    #[must_use] 
+    #[must_use]
     pub fn conflict_strategy(mut self, strategy: EntraConflictStrategy) -> Self {
         self.conflict_strategy = strategy;
         self
     }
 
     /// Enables transitive member resolution.
-    #[must_use] 
+    #[must_use]
     pub fn resolve_transitive_members(mut self, resolve: bool) -> Self {
         self.resolve_transitive_members = resolve;
         self

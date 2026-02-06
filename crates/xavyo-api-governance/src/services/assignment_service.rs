@@ -22,7 +22,7 @@ pub struct AssignmentService {
 
 impl AssignmentService {
     /// Create a new assignment service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             effective_access_service: EffectiveAccessService::new(pool.clone()),

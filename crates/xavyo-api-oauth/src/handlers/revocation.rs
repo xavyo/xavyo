@@ -132,7 +132,9 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
     }
 
     // Extract user_id from subject — reject if not a valid UUID
-    let user_id = if let Ok(uid) = claims.sub.parse::<Uuid>() { uid } else {
+    let user_id = if let Ok(uid) = claims.sub.parse::<Uuid>() {
+        uid
+    } else {
         tracing::warn!(
             target: "token_lifecycle",
             jti = %jti,

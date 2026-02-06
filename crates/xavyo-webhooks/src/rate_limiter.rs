@@ -31,7 +31,7 @@ impl Default for RateLimitConfig {
 
 impl RateLimitConfig {
     /// Create a new rate limit configuration.
-    #[must_use] 
+    #[must_use]
     pub fn new(requests_per_second: f64, burst_size: u32) -> Self {
         Self {
             requests_per_second,
@@ -40,14 +40,14 @@ impl RateLimitConfig {
     }
 
     /// Create a configuration with custom requests per second.
-    #[must_use] 
+    #[must_use]
     pub fn with_requests_per_second(mut self, rps: f64) -> Self {
         self.requests_per_second = rps;
         self
     }
 
     /// Create a configuration with custom burst size.
-    #[must_use] 
+    #[must_use]
     pub fn with_burst_size(mut self, size: u32) -> Self {
         self.burst_size = size;
         self
@@ -66,7 +66,7 @@ impl RateLimiter {
     /// Create a new rate limiter with the given configuration.
     ///
     /// Starts with a full bucket of tokens.
-    #[must_use] 
+    #[must_use]
     pub fn new(config: RateLimitConfig) -> Self {
         Self {
             tokens: f64::from(config.burst_size),
@@ -131,7 +131,7 @@ impl RateLimiter {
     }
 
     /// Get the configuration.
-    #[must_use] 
+    #[must_use]
     pub fn config(&self) -> &RateLimitConfig {
         &self.config
     }
@@ -163,7 +163,7 @@ pub struct RateLimiterRegistry {
 
 impl RateLimiterRegistry {
     /// Create a new registry with the given default configuration.
-    #[must_use] 
+    #[must_use]
     pub fn new(default_config: RateLimitConfig) -> Self {
         Self {
             limiters: Arc::new(RwLock::new(HashMap::new())),

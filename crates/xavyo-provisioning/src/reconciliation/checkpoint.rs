@@ -59,13 +59,13 @@ impl Default for Checkpoint {
 
 impl Checkpoint {
     /// Create a new checkpoint at initialization phase.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Create checkpoint at resource processing phase.
-    #[must_use] 
+    #[must_use]
     pub fn at_resource_processing(
         last_key: Option<String>,
         accounts_processed: u32,
@@ -80,7 +80,7 @@ impl Checkpoint {
     }
 
     /// Create checkpoint at shadow processing phase.
-    #[must_use] 
+    #[must_use]
     pub fn at_shadow_processing(
         last_key: Option<String>,
         accounts_processed: u32,
@@ -95,7 +95,7 @@ impl Checkpoint {
     }
 
     /// Create checkpoint at finalization phase.
-    #[must_use] 
+    #[must_use]
     pub fn at_finalization(accounts_processed: u32) -> Self {
         Self {
             phase: CheckpointPhase::Finalization,
@@ -134,7 +134,7 @@ pub struct CheckpointManager {
 
 impl CheckpointManager {
     /// Create a new checkpoint manager.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

@@ -33,11 +33,11 @@ use xavyo_api_auth::{
     admin_invite_public_router, admin_invite_router, admin_router as auth_admin_router,
     alerts_router, api_key_auth_middleware, audit_router, auth_router, branding_router,
     delegation_router, devices_router, jwt_auth_middleware, key_management_router, me_router,
-    mfa_router, passwordless_admin_router, passwordless_router, public_router, revocation_router,
-    users_router as auth_users_router, AuditService, AuthService, AuthState, EmailRateLimiter,
-    JwtPublicKey, JwtPublicKeys, KeyService, LockoutService, MfaService, MockEmailSender,
-    RateLimitConfig, RateLimiter, RevocationCache, SessionService, TokenConfig, TokenService,
-    TotpEncryption,
+    mfa_router, org_security_policy_router, passwordless_admin_router, passwordless_router,
+    public_router, revocation_router, users_router as auth_users_router, AuditService, AuthService,
+    AuthState, EmailRateLimiter, JwtPublicKey, JwtPublicKeys, KeyService, LockoutService,
+    MfaService, MockEmailSender, RateLimitConfig, RateLimiter, RevocationCache, SessionService,
+    TokenConfig, TokenService, TotpEncryption,
 };
 use xavyo_api_authorization::authorization_router;
 use xavyo_api_connectors::{
@@ -53,7 +53,7 @@ use xavyo_api_oauth::router::{
 };
 use xavyo_api_oidc_federation::{create_federation_router, FederationConfig};
 use xavyo_api_saml::{create_saml_state, saml_admin_router, saml_public_router};
-use xavyo_api_scim::{scim_router, ScimConfig};
+use xavyo_api_scim::{scim_admin_router, scim_resource_router, ScimConfig};
 use xavyo_api_social::{admin_social_router, public_social_router, SocialConfig, SocialState};
 use xavyo_api_tenants::{
     api_keys_router, oauth_clients_router, suspension_check_middleware, system_admin_router,
@@ -124,26 +124,48 @@ async fn main() {
         }
     }
 
-    // Create database connection pool
-    let pool = match PgPoolOptions::new()
-        .max_connections(10)
+    // Create admin database connection pool (superuser — for bootstrap/migrations only)
+    let admin_pool = match PgPoolOptions::new()
+        .max_connections(2)
         .acquire_timeout(Duration::from_secs(5))
         .connect(&config.database_url)
         .await
     {
         Ok(pool) => {
-            info!("Database connection established");
+            info!("Admin database connection established (superuser)");
             pool
         }
         Err(e) => {
-            eprintln!("Failed to connect to database: {e}");
+            eprintln!("Failed to connect to database (admin): {e}");
+            std::process::exit(1);
+        }
+    };
+
+    // Create app database connection pool (xavyo_app — RLS enforced)
+    // Falls back to superuser pool if APP_DATABASE_URL is not configured
+    let app_database_url = config
+        .app_database_url
+        .as_deref()
+        .unwrap_or(&config.database_url);
+    let pool = match middleware::create_rls_pool(app_database_url, 10).await {
+        Ok(pool) => {
+            if config.app_database_url.is_some() {
+                info!("App database connection established (RLS enforced via xavyo_app)");
+            } else {
+                info!("App database connection established (using superuser — set APP_DATABASE_URL for RLS)");
+            }
+            pool
+        }
+        Err(e) => {
+            eprintln!("Failed to connect to database (app): {e}");
             std::process::exit(1);
         }
     };
 
     // F095: Bootstrap system tenant and CLI OAuth client
     // This must happen after DB connection but before any services that depend on tenants
-    match bootstrap::bootstrap_system(&pool).await {
+    // Uses admin_pool (superuser) since bootstrap needs to create system tenant without RLS
+    match bootstrap::bootstrap_system(&admin_pool).await {
         Ok(result) => {
             info!(
                 tenant_created = result.tenant_created,
@@ -157,6 +179,10 @@ async fn main() {
             std::process::exit(1);
         }
     }
+
+    // Close admin pool — no longer needed after bootstrap
+    admin_pool.close().await;
+    drop(admin_pool);
 
     // F082-US4: Create revocation cache (moka LRU, 10K entries, 30s TTL)
     let revocation_cache = RevocationCache::new(pool.clone());
@@ -336,6 +362,16 @@ async fn main() {
 
     // Build auth admin routes (for /admin/tenants/:id/session-policy)
     let auth_admin_routes = auth_admin_router(auth_state.clone())
+        .layer(axum::middleware::from_fn(jwt_auth_middleware))
+        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(true)
+                .build(),
+        ));
+
+    // Build org security policy routes (F-066)
+    let org_security_policy_routes = org_security_policy_router(auth_state.clone())
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
         .layer(TenantLayer::with_config(
@@ -649,9 +685,18 @@ async fn main() {
                 .build(),
         ));
 
-    // SCIM 2.0 provisioning routes
+    // SCIM 2.0 provisioning routes (resource routes use SCIM Bearer token auth)
     let scim_config = ScimConfig::new(pool.clone(), config.issuer_url.clone());
-    let scim_routes = scim_router(scim_config);
+    let scim_resource_routes = scim_resource_router(scim_config);
+    // SCIM admin routes (token/mapping management - requires JWT + admin role)
+    let scim_admin_routes = scim_admin_router(pool.clone())
+        .layer(axum::middleware::from_fn(jwt_auth_middleware))
+        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(true)
+                .build(),
+        ));
 
     // Governance routes (F033 - IGA Entitlement Management)
     // F113: Support both API key and JWT authentication for programmatic access
@@ -956,8 +1001,10 @@ async fn main() {
         .nest("/admin/saml", saml_admin_routes)
         // OIDC Federation routes (external IdP integration)
         .merge(federation_routes)
-        // SCIM 2.0 provisioning routes
-        .merge(scim_routes)
+        // SCIM 2.0 resource provisioning routes (SCIM Bearer token auth)
+        .nest("/scim/v2", scim_resource_routes)
+        // SCIM admin routes (JWT + admin role)
+        .nest("/admin/scim", scim_admin_routes)
         // Devices routes (F026)
         .nest("/devices", devices_routes)
         // Audit routes (F025)
@@ -968,6 +1015,8 @@ async fn main() {
         .nest("/me", me_routes)
         // Delegation admin routes (F029)
         .nest("/admin/delegation", delegation_routes)
+        // Organization security policy routes (F-066)
+        .merge(org_security_policy_routes)
         // Admin invitation routes (F-ADMIN-INVITE - authenticated)
         .nest("/admin", admin_invite_routes)
         // Admin invitation accept route (F-ADMIN-INVITE - public, no auth)
@@ -1075,7 +1124,11 @@ async fn main() {
         // F082-US4: Revocation cache for fast JTI lookups
         .layer(axum::Extension(revocation_cache))
         // F085: Webhook event publisher for identity lifecycle events
-        .layer(axum::Extension(event_publisher));
+        .layer(axum::Extension(event_publisher))
+        // RLS: Set task-local tenant context for automatic app.current_tenant on DB connections.
+        // This is the outermost middleware — runs first on request, wraps everything.
+        // Reads X-Tenant-ID header and scopes the entire request in a task-local.
+        .layer(axum::middleware::from_fn(middleware::rls_tenant_middleware));
 
     // Start Kafka consumers if configured (F055 - Micro-certification)
     #[cfg(feature = "kafka")]

@@ -65,6 +65,10 @@ pub enum ConnectorApiError {
     #[error("unauthorized: {message}")]
     Unauthorized { message: String },
 
+    /// Access denied (insufficient permissions).
+    #[error("access denied")]
+    Forbidden,
+
     /// Operation not found.
     #[error("operation not found: {0}")]
     OperationNotFound(Uuid),
@@ -134,16 +138,22 @@ impl IntoResponse for ConnectorApiError {
                 "unsupported_connector_type",
                 self.to_string(),
             ),
-            ConnectorApiError::EncryptionFailed(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "encryption_failed",
-                self.to_string(),
-            ),
-            ConnectorApiError::DecryptionFailed(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "decryption_failed",
-                self.to_string(),
-            ),
+            ConnectorApiError::EncryptionFailed(ref e) => {
+                error!("Encryption failed: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "encryption_failed",
+                    "Credential encryption failed".to_string(),
+                )
+            }
+            ConnectorApiError::DecryptionFailed(ref e) => {
+                error!("Decryption failed: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "decryption_failed",
+                    "Credential decryption failed".to_string(),
+                )
+            }
             ConnectorApiError::Validation(_) => (
                 StatusCode::BAD_REQUEST,
                 "validation_error",
@@ -157,14 +167,22 @@ impl IntoResponse for ConnectorApiError {
                     "Internal database error".to_string(),
                 )
             }
-            ConnectorApiError::Connector(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "connector_error",
-                self.to_string(),
-            ),
+            ConnectorApiError::Connector(ref e) => {
+                error!("Connector error: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "connector_error",
+                    "A connector error occurred".to_string(),
+                )
+            }
             ConnectorApiError::Unauthorized { .. } => {
                 (StatusCode::UNAUTHORIZED, "unauthorized", self.to_string())
             }
+            ConnectorApiError::Forbidden => (
+                StatusCode::FORBIDDEN,
+                "forbidden",
+                "Access denied".to_string(),
+            ),
             ConnectorApiError::OperationNotFound(_) => (
                 StatusCode::NOT_FOUND,
                 "operation_not_found",
@@ -175,27 +193,39 @@ impl IntoResponse for ConnectorApiError {
                 "invalid_operation_state",
                 self.to_string(),
             ),
-            ConnectorApiError::QueueError(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "queue_error",
-                self.to_string(),
-            ),
+            ConnectorApiError::QueueError(ref e) => {
+                error!("Queue error: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "queue_error",
+                    "A queue error occurred".to_string(),
+                )
+            }
             ConnectorApiError::Conflict(_) => (StatusCode::CONFLICT, "conflict", self.to_string()),
-            ConnectorApiError::HealthError(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "health_error",
-                self.to_string(),
-            ),
-            ConnectorApiError::SyncError(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "sync_error",
-                self.to_string(),
-            ),
-            ConnectorApiError::Internal(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "internal_error",
-                self.to_string(),
-            ),
+            ConnectorApiError::HealthError(ref e) => {
+                error!("Health check error: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "health_error",
+                    "A health check error occurred".to_string(),
+                )
+            }
+            ConnectorApiError::SyncError(ref e) => {
+                error!("Sync error: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "sync_error",
+                    "A synchronization error occurred".to_string(),
+                )
+            }
+            ConnectorApiError::Internal(ref msg) => {
+                error!("Internal error: {}", msg);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal_error",
+                    "An internal error occurred".to_string(),
+                )
+            }
         };
 
         let body = json!({

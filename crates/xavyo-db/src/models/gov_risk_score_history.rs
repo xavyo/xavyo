@@ -67,7 +67,7 @@ pub struct RiskScoreTrend {
 
 impl TrendDirection {
     /// Determine trend direction from score change.
-    #[must_use] 
+    #[must_use]
     pub fn from_change(change: i32, threshold: i32) -> Self {
         if change > threshold {
             Self::Increasing

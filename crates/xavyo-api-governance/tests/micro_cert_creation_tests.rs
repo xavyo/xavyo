@@ -4,9 +4,7 @@
 
 use chrono::{Duration, Utc};
 use uuid::Uuid;
-use xavyo_db::{
-    MicroCertDecision, MicroCertStatus,
-};
+use xavyo_db::{MicroCertDecision, MicroCertStatus};
 
 /// Simulated certification creation input
 #[derive(Debug, Clone)]
@@ -349,7 +347,9 @@ fn create_certification_with_escalation(
     let escalation_deadline = if input.backup_reviewer_id.is_some() {
         Some(
             Utc::now()
-                + Duration::seconds(i64::from(input.timeout_secs * reminder_threshold_percent / 100)),
+                + Duration::seconds(i64::from(
+                    input.timeout_secs * reminder_threshold_percent / 100,
+                )),
         )
     } else {
         None

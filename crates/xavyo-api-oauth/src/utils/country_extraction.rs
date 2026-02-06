@@ -20,7 +20,7 @@ pub const UNKNOWN_COUNTRY: &str = "XX";
 ///
 /// # Returns
 /// A 2-letter ISO 3166-1 alpha-2 country code, or "XX" if unknown.
-#[must_use] 
+#[must_use]
 pub fn extract_country_code(headers: &HeaderMap) -> String {
     // 1. CloudFlare: CF-IPCountry
     if let Some(cf_country) = headers.get("CF-IPCountry") {

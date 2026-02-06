@@ -32,7 +32,7 @@ impl AttributeMapper {
     /// When `mappings` is non-empty, the mapper uses those entries to decide
     /// which SCIM paths to populate and how.  When `mappings` is empty, the
     /// built-in default mapping (equivalent to the default DB rows) is used.
-    #[must_use] 
+    #[must_use]
     pub fn map_user_to_scim(
         user_id: Uuid,
         email: Option<&str>,
@@ -45,8 +45,14 @@ impl AttributeMapper {
         // Collect source field values into a lookup table.
         let source_values: Vec<(&str, Option<String>)> = vec![
             ("email", email.map(std::string::ToString::to_string)),
-            ("display_name", display_name.map(std::string::ToString::to_string)),
-            ("first_name", first_name.map(std::string::ToString::to_string)),
+            (
+                "display_name",
+                display_name.map(std::string::ToString::to_string),
+            ),
+            (
+                "first_name",
+                first_name.map(std::string::ToString::to_string),
+            ),
             ("last_name", last_name.map(std::string::ToString::to_string)),
             ("is_active", Some(active.to_string())),
         ];
@@ -167,7 +173,7 @@ impl AttributeMapper {
     /// SCIM-side resource IDs of members that have already been provisioned.
     /// These are string identifiers returned by the target system and may or
     /// may not be valid UUIDs depending on the target.
-    #[must_use] 
+    #[must_use]
     pub fn map_group_to_scim(
         group_id: Uuid,
         display_name: &str,
@@ -203,7 +209,7 @@ impl AttributeMapper {
     ///
     /// Returns `None` if no patch operations would be generated (e.g. no fields
     /// map to any SCIM path).
-    #[must_use] 
+    #[must_use]
     pub fn build_user_patch(
         changed_fields: &[(String, Option<String>)],
         mappings: &[ScimTargetAttributeMapping],

@@ -100,6 +100,14 @@ pub struct User {
     /// JSONB custom attributes for extensible user schema.
     #[sqlx(default)]
     pub custom_attributes: serde_json::Value,
+
+    // Identity Archetype fields (F058)
+    /// Optional reference to identity archetype. When set, archetype policies and schema extensions apply.
+    pub archetype_id: Option<uuid::Uuid>,
+
+    /// Custom attribute values for this user based on their archetype schema extensions.
+    #[sqlx(default)]
+    pub archetype_custom_attrs: serde_json::Value,
 }
 
 impl User {
@@ -435,6 +443,100 @@ impl User {
     }
 
     // ========================================================================
+    // F058: Identity Archetype Methods
+    // ========================================================================
+
+    /// Assign an archetype to a user (F058).
+    pub async fn assign_archetype(
+        pool: &sqlx::PgPool,
+        tenant_id: uuid::Uuid,
+        user_id: uuid::Uuid,
+        archetype_id: uuid::Uuid,
+        custom_attrs: Option<serde_json::Value>,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        let attrs = custom_attrs.unwrap_or_else(|| serde_json::json!({}));
+        sqlx::query_as(
+            r"
+            UPDATE users
+            SET archetype_id = $3,
+                archetype_custom_attrs = $4,
+                updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2
+            RETURNING *
+            ",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .bind(archetype_id)
+        .bind(attrs)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Remove archetype from a user (F058).
+    pub async fn remove_archetype(
+        pool: &sqlx::PgPool,
+        tenant_id: uuid::Uuid,
+        user_id: uuid::Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            UPDATE users
+            SET archetype_id = NULL,
+                archetype_custom_attrs = '{}',
+                updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2
+            RETURNING *
+            ",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Update archetype custom attributes for a user (F058).
+    pub async fn update_archetype_custom_attrs(
+        pool: &sqlx::PgPool,
+        tenant_id: uuid::Uuid,
+        user_id: uuid::Uuid,
+        custom_attrs: serde_json::Value,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            UPDATE users
+            SET archetype_custom_attrs = $3,
+                updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2 AND archetype_id IS NOT NULL
+            RETURNING *
+            ",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .bind(custom_attrs)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Get user's archetype ID (F058).
+    pub async fn get_archetype_id(
+        pool: &sqlx::PgPool,
+        tenant_id: uuid::Uuid,
+        user_id: uuid::Uuid,
+    ) -> Result<Option<uuid::Uuid>, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT archetype_id FROM users
+            WHERE id = $1 AND tenant_id = $2
+            ",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .fetch_one(pool)
+        .await
+    }
+
+    // ========================================================================
     // F097: Tenant Provisioning API Methods
     // ========================================================================
 
@@ -507,7 +609,101 @@ mod tests {
             manager_id: None,
             // Custom attributes (F070)
             custom_attributes: serde_json::json!({}),
+            // Identity Archetype fields (F058)
+            archetype_id: None,
+            archetype_custom_attrs: serde_json::json!({}),
         };
         assert_eq!(*user.user_id().as_uuid(), uuid);
+    }
+
+    #[test]
+    fn test_user_archetype_fields_default() {
+        let user = User {
+            id: uuid::Uuid::new_v4(),
+            tenant_id: uuid::Uuid::new_v4(),
+            email: "test@example.com".to_string(),
+            password_hash: "hash".to_string(),
+            display_name: None,
+            is_active: true,
+            email_verified: false,
+            email_verified_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            external_id: None,
+            first_name: None,
+            last_name: None,
+            scim_provisioned: false,
+            scim_last_sync: None,
+            failed_login_count: 0,
+            last_failed_login_at: None,
+            locked_at: None,
+            locked_until: None,
+            lockout_reason: None,
+            password_changed_at: None,
+            password_expires_at: None,
+            must_change_password: false,
+            avatar_url: None,
+            lifecycle_state_id: None,
+            manager_id: None,
+            custom_attributes: serde_json::json!({}),
+            archetype_id: None,
+            archetype_custom_attrs: serde_json::json!({}),
+        };
+        assert!(user.archetype_id.is_none());
+        assert_eq!(user.archetype_custom_attrs, serde_json::json!({}));
+    }
+
+    #[test]
+    fn test_user_archetype_fields_assigned() {
+        let archetype_id = uuid::Uuid::new_v4();
+        let custom_attrs = serde_json::json!({"employee_id": "E12345"});
+        let user = User {
+            id: uuid::Uuid::new_v4(),
+            tenant_id: uuid::Uuid::new_v4(),
+            email: "test@example.com".to_string(),
+            password_hash: "hash".to_string(),
+            display_name: None,
+            is_active: true,
+            email_verified: false,
+            email_verified_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            external_id: None,
+            first_name: None,
+            last_name: None,
+            scim_provisioned: false,
+            scim_last_sync: None,
+            failed_login_count: 0,
+            last_failed_login_at: None,
+            locked_at: None,
+            locked_until: None,
+            lockout_reason: None,
+            password_changed_at: None,
+            password_expires_at: None,
+            must_change_password: false,
+            avatar_url: None,
+            lifecycle_state_id: None,
+            manager_id: None,
+            custom_attributes: serde_json::json!({}),
+            archetype_id: Some(archetype_id),
+            archetype_custom_attrs: custom_attrs.clone(),
+        };
+        assert_eq!(user.archetype_id, Some(archetype_id));
+        assert_eq!(user.archetype_custom_attrs, custom_attrs);
+    }
+
+    #[test]
+    fn test_archetype_custom_attrs_serialization() {
+        let custom_attrs = serde_json::json!({
+            "employee_id": "E12345",
+            "department": "Engineering",
+            "location": "Remote"
+        });
+
+        // Verify custom attrs can be serialized and deserialized
+        let serialized = serde_json::to_string(&custom_attrs).unwrap();
+        let deserialized: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized["employee_id"], "E12345");
+        assert_eq!(deserialized["department"], "Engineering");
     }
 }

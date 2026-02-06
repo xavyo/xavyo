@@ -43,7 +43,7 @@ pub async fn list_sod_rules(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (rules, total) = state
         .sod_rule_service
@@ -116,6 +116,9 @@ pub async fn create_sod_rule(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateSodRuleRequest>,
 ) -> ApiResult<(StatusCode, Json<SodRuleResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -165,6 +168,9 @@ pub async fn update_sod_rule(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateSodRuleRequest>,
 ) -> ApiResult<Json<SodRuleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -208,6 +214,9 @@ pub async fn delete_sod_rule(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -239,6 +248,9 @@ pub async fn enable_sod_rule(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<SodRuleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -270,6 +282,9 @@ pub async fn disable_sod_rule(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<SodRuleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

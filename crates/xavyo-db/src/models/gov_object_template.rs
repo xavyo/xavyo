@@ -509,19 +509,19 @@ impl GovObjectTemplate {
     }
 
     /// Check if template is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         self.status == ObjectTemplateStatus::Active
     }
 
     /// Check if template is draft.
-    #[must_use] 
+    #[must_use]
     pub fn is_draft(&self) -> bool {
         self.status == ObjectTemplateStatus::Draft
     }
 
     /// Check if template is disabled.
-    #[must_use] 
+    #[must_use]
     pub fn is_disabled(&self) -> bool {
         self.status == ObjectTemplateStatus::Disabled
     }

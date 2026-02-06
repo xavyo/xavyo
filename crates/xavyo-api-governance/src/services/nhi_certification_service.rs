@@ -82,7 +82,7 @@ pub struct NhiCertificationService {
 
 impl NhiCertificationService {
     /// Create a new NHI certification service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             credential_service: NhiCredentialService::new(pool.clone()),
@@ -139,7 +139,9 @@ impl NhiCertificationService {
 
         // Validate specific reviewers if required
         if reviewer_type == NhiCertReviewerType::SpecificUsers
-            && specific_reviewers.as_ref().is_none_or(std::vec::Vec::is_empty)
+            && specific_reviewers
+                .as_ref()
+                .is_none_or(std::vec::Vec::is_empty)
         {
             return Err(GovernanceError::SpecificReviewersRequired);
         }
@@ -1192,7 +1194,7 @@ impl NhiCertificationService {
                    i.decision, i.decided_by, i.decided_at, i.comment,
                    i.delegated_by, i.original_reviewer_id, i.created_at
             FROM gov_nhi_certification_items i
-            JOIN gov_service_accounts s ON i.nhi_id = s.id
+            JOIN gov_service_accounts s ON i.nhi_id = s.id AND s.tenant_id = i.tenant_id
             WHERE i.tenant_id = $1
             ",
         );
@@ -1201,7 +1203,7 @@ impl NhiCertificationService {
             r"
             SELECT COUNT(*)
             FROM gov_nhi_certification_items i
-            JOIN gov_service_accounts s ON i.nhi_id = s.id
+            JOIN gov_service_accounts s ON i.nhi_id = s.id AND s.tenant_id = i.tenant_id
             WHERE i.tenant_id = $1
             ",
         );
@@ -1544,7 +1546,7 @@ impl NhiCertificationService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

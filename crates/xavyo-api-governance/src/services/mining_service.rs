@@ -35,7 +35,7 @@ pub struct MiningService {
 
 impl MiningService {
     /// Create a new mining service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -426,8 +426,8 @@ impl MiningService {
         // Query user group memberships
         let rows: Vec<(Uuid, Uuid, String)> = sqlx::query_as(
             r"
-            SELECT ug.user_id, ug.group_id, g.name
-            FROM user_groups ug
+            SELECT ug.user_id, ug.group_id, g.display_name
+            FROM group_memberships ug
             INNER JOIN groups g ON g.id = ug.group_id AND g.tenant_id = ug.tenant_id
             WHERE ug.tenant_id = $1 AND ug.user_id = ANY($2)
             ",
@@ -505,14 +505,14 @@ impl MiningService {
             r"
             SELECT
                 g.id as role_id,
-                g.name,
+                g.display_name,
                 array_agg(DISTINCT ea.entitlement_id) as entitlement_ids
             FROM groups g
             INNER JOIN gov_entitlement_assignments ea ON ea.target_id = g.id
                 AND ea.target_type = 'group'
                 AND ea.status = 'active'
             WHERE g.tenant_id = $1
-            GROUP BY g.id, g.name
+            GROUP BY g.id, g.display_name
             HAVING COUNT(ea.entitlement_id) > 0
             ",
         )
@@ -787,7 +787,7 @@ impl MiningService {
     ) -> Result<Uuid> {
         // Check if a group with this name already exists
         let existing: Option<Uuid> =
-            sqlx::query_scalar(r"SELECT id FROM groups WHERE tenant_id = $1 AND name = $2")
+            sqlx::query_scalar(r"SELECT id FROM groups WHERE tenant_id = $1 AND display_name = $2")
                 .bind(tenant_id)
                 .bind(name)
                 .fetch_optional(tx.as_mut())
@@ -802,7 +802,7 @@ impl MiningService {
         // Create a new group
         let group_id: Uuid = sqlx::query_scalar(
             r"
-            INSERT INTO groups (tenant_id, name, description, created_at, updated_at)
+            INSERT INTO groups (tenant_id, display_name, description, created_at, updated_at)
             VALUES ($1, $2, $3, NOW(), NOW())
             RETURNING id
             ",

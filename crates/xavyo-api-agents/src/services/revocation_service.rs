@@ -111,7 +111,7 @@ pub struct OcspResponse {
 
 impl RevocationService {
     /// Create a new `RevocationService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, certificate_service: Arc<CertificateService>) -> Self {
         Self {
             pool,
@@ -121,7 +121,7 @@ impl RevocationService {
     }
 
     /// Create a new `RevocationService` with CA service for CRL generation.
-    #[must_use] 
+    #[must_use]
     pub fn with_ca_service(
         pool: PgPool,
         certificate_service: Arc<CertificateService>,

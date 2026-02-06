@@ -32,13 +32,13 @@ pub struct SemiManualResourceService {
 
 impl SemiManualResourceService {
     /// Create a new semi-manual resource service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -50,7 +50,7 @@ impl SemiManualResourceService {
         query: &ListSemiManualApplicationsQuery,
     ) -> Result<SemiManualApplicationsListResponse> {
         let limit = query.limit.unwrap_or(50).min(100);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         // Get all semi-manual applications to calculate total count
         let all_applications =

@@ -35,7 +35,7 @@ pub struct SchemaSchedulerJob {
 
 impl SchemaSchedulerJob {
     /// Create a new schema scheduler job.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         pool: PgPool,
         schedule_service: ScheduleService,
@@ -52,7 +52,7 @@ impl SchemaSchedulerJob {
     }
 
     /// Create with custom batch size.
-    #[must_use] 
+    #[must_use]
     pub fn with_batch_size(mut self, batch_size: i32) -> Self {
         self.batch_size = batch_size.max(1);
         self
@@ -233,7 +233,7 @@ impl SchemaSchedulerJob {
     }
 
     /// Get the batch size for polling.
-    #[must_use] 
+    #[must_use]
     pub fn batch_size(&self) -> i32 {
         self.batch_size
     }

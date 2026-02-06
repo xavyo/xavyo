@@ -197,13 +197,13 @@ impl AiAgent {
     }
 
     /// Check if the agent is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         self.status == "active"
     }
 
     /// Check if the agent has expired.
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
             expires_at < Utc::now()

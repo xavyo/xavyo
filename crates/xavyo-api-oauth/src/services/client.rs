@@ -39,13 +39,13 @@ pub struct OAuth2ClientService {
 
 impl OAuth2ClientService {
     /// Create a new client service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -616,7 +616,9 @@ impl OAuth2ClientService {
             OAuthError::Internal("Database error".to_string())
         })?;
 
-        let client = if let Some(c) = client { c } else {
+        let client = if let Some(c) = client {
+            c
+        } else {
             tracing::warn!(
                 client_id = %client_id,
                 "Client authentication failed: client not found"
@@ -644,7 +646,9 @@ impl OAuth2ClientService {
         }
 
         // Verify the secret
-        let secret_hash = if let Some(hash) = client.client_secret_hash.as_ref() { hash } else {
+        let secret_hash = if let Some(hash) = client.client_secret_hash.as_ref() {
+            hash
+        } else {
             tracing::warn!(
                 client_id = %client_id,
                 "Client authentication failed: no secret configured"
@@ -857,7 +861,7 @@ impl OAuth2ClientService {
 
 impl ClientType {
     /// Check if this client type requires a secret.
-    #[must_use] 
+    #[must_use]
     pub fn requires_secret(&self) -> bool {
         matches!(self, ClientType::Confidential)
     }

@@ -16,7 +16,7 @@ pub struct SiemHealthService {
 }
 
 impl SiemHealthService {
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -46,15 +46,11 @@ impl SiemHealthService {
 
         Ok(HealthSummaryData {
             destination_id,
-            total_events_sent: health_summary
-                .as_ref()
-                .map_or(0, |h| h.total_events_sent),
+            total_events_sent: health_summary.as_ref().map_or(0, |h| h.total_events_sent),
             total_events_delivered: health_summary
                 .as_ref()
                 .map_or(0, |h| h.total_events_delivered),
-            total_events_failed: health_summary
-                .as_ref()
-                .map_or(0, |h| h.total_events_failed),
+            total_events_failed: health_summary.as_ref().map_or(0, |h| h.total_events_failed),
             total_events_dropped: health_summary
                 .as_ref()
                 .map_or(0, |h| h.total_events_dropped),

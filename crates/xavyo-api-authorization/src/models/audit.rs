@@ -269,8 +269,8 @@ impl From<ListAuditQuery> for PolicyAuditFilter {
             }),
             from_date: query.from_date,
             to_date: query.to_date,
-            limit: Some(query.limit.min(1000) as usize),
-            offset: Some(query.offset as usize),
+            limit: Some(query.limit.clamp(1, 1000) as usize),
+            offset: Some(query.offset.max(0) as usize),
         }
     }
 }

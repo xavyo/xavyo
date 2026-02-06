@@ -399,19 +399,19 @@ impl GovOutlierResult {
     }
 
     /// Get peer scores as a vec.
-    #[must_use] 
+    #[must_use]
     pub fn get_peer_scores(&self) -> &Vec<PeerGroupScore> {
         &self.peer_scores.0
     }
 
     /// Get factor breakdown.
-    #[must_use] 
+    #[must_use]
     pub fn get_factors(&self) -> &FactorBreakdown {
         &self.factor_breakdown.0
     }
 
     /// Check if this is an outlier.
-    #[must_use] 
+    #[must_use]
     pub fn is_outlier(&self) -> bool {
         matches!(self.classification, OutlierClassification::Outlier)
     }

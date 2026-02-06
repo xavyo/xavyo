@@ -1,9 +1,12 @@
 //! Handlers for API key management.
 //!
 //! F-KEY-ROTATE: These endpoints allow tenants to manage and rotate their API keys.
+//! F-049: API key creation endpoint for self-service key generation.
+//! F-054: API key usage statistics endpoint for monitoring and quota management.
+//! F-055: API key introspection endpoint for viewing key metadata and scopes.
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     Extension, Json,
 };
 use chrono::{Duration, Utc};
@@ -12,14 +15,151 @@ use xavyo_auth::JwtClaims;
 use xavyo_db::{
     bootstrap::SYSTEM_TENANT_ID,
     models::{
-        AdminAction, AdminAuditLog, AdminResourceType, ApiKey, CreateApiKey, CreateAuditLogEntry,
+        AdminAction, AdminAuditLog, AdminResourceType, ApiKey, ApiKeyUsage, ApiKeyUsageDaily,
+        ApiKeyUsageHourly, CreateApiKey, CreateAuditLogEntry,
     },
 };
 
+// Note: AdminAction::Read doesn't exist, so we skip audit logging for read-only usage queries.
+
 use crate::error::TenantError;
-use crate::models::{ApiKeyInfo, ApiKeyListResponse, RotateApiKeyRequest, RotateApiKeyResponse};
+use crate::models::get_scope_info;
+use crate::models::{
+    ApiKeyInfo, ApiKeyListResponse, ApiKeyUsageDailyEntry, ApiKeyUsageHourlyEntry,
+    ApiKeyUsageResponse, ApiKeyUsageSummary, CreateApiKeyRequest, CreateApiKeyResponse,
+    GetApiKeyUsageQuery, IntrospectApiKeyResponse, RotateApiKeyRequest, RotateApiKeyResponse,
+};
 use crate::router::TenantAppState;
 use crate::services::ApiKeyService;
+
+// ============================================================================
+// F-049: API Key Creation Endpoint
+// ============================================================================
+
+/// POST /tenants/{tenant_id}/api-keys
+///
+/// Create a new API key for the specified tenant.
+///
+/// The plaintext API key is returned ONLY ONCE in the response - it cannot be
+/// retrieved later. The key is stored as a SHA-256 hash.
+///
+/// ## Authorization
+/// - System administrators can create keys for any tenant
+/// - Tenant users can create keys for their own tenant only
+#[utoipa::path(
+    post,
+    path = "/tenants/{tenant_id}/api-keys",
+    params(
+        ("tenant_id" = Uuid, Path, description = "Tenant ID to create the key for")
+    ),
+    request_body = CreateApiKeyRequest,
+    responses(
+        (status = 201, description = "API key created successfully", body = CreateApiKeyResponse),
+        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - user cannot create keys for this tenant", body = crate::error::ErrorResponse),
+    ),
+    tag = "API Keys",
+    security(
+        ("bearerAuth" = [])
+    )
+)]
+pub async fn create_api_key_handler(
+    State(state): State<TenantAppState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(tenant_id): Path<Uuid>,
+    Json(request): Json<CreateApiKeyRequest>,
+) -> Result<(axum::http::StatusCode, Json<CreateApiKeyResponse>), TenantError> {
+    // Validate the request
+    if let Some(error) = request.validate() {
+        return Err(TenantError::Validation(error));
+    }
+
+    // Verify caller has access to this tenant
+    let caller_tenant_id = claims
+        .tid
+        .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
+
+    // Allow system tenant admins or the tenant's own users
+    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+        return Err(TenantError::Forbidden(
+            "You don't have access to create API keys for this tenant".to_string(),
+        ));
+    }
+
+    // Get the user ID from claims
+    let user_id = claims
+        .sub
+        .parse::<Uuid>()
+        .map_err(|_| TenantError::Unauthorized("Invalid user ID in claims".to_string()))?;
+
+    // Generate the new API key
+    let api_key_service = ApiKeyService::new();
+    let (plaintext_key, key_hash, key_prefix) = api_key_service.create_key_pair();
+
+    // Create the API key in the database
+    let new_key_data = CreateApiKey {
+        tenant_id,
+        user_id,
+        name: request.name.clone(),
+        key_prefix: key_prefix.clone(),
+        key_hash,
+        scopes: request.scopes.clone(),
+        expires_at: request.expires_at,
+    };
+
+    let new_key = ApiKey::create(&state.pool, new_key_data)
+        .await
+        .map_err(|e| TenantError::Database(e.to_string()))?;
+
+    // Create audit log entry
+    let _ = AdminAuditLog::create(
+        &state.pool,
+        CreateAuditLogEntry {
+            tenant_id,
+            admin_user_id: user_id,
+            action: AdminAction::Create,
+            resource_type: AdminResourceType::ApiKey,
+            resource_id: Some(new_key.id),
+            old_value: None,
+            new_value: Some(serde_json::json!({
+                "key_id": new_key.id,
+                "name": request.name,
+                "key_prefix": key_prefix,
+                "scopes": request.scopes,
+                "expires_at": request.expires_at,
+            })),
+            ip_address: None,
+            user_agent: None,
+        },
+    )
+    .await;
+
+    tracing::info!(
+        tenant_id = %tenant_id,
+        key_id = %new_key.id,
+        user_id = %user_id,
+        key_name = %request.name,
+        "API key created"
+    );
+
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(CreateApiKeyResponse {
+            id: new_key.id,
+            name: new_key.name,
+            key_prefix: new_key.key_prefix,
+            api_key: plaintext_key, // Shown only once!
+            scopes: new_key.scopes,
+            expires_at: new_key.expires_at,
+            created_at: new_key.created_at,
+        }),
+    ))
+}
+
+// ============================================================================
+// F-KEY-ROTATE: API Key Rotation Endpoint (existing)
+// ============================================================================
 
 /// POST /tenants/{tenant_id}/api-keys/{key_id}/rotate
 ///
@@ -314,4 +454,249 @@ pub async fn deactivate_api_key_handler(
     );
 
     Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+// ============================================================================
+// F-054: API Key Usage Statistics Endpoint
+// ============================================================================
+
+/// GET /tenants/{tenant_id}/api-keys/{key_id}/usage
+///
+/// Retrieve usage statistics for a specific API key.
+///
+/// Returns request counts, error rates, and optionally time-series data
+/// based on the granularity parameter.
+///
+/// ## Authorization
+/// - System administrators can view usage for any API key in any tenant
+/// - Tenant users can view usage for API keys in their own tenant only
+#[utoipa::path(
+    get,
+    path = "/tenants/{tenant_id}/api-keys/{key_id}/usage",
+    params(
+        ("tenant_id" = Uuid, Path, description = "Tenant ID"),
+        ("key_id" = Uuid, Path, description = "API Key ID"),
+        ("start_date" = Option<String>, Query, description = "Start date (YYYY-MM-DD)"),
+        ("end_date" = Option<String>, Query, description = "End date (YYYY-MM-DD)"),
+        ("granularity" = Option<String>, Query, description = "Level of detail: summary, hourly, or daily")
+    ),
+    responses(
+        (status = 200, description = "Usage statistics retrieved", body = ApiKeyUsageResponse),
+        (status = 400, description = "Invalid query parameters", body = crate::error::ErrorResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Access denied", body = crate::error::ErrorResponse),
+        (status = 404, description = "API key not found", body = crate::error::ErrorResponse),
+    ),
+    tag = "API Keys",
+    security(
+        ("bearerAuth" = []),
+        ("apiKeyAuth" = [])
+    )
+)]
+pub async fn get_api_key_usage_handler(
+    State(state): State<TenantAppState>,
+    Extension(claims): Extension<JwtClaims>,
+    Path((tenant_id, key_id)): Path<(Uuid, Uuid)>,
+    Query(query): Query<GetApiKeyUsageQuery>,
+) -> Result<Json<ApiKeyUsageResponse>, TenantError> {
+    // Validate query parameters
+    if let Some(error) = query.validate() {
+        return Err(TenantError::Validation(error));
+    }
+
+    // Verify caller has access to this tenant
+    let caller_tenant_id = claims
+        .tid
+        .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
+
+    // Allow system tenant admins or the tenant's own users
+    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+        return Err(TenantError::Forbidden(
+            "Access denied to this tenant's resources".to_string(),
+        ));
+    }
+
+    // Verify the API key exists
+    let api_key = ApiKey::find_by_id(&state.pool, tenant_id, key_id)
+        .await
+        .map_err(|e| TenantError::Database(e.to_string()))?
+        .ok_or_else(|| TenantError::NotFoundWithMessage("API key not found".to_string()))?;
+
+    // Get usage statistics
+    let usage = ApiKeyUsage::get_by_key_id(&state.pool, key_id, tenant_id)
+        .await
+        .map_err(|e| TenantError::Database(e.to_string()))?;
+
+    // Build the summary
+    let summary = if let Some(ref u) = usage {
+        ApiKeyUsageSummary {
+            total_requests: u.total_requests,
+            success_count: u.success_count,
+            client_error_count: u.client_error_count,
+            server_error_count: u.server_error_count,
+            error_rate: ApiKeyUsageSummary::calculate_error_rate(
+                u.total_requests,
+                u.client_error_count,
+                u.server_error_count,
+            ),
+            first_used_at: u.first_used_at,
+            last_used_at: u.last_used_at,
+        }
+    } else {
+        // No usage record yet - key has never been used
+        ApiKeyUsageSummary {
+            total_requests: 0,
+            success_count: 0,
+            client_error_count: 0,
+            server_error_count: 0,
+            error_rate: 0.0,
+            first_used_at: None,
+            last_used_at: None,
+        }
+    };
+
+    // Get time-series data based on granularity
+    let granularity = query.granularity.as_deref().unwrap_or("summary");
+
+    let hourly = if granularity == "hourly" {
+        let hourly_data = ApiKeyUsageHourly::get_range(
+            &state.pool,
+            key_id,
+            tenant_id,
+            query.start_date,
+            query.end_date,
+        )
+        .await
+        .map_err(|e| TenantError::Database(e.to_string()))?;
+
+        Some(
+            hourly_data
+                .into_iter()
+                .map(|h| ApiKeyUsageHourlyEntry {
+                    hour: h.hour,
+                    request_count: h.request_count,
+                    success_count: h.success_count,
+                    client_error_count: h.client_error_count,
+                    server_error_count: h.server_error_count,
+                })
+                .collect(),
+        )
+    } else {
+        None
+    };
+
+    let daily = if granularity == "daily" {
+        let daily_data = ApiKeyUsageDaily::get_range(
+            &state.pool,
+            key_id,
+            tenant_id,
+            query.start_date,
+            query.end_date,
+        )
+        .await
+        .map_err(|e| TenantError::Database(e.to_string()))?;
+
+        Some(
+            daily_data
+                .into_iter()
+                .map(|d| ApiKeyUsageDailyEntry {
+                    date: d.date,
+                    request_count: d.request_count,
+                    success_count: d.success_count,
+                    client_error_count: d.client_error_count,
+                    server_error_count: d.server_error_count,
+                })
+                .collect(),
+        )
+    } else {
+        None
+    };
+
+    // Note: Read operations are not audit logged to avoid log noise.
+    // Usage queries are idempotent read-only operations.
+
+    tracing::debug!(
+        tenant_id = %tenant_id,
+        key_id = %key_id,
+        granularity = %granularity,
+        "API key usage queried"
+    );
+
+    Ok(Json(ApiKeyUsageResponse {
+        key_id,
+        key_name: api_key.name,
+        summary,
+        hourly,
+        daily,
+    }))
+}
+
+// ============================================================================
+// F-055: API Key Introspection Endpoint
+// ============================================================================
+
+/// GET /api-keys/introspect
+///
+/// Introspect the current API key to view its metadata, scopes, and allowed operations.
+///
+/// This endpoint uses the API key from the Authorization header. No additional
+/// parameters are needed - the key introspects itself.
+///
+/// ## Response
+///
+/// Returns:
+/// - Key metadata (id, name, prefix, timestamps)
+/// - Whether the key has full access (empty scopes)
+/// - Detailed scope information with descriptions and operations
+///
+/// ## Authorization
+///
+/// Requires a valid API key in the Authorization header.
+/// The key must be active and not expired.
+#[utoipa::path(
+    get,
+    path = "/api-keys/introspect",
+    responses(
+        (status = 200, description = "API key introspection successful", body = IntrospectApiKeyResponse),
+        (status = 401, description = "Unauthorized - invalid, expired, or revoked API key", body = crate::error::ErrorResponse),
+    ),
+    tag = "API Keys",
+    security(
+        ("apiKeyAuth" = [])
+    )
+)]
+pub async fn introspect_api_key_handler(
+    Extension(api_key): Extension<ApiKey>,
+) -> Result<Json<IntrospectApiKeyResponse>, TenantError> {
+    // The API key is already validated by the api_key_auth_middleware
+    // and injected into request extensions
+
+    // Check if key has full access (empty scopes = full access)
+    let has_full_access = api_key.scopes.is_empty();
+
+    // Build scope info with descriptions and operations
+    let scopes = api_key
+        .scopes
+        .iter()
+        .map(|scope| get_scope_info(scope))
+        .collect();
+
+    tracing::debug!(
+        key_id = %api_key.id,
+        key_name = %api_key.name,
+        scopes_count = api_key.scopes.len(),
+        has_full_access = has_full_access,
+        "API key introspected"
+    );
+
+    Ok(Json(IntrospectApiKeyResponse {
+        key_id: api_key.id,
+        name: api_key.name,
+        key_prefix: api_key.key_prefix,
+        created_at: api_key.created_at,
+        expires_at: api_key.expires_at,
+        is_active: api_key.is_active,
+        has_full_access,
+        scopes,
+    }))
 }

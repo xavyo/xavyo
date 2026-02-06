@@ -974,7 +974,11 @@ fn evaluate_expression_simple(expression: &str, context: &serde_json::Value) -> 
     if expression.starts_with("if(") {
         // Parse if(condition, true_val, false_val)
         if expression.contains("${is_manager}") {
-            if context.get("is_manager").and_then(serde_json::Value::as_bool) == Some(true) {
+            if context
+                .get("is_manager")
+                .and_then(serde_json::Value::as_bool)
+                == Some(true)
+            {
                 return json!("elevated");
             }
             return json!("standard");
@@ -1032,7 +1036,10 @@ fn evaluate_validation(expression: &str, context: &serde_json::Value) -> bool {
 
 fn evaluate_condition(condition: &str, context: &serde_json::Value) -> bool {
     if condition.contains("is_manager") && condition.contains("false") {
-        return context.get("is_manager").and_then(serde_json::Value::as_bool) == Some(false);
+        return context
+            .get("is_manager")
+            .and_then(serde_json::Value::as_bool)
+            == Some(false);
     }
     true
 }
@@ -1045,4 +1052,229 @@ fn evaluate_expression(
         return Err("Invalid expression syntax".to_string());
     }
     Ok(json!(null))
+}
+
+// =============================================================================
+// Tenant Isolation Tests (T089)
+// =============================================================================
+
+/// Templates from one tenant should never affect objects from another tenant.
+#[test]
+fn test_tenant_isolation_templates_independent() {
+    // Tenant A templates
+    let tenant_a_rules = vec![TestRule {
+        rule_type: TemplateRuleType::Default,
+        target_attribute: "department".to_string(),
+        expression: "\"Engineering\"".to_string(),
+        strength: TemplateStrength::Strong,
+        authoritative: true,
+        condition: None,
+    }];
+
+    // Tenant B templates with different defaults
+    let tenant_b_rules = vec![TestRule {
+        rule_type: TemplateRuleType::Default,
+        target_attribute: "department".to_string(),
+        expression: "\"Marketing\"".to_string(),
+        strength: TemplateStrength::Strong,
+        authoritative: true,
+        condition: None,
+    }];
+
+    let input = json!({"name": "User"});
+
+    let result_a = apply_rules_on_create(&tenant_a_rules, &input);
+    let result_b = apply_rules_on_create(&tenant_b_rules, &input);
+
+    // Each tenant gets their own default
+    assert_eq!(
+        result_a.get("department").and_then(|v| v.as_str()),
+        Some("Engineering")
+    );
+    assert_eq!(
+        result_b.get("department").and_then(|v| v.as_str()),
+        Some("Marketing")
+    );
+}
+
+/// Template rules from one tenant should not cross-contaminate another.
+#[test]
+fn test_tenant_isolation_no_cross_contamination() {
+    // Tenant A has a validation rule requiring @company.com email
+    let tenant_a_rules = vec![TestRule {
+        rule_type: TemplateRuleType::Validation,
+        target_attribute: "email".to_string(),
+        expression: "contains(${email}, \"@company.com\")".to_string(),
+        strength: TemplateStrength::Normal,
+        authoritative: false,
+        condition: None,
+    }];
+
+    // Tenant B input with a non-@company.com email
+    let tenant_b_input = json!({"email": "user@tenantB.com"});
+
+    // Only validate with Tenant B's own rules (empty = no rules)
+    let tenant_b_rules: Vec<TestRule> = vec![];
+    let errors = validate_rules(&tenant_b_rules, &tenant_b_input);
+
+    // Tenant B has no validation rules, so no errors
+    assert!(errors.is_empty());
+
+    // Tenant A's rules would reject this email (not @company.com)
+    let errors_a = validate_rules(&tenant_a_rules, &tenant_b_input);
+    assert!(!errors_a.is_empty());
+}
+
+/// Separate tenants can have templates with the same name without conflict.
+#[test]
+fn test_tenant_isolation_same_template_names() {
+    // Both tenants have a "Base User Template" but with different rules
+    let tenant_a_rules = vec![TestRule {
+        rule_type: TemplateRuleType::Default,
+        target_attribute: "locale".to_string(),
+        expression: "\"en-US\"".to_string(),
+        strength: TemplateStrength::Normal,
+        authoritative: false,
+        condition: None,
+    }];
+
+    let tenant_b_rules = vec![TestRule {
+        rule_type: TemplateRuleType::Default,
+        target_attribute: "locale".to_string(),
+        expression: "\"fr-FR\"".to_string(),
+        strength: TemplateStrength::Normal,
+        authoritative: false,
+        condition: None,
+    }];
+
+    let input = json!({"name": "User"});
+
+    let result_a = apply_rules_on_create(&tenant_a_rules, &input);
+    let result_b = apply_rules_on_create(&tenant_b_rules, &input);
+
+    assert_eq!(
+        result_a.get("locale").and_then(|v| v.as_str()),
+        Some("en-US")
+    );
+    assert_eq!(
+        result_b.get("locale").and_then(|v| v.as_str()),
+        Some("fr-FR")
+    );
+}
+
+// =============================================================================
+// Performance Tests (T090)
+// =============================================================================
+
+/// Template evaluation with many rules should complete quickly (<10ms overhead).
+#[test]
+fn test_template_evaluation_performance_many_rules() {
+    // Create 100 rules (mix of types)
+    let mut rules = Vec::new();
+    for i in 0..25 {
+        rules.push(TestRule {
+            rule_type: TemplateRuleType::Default,
+            target_attribute: format!("attr_default_{i}"),
+            expression: format!("\"value_{i}\""),
+            strength: TemplateStrength::Normal,
+            authoritative: false,
+            condition: None,
+        });
+    }
+    for i in 0..25 {
+        rules.push(TestRule {
+            rule_type: TemplateRuleType::Computed,
+            target_attribute: format!("attr_computed_{i}"),
+            expression: "${name}".to_string(),
+            strength: TemplateStrength::Normal,
+            authoritative: false,
+            condition: None,
+        });
+    }
+    for i in 0..25 {
+        rules.push(TestRule {
+            rule_type: TemplateRuleType::Normalization,
+            target_attribute: format!("attr_norm_{i}"),
+            expression: "lowercase(${name})".to_string(),
+            strength: TemplateStrength::Normal,
+            authoritative: false,
+            condition: None,
+        });
+    }
+    for i in 0..25 {
+        rules.push(TestRule {
+            rule_type: TemplateRuleType::Validation,
+            target_attribute: format!("attr_val_{i}"),
+            expression: "min_length(3)".to_string(),
+            strength: TemplateStrength::Normal,
+            authoritative: false,
+            condition: None,
+        });
+    }
+
+    let input = json!({"name": "John Doe", "email": "john@example.com"});
+
+    let start = std::time::Instant::now();
+    for _ in 0..100 {
+        let _ = apply_rules_on_create(&rules, &input);
+    }
+    let elapsed = start.elapsed();
+
+    // 100 iterations with 100 rules each should take well under 1 second
+    // (target: <10ms per evaluation, so 100 evals < 1s)
+    assert!(
+        elapsed.as_millis() < 1000,
+        "Template evaluation took {}ms for 100 iterations with 100 rules, expected <1000ms",
+        elapsed.as_millis()
+    );
+}
+
+/// Template evaluation with complex expressions should remain performant.
+#[test]
+fn test_template_evaluation_performance_complex_expressions() {
+    let rules = vec![
+        TestRule {
+            rule_type: TemplateRuleType::Computed,
+            target_attribute: "display_name".to_string(),
+            expression: "${first_name} + \" \" + ${last_name}".to_string(),
+            strength: TemplateStrength::Normal,
+            authoritative: false,
+            condition: None,
+        },
+        TestRule {
+            rule_type: TemplateRuleType::Normalization,
+            target_attribute: "email".to_string(),
+            expression: "lowercase(${email})".to_string(),
+            strength: TemplateStrength::Normal,
+            authoritative: false,
+            condition: None,
+        },
+        TestRule {
+            rule_type: TemplateRuleType::Default,
+            target_attribute: "department".to_string(),
+            expression: "\"Unassigned\"".to_string(),
+            strength: TemplateStrength::Normal,
+            authoritative: false,
+            condition: None,
+        },
+    ];
+
+    let input = json!({
+        "first_name": "John",
+        "last_name": "Doe",
+        "email": "JOHN.DOE@EXAMPLE.COM"
+    });
+
+    let start = std::time::Instant::now();
+    for _ in 0..1000 {
+        let _ = apply_rules_on_create(&rules, &input);
+    }
+    let elapsed = start.elapsed();
+
+    // 1000 iterations should complete quickly
+    assert!(
+        elapsed.as_millis() < 500,
+        "Template evaluation took {}ms for 1000 iterations, expected <500ms",
+        elapsed.as_millis()
+    );
 }

@@ -376,9 +376,11 @@ mod audit_integration {
 
     #[test]
     fn test_audit_trail_shows_all_context_changes() {
-        let audit_events = [json!({"event_type": "ContextSwitched", "to_persona": "admin.john.doe"}),
+        let audit_events = [
+            json!({"event_type": "ContextSwitched", "to_persona": "admin.john.doe"}),
             json!({"event_type": "ContextSwitched", "to_persona": "support.john.doe"}),
-            json!({"event_type": "ContextSwitchedBack", "to_persona": null})];
+            json!({"event_type": "ContextSwitchedBack", "to_persona": null}),
+        ];
 
         assert_eq!(audit_events.len(), 3);
     }
@@ -438,9 +440,11 @@ mod edge_cases_integration {
     #[test]
     fn test_rapid_context_switches() {
         // Multiple rapid switches should all be tracked
-        let switches = [json!({"to": "employee_persona", "at": Utc::now().to_rfc3339()}),
+        let switches = [
+            json!({"to": "employee_persona", "at": Utc::now().to_rfc3339()}),
             json!({"to": "admin_persona", "at": (Utc::now() + Duration::seconds(30)).to_rfc3339()}),
-            json!({"to": "physical", "at": (Utc::now() + Duration::minutes(1)).to_rfc3339()})];
+            json!({"to": "physical", "at": (Utc::now() + Duration::minutes(1)).to_rfc3339()}),
+        ];
 
         assert_eq!(switches.len(), 3);
     }

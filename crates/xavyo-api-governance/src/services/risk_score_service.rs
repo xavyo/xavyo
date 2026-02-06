@@ -30,7 +30,7 @@ pub struct RiskScoreService {
 
 impl RiskScoreService {
     /// Create a new risk score service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

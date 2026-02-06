@@ -69,13 +69,13 @@ pub struct SyncStatus {
 
 impl SyncStatus {
     /// Get the current state enum.
-    #[must_use] 
+    #[must_use]
     pub fn current_state(&self) -> SyncState {
         self.current_state.parse().unwrap_or(SyncState::Idle)
     }
 
     /// Get current rate as f64.
-    #[must_use] 
+    #[must_use]
     pub fn current_rate_f64(&self) -> f64 {
         self.current_rate
     }

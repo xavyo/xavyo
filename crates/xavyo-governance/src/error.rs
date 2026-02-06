@@ -763,6 +763,23 @@ pub enum GovernanceError {
     #[error("Invalid transition: {0}")]
     InvalidTransition(String),
 
+    /// Transition conditions not satisfied.
+    #[error(
+        "Transition conditions not satisfied: {failed_count} of {total_count} conditions failed"
+    )]
+    TransitionConditionsNotSatisfied {
+        /// Number of conditions that failed
+        failed_count: usize,
+        /// Total number of conditions
+        total_count: usize,
+        /// Summary of why conditions failed
+        summary: String,
+    },
+
+    /// Lifecycle action execution failed.
+    #[error("Lifecycle action execution failed: {0}")]
+    ActionExecutionFailed(String),
+
     /// Transition audit record not found.
     #[error("Transition audit record not found: {0}")]
     TransitionAuditNotFound(Uuid),
@@ -1833,6 +1850,93 @@ pub enum GovernanceError {
     PersonaOperationRequiresApproval(String),
 
     // =========================================================================
+    // Power of Attorney Errors (F-061)
+    // =========================================================================
+    /// Power of Attorney not found.
+    #[error("Power of Attorney not found: {0}")]
+    PoaNotFound(Uuid),
+
+    /// Cannot grant PoA to self.
+    #[error("Cannot grant Power of Attorney to yourself")]
+    PoaSelfDelegationNotAllowed,
+
+    /// PoA duration exceeds maximum (90 days).
+    #[error("Power of Attorney duration exceeds maximum of 90 days")]
+    PoaDurationExceedsMaximum,
+
+    /// PoA start date must not be in the past.
+    #[error("Power of Attorney start date cannot be in the past")]
+    PoaStartDateInPast,
+
+    /// PoA end date must be after start date.
+    #[error("Power of Attorney end date must be after start date")]
+    PoaInvalidPeriod,
+
+    /// PoA is not active (cannot assume identity).
+    #[error("Power of Attorney is not active: {0}")]
+    PoaNotActive(Uuid),
+
+    /// PoA is in terminal state (expired or revoked).
+    #[error("Power of Attorney is in terminal state: {0}")]
+    PoaTerminalState(Uuid),
+
+    /// PoA has already been revoked.
+    #[error("Power of Attorney has already been revoked: {0}")]
+    PoaAlreadyRevoked(Uuid),
+
+    /// Assumed session not found.
+    #[error("Assumed session not found: {0}")]
+    PoaAssumedSessionNotFound(Uuid),
+
+    /// User is not currently assuming an identity.
+    #[error("User is not currently assuming an identity")]
+    PoaNotAssuming,
+
+    /// User is already assuming an identity.
+    #[error("User is already assuming an identity - drop current assumption first")]
+    PoaAlreadyAssuming,
+
+    /// PoA donor user not found.
+    #[error("Power of Attorney donor not found: {0}")]
+    PoaDonorNotFound(Uuid),
+
+    /// PoA attorney user not found.
+    #[error("Power of Attorney attorney not found: {0}")]
+    PoaAttorneyNotFound(Uuid),
+
+    /// PoA donor user is not active.
+    #[error("Power of Attorney donor is not active: {0}")]
+    PoaDonorNotActive(Uuid),
+
+    /// PoA attorney user is not active.
+    #[error("Power of Attorney attorney is not active: {0}")]
+    PoaAttorneyNotActive(Uuid),
+
+    /// PoA scope violation - action not in scope.
+    #[error("Action not permitted under Power of Attorney scope: {0}")]
+    PoaScopeViolation(String),
+
+    /// PoA audit event not found.
+    #[error("Power of Attorney audit event not found: {0}")]
+    PoaAuditEventNotFound(Uuid),
+
+    /// Cannot extend PoA - would exceed 90 days from original start.
+    #[error("Extension would exceed maximum 90 days from original start")]
+    PoaExtensionExceedsMaximum,
+
+    /// Cannot extend expired PoA.
+    #[error("Cannot extend expired Power of Attorney: {0}")]
+    PoaCannotExtendExpired(Uuid),
+
+    /// Cannot extend revoked PoA.
+    #[error("Cannot extend revoked Power of Attorney: {0}")]
+    PoaCannotExtendRevoked(Uuid),
+
+    /// New end date must be after current end date.
+    #[error("New end date must be after current end date")]
+    PoaInvalidExtension,
+
+    // =========================================================================
     // Semi-manual Resources Errors (F064)
     // =========================================================================
     /// SLA policy not found.
@@ -2047,6 +2151,39 @@ pub enum GovernanceError {
     #[error("Moving this role would cause descendants to exceed maximum hierarchy depth of {0}")]
     GovRoleMoveExceedsDepth(i32),
 
+    // =========================================================================
+    // Role Inducements & Constructions Errors (F-063)
+    // =========================================================================
+    /// Role construction not found.
+    #[error("Role construction not found: {0}")]
+    RoleConstructionNotFound(Uuid),
+
+    /// Role construction version conflict.
+    #[error("Role construction was modified by another process (version conflict)")]
+    RoleConstructionVersionConflict,
+
+    /// Role construction already exists.
+    #[error(
+        "Construction already exists for this role/connector/object_class/account_type combination"
+    )]
+    RoleConstructionExists,
+
+    /// Role inducement not found.
+    #[error("Role inducement not found: {0}")]
+    RoleInducementNotFound(Uuid),
+
+    /// Role inducement already exists.
+    #[error("Inducement already exists between these roles")]
+    RoleInducementExists,
+
+    /// Role inducement cycle detected.
+    #[error("Creating this inducement would create a circular reference: {0}")]
+    RoleInducementCycleDetected(String),
+
+    /// Connector not found (for construction validation).
+    #[error("Connector not found: {0}")]
+    ConnectorNotFound(Uuid),
+
     /// Database error.
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
@@ -2069,11 +2206,70 @@ pub enum GovernanceError {
     /// Prerequisite entitlement not assigned.
     #[error("Prerequisite entitlement not assigned: {0}")]
     PrerequisiteNotAssigned(Uuid),
+
+    // =========================================================================
+    // Self-Service Request Catalog Errors (F-062)
+    // =========================================================================
+    /// Catalog category not found.
+    #[error("Catalog category not found: {0}")]
+    CatalogCategoryNotFound(Uuid),
+
+    /// Catalog category name already exists.
+    #[error("Catalog category name '{0}' already exists at this level")]
+    CatalogCategoryNameExists(String),
+
+    /// Catalog category has children and cannot be deleted.
+    #[error("Cannot delete category with {0} child categories")]
+    CatalogCategoryHasChildren(i64),
+
+    /// Catalog category has items and cannot be deleted.
+    #[error("Cannot delete category with {0} catalog items")]
+    CatalogCategoryHasItems(i64),
+
+    /// Catalog item not found.
+    #[error("Catalog item not found: {0}")]
+    CatalogItemNotFound(Uuid),
+
+    /// Catalog item name already exists.
+    #[error("Catalog item name '{0}' already exists")]
+    CatalogItemNameExists(String),
+
+    /// Catalog item is disabled.
+    #[error("Catalog item is disabled: {0}")]
+    CatalogItemDisabled(Uuid),
+
+    /// Catalog item has pending requests in carts.
+    #[error("Cannot delete item with {0} pending cart references")]
+    CatalogItemInCarts(i64),
+
+    /// Request cart not found.
+    #[error("Request cart not found: {0}")]
+    RequestCartNotFound(Uuid),
+
+    /// Request cart item not found.
+    #[error("Request cart item not found: {0}")]
+    RequestCartItemNotFound(Uuid),
+
+    /// Request cart item already exists (duplicate item in cart).
+    #[error("Item is already in the cart")]
+    RequestCartItemDuplicate,
+
+    /// Request cart is empty.
+    #[error("Cannot submit an empty cart")]
+    RequestCartEmpty,
+
+    /// Catalog item not requestable.
+    #[error("Item is not requestable: {0}")]
+    CatalogItemNotRequestable(String),
+
+    /// Beneficiary validation failed.
+    #[error("Invalid beneficiary: {0}")]
+    InvalidBeneficiary(String),
 }
 
 impl GovernanceError {
     /// Returns true if this is a not-found error.
-    #[must_use] 
+    #[must_use]
     pub fn is_not_found(&self) -> bool {
         matches!(
             self,
@@ -2174,6 +2370,12 @@ impl GovernanceError {
                 | Self::PersonaSessionNotFound(_)
                 | Self::PersonaLinkNotFound(_)
                 | Self::PersonaAuditEventNotFound(_)
+                // Power of Attorney (F-061)
+                | Self::PoaNotFound(_)
+                | Self::PoaAssumedSessionNotFound(_)
+                | Self::PoaDonorNotFound(_)
+                | Self::PoaAttorneyNotFound(_)
+                | Self::PoaAuditEventNotFound(_)
                 // Semi-manual Resources (F064)
                 | Self::SlaPolicyNotFound(_)
                 | Self::TicketingConfigurationNotFound(_)
@@ -2203,11 +2405,20 @@ impl GovernanceError {
                 | Self::GovRoleNotFound(_)
                 | Self::GovRoleParentNotFound(_)
                 | Self::GovRoleInheritanceBlockNotFound(_)
+                // Self-Service Request Catalog (F-062)
+                | Self::CatalogCategoryNotFound(_)
+                | Self::CatalogItemNotFound(_)
+                | Self::RequestCartNotFound(_)
+                | Self::RequestCartItemNotFound(_)
+                // Role Inducements & Constructions (F-063)
+                | Self::RoleConstructionNotFound(_)
+                | Self::RoleInducementNotFound(_)
+                | Self::ConnectorNotFound(_)
         )
     }
 
     /// Returns true if this is a conflict/duplicate error.
-    #[must_use] 
+    #[must_use]
     pub fn is_conflict(&self) -> bool {
         matches!(
             self,
@@ -2322,11 +2533,23 @@ impl GovernanceError {
                 | Self::GovRoleNameExists(_)
                 | Self::GovRoleVersionConflict
                 | Self::GovRoleInheritanceBlockExists
+                // Self-Service Request Catalog (F-062)
+                | Self::CatalogCategoryNameExists(_)
+                | Self::CatalogCategoryHasChildren(_)
+                | Self::CatalogCategoryHasItems(_)
+                | Self::CatalogItemNameExists(_)
+                | Self::CatalogItemInCarts(_)
+                | Self::RequestCartItemDuplicate
+                // Role Inducements & Constructions (F-063)
+                | Self::RoleConstructionVersionConflict
+                | Self::RoleConstructionExists
+                | Self::RoleInducementExists
+                | Self::RoleInducementCycleDetected(_)
         )
     }
 
     /// Returns true if this is an escalation error.
-    #[must_use] 
+    #[must_use]
     pub fn is_escalation_error(&self) -> bool {
         matches!(
             self,
@@ -2348,13 +2571,13 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an `SoD` violation error.
-    #[must_use] 
+    #[must_use]
     pub fn is_sod_violation(&self) -> bool {
         matches!(self, Self::SodViolationBlocked { .. })
     }
 
     /// Returns true if this is a precondition failure.
-    #[must_use] 
+    #[must_use]
     pub fn is_precondition_failed(&self) -> bool {
         matches!(
             self,
@@ -2420,11 +2643,13 @@ impl GovernanceError {
                 | Self::InvalidCorrelationBatchSize(_)
                 // SIEM Integration (F078)
                 | Self::SiemBatchExportNotReady(_, _)
+                // Lifecycle State Machine Extensions (F-193)
+                | Self::TransitionConditionsNotSatisfied { .. }
         )
     }
 
     /// Returns true if this is a forbidden action.
-    #[must_use] 
+    #[must_use]
     pub fn is_forbidden(&self) -> bool {
         matches!(
             self,
@@ -2439,7 +2664,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a certification campaign error.
-    #[must_use] 
+    #[must_use]
     pub fn is_certification_error(&self) -> bool {
         matches!(
             self,
@@ -2463,7 +2688,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a lifecycle workflow error.
-    #[must_use] 
+    #[must_use]
     pub fn is_lifecycle_error(&self) -> bool {
         matches!(
             self,
@@ -2488,7 +2713,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a risk scoring error.
-    #[must_use] 
+    #[must_use]
     pub fn is_risk_scoring_error(&self) -> bool {
         matches!(
             self,
@@ -2510,7 +2735,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an orphan detection error.
-    #[must_use] 
+    #[must_use]
     pub fn is_orphan_detection_error(&self) -> bool {
         matches!(
             self,
@@ -2532,7 +2757,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a compliance reporting error.
-    #[must_use] 
+    #[must_use]
     pub fn is_compliance_reporting_error(&self) -> bool {
         matches!(
             self,
@@ -2560,7 +2785,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an object lifecycle states error.
-    #[must_use] 
+    #[must_use]
     pub fn is_lifecycle_states_error(&self) -> bool {
         matches!(
             self,
@@ -2574,6 +2799,7 @@ impl GovernanceError {
                 | Self::LifecycleTransitionStatePairExists(_, _)
                 | Self::InvalidLifecycleTransition(_, _, _)
                 | Self::InvalidTransition(_)
+                | Self::TransitionConditionsNotSatisfied { .. }
                 | Self::TransitionAuditNotFound(_)
                 | Self::StateTransitionRequestNotFound(_)
                 | Self::InvalidTransitionRequestStatus(_)
@@ -2597,7 +2823,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a delegation error.
-    #[must_use] 
+    #[must_use]
     pub fn is_delegation_error(&self) -> bool {
         matches!(
             self,
@@ -2619,7 +2845,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a micro-certification error.
-    #[must_use] 
+    #[must_use]
     pub fn is_micro_certification_error(&self) -> bool {
         matches!(
             self,
@@ -2647,7 +2873,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a role mining error.
-    #[must_use] 
+    #[must_use]
     pub fn is_role_mining_error(&self) -> bool {
         matches!(
             self,
@@ -2678,7 +2904,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a meta-role error.
-    #[must_use] 
+    #[must_use]
     pub fn is_meta_role_error(&self) -> bool {
         matches!(
             self,
@@ -2707,7 +2933,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an NHI (Non-Human Identity) lifecycle error.
-    #[must_use] 
+    #[must_use]
     pub fn is_nhi_error(&self) -> bool {
         matches!(
             self,
@@ -2745,7 +2971,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a parametric role error.
-    #[must_use] 
+    #[must_use]
     pub fn is_parametric_role_error(&self) -> bool {
         matches!(
             self,
@@ -2772,7 +2998,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an outlier detection error.
-    #[must_use] 
+    #[must_use]
     pub fn is_outlier_detection_error(&self) -> bool {
         matches!(
             self,
@@ -2795,7 +3021,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a provisioning scripts error.
-    #[must_use] 
+    #[must_use]
     pub fn is_provisioning_script_error(&self) -> bool {
         matches!(
             self,
@@ -2820,7 +3046,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an object template error.
-    #[must_use] 
+    #[must_use]
     pub fn is_object_template_error(&self) -> bool {
         matches!(
             self,
@@ -2859,7 +3085,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is an enhanced simulation error.
-    #[must_use] 
+    #[must_use]
     pub fn is_simulation_error(&self) -> bool {
         matches!(
             self,
@@ -2882,7 +3108,7 @@ impl GovernanceError {
     }
 
     /// Returns true if this is a role hierarchy error (F088).
-    #[must_use] 
+    #[must_use]
     pub fn is_role_hierarchy_error(&self) -> bool {
         matches!(
             self,
@@ -2897,6 +3123,35 @@ impl GovernanceError {
                 | Self::GovRoleInheritanceBlockExists
                 | Self::GovRoleHasChildren(_)
                 | Self::GovRoleMoveExceedsDepth(_)
+        )
+    }
+
+    /// Returns true if this is a Power of Attorney error (F-061).
+    #[must_use]
+    pub fn is_poa_error(&self) -> bool {
+        matches!(
+            self,
+            Self::PoaNotFound(_)
+                | Self::PoaSelfDelegationNotAllowed
+                | Self::PoaDurationExceedsMaximum
+                | Self::PoaStartDateInPast
+                | Self::PoaInvalidPeriod
+                | Self::PoaNotActive(_)
+                | Self::PoaTerminalState(_)
+                | Self::PoaAlreadyRevoked(_)
+                | Self::PoaAssumedSessionNotFound(_)
+                | Self::PoaNotAssuming
+                | Self::PoaAlreadyAssuming
+                | Self::PoaDonorNotFound(_)
+                | Self::PoaAttorneyNotFound(_)
+                | Self::PoaDonorNotActive(_)
+                | Self::PoaAttorneyNotActive(_)
+                | Self::PoaScopeViolation(_)
+                | Self::PoaAuditEventNotFound(_)
+                | Self::PoaExtensionExceedsMaximum
+                | Self::PoaCannotExtendExpired(_)
+                | Self::PoaCannotExtendRevoked(_)
+                | Self::PoaInvalidExtension
         )
     }
 }

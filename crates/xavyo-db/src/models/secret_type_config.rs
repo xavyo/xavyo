@@ -75,10 +75,11 @@ impl SecretTypeConfiguration {
     }
 
     /// Get the effective TTL (use default if not specified).
-    #[must_use] 
+    #[must_use]
     pub fn effective_ttl(&self, requested_ttl: Option<i32>) -> i32 {
-        requested_ttl
-            .map_or(self.default_ttl_seconds, |ttl| ttl.min(self.max_ttl_seconds))
+        requested_ttl.map_or(self.default_ttl_seconds, |ttl| {
+            ttl.min(self.max_ttl_seconds)
+        })
     }
 }
 

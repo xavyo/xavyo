@@ -10,16 +10,24 @@ use axum::{extract::Path, Extension, Json};
 use std::sync::Arc;
 use uuid::Uuid;
 use validator::Validate;
+use xavyo_auth::JwtClaims;
+use xavyo_core::TenantId;
 
 /// Get password policy for a tenant.
 ///
 /// GET /admin/tenants/:tenant_id/password-policy
 pub async fn get_password_policy(
     Extension(password_policy_service): Extension<Arc<PasswordPolicyService>>,
-    Path(tenant_id): Path<Uuid>,
+    Extension(tenant_id): Extension<TenantId>,
+    Path(path_tenant_id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<PasswordPolicyResponse>), ApiAuthError> {
+    if *tenant_id.as_uuid() != path_tenant_id {
+        return Err(ApiAuthError::PermissionDenied(
+            "Cannot access other tenant's policy".to_string(),
+        ));
+    }
     let policy = password_policy_service
-        .get_password_policy(tenant_id)
+        .get_password_policy(path_tenant_id)
         .await?;
     Ok((StatusCode::OK, Json(PasswordPolicyResponse::from(policy))))
 }
@@ -28,10 +36,22 @@ pub async fn get_password_policy(
 ///
 /// PUT /admin/tenants/:tenant_id/password-policy
 pub async fn update_password_policy(
+    Extension(claims): Extension<JwtClaims>,
     Extension(password_policy_service): Extension<Arc<PasswordPolicyService>>,
-    Path(tenant_id): Path<Uuid>,
+    Extension(tenant_id): Extension<TenantId>,
+    Path(path_tenant_id): Path<Uuid>,
     Json(request): Json<UpdatePasswordPolicyRequest>,
 ) -> Result<(StatusCode, Json<PasswordPolicyResponse>), ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
+    if *tenant_id.as_uuid() != path_tenant_id {
+        return Err(ApiAuthError::PermissionDenied(
+            "Cannot access other tenant's policy".to_string(),
+        ));
+    }
     // Validate request
     request.validate().map_err(|e| {
         let errors: Vec<String> = e
@@ -60,7 +80,7 @@ pub async fn update_password_policy(
     }
 
     let policy = password_policy_service
-        .update_password_policy(tenant_id, request.into_upsert())
+        .update_password_policy(path_tenant_id, request.into_upsert())
         .await?;
 
     Ok((StatusCode::OK, Json(PasswordPolicyResponse::from(policy))))

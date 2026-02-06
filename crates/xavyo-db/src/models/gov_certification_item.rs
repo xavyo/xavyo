@@ -25,19 +25,19 @@ pub enum CertItemStatus {
 
 impl CertItemStatus {
     /// Check if the item is pending decision.
-    #[must_use] 
+    #[must_use]
     pub fn is_pending(&self) -> bool {
         matches!(self, Self::Pending)
     }
 
     /// Check if the item has been decided.
-    #[must_use] 
+    #[must_use]
     pub fn is_decided(&self) -> bool {
         matches!(self, Self::Approved | Self::Revoked)
     }
 
     /// Check if the item is in a terminal state.
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         !self.is_pending()
     }
@@ -536,7 +536,7 @@ impl GovCertificationItem {
     }
 
     /// Check if the item is pending.
-    #[must_use] 
+    #[must_use]
     pub fn is_pending(&self) -> bool {
         self.status.is_pending()
     }

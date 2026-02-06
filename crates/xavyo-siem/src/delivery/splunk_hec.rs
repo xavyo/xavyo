@@ -20,7 +20,7 @@ pub struct SplunkHecWorker {
 }
 
 impl SplunkHecWorker {
-    #[must_use] 
+    #[must_use]
     pub fn new(
         host: String,
         port: u16,
@@ -61,7 +61,8 @@ impl SplunkHecWorker {
         let timestamp = event
             .get("timestamp")
             .and_then(|t| t.as_str())
-            .and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok()).map_or_else(|| chrono::Utc::now().timestamp(), |dt| dt.timestamp());
+            .and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok())
+            .map_or_else(|| chrono::Utc::now().timestamp(), |dt| dt.timestamp());
 
         let mut payload = json!({
             "time": timestamp,

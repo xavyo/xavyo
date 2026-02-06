@@ -85,9 +85,7 @@ pub async fn delete_tenant_handler(
     let target_tenant = Tenant::find_by_id(&state.pool, tenant_id)
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
-        .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
-        })?;
+        .ok_or_else(|| TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found")))?;
 
     if target_tenant.is_system() {
         return Err(TenantError::Forbidden(
@@ -205,9 +203,7 @@ pub async fn restore_tenant_handler(
     let target_tenant = Tenant::find_by_id(&state.pool, tenant_id)
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
-        .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
-        })?;
+        .ok_or_else(|| TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found")))?;
 
     if !target_tenant.is_deleted() {
         return Err(TenantError::Conflict(format!(

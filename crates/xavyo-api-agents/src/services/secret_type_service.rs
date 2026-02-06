@@ -32,7 +32,7 @@ pub struct SecretTypeService {
 
 impl SecretTypeService {
     /// Create a new `SecretTypeService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

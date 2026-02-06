@@ -24,7 +24,7 @@ pub struct CertificationItemService {
 
 impl CertificationItemService {
     /// Create a new certification item service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             remediation_service: CertificationRemediationService::new(pool.clone()),
@@ -194,7 +194,7 @@ impl CertificationItemService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

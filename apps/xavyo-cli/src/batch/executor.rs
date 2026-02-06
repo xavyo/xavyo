@@ -216,7 +216,7 @@ impl BatchExecutor {
         let start = Instant::now();
 
         // First, list all agents
-        let agents = self.client.list_agents(1000, 0).await?;
+        let agents = self.client.list_agents(1000, 0, None, None).await?;
 
         // Filter matching agents
         let matching: Vec<&AgentResponse> = agents
@@ -338,7 +338,7 @@ impl BatchExecutor {
         let start = Instant::now();
 
         // List all agents
-        let agents = self.client.list_agents(1000, 0).await?;
+        let agents = self.client.list_agents(1000, 0, None, None).await?;
         let count = agents.agents.len();
 
         if count == 0 {

@@ -551,8 +551,8 @@ pub async fn list_reconciliation_runs(
             connector_id,
             query.mode.as_deref(),
             query.status.as_deref(),
-            query.limit.unwrap_or(50),
-            query.offset.unwrap_or(0),
+            query.limit.unwrap_or(50).min(100),
+            query.offset.unwrap_or(0).max(0),
         )
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?;
@@ -695,8 +695,8 @@ pub async fn list_discrepancies(
             query.resolution_status.as_deref(),
             query.identity_id,
             query.external_uid.as_deref(),
-            query.limit.unwrap_or(50),
-            query.offset.unwrap_or(0),
+            query.limit.unwrap_or(50).min(100),
+            query.offset.unwrap_or(0).max(0),
         )
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?;
@@ -1264,8 +1264,8 @@ pub async fn list_actions(
             query.action_type.as_deref(),
             query.result.as_deref(),
             query.dry_run,
-            query.limit.unwrap_or(50),
-            query.offset.unwrap_or(0),
+            query.limit.unwrap_or(50).min(100),
+            query.offset.unwrap_or(0).max(0),
         )
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?;

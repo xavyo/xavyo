@@ -43,7 +43,7 @@ pub enum AppEnvironment {
 }
 
 impl AppEnvironment {
-    #[must_use] 
+    #[must_use]
     pub fn from_env_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "production" | "prod" => Self::Production,
@@ -51,7 +51,7 @@ impl AppEnvironment {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn is_production(&self) -> bool {
         *self == Self::Production
     }

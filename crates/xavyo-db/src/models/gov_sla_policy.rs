@@ -73,25 +73,25 @@ pub struct SlaPolicyFilter {
 
 impl GovSlaPolicy {
     /// Calculate warning time threshold.
-    #[must_use] 
+    #[must_use]
     pub fn warning_threshold_seconds(&self) -> i64 {
         (i64::from(self.target_duration_seconds) * i64::from(self.warning_threshold_percent)) / 100
     }
 
     /// Calculate deadline from a start time.
-    #[must_use] 
+    #[must_use]
     pub fn deadline_from(&self, start_time: DateTime<Utc>) -> DateTime<Utc> {
         start_time + chrono::Duration::seconds(i64::from(self.target_duration_seconds))
     }
 
     /// Calculate warning time from a start time.
-    #[must_use] 
+    #[must_use]
     pub fn warning_time_from(&self, start_time: DateTime<Utc>) -> DateTime<Utc> {
         start_time + chrono::Duration::seconds(self.warning_threshold_seconds())
     }
 
     /// Get human-readable duration string.
-    #[must_use] 
+    #[must_use]
     pub fn target_duration_human(&self) -> String {
         let seconds = self.target_duration_seconds;
         if seconds >= 86400 {

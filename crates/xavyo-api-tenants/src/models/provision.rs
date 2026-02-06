@@ -118,7 +118,7 @@ impl ProvisionTenantRequest {
     /// Validate the organization name.
     ///
     /// Returns an error message if validation fails, None if valid.
-    #[must_use] 
+    #[must_use]
     pub fn validate(&self) -> Option<String> {
         let name = self.organization_name.trim();
 

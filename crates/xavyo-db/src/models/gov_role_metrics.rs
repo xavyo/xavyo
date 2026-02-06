@@ -338,7 +338,7 @@ impl GovRoleMetrics {
     }
 
     /// Parse entitlement usage from JSON.
-    #[must_use] 
+    #[must_use]
     pub fn parse_entitlement_usage(&self) -> Vec<EntitlementUsage> {
         serde_json::from_value(self.entitlement_usage.clone()).unwrap_or_default()
     }

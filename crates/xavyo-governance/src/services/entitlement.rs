@@ -190,7 +190,7 @@ pub struct InMemoryEntitlementStore {
 
 impl InMemoryEntitlementStore {
     /// Create a new in-memory store.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             entitlements: Arc::new(RwLock::new(HashMap::new())),
@@ -355,8 +355,8 @@ impl EntitlementStore for InMemoryEntitlementStore {
         // Apply pagination
         Ok(results
             .into_iter()
-            .skip(options.offset as usize)
-            .take(options.limit as usize)
+            .skip(options.offset.max(0) as usize)
+            .take(options.limit.max(0) as usize)
             .collect())
     }
 

@@ -14,7 +14,7 @@ pub struct ClaimsService;
 
 impl ClaimsService {
     /// Create a new claims service.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
@@ -225,7 +225,7 @@ impl ClaimsService {
     }
 
     /// Extract the subject (`NameID`) from claims based on configuration.
-    #[must_use] 
+    #[must_use]
     pub fn extract_subject(&self, mapping: &ClaimMappingConfig, claims: &IdTokenClaims) -> String {
         // Check name_id configuration
         if let Some(name_id) = &mapping.name_id {

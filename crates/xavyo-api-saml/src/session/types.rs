@@ -37,7 +37,7 @@ pub struct AuthnRequestSession {
 
 impl AuthnRequestSession {
     /// Create a new session with default TTL
-    #[must_use] 
+    #[must_use]
     pub fn new(
         tenant_id: Uuid,
         request_id: String,
@@ -54,7 +54,7 @@ impl AuthnRequestSession {
     }
 
     /// Create a new session with custom TTL
-    #[must_use] 
+    #[must_use]
     pub fn with_ttl(
         tenant_id: Uuid,
         request_id: String,
@@ -76,7 +76,7 @@ impl AuthnRequestSession {
     }
 
     /// Check if this session has expired (with grace period for clock skew)
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         let now = Utc::now();
         let grace_period = Duration::seconds(CLOCK_SKEW_GRACE_SECONDS);
@@ -84,7 +84,7 @@ impl AuthnRequestSession {
     }
 
     /// Check if this session has been consumed
-    #[must_use] 
+    #[must_use]
     pub fn is_consumed(&self) -> bool {
         self.consumed_at.is_some()
     }

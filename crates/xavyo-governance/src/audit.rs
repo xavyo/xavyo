@@ -200,7 +200,7 @@ pub struct InMemoryAuditStore {
 
 impl InMemoryAuditStore {
     /// Create a new in-memory audit store.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             events: Arc::new(RwLock::new(HashMap::new())),
@@ -218,7 +218,7 @@ impl InMemoryAuditStore {
     }
 
     /// Get all events (for testing).
-    #[must_use] 
+    #[must_use]
     pub fn get_all(&self) -> Vec<EntitlementAuditEvent> {
         // Use try_read to avoid blocking
         self.events

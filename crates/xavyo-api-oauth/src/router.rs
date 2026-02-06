@@ -94,7 +94,7 @@ impl OAuthState {
     /// * `public_key` - JWT public key in PEM format
     /// * `key_id` - Key ID for JWKS
     /// * `csrf_secret` - CSRF secret for consent form protection (MUST be independent of JWT key)
-    #[must_use] 
+    #[must_use]
     pub fn new(
         pool: PgPool,
         issuer: String,
@@ -131,7 +131,7 @@ impl OAuthState {
     /// * `key_id` - Active key ID
     /// * `signing_keys` - All signing keys (active + rotated)
     /// * `csrf_secret` - CSRF secret for consent form protection (MUST be independent of JWT key)
-    #[must_use] 
+    #[must_use]
     pub fn with_signing_keys(
         pool: PgPool,
         issuer: String,
@@ -212,13 +212,13 @@ impl OAuthState {
     }
 
     /// Returns the active signing key.
-    #[must_use] 
+    #[must_use]
     pub fn active_signing_key(&self) -> Option<&OAuthSigningKey> {
         self.signing_keys.iter().find(|k| k.is_active)
     }
 
     /// Find a signing key by its kid.
-    #[must_use] 
+    #[must_use]
     pub fn find_key_by_kid(&self, kid: &str) -> Option<&OAuthSigningKey> {
         self.signing_keys.iter().find(|k| k.kid == kid)
     }
@@ -227,7 +227,7 @@ impl OAuthState {
     ///
     /// SECURITY: Returns an independently-generated secret that is NOT derived
     /// from the JWT signing key. This prevents key material reuse vulnerabilities.
-    #[must_use] 
+    #[must_use]
     pub fn csrf_secret(&self) -> &[u8] {
         &self.csrf_secret
     }
@@ -237,7 +237,7 @@ impl OAuthState {
     /// Returns `true` if the issuer URL indicates a production deployment
     /// (i.e., not localhost). Used to determine cookie security flags.
     #[inline]
-    #[must_use] 
+    #[must_use]
     pub fn is_production(&self) -> bool {
         !self.issuer.starts_with("http://localhost")
     }

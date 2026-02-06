@@ -17,7 +17,7 @@ pub struct OAuthError {
 }
 
 impl OAuthError {
-    #[must_use] 
+    #[must_use]
     pub fn invalid_grant() -> Self {
         Self {
             error: "invalid_grant".to_string(),
@@ -25,7 +25,7 @@ impl OAuthError {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn access_denied() -> Self {
         Self {
             error: "access_denied".to_string(),
@@ -33,7 +33,7 @@ impl OAuthError {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn invalid_client() -> Self {
         Self {
             error: "invalid_client".to_string(),
@@ -41,7 +41,7 @@ impl OAuthError {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn rate_limit_exceeded() -> Self {
         Self {
             error: "rate_limit_exceeded".to_string(),
@@ -262,7 +262,7 @@ pub async fn setup_google_token_revoked(server: &MockServer) {
 
 /// Generate a mock Apple identity token (JWT)
 /// Uses a simple structure for testing purposes
-#[must_use] 
+#[must_use]
 pub fn generate_apple_id_token(user: &MockUser, client_id: &str, nonce: Option<&str>) -> String {
     // For testing, we create a simple JWT structure
     // In real tests, you would use jsonwebtoken with test RSA keys
@@ -338,7 +338,7 @@ fn base64_url_encode(data: &str) -> String {
 }
 
 /// Validate PKCE code challenge matches verifier
-#[must_use] 
+#[must_use]
 pub fn validate_pkce(code_verifier: &str, code_challenge: &str) -> bool {
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
     use sha2::{Digest, Sha256};
@@ -352,7 +352,7 @@ pub fn validate_pkce(code_verifier: &str, code_challenge: &str) -> bool {
 }
 
 /// Build authorization URL for testing
-#[must_use] 
+#[must_use]
 pub fn build_auth_url(
     base_url: &str,
     client_id: &str,

@@ -25,7 +25,7 @@ impl EncryptionService {
     /// Create a new encryption service with a master key.
     ///
     /// The master key should be loaded from environment or a secrets manager.
-    #[must_use] 
+    #[must_use]
     pub fn new(master_key: [u8; 32]) -> Self {
         Self { master_key }
     }
@@ -85,11 +85,11 @@ impl EncryptionService {
         // SECURITY: Use OsRng (CSPRNG) for cryptographic nonce generation
         let mut nonce_bytes = [0u8; NONCE_SIZE];
         rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::from(nonce_bytes);
 
         // Encrypt
         let ciphertext = cipher
-            .encrypt(nonce, plaintext.as_bytes())
+            .encrypt(&nonce, plaintext.as_bytes())
             .map_err(|e| FederationError::EncryptionFailed(e.to_string()))?;
 
         // Prepend nonce to ciphertext
@@ -116,11 +116,14 @@ impl EncryptionService {
 
         // Split nonce and ciphertext
         let (nonce_bytes, ciphertext) = encrypted.split_at(NONCE_SIZE);
-        let nonce = Nonce::from_slice(nonce_bytes);
+        let nonce_array: [u8; NONCE_SIZE] = nonce_bytes
+            .try_into()
+            .map_err(|_| FederationError::DecryptionFailed("invalid nonce length".to_string()))?;
+        let nonce = Nonce::from(nonce_array);
 
         // Decrypt
         let plaintext = cipher
-            .decrypt(nonce, ciphertext)
+            .decrypt(&nonce, ciphertext)
             .map_err(|e| FederationError::DecryptionFailed(e.to_string()))?;
 
         String::from_utf8(plaintext).map_err(|e| FederationError::DecryptionFailed(e.to_string()))
@@ -130,7 +133,7 @@ impl EncryptionService {
 /// Generate a random master key for testing/initialization.
 ///
 /// SECURITY: Uses `OsRng` (CSPRNG) for cryptographic key generation.
-#[must_use] 
+#[must_use]
 pub fn generate_master_key() -> [u8; 32] {
     let mut key = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut key);
@@ -138,7 +141,7 @@ pub fn generate_master_key() -> [u8; 32] {
 }
 
 /// Generate a random master key as base64 string.
-#[must_use] 
+#[must_use]
 pub fn generate_master_key_base64() -> String {
     BASE64.encode(generate_master_key())
 }

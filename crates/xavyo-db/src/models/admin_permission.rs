@@ -195,7 +195,7 @@ impl AdminPermission {
 
     /// Check if a permission code matches a wildcard pattern.
     /// e.g., "users:read" matches "users:*" or "users:read"
-    #[must_use] 
+    #[must_use]
     pub fn matches_pattern(code: &str, pattern: &str) -> bool {
         if code == pattern {
             return true;

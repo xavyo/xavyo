@@ -47,10 +47,10 @@ pub fn encrypt_auth_config(plaintext: &str, key: &[u8]) -> Result<Vec<u8>, Crypt
     // SECURITY: Use OsRng (CSPRNG) for cryptographic nonce generation
     let mut nonce_bytes = [0u8; NONCE_SIZE];
     rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    let nonce = Nonce::from(nonce_bytes);
 
     let ciphertext = cipher
-        .encrypt(nonce, plaintext.as_bytes())
+        .encrypt(&nonce, plaintext.as_bytes())
         .map_err(|e| CryptoError::EncryptionFailed(e.to_string()))?;
 
     // Prepend nonce to ciphertext
@@ -76,11 +76,14 @@ pub fn decrypt_auth_config(encrypted: &[u8], key: &[u8]) -> Result<String, Crypt
     let cipher =
         Aes256Gcm::new_from_slice(key).map_err(|e| CryptoError::DecryptionFailed(e.to_string()))?;
 
-    let nonce = Nonce::from_slice(&encrypted[..NONCE_SIZE]);
+    let nonce_array: [u8; NONCE_SIZE] = encrypted[..NONCE_SIZE]
+        .try_into()
+        .map_err(|_| CryptoError::DecryptionFailed("invalid nonce length".to_string()))?;
+    let nonce = Nonce::from(nonce_array);
     let ciphertext = &encrypted[NONCE_SIZE..];
 
     let plaintext = cipher
-        .decrypt(nonce, ciphertext)
+        .decrypt(&nonce, ciphertext)
         .map_err(|e| CryptoError::DecryptionFailed(e.to_string()))?;
 
     String::from_utf8(plaintext).map_err(|e| CryptoError::DecryptionFailed(e.to_string()))

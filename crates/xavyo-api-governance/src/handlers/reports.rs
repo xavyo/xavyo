@@ -39,7 +39,7 @@ pub async fn list_reports(
         .as_uuid();
 
     let limit = query.limit.min(100);
-    let offset = query.offset;
+    let offset = query.offset.max(0);
 
     let (reports, total) = state
         .report_service

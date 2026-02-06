@@ -438,25 +438,25 @@ impl GovBatchSimulation {
     }
 
     /// Parse the filter criteria.
-    #[must_use] 
+    #[must_use]
     pub fn parse_filter_criteria(&self) -> FilterCriteria {
         serde_json::from_value(self.filter_criteria.clone()).unwrap_or_default()
     }
 
     /// Parse the change specification.
-    #[must_use] 
+    #[must_use]
     pub fn parse_change_spec(&self) -> Option<ChangeSpec> {
         serde_json::from_value(self.change_spec.clone()).ok()
     }
 
     /// Parse the impact summary.
-    #[must_use] 
+    #[must_use]
     pub fn parse_impact_summary(&self) -> BatchImpactSummary {
         serde_json::from_value(self.impact_summary.clone()).unwrap_or_default()
     }
 
     /// Check if the simulation exceeds the scope warning threshold.
-    #[must_use] 
+    #[must_use]
     pub fn has_scope_warning(&self) -> bool {
         self.parse_impact_summary().affected_users > i64::from(SCOPE_WARNING_THRESHOLD)
     }

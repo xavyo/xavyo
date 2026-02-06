@@ -1,9 +1,11 @@
 //! CLI command implementations
 
 pub mod agents;
+pub mod api_keys;
 pub mod apply;
 pub mod authorize;
 pub mod completions;
+pub mod credentials;
 pub mod doctor;
 pub mod export;
 pub mod init;

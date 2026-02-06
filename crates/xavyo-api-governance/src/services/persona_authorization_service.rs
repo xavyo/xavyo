@@ -35,7 +35,7 @@ pub struct AuthorizationResult {
 }
 
 impl AuthorizationResult {
-    #[must_use] 
+    #[must_use]
     pub fn allowed() -> Self {
         Self {
             authorized: true,
@@ -44,7 +44,7 @@ impl AuthorizationResult {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn denied(reason: &str) -> Self {
         Self {
             authorized: false,
@@ -53,7 +53,7 @@ impl AuthorizationResult {
         }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn requires_approval(reason: &str) -> Self {
         Self {
             authorized: false,
@@ -75,7 +75,7 @@ pub struct PersonaAuthorizationService {
 
 impl PersonaAuthorizationService {
     /// Create a new authorization service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

@@ -153,13 +153,13 @@ impl CredentialRequestAudit {
     }
 
     /// Check if the request was successful.
-    #[must_use] 
+    #[must_use]
     pub fn is_success(&self) -> bool {
         self.outcome == "success"
     }
 
     /// Parse the source IP as an `IpAddr`.
-    #[must_use] 
+    #[must_use]
     pub fn source_ip_addr(&self) -> Option<IpAddr> {
         self.source_ip.as_ref().and_then(|s| s.parse().ok())
     }

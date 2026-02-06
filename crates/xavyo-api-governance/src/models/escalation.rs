@@ -486,7 +486,7 @@ pub struct StepEscalationResponse {
 
 impl StepEscalationResponse {
     /// Create response from step with optional rule.
-    #[must_use] 
+    #[must_use]
     pub fn from_step_and_rule(
         step_id: Uuid,
         escalation_enabled: bool,

@@ -17,12 +17,18 @@ use crate::handlers::{
     approval_groups,
     approval_workflows,
     approvals,
+    // Identity Archetype handlers (F-058)
+    archetypes,
     assignments,
     // Enhanced Simulation handlers (F060)
     batch_simulations,
     birthright_policies,
+    // Bulk Action Engine handlers (F-064 Bulk Actions)
+    bulk_actions,
     // Object Lifecycle States handlers (F052)
     bulk_state_operation,
+    // Self-Service Request Catalog handlers (F-062)
+    catalog,
     // Certification Campaign handlers (F036)
     certification_campaigns,
     certification_items,
@@ -77,6 +83,8 @@ use crate::handlers::{
     // Persona Management handlers (F063)
     personas,
     policy_simulations,
+    // Power of Attorney handlers (F-061)
+    power_of_attorney,
     // Provisioning Scripts handlers (F066)
     provisioning_scripts,
     reconciliation_runs,
@@ -89,9 +97,13 @@ use crate::handlers::{
     risk_factors,
     risk_scores,
     risk_thresholds,
+    // Role Inducements & Constructions handlers (F-063)
+    role_assignments,
+    role_constructions,
     // Business Role Hierarchy handlers (F088)
     role_entitlements,
     role_hierarchy,
+    role_inducements,
     role_inheritance_blocks,
     role_mappings,
     // Role Mining & Analytics handlers (F041)
@@ -129,8 +141,12 @@ use crate::services::{
     BatchSimulationService,
     // Lifecycle Workflow services (F037)
     BirthrightPolicyService,
+    // Bulk Action Engine services (F-064 Bulk Actions)
+    BulkActionService,
     // Object Lifecycle States services (F052)
     BulkOperationService,
+    // Self-Service Request Catalog services (F-062)
+    CatalogService,
     // Certification Campaign services (F036)
     CertificationCampaignService,
     CertificationItemService,
@@ -153,8 +169,12 @@ use crate::services::{
     EscalationPolicyService,
     EscalationService,
     FailedOperationService,
+    // GDPR Report services (F-067)
+    GdprReportService,
     IdentityCorrelationRuleService,
     IdentityMergeService,
+    // Role Inducements & Constructions services (F-063)
+    InducementTriggerService,
     // License Management services (F065)
     LicenseAnalyticsService,
     LicenseAssignmentService,
@@ -205,6 +225,8 @@ use crate::services::{
     PersonaExpirationService,
     PersonaService,
     PersonaSessionService,
+    // Power of Attorney services (F-061)
+    PoaService,
     PolicySimulationService,
     ReconciliationService,
     // Compliance Reporting services (F042)
@@ -217,9 +239,12 @@ use crate::services::{
     RiskFactorService,
     RiskScoreService,
     RiskThresholdService,
+    RoleAssignmentService,
+    RoleConstructionService,
     RoleEntitlementService,
     // Business Role Hierarchy services (F088)
     RoleHierarchyService,
+    RoleInducementService,
     ScheduledTransitionService,
     // Provisioning Scripts services (F066)
     ScriptAnalyticsService,
@@ -245,8 +270,10 @@ use crate::services::{
     StateAccessRuleService,
     StateTransitionService,
     TemplateApplicationService,
+    TemplateMergeService,
     TemplateRuleService,
     TemplateScopeService,
+    TemplateSimulationService,
     TicketSyncService,
     TicketingConfigService,
 };
@@ -254,7 +281,7 @@ use crate::services::{
 /// Shared state for governance API.
 #[derive(Clone)]
 pub struct GovernanceState {
-    pool: PgPool,
+    pub(crate) pool: PgPool,
     pub application_service: Arc<ApplicationService>,
     pub entitlement_service: Arc<EntitlementService>,
     pub assignment_service: Arc<AssignmentService>,
@@ -326,6 +353,8 @@ pub struct GovernanceState {
     pub template_rule_service: Arc<TemplateRuleService>,
     pub template_scope_service: Arc<TemplateScopeService>,
     pub template_application_service: Arc<TemplateApplicationService>,
+    pub template_merge_service: Arc<TemplateMergeService>,
+    pub template_simulation_service: Arc<TemplateSimulationService>,
     // Outlier detection services (F059)
     pub outlier_config_service: Arc<OutlierConfigService>,
     pub outlier_scoring_service: Arc<OutlierScoringService>,
@@ -353,6 +382,8 @@ pub struct GovernanceState {
     pub persona_session_service: Arc<PersonaSessionService>,
     pub persona_entitlement_service: Arc<PersonaEntitlementService>,
     pub persona_expiration_service: Arc<PersonaExpirationService>,
+    // Power of Attorney services (F-061)
+    pub poa_service: Arc<PoaService>,
     // Semi-manual Resources services (F064)
     pub manual_task_service: Arc<ManualTaskService>,
     pub semi_manual_resource_service: Arc<SemiManualResourceService>,
@@ -390,17 +421,28 @@ pub struct GovernanceState {
     siem_encryption_key: [u8; 32],
     // Business Role Hierarchy services (F088)
     pub role_hierarchy_service: Arc<RoleHierarchyService>,
+    // Self-Service Request Catalog services (F-062)
+    pub catalog_service: Arc<CatalogService>,
+    // Role Inducements & Constructions services (F-063)
+    pub role_construction_service: Arc<RoleConstructionService>,
+    pub role_inducement_service: Arc<RoleInducementService>,
+    pub inducement_trigger_service: Arc<InducementTriggerService>,
+    pub role_assignment_service: Arc<RoleAssignmentService>,
+    // Bulk Action Engine services (F-064 Bulk Actions)
+    pub bulk_action_service: Arc<BulkActionService>,
+    // GDPR Report services (F-067)
+    pub gdpr_report_service: Arc<GdprReportService>,
 }
 
 impl GovernanceState {
     /// Get the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Get the SIEM encryption key for `auth_config` encryption.
-    #[must_use] 
+    #[must_use]
     pub fn siem_encryption_key(&self) -> &[u8] {
         &self.siem_encryption_key
     }
@@ -412,7 +454,8 @@ impl GovernanceState {
             let key_bytes = base64::engine::general_purpose::STANDARD
                 .decode(&key_b64)
                 .expect("XAVYO_SIEM_ENCRYPTION_KEY must be valid base64");
-            assert!(key_bytes.len() == 32, 
+            assert!(
+                key_bytes.len() == 32,
                 "XAVYO_SIEM_ENCRYPTION_KEY must decode to 32 bytes, got {}",
                 key_bytes.len()
             );
@@ -433,7 +476,7 @@ impl GovernanceState {
     }
 
     /// Create a new governance state with all services.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         let sod_enforcement_service = Arc::new(SodEnforcementService::new(pool.clone()));
         let matching_service = Arc::new(MetaRoleMatchingService::new(pool.clone()));
@@ -555,6 +598,8 @@ impl GovernanceState {
             template_rule_service: Arc::new(TemplateRuleService::new(pool.clone())),
             template_scope_service: Arc::new(TemplateScopeService::new(pool.clone())),
             template_application_service: Arc::new(TemplateApplicationService::new(pool.clone())),
+            template_merge_service: Arc::new(TemplateMergeService::new(pool.clone())),
+            template_simulation_service: Arc::new(TemplateSimulationService::new(pool.clone())),
             // Outlier detection services (F059)
             outlier_config_service: Arc::new(OutlierConfigService::new(pool.clone())),
             outlier_scoring_service: Arc::new(OutlierScoringService::new(pool.clone())),
@@ -591,6 +636,8 @@ impl GovernanceState {
             persona_session_service: Arc::new(PersonaSessionService::new(pool.clone())),
             persona_entitlement_service: Arc::new(PersonaEntitlementService::new(pool.clone())),
             persona_expiration_service: Arc::new(PersonaExpirationService::new(pool.clone())),
+            // Power of Attorney services (F-061)
+            poa_service: Arc::new(PoaService::new(pool.clone())),
             // Semi-manual Resources services (F064)
             manual_task_service: Arc::new(ManualTaskService::new(pool.clone())),
             semi_manual_resource_service: Arc::new(SemiManualResourceService::new(pool.clone())),
@@ -629,7 +676,18 @@ impl GovernanceState {
             siem_health_service: Arc::new(SiemHealthService::new(pool.clone())),
             siem_encryption_key: Self::load_siem_encryption_key(),
             // Business Role Hierarchy services (F088)
-            role_hierarchy_service: Arc::new(RoleHierarchyService::new(pool)),
+            role_hierarchy_service: Arc::new(RoleHierarchyService::new(pool.clone())),
+            // Self-Service Request Catalog services (F-062)
+            catalog_service: Arc::new(CatalogService::new(pool.clone())),
+            // Role Inducements & Constructions services (F-063)
+            role_construction_service: Arc::new(RoleConstructionService::new(pool.clone())),
+            role_inducement_service: Arc::new(RoleInducementService::new(pool.clone())),
+            inducement_trigger_service: Arc::new(InducementTriggerService::new(pool.clone())),
+            role_assignment_service: Arc::new(RoleAssignmentService::new(pool.clone())),
+            // Bulk Action Engine services (F-064 Bulk Actions)
+            bulk_action_service: Arc::new(BulkActionService::new(pool.clone())),
+            // GDPR Report services (F-067)
+            gdpr_report_service: Arc::new(GdprReportService::new(pool)),
         }
     }
 }
@@ -662,6 +720,12 @@ pub fn governance_router(pool: PgPool) -> Router {
         // Entitlement Owners
         .route("/entitlements/:id/owner", put(owners::set_owner))
         .route("/entitlements/:id/owner", delete(owners::remove_owner))
+        // GDPR Data Protection (F-067)
+        .route("/gdpr/report", get(entitlements::gdpr_report))
+        .route(
+            "/gdpr/users/:user_id/data-protection",
+            get(entitlements::user_data_protection),
+        )
         // Assignments
         .route("/assignments", get(assignments::list_assignments))
         .route("/assignments", post(assignments::create_assignment))
@@ -1431,6 +1495,33 @@ pub fn governance_router(pool: PgPool) -> Router {
             "/lifecycle/configs/:config_id/transitions/:transition_id",
             delete(lifecycle_config::delete_transition),
         )
+        // Transition Conditions (F-193)
+        .route(
+            "/lifecycle/configs/:config_id/transitions/:transition_id/conditions",
+            get(lifecycle_config::get_transition_conditions),
+        )
+        .route(
+            "/lifecycle/configs/:config_id/transitions/:transition_id/conditions",
+            put(lifecycle_config::update_transition_conditions),
+        )
+        .route(
+            "/lifecycle/configs/:config_id/transitions/:transition_id/conditions/evaluate",
+            post(lifecycle_config::evaluate_transition_conditions),
+        )
+        // State Actions (F-193)
+        .route(
+            "/lifecycle/configs/:config_id/states/:state_id/actions",
+            get(lifecycle_config::get_state_actions),
+        )
+        .route(
+            "/lifecycle/configs/:config_id/states/:state_id/actions",
+            put(lifecycle_config::update_state_actions),
+        )
+        // User Lifecycle Status (F-193)
+        .route(
+            "/users/:user_id/lifecycle/status",
+            get(lifecycle_config::get_user_lifecycle_status),
+        )
         // State Transitions (F052)
         .route(
             "/lifecycle/transitions",
@@ -1893,6 +1984,37 @@ pub fn governance_router(pool: PgPool) -> Router {
             "/object-templates/application-events/:object_type/:object_id",
             get(object_templates::list_application_events_by_object),
         )
+        // Template Merge Policies (F058)
+        .route(
+            "/object-templates/:template_id/merge-policies",
+            get(object_templates::list_merge_policies).post(object_templates::create_merge_policy),
+        )
+        .route(
+            "/object-templates/:template_id/merge-policies/:policy_id",
+            get(object_templates::get_merge_policy),
+        )
+        .route(
+            "/object-templates/:template_id/merge-policies/:policy_id",
+            put(object_templates::update_merge_policy),
+        )
+        .route(
+            "/object-templates/:template_id/merge-policies/:policy_id",
+            delete(object_templates::delete_merge_policy),
+        )
+        // Template Exclusions (F058)
+        .route(
+            "/object-templates/:template_id/exclusions",
+            get(object_templates::list_exclusions).post(object_templates::create_exclusion),
+        )
+        .route(
+            "/object-templates/:template_id/exclusions/:exclusion_id",
+            delete(object_templates::delete_exclusion),
+        )
+        // Template Simulation (F058)
+        .route(
+            "/object-templates/:template_id/simulate",
+            post(object_templates::simulate_template),
+        )
         // Outlier Detection (F059)
         // Configuration
         .route("/outliers/config", get(outliers::get_config))
@@ -2255,6 +2377,45 @@ pub fn governance_router(pool: PgPool) -> Router {
         // Persona Expiration (F063)
         .route("/personas/:id/extend", post(personas::extend_persona))
         .route("/personas/expiring", get(personas::get_expiring_personas))
+        // Power of Attorney (F-061)
+        .route(
+            "/power-of-attorney",
+            get(power_of_attorney::list_poa).post(power_of_attorney::grant_poa),
+        )
+        .route("/power-of-attorney/:id", get(power_of_attorney::get_poa))
+        .route(
+            "/power-of-attorney/:id/revoke",
+            post(power_of_attorney::revoke_poa),
+        )
+        .route(
+            "/power-of-attorney/:id/extend",
+            post(power_of_attorney::extend_poa),
+        )
+        .route(
+            "/power-of-attorney/:id/assume",
+            post(power_of_attorney::assume_identity),
+        )
+        .route(
+            "/power-of-attorney/drop",
+            post(power_of_attorney::drop_identity),
+        )
+        .route(
+            "/power-of-attorney/current-assumption",
+            get(power_of_attorney::get_current_assumption),
+        )
+        .route(
+            "/power-of-attorney/:id/audit",
+            get(power_of_attorney::get_poa_audit_trail),
+        )
+        // Power of Attorney Admin (F-061)
+        .route(
+            "/admin/power-of-attorney",
+            get(power_of_attorney::admin_list_poa),
+        )
+        .route(
+            "/admin/power-of-attorney/:id/revoke",
+            post(power_of_attorney::admin_revoke_poa),
+        )
         // SLA Policies (F064)
         .route(
             "/sla-policies",
@@ -2686,6 +2847,207 @@ pub fn governance_router(pool: PgPool) -> Router {
         .route(
             "/roles/:role_id/inheritance-blocks/:block_id",
             delete(role_inheritance_blocks::remove_inheritance_block),
+        )
+        // Identity Archetypes (F-058)
+        .route("/archetypes", get(archetypes::list_archetypes))
+        .route("/archetypes", post(archetypes::create_archetype))
+        .route("/archetypes/:id", get(archetypes::get_archetype))
+        .route("/archetypes/:id", put(archetypes::update_archetype))
+        .route("/archetypes/:id", delete(archetypes::delete_archetype))
+        .route(
+            "/archetypes/:id/ancestry",
+            get(archetypes::get_archetype_ancestry),
+        )
+        .route(
+            "/archetypes/:id/policies",
+            get(archetypes::list_archetype_policies),
+        )
+        .route(
+            "/archetypes/:id/policies",
+            post(archetypes::bind_archetype_policy),
+        )
+        .route(
+            "/archetypes/:id/policies/:policy_type",
+            delete(archetypes::unbind_archetype_policy),
+        )
+        .route(
+            "/archetypes/:id/effective-policies",
+            get(archetypes::get_effective_policies),
+        )
+        // Archetype Lifecycle Assignment (F-193)
+        .route(
+            "/archetypes/:archetype_id/lifecycle",
+            get(archetypes::get_archetype_lifecycle),
+        )
+        .route(
+            "/archetypes/:archetype_id/lifecycle",
+            put(archetypes::assign_archetype_lifecycle),
+        )
+        .route(
+            "/archetypes/:archetype_id/lifecycle",
+            delete(archetypes::remove_archetype_lifecycle),
+        )
+        // User Archetype Assignment (F-058)
+        .route(
+            "/users/:user_id/archetype",
+            get(archetypes::get_user_archetype),
+        )
+        .route(
+            "/users/:user_id/archetype",
+            put(archetypes::assign_user_archetype),
+        )
+        .route(
+            "/users/:user_id/archetype",
+            delete(archetypes::remove_user_archetype),
+        )
+        // Self-Service Request Catalog routes (F-062)
+        // Browse routes (US1)
+        .route("/catalog/categories", get(catalog::list_catalog_categories))
+        .route(
+            "/catalog/categories/:id",
+            get(catalog::get_catalog_category),
+        )
+        .route("/catalog/items", get(catalog::list_catalog_items))
+        .route("/catalog/items/:id", get(catalog::get_catalog_item))
+        // Admin catalog routes (US5)
+        .route(
+            "/admin/catalog/categories",
+            get(catalog::admin_list_catalog_categories),
+        )
+        .route(
+            "/admin/catalog/categories",
+            post(catalog::create_catalog_category),
+        )
+        .route(
+            "/admin/catalog/categories/:id",
+            put(catalog::update_catalog_category),
+        )
+        .route(
+            "/admin/catalog/categories/:id",
+            delete(catalog::delete_catalog_category),
+        )
+        .route(
+            "/admin/catalog/items",
+            get(catalog::admin_list_catalog_items),
+        )
+        .route("/admin/catalog/items", post(catalog::create_catalog_item))
+        .route(
+            "/admin/catalog/items/:id",
+            put(catalog::update_catalog_item),
+        )
+        .route(
+            "/admin/catalog/items/:id",
+            delete(catalog::delete_catalog_item),
+        )
+        .route(
+            "/admin/catalog/items/:id/enable",
+            post(catalog::enable_catalog_item),
+        )
+        .route(
+            "/admin/catalog/items/:id/disable",
+            post(catalog::disable_catalog_item),
+        )
+        // Cart routes (US2)
+        .route(
+            "/catalog/cart",
+            get(catalog::get_cart).delete(catalog::clear_cart),
+        )
+        .route("/catalog/cart/items", post(catalog::add_to_cart))
+        .route(
+            "/catalog/cart/items/:item_id",
+            put(catalog::update_cart_item).delete(catalog::remove_from_cart),
+        )
+        // Cart validation & submission routes (US3)
+        .route("/catalog/cart/validate", post(catalog::validate_cart))
+        .route("/catalog/cart/submit", post(catalog::submit_cart))
+        // Role Constructions (F-063)
+        .route(
+            "/roles/:role_id/constructions",
+            get(role_constructions::list_role_constructions)
+                .post(role_constructions::create_role_construction),
+        )
+        .route(
+            "/roles/:role_id/constructions/:construction_id",
+            get(role_constructions::get_role_construction)
+                .put(role_constructions::update_role_construction)
+                .delete(role_constructions::delete_role_construction),
+        )
+        .route(
+            "/roles/:role_id/constructions/:construction_id/enable",
+            post(role_constructions::enable_role_construction),
+        )
+        .route(
+            "/roles/:role_id/constructions/:construction_id/disable",
+            post(role_constructions::disable_role_construction),
+        )
+        // Role Inducements (F-063)
+        .route(
+            "/roles/:role_id/inducements",
+            get(role_inducements::list_role_inducements)
+                .post(role_inducements::create_role_inducement),
+        )
+        .route(
+            "/roles/:role_id/inducements/:inducement_id",
+            get(role_inducements::get_role_inducement)
+                .delete(role_inducements::delete_role_inducement),
+        )
+        .route(
+            "/roles/:role_id/inducements/:inducement_id/enable",
+            post(role_inducements::enable_role_inducement),
+        )
+        .route(
+            "/roles/:role_id/inducements/:inducement_id/disable",
+            post(role_inducements::disable_role_inducement),
+        )
+        .route(
+            "/roles/:role_id/induced-roles",
+            get(role_inducements::get_induced_roles),
+        )
+        // Role Effective Constructions (F-063)
+        .route(
+            "/roles/:role_id/effective-constructions",
+            get(role_constructions::get_role_effective_constructions),
+        )
+        // User Effective Constructions (F-063)
+        .route(
+            "/users/:user_id/effective-constructions",
+            get(role_constructions::get_user_effective_constructions),
+        )
+        // Role Assignments with Construction Triggering (F-063)
+        .route(
+            "/roles/:role_id/assignments/:user_id",
+            get(role_assignments::check_user_has_role)
+                .post(role_assignments::assign_role)
+                .delete(role_assignments::revoke_role),
+        )
+        .route(
+            "/users/:user_id/roles",
+            get(role_assignments::list_user_roles),
+        )
+        // Bulk Action Engine routes (F-064 Bulk Actions)
+        .route(
+            "/admin/bulk-actions",
+            get(bulk_actions::list_bulk_actions).post(bulk_actions::create_bulk_action),
+        )
+        .route(
+            "/admin/bulk-actions/validate-expression",
+            post(bulk_actions::validate_expression),
+        )
+        .route(
+            "/admin/bulk-actions/:id",
+            get(bulk_actions::get_bulk_action).delete(bulk_actions::delete_bulk_action),
+        )
+        .route(
+            "/admin/bulk-actions/:id/preview",
+            post(bulk_actions::preview_bulk_action),
+        )
+        .route(
+            "/admin/bulk-actions/:id/execute",
+            post(bulk_actions::execute_bulk_action),
+        )
+        .route(
+            "/admin/bulk-actions/:id/cancel",
+            post(bulk_actions::cancel_bulk_action),
         )
         .with_state(state)
 }

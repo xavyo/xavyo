@@ -23,13 +23,13 @@ pub enum EnforcementMode {
 
 impl EnforcementMode {
     /// Returns true if risk evaluation should run.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         !matches!(self, Self::Disabled)
     }
 
     /// Returns true if enforcement actions should be applied.
-    #[must_use] 
+    #[must_use]
     pub fn is_enforcing(&self) -> bool {
         matches!(self, Self::Enforce)
     }

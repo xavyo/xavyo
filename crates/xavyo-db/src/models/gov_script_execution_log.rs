@@ -243,9 +243,7 @@ impl GovScriptExecutionLog {
         }
 
         // Count query
-        let count_query = format!(
-            "SELECT COUNT(*) FROM gov_script_execution_logs {where_clause}"
-        );
+        let count_query = format!("SELECT COUNT(*) FROM gov_script_execution_logs {where_clause}");
 
         let mut count_q = sqlx::query_scalar::<_, i64>(&count_query).bind(tenant_id);
 

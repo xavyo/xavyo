@@ -11,9 +11,16 @@ use std::env;
 use uuid::Uuid;
 
 /// Create a test database pool.
+///
+/// Uses `DATABASE_URL_SUPERUSER` (preferred) or `DATABASE_URL` for direct DB tests.
+/// These integration tests perform direct SQL INSERT/UPDATE/DELETE so they need
+/// superuser access (bypasses RLS).
 pub async fn create_test_pool() -> PgPool {
-    let database_url = env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/xavyo_test".to_string());
+    let database_url = env::var("DATABASE_URL_SUPERUSER")
+        .or_else(|_| env::var("DATABASE_URL"))
+        .unwrap_or_else(|_| {
+            "postgres://xavyo:xavyo_test_password@localhost:5434/xavyo_test".to_string()
+        });
 
     PgPoolOptions::new()
         .max_connections(5)
@@ -278,26 +285,26 @@ pub async fn set_nhi_risk_score(pool: &PgPool, tenant_id: Uuid, nhi_id: Uuid, sc
 pub async fn cleanup_test_tenant(pool: &PgPool, tenant_id: Uuid) {
     // Delete in reverse order of dependencies
 
-    // NHI certifications
-    let _ = sqlx::query("DELETE FROM nhi_certifications WHERE tenant_id = $1")
+    // NHI risk scores (FK to gov_service_accounts)
+    let _ = sqlx::query("DELETE FROM gov_nhi_risk_scores WHERE tenant_id = $1")
         .bind(tenant_id)
         .execute(pool)
         .await;
 
     // NHI credentials
-    let _ = sqlx::query("DELETE FROM nhi_credentials WHERE tenant_id = $1")
+    let _ = sqlx::query("DELETE FROM gov_nhi_credentials WHERE tenant_id = $1")
+        .bind(tenant_id)
+        .execute(pool)
+        .await;
+
+    // AI agents
+    let _ = sqlx::query("DELETE FROM ai_agents WHERE tenant_id = $1")
         .bind(tenant_id)
         .execute(pool)
         .await;
 
     // Service accounts
     let _ = sqlx::query("DELETE FROM gov_service_accounts WHERE tenant_id = $1")
-        .bind(tenant_id)
-        .execute(pool)
-        .await;
-
-    // Non-human identities
-    let _ = sqlx::query("DELETE FROM v_non_human_identities WHERE tenant_id = $1")
         .bind(tenant_id)
         .execute(pool)
         .await;

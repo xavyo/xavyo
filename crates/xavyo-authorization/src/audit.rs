@@ -117,7 +117,7 @@ impl Default for InMemoryAuditStore {
 }
 
 impl InMemoryAuditStore {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             events: RwLock::new(HashMap::new()),
@@ -224,7 +224,7 @@ impl PolicyAuditService {
         Self { store }
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn in_memory() -> Self {
         Self::new(Arc::new(InMemoryAuditStore::new()))
     }

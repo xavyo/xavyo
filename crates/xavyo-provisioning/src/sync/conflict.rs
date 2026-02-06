@@ -43,13 +43,13 @@ pub struct SyncConflict {
 
 impl SyncConflict {
     /// Check if this conflict is resolved.
-    #[must_use] 
+    #[must_use]
     pub fn is_resolved(&self) -> bool {
         self.resolved_at.is_some()
     }
 
     /// Check if this conflict needs manual resolution.
-    #[must_use] 
+    #[must_use]
     pub fn needs_manual_resolution(&self) -> bool {
         self.resolution_strategy == ResolutionStrategy::Manual && !self.is_resolved()
     }
@@ -62,7 +62,7 @@ pub struct SyncConflictDetector {
 
 impl SyncConflictDetector {
     /// Create a new conflict detector.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -209,7 +209,10 @@ impl SyncConflictDetector {
         .fetch_all(&self.pool)
         .await?;
 
-        Ok(rows.into_iter().map(SyncConflictRow::into_conflict).collect())
+        Ok(rows
+            .into_iter()
+            .map(SyncConflictRow::into_conflict)
+            .collect())
     }
 
     /// Count pending conflicts for a connector.

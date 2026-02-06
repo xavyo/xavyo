@@ -38,7 +38,7 @@ impl CredentialEncryption {
     ///
     /// # Arguments
     /// * `master_key` - 32-byte master key for deriving tenant keys.
-    #[must_use] 
+    #[must_use]
     pub fn new(master_key: [u8; KEY_LENGTH]) -> Self {
         Self { master_key }
     }
@@ -118,12 +118,12 @@ impl CredentialEncryption {
         use rand::RngCore;
         let mut nonce_bytes = [0u8; NONCE_LENGTH];
         OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::from(nonce_bytes);
 
         // Encrypt
         let ciphertext =
             cipher
-                .encrypt(nonce, plaintext)
+                .encrypt(&nonce, plaintext)
                 .map_err(|e| ConnectorError::EncryptionFailed {
                     message: format!("encryption failed: {e}"),
                 })?;
@@ -160,12 +160,18 @@ impl CredentialEncryption {
 
         // Extract nonce and ciphertext
         let (nonce_bytes, encrypted) = ciphertext.split_at(NONCE_LENGTH);
-        let nonce = Nonce::from_slice(nonce_bytes);
+        let nonce_array: [u8; NONCE_LENGTH] =
+            nonce_bytes
+                .try_into()
+                .map_err(|_| ConnectorError::DecryptionFailed {
+                    message: "invalid nonce length".to_string(),
+                })?;
+        let nonce = Nonce::from(nonce_array);
 
         // Decrypt
         let plaintext =
             cipher
-                .decrypt(nonce, encrypted)
+                .decrypt(&nonce, encrypted)
                 .map_err(|e| ConnectorError::DecryptionFailed {
                     message: format!("decryption failed: {e}"),
                 })?;
@@ -224,7 +230,7 @@ impl std::fmt::Debug for CredentialEncryption {
 /// This should only be used for initial setup or testing.
 ///
 /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG.
-#[must_use] 
+#[must_use]
 pub fn generate_master_key() -> [u8; KEY_LENGTH] {
     use rand::rngs::OsRng;
     use rand::RngCore;
@@ -234,7 +240,7 @@ pub fn generate_master_key() -> [u8; KEY_LENGTH] {
 }
 
 /// Generate a random master key as a hex string.
-#[must_use] 
+#[must_use]
 pub fn generate_master_key_hex() -> String {
     hex::encode(generate_master_key())
 }

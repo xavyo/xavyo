@@ -44,7 +44,10 @@ impl UserRecoveryCode {
         E: PgExecutor<'e>,
     {
         // Use unnest for bulk insert
-        let code_hashes_vec: Vec<&str> = code_hashes.iter().map(std::string::String::as_str).collect();
+        let code_hashes_vec: Vec<&str> = code_hashes
+            .iter()
+            .map(std::string::String::as_str)
+            .collect();
 
         sqlx::query_as(
             r"
@@ -63,26 +66,33 @@ impl UserRecoveryCode {
     /// Find all unused recovery codes for a user.
     pub async fn find_unused_by_user<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
-        sqlx::query_as("SELECT * FROM user_recovery_codes WHERE user_id = $1 AND used_at IS NULL")
+        sqlx::query_as("SELECT * FROM user_recovery_codes WHERE user_id = $1 AND tenant_id = $2 AND used_at IS NULL")
             .bind(user_id)
+            .bind(tenant_id)
             .fetch_all(executor)
             .await
     }
 
     /// Count unused recovery codes for a user.
-    pub async fn count_unused<'e, E>(executor: E, user_id: Uuid) -> Result<i64, sqlx::Error>
+    pub async fn count_unused<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<i64, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
         let result: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = $1 AND used_at IS NULL",
+            "SELECT COUNT(*) FROM user_recovery_codes WHERE user_id = $1 AND tenant_id = $2 AND used_at IS NULL",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .fetch_one(executor)
         .await?;
         Ok(result.0)
@@ -92,6 +102,7 @@ impl UserRecoveryCode {
     /// Returns true if a matching unused code was found and marked.
     pub async fn mark_used<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
         code_hash: &str,
     ) -> Result<bool, sqlx::Error>
@@ -102,10 +113,11 @@ impl UserRecoveryCode {
             r"
             UPDATE user_recovery_codes
             SET used_at = NOW()
-            WHERE user_id = $1 AND code_hash = $2 AND used_at IS NULL
+            WHERE user_id = $1 AND tenant_id = $2 AND code_hash = $3 AND used_at IS NULL
             ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .bind(code_hash)
         .execute(executor)
         .await?;
@@ -113,14 +125,20 @@ impl UserRecoveryCode {
     }
 
     /// Delete all recovery codes for a user (for regeneration or MFA disable).
-    pub async fn delete_all_for_user<'e, E>(executor: E, user_id: Uuid) -> Result<u64, sqlx::Error>
+    pub async fn delete_all_for_user<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<u64, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
-        let result = sqlx::query("DELETE FROM user_recovery_codes WHERE user_id = $1")
-            .bind(user_id)
-            .execute(executor)
-            .await?;
+        let result =
+            sqlx::query("DELETE FROM user_recovery_codes WHERE user_id = $1 AND tenant_id = $2")
+                .bind(user_id)
+                .bind(tenant_id)
+                .execute(executor)
+                .await?;
         Ok(result.rows_affected())
     }
 }

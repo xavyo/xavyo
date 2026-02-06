@@ -210,7 +210,7 @@ impl GovOutlierConfiguration {
     }
 
     /// Get the scoring weights as a struct.
-    #[must_use] 
+    #[must_use]
     pub fn get_weights(&self) -> &ScoringWeights {
         &self.scoring_weights.0
     }

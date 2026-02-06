@@ -15,7 +15,7 @@
 /// # Returns
 ///
 /// `false` if the attribute is missing (fail-safe: missing data = not satisfied).
-#[must_use] 
+#[must_use]
 pub fn evaluate_abac_condition(
     user_attributes: &serde_json::Value,
     attribute_path: &str,

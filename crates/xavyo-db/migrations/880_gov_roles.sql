@@ -34,12 +34,7 @@ ALTER TABLE gov_roles ENABLE ROW LEVEL SECURITY;
 -- RLS policy for tenant isolation
 DROP POLICY IF EXISTS gov_roles_tenant_isolation ON gov_roles;
 CREATE POLICY gov_roles_tenant_isolation ON gov_roles
-    USING (
-        tenant_id = COALESCE(
-            NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-            tenant_id
-        )
-    );
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- Comments for documentation
 COMMENT ON TABLE gov_roles IS 'Business role hierarchy with parent-child relationships and entitlement inheritance (F088)';

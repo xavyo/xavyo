@@ -50,7 +50,7 @@ pub struct StateTransitionService {
 
 impl StateTransitionService {
     /// Create a new state transition service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, access_rule_service: Arc<StateAccessRuleService>) -> Self {
         Self {
             pool,
@@ -62,7 +62,7 @@ impl StateTransitionService {
     }
 
     /// Create a new state transition service with failed operation retry support.
-    #[must_use] 
+    #[must_use]
     pub fn with_retry_support(
         pool: PgPool,
         access_rule_service: Arc<StateAccessRuleService>,
@@ -149,11 +149,34 @@ impl StateTransitionService {
         if current_state_id != Some(transition.from_state_id) {
             let from_state =
                 GovLifecycleState::find_by_id(&self.pool, tenant_id, transition.from_state_id)
-                    .await?.map_or_else(|| "unknown".to_string(), |s| s.name);
+                    .await?
+                    .map_or_else(|| "unknown".to_string(), |s| s.name);
 
             return Err(GovernanceError::InvalidTransition(format!(
                 "Object is not in the required '{from_state}' state for this transition"
             )));
+        }
+
+        // 5a. Evaluate transition conditions (F-193)
+        if transition.conditions.is_some() {
+            let condition_evaluator =
+                crate::services::condition_evaluator::ConditionEvaluator::new(self.pool.clone());
+            let evaluation_result = condition_evaluator
+                .evaluate(tenant_id, request.transition_id, request.object_id)
+                .await?;
+
+            if !evaluation_result.all_satisfied {
+                let failed_count = evaluation_result
+                    .conditions
+                    .iter()
+                    .filter(|c| !c.satisfied)
+                    .count();
+                return Err(GovernanceError::TransitionConditionsNotSatisfied {
+                    failed_count,
+                    total_count: evaluation_result.conditions.len(),
+                    summary: evaluation_result.summary,
+                });
+            }
         }
 
         // 6. Get state names for response/audit
@@ -310,6 +333,20 @@ impl StateTransitionService {
             .capture_access_snapshot(tenant_id, &object_type_str, request.object_id)
             .await?;
 
+        // 1a. Execute exit actions on from_state (F-193)
+        if from_state.exit_actions.is_some() {
+            self.execute_state_actions(
+                tenant_id,
+                request.object_id,
+                request.id, // Use request.id as we don't have audit yet
+                from_state,
+                actor_id,
+                now,
+                xavyo_db::ActionTriggerType::Exit,
+            )
+            .await?;
+        }
+
         // 2. Update the object's lifecycle state
         self.update_object_lifecycle_state(
             tenant_id,
@@ -318,6 +355,20 @@ impl StateTransitionService {
             to_state.id,
         )
         .await?;
+
+        // 2a. Execute entry actions on to_state (F-193)
+        if to_state.entry_actions.is_some() {
+            self.execute_state_actions(
+                tenant_id,
+                request.object_id,
+                request.id, // Use request.id as we don't have audit yet
+                to_state,
+                actor_id,
+                now,
+                xavyo_db::ActionTriggerType::Entry,
+            )
+            .await?;
+        }
 
         // 3. Apply state-based access rules
         let access_result = self
@@ -1137,6 +1188,99 @@ impl StateTransitionService {
         self.access_rule_service
             .get_state_affected_entitlements(tenant_id, &object_type_str, object_id, &to_state)
             .await
+    }
+
+    /// Execute state actions (entry or exit) for a lifecycle state (F-193).
+    ///
+    /// This method executes all configured actions for a state during a transition.
+    async fn execute_state_actions(
+        &self,
+        tenant_id: Uuid,
+        object_id: Uuid,
+        transition_audit_id: Uuid,
+        state: &GovLifecycleState,
+        actor_id: Uuid,
+        transition_started_at: chrono::DateTime<Utc>,
+        trigger_type: xavyo_db::ActionTriggerType,
+    ) -> Result<()> {
+        use crate::models::lifecycle::LifecycleAction;
+        use crate::services::action_executor::{ActionExecutionContext, ActionExecutor};
+
+        // Get the appropriate actions based on trigger type
+        let actions_json = match trigger_type {
+            xavyo_db::ActionTriggerType::Entry => state.entry_actions.as_ref(),
+            xavyo_db::ActionTriggerType::Exit => state.exit_actions.as_ref(),
+        };
+
+        let Some(actions_json) = actions_json else {
+            return Ok(());
+        };
+
+        // Parse the actions
+        let actions: Vec<LifecycleAction> =
+            serde_json::from_value(actions_json.clone()).map_err(|e| {
+                GovernanceError::ActionExecutionFailed(format!(
+                    "Failed to parse {} actions for state {}: {}",
+                    match trigger_type {
+                        xavyo_db::ActionTriggerType::Entry => "entry",
+                        xavyo_db::ActionTriggerType::Exit => "exit",
+                    },
+                    state.name,
+                    e
+                ))
+            })?;
+
+        if actions.is_empty() {
+            return Ok(());
+        }
+
+        // Create executor context
+        let context = ActionExecutionContext {
+            tenant_id,
+            object_id,
+            transition_audit_id,
+            state_id: state.id,
+            actor_id,
+            transition_started_at,
+        };
+
+        // Execute actions
+        let executor = ActionExecutor::new(Arc::new(self.pool.clone()));
+        let result = executor
+            .execute_actions(&context, &actions, trigger_type)
+            .await?;
+
+        // Check for blocking failures
+        if result.has_blocking_failure {
+            let failed_action = result.results.iter().find(|r| !r.success);
+            let error_msg = failed_action
+                .and_then(|r| r.error_message.clone())
+                .unwrap_or_else(|| "Unknown error".to_string());
+
+            return Err(GovernanceError::ActionExecutionFailed(format!(
+                "{} action {} failed: {}",
+                match trigger_type {
+                    xavyo_db::ActionTriggerType::Entry => "Entry",
+                    xavyo_db::ActionTriggerType::Exit => "Exit",
+                },
+                failed_action
+                    .map(|r| r.action_type.to_string())
+                    .unwrap_or_default(),
+                error_msg
+            )));
+        }
+
+        info!(
+            tenant_id = %tenant_id,
+            object_id = %object_id,
+            state_id = %state.id,
+            trigger_type = ?trigger_type,
+            success_count = result.success_count,
+            failure_count = result.failure_count,
+            "Executed state actions"
+        );
+
+        Ok(())
     }
 
     /// Build a transition response from a request.

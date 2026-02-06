@@ -131,9 +131,14 @@ impl WebAuthnService {
             .collect();
 
         // Delete any pending registration challenges
-        WebAuthnChallenge::delete_by_user_and_type(&mut *tx, user_id, CeremonyType::Registration)
-            .await
-            .map_err(ApiAuthError::Database)?;
+        WebAuthnChallenge::delete_by_user_and_type(
+            &mut *tx,
+            tenant_id,
+            user_id,
+            CeremonyType::Registration,
+        )
+        .await
+        .map_err(ApiAuthError::Database)?;
 
         // Create user for webauthn-rs
         let user_unique_id = Uuid::new_v4(); // User handle for WebAuthn (not the actual user_id for privacy)
@@ -216,11 +221,15 @@ impl WebAuthnService {
             .map_err(ApiAuthError::Database)?;
 
         // Get pending registration challenge
-        let challenge =
-            WebAuthnChallenge::find_active(&mut *tx, user_id, CeremonyType::Registration)
-                .await
-                .map_err(ApiAuthError::Database)?
-                .ok_or(ApiAuthError::WebAuthnChallengeNotFound)?;
+        let challenge = WebAuthnChallenge::find_active(
+            &mut *tx,
+            tenant_id,
+            user_id,
+            CeremonyType::Registration,
+        )
+        .await
+        .map_err(ApiAuthError::Database)?
+        .ok_or(ApiAuthError::WebAuthnChallengeNotFound)?;
 
         if challenge.is_expired() {
             return Err(ApiAuthError::WebAuthnChallengeExpired);
@@ -265,19 +274,14 @@ impl WebAuthnService {
         // T066: Enforce allowed_authenticator_types policy
         // Determine authenticator type from attachment hint
         // Platform authenticators (Touch ID, Windows Hello) use "internal" transport
-        let auth_type = if reg_response
-            .response
-            .transports
-            .as_ref()
-            .is_some_and(|t| {
-                t.iter().any(|transport| {
-                    matches!(
-                        transport,
-                        webauthn_rs_proto::AuthenticatorTransport::Internal
-                    )
-                })
+        let auth_type = if reg_response.response.transports.as_ref().is_some_and(|t| {
+            t.iter().any(|transport| {
+                matches!(
+                    transport,
+                    webauthn_rs_proto::AuthenticatorTransport::Internal
+                )
             })
-        {
+        }) {
             "platform"
         } else {
             "cross-platform"
@@ -333,7 +337,7 @@ impl WebAuthnService {
         .map_err(ApiAuthError::Database)?;
 
         // Delete the used challenge
-        WebAuthnChallenge::delete(&mut *tx, challenge.id)
+        WebAuthnChallenge::delete(&mut *tx, tenant_id, challenge.id)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -410,9 +414,14 @@ impl WebAuthnService {
         }
 
         // Delete any pending authentication challenges
-        WebAuthnChallenge::delete_by_user_and_type(&mut *tx, user_id, CeremonyType::Authentication)
-            .await
-            .map_err(ApiAuthError::Database)?;
+        WebAuthnChallenge::delete_by_user_and_type(
+            &mut *tx,
+            tenant_id,
+            user_id,
+            CeremonyType::Authentication,
+        )
+        .await
+        .map_err(ApiAuthError::Database)?;
 
         // Start authentication ceremony
         let (rcr, auth_state) = self
@@ -487,11 +496,15 @@ impl WebAuthnService {
             .map_err(ApiAuthError::Database)?;
 
         // Get pending authentication challenge
-        let challenge =
-            WebAuthnChallenge::find_active(&mut *tx, user_id, CeremonyType::Authentication)
-                .await
-                .map_err(ApiAuthError::Database)?
-                .ok_or(ApiAuthError::WebAuthnChallengeNotFound)?;
+        let challenge = WebAuthnChallenge::find_active(
+            &mut *tx,
+            tenant_id,
+            user_id,
+            CeremonyType::Authentication,
+        )
+        .await
+        .map_err(ApiAuthError::Database)?
+        .ok_or(ApiAuthError::WebAuthnChallengeNotFound)?;
 
         if challenge.is_expired() {
             return Err(ApiAuthError::WebAuthnChallengeExpired);
@@ -566,7 +579,7 @@ impl WebAuthnService {
         .map_err(ApiAuthError::Database)?;
 
         // Delete the used challenge
-        WebAuthnChallenge::delete(&mut *tx, challenge.id)
+        WebAuthnChallenge::delete(&mut *tx, tenant_id, challenge.id)
             .await
             .map_err(ApiAuthError::Database)?;
 

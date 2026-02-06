@@ -43,7 +43,7 @@ pub struct AgentSecretPermission {
 
 impl AgentSecretPermission {
     /// Check if this permission is currently valid.
-    #[must_use] 
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         match self.expires_at {
             Some(expires) => expires > Utc::now(),
@@ -52,14 +52,14 @@ impl AgentSecretPermission {
     }
 
     /// Get the effective max TTL for this permission.
-    #[must_use] 
+    #[must_use]
     pub fn effective_max_ttl(&self, type_max_ttl: i32) -> i32 {
         self.max_ttl_seconds
             .map_or(type_max_ttl, |ttl| ttl.min(type_max_ttl))
     }
 
     /// Get the effective rate limit for this permission.
-    #[must_use] 
+    #[must_use]
     pub fn effective_rate_limit(&self, type_rate_limit: i32) -> i32 {
         self.max_requests_per_hour
             .map_or(type_rate_limit, |rate| rate.min(type_rate_limit))

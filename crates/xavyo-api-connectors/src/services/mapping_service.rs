@@ -156,7 +156,7 @@ pub struct MappingService {
 
 impl MappingService {
     /// Create a new mapping service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -394,8 +394,15 @@ impl MappingService {
             return Ok(());
         }
 
-        // Validate array format
-        let rules = mappings.as_array().unwrap();
+        // Validate array format (already checked is_array() above via fall-through)
+        let rules = match mappings.as_array() {
+            Some(arr) => arr,
+            None => {
+                return Err(ConnectorApiError::Validation(
+                    "Mappings must be an array or object".to_string(),
+                ));
+            }
+        };
         for (i, rule) in rules.iter().enumerate() {
             if !rule.is_object() {
                 return Err(ConnectorApiError::Validation(format!(
@@ -423,12 +430,15 @@ impl MappingService {
     fn parse_mapping_config(&self, mapping: &AttributeMapping) -> Result<MappingConfiguration> {
         // Try to parse mappings as array of MappingRule
         let attribute_mappings: Vec<MappingRule> = if mapping.mappings.is_array() {
-            serde_json::from_value(mapping.mappings.clone()).map_err(|e| {
-                ConnectorApiError::Validation(format!("Invalid mapping rules: {e}"))
-            })?
+            serde_json::from_value(mapping.mappings.clone())
+                .map_err(|e| ConnectorApiError::Validation(format!("Invalid mapping rules: {e}")))?
         } else if mapping.mappings.is_object() {
             // Simple format: {source_attr: target_attr}
-            let obj = mapping.mappings.as_object().unwrap();
+            let Some(obj) = mapping.mappings.as_object() else {
+                return Err(ConnectorApiError::Validation(
+                    "Expected object format for mappings".to_string(),
+                ));
+            };
             obj.iter()
                 .map(|(source, target)| {
                     let target_attr = target.as_str().unwrap_or_default().to_string();

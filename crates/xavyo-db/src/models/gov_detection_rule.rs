@@ -25,13 +25,13 @@ pub enum DetectionRuleType {
 
 impl DetectionRuleType {
     /// Check if this rule type requires parameters.
-    #[must_use] 
+    #[must_use]
     pub fn requires_parameters(&self) -> bool {
         matches!(self, Self::Inactive | Self::Custom)
     }
 
     /// Get default parameters for this rule type.
-    #[must_use] 
+    #[must_use]
     pub fn default_parameters(&self) -> serde_json::Value {
         match self {
             Self::NoManager => serde_json::json!({}),

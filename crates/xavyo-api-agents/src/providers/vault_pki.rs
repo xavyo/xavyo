@@ -162,7 +162,7 @@ pub struct VaultPkiProvider {
 
 impl VaultPkiProvider {
     /// Create a new Vault PKI provider.
-    #[must_use] 
+    #[must_use]
     pub fn new(config: VaultPkiConfig) -> Self {
         let http_client = Client::builder()
             .timeout(StdDuration::from_millis(config.timeout_ms))
@@ -177,7 +177,7 @@ impl VaultPkiProvider {
     }
 
     /// Create a provider with pre-loaded Vault token.
-    #[must_use] 
+    #[must_use]
     pub fn with_token(config: VaultPkiConfig, token: String) -> Self {
         let http_client = Client::builder()
             .timeout(StdDuration::from_millis(config.timeout_ms))
@@ -192,7 +192,7 @@ impl VaultPkiProvider {
     }
 
     /// Get the provider configuration.
-    #[must_use] 
+    #[must_use]
     pub fn config(&self) -> &VaultPkiConfig {
         &self.config
     }
@@ -238,9 +238,8 @@ impl VaultPkiProvider {
     /// Extract subject DN from a PEM certificate.
     fn extract_subject_dn(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
-        })?;
+        let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der)
+            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}")))?;
 
         Ok(cert.subject().to_string())
     }
@@ -248,9 +247,8 @@ impl VaultPkiProvider {
     /// Extract issuer DN from a PEM certificate.
     fn extract_issuer_dn(cert_pem: &str) -> CaResult<String> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
-        })?;
+        let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der)
+            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}")))?;
 
         Ok(cert.issuer().to_string())
     }
@@ -258,9 +256,8 @@ impl VaultPkiProvider {
     /// Extract validity timestamps from a PEM certificate.
     fn extract_validity(cert_pem: &str) -> CaResult<(i64, i64)> {
         let der = Self::parse_pem_to_der(cert_pem)?;
-        let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der).map_err(|e| {
-            CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}"))
-        })?;
+        let (_, cert) = x509_parser::prelude::X509Certificate::from_der(&der)
+            .map_err(|e| CaProviderError::InvalidFormat(format!("Failed to parse X.509: {e:?}")))?;
 
         let not_before = cert.validity().not_before.timestamp();
         let not_after = cert.validity().not_after.timestamp();
@@ -286,10 +283,12 @@ impl CaProvider for VaultPkiProvider {
         // First check Vault health
         let url = format!("{}/v1/sys/health", self.config.vault_url);
 
-        let response =
-            self.http_client.get(&url).send().await.map_err(|e| {
-                CaProviderError::NetworkError(format!("Health check failed: {e}"))
-            })?;
+        let response = self
+            .http_client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| CaProviderError::NetworkError(format!("Health check failed: {e}")))?;
 
         // Vault health endpoint returns different status codes based on state
         // 200 = initialized, unsealed, active

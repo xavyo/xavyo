@@ -5,6 +5,7 @@
 use axum::{extract::Path, http::StatusCode, Extension, Json};
 use sqlx::PgPool;
 use uuid::Uuid;
+use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
 use xavyo_db::set_tenant_context;
 
@@ -21,11 +22,17 @@ use std::sync::Arc;
 /// Requires authentication and admin role.
 pub async fn get_user_mfa_status(
     Extension(pool): Extension<PgPool>,
+    Extension(claims): Extension<JwtClaims>,
     Extension(mfa_service): Extension<Arc<MfaService>>,
     Extension(webauthn_service): Extension<Arc<WebAuthnService>>,
     Extension(tenant_id): Extension<TenantId>,
     Path(user_id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<MfaStatusResponse>), ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     // Set tenant context
     let mut conn = pool.acquire().await.map_err(ApiAuthError::Database)?;
     set_tenant_context(&mut *conn, tenant_id)

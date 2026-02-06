@@ -110,7 +110,7 @@ pub struct SyncConflict {
 
 impl SyncConflict {
     /// Get the conflict type enum.
-    #[must_use] 
+    #[must_use]
     pub fn conflict_type(&self) -> SyncConflictType {
         self.conflict_type
             .parse()
@@ -118,7 +118,7 @@ impl SyncConflict {
     }
 
     /// Get the resolution strategy enum.
-    #[must_use] 
+    #[must_use]
     pub fn resolution_strategy(&self) -> SyncResolutionStrategy {
         self.resolution_strategy
             .parse()
@@ -126,7 +126,7 @@ impl SyncConflict {
     }
 
     /// Check if conflict is resolved.
-    #[must_use] 
+    #[must_use]
     pub fn is_resolved(&self) -> bool {
         self.resolved_at.is_some()
     }

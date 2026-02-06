@@ -38,7 +38,7 @@ pub struct UserClaims {
 
 impl UserClaims {
     /// Create new user claims with just the subject.
-    #[must_use] 
+    #[must_use]
     pub fn new(sub: Uuid) -> Self {
         Self {
             sub: sub.to_string(),
@@ -51,7 +51,7 @@ impl UserClaims {
     }
 
     /// Add email claims.
-    #[must_use] 
+    #[must_use]
     pub fn with_email(mut self, email: String, verified: bool) -> Self {
         self.email = Some(email);
         self.email_verified = Some(verified);
@@ -59,7 +59,7 @@ impl UserClaims {
     }
 
     /// Add profile claims.
-    #[must_use] 
+    #[must_use]
     pub fn with_profile(mut self, name: Option<String>) -> Self {
         self.name = name;
         self
@@ -74,13 +74,13 @@ pub struct UserInfoService {
 
 impl UserInfoService {
     /// Create a new userinfo service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -169,13 +169,13 @@ impl UserInfoService {
     }
 
     /// Parse scopes from a space-separated string.
-    #[must_use] 
+    #[must_use]
     pub fn parse_scopes(scope: &str) -> Vec<&str> {
         scope.split_whitespace().collect()
     }
 
     /// Check if a scope list contains a specific scope.
-    #[must_use] 
+    #[must_use]
     pub fn has_scope(scopes: &[&str], scope: &str) -> bool {
         scopes.contains(&scope)
     }

@@ -416,13 +416,13 @@ impl GovMergeOperation {
     }
 
     /// Check if operation is in progress.
-    #[must_use] 
+    #[must_use]
     pub fn is_in_progress(&self) -> bool {
         matches!(self.status, GovMergeOperationStatus::InProgress)
     }
 
     /// Check if operation is completed.
-    #[must_use] 
+    #[must_use]
     pub fn is_completed(&self) -> bool {
         matches!(self.status, GovMergeOperationStatus::Completed)
     }

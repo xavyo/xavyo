@@ -132,19 +132,19 @@ impl DynamicCredential {
     }
 
     /// Check if the credential is currently valid.
-    #[must_use] 
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         self.status == "active" && self.expires_at > Utc::now()
     }
 
     /// Check if the credential has expired.
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         self.expires_at <= Utc::now() || self.status == "expired"
     }
 
     /// Get TTL in seconds from now (0 if expired).
-    #[must_use] 
+    #[must_use]
     pub fn ttl_seconds(&self) -> i64 {
         let remaining = self.expires_at.signed_duration_since(Utc::now());
         remaining.num_seconds().max(0)

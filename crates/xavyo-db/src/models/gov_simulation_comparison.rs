@@ -276,19 +276,19 @@ impl GovSimulationComparison {
     }
 
     /// Parse summary statistics.
-    #[must_use] 
+    #[must_use]
     pub fn parse_summary_stats(&self) -> ComparisonSummary {
         serde_json::from_value(self.summary_stats.clone()).unwrap_or_default()
     }
 
     /// Parse delta results.
-    #[must_use] 
+    #[must_use]
     pub fn parse_delta_results(&self) -> DeltaResults {
         serde_json::from_value(self.delta_results.clone()).unwrap_or_default()
     }
 
     /// Check if comparison references a specific simulation.
-    #[must_use] 
+    #[must_use]
     pub fn references_simulation(&self, simulation_id: Uuid) -> bool {
         self.simulation_a_id == Some(simulation_id) || self.simulation_b_id == Some(simulation_id)
     }

@@ -116,7 +116,7 @@ pub struct PersonaExpirationService {
 
 impl PersonaExpirationService {
     /// Create a new persona expiration service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: PersonaAuditService::new(pool.clone()),
@@ -501,10 +501,7 @@ impl PersonaExpirationService {
         let _today_end = today_start.succ_opt().unwrap_or(today_start);
         let expires_today = expiring
             .iter()
-            .filter(|p| {
-                p.valid_until
-                    .is_some_and(|v| v.date_naive() == today_start)
-            })
+            .filter(|p| p.valid_until.is_some_and(|v| v.date_naive() == today_start))
             .count() as i64;
 
         // Get recently expired personas (last 7 days)

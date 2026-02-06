@@ -391,13 +391,13 @@ impl GovOutlierDisposition {
     }
 
     /// Check if this disposition requires attention.
-    #[must_use] 
+    #[must_use]
     pub fn requires_attention(&self) -> bool {
         self.status.requires_attention()
     }
 
     /// Check if this disposition has expired.
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         if let Some(expires_at) = self.expires_at {
             expires_at <= Utc::now()

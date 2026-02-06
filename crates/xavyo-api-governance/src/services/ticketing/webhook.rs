@@ -274,11 +274,15 @@ impl TicketingProvider for WebhookProvider {
             // Try to parse the response
             let response_text = response.text().await?;
 
-            if let Ok(webhook_response) = serde_json::from_str::<WebhookCreateResponse>(&response_text) { Ok(CreateTicketResponse {
-                external_reference: webhook_response.ticket_id,
-                external_url: webhook_response.ticket_url,
-                raw_response: serde_json::from_str(&response_text).ok(),
-            }) } else {
+            if let Ok(webhook_response) =
+                serde_json::from_str::<WebhookCreateResponse>(&response_text)
+            {
+                Ok(CreateTicketResponse {
+                    external_reference: webhook_response.ticket_id,
+                    external_url: webhook_response.ticket_url,
+                    raw_response: serde_json::from_str(&response_text).ok(),
+                })
+            } else {
                 // If response doesn't match expected format, use task_id as reference
                 tracing::warn!(
                     "Webhook response didn't match expected format, using task_id as reference"

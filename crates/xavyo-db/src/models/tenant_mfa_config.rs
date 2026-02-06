@@ -70,7 +70,7 @@ pub struct UpsertMfaConfig {
 
 impl TenantMfaConfig {
     /// Get default configuration for a tenant (doesn't persist).
-    #[must_use] 
+    #[must_use]
     pub fn default_for_tenant(tenant_id: Uuid) -> Self {
         Self {
             tenant_id,

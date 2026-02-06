@@ -35,7 +35,7 @@ pub struct BrandingService {
 
 impl BrandingService {
     /// Create a new branding service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -45,7 +45,7 @@ impl BrandingService {
     }
 
     /// Create a new branding service with custom cache TTL.
-    #[must_use] 
+    #[must_use]
     pub fn with_cache_ttl(pool: PgPool, ttl_secs: u64) -> Self {
         Self {
             pool,

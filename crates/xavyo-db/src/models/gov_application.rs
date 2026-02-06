@@ -433,13 +433,13 @@ impl GovApplication {
     }
 
     /// Check if application is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self.status, GovAppStatus::Active)
     }
 
     /// Check if application requires semi-manual provisioning (F064).
-    #[must_use] 
+    #[must_use]
     pub fn requires_manual_provisioning(&self) -> bool {
         self.is_semi_manual
     }

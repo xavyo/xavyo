@@ -375,7 +375,7 @@ impl GovMetaRole {
     }
 
     /// Check if meta-role is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         self.status == MetaRoleStatus::Active
     }

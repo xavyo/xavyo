@@ -26,7 +26,7 @@ pub struct A2aService {
 
 impl A2aService {
     /// Create a new A2A service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, webhook_service: Arc<WebhookService>) -> Self {
         Self {
             pool,
@@ -142,7 +142,7 @@ impl A2aService {
         let total = A2aTask::count(&self.pool, tenant_id, source_agent_id, &filter).await?;
 
         let limit = query.limit.unwrap_or(100).min(1000);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         Ok(A2aTaskListResponse {
             tasks: tasks.iter().map(|t| self.task_to_response(t)).collect(),

@@ -20,7 +20,7 @@ pub enum MappingDirection {
 
 impl MappingDirection {
     /// Convert to string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             MappingDirection::Inbound => "inbound",
@@ -30,7 +30,7 @@ impl MappingDirection {
     }
 
     /// Check if this direction includes inbound.
-    #[must_use] 
+    #[must_use]
     pub fn includes_inbound(&self) -> bool {
         matches!(
             self,
@@ -39,7 +39,7 @@ impl MappingDirection {
     }
 
     /// Check if this direction includes outbound.
-    #[must_use] 
+    #[must_use]
     pub fn includes_outbound(&self) -> bool {
         matches!(
             self,
@@ -114,14 +114,14 @@ impl AttributeMapping {
     }
 
     /// Set required flag.
-    #[must_use] 
+    #[must_use]
     pub fn with_required(mut self, required: bool) -> Self {
         self.required = required;
         self
     }
 
     /// Set default value.
-    #[must_use] 
+    #[must_use]
     pub fn with_default(mut self, default: serde_json::Value) -> Self {
         self.default_value = Some(default);
         self
@@ -147,7 +147,7 @@ pub struct MappingResult {
 
 impl MappingResult {
     /// Create a new empty result.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             attributes: HashMap::new(),
@@ -157,7 +157,7 @@ impl MappingResult {
     }
 
     /// Check if mapping was successful (no unmapped required attributes).
-    #[must_use] 
+    #[must_use]
     pub fn is_success(&self) -> bool {
         self.unmapped.is_empty()
     }
@@ -177,7 +177,7 @@ pub struct InboundMapper {
 
 impl InboundMapper {
     /// Create a new inbound mapper.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             mappings: HashMap::new(),
@@ -185,7 +185,7 @@ impl InboundMapper {
     }
 
     /// Create from a list of mappings.
-    #[must_use] 
+    #[must_use]
     pub fn from_mappings(mappings: Vec<AttributeMapping>) -> Self {
         let mut mapper = Self::new();
         for mapping in mappings {
@@ -255,7 +255,7 @@ impl InboundMapper {
     }
 
     /// Get the internal attribute name for an external attribute.
-    #[must_use] 
+    #[must_use]
     pub fn get_internal_name(&self, external: &str) -> Option<&str> {
         self.mappings
             .get(external)
@@ -263,13 +263,13 @@ impl InboundMapper {
     }
 
     /// Get the number of mappings.
-    #[must_use] 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.mappings.len()
     }
 
     /// Check if there are no mappings.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.mappings.is_empty()
     }

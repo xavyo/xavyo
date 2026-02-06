@@ -52,7 +52,7 @@ impl std::fmt::Display for ApprovalStatus {
 
 impl ApprovalStatus {
     /// Convert to database string.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -63,7 +63,7 @@ impl ApprovalStatus {
     }
 
     /// Check if this is a terminal state.
-    #[must_use] 
+    #[must_use]
     pub fn is_terminal(&self) -> bool {
         matches!(self, Self::Approved | Self::Denied | Self::Expired)
     }
@@ -100,19 +100,19 @@ impl AiAgentApprovalRequest {
     }
 
     /// Check if the approval request is still pending.
-    #[must_use] 
+    #[must_use]
     pub fn is_pending(&self) -> bool {
         self.status == "pending"
     }
 
     /// Check if the approval has expired (past `expires_at` time).
-    #[must_use] 
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         self.expires_at < Utc::now()
     }
 
     /// Check if the approval can still be decided (pending and not expired).
-    #[must_use] 
+    #[must_use]
     pub fn can_be_decided(&self) -> bool {
         self.is_pending() && !self.is_expired()
     }

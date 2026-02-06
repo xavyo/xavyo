@@ -21,7 +21,7 @@ pub struct RiskFactorService {
 
 impl RiskFactorService {
     /// Create a new risk factor service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -167,7 +167,7 @@ impl RiskFactorService {
         };
 
         let limit = query.limit.unwrap_or(50).min(100);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         let factors =
             GovRiskFactor::list_by_tenant(&self.pool, tenant_id, &filter, limit, offset).await?;

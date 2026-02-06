@@ -182,9 +182,7 @@ fn test_transfer_ownership_serialization() {
 #[test]
 fn test_transfer_ownership_deserialization() {
     let new_owner_id = Uuid::new_v4();
-    let json = format!(
-        r#"{{"new_owner_id": "{new_owner_id}", "reason": "Owner transition"}}"#
-    );
+    let json = format!(r#"{{"new_owner_id": "{new_owner_id}", "reason": "Owner transition"}}"#);
 
     let request: TransferOwnershipRequest = serde_json::from_str(&json).unwrap();
     assert_eq!(request.new_owner_id, new_owner_id);

@@ -115,7 +115,7 @@ pub struct ErrorResponse {
 
 impl SocialError {
     /// Get the error code for API responses.
-    #[must_use] 
+    #[must_use]
     pub fn error_code(&self) -> &'static str {
         match self {
             SocialError::ProviderUnavailable { .. } => "provider_unavailable",
@@ -140,17 +140,17 @@ impl SocialError {
     }
 
     /// Get the HTTP status code for this error.
-    #[must_use] 
+    #[must_use]
     pub fn status_code(&self) -> StatusCode {
         match self {
-            SocialError::ProviderUnavailable { .. } => StatusCode::NOT_FOUND,
+            SocialError::ProviderUnavailable { .. } => StatusCode::FORBIDDEN,
             SocialError::InvalidProvider { .. } => StatusCode::BAD_REQUEST,
             SocialError::InvalidCallback { .. } => StatusCode::BAD_REQUEST,
             SocialError::TokenExchangeFailed { .. } => StatusCode::BAD_GATEWAY,
             SocialError::UserInfoFailed { .. } => StatusCode::BAD_GATEWAY,
             SocialError::AccountLinkingRequired { .. } => StatusCode::CONFLICT,
             SocialError::AlreadyLinkedToOther => StatusCode::CONFLICT,
-            SocialError::UnlinkForbidden { .. } => StatusCode::BAD_REQUEST,
+            SocialError::UnlinkForbidden { .. } => StatusCode::FORBIDDEN,
             SocialError::ConnectionNotFound => StatusCode::NOT_FOUND,
             SocialError::EncryptionError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             SocialError::InvalidState { .. } => StatusCode::BAD_REQUEST,
@@ -168,15 +168,47 @@ impl SocialError {
 impl IntoResponse for SocialError {
     fn into_response(self) -> Response {
         let status = self.status_code();
+        let details = match &self {
+            SocialError::AccountLinkingRequired { email, .. } => {
+                Some(serde_json::json!({ "email": email }))
+            }
+            _ => None,
+        };
+        let message = match &self {
+            SocialError::DatabaseError(e) => {
+                tracing::error!("Social database error: {:?}", e);
+                "A database error occurred".to_string()
+            }
+            SocialError::HttpError(e) => {
+                tracing::error!("Social HTTP error: {:?}", e);
+                "An HTTP client error occurred".to_string()
+            }
+            SocialError::JsonError(e) => {
+                tracing::error!("Social JSON error: {:?}", e);
+                "A data processing error occurred".to_string()
+            }
+            SocialError::JwtError(e) => {
+                tracing::error!("Social JWT error: {:?}", e);
+                "A token processing error occurred".to_string()
+            }
+            SocialError::InternalError { message } => {
+                tracing::error!("Social internal error: {}", message);
+                "An internal error occurred".to_string()
+            }
+            SocialError::EncryptionError { operation } => {
+                tracing::error!("Social encryption error: {}", operation);
+                "An encryption error occurred".to_string()
+            }
+            SocialError::ConfigurationError { .. } => {
+                tracing::error!("Social configuration error");
+                "A provider configuration error occurred".to_string()
+            }
+            _ => self.to_string(),
+        };
         let body = ErrorResponse {
             error: self.error_code().to_string(),
-            message: self.to_string(),
-            details: match &self {
-                SocialError::AccountLinkingRequired { email, .. } => {
-                    Some(serde_json::json!({ "email": email }))
-                }
-                _ => None,
-            },
+            message,
+            details,
         };
 
         (status, axum::Json(body)).into_response()

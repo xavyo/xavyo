@@ -43,7 +43,7 @@ pub struct PrivilegeDetector {
 
 impl PrivilegeDetector {
     /// Create a new privilege detector.
-    #[must_use] 
+    #[must_use]
     pub fn new(params: MiningJobParameters) -> Self {
         Self { params }
     }
@@ -264,7 +264,7 @@ impl PrivilegeDetector {
     }
 
     /// Convert detections to database creation requests.
-    #[must_use] 
+    #[must_use]
     pub fn detections_to_create_requests(
         &self,
         job_id: Uuid,

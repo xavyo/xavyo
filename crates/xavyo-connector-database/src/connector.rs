@@ -357,15 +357,15 @@ impl Connector for DatabaseConnector {
 
         // Verify users table exists
         let users_table = &self.config.users_table;
-        let check_table_query = format!(
-            "SELECT 1 FROM information_schema.tables WHERE table_name = '{}'",
-            users_table.replace('\'', "''")
-        );
 
-        let table_exists: Option<sqlx::postgres::PgRow> = sqlx::query(&check_table_query)
-            .fetch_optional(&pool)
-            .await
-            .map_err(|e| ConnectorError::connection_failed_with_source("Table check failed", e))?;
+        let table_exists: Option<sqlx::postgres::PgRow> =
+            sqlx::query("SELECT 1 FROM information_schema.tables WHERE table_name = $1")
+                .bind(users_table)
+                .fetch_optional(&pool)
+                .await
+                .map_err(|e| {
+                    ConnectorError::connection_failed_with_source("Table check failed", e)
+                })?;
 
         if table_exists.is_none() {
             return Err(ConnectorError::connection_failed(format!(

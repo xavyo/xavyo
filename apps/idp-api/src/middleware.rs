@@ -78,7 +78,8 @@ pub async fn otel_trace_middleware(
     let method = request.method().to_string();
     let target = request.uri().path().to_string();
     let route = matched_path
-        .as_ref().map_or_else(|| "unmatched".to_string(), |m| m.as_str().to_string());
+        .as_ref()
+        .map_or_else(|| "unmatched".to_string(), |m| m.as_str().to_string());
 
     // Extract W3C trace context from incoming headers (FR-002)
     let otel_cx = extract_otel_context(request.headers());
@@ -184,7 +185,10 @@ pub async fn request_timeout_middleware(
         std::time::Duration::from_secs(timeout_secs),
         next.run(request),
     )
-    .await { response } else {
+    .await
+    {
+        response
+    } else {
         let mut response = Response::new(Body::from(
             serde_json::json!({
                 "error": "request_timeout",
@@ -672,7 +676,9 @@ pub async fn idempotency_middleware_jwt(
     request: axum::http::Request<Body>,
     next: Next,
 ) -> Response {
-    let tenant_uuid = if let Some(tid) = claims.tenant_id() { *tid.as_uuid() } else {
+    let tenant_uuid = if let Some(tid) = claims.tenant_id() {
+        *tid.as_uuid()
+    } else {
         tracing::error!("Idempotency middleware: JWT claims missing tenant_id");
         return IdempotencyError::Database(sqlx::Error::Protocol(
             "Missing tenant context".to_string(),
@@ -852,6 +858,124 @@ async fn idempotency_middleware_inner(
                     response
                 }
             }
+        }
+    }
+}
+
+// ── RLS Tenant Context for xavyo_app Pool ─────────────────────────────────
+
+// Task-local storage for the current tenant ID.
+//
+// This is set by `rls_tenant_middleware` and read by the `before_acquire`
+// callback on the app pool to automatically set `app.current_tenant` on
+// every connection acquired from the pool. This ensures RLS policies
+// are properly enforced without requiring handler changes.
+tokio::task_local! {
+    pub static CURRENT_TENANT: uuid::Uuid;
+}
+
+/// A nil UUID used as a sentinel for "no tenant context".
+///
+/// This is set on connections when no tenant is active. Because existing RLS
+/// policies cast `current_setting('app.current_tenant')::uuid` directly (without
+/// NULLIF), we use a valid but non-existent UUID to avoid `invalid input syntax`
+/// errors. This UUID never matches any real tenant, so RLS returns 0 rows (fail-closed).
+const NIL_TENANT: &str = "00000000-0000-0000-0000-000000000000";
+
+/// Create an app pool (connecting as `xavyo_app`) with RLS-aware connection hooks.
+///
+/// The `before_acquire` callback reads the task-local `CURRENT_TENANT` and
+/// sets `app.current_tenant` on the connection. The `after_release` callback
+/// resets to the nil sentinel to prevent tenant context leaking across requests.
+pub async fn create_rls_pool(
+    database_url: &str,
+    max_connections: u32,
+) -> Result<sqlx::PgPool, sqlx::Error> {
+    sqlx::postgres::PgPoolOptions::new()
+        .max_connections(max_connections)
+        .acquire_timeout(std::time::Duration::from_secs(5))
+        .after_connect(|conn, _meta| {
+            Box::pin(async move {
+                // Set nil tenant on new connections (fail-closed default)
+                sqlx::Executor::execute(
+                    &mut *conn,
+                    sqlx::query("SELECT set_config('app.current_tenant', $1::text, false)")
+                        .bind(NIL_TENANT)
+                        as sqlx::query::Query<'_, sqlx::Postgres, _>,
+                )
+                .await?;
+                Ok(())
+            })
+        })
+        .before_acquire(|conn, _meta| {
+            Box::pin(async move {
+                // Read the task-local tenant ID and set app.current_tenant
+                let tenant_str = CURRENT_TENANT
+                    .try_with(|tenant_id| tenant_id.to_string())
+                    .unwrap_or_else(|_| NIL_TENANT.to_string());
+
+                sqlx::Executor::execute(
+                    &mut *conn,
+                    sqlx::query("SELECT set_config('app.current_tenant', $1::text, false)")
+                        .bind(tenant_str)
+                        as sqlx::query::Query<'_, sqlx::Postgres, _>,
+                )
+                .await?;
+                Ok(true)
+            })
+        })
+        .after_release(|conn, _meta| {
+            Box::pin(async move {
+                // Reset to nil sentinel when returning connection to pool
+                let _ = sqlx::Executor::execute(
+                    &mut *conn,
+                    sqlx::query("SELECT set_config('app.current_tenant', $1::text, false)")
+                        .bind(NIL_TENANT)
+                        as sqlx::query::Query<'_, sqlx::Postgres, _>,
+                )
+                .await;
+                Ok(true)
+            })
+        })
+        .connect(database_url)
+        .await
+}
+
+/// Axum middleware that wraps request processing with the task-local tenant context.
+///
+/// This is a GLOBAL middleware that runs BEFORE route-level middleware (including
+/// TenantLayer). It extracts the tenant ID directly from:
+///   1. Request extensions (set by prior middleware, e.g. API key auth)
+///   2. `X-Tenant-ID` header (same source as TenantLayer)
+///
+/// It scopes the handler execution within a `CURRENT_TENANT` task-local, so any
+/// pool connection acquired within the handler will automatically have
+/// `app.current_tenant` set via the `before_acquire` callback.
+pub async fn rls_tenant_middleware(req: axum::extract::Request, next: Next) -> Response {
+    // Try to extract TenantId from extensions first (set by API key auth middleware)
+    let tenant_id = req
+        .extensions()
+        .get::<xavyo_core::TenantId>()
+        .map(|t| *t.as_uuid())
+        // Fall back to X-Tenant-ID header (same source as TenantLayer)
+        .or_else(|| {
+            req.headers()
+                .get("X-Tenant-ID")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.trim().parse::<uuid::Uuid>().ok())
+        });
+
+    match tenant_id {
+        Some(tid) => {
+            // Wrap the handler in a task-local scope with the tenant ID
+            CURRENT_TENANT
+                .scope(tid, async move { next.run(req).await })
+                .await
+        }
+        None => {
+            // No tenant context — proceed without setting task-local
+            // (health checks, public endpoints, etc.)
+            next.run(req).await
         }
     }
 }

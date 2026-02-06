@@ -111,7 +111,7 @@ impl ListSiemDestinationsQuery {
     /// Validate and clamp pagination values.
     ///
     /// SECURITY: Prevents `DoS` via unbounded pagination.
-    #[must_use] 
+    #[must_use]
     pub fn validated(self) -> Self {
         Self {
             enabled: self.enabled,

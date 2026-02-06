@@ -91,6 +91,9 @@ pub mod identity_merge;
 // Persona Management handlers (F063)
 pub mod personas;
 
+// Power of Attorney handlers (F-061)
+pub mod power_of_attorney;
+
 // Semi-manual Resources handlers (F064)
 pub mod manual_tasks;
 pub mod semi_manual;
@@ -129,3 +132,17 @@ pub mod siem;
 pub mod role_entitlements;
 pub mod role_hierarchy;
 pub mod role_inheritance_blocks;
+
+// Identity Archetype handlers (F-058)
+pub mod archetypes;
+
+// Self-Service Request Catalog handlers (F-062)
+pub mod catalog;
+
+// Role Inducements & Constructions handlers (F-063)
+pub mod role_assignments;
+pub mod role_constructions;
+pub mod role_inducements;
+
+// Bulk Action Engine handlers (F-064 Bulk Actions)
+pub mod bulk_actions;

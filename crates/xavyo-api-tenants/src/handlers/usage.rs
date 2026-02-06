@@ -58,9 +58,7 @@ pub async fn get_tenant_usage_handler(
     let tenant = xavyo_db::models::Tenant::find_by_id(&state.pool, tenant_id)
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
-        .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
-        })?;
+        .ok_or_else(|| TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found")))?;
 
     // Get or create current period metrics
     let metrics = TenantUsageMetrics::get_or_create_current(&state.pool, tenant_id)
@@ -134,9 +132,7 @@ pub async fn get_tenant_usage_history_handler(
     let _tenant = xavyo_db::models::Tenant::find_by_id(&state.pool, tenant_id)
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
-        .ok_or_else(|| {
-            TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found"))
-        })?;
+        .ok_or_else(|| TenantError::NotFoundWithMessage(format!("Tenant {tenant_id} not found")))?;
 
     // Get historical metrics
     let history = TenantUsageMetrics::get_history(&state.pool, tenant_id, query.periods)
@@ -167,7 +163,11 @@ fn extract_limits_from_settings(settings: &serde_json::Value) -> UsageLimits {
             .get("max_mau")
             .and_then(serde_json::Value::as_i64)
             .map(|v| v as i32),
-        max_api_calls: limits.get("max_api_calls").and_then(serde_json::Value::as_i64),
-        max_agent_invocations: limits.get("max_agent_invocations").and_then(serde_json::Value::as_i64),
+        max_api_calls: limits
+            .get("max_api_calls")
+            .and_then(serde_json::Value::as_i64),
+        max_agent_invocations: limits
+            .get("max_agent_invocations")
+            .and_then(serde_json::Value::as_i64),
     }
 }

@@ -19,6 +19,7 @@ mod commands;
 mod config;
 mod credentials;
 mod error;
+mod interactive;
 mod models;
 mod output;
 
@@ -59,6 +60,12 @@ enum Commands {
 
     /// Manage AI agents
     Agents(commands::agents::AgentsArgs),
+
+    /// Manage API keys
+    ApiKeys(commands::api_keys::ApiKeysArgs),
+
+    /// Manage NHI credentials
+    Credentials(commands::credentials::CredentialsArgs),
 
     /// Manage tools
     Tools(commands::tools::ToolsArgs),
@@ -116,6 +123,8 @@ async fn run(cli: Cli) -> CliResult<()> {
         Commands::Init(args) => commands::init::execute(args).await,
         Commands::Status(args) => commands::status::execute(args).await,
         Commands::Agents(args) => commands::agents::execute(args).await,
+        Commands::ApiKeys(args) => commands::api_keys::execute(args).await,
+        Commands::Credentials(args) => commands::credentials::execute(args).await,
         Commands::Tools(args) => commands::tools::execute(args).await,
         Commands::Authorize(args) => commands::authorize::execute(args).await,
         Commands::Doctor(args) => commands::doctor::execute(args).await,

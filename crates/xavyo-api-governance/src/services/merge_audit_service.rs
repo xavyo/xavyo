@@ -20,7 +20,7 @@ pub struct MergeAuditService {
 
 impl MergeAuditService {
     /// Create a new merge audit service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

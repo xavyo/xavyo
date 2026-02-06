@@ -57,7 +57,7 @@ pub struct PermissionWithTool {
 
 impl AssessmentService {
     /// Create a new `AssessmentService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -260,9 +260,7 @@ impl AssessmentService {
         } else if count <= MAX_TOOL_PERMISSIONS {
             VulnerabilityCheck::pass(
                 CheckName::GranularScopes,
-                format!(
-                    "Agent has {count} tool permissions (<{MAX_TOOL_PERMISSIONS} recommended)"
-                ),
+                format!("Agent has {count} tool permissions (<{MAX_TOOL_PERMISSIONS} recommended)"),
             )
         } else {
             VulnerabilityCheck::warning(
@@ -633,9 +631,7 @@ impl AssessmentService {
         if high > 0 {
             return VulnerabilityCheck::fail(
                 CheckName::AnomalyDetection,
-                format!(
-                    "{high} high-severity anomalies detected in last 24h ({medium} medium)"
-                ),
+                format!("{high} high-severity anomalies detected in last 24h ({medium} medium)"),
             );
         }
 

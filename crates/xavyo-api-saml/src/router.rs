@@ -85,7 +85,7 @@ pub fn saml_router(state: SamlState) -> Router {
 }
 
 /// Create SAML state from configuration
-#[must_use] 
+#[must_use]
 pub fn create_saml_state(
     pool: sqlx::PgPool,
     base_url: String,

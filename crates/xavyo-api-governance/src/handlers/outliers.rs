@@ -222,7 +222,7 @@ pub async fn list_analyses(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (analyses, total) = state
         .outlier_scoring_service
@@ -415,7 +415,7 @@ pub async fn list_results(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (results, total) = state
         .outlier_scoring_service
@@ -784,7 +784,7 @@ pub async fn list_dispositions(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (dispositions, total) = state
         .outlier_scoring_service
@@ -881,7 +881,7 @@ pub async fn list_alerts(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (alerts, total) = state
         .outlier_scoring_service

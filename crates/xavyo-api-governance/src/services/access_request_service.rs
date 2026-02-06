@@ -29,7 +29,7 @@ pub struct AccessRequestService {
 
 impl AccessRequestService {
     /// Create a new access request service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             sod_enforcement_service: SodEnforcementService::new(pool.clone()),
@@ -236,7 +236,7 @@ impl AccessRequestService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

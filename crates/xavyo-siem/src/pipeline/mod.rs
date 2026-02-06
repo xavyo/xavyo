@@ -77,7 +77,7 @@ pub struct ExportPipeline {
 
 impl ExportPipeline {
     /// Create a new export pipeline for a destination.
-    #[must_use] 
+    #[must_use]
     pub fn new(worker: Box<dyn DeliveryWorker>, config: PipelineConfig) -> Self {
         let circuit_breaker = CircuitBreaker::new(
             config.circuit_breaker_threshold,

@@ -333,9 +333,7 @@ fn print_report(report: &DiagnosticReport) {
         // Show suggestion if present
         if let Some(ref suggestion) = check.suggestion {
             if use_color {
-                println!(
-                    "                              └─ \x1b[90m{suggestion}{RESET}"
-                );
+                println!("                              └─ \x1b[90m{suggestion}{RESET}");
             } else {
                 println!("                              └─ {suggestion}");
             }

@@ -174,7 +174,6 @@ mod persona_archetype_crud {
 }
 
 mod naming_pattern_validation {
-    
 
     #[test]
     fn test_naming_pattern_with_username() {

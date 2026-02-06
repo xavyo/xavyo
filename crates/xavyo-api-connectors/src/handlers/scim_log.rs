@@ -83,14 +83,17 @@ pub async fn list_provisioning_log(
             id: target_id.to_string(),
         })?;
 
+    let limit = query.limit.min(100);
+    let offset = query.offset.max(0);
+
     let (items, total_count) = ScimProvisioningLog::list_by_target(
         pool,
         tenant_id,
         target_id,
         query.resource_type.as_deref(),
         query.operation_type.as_deref(),
-        query.limit,
-        query.offset,
+        limit,
+        offset,
     )
     .await?;
 
@@ -98,8 +101,8 @@ pub async fn list_provisioning_log(
         target_id,
         items,
         total_count,
-        limit: query.limit,
-        offset: query.offset,
+        limit,
+        offset,
     }))
 }
 

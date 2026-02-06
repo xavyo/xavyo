@@ -127,7 +127,7 @@ pub struct InMemoryPolicyAuditStore {
 
 impl InMemoryPolicyAuditStore {
     /// Create a new in-memory policy audit store.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             events: Arc::new(RwLock::new(HashMap::new())),
@@ -218,9 +218,9 @@ impl PolicyAuditStore for InMemoryPolicyAuditStore {
         let mut versions = self.versions.write().await;
         let key = (input.tenant_id, input.policy_id);
 
-        let version_number = versions
-            .get(&key)
-            .map_or(1, |v| v.iter().map(|pv| pv.version_number).max().unwrap_or(0) + 1);
+        let version_number = versions.get(&key).map_or(1, |v| {
+            v.iter().map(|pv| pv.version_number).max().unwrap_or(0) + 1
+        });
 
         let version = PolicyVersion {
             id: Uuid::new_v4(),
@@ -274,9 +274,9 @@ impl PolicyAuditStore for InMemoryPolicyAuditStore {
         let versions = self.versions.read().await;
         let key = (tenant_id, policy_id);
 
-        Ok(versions
-            .get(&key)
-            .map_or(1, |v| v.iter().map(|pv| pv.version_number).max().unwrap_or(0) + 1))
+        Ok(versions.get(&key).map_or(1, |v| {
+            v.iter().map(|pv| pv.version_number).max().unwrap_or(0) + 1
+        }))
     }
 }
 

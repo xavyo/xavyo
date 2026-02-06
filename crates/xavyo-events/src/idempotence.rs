@@ -86,7 +86,7 @@ impl IdempotenceService {
     }
 
     /// Get the consumer group name.
-    #[must_use] 
+    #[must_use]
     pub fn consumer_group(&self) -> &str {
         &self.consumer_group
     }

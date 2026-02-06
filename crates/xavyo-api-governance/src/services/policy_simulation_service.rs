@@ -40,7 +40,7 @@ pub struct PolicySimulationService {
 
 impl PolicySimulationService {
     /// Create a new policy simulation service with default limits.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -49,13 +49,13 @@ impl PolicySimulationService {
     }
 
     /// Create a new policy simulation service with custom limits.
-    #[must_use] 
+    #[must_use]
     pub fn with_limits(pool: PgPool, limits: SimulationLimits) -> Self {
         Self { pool, limits }
     }
 
     /// Get the configured limits.
-    #[must_use] 
+    #[must_use]
     pub fn limits(&self) -> &SimulationLimits {
         &self.limits
     }
@@ -119,7 +119,10 @@ impl PolicySimulationService {
 
         // Validate policy config is not empty
         if policy_config.is_null()
-            || (policy_config.is_object() && policy_config.as_object().is_none_or(serde_json::Map::is_empty))
+            || (policy_config.is_object()
+                && policy_config
+                    .as_object()
+                    .is_none_or(serde_json::Map::is_empty))
         {
             return Err(GovernanceError::Validation(
                 "Policy configuration is required".to_string(),

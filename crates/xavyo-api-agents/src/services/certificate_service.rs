@@ -32,7 +32,7 @@ pub struct CertificateService {
 
 impl CertificateService {
     /// Create a new `CertificateService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, ca_service: Arc<CaService>, audit_service: Arc<AuditService>) -> Self {
         Self {
             pool,
@@ -125,12 +125,10 @@ impl CertificateService {
             ApiAgentsError::CertificateIssueFailed(format!("Failed to parse certificate: {e}"))
         })?;
 
-        let (_, x509_cert) = x509_parser::certificate::X509Certificate::from_der(
-            cert_der.contents(),
-        )
-        .map_err(|e| {
-            ApiAgentsError::CertificateIssueFailed(format!("Failed to parse X.509: {e:?}"))
-        })?;
+        let (_, x509_cert) =
+            x509_parser::certificate::X509Certificate::from_der(cert_der.contents()).map_err(
+                |e| ApiAgentsError::CertificateIssueFailed(format!("Failed to parse X.509: {e:?}")),
+            )?;
 
         // Calculate SHA-256 fingerprint
         let fingerprint = calculate_fingerprint(cert_der.contents());
@@ -257,7 +255,7 @@ impl CertificateService {
                 .map_err(ApiAgentsError::Database)?;
 
         // Count total (we'd need a count query, for now use len as approximation if < limit)
-        let total = if certificates.len() < limit as usize && offset == 0 {
+        let total = if certificates.len() < limit.max(0) as usize && offset == 0 {
             certificates.len() as i64
         } else {
             // Would need a proper count query
@@ -603,10 +601,7 @@ fn calculate_fingerprint(der_bytes: &[u8]) -> String {
 
 /// Format serial number bytes as hex string.
 fn format_serial_number(bytes: Vec<u8>) -> String {
-    bytes
-        .iter()
-        .map(|b| format!("{b:02X}"))
-        .collect::<String>()
+    bytes.iter().map(|b| format!("{b:02X}")).collect::<String>()
 }
 
 /// Format an X.500 Distinguished Name.

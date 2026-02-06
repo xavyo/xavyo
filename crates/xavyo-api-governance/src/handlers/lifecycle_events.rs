@@ -42,7 +42,7 @@ pub async fn list_events(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = LifecycleEventFilter {
         user_id: query.user_id,

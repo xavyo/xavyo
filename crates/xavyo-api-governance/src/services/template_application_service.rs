@@ -59,7 +59,7 @@ pub struct TemplateApplicationService {
 
 impl TemplateApplicationService {
     /// Create a new template application service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             scope_service: TemplateScopeService::new(pool.clone()),

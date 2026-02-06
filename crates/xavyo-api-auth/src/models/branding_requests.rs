@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
+use validator::Validate;
 
 /// Request to update tenant branding.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -26,6 +27,91 @@ pub struct UpdateBrandingRequest {
     pub privacy_policy_url: Option<String>,
     pub terms_of_service_url: Option<String>,
     pub support_url: Option<String>,
+}
+
+impl Validate for UpdateBrandingRequest {
+    fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        let mut errors = validator::ValidationErrors::new();
+
+        // URL fields: max 2048 chars
+        let url_fields: &[(&Option<String>, &str)] = &[
+            (&self.logo_url, "logo_url"),
+            (&self.logo_dark_url, "logo_dark_url"),
+            (&self.favicon_url, "favicon_url"),
+            (&self.email_logo_url, "email_logo_url"),
+            (&self.login_page_background_url, "login_page_background_url"),
+            (&self.privacy_policy_url, "privacy_policy_url"),
+            (&self.terms_of_service_url, "terms_of_service_url"),
+            (&self.support_url, "support_url"),
+        ];
+        for (field, name) in url_fields {
+            if let Some(v) = field {
+                if v.len() > 2048 {
+                    let mut err = validator::ValidationError::new("length");
+                    err.message = Some(format!("{name} must be at most 2048 characters").into());
+                    errors.add(name, err);
+                }
+            }
+        }
+
+        // Color fields: max 25 chars (e.g., #RRGGBB, rgb(), hsl())
+        let color_fields: &[(&Option<String>, &str)] = &[
+            (&self.primary_color, "primary_color"),
+            (&self.secondary_color, "secondary_color"),
+            (&self.accent_color, "accent_color"),
+            (&self.background_color, "background_color"),
+            (&self.text_color, "text_color"),
+        ];
+        for (field, name) in color_fields {
+            if let Some(v) = field {
+                if v.len() > 25 {
+                    let mut err = validator::ValidationError::new("length");
+                    err.message = Some(format!("{name} must be at most 25 characters").into());
+                    errors.add(name, err);
+                }
+            }
+        }
+
+        // Font family: max 255 chars
+        if let Some(ref v) = self.font_family {
+            if v.len() > 255 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("font_family must be at most 255 characters".into());
+                errors.add("font_family", err);
+            }
+        }
+
+        // custom_css: max 50KB
+        if let Some(ref v) = self.custom_css {
+            if v.len() > 51_200 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("custom_css must be at most 50KB".into());
+                errors.add("custom_css", err);
+            }
+        }
+
+        // Text fields: max 500 chars
+        let text_fields: &[(&Option<String>, &str)] = &[
+            (&self.login_page_title, "login_page_title"),
+            (&self.login_page_subtitle, "login_page_subtitle"),
+            (&self.footer_text, "footer_text"),
+        ];
+        for (field, name) in text_fields {
+            if let Some(v) = field {
+                if v.len() > 500 {
+                    let mut err = validator::ValidationError::new("length");
+                    err.message = Some(format!("{name} must be at most 500 characters").into());
+                    errors.add(name, err);
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 /// Response for tenant branding configuration.
@@ -129,6 +215,47 @@ pub struct UpdateEmailTemplateRequest {
     pub is_active: Option<bool>,
 }
 
+impl Validate for UpdateEmailTemplateRequest {
+    fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        let mut errors = validator::ValidationErrors::new();
+
+        if let Some(ref v) = self.locale {
+            if v.len() > 10 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("locale must be at most 10 characters".into());
+                errors.add("locale", err);
+            }
+        }
+        if let Some(ref v) = self.subject {
+            if v.len() > 500 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("subject must be at most 500 characters".into());
+                errors.add("subject", err);
+            }
+        }
+        if let Some(ref v) = self.body_html {
+            if v.len() > 102_400 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("body_html must be at most 100KB".into());
+                errors.add("body_html", err);
+            }
+        }
+        if let Some(ref v) = self.body_text {
+            if v.len() > 102_400 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("body_text must be at most 100KB".into());
+                errors.add("body_text", err);
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
 /// Request to preview an email template.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct PreviewEmailTemplateRequest {
@@ -212,7 +339,7 @@ impl From<xavyo_db::models::BrandingAsset> for AssetResponse {
 
 impl BrandingResponse {
     /// Create a default branding response for a tenant with no branding configured.
-    #[must_use] 
+    #[must_use]
     pub fn default_for_tenant(_tenant_id: Uuid) -> Self {
         Self {
             logo_url: None,

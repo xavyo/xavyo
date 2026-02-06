@@ -30,7 +30,7 @@ pub enum ReconciliationDiscrepancyType {
 
 impl ReconciliationDiscrepancyType {
     /// Get suggested actions for this discrepancy type.
-    #[must_use] 
+    #[must_use]
     pub fn suggested_actions(&self) -> Vec<ReconciliationActionType> {
         match self {
             Self::Missing => vec![ReconciliationActionType::Create],
@@ -183,7 +183,7 @@ pub struct ReconciliationDiscrepancy {
 
 impl ReconciliationDiscrepancy {
     /// Get discrepancy type enum.
-    #[must_use] 
+    #[must_use]
     pub fn discrepancy_type(&self) -> ReconciliationDiscrepancyType {
         self.discrepancy_type
             .parse()
@@ -191,13 +191,13 @@ impl ReconciliationDiscrepancy {
     }
 
     /// Get resolution status enum.
-    #[must_use] 
+    #[must_use]
     pub fn resolution_status(&self) -> ReconciliationResolutionStatus {
         self.resolution_status.parse().unwrap_or_default()
     }
 
     /// Get resolved action enum.
-    #[must_use] 
+    #[must_use]
     pub fn resolved_action(&self) -> Option<ReconciliationActionType> {
         self.resolved_action.as_ref().and_then(|s| s.parse().ok())
     }
@@ -553,24 +553,24 @@ pub struct ReconciliationDiscrepancyFilter {
 }
 
 impl ReconciliationDiscrepancyFilter {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn for_run(mut self, run_id: Uuid) -> Self {
         self.run_id = Some(run_id);
         self
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn with_type(mut self, dtype: ReconciliationDiscrepancyType) -> Self {
         self.discrepancy_type = Some(dtype);
         self
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn pending_only(mut self) -> Self {
         self.resolution_status = Some(ReconciliationResolutionStatus::Pending);
         self

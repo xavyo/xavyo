@@ -36,6 +36,7 @@
 
 pub mod audit;
 pub mod error;
+pub mod expression;
 pub mod services;
 pub mod types;
 
@@ -110,3 +111,10 @@ pub use services::{
 
 // Re-export audit types
 pub use audit::{AuditStore, EntitlementAuditAction, EntitlementAuditEvent, InMemoryAuditStore};
+
+// Re-export expression types (F-064)
+pub use expression::{
+    eval_expression, validate_expression, Comparison, ComparisonOp, EvalContext, EvalError,
+    Evaluator, Expression, ExpressionError, FunctionCall, FunctionContext, FunctionError,
+    FunctionRegistry, Lexer, LexerError, ParseError, Parser, Token, Value,
+};

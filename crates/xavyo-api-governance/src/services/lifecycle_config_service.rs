@@ -27,7 +27,7 @@ pub struct LifecycleConfigService {
 
 impl LifecycleConfigService {
     /// Create a new lifecycle config service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }

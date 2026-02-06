@@ -61,7 +61,7 @@ pub struct ReconciliationAction {
 
 impl ReconciliationAction {
     /// Get action type enum.
-    #[must_use] 
+    #[must_use]
     pub fn action_type(&self) -> ReconciliationActionType {
         self.action_type
             .parse()
@@ -69,7 +69,7 @@ impl ReconciliationAction {
     }
 
     /// Get result enum.
-    #[must_use] 
+    #[must_use]
     pub fn result(&self) -> ReconciliationActionResult {
         self.result
             .parse()
@@ -77,7 +77,7 @@ impl ReconciliationAction {
     }
 
     /// Check if action succeeded.
-    #[must_use] 
+    #[must_use]
     pub fn is_success(&self) -> bool {
         self.result().eq(&ReconciliationActionResult::Success)
     }
@@ -362,7 +362,7 @@ pub struct CreateReconciliationAction {
 
 impl CreateReconciliationAction {
     /// Create a success action record.
-    #[must_use] 
+    #[must_use]
     pub fn success(
         discrepancy_id: Uuid,
         action_type: ReconciliationActionType,
@@ -382,7 +382,7 @@ impl CreateReconciliationAction {
     }
 
     /// Create a failure action record.
-    #[must_use] 
+    #[must_use]
     pub fn failure(
         discrepancy_id: Uuid,
         action_type: ReconciliationActionType,
@@ -403,14 +403,14 @@ impl CreateReconciliationAction {
     }
 
     /// Add before state.
-    #[must_use] 
+    #[must_use]
     pub fn with_before_state(mut self, state: JsonValue) -> Self {
         self.before_state = Some(state);
         self
     }
 
     /// Add after state.
-    #[must_use] 
+    #[must_use]
     pub fn with_after_state(mut self, state: JsonValue) -> Self {
         self.after_state = Some(state);
         self
@@ -429,30 +429,30 @@ pub struct ReconciliationActionFilter {
 }
 
 impl ReconciliationActionFilter {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn for_discrepancy(mut self, discrepancy_id: Uuid) -> Self {
         self.discrepancy_id = Some(discrepancy_id);
         self
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn with_type(mut self, action_type: ReconciliationActionType) -> Self {
         self.action_type = Some(action_type);
         self
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn successful_only(mut self) -> Self {
         self.result = Some(ReconciliationActionResult::Success);
         self
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn exclude_dry_run(mut self) -> Self {
         self.dry_run = Some(false);
         self

@@ -122,14 +122,14 @@ pub struct NhiCredentialFilter {
 
 impl GovNhiCredential {
     /// Check if this credential is currently valid.
-    #[must_use] 
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         let now = Utc::now();
         self.is_active && self.valid_from <= now && self.valid_until > now
     }
 
     /// Get days until expiration.
-    #[must_use] 
+    #[must_use]
     pub fn days_until_expiry(&self) -> i64 {
         let duration = self.valid_until.signed_duration_since(Utc::now());
         duration.num_days()
@@ -140,7 +140,7 @@ impl GovNhiCredential {
     /// Uses Argon2id for password hashing verification.
     /// Returns true if the credential matches the stored hash.
     #[cfg(feature = "argon2")]
-    #[must_use] 
+    #[must_use]
     pub fn verify_credential(&self, credential: &str) -> bool {
         use argon2::{Argon2, PasswordHash, PasswordVerifier};
 

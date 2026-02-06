@@ -55,7 +55,7 @@ pub struct SyncToken {
 
 impl SyncToken {
     /// Get the token type enum.
-    #[must_use] 
+    #[must_use]
     pub fn token_type(&self) -> SyncTokenType {
         self.token_type.parse().unwrap_or(SyncTokenType::Batch)
     }
@@ -262,7 +262,7 @@ pub struct CreateSyncToken {
 
 impl CreateSyncToken {
     /// Create a new initial token.
-    #[must_use] 
+    #[must_use]
     pub fn initial(token_value: String, token_type: SyncTokenType) -> Self {
         Self {
             token_value,

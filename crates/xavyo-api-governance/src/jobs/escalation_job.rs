@@ -62,7 +62,7 @@ impl EscalationStats {
 
 impl EscalationJob {
     /// Create a new escalation job.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         escalation_service: EscalationService,
         escalation_policy_service: EscalationPolicyService,

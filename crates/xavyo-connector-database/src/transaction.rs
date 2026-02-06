@@ -54,13 +54,13 @@ impl<'a> DatabaseTransaction<'a> {
     }
 
     /// Get the current transaction state.
-    #[must_use] 
+    #[must_use]
     pub fn state(&self) -> TransactionState {
         self.state
     }
 
     /// Check if the transaction is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         self.state == TransactionState::Active
     }
@@ -120,6 +120,15 @@ impl<'a> DatabaseTransaction<'a> {
             self.savepoint_counter += 1;
             format!("sp_{}", self.savepoint_counter)
         } else {
+            // SECURITY: Validate savepoint name to prevent SQL injection.
+            // Only allow alphanumeric characters and underscores.
+            if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                return Err(ConnectorError::InvalidData {
+                    message:
+                        "Savepoint name must contain only alphanumeric characters and underscores"
+                            .to_string(),
+                });
+            }
             name.to_string()
         };
 
@@ -216,13 +225,13 @@ pub struct Savepoint {
 
 impl Savepoint {
     /// Get the savepoint name.
-    #[must_use] 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Check if the savepoint has been released.
-    #[must_use] 
+    #[must_use]
     pub fn is_released(&self) -> bool {
         self.released
     }
@@ -268,7 +277,7 @@ struct BatchDelete {
 
 impl BatchOperation {
     /// Create a new batch operation builder.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -321,31 +330,31 @@ impl BatchOperation {
     }
 
     /// Get the total number of operations in the batch.
-    #[must_use] 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.inserts.len() + self.updates.len() + self.deletes.len()
     }
 
     /// Check if the batch is empty.
-    #[must_use] 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Get the number of insert operations.
-    #[must_use] 
+    #[must_use]
     pub fn insert_count(&self) -> usize {
         self.inserts.len()
     }
 
     /// Get the number of update operations.
-    #[must_use] 
+    #[must_use]
     pub fn update_count(&self) -> usize {
         self.updates.len()
     }
 
     /// Get the number of delete operations.
-    #[must_use] 
+    #[must_use]
     pub fn delete_count(&self) -> usize {
         self.deletes.len()
     }
@@ -388,19 +397,19 @@ pub enum BatchOperationType {
 
 impl BatchResult {
     /// Check if all operations succeeded.
-    #[must_use] 
+    #[must_use]
     pub fn is_success(&self) -> bool {
         self.errors.is_empty()
     }
 
     /// Get the total number of successful operations.
-    #[must_use] 
+    #[must_use]
     pub fn success_count(&self) -> usize {
         self.inserted.len() + self.updated.len() + self.deleted
     }
 
     /// Get the total number of failed operations.
-    #[must_use] 
+    #[must_use]
     pub fn error_count(&self) -> usize {
         self.errors.len()
     }
@@ -418,7 +427,7 @@ pub struct PreparedStatementCache {
 
 impl PreparedStatementCache {
     /// Create a new prepared statement cache.
-    #[must_use] 
+    #[must_use]
     pub fn new(max_size: usize) -> Self {
         Self {
             cache: Arc::new(Mutex::new(std::collections::HashMap::new())),

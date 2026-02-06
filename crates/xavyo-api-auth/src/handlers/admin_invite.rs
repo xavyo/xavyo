@@ -51,6 +51,11 @@ pub async fn create_invitation_handler(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateInvitationRequest>,
 ) -> Result<impl IntoResponse, ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     // Validate request
     request.validate().map_err(ApiAuthError::Validation)?;
 
@@ -136,6 +141,11 @@ pub async fn resend_invitation_handler(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     let tenant_uuid = *tenant_id.as_uuid();
     let admin_user_id = extract_user_id(&claims)?;
 
@@ -172,6 +182,11 @@ pub async fn cancel_invitation_handler(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     let tenant_uuid = *tenant_id.as_uuid();
     let admin_user_id = extract_user_id(&claims)?;
 

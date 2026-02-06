@@ -226,7 +226,7 @@ pub mod weights {
 /// assert_eq!(calculate_risk_score(&high_risk), 100);
 /// assert_eq!(calculate_risk_level(100), NhiRiskLevel::Critical);
 /// ```
-#[must_use] 
+#[must_use]
 pub fn calculate_risk_score(factors: &RiskFactors) -> u32 {
     let staleness = calculate_staleness_score(factors.staleness_days);
     let credential_age = calculate_credential_age_score(factors.credential_age_days);
@@ -271,7 +271,7 @@ pub fn calculate_risk_score(factors: &RiskFactors) -> u32 {
 ///     println!("Risk level {} requires attention", level);
 /// }
 /// ```
-#[must_use] 
+#[must_use]
 pub fn calculate_risk_level(score: u32) -> NhiRiskLevel {
     NhiRiskLevel::from(score)
 }
@@ -348,7 +348,7 @@ fn calculate_scope_score(count: Option<u32>) -> u32 {
 /// assert_eq!(risk_level_to_score("unknown"), 0);
 /// assert_eq!(risk_level_to_score(""), 0);
 /// ```
-#[must_use] 
+#[must_use]
 pub fn risk_level_to_score(risk_level: &str) -> u32 {
     match risk_level.to_lowercase().as_str() {
         "low" => 20,
@@ -391,7 +391,7 @@ pub fn risk_level_to_score(risk_level: &str) -> u32 {
 /// assert_eq!(normalize_score(150), 100);
 /// assert_eq!(normalize_score(999), 100);
 /// ```
-#[must_use] 
+#[must_use]
 pub fn normalize_score(score: i32) -> u32 {
     score.clamp(0, 100) as u32
 }

@@ -75,9 +75,8 @@ impl KubernetesOidcProvider {
             CloudProviderError::AuthenticationFailed(format!("Failed to get key: {e}"))
         })?;
 
-        DecodingKey::from_rsa_pem(&pem).map_err(|e| {
-            CloudProviderError::AuthenticationFailed(format!("Invalid RSA key: {e}"))
-        })
+        DecodingKey::from_rsa_pem(&pem)
+            .map_err(|e| CloudProviderError::AuthenticationFailed(format!("Invalid RSA key: {e}")))
     }
 }
 
@@ -158,7 +157,7 @@ pub enum Audience {
 
 impl Audience {
     /// Get the audience as a vector of strings.
-    #[must_use] 
+    #[must_use]
     pub fn as_vec(&self) -> Vec<String> {
         match self {
             Audience::Single(s) => vec![s.clone()],
@@ -167,7 +166,7 @@ impl Audience {
     }
 
     /// Check if the audience contains a specific value.
-    #[must_use] 
+    #[must_use]
     pub fn contains(&self, value: &str) -> bool {
         match self {
             Audience::Single(s) => s == value,
@@ -437,7 +436,7 @@ impl KubernetesOidcConfigBuilder {
     }
 
     /// Build the configuration.
-    #[must_use] 
+    #[must_use]
     pub fn build(self) -> KubernetesOidcConfig {
         KubernetesOidcConfig {
             api_server_url: self.api_server_url,

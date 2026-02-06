@@ -14,7 +14,7 @@ pub struct MetadataGenerator {
 
 impl MetadataGenerator {
     /// Create a new metadata generator
-    #[must_use] 
+    #[must_use]
     pub fn new(
         entity_id: String,
         sso_url: String,

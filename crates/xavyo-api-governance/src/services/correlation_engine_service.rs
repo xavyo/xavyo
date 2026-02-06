@@ -155,7 +155,7 @@ pub struct CorrelationEngineService {
 
 impl CorrelationEngineService {
     /// Create a new correlation engine service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -176,7 +176,7 @@ impl CorrelationEngineService {
     }
 
     /// Get the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -648,7 +648,9 @@ impl CorrelationEngineService {
         trigger: GovCorrelationTrigger,
     ) -> Result<Uuid> {
         let job_id = Uuid::new_v4();
-        let total_accounts = if let Some(ids) = &account_ids { ids.len() as i64 } else {
+        let total_accounts = if let Some(ids) = &account_ids {
+            ids.len() as i64
+        } else {
             // Count uncorrelated shadow accounts for the connector.
             let count: i64 = sqlx::query_scalar(
                 r"
@@ -738,7 +740,7 @@ impl CorrelationEngineService {
     }
 
     /// Convert job status to the API response DTO.
-    #[must_use] 
+    #[must_use]
     pub fn job_status_to_response(status: &CorrelationJobStatus) -> CorrelationJobStatusResponse {
         CorrelationJobStatusResponse {
             job_id: status.job_id,
@@ -1461,7 +1463,7 @@ fn evaluate_expression(expression: &str, source: &str, target: &str) -> f64 {
 /// Note: `unicode_normalization` crate is required in Cargo.toml.
 /// If not available, we fall back to basic lowercasing which handles
 /// ASCII correctly.
-#[must_use] 
+#[must_use]
 pub fn normalize_attribute(value: &str) -> String {
     // Basic normalization: trim whitespace, lowercase.
     // Full Unicode NFC requires the `unicode-normalization` crate.
@@ -1478,7 +1480,7 @@ pub fn normalize_attribute(value: &str) -> String {
 /// When some rules are skipped (e.g., due to missing attributes), their weight
 /// is proportionally redistributed among the remaining rules so that the total
 /// weight sums to 1.0 (or the original total, whichever is appropriate).
-#[must_use] 
+#[must_use]
 pub fn redistribute_weights(
     all_rules: &[GovCorrelationRule],
     available_rule_ids: &[Uuid],
@@ -1529,7 +1531,7 @@ pub fn redistribute_weights(
 // =============================================================================
 
 /// Apply confidence thresholds to determine the evaluation outcome.
-#[must_use] 
+#[must_use]
 pub fn apply_thresholds(
     confidence: f64,
     auto_confirm_threshold: f64,

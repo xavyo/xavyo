@@ -146,7 +146,9 @@ impl Drop for ProviderTestContext {
 #[tokio::test]
 #[ignore = "requires database - run with: cargo test -p xavyo-api-agents --test providers_test -- --ignored"]
 async fn test_create_provider_via_db() {
-    let ctx = if let Some(c) = ProviderTestContext::new().await { c } else {
+    let ctx = if let Some(c) = ProviderTestContext::new().await {
+        c
+    } else {
         eprintln!("Skipping test: database not available");
         return;
     };
@@ -176,7 +178,9 @@ async fn test_create_provider_via_db() {
 #[tokio::test]
 #[ignore = "requires database - run with: cargo test -p xavyo-api-agents --test providers_test -- --ignored"]
 async fn test_list_providers_by_type() {
-    let ctx = if let Some(c) = ProviderTestContext::new().await { c } else {
+    let ctx = if let Some(c) = ProviderTestContext::new().await {
+        c
+    } else {
         eprintln!("Skipping test: database not available");
         return;
     };
@@ -208,7 +212,9 @@ async fn test_list_providers_by_type() {
 #[tokio::test]
 #[ignore = "requires database - run with: cargo test -p xavyo-api-agents --test providers_test -- --ignored"]
 async fn test_provider_tenant_isolation() {
-    let ctx = if let Some(c) = ProviderTestContext::new().await { c } else {
+    let ctx = if let Some(c) = ProviderTestContext::new().await {
+        c
+    } else {
         eprintln!("Skipping test: database not available");
         return;
     };
@@ -269,7 +275,9 @@ async fn test_provider_tenant_isolation() {
 #[tokio::test]
 #[ignore = "requires database - run with: cargo test -p xavyo-api-agents --test providers_test -- --ignored"]
 async fn test_update_provider_status() {
-    let ctx = if let Some(c) = ProviderTestContext::new().await { c } else {
+    let ctx = if let Some(c) = ProviderTestContext::new().await {
+        c
+    } else {
         eprintln!("Skipping test: database not available");
         return;
     };
@@ -303,7 +311,9 @@ async fn test_update_provider_status() {
 #[tokio::test]
 #[ignore = "requires database - run with: cargo test -p xavyo-api-agents --test providers_test -- --ignored"]
 async fn test_delete_provider() {
-    let ctx = if let Some(c) = ProviderTestContext::new().await { c } else {
+    let ctx = if let Some(c) = ProviderTestContext::new().await {
+        c
+    } else {
         eprintln!("Skipping test: database not available");
         return;
     };

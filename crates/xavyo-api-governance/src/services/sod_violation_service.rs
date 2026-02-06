@@ -35,7 +35,7 @@ pub struct SodViolationService {
 
 impl SodViolationService {
     /// Create a new `SoD` violation service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             effective_access_service: EffectiveAccessService::new(pool.clone()),
@@ -273,7 +273,7 @@ impl SodViolationService {
     }
 
     /// Convert database model to API response format.
-    #[must_use] 
+    #[must_use]
     pub fn to_api_response(violation: &GovSodViolation) -> SodViolationResponse {
         SodViolationResponse {
             id: violation.id,
@@ -292,7 +292,7 @@ impl SodViolationService {
     }
 
     /// Get database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

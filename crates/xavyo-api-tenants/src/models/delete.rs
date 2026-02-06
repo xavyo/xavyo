@@ -23,7 +23,7 @@ pub struct DeleteTenantRequest {
 
 impl DeleteTenantRequest {
     /// Validate the request.
-    #[must_use] 
+    #[must_use]
     pub fn validate(&self) -> Option<String> {
         if self.reason.trim().is_empty() {
             return Some("Deletion reason is required".to_string());

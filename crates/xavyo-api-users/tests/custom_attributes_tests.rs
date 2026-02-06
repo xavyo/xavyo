@@ -28,7 +28,7 @@ async fn test_create_attribute_definition() {
 
     // Verify definition was created
     let row: Option<(String, String, bool)> = sqlx::query_as(
-        "SELECT name, data_type::text, required FROM user_attribute_definitions WHERE id = $1 AND tenant_id = $2",
+        "SELECT name, data_type, required FROM tenant_attribute_definitions WHERE id = $1 AND tenant_id = $2",
     )
     .bind(definition_id)
     .bind(tenant_id)
@@ -65,19 +65,28 @@ async fn test_set_user_custom_attribute() {
     let value = json!("test value");
     set_user_custom_attribute(&pool, user_id, definition_id, value.clone()).await;
 
-    // Verify attribute value was set
-    let row: Option<(serde_json::Value,)> = sqlx::query_as(
-        "SELECT value FROM user_custom_attributes WHERE user_id = $1 AND definition_id = $2",
-    )
-    .bind(user_id)
-    .bind(definition_id)
-    .fetch_optional(&pool)
-    .await
-    .expect("Query should succeed");
+    // Verify attribute value was set in users.custom_attributes JSONB
+    // First look up the attribute name from the definition
+    let (attr_name,): (String,) =
+        sqlx::query_as("SELECT name FROM tenant_attribute_definitions WHERE id = $1")
+            .bind(definition_id)
+            .fetch_one(&pool)
+            .await
+            .expect("Definition lookup should succeed");
 
-    assert!(row.is_some(), "Attribute should be set");
-    let (stored_value,) = row.unwrap();
-    assert_eq!(stored_value, value);
+    let row: Option<(serde_json::Value,)> =
+        sqlx::query_as("SELECT custom_attributes FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_optional(&pool)
+            .await
+            .expect("Query should succeed");
+
+    assert!(row.is_some(), "User should exist");
+    let (custom_attrs,) = row.unwrap();
+    let stored_value = custom_attrs
+        .get(&attr_name)
+        .expect("Attribute should be set");
+    assert_eq!(*stored_value, value);
 
     cleanup_test_tenant(&pool, tenant_id).await;
 }
@@ -113,15 +122,19 @@ async fn test_get_user_custom_attributes() {
     set_user_custom_attribute(&pool, user_id, attr1_id, json!("hello")).await;
     set_user_custom_attribute(&pool, user_id, attr2_id, json!(42)).await;
 
-    // Query all attributes for user
-    let attrs: Vec<(serde_json::Value,)> =
-        sqlx::query_as("SELECT value FROM user_custom_attributes WHERE user_id = $1")
+    // Query custom attributes from user's JSONB column
+    let row: (serde_json::Value,) =
+        sqlx::query_as("SELECT custom_attributes FROM users WHERE id = $1")
             .bind(user_id)
-            .fetch_all(&pool)
+            .fetch_one(&pool)
             .await
             .expect("Query should succeed");
 
-    assert_eq!(attrs.len(), 2, "User should have 2 custom attributes");
+    let obj = row
+        .0
+        .as_object()
+        .expect("custom_attributes should be an object");
+    assert_eq!(obj.len(), 2, "User should have 2 custom attributes");
 
     cleanup_test_tenant(&pool, tenant_id).await;
 }
@@ -179,9 +192,9 @@ async fn test_attribute_validation_regex() {
     )
     .await;
 
-    // Verify definition has regex
-    let row: Option<(Option<String>,)> = sqlx::query_as(
-        "SELECT validation_regex FROM user_attribute_definitions WHERE tenant_id = $1 AND name = $2",
+    // Verify definition has validation_rules with pattern
+    let row: Option<(Option<serde_json::Value>,)> = sqlx::query_as(
+        "SELECT validation_rules FROM tenant_attribute_definitions WHERE tenant_id = $1 AND name = $2",
     )
     .bind(tenant_id)
     .bind(&attr_name)
@@ -190,8 +203,13 @@ async fn test_attribute_validation_regex() {
     .expect("Query should succeed");
 
     assert!(row.is_some(), "Definition should exist");
-    let (regex,) = row.unwrap();
-    assert!(regex.is_some(), "Definition should have validation regex");
+    let (rules,) = row.unwrap();
+    assert!(rules.is_some(), "Definition should have validation rules");
+    let rules_obj = rules.unwrap();
+    assert!(
+        rules_obj.get("pattern").is_some(),
+        "Validation rules should contain a pattern"
+    );
 
     cleanup_test_tenant(&pool, tenant_id).await;
 }
@@ -237,21 +255,52 @@ async fn test_attribute_data_type_validation() {
     set_user_custom_attribute(&pool, user_id, number_attr, json!(123)).await;
     set_user_custom_attribute(&pool, user_id, boolean_attr, json!(true)).await;
 
-    // Verify all values were stored correctly
-    let attrs: Vec<(serde_json::Value,)> = sqlx::query_as(
-        "SELECT value FROM user_custom_attributes WHERE user_id = $1 ORDER BY created_at",
-    )
-    .bind(user_id)
-    .fetch_all(&pool)
-    .await
-    .expect("Query should succeed");
+    // Verify all values were stored correctly in users.custom_attributes JSONB
+    let row: (serde_json::Value,) =
+        sqlx::query_as("SELECT custom_attributes FROM users WHERE id = $1")
+            .bind(user_id)
+            .fetch_one(&pool)
+            .await
+            .expect("Query should succeed");
 
-    assert_eq!(attrs.len(), 3, "User should have 3 custom attributes");
+    let obj = row
+        .0
+        .as_object()
+        .expect("custom_attributes should be an object");
+    assert_eq!(obj.len(), 3, "User should have 3 custom attributes");
 
-    // Verify types
-    assert!(attrs[0].0.is_string(), "First value should be string");
-    assert!(attrs[1].0.is_number(), "Second value should be number");
-    assert!(attrs[2].0.is_boolean(), "Third value should be boolean");
+    // Verify types (look up attribute names from definitions)
+    let (string_name,): (String,) =
+        sqlx::query_as("SELECT name FROM tenant_attribute_definitions WHERE id = $1")
+            .bind(string_attr)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let (number_name,): (String,) =
+        sqlx::query_as("SELECT name FROM tenant_attribute_definitions WHERE id = $1")
+            .bind(number_attr)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let (boolean_name,): (String,) =
+        sqlx::query_as("SELECT name FROM tenant_attribute_definitions WHERE id = $1")
+            .bind(boolean_attr)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    assert!(
+        obj.get(&string_name).unwrap().is_string(),
+        "String value should be string"
+    );
+    assert!(
+        obj.get(&number_name).unwrap().is_number(),
+        "Number value should be number"
+    );
+    assert!(
+        obj.get(&boolean_name).unwrap().is_boolean(),
+        "Boolean value should be boolean"
+    );
 
     cleanup_test_tenant(&pool, tenant_id).await;
 }

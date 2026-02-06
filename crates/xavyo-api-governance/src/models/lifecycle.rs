@@ -8,9 +8,9 @@ use uuid::Uuid;
 use validator::Validate;
 use xavyo_db::{
     AuditActionType, BulkOperationStatus, EntitlementAction, GovBulkStateOperation,
-    GovLifecycleState, GovLifecycleTransitionWithStates, GovScheduleStatus,
-    GovStateTransitionAudit, GovStateTransitionRequestWithStates, LifecycleObjectType,
-    TransitionRequestStatus,
+    GovLifecycleActionExecution, GovLifecycleState, GovLifecycleTransitionWithStates,
+    GovScheduleStatus, GovStateTransitionAudit, GovStateTransitionRequestWithStates,
+    LifecycleObjectType, TransitionRequestStatus,
 };
 
 // ============================================================================
@@ -239,7 +239,7 @@ pub struct LifecycleStateResponse {
 
 impl LifecycleStateResponse {
     /// Create from database model.
-    #[must_use] 
+    #[must_use]
     pub fn from_model(state: GovLifecycleState, object_count: i64) -> Self {
         Self {
             id: state.id,
@@ -940,4 +940,661 @@ pub struct TransitionAuditListResponse {
 
     /// Offset.
     pub offset: i64,
+}
+
+// ============================================================================
+// Transition Condition Models (F-193)
+// ============================================================================
+
+/// Types of conditions that can be applied to transitions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TransitionConditionType {
+    /// Check if termination_date is set on the user.
+    TerminationDateSet,
+    /// Check if termination_date has been reached (current time >= termination_date).
+    TerminationDateReached,
+    /// Check if manager approval has been received for the transition.
+    ManagerApprovalReceived,
+    /// Check if an access review is complete for the user.
+    AccessReviewComplete,
+    /// Check if the user has no active sessions.
+    NoActiveSessions,
+    /// Check if a custom attribute equals a specific value.
+    CustomAttributeEquals,
+}
+
+impl std::fmt::Display for TransitionConditionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TerminationDateSet => write!(f, "termination_date_set"),
+            Self::TerminationDateReached => write!(f, "termination_date_reached"),
+            Self::ManagerApprovalReceived => write!(f, "manager_approval_received"),
+            Self::AccessReviewComplete => write!(f, "access_review_complete"),
+            Self::NoActiveSessions => write!(f, "no_active_sessions"),
+            Self::CustomAttributeEquals => write!(f, "custom_attribute_equals"),
+        }
+    }
+}
+
+/// A condition that must be satisfied for a transition to be allowed.
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
+pub struct TransitionCondition {
+    /// Type of condition to evaluate.
+    #[serde(rename = "type")]
+    pub condition_type: TransitionConditionType,
+
+    /// Configuration for the condition (depends on type).
+    /// For CustomAttributeEquals: {"attribute": "department", "value": "Sales"}
+    #[serde(default)]
+    pub config: JsonValue,
+
+    /// Optional human-readable description.
+    #[validate(length(max = 500, message = "Description must not exceed 500 characters"))]
+    pub description: Option<String>,
+}
+
+impl TransitionCondition {
+    /// Create a new condition.
+    #[must_use]
+    pub fn new(condition_type: TransitionConditionType) -> Self {
+        Self {
+            condition_type,
+            config: JsonValue::Object(serde_json::Map::new()),
+            description: None,
+        }
+    }
+
+    /// Create a condition with configuration.
+    #[must_use]
+    pub fn with_config(condition_type: TransitionConditionType, config: JsonValue) -> Self {
+        Self {
+            condition_type,
+            config,
+            description: None,
+        }
+    }
+}
+
+/// Result of evaluating a single transition condition.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TransitionConditionResult {
+    /// The condition that was evaluated.
+    pub condition: TransitionCondition,
+
+    /// Whether the condition was satisfied.
+    pub satisfied: bool,
+
+    /// Human-readable explanation of the result.
+    pub reason: String,
+}
+
+/// Result of evaluating all conditions for a transition.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TransitionConditionsEvaluationResult {
+    /// Whether all conditions are satisfied.
+    pub all_satisfied: bool,
+
+    /// Individual condition results.
+    pub conditions: Vec<TransitionConditionResult>,
+
+    /// Summary message.
+    pub summary: String,
+}
+
+// ============================================================================
+// Lifecycle Action Models (F-193)
+// ============================================================================
+
+/// Types of actions that can be executed on state entry/exit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LifecycleActionType {
+    /// Disable user access (set is_active = false).
+    DisableAccess,
+    /// Enable user access (set is_active = true).
+    EnableAccess,
+    /// Revoke all active sessions for the user.
+    RevokeSessions,
+    /// Send notification to the user's manager.
+    NotifyManager,
+    /// Schedule an access review (micro-certification) for the user.
+    ScheduleAccessReview,
+    /// Anonymize PII data for the user.
+    AnonymizeData,
+    /// Send a notification (email, webhook, etc.).
+    SendNotification,
+    /// Call an external webhook.
+    Webhook,
+}
+
+impl std::fmt::Display for LifecycleActionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DisableAccess => write!(f, "disable_access"),
+            Self::EnableAccess => write!(f, "enable_access"),
+            Self::RevokeSessions => write!(f, "revoke_sessions"),
+            Self::NotifyManager => write!(f, "notify_manager"),
+            Self::ScheduleAccessReview => write!(f, "schedule_access_review"),
+            Self::AnonymizeData => write!(f, "anonymize_data"),
+            Self::SendNotification => write!(f, "send_notification"),
+            Self::Webhook => write!(f, "webhook"),
+        }
+    }
+}
+
+/// An action to execute on state entry or exit.
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
+pub struct LifecycleAction {
+    /// Type of action to execute.
+    #[serde(rename = "type")]
+    pub action_type: LifecycleActionType,
+
+    /// Configuration for the action (depends on type).
+    /// For Webhook: {"url": "https://...", "method": "POST", "headers": {}}
+    /// For SendNotification: {"template": "...", "recipients": [...]}
+    #[serde(default)]
+    pub config: JsonValue,
+
+    /// Optional human-readable description.
+    #[validate(length(max = 500, message = "Description must not exceed 500 characters"))]
+    pub description: Option<String>,
+
+    /// Whether to continue if this action fails (default: false).
+    #[serde(default)]
+    pub continue_on_failure: bool,
+}
+
+impl LifecycleAction {
+    /// Create a new action.
+    #[must_use]
+    pub fn new(action_type: LifecycleActionType) -> Self {
+        Self {
+            action_type,
+            config: JsonValue::Object(serde_json::Map::new()),
+            description: None,
+            continue_on_failure: false,
+        }
+    }
+
+    /// Create an action with configuration.
+    #[must_use]
+    pub fn with_config(action_type: LifecycleActionType, config: JsonValue) -> Self {
+        Self {
+            action_type,
+            config,
+            description: None,
+            continue_on_failure: false,
+        }
+    }
+}
+
+// ============================================================================
+// Condition and Action DTOs (F-193)
+// ============================================================================
+
+/// Request to get transition conditions.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GetTransitionConditionsResponse {
+    /// The transition ID.
+    pub transition_id: Uuid,
+
+    /// Transition name.
+    pub transition_name: String,
+
+    /// Conditions configured for this transition.
+    pub conditions: Vec<TransitionCondition>,
+}
+
+/// Request to update transition conditions.
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
+pub struct UpdateTransitionConditionsRequest {
+    /// Conditions to set on the transition.
+    pub conditions: Vec<TransitionCondition>,
+}
+
+/// Request to evaluate conditions for a transition.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct EvaluateTransitionConditionsRequest {
+    /// The object ID to evaluate conditions against.
+    pub object_id: Uuid,
+
+    /// Object type.
+    pub object_type: LifecycleObjectType,
+}
+
+/// Response for condition evaluation.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct EvaluateTransitionConditionsResponse {
+    /// Transition ID.
+    pub transition_id: Uuid,
+
+    /// Object ID that was evaluated.
+    pub object_id: Uuid,
+
+    /// Whether all conditions are satisfied.
+    pub can_transition: bool,
+
+    /// Detailed evaluation results.
+    pub evaluation: TransitionConditionsEvaluationResult,
+}
+
+/// Request to get state actions.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GetStateActionsResponse {
+    /// The state ID.
+    pub state_id: Uuid,
+
+    /// State name.
+    pub state_name: String,
+
+    /// Actions to execute when entering this state.
+    pub entry_actions: Vec<LifecycleAction>,
+
+    /// Actions to execute when leaving this state.
+    pub exit_actions: Vec<LifecycleAction>,
+}
+
+/// Request to update state actions.
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
+pub struct UpdateStateActionsRequest {
+    /// Entry actions to set (if provided, replaces all entry actions).
+    pub entry_actions: Option<Vec<LifecycleAction>>,
+
+    /// Exit actions to set (if provided, replaces all exit actions).
+    pub exit_actions: Option<Vec<LifecycleAction>>,
+}
+
+/// Query parameters for listing action executions.
+#[derive(Debug, Clone, Deserialize, IntoParams)]
+pub struct ListActionExecutionsQuery {
+    /// Filter by transition audit ID.
+    pub transition_audit_id: Option<Uuid>,
+
+    /// Filter by state ID.
+    pub state_id: Option<Uuid>,
+
+    /// Filter by action type.
+    pub action_type: Option<String>,
+
+    /// Filter by status.
+    pub status: Option<String>,
+
+    /// Maximum number of results.
+    #[param(minimum = 1, maximum = 100)]
+    pub limit: Option<i64>,
+
+    /// Number of results to skip.
+    #[param(minimum = 0)]
+    pub offset: Option<i64>,
+}
+
+impl Default for ListActionExecutionsQuery {
+    fn default() -> Self {
+        Self {
+            transition_audit_id: None,
+            state_id: None,
+            action_type: None,
+            status: None,
+            limit: Some(50),
+            offset: Some(0),
+        }
+    }
+}
+
+/// Action execution response.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ActionExecutionResponse {
+    /// Unique identifier.
+    pub id: Uuid,
+
+    /// The transition audit ID this action belongs to.
+    pub transition_audit_id: Uuid,
+
+    /// The state ID.
+    pub state_id: Uuid,
+
+    /// Action type.
+    pub action_type: String,
+
+    /// Action configuration.
+    pub action_config: JsonValue,
+
+    /// Whether this was an entry or exit action.
+    pub trigger_type: String,
+
+    /// Current status.
+    pub status: String,
+
+    /// When executed.
+    pub executed_at: Option<DateTime<Utc>>,
+
+    /// Error message if failed.
+    pub error_message: Option<String>,
+
+    /// When created.
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<GovLifecycleActionExecution> for ActionExecutionResponse {
+    fn from(e: GovLifecycleActionExecution) -> Self {
+        Self {
+            id: e.id,
+            transition_audit_id: e.transition_audit_id,
+            state_id: e.state_id,
+            action_type: e.action_type,
+            action_config: e.action_config,
+            trigger_type: e.trigger_type,
+            status: e.status,
+            executed_at: e.executed_at,
+            error_message: e.error_message,
+            created_at: e.created_at,
+        }
+    }
+}
+
+/// Paginated list of action executions.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ActionExecutionListResponse {
+    /// List of action executions.
+    pub items: Vec<ActionExecutionResponse>,
+
+    /// Total count.
+    pub total: i64,
+
+    /// Limit.
+    pub limit: i64,
+
+    /// Offset.
+    pub offset: i64,
+}
+
+/// Enhanced user lifecycle status response with condition evaluation.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct UserLifecycleStatusResponse {
+    /// User ID.
+    pub user_id: Uuid,
+
+    /// Current lifecycle state.
+    pub current_state: Option<LifecycleStateResponse>,
+
+    /// Available transitions with condition evaluation.
+    pub available_transitions: Vec<AvailableTransitionWithConditions>,
+
+    /// Pending scheduled transitions.
+    pub pending_schedules: Vec<ScheduledTransitionResponse>,
+
+    /// Active rollback window (if any).
+    pub active_rollback: Option<RollbackInfo>,
+
+    /// Effective lifecycle model (from archetype or direct assignment).
+    pub lifecycle_model: Option<LifecycleModelInfo>,
+}
+
+/// Information about a lifecycle model.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct LifecycleModelInfo {
+    /// Model ID.
+    pub id: Uuid,
+
+    /// Model name.
+    pub name: String,
+
+    /// Source of the model assignment.
+    pub source: LifecycleModelSource,
+}
+
+/// Source of lifecycle model assignment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LifecycleModelSource {
+    /// Directly assigned to the identity.
+    Direct,
+    /// Inherited from archetype.
+    Archetype,
+    /// System default.
+    SystemDefault,
+}
+
+/// Transition with pre-evaluated conditions.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct AvailableTransitionWithConditions {
+    /// Transition details.
+    #[serde(flatten)]
+    pub transition: LifecycleTransitionResponse,
+
+    /// Whether all conditions are satisfied.
+    pub conditions_satisfied: bool,
+
+    /// Condition evaluation results.
+    pub condition_results: Vec<TransitionConditionResult>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transition_condition_type_display() {
+        assert_eq!(
+            TransitionConditionType::TerminationDateSet.to_string(),
+            "termination_date_set"
+        );
+        assert_eq!(
+            TransitionConditionType::NoActiveSessions.to_string(),
+            "no_active_sessions"
+        );
+    }
+
+    #[test]
+    fn test_lifecycle_action_type_display() {
+        assert_eq!(
+            LifecycleActionType::DisableAccess.to_string(),
+            "disable_access"
+        );
+        assert_eq!(LifecycleActionType::Webhook.to_string(), "webhook");
+    }
+
+    #[test]
+    fn test_transition_condition_serialization() {
+        let condition = TransitionCondition::new(TransitionConditionType::TerminationDateSet);
+        let json = serde_json::to_string(&condition).unwrap();
+        assert!(json.contains("\"type\":\"termination_date_set\""));
+    }
+
+    #[test]
+    fn test_lifecycle_action_serialization() {
+        let action = LifecycleAction::new(LifecycleActionType::DisableAccess);
+        let json = serde_json::to_string(&action).unwrap();
+        assert!(json.contains("\"type\":\"disable_access\""));
+    }
+
+    #[test]
+    fn test_condition_with_config() {
+        let config = serde_json::json!({
+            "attribute": "department",
+            "value": "Sales"
+        });
+        let condition = TransitionCondition::with_config(
+            TransitionConditionType::CustomAttributeEquals,
+            config.clone(),
+        );
+        assert_eq!(condition.config, config);
+    }
+
+    #[test]
+    fn test_action_with_config() {
+        let config = serde_json::json!({
+            "url": "https://example.com/webhook",
+            "method": "POST"
+        });
+        let action = LifecycleAction::with_config(LifecycleActionType::Webhook, config.clone());
+        assert_eq!(action.config, config);
+        assert!(!action.continue_on_failure);
+    }
+
+    // =========================================================================
+    // T027: Unit tests for LifecycleAction validation
+    // =========================================================================
+
+    #[test]
+    fn test_lifecycle_action_all_types_serialize() {
+        let action_types = vec![
+            LifecycleActionType::DisableAccess,
+            LifecycleActionType::EnableAccess,
+            LifecycleActionType::RevokeSessions,
+            LifecycleActionType::NotifyManager,
+            LifecycleActionType::ScheduleAccessReview,
+            LifecycleActionType::AnonymizeData,
+            LifecycleActionType::SendNotification,
+            LifecycleActionType::Webhook,
+        ];
+
+        for action_type in action_types {
+            let action = LifecycleAction::new(action_type);
+            let json = serde_json::to_string(&action).unwrap();
+            let parsed: LifecycleAction = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed.action_type, action_type);
+        }
+    }
+
+    #[test]
+    fn test_lifecycle_action_continue_on_failure_default() {
+        let action = LifecycleAction::new(LifecycleActionType::DisableAccess);
+        assert!(!action.continue_on_failure, "Default should be false");
+    }
+
+    #[test]
+    fn test_lifecycle_action_with_continue_on_failure() {
+        let mut action = LifecycleAction::new(LifecycleActionType::NotifyManager);
+        action.continue_on_failure = true;
+        let json = serde_json::to_string(&action).unwrap();
+        let parsed: LifecycleAction = serde_json::from_str(&json).unwrap();
+        assert!(parsed.continue_on_failure);
+    }
+
+    #[test]
+    fn test_lifecycle_action_webhook_config() {
+        let config = serde_json::json!({
+            "url": "https://hooks.example.com/lifecycle",
+            "method": "POST",
+            "headers": {
+                "Authorization": "Bearer token123",
+                "Content-Type": "application/json"
+            },
+            "timeout_seconds": 30
+        });
+        let action = LifecycleAction::with_config(LifecycleActionType::Webhook, config.clone());
+        assert_eq!(action.config["url"], "https://hooks.example.com/lifecycle");
+        assert_eq!(action.config["method"], "POST");
+        assert_eq!(action.config["timeout_seconds"], 30);
+    }
+
+    #[test]
+    fn test_lifecycle_action_send_notification_config() {
+        let config = serde_json::json!({
+            "template": "lifecycle_state_change",
+            "recipients": ["user", "manager"],
+            "channel": "email"
+        });
+        let action =
+            LifecycleAction::with_config(LifecycleActionType::SendNotification, config.clone());
+        assert_eq!(action.config["template"], "lifecycle_state_change");
+        assert!(action.config["recipients"].is_array());
+    }
+
+    #[test]
+    fn test_lifecycle_action_schedule_access_review_config() {
+        let config = serde_json::json!({
+            "review_type": "micro_certification",
+            "scope": "all_entitlements",
+            "deadline_days": 7
+        });
+        let action =
+            LifecycleAction::with_config(LifecycleActionType::ScheduleAccessReview, config.clone());
+        assert_eq!(action.config["review_type"], "micro_certification");
+        assert_eq!(action.config["deadline_days"], 7);
+    }
+
+    #[test]
+    fn test_lifecycle_action_with_description() {
+        let mut action = LifecycleAction::new(LifecycleActionType::DisableAccess);
+        action.description = Some("Disable user access upon termination".to_string());
+        let json = serde_json::to_string(&action).unwrap();
+        assert!(json.contains("Disable user access upon termination"));
+    }
+
+    #[test]
+    fn test_lifecycle_action_description_validation() {
+        use validator::Validate;
+
+        let mut action = LifecycleAction::new(LifecycleActionType::DisableAccess);
+        // Valid description
+        action.description = Some("Short description".to_string());
+        assert!(action.validate().is_ok());
+
+        // Description too long (> 500 chars)
+        action.description = Some("x".repeat(501));
+        assert!(action.validate().is_err());
+    }
+
+    #[test]
+    fn test_update_state_actions_request_validation() {
+        use validator::Validate;
+
+        let request = UpdateStateActionsRequest {
+            entry_actions: Some(vec![LifecycleAction::new(
+                LifecycleActionType::DisableAccess,
+            )]),
+            exit_actions: None,
+        };
+        assert!(request.validate().is_ok());
+    }
+
+    #[test]
+    fn test_lifecycle_action_empty_config() {
+        let action = LifecycleAction::new(LifecycleActionType::EnableAccess);
+        assert!(action.config.is_object());
+        assert!(action.config.as_object().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_lifecycle_action_deserialize_from_json() {
+        let json = r#"{
+            "type": "revoke_sessions",
+            "config": {"force": true},
+            "description": "Force revoke all sessions",
+            "continue_on_failure": true
+        }"#;
+        let action: LifecycleAction = serde_json::from_str(json).unwrap();
+        assert_eq!(action.action_type, LifecycleActionType::RevokeSessions);
+        assert_eq!(action.config["force"], true);
+        assert_eq!(
+            action.description,
+            Some("Force revoke all sessions".to_string())
+        );
+        assert!(action.continue_on_failure);
+    }
+
+    #[test]
+    fn test_lifecycle_action_deserialize_minimal() {
+        let json = r#"{"type": "disable_access"}"#;
+        let action: LifecycleAction = serde_json::from_str(json).unwrap();
+        assert_eq!(action.action_type, LifecycleActionType::DisableAccess);
+        assert!(!action.continue_on_failure);
+        assert!(action.description.is_none());
+    }
+
+    #[test]
+    fn test_get_state_actions_response_structure() {
+        let response = GetStateActionsResponse {
+            state_id: Uuid::new_v4(),
+            state_name: "terminated".to_string(),
+            entry_actions: vec![LifecycleAction::new(LifecycleActionType::DisableAccess)],
+            exit_actions: vec![],
+        };
+        assert_eq!(response.state_name, "terminated");
+        assert_eq!(response.entry_actions.len(), 1);
+        assert!(response.exit_actions.is_empty());
+    }
 }

@@ -198,13 +198,13 @@ impl Default for SpGroupConfig {
 
 impl SamlServiceProvider {
     /// Parse attribute mapping from JSONB value
-    #[must_use] 
+    #[must_use]
     pub fn get_attribute_mapping(&self) -> AttributeMapping {
         serde_json::from_value(self.attribute_mapping.clone()).unwrap_or_default()
     }
 
     /// Get group configuration for this SP
-    #[must_use] 
+    #[must_use]
     pub fn get_group_config(&self) -> SpGroupConfig {
         SpGroupConfig {
             attribute_name: self

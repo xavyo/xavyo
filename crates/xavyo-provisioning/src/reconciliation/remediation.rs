@@ -44,7 +44,7 @@ pub struct RemediationResult {
 
 impl RemediationResult {
     /// Create a successful result.
-    #[must_use] 
+    #[must_use]
     pub fn success(discrepancy_id: Uuid, action: ActionType, dry_run: bool) -> Self {
         Self {
             discrepancy_id,
@@ -59,7 +59,7 @@ impl RemediationResult {
     }
 
     /// Create a failure result.
-    #[must_use] 
+    #[must_use]
     pub fn failure(discrepancy_id: Uuid, action: ActionType, error: String, dry_run: bool) -> Self {
         Self {
             discrepancy_id,
@@ -74,27 +74,27 @@ impl RemediationResult {
     }
 
     /// Add before state.
-    #[must_use] 
+    #[must_use]
     pub fn with_before_state(mut self, state: JsonValue) -> Self {
         self.before_state = Some(state);
         self
     }
 
     /// Add after state.
-    #[must_use] 
+    #[must_use]
     pub fn with_after_state(mut self, state: JsonValue) -> Self {
         self.after_state = Some(state);
         self
     }
 
     /// Check if successful.
-    #[must_use] 
+    #[must_use]
     pub fn is_success(&self) -> bool {
         matches!(self.result, ActionResult::Success)
     }
 
     /// Check if failed.
-    #[must_use] 
+    #[must_use]
     pub fn is_failure(&self) -> bool {
         matches!(self.result, ActionResult::Failure)
     }
@@ -120,7 +120,7 @@ pub struct RemediationRequest {
 
 impl RemediationRequest {
     /// Create a new remediation request.
-    #[must_use] 
+    #[must_use]
     pub fn new(discrepancy_id: Uuid, action: ActionType) -> Self {
         Self {
             discrepancy_id,
@@ -132,21 +132,21 @@ impl RemediationRequest {
     }
 
     /// Set direction.
-    #[must_use] 
+    #[must_use]
     pub fn with_direction(mut self, direction: RemediationDirection) -> Self {
         self.direction = direction;
         self
     }
 
     /// Set identity ID for link action.
-    #[must_use] 
+    #[must_use]
     pub fn with_identity(mut self, identity_id: Uuid) -> Self {
         self.identity_id = Some(identity_id);
         self
     }
 
     /// Set dry run mode.
-    #[must_use] 
+    #[must_use]
     pub fn with_dry_run(mut self, dry_run: bool) -> Self {
         self.dry_run = dry_run;
         self
@@ -210,7 +210,7 @@ pub struct BulkRemediationSummary {
 
 impl BulkRemediationResult {
     /// Create from results.
-    #[must_use] 
+    #[must_use]
     pub fn from_results(results: Vec<RemediationResult>) -> Self {
         let total = results.len();
         let succeeded = results.iter().filter(|r| r.is_success()).count();
@@ -1332,7 +1332,7 @@ where
     }
 
     /// Begin a new remediation transaction.
-    #[must_use] 
+    #[must_use]
     pub fn begin_transaction(&self) -> RemediationTransaction {
         RemediationTransaction::new(self.tenant_id)
     }

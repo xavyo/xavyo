@@ -34,7 +34,7 @@ pub struct InboundCorrelationRule {
 
 impl InboundCorrelationRule {
     /// Create a new exact match rule.
-    #[must_use] 
+    #[must_use]
     pub fn exact(name: &str, source: &str, target: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -47,7 +47,7 @@ impl InboundCorrelationRule {
     }
 
     /// Create a case-sensitive exact match rule.
-    #[must_use] 
+    #[must_use]
     pub fn exact_case_sensitive(name: &str, source: &str, target: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -60,7 +60,7 @@ impl InboundCorrelationRule {
     }
 
     /// Set the weight for confidence scoring.
-    #[must_use] 
+    #[must_use]
     pub fn with_weight(mut self, weight: f64) -> Self {
         self.weight = weight;
         self
@@ -124,7 +124,7 @@ pub struct DatabaseInboundCorrelator {
 
 impl DatabaseInboundCorrelator {
     /// Create a new database-backed correlator.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -133,7 +133,7 @@ impl DatabaseInboundCorrelator {
     }
 
     /// Create with custom configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_config(pool: PgPool, config: InboundCorrelationConfig) -> Self {
         Self { pool, config }
     }
@@ -144,9 +144,9 @@ impl DatabaseInboundCorrelator {
             Some(serde_json::Value::String(s)) => Some(s.clone()),
             Some(serde_json::Value::Number(n)) => Some(n.to_string()),
             Some(serde_json::Value::Bool(b)) => Some(b.to_string()),
-            Some(serde_json::Value::Array(arr)) => {
-                arr.first().and_then(|v| v.as_str().map(std::string::ToString::to_string))
-            }
+            Some(serde_json::Value::Array(arr)) => arr
+                .first()
+                .and_then(|v| v.as_str().map(std::string::ToString::to_string)),
             _ => None,
         }
     }

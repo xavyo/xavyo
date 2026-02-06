@@ -438,13 +438,13 @@ impl GovSodRule {
     }
 
     /// Check if rule is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self.status, GovSodRuleStatus::Active)
     }
 
     /// Get the other entitlement ID given one of the pair.
-    #[must_use] 
+    #[must_use]
     pub fn get_conflicting_entitlement(&self, entitlement_id: Uuid) -> Option<Uuid> {
         if self.first_entitlement_id == entitlement_id {
             Some(self.second_entitlement_id)

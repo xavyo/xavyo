@@ -5,10 +5,12 @@
 
 use axum::{
     extract::{Path, Query, State},
+    http::StatusCode,
     Extension, Json,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use validator::Validate;
 
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::{CreateGovRole, GovRoleFilter, UpdateGovRole};
@@ -50,6 +52,29 @@ pub struct CreateRoleRequest {
     pub is_abstract: bool,
 }
 
+impl Validate for CreateRoleRequest {
+    fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        let mut errors = validator::ValidationErrors::new();
+        if self.name.trim().is_empty() || self.name.len() > 255 {
+            let mut err = validator::ValidationError::new("length");
+            err.message = Some("name must be 1-255 characters".into());
+            errors.add("name", err);
+        }
+        if let Some(ref d) = self.description {
+            if d.len() > 2000 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("description must be at most 2000 characters".into());
+                errors.add("description", err);
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
 /// Request to update a governance role.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -64,6 +89,31 @@ pub struct UpdateRoleRequest {
     pub is_abstract: Option<bool>,
     /// Expected version for optimistic concurrency.
     pub version: i32,
+}
+
+impl Validate for UpdateRoleRequest {
+    fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        let mut errors = validator::ValidationErrors::new();
+        if let Some(ref n) = self.name {
+            if n.trim().is_empty() || n.len() > 255 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("name must be 1-255 characters".into());
+                errors.add("name", err);
+            }
+        }
+        if let Some(ref d) = self.description {
+            if d.len() > 2000 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("description must be at most 2000 characters".into());
+                errors.add("description", err);
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 /// Request to move a role to a new parent.
@@ -247,7 +297,7 @@ pub async fn list_roles(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     // Parse parent_role_id filter
     let parent_filter = match query.parent_role_id.as_deref() {
@@ -299,18 +349,17 @@ pub async fn create_role(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateRoleRequest>,
 ) -> ApiResult<Json<RoleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+    request
+        .validate()
+        .map_err(|e| ApiGovernanceError::Validation(e.to_string()))?;
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
     let created_by = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
-
-    // Validate name
-    if request.name.trim().is_empty() {
-        return Err(ApiGovernanceError::Validation(
-            "Role name cannot be empty".to_string(),
-        ));
-    }
     if request.name.len() > 255 {
         return Err(ApiGovernanceError::Validation(
             "Role name cannot exceed 255 characters".to_string(),
@@ -391,6 +440,12 @@ pub async fn update_role(
     Path(role_id): Path<Uuid>,
     Json(request): Json<UpdateRoleRequest>,
 ) -> ApiResult<Json<RoleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+    request
+        .validate()
+        .map_err(|e| ApiGovernanceError::Validation(e.to_string()))?;
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -447,7 +502,10 @@ pub async fn delete_role(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(role_id): Path<Uuid>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -459,7 +517,7 @@ pub async fn delete_role(
         .delete_role(tenant_id, role_id, deleted_by)
         .await?;
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ============================================================================
@@ -638,6 +696,9 @@ pub async fn move_role(
     Path(role_id): Path<Uuid>,
     Json(request): Json<MoveRoleRequest>,
 ) -> ApiResult<Json<RoleMoveResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

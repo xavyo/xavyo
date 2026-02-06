@@ -361,7 +361,7 @@ pub struct CustomAttributeFilter {
 ///
 /// Supported operator suffixes: `.lt`, `.gt`, `.lte`, `.gte`
 /// No suffix means equality (`.eq`).
-#[must_use] 
+#[must_use]
 pub fn parse_custom_attr_filters(query: &str) -> Vec<CustomAttributeFilter> {
     let mut filters = Vec::new();
     let prefix = "custom_attr.";

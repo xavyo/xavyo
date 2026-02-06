@@ -110,7 +110,7 @@ fn default_periods() -> usize {
 
 impl UsageHistoryQuery {
     /// Validate the query parameters.
-    #[must_use] 
+    #[must_use]
     pub fn validate(&self) -> Option<String> {
         if self.periods == 0 {
             return Some("periods must be at least 1".to_string());

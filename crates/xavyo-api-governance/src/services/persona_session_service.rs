@@ -59,7 +59,7 @@ pub struct PersonaSessionService {
 
 impl PersonaSessionService {
     /// Create a new persona session service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             audit_service: PersonaAuditService::new(pool.clone()),

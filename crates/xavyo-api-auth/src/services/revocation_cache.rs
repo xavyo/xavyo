@@ -32,7 +32,7 @@ pub struct RevocationCache {
 
 impl RevocationCache {
     /// Create a new revocation cache.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         let cache = Cache::builder()
             .max_capacity(MAX_CACHE_ENTRIES)

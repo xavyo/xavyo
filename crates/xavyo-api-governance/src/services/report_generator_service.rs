@@ -21,7 +21,7 @@ pub struct ReportGeneratorService {
 
 impl ReportGeneratorService {
     /// Create a new report generator service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             report_service: ReportService::new(pool.clone()),
@@ -147,7 +147,7 @@ impl ReportGeneratorService {
 // We need to expose the pool from ReportDataService
 impl ReportDataService {
     /// Get a reference to the pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

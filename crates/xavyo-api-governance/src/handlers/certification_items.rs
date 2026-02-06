@@ -46,7 +46,7 @@ pub async fn list_campaign_items(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
     let page = (offset / limit) + 1;
 
     // Verify campaign exists
@@ -243,7 +243,9 @@ pub async fn reassign_item(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    // TODO: Add admin check here
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let item = state
         .certification_item_service
@@ -279,7 +281,7 @@ pub async fn get_my_certifications(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
     let page = (offset / limit) + 1;
 
     let (items, total) = state

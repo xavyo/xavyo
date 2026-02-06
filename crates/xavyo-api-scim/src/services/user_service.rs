@@ -389,7 +389,8 @@ impl UserService {
                                 user.is_active = active.as_bool().unwrap_or(true);
                             }
                             if let Some(display_name) = obj.get("displayName") {
-                                user.display_name = display_name.as_str().map(std::string::ToString::to_string);
+                                user.display_name =
+                                    display_name.as_str().map(std::string::ToString::to_string);
                             }
                             // Handle enterprise extension attributes in bulk patch (F081)
                             let enterprise_uri =
@@ -606,6 +607,9 @@ mod tests {
             manager_id: None,
             // Custom attributes (F070)
             custom_attributes: serde_json::json!({}),
+            // Archetype fields (F058)
+            archetype_id: None,
+            archetype_custom_attrs: serde_json::json!({}),
         };
 
         let op = ScimPatchOp {

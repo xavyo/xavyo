@@ -1013,7 +1013,7 @@ pub async fn list_nhi_certification_campaigns(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (items, total) = state
         .nhi_certification_service
@@ -1121,7 +1121,7 @@ pub async fn list_nhi_certification_items(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let reviewer_id = if query.my_pending == Some(true) {
         Some(Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?)
@@ -1409,7 +1409,7 @@ pub async fn list_nhi_requests(
     };
 
     let limit = query.limit.unwrap_or(50);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let result = state
         .nhi_request_service

@@ -42,7 +42,7 @@ pub struct InMemoryRiskHistoryStore {
 
 impl InMemoryRiskHistoryStore {
     /// Create a new in-memory history store.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             history: RwLock::new(HashMap::new()),

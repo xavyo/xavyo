@@ -477,19 +477,19 @@ impl ConnectorConfiguration {
     }
 
     /// Check if connector is active.
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         matches!(self.status, ConnectorStatus::Active)
     }
 
     /// Check if connector has an error.
-    #[must_use] 
+    #[must_use]
     pub fn has_error(&self) -> bool {
         matches!(self.status, ConnectorStatus::Error)
     }
 
     /// Get summary view of this connector.
-    #[must_use] 
+    #[must_use]
     pub fn to_summary(&self) -> ConnectorSummary {
         ConnectorSummary {
             id: self.id,

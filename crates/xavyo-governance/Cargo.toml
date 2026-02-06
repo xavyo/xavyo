@@ -33,6 +33,9 @@ sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio",
 # Logging
 tracing = "0.1"
 
+# Regular expressions (for LIKE operator in expression parser)
+regex = "1.10"
+
 # Async traits
 async-trait = "0.1"
 

@@ -286,13 +286,13 @@ impl GovPolicySimulationResult {
     }
 
     /// Parse `SoD` violation details.
-    #[must_use] 
+    #[must_use]
     pub fn parse_sod_details(&self) -> Option<SodViolationDetails> {
         serde_json::from_value(self.details.clone()).ok()
     }
 
     /// Parse birthright change details.
-    #[must_use] 
+    #[must_use]
     pub fn parse_birthright_details(&self) -> Option<BirthrightChangeDetails> {
         serde_json::from_value(self.details.clone()).ok()
     }

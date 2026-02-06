@@ -21,7 +21,7 @@ pub struct EnvSecretProvider {
 
 impl EnvSecretProvider {
     /// Create a new `EnvSecretProvider` with the given logical name mappings.
-    #[must_use] 
+    #[must_use]
     pub fn new(mappings: HashMap<String, String>) -> Self {
         Self { mappings }
     }

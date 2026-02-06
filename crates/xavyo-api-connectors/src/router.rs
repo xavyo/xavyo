@@ -24,7 +24,7 @@ pub struct ConnectorState {
 
 impl ConnectorState {
     /// Create a new connector state.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         connector_service: Arc<ConnectorService>,
         schema_service: Arc<SchemaService>,
@@ -41,7 +41,7 @@ impl ConnectorState {
     }
 
     /// Create a new connector state with health service.
-    #[must_use] 
+    #[must_use]
     pub fn with_health_service(
         connector_service: Arc<ConnectorService>,
         schema_service: Arc<SchemaService>,
@@ -114,7 +114,7 @@ pub struct OperationState {
 
 impl OperationState {
     /// Create a new operation state.
-    #[must_use] 
+    #[must_use]
     pub fn new(operation_service: Arc<OperationService>) -> Self {
         Self {
             operation_service,
@@ -123,7 +123,7 @@ impl OperationState {
     }
 
     /// Create a new operation state with conflict service.
-    #[must_use] 
+    #[must_use]
     pub fn with_conflict_service(
         operation_service: Arc<OperationService>,
         conflict_service: Arc<ConflictService>,
@@ -177,7 +177,7 @@ pub struct SyncState {
 
 impl SyncState {
     /// Create a new sync state.
-    #[must_use] 
+    #[must_use]
     pub fn new(sync_service: Arc<SyncService>) -> Self {
         Self { sync_service }
     }
@@ -245,7 +245,7 @@ pub struct ReconciliationState {
 
 impl ReconciliationState {
     /// Create a new reconciliation state.
-    #[must_use] 
+    #[must_use]
     pub fn new(reconciliation_service: Arc<ReconciliationService>) -> Self {
         Self {
             reconciliation_service,

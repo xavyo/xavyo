@@ -368,7 +368,7 @@ impl GovRoleParameter {
     }
 
     /// Get the parsed constraints.
-    #[must_use] 
+    #[must_use]
     pub fn get_constraints(&self) -> Option<ParameterConstraints> {
         self.constraints
             .as_ref()

@@ -43,7 +43,7 @@ pub struct IdentityFederationService {
 
 impl IdentityFederationService {
     /// Create a new identity federation service.
-    #[must_use] 
+    #[must_use]
     pub fn new(
         pool: PgPool,
         provider_service: IdentityProviderService,
@@ -352,8 +352,7 @@ impl IdentityFederationService {
         IdentityCredentialRequest::create(&self.pool, tenant_id, &request).await?;
 
         // Audit log
-        let role_identifier = mapping
-            .map_or("unknown", |m| m.role_identifier.as_str());
+        let role_identifier = mapping.map_or("unknown", |m| m.role_identifier.as_str());
 
         self.audit_service
             .log_credential_request(

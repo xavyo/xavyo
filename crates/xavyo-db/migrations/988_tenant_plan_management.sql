@@ -39,10 +39,7 @@ BEGIN
         CREATE POLICY tenant_plan_changes_isolation ON tenant_plan_changes
             FOR ALL
             USING (
-                tenant_id = COALESCE(
-                    NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-                    '00000000-0000-0000-0000-000000000001'::uuid
-                )
+                tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid
                 OR current_setting('app.current_tenant', true) = '00000000-0000-0000-0000-000000000001'
             );
     END IF;

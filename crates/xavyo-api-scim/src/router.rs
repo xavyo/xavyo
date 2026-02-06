@@ -35,7 +35,7 @@ impl ScimConfig {
     }
 
     /// Set rate limits
-    #[must_use] 
+    #[must_use]
     pub fn with_rate_limits(mut self, per_sec: u32, burst: u32) -> Self {
         self.rate_limit_per_sec = per_sec;
         self.rate_limit_burst = burst;

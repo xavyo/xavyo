@@ -65,7 +65,7 @@ pub enum TicketSyncJobError {
 
 impl TicketSyncJob {
     /// Create a new ticket sync job.
-    #[must_use] 
+    #[must_use]
     pub fn new(sync_service: TicketSyncService) -> Self {
         Self {
             sync_service: Arc::new(sync_service),

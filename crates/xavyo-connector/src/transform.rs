@@ -16,13 +16,13 @@ pub struct TransformEngine;
 
 impl TransformEngine {
     /// Create a new transformation engine.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
 
     /// Evaluate a complete mapping configuration against input attributes.
-    #[must_use] 
+    #[must_use]
     pub fn evaluate(
         &self,
         config: &MappingConfiguration,
@@ -178,10 +178,7 @@ impl TransformEngine {
                     if *group == 0 {
                         Ok(caps.get(0).map_or("", |m| m.as_str()).to_string())
                     } else {
-                        Ok(caps
-                            .get(*group)
-                            .map_or("", |m| m.as_str())
-                            .to_string())
+                        Ok(caps.get(*group).map_or("", |m| m.as_str()).to_string())
                     }
                 } else {
                     Ok(String::new())

@@ -71,7 +71,7 @@ pub struct BatchMergeService {
 
 impl BatchMergeService {
     /// Create a new batch merge service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, identity_merge_service: Arc<IdentityMergeService>) -> Self {
         Self {
             pool,

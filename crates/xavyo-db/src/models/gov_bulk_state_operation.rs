@@ -436,7 +436,7 @@ impl GovBulkStateOperation {
     }
 
     /// Get the progress of an operation.
-    #[must_use] 
+    #[must_use]
     pub fn get_progress(&self) -> BulkOperationProgress {
         let progress_percent = if self.total_count > 0 {
             ((f64::from(self.processed_count) / f64::from(self.total_count)) * 100.0) as u8

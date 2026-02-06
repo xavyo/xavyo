@@ -3,6 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use validator::Validate;
 
 use utoipa::{IntoParams, ToSchema};
 
@@ -243,6 +244,24 @@ pub struct ExportPolicySimulationQuery {
 pub struct UpdateNotesRequest {
     /// Notes/comments on the simulation (null to clear).
     pub notes: Option<String>,
+}
+
+impl Validate for UpdateNotesRequest {
+    fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        let mut errors = validator::ValidationErrors::new();
+        if let Some(ref n) = self.notes {
+            if n.len() > 10_000 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("notes must be at most 10,000 characters".into());
+                errors.add("notes", err);
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 fn default_format() -> String {

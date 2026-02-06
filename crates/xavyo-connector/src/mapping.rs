@@ -206,7 +206,7 @@ pub struct MappingError {
 
 impl MappingResult {
     /// Create a new empty result.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -226,7 +226,7 @@ impl MappingResult {
     }
 
     /// Check if there are any fatal errors.
-    #[must_use] 
+    #[must_use]
     pub fn has_fatal_errors(&self) -> bool {
         self.errors.iter().any(|e| e.fatal)
     }

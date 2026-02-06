@@ -61,14 +61,14 @@ impl From<TenantIdpCertificate> for CertificateInfo {
 
 impl TenantIdpCertificate {
     /// Check if certificate is currently valid
-    #[must_use] 
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         let now = Utc::now();
         now >= self.not_before && now <= self.not_after
     }
 
     /// Check if certificate is expiring soon (within 30 days)
-    #[must_use] 
+    #[must_use]
     pub fn is_expiring_soon(&self) -> bool {
         let thirty_days = chrono::Duration::days(30);
         let expiry_threshold = Utc::now() + thirty_days;

@@ -21,7 +21,7 @@ pub struct PermissionService {
 
 impl PermissionService {
     /// Create a new `PermissionService`.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -103,8 +103,8 @@ impl PermissionService {
         // Apply pagination in memory (for simplicity)
         let paginated: Vec<_> = permissions
             .into_iter()
-            .skip(offset as usize)
-            .take(limit as usize)
+            .skip(offset.max(0) as usize)
+            .take(limit.max(0) as usize)
             .map(|p| self.details_to_response(p))
             .collect();
 

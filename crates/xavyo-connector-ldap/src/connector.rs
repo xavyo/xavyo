@@ -375,9 +375,9 @@ impl Connector for LdapConnector {
             .await
             .map_err(|e| ConnectorError::connection_failed_with_source("Test search failed", e))?;
 
-        let (entries, _res) = result.success().map_err(|e| {
-            ConnectorError::connection_failed(format!("Test search failed: {e:?}"))
-        })?;
+        let (entries, _res) = result
+            .success()
+            .map_err(|e| ConnectorError::connection_failed(format!("Test search failed: {e:?}")))?;
 
         if entries.is_empty() {
             return Err(ConnectorError::connection_failed(format!(
@@ -648,7 +648,9 @@ impl LdapConnector {
 
         let data_type = meta
             .and_then(|m| m.syntax.as_ref())
-            .map_or(AttributeDataType::String, |s| self.ldap_syntax_to_data_type(s));
+            .map_or(AttributeDataType::String, |s| {
+                self.ldap_syntax_to_data_type(s)
+            });
 
         let mut attr = SchemaAttribute::new(attr_name, attr_name, data_type).case_insensitive(); // LDAP attributes are case-insensitive
 
@@ -1000,15 +1002,17 @@ impl CreateOp for LdapConnector {
         // Convert to the format ldap3 expects
         let ldap_attrs_vec: Vec<(&str, std::collections::HashSet<&str>)> = ldap_attrs
             .iter()
-            .map(|(k, v)| (k.as_str(), v.iter().map(std::string::String::as_str).collect()))
+            .map(|(k, v)| {
+                (
+                    k.as_str(),
+                    v.iter().map(std::string::String::as_str).collect(),
+                )
+            })
             .collect();
 
         // Perform the add operation
         let result = ldap.add(&dn, ldap_attrs_vec).await.map_err(|e| {
-            ConnectorError::operation_failed_with_source(
-                format!("Failed to create entry: {dn}"),
-                e,
-            )
+            ConnectorError::operation_failed_with_source(format!("Failed to create entry: {dn}"), e)
         })?;
 
         // Check result
@@ -1088,10 +1092,7 @@ impl UpdateOp for LdapConnector {
 
         // Perform the modify operation
         let result = ldap.modify(dn, mods).await.map_err(|e| {
-            ConnectorError::operation_failed_with_source(
-                format!("Failed to update entry: {dn}"),
-                e,
-            )
+            ConnectorError::operation_failed_with_source(format!("Failed to update entry: {dn}"), e)
         })?;
 
         // Check for "no such object" error
@@ -1125,10 +1126,7 @@ impl DeleteOp for LdapConnector {
 
         // Perform the delete operation
         let result = ldap.delete(dn).await.map_err(|e| {
-            ConnectorError::operation_failed_with_source(
-                format!("Failed to delete entry: {dn}"),
-                e,
-            )
+            ConnectorError::operation_failed_with_source(format!("Failed to delete entry: {dn}"), e)
         })?;
 
         // Check for "no such object" error
@@ -1195,9 +1193,9 @@ impl SearchOp for LdapConnector {
             .await
             .map_err(|e| ConnectorError::operation_failed_with_source("LDAP search failed", e))?;
 
-        let (entries, _) = result.success().map_err(|e| {
-            ConnectorError::operation_failed(format!("LDAP search failed: {e:?}"))
-        })?;
+        let (entries, _) = result
+            .success()
+            .map_err(|e| ConnectorError::operation_failed(format!("LDAP search failed: {e:?}")))?;
 
         let total = entries.len();
 

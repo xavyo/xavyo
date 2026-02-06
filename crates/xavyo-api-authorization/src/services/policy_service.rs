@@ -23,7 +23,7 @@ pub struct PolicyService {
 
 impl PolicyService {
     /// Create a new policy service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, policy_cache: std::sync::Arc<PolicyCache>) -> Self {
         Self { pool, policy_cache }
     }

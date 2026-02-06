@@ -41,10 +41,10 @@ pub fn encrypt_secret(plaintext: &str, key: &[u8]) -> Result<String, WebhookErro
     use rand::RngCore;
     let mut nonce_bytes = [0u8; NONCE_SIZE];
     OsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    let nonce = Nonce::from(nonce_bytes);
 
     let ciphertext = cipher
-        .encrypt(nonce, plaintext.as_bytes())
+        .encrypt(&nonce, plaintext.as_bytes())
         .map_err(|e| WebhookError::EncryptionFailed(e.to_string()))?;
 
     let mut result = Vec::with_capacity(NONCE_SIZE + ciphertext.len());
@@ -76,11 +76,14 @@ pub fn decrypt_secret(encoded: &str, key: &[u8]) -> Result<String, WebhookError>
     let cipher = Aes256Gcm::new_from_slice(key)
         .map_err(|e| WebhookError::EncryptionFailed(e.to_string()))?;
 
-    let nonce = Nonce::from_slice(&encrypted[..NONCE_SIZE]);
+    let nonce_array: [u8; NONCE_SIZE] = encrypted[..NONCE_SIZE]
+        .try_into()
+        .map_err(|_| WebhookError::EncryptionFailed("invalid nonce length".to_string()))?;
+    let nonce = Nonce::from(nonce_array);
     let ciphertext = &encrypted[NONCE_SIZE..];
 
     let plaintext = cipher
-        .decrypt(nonce, ciphertext)
+        .decrypt(&nonce, ciphertext)
         .map_err(|e| WebhookError::EncryptionFailed(e.to_string()))?;
 
     String::from_utf8(plaintext).map_err(|e| WebhookError::EncryptionFailed(e.to_string()))
@@ -94,7 +97,7 @@ pub fn decrypt_secret(encoded: &str, key: &[u8]) -> Result<String, WebhookError>
 ///
 /// The signature covers `{timestamp}.{body}` to prevent replay attacks.
 /// Returns hex-encoded signature string.
-#[must_use] 
+#[must_use]
 pub fn compute_hmac_signature(secret: &str, timestamp: &str, body: &[u8]) -> String {
     let mut mac = <HmacSha256 as Mac>::new_from_slice(secret.as_bytes())
         .expect("HMAC can take key of any size");
@@ -109,7 +112,7 @@ pub fn compute_hmac_signature(secret: &str, timestamp: &str, body: &[u8]) -> Str
 /// Verify an HMAC-SHA256 signature using constant-time comparison.
 ///
 /// Returns true if the expected signature matches the computed one.
-#[must_use] 
+#[must_use]
 pub fn verify_hmac_signature(
     expected_hex: &str,
     secret: &str,

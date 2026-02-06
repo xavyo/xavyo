@@ -95,7 +95,7 @@ impl GraphClient {
     }
 
     /// Returns the rate limiter for direct access.
-    #[must_use] 
+    #[must_use]
     pub fn rate_limiter(&self) -> &Arc<RateLimiter> {
         &self.rate_limiter
     }
@@ -106,7 +106,7 @@ impl GraphClient {
     }
 
     /// Returns the base URL for Graph API requests.
-    #[must_use] 
+    #[must_use]
     pub fn base_url(&self) -> String {
         format!(
             "{}/{}",

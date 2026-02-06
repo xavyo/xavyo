@@ -89,9 +89,7 @@ If you didn't expect this invitation, you can safely ignore this email.
         email_sender
             .send(to_email, subject, &body)
             .await
-            .map_err(|e| {
-                ImportError::Internal(format!("Failed to send invitation email: {e}"))
-            })?;
+            .map_err(|e| ImportError::Internal(format!("Failed to send invitation email: {e}")))?;
 
         Ok(())
     }
@@ -138,7 +136,9 @@ If you didn't expect this invitation, you can safely ignore this email.
 
         for inv in &invitations {
             // Skip invitations without a user_id (admin invitations use email instead)
-            let user_id = if let Some(uid) = inv.user_id { uid } else {
+            let user_id = if let Some(uid) = inv.user_id {
+                uid
+            } else {
                 skipped += 1;
                 continue;
             };
@@ -151,7 +151,9 @@ If you didn't expect this invitation, you can safely ignore this email.
                     .fetch_optional(pool)
                     .await?;
 
-            let email = if let Some(e) = user_email { e } else {
+            let email = if let Some(e) = user_email {
+                e
+            } else {
                 skipped += 1;
                 continue;
             };

@@ -36,13 +36,13 @@ pub struct AuthorizationService {
 
 impl AuthorizationService {
     /// Create a new authorization service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -67,7 +67,7 @@ impl AuthorizationService {
     }
 
     /// Generate a PKCE code challenge from a verifier using S256.
-    #[must_use] 
+    #[must_use]
     pub fn generate_code_challenge(code_verifier: &str) -> String {
         let mut hasher = Sha256::new();
         hasher.update(code_verifier.as_bytes());
@@ -76,7 +76,7 @@ impl AuthorizationService {
     }
 
     /// Verify a PKCE code verifier against a code challenge.
-    #[must_use] 
+    #[must_use]
     pub fn verify_code_verifier(code_verifier: &str, code_challenge: &str) -> bool {
         let computed_challenge = Self::generate_code_challenge(code_verifier);
         // Use constant-time comparison to prevent timing attacks

@@ -66,6 +66,9 @@ pub async fn create_scim_target(
     Extension(claims): Extension<JwtClaims>,
     Json(body): Json<CreateScimTargetRequest>,
 ) -> Result<(StatusCode, Json<ScimTargetResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let target = state
         .scim_target_service
@@ -148,6 +151,9 @@ pub async fn update_scim_target(
     Path(target_id): Path<Uuid>,
     Json(body): Json<UpdateScimTargetRequest>,
 ) -> Result<Json<ScimTargetResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let target = state
         .scim_target_service
@@ -174,6 +180,9 @@ pub async fn delete_scim_target(
     Extension(claims): Extension<JwtClaims>,
     Path(target_id): Path<Uuid>,
 ) -> Result<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     state
         .scim_target_service
@@ -200,6 +209,9 @@ pub async fn health_check_scim_target(
     Extension(claims): Extension<JwtClaims>,
     Path(target_id): Path<Uuid>,
 ) -> Result<Json<HealthCheckResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let result = state
         .scim_target_service

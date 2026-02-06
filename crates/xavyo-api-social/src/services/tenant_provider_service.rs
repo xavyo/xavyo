@@ -27,7 +27,7 @@ pub struct ProviderConfig {
 
 impl TenantProviderService {
     /// Create a new tenant provider service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool, encryption: EncryptionService) -> Self {
         Self { pool, encryption }
     }

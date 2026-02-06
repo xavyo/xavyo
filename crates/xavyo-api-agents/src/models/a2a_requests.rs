@@ -189,30 +189,28 @@ impl A2aErrorResponse {
     }
 
     /// Invalid state transition error.
-    #[must_use] 
+    #[must_use]
     pub fn invalid_state_transition(current_state: &str) -> Self {
         Self::new(
             "invalid_state_transition",
-            format!(
-                "Task cannot be cancelled: already in '{current_state}' state"
-            ),
+            format!("Task cannot be cancelled: already in '{current_state}' state"),
         )
     }
 
     /// Task not found error.
-    #[must_use] 
+    #[must_use]
     pub fn not_found() -> Self {
         Self::new("not_found", "Task not found")
     }
 
     /// Target agent not found error.
-    #[must_use] 
+    #[must_use]
     pub fn target_not_found() -> Self {
         Self::new("target_not_found", "Target agent not found")
     }
 
     /// Invalid callback URL error.
-    #[must_use] 
+    #[must_use]
     pub fn invalid_callback_url() -> Self {
         Self::new("invalid_callback_url", "Callback URL format is invalid")
     }

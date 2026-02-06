@@ -295,7 +295,7 @@ impl SyncChange {
     }
 
     /// Set the timestamp of the change.
-    #[must_use] 
+    #[must_use]
     pub fn with_timestamp(mut self, timestamp: chrono::DateTime<chrono::Utc>) -> Self {
         self.timestamp = Some(timestamp);
         self
@@ -337,7 +337,7 @@ pub struct SyncResult {
 
 impl SyncResult {
     /// Create a new sync result with no changes.
-    #[must_use] 
+    #[must_use]
     pub fn empty() -> Self {
         Self {
             changes: Vec::new(),
@@ -347,7 +347,7 @@ impl SyncResult {
     }
 
     /// Create a new sync result with changes.
-    #[must_use] 
+    #[must_use]
     pub fn with_changes(changes: Vec<SyncChange>) -> Self {
         Self {
             changes,
@@ -363,7 +363,7 @@ impl SyncResult {
     }
 
     /// Indicate that there are more changes to fetch.
-    #[must_use] 
+    #[must_use]
     pub fn with_more(mut self) -> Self {
         self.has_more = true;
         self

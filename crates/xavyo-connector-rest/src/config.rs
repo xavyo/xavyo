@@ -133,7 +133,7 @@ pub enum HttpMethod {
 
 impl HttpMethod {
     /// Get the string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             HttpMethod::Get => "GET",
@@ -247,7 +247,7 @@ impl RestConfig {
     }
 
     /// Set authentication.
-    #[must_use] 
+    #[must_use]
     pub fn with_auth(mut self, auth: AuthConfig) -> Self {
         self.auth = auth;
         self
@@ -285,7 +285,7 @@ impl RestConfig {
     }
 
     /// Build the full URL for an endpoint.
-    #[must_use] 
+    #[must_use]
     pub fn url(&self, path: &str) -> String {
         let base = self.base_url.trim_end_matches('/');
         let path = path.trim_start_matches('/');
@@ -293,35 +293,35 @@ impl RestConfig {
     }
 
     /// Set rate limiting configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_rate_limit(mut self, config: RateLimitConfig) -> Self {
         self.rate_limit = config;
         self
     }
 
     /// Set retry configuration.
-    #[must_use] 
+    #[must_use]
     pub fn with_retry(mut self, config: RetryConfig) -> Self {
         self.retry = config;
         self
     }
 
     /// Set logging verbosity.
-    #[must_use] 
+    #[must_use]
     pub fn with_log_verbosity(mut self, verbosity: LogVerbosity) -> Self {
         self.log_verbosity = verbosity;
         self
     }
 
     /// Disable rate limiting.
-    #[must_use] 
+    #[must_use]
     pub fn without_rate_limit(mut self) -> Self {
         self.rate_limit = RateLimitConfig::disabled();
         self
     }
 
     /// Disable retries.
-    #[must_use] 
+    #[must_use]
     pub fn without_retry(mut self) -> Self {
         self.retry = RetryConfig::disabled();
         self
@@ -341,7 +341,7 @@ impl RestConfig {
     /// let config = RestConfig::new(&mock_server.uri())
     ///     .with_allow_localhost();
     /// ```
-    #[must_use] 
+    #[must_use]
     pub fn with_allow_localhost(mut self) -> Self {
         self.allow_localhost = true;
         self
@@ -484,7 +484,7 @@ impl Default for EndpointConfig {
 
 impl EndpointConfig {
     /// Get the endpoint for an object by ID, replacing the placeholder.
-    #[must_use] 
+    #[must_use]
     pub fn endpoint_for_id(&self, template: &str, id: &str) -> String {
         template.replace(&self.id_placeholder, id)
     }

@@ -141,13 +141,13 @@ impl std::fmt::Display for RevokeReason {
 
 impl Session {
     /// Check if the session is active (not revoked and not expired).
-    #[must_use] 
+    #[must_use]
     pub fn is_active(&self) -> bool {
         self.revoked_at.is_none() && self.expires_at > Utc::now()
     }
 
     /// Check if the session has exceeded idle timeout.
-    #[must_use] 
+    #[must_use]
     pub fn is_idle(&self, idle_timeout_minutes: i64) -> bool {
         if idle_timeout_minutes == 0 {
             return false; // Idle timeout disabled

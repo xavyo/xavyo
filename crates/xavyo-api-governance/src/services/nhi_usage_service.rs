@@ -37,7 +37,7 @@ pub struct NhiUsageService {
 
 impl NhiUsageService {
     /// Create a new usage service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -155,7 +155,7 @@ impl NhiUsageService {
         };
 
         let limit = query.limit.unwrap_or(50);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         let events = GovNhiUsageEvent::list(&self.pool, tenant_id, &filter, limit, offset)
             .await
@@ -263,7 +263,9 @@ impl NhiUsageService {
         for nhi in nhis {
             let days_inactive = nhi
                 .last_used_at
-                .map_or((now - nhi.created_at).num_days(), |last| (now - last).num_days());
+                .map_or((now - nhi.created_at).num_days(), |last| {
+                    (now - last).num_days()
+                });
 
             let individual_threshold = nhi.inactivity_threshold_days.unwrap_or(90);
 

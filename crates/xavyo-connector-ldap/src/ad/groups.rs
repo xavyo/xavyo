@@ -61,7 +61,7 @@ pub struct MappedGroup {
 /// - member → `direct_member_dns` (multi-valued DN)
 /// - memberOf → `member_of_dns` (read-only, multi-valued)
 /// - managedBy → `managed_by_dn`
-#[must_use] 
+#[must_use]
 pub fn map_ad_group(entry: &AttributeSet) -> Option<MappedGroup> {
     let external_id = extract_group_guid(entry)?;
 
@@ -129,7 +129,9 @@ pub fn map_ad_group(entry: &AttributeSet) -> Option<MappedGroup> {
         entry.get_string("whenChanged"),
     );
 
-    let usn_changed = entry.get_string("uSNChanged").map(std::string::ToString::to_string);
+    let usn_changed = entry
+        .get_string("uSNChanged")
+        .map(std::string::ToString::to_string);
 
     Some(MappedGroup {
         external_id,
@@ -246,7 +248,7 @@ pub fn resolve_nested_members(
 }
 
 /// Build a `SyncChange` from a `MappedGroup`.
-#[must_use] 
+#[must_use]
 pub fn mapped_group_to_sync_change(group: &MappedGroup, change_type: SyncChangeType) -> SyncChange {
     let mut attrs = AttributeSet::new();
 
@@ -320,7 +322,7 @@ pub fn build_group_sync_result(
 }
 
 /// Compute the highest uSNChanged value from a batch of mapped groups.
-#[must_use] 
+#[must_use]
 pub fn highest_group_usn(groups: &[MappedGroup]) -> Option<String> {
     groups
         .iter()
@@ -331,7 +333,7 @@ pub fn highest_group_usn(groups: &[MappedGroup]) -> Option<String> {
 }
 
 /// Build the LDAP attribute list for AD group sync queries.
-#[must_use] 
+#[must_use]
 pub fn group_sync_attributes() -> Vec<&'static str> {
     vec![
         "objectGUID",
@@ -917,8 +919,12 @@ mod tests {
 
     #[test]
     fn test_membership_diff_additions_only() {
-        let ad: HashSet<String> = ["a", "b", "c"].iter().map(std::string::ToString::to_string).collect();
-        let platform: HashSet<String> = ["a"].iter().map(std::string::ToString::to_string).collect();
+        let ad: HashSet<String> = ["a", "b", "c"]
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
+        let platform: HashSet<String> =
+            ["a"].iter().map(std::string::ToString::to_string).collect();
 
         let diff = compute_membership_diff(&ad, &platform);
         assert_eq!(diff.to_add.len(), 2);
@@ -928,7 +934,10 @@ mod tests {
     #[test]
     fn test_membership_diff_removals_only() {
         let ad: HashSet<String> = ["a"].iter().map(std::string::ToString::to_string).collect();
-        let platform: HashSet<String> = ["a", "b", "c"].iter().map(std::string::ToString::to_string).collect();
+        let platform: HashSet<String> = ["a", "b", "c"]
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
 
         let diff = compute_membership_diff(&ad, &platform);
         assert!(diff.to_add.is_empty());
@@ -937,8 +946,14 @@ mod tests {
 
     #[test]
     fn test_membership_diff_mixed() {
-        let ad: HashSet<String> = ["a", "b", "new"].iter().map(std::string::ToString::to_string).collect();
-        let platform: HashSet<String> = ["a", "b", "old"].iter().map(std::string::ToString::to_string).collect();
+        let ad: HashSet<String> = ["a", "b", "new"]
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
+        let platform: HashSet<String> = ["a", "b", "old"]
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
 
         let diff = compute_membership_diff(&ad, &platform);
         assert_eq!(diff.to_add, vec!["new"]);
@@ -947,8 +962,14 @@ mod tests {
 
     #[test]
     fn test_membership_diff_identical() {
-        let ad: HashSet<String> = ["a", "b"].iter().map(std::string::ToString::to_string).collect();
-        let platform: HashSet<String> = ["a", "b"].iter().map(std::string::ToString::to_string).collect();
+        let ad: HashSet<String> = ["a", "b"]
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
+        let platform: HashSet<String> = ["a", "b"]
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
 
         let diff = compute_membership_diff(&ad, &platform);
         assert!(diff.to_add.is_empty());
@@ -958,7 +979,10 @@ mod tests {
     #[test]
     fn test_membership_diff_empty_ad() {
         let ad: HashSet<String> = HashSet::new();
-        let platform: HashSet<String> = ["a", "b"].iter().map(std::string::ToString::to_string).collect();
+        let platform: HashSet<String> = ["a", "b"]
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
 
         let diff = compute_membership_diff(&ad, &platform);
         assert!(diff.to_add.is_empty());
@@ -967,7 +991,10 @@ mod tests {
 
     #[test]
     fn test_membership_diff_empty_platform() {
-        let ad: HashSet<String> = ["a", "b"].iter().map(std::string::ToString::to_string).collect();
+        let ad: HashSet<String> = ["a", "b"]
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
         let platform: HashSet<String> = HashSet::new();
 
         let diff = compute_membership_diff(&ad, &platform);

@@ -367,13 +367,13 @@ impl ConnectorHealth {
     }
 
     /// Check if the circuit is open (blocking operations).
-    #[must_use] 
+    #[must_use]
     pub fn is_circuit_open(&self) -> bool {
         matches!(self.circuit_state, CircuitState::Open)
     }
 
     /// Check if the circuit allows operations.
-    #[must_use] 
+    #[must_use]
     pub fn allows_operations(&self) -> bool {
         matches!(
             self.circuit_state,
@@ -382,13 +382,13 @@ impl ConnectorHealth {
     }
 
     /// Check if connector is healthy.
-    #[must_use] 
+    #[must_use]
     pub fn is_healthy(&self) -> bool {
         matches!(self.status, HealthStatus::Connected)
     }
 
     /// Get failure rate as percentage.
-    #[must_use] 
+    #[must_use]
     pub fn failure_rate(&self) -> f64 {
         let total = self.operations_completed_24h + self.operations_failed_24h;
         if total == 0 {
@@ -403,13 +403,13 @@ impl ConnectorHealth {
     /// A connector is offline if:
     /// - Status is disconnected, OR
     /// - Consecutive failures >= 3 (offline threshold)
-    #[must_use] 
+    #[must_use]
     pub fn is_offline(&self) -> bool {
         self.status == HealthStatus::Disconnected || self.consecutive_failures >= 3
     }
 
     /// Check if connector is online and accepting operations.
-    #[must_use] 
+    #[must_use]
     pub fn is_online(&self) -> bool {
         !self.is_offline() && self.allows_operations()
     }
@@ -510,7 +510,7 @@ impl ConnectorHealth {
     }
 
     /// Get duration the connector has been offline.
-    #[must_use] 
+    #[must_use]
     pub fn offline_duration(&self) -> Option<chrono::Duration> {
         self.offline_since.map(|since| Utc::now() - since)
     }

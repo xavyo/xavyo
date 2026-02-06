@@ -31,6 +31,7 @@ pub struct ApiKey {
     pub key_prefix: String,
 
     /// SHA-256 hash of the full API key.
+    #[serde(skip_serializing)]
     pub key_hash: String,
 
     /// Allowed API scopes (empty = all scopes).
@@ -179,13 +180,14 @@ impl ApiKey {
     }
 
     /// Update the `last_used_at` timestamp.
-    pub async fn update_last_used(pool: &PgPool, id: Uuid) -> Result<(), DbError> {
+    pub async fn update_last_used(pool: &PgPool, tenant_id: Uuid, id: Uuid) -> Result<(), DbError> {
         sqlx::query(
             r"
-            UPDATE api_keys SET last_used_at = NOW() WHERE id = $1
+            UPDATE api_keys SET last_used_at = NOW() WHERE id = $1 AND tenant_id = $2
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(pool)
         .await
         .map_err(DbError::QueryFailed)?;

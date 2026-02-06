@@ -21,7 +21,7 @@ pub struct DiscoveryService;
 
 impl DiscoveryService {
     /// Create a new discovery service.
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
@@ -41,7 +41,9 @@ impl DiscoveryService {
         let http_client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .build()
-            .map_err(|e| FederationError::InvalidConfiguration(format!("Failed to create HTTP client: {e}")))?;
+            .map_err(|e| {
+                FederationError::InvalidConfiguration(format!("Failed to create HTTP client: {e}"))
+            })?;
 
         // Fetch provider metadata
         let metadata = CoreProviderMetadata::discover_async(issuer, &http_client)
@@ -87,7 +89,7 @@ impl DiscoveryService {
     }
 
     /// Get well-known configuration URL for an issuer.
-    #[must_use] 
+    #[must_use]
     pub fn get_well_known_url(issuer_url: &str) -> String {
         let issuer_url = issuer_url.trim_end_matches('/');
         format!("{issuer_url}/.well-known/openid-configuration")

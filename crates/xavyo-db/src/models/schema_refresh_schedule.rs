@@ -20,7 +20,7 @@ pub enum ScheduleType {
 
 impl ScheduleType {
     /// Get the string representation.
-    #[must_use] 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             ScheduleType::Interval => "interval",
@@ -29,7 +29,7 @@ impl ScheduleType {
     }
 
     /// Parse from string.
-    #[must_use] 
+    #[must_use]
     pub fn parse_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "interval" => Some(ScheduleType::Interval),
@@ -236,19 +236,19 @@ impl SchemaRefreshSchedule {
     }
 
     /// Get schedule type as enum.
-    #[must_use] 
+    #[must_use]
     pub fn get_schedule_type(&self) -> ScheduleType {
         ScheduleType::parse_str(&self.schedule_type).unwrap_or_default()
     }
 
     /// Check if this is an interval schedule.
-    #[must_use] 
+    #[must_use]
     pub fn is_interval(&self) -> bool {
         self.get_schedule_type() == ScheduleType::Interval
     }
 
     /// Check if this is a cron schedule.
-    #[must_use] 
+    #[must_use]
     pub fn is_cron(&self) -> bool {
         self.get_schedule_type() == ScheduleType::Cron
     }

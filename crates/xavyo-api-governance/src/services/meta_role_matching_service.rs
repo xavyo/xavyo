@@ -55,7 +55,7 @@ pub struct MetaRoleMatchingService {
 
 impl MetaRoleMatchingService {
     /// Create a new meta-role matching service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -259,9 +259,9 @@ impl MetaRoleMatchingService {
         match field {
             "risk_level" => serde_json::json!(format!("{:?}", role.risk_level)),
             "application_id" => serde_json::json!(role.application_id.to_string()),
-            "owner_id" => role
-                .owner_id
-                .map_or(serde_json::Value::Null, |id| serde_json::json!(id.to_string())),
+            "owner_id" => role.owner_id.map_or(serde_json::Value::Null, |id| {
+                serde_json::json!(id.to_string())
+            }),
             "status" => serde_json::json!(format!("{:?}", role.status)),
             "name" => serde_json::json!(&role.name),
             "is_delegable" => serde_json::json!(role.is_delegable),
@@ -275,7 +275,7 @@ impl MetaRoleMatchingService {
     // =========================================================================
 
     /// Evaluate if a role matches a set of criteria (used by simulation service).
-    #[must_use] 
+    #[must_use]
     pub fn role_matches_criteria(
         &self,
         role: &GovEntitlement,

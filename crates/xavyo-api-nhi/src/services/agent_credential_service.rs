@@ -58,7 +58,7 @@ pub struct AgentCredentialService {
 
 impl AgentCredentialService {
     /// Create a new agent credential service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,

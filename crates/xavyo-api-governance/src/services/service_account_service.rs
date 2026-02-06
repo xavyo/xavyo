@@ -22,13 +22,13 @@ pub struct ServiceAccountService {
 
 impl ServiceAccountService {
     /// Create a new service account service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -51,7 +51,7 @@ impl ServiceAccountService {
         };
 
         let limit = query.limit.unwrap_or(50).min(100);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         let accounts = GovServiceAccount::list(&self.pool, tenant_id, &filter, limit, offset)
             .await

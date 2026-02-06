@@ -6,6 +6,7 @@
 use axum::{extract::Path, http::StatusCode, Extension, Json};
 use std::sync::Arc;
 use uuid::Uuid;
+use validator::Validate;
 use xavyo_core::{TenantId, UserId};
 
 use crate::{
@@ -72,6 +73,10 @@ pub async fn trust_device(
     Path(device_id): Path<Uuid>,
     body: Option<Json<TrustDeviceRequest>>,
 ) -> Result<(StatusCode, Json<TrustDeviceResponse>), ApiAuthError> {
+    if let Some(ref b) = body {
+        b.validate()
+            .map_err(|e| ApiAuthError::Validation(e.to_string()))?;
+    }
     // Check if trust is allowed by tenant policy
     let allow_mfa_bypass = device_policy_service
         .is_mfa_bypass_allowed(*tenant_id.as_uuid())

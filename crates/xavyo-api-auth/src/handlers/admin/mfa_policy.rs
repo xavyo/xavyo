@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use tracing::info;
 use xavyo_auth::JwtClaims;
+use xavyo_core::TenantId;
 use xavyo_db::{MfaPolicy, TenantMfaPolicy};
 
 use crate::error::ApiAuthError;
@@ -29,10 +30,17 @@ pub struct UpdateMfaPolicyRequest {
 /// Get the MFA policy for a tenant.
 pub async fn get_mfa_policy(
     Extension(pool): Extension<PgPool>,
-    Path(tenant_id): Path<uuid::Uuid>,
+    Extension(tenant_id): Extension<TenantId>,
+    Path(path_tenant_id): Path<uuid::Uuid>,
 ) -> Result<(StatusCode, Json<MfaPolicyResponse>), ApiAuthError> {
+    if *tenant_id.as_uuid() != path_tenant_id {
+        return Err(ApiAuthError::PermissionDenied(
+            "Cannot access other tenant's policy".to_string(),
+        ));
+    }
+
     // Get MFA policy
-    let policy = TenantMfaPolicy::get(&pool, tenant_id)
+    let policy = TenantMfaPolicy::get(&pool, path_tenant_id)
         .await
         .map_err(ApiAuthError::Database)?;
 
@@ -51,16 +59,28 @@ pub async fn get_mfa_policy(
 pub async fn update_mfa_policy(
     Extension(pool): Extension<PgPool>,
     Extension(claims): Extension<JwtClaims>,
-    Path(tenant_id): Path<uuid::Uuid>,
+    Extension(tenant_id): Extension<TenantId>,
+    Path(path_tenant_id): Path<uuid::Uuid>,
     Json(request): Json<UpdateMfaPolicyRequest>,
 ) -> Result<(StatusCode, Json<MfaPolicyResponse>), ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
+    if *tenant_id.as_uuid() != path_tenant_id {
+        return Err(ApiAuthError::PermissionDenied(
+            "Cannot access other tenant's policy".to_string(),
+        ));
+    }
+
     // Update MFA policy
-    let policy = TenantMfaPolicy::update(&pool, tenant_id, request.mfa_policy)
+    let policy = TenantMfaPolicy::update(&pool, path_tenant_id, request.mfa_policy)
         .await
         .map_err(ApiAuthError::Database)?;
 
     info!(
-        tenant_id = %tenant_id,
+        tenant_id = %path_tenant_id,
         mfa_policy = %policy.mfa_policy,
         updated_by = %claims.sub,
         "MFA policy updated"

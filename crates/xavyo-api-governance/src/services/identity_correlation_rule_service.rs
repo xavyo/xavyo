@@ -23,7 +23,7 @@ pub struct IdentityCorrelationRuleService {
 
 impl IdentityCorrelationRuleService {
     /// Create a new identity correlation rule service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -168,9 +168,7 @@ impl IdentityCorrelationRuleService {
             source_field: rule.attribute.clone(),
             target_field: rule.attribute.clone(),
             weight: rule.weight.to_f64().unwrap_or(1.0),
-            threshold: rule
-                .threshold
-                .map_or(0.7, |t| t.to_f64().unwrap_or(0.7)),
+            threshold: rule.threshold.map_or(0.7, |t| t.to_f64().unwrap_or(0.7)),
             fuzzy,
         }
     }

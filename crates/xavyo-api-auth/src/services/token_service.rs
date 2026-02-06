@@ -52,7 +52,7 @@ pub struct TokenService {
 
 impl TokenService {
     /// Create a new token service.
-    #[must_use] 
+    #[must_use]
     pub fn new(config: TokenConfig, pool: PgPool) -> Self {
         Self {
             config,
@@ -63,7 +63,7 @@ impl TokenService {
     }
 
     /// Create a token service with custom validity periods.
-    #[must_use] 
+    #[must_use]
     pub fn with_validity(
         config: TokenConfig,
         pool: PgPool,
@@ -354,7 +354,7 @@ impl TokenService {
 }
 
 /// Hash a token using SHA-256.
-#[must_use] 
+#[must_use]
 pub fn hash_token(token: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(token.as_bytes());
@@ -368,7 +368,7 @@ pub fn hash_token(token: &str) -> String {
 ///
 /// SECURITY: Uses `OsRng` directly from the operating system's CSPRNG for maximum security.
 /// This is preferred over `thread_rng()` for security-critical operations like token generation.
-#[must_use] 
+#[must_use]
 pub fn generate_secure_token() -> String {
     use rand::rngs::OsRng;
     let mut bytes = [0u8; SECURE_TOKEN_BYTES];
@@ -389,7 +389,7 @@ pub fn generate_secure_token() -> String {
 /// # Returns
 ///
 /// `true` if the token matches the hash, `false` otherwise.
-#[must_use] 
+#[must_use]
 pub fn verify_token_hash_constant_time(provided_token: &str, stored_hash: &str) -> bool {
     let provided_hash = hash_token(provided_token);
     provided_hash
@@ -403,7 +403,7 @@ pub fn verify_token_hash_constant_time(provided_token: &str, stored_hash: &str) 
 /// Returns a tuple of (`raw_token`, `token_hash`).
 /// The raw token should be sent to the user via email.
 /// The token hash should be stored in the database.
-#[must_use] 
+#[must_use]
 pub fn generate_password_reset_token() -> (String, String) {
     let token = generate_secure_token();
     let hash = hash_token(&token);
@@ -415,7 +415,7 @@ pub fn generate_password_reset_token() -> (String, String) {
 /// Returns a tuple of (`raw_token`, `token_hash`).
 /// The raw token should be sent to the user via email.
 /// The token hash should be stored in the database.
-#[must_use] 
+#[must_use]
 pub fn generate_email_verification_token() -> (String, String) {
     let token = generate_secure_token();
     let hash = hash_token(&token);

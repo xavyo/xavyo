@@ -51,7 +51,7 @@ pub struct TokenResponse {
 
 impl TokenResponse {
     /// Create a new token response.
-    #[must_use] 
+    #[must_use]
     pub fn new(access_token: String, expires_in: i64) -> Self {
         Self {
             access_token,
@@ -64,21 +64,21 @@ impl TokenResponse {
     }
 
     /// Add refresh token.
-    #[must_use] 
+    #[must_use]
     pub fn with_refresh_token(mut self, refresh_token: String) -> Self {
         self.refresh_token = Some(refresh_token);
         self
     }
 
     /// Add ID token.
-    #[must_use] 
+    #[must_use]
     pub fn with_id_token(mut self, id_token: String) -> Self {
         self.id_token = Some(id_token);
         self
     }
 
     /// Add scope.
-    #[must_use] 
+    #[must_use]
     pub fn with_scope(mut self, scope: String) -> Self {
         self.scope = Some(scope);
         self

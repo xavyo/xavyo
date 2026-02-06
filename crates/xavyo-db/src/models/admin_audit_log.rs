@@ -177,13 +177,13 @@ pub struct AuditLogFilter {
 
 impl AdminAuditLog {
     /// Get the action as enum.
-    #[must_use] 
+    #[must_use]
     pub fn action_enum(&self) -> Option<AdminAction> {
         self.action.parse().ok()
     }
 
     /// Get the resource type as enum.
-    #[must_use] 
+    #[must_use]
     pub fn resource_type_enum(&self) -> Option<AdminResourceType> {
         self.resource_type.parse().ok()
     }

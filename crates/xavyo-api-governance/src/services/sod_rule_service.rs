@@ -15,7 +15,7 @@ pub struct SodRuleService {
 
 impl SodRuleService {
     /// Create a new `SoD` rule service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -222,7 +222,7 @@ impl SodRuleService {
     }
 
     /// Get the database pool reference for use in transactions.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

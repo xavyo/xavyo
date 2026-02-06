@@ -165,6 +165,7 @@ impl SocialConnection {
     /// Update a social connection.
     pub async fn update(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         input: UpdateSocialConnection,
     ) -> Result<Self, sqlx::Error> {
@@ -172,18 +173,19 @@ impl SocialConnection {
             r"
             UPDATE social_connections
             SET
-                email = COALESCE($2, email),
-                display_name = COALESCE($3, display_name),
-                access_token_encrypted = COALESCE($4, access_token_encrypted),
-                refresh_token_encrypted = COALESCE($5, refresh_token_encrypted),
-                token_expires_at = COALESCE($6, token_expires_at),
-                raw_claims = COALESCE($7, raw_claims),
+                email = COALESCE($3, email),
+                display_name = COALESCE($4, display_name),
+                access_token_encrypted = COALESCE($5, access_token_encrypted),
+                refresh_token_encrypted = COALESCE($6, refresh_token_encrypted),
+                token_expires_at = COALESCE($7, token_expires_at),
+                raw_claims = COALESCE($8, raw_claims),
                 updated_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             RETURNING *
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(&input.email)
         .bind(&input.display_name)
         .bind(&input.access_token_encrypted)
@@ -195,9 +197,14 @@ impl SocialConnection {
     }
 
     /// Delete a social connection.
-    pub async fn delete(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM social_connections WHERE id = $1")
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM social_connections WHERE id = $1 AND tenant_id = $2")
             .bind(id)
+            .bind(tenant_id)
             .execute(pool)
             .await?;
 

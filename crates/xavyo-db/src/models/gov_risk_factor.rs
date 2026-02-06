@@ -21,13 +21,13 @@ pub enum RiskFactorCategory {
 
 impl RiskFactorCategory {
     /// Check if this is a static factor.
-    #[must_use] 
+    #[must_use]
     pub fn is_static(&self) -> bool {
         matches!(self, Self::Static)
     }
 
     /// Check if this is a dynamic factor.
-    #[must_use] 
+    #[must_use]
     pub fn is_dynamic(&self) -> bool {
         matches!(self, Self::Dynamic)
     }
@@ -97,6 +97,9 @@ pub struct RiskFactorFilter {
     pub factor_type: Option<String>,
 }
 
+/// Column list for risk factor queries, casting DECIMAL weight to float8 for sqlx compatibility.
+const RF_COLS: &str = "id, tenant_id, name, category, factor_type, weight::float8 as weight, description, is_enabled, created_at, updated_at";
+
 impl GovRiskFactor {
     /// Find a factor by ID within a tenant.
     pub async fn find_by_id(
@@ -104,16 +107,13 @@ impl GovRiskFactor {
         tenant_id: Uuid,
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as(
-            r"
-            SELECT * FROM gov_risk_factors
-            WHERE id = $1 AND tenant_id = $2
-            ",
-        )
-        .bind(id)
-        .bind(tenant_id)
-        .fetch_optional(pool)
-        .await
+        let sql =
+            format!("SELECT {RF_COLS} FROM gov_risk_factors WHERE id = $1 AND tenant_id = $2");
+        sqlx::query_as(&sql)
+            .bind(id)
+            .bind(tenant_id)
+            .fetch_optional(pool)
+            .await
     }
 
     /// Find a factor by name within a tenant.
@@ -122,16 +122,13 @@ impl GovRiskFactor {
         tenant_id: Uuid,
         name: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as(
-            r"
-            SELECT * FROM gov_risk_factors
-            WHERE tenant_id = $1 AND name = $2
-            ",
-        )
-        .bind(tenant_id)
-        .bind(name)
-        .fetch_optional(pool)
-        .await
+        let sql =
+            format!("SELECT {RF_COLS} FROM gov_risk_factors WHERE tenant_id = $1 AND name = $2");
+        sqlx::query_as(&sql)
+            .bind(tenant_id)
+            .bind(name)
+            .fetch_optional(pool)
+            .await
     }
 
     /// Find a factor by type within a tenant.
@@ -140,16 +137,14 @@ impl GovRiskFactor {
         tenant_id: Uuid,
         factor_type: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as(
-            r"
-            SELECT * FROM gov_risk_factors
-            WHERE tenant_id = $1 AND factor_type = $2
-            ",
-        )
-        .bind(tenant_id)
-        .bind(factor_type)
-        .fetch_optional(pool)
-        .await
+        let sql = format!(
+            "SELECT {RF_COLS} FROM gov_risk_factors WHERE tenant_id = $1 AND factor_type = $2"
+        );
+        sqlx::query_as(&sql)
+            .bind(tenant_id)
+            .bind(factor_type)
+            .fetch_optional(pool)
+            .await
     }
 
     /// List enabled factors for a tenant.
@@ -157,16 +152,8 @@ impl GovRiskFactor {
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
-        sqlx::query_as(
-            r"
-            SELECT * FROM gov_risk_factors
-            WHERE tenant_id = $1 AND is_enabled = true
-            ORDER BY category, name ASC
-            ",
-        )
-        .bind(tenant_id)
-        .fetch_all(pool)
-        .await
+        let sql = format!("SELECT {RF_COLS} FROM gov_risk_factors WHERE tenant_id = $1 AND is_enabled = true ORDER BY category, name ASC");
+        sqlx::query_as(&sql).bind(tenant_id).fetch_all(pool).await
     }
 
     /// List enabled factors by category for a tenant.
@@ -175,17 +162,12 @@ impl GovRiskFactor {
         tenant_id: Uuid,
         category: RiskFactorCategory,
     ) -> Result<Vec<Self>, sqlx::Error> {
-        sqlx::query_as(
-            r"
-            SELECT * FROM gov_risk_factors
-            WHERE tenant_id = $1 AND category = $2 AND is_enabled = true
-            ORDER BY name ASC
-            ",
-        )
-        .bind(tenant_id)
-        .bind(category)
-        .fetch_all(pool)
-        .await
+        let sql = format!("SELECT {RF_COLS} FROM gov_risk_factors WHERE tenant_id = $1 AND category = $2 AND is_enabled = true ORDER BY name ASC");
+        sqlx::query_as(&sql)
+            .bind(tenant_id)
+            .bind(category)
+            .fetch_all(pool)
+            .await
     }
 
     /// List factors for a tenant with filtering and pagination.
@@ -196,12 +178,7 @@ impl GovRiskFactor {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<Self>, sqlx::Error> {
-        let mut query = String::from(
-            r"
-            SELECT * FROM gov_risk_factors
-            WHERE tenant_id = $1
-            ",
-        );
+        let mut query = format!("SELECT {RF_COLS} FROM gov_risk_factors WHERE tenant_id = $1");
         let mut param_count = 1;
 
         if filter.category.is_some() {
@@ -286,24 +263,20 @@ impl GovRiskFactor {
         tenant_id: Uuid,
         input: CreateGovRiskFactor,
     ) -> Result<Self, sqlx::Error> {
-        sqlx::query_as(
-            r"
-            INSERT INTO gov_risk_factors (
-                tenant_id, name, category, factor_type, weight, description, is_enabled
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING *
-            ",
-        )
-        .bind(tenant_id)
-        .bind(&input.name)
-        .bind(input.category)
-        .bind(&input.factor_type)
-        .bind(input.weight)
-        .bind(&input.description)
-        .bind(input.is_enabled.unwrap_or(true))
-        .fetch_one(pool)
-        .await
+        let sql = format!(
+            "INSERT INTO gov_risk_factors (tenant_id, name, category, factor_type, weight, description, is_enabled) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING {RF_COLS}"
+        );
+        sqlx::query_as(&sql)
+            .bind(tenant_id)
+            .bind(&input.name)
+            .bind(input.category)
+            .bind(&input.factor_type)
+            .bind(input.weight)
+            .bind(&input.description)
+            .bind(input.is_enabled.unwrap_or(true))
+            .fetch_one(pool)
+            .await
     }
 
     /// Update a risk factor.
@@ -342,7 +315,7 @@ impl GovRiskFactor {
         }
 
         let query = format!(
-            "UPDATE gov_risk_factors SET {} WHERE id = $1 AND tenant_id = $2 RETURNING *",
+            "UPDATE gov_risk_factors SET {} WHERE id = $1 AND tenant_id = $2 RETURNING {RF_COLS}",
             updates.join(", ")
         );
 
@@ -398,18 +371,15 @@ impl GovRiskFactor {
         tenant_id: Uuid,
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as(
-            r"
-            UPDATE gov_risk_factors
-            SET is_enabled = true, updated_at = NOW()
-            WHERE id = $1 AND tenant_id = $2 AND is_enabled = false
-            RETURNING *
-            ",
-        )
-        .bind(id)
-        .bind(tenant_id)
-        .fetch_optional(pool)
-        .await
+        let sql = format!(
+            "UPDATE gov_risk_factors SET is_enabled = true, updated_at = NOW() \
+             WHERE id = $1 AND tenant_id = $2 AND is_enabled = false RETURNING {RF_COLS}"
+        );
+        sqlx::query_as(&sql)
+            .bind(id)
+            .bind(tenant_id)
+            .fetch_optional(pool)
+            .await
     }
 
     /// Disable a risk factor.
@@ -418,18 +388,15 @@ impl GovRiskFactor {
         tenant_id: Uuid,
         id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as(
-            r"
-            UPDATE gov_risk_factors
-            SET is_enabled = false, updated_at = NOW()
-            WHERE id = $1 AND tenant_id = $2 AND is_enabled = true
-            RETURNING *
-            ",
-        )
-        .bind(id)
-        .bind(tenant_id)
-        .fetch_optional(pool)
-        .await
+        let sql = format!(
+            "UPDATE gov_risk_factors SET is_enabled = false, updated_at = NOW() \
+             WHERE id = $1 AND tenant_id = $2 AND is_enabled = true RETURNING {RF_COLS}"
+        );
+        sqlx::query_as(&sql)
+            .bind(id)
+            .bind(tenant_id)
+            .fetch_optional(pool)
+            .await
     }
 }
 

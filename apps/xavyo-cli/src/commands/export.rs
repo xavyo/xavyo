@@ -53,7 +53,7 @@ async fn fetch_all_resources(
     Vec<crate::models::tool::ToolResponse>,
 )> {
     // Fetch all agents (using large limit to get all)
-    let agents_response = client.list_agents(1000, 0).await?;
+    let agents_response = client.list_agents(1000, 0, None, None).await?;
     let agents = agents_response.agents;
 
     // Fetch all tools

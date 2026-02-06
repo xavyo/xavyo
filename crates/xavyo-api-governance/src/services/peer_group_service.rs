@@ -30,7 +30,7 @@ pub struct PeerGroupService {
 
 impl PeerGroupService {
     /// Create a new peer group service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -79,7 +79,7 @@ impl PeerGroupService {
         };
 
         let limit = query.limit.unwrap_or(50).min(100);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         let groups =
             GovPeerGroup::list_by_tenant(&self.pool, tenant_id, &filter, limit, offset).await?;
@@ -295,7 +295,7 @@ impl PeerGroupService {
     }
 
     /// Get the minimum peer group size required for statistical validity.
-    #[must_use] 
+    #[must_use]
     pub fn min_peer_group_size() -> i32 {
         MIN_PEER_GROUP_SIZE
     }

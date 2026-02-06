@@ -27,25 +27,25 @@ pub enum LifecycleActionType {
 
 impl LifecycleActionType {
     /// Check if this action type creates an assignment.
-    #[must_use] 
+    #[must_use]
     pub fn creates_assignment(&self) -> bool {
         matches!(self, Self::Provision)
     }
 
     /// Check if this action type removes an assignment.
-    #[must_use] 
+    #[must_use]
     pub fn removes_assignment(&self) -> bool {
         matches!(self, Self::Revoke)
     }
 
     /// Check if this action type is a scheduled action.
-    #[must_use] 
+    #[must_use]
     pub fn is_scheduled(&self) -> bool {
         matches!(self, Self::ScheduleRevoke)
     }
 
     /// Check if this action type can be cancelled.
-    #[must_use] 
+    #[must_use]
     pub fn can_cancel(&self) -> bool {
         matches!(self, Self::ScheduleRevoke)
     }
@@ -364,19 +364,19 @@ impl GovLifecycleAction {
     }
 
     /// Check if action is pending (scheduled but not executed/cancelled).
-    #[must_use] 
+    #[must_use]
     pub fn is_pending(&self) -> bool {
         self.scheduled_at.is_some() && self.executed_at.is_none() && self.cancelled_at.is_none()
     }
 
     /// Check if action is executed.
-    #[must_use] 
+    #[must_use]
     pub fn is_executed(&self) -> bool {
         self.executed_at.is_some()
     }
 
     /// Check if action is cancelled.
-    #[must_use] 
+    #[must_use]
     pub fn is_cancelled(&self) -> bool {
         self.cancelled_at.is_some()
     }

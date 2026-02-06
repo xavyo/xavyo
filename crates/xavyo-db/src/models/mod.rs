@@ -5,6 +5,12 @@
 
 pub mod admin_audit_log;
 
+// Self-Service Request Catalog models (F-062)
+pub mod catalog_category;
+pub mod catalog_item;
+pub mod request_cart;
+pub mod request_cart_item;
+
 // Core tenant model (F095)
 pub mod admin_permission;
 pub mod admin_role_template;
@@ -214,8 +220,8 @@ pub use gov_application::{
     CreateGovApplication, GovAppStatus, GovAppType, GovApplication, UpdateGovApplication,
 };
 pub use gov_entitlement::{
-    CreateGovEntitlement, EntitlementFilter, GovEntitlement, GovEntitlementStatus, GovRiskLevel,
-    UpdateGovEntitlement,
+    CreateGovEntitlement, DataProtectionClassification, EntitlementFilter, GdprLegalBasis,
+    GovEntitlement, GovEntitlementStatus, GovRiskLevel, UpdateGovEntitlement,
 };
 pub use gov_entitlement_assignment::{
     BulkAssignmentFailure, BulkAssignmentRequest, BulkAssignmentResult, CreateGovAssignment,
@@ -464,6 +470,7 @@ pub use reconciliation_schedule::{
 
 // Object Lifecycle States models (F052)
 pub mod gov_bulk_state_operation;
+pub mod gov_lifecycle_action_execution;
 pub mod gov_lifecycle_config;
 pub mod gov_lifecycle_failed_operation;
 pub mod gov_lifecycle_state;
@@ -495,6 +502,10 @@ pub use gov_bulk_state_operation::{
     BulkOperationFilter, BulkOperationProgress, BulkOperationResult, BulkOperationStatus,
     CreateGovBulkStateOperation, GovBulkStateOperation, UpdateGovBulkStateOperation,
     MAX_BULK_OPERATION_SIZE,
+};
+pub use gov_lifecycle_action_execution::{
+    ActionExecutionFilter, ActionExecutionStatus, ActionTriggerType,
+    CreateGovLifecycleActionExecution, GovLifecycleActionExecution,
 };
 pub use gov_lifecycle_config::{
     CreateGovLifecycleConfig, GovLifecycleConfig, LifecycleConfigFilter, LifecycleObjectType,
@@ -1010,6 +1021,10 @@ pub mod gov_role;
 pub mod gov_role_effective_entitlement;
 pub mod gov_role_inheritance_block;
 
+// Role Inducements (Construction Pattern) models (F-063)
+pub mod role_construction;
+pub mod role_inducement;
+
 // Business Role Hierarchy exports (F088)
 pub use gov_role::{
     CreateGovRole, GovRole, GovRoleDescendant, GovRoleFilter, GovRoleImpactAnalysis,
@@ -1020,6 +1035,19 @@ pub use gov_role_effective_entitlement::{
 };
 pub use gov_role_inheritance_block::{
     CreateGovRoleInheritanceBlock, GovRoleInheritanceBlock, InheritanceBlockDetails,
+};
+
+// Role Inducements (Construction Pattern) exports (F-063)
+pub use role_construction::{
+    AttributeMappingType, ConstructionAttributeMapping, ConstructionAttributeMappings,
+    ConstructionCondition, ConstructionConditionOperator, ConstructionSourceRole,
+    CreateRoleConstruction, DeprovisioningPolicy, EffectiveConstruction, RoleConstruction,
+    RoleConstructionFilter, RoleConstructionWithDetails, UpdateRoleConstruction,
+    UserEffectiveConstruction,
+};
+pub use role_inducement::{
+    CreateRoleInducement, InducedRoleInfo, RoleInducement, RoleInducementFilter,
+    RoleInducementWithNames,
 };
 
 // AI Agent Security models (F089)
@@ -1101,6 +1129,15 @@ pub mod tenant_mfa_config;
 // Tenant Provisioning API exports (F097)
 pub use api_key::{ApiKey, CreateApiKey};
 pub use tenant_mfa_config::{TenantMfaConfig, UpsertMfaConfig};
+
+// API Key Usage Statistics models (F-054)
+pub mod api_key_usage;
+
+// API Key Usage Statistics exports (F-054)
+pub use api_key_usage::{
+    ApiKeyUsage, ApiKeyUsageDaily, ApiKeyUsageHourly, CreateApiKeyUsage, IncrementUsage,
+    ResponseCategory, UsageFilter,
+};
 
 // Unified NHI View models (F108)
 pub mod nhi_view;
@@ -1184,6 +1221,10 @@ pub use identity_provider_config::{
     IdentityProviderConfigFilter, IdpHealthStatus, UpdateIdentityProviderConfig,
 };
 
+// Identity Archetype models (F058)
+pub mod archetype_policy_binding;
+pub mod identity_archetype;
+
 // Agent PKI & Certificate Issuance models (F127)
 pub mod agent_certificate;
 pub mod certificate_authority;
@@ -1201,4 +1242,56 @@ pub use certificate_authority::{
 pub use certificate_revocation::{
     CertificateRevocation, CertificateRevocationFilter, RevocationReasonCode,
     RevokeCertificateRequest,
+};
+
+// Identity Archetype exports (F058)
+pub use archetype_policy_binding::{
+    ArchetypePolicyBinding, CreatePolicyBinding, EffectivePolicy, PolicyType,
+};
+pub use identity_archetype::{
+    AncestryNode, ArchetypeWithAncestry, CreateIdentityArchetype, IdentityArchetype,
+    UpdateIdentityArchetype,
+};
+
+// Power of Attorney models (F061)
+pub mod poa_assumed_session;
+pub mod poa_audit_event;
+pub mod power_of_attorney;
+
+// Power of Attorney exports (F061)
+pub use poa_assumed_session::{AssumedSessionFilter, CreatePoaAssumedSession, PoaAssumedSession};
+pub use poa_audit_event::{CreatePoaAuditEvent, PoaAuditEvent, PoaAuditEventFilter, PoaEventType};
+pub use power_of_attorney::{
+    CreatePowerOfAttorney, PoaFilter, PoaStatus, PowerOfAttorney, POA_MAX_DURATION_DAYS,
+};
+
+// Self-Service Request Catalog exports (F-062)
+pub use catalog_category::{
+    CatalogCategory, CatalogCategoryFilter, CreateCatalogCategory, UpdateCatalogCategory,
+};
+pub use catalog_item::{
+    CatalogItem, CatalogItemFilter, CatalogItemType, CreateCatalogItem, FormField,
+    RequestabilityRules, UpdateCatalogItem,
+};
+pub use request_cart::{CreateRequestCart, RequestCart};
+pub use request_cart_item::{AddCartItem, CartItemWithDetails, RequestCartItem, UpdateCartItem};
+
+// Bulk Action Engine models (F-064)
+pub mod gov_bulk_action;
+
+// Bulk Action Engine exports (F-064)
+pub use gov_bulk_action::{
+    BulkActionFilter as GovBulkActionFilter, BulkActionProgress as GovBulkActionProgress,
+    BulkActionResultItem as GovBulkActionResultItem, BulkActionStatus as GovBulkActionStatus,
+    BulkActionType as GovBulkActionType, CreateGovBulkAction, GovBulkAction, UpdateGovBulkAction,
+    MAX_BULK_ACTION_SIZE, MIN_JUSTIFICATION_LENGTH,
+};
+
+// Organization Security Policies models (F-066)
+pub mod org_security_policy;
+
+// Organization Security Policies exports (F-066)
+pub use org_security_policy::{
+    CreateOrgSecurityPolicy, EffectiveOrgPolicy, EffectivePolicyRow, OrgPolicyType,
+    OrgSecurityPolicy, OrgSecurityPolicyFilter, PolicySource, UpdateOrgSecurityPolicy,
 };

@@ -42,7 +42,7 @@ pub struct NhiService {
 
 impl NhiService {
     /// Create a new NHI service.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
@@ -52,7 +52,7 @@ impl NhiService {
     }
 
     /// Get the database pool reference.
-    #[must_use] 
+    #[must_use]
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -85,7 +85,7 @@ impl NhiService {
         };
 
         let limit = query.limit.unwrap_or(50).min(100);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         let accounts = GovServiceAccount::list(&self.pool, tenant_id, &filter, limit, offset)
             .await

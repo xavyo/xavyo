@@ -25,13 +25,13 @@ pub struct SchemaCleanupJob {
 
 impl SchemaCleanupJob {
     /// Create a new schema cleanup job with default retention.
-    #[must_use] 
+    #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self::with_retention(pool, DEFAULT_SCHEMA_RETENTION_COUNT)
     }
 
     /// Create a new schema cleanup job with custom retention count.
-    #[must_use] 
+    #[must_use]
     pub fn with_retention(pool: PgPool, retention_count: i32) -> Self {
         let retention_count = retention_count.max(1); // At least keep 1 version
         Self {
@@ -110,7 +110,7 @@ impl SchemaCleanupJob {
     }
 
     /// Get the configured retention count.
-    #[must_use] 
+    #[must_use]
     pub fn retention_count(&self) -> i32 {
         self.retention_count
     }
