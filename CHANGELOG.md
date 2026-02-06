@@ -5,6 +5,29 @@ All notable changes to xavyo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-02-06
+
+### Added
+
+- **`xavyo verify` command** — new top-level command with two subcommands:
+  - `xavyo verify status` — check email verification status via `GET /me/profile`
+  - `xavyo verify resend [--email <address>]` — resend verification email (infers email from session if omitted)
+- **`--json` flag** on verify commands for machine-readable output
+- **Profile API client** (`api/profile.rs`) — `get_profile()` for authenticated profile retrieval
+- **Resend verification API client** (`api/auth.rs`) — `resend_verification()` with tenant header support
+
+### Changed
+
+- **Setup wizard** now includes email verification as Step 2 (between authentication and tenant creation)
+  - Interactive mode prompts to continue or wait when email is unverified
+  - Check mode (`xavyo setup --check`) reports email verification status
+  - "You're all set!" message now requires auth + email verified + tenant (consistent with check mode)
+- **Post-signup messaging** now shows `xavyo verify status` and `xavyo verify resend` commands
+
+### Fixed
+
+- Removed unused `Config::load()` call in setup wizard
+
 ## [0.1.0] - 2026-02-06
 
 Initial public release of xavyo — the Identity Platform for the AI Agent Era.
@@ -125,4 +148,5 @@ Initial public release of xavyo — the Identity Platform for the AI Agent Era.
 - 2 alpha connectors (REST, Database) — skeleton implementations
 - No web UI (API-only by design, per project constitution)
 
+[0.1.1]: https://github.com/xavyo/xavyo-idp/releases/tag/v0.1.1
 [0.1.0]: https://github.com/xavyo/xavyo-idp/releases/tag/v0.1.0
