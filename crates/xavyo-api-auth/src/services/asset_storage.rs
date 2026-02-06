@@ -253,13 +253,16 @@ impl AssetStorage for InMemoryAssetStorage {
         let storage_path = format!("{}/{}.{}", tenant_id, asset_id, extension);
         self.assets
             .write()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .insert(storage_path.clone(), data.to_vec());
         Ok(storage_path)
     }
 
     async fn delete(&self, storage_path: &str) -> Result<(), ApiAuthError> {
-        self.assets.write().unwrap().remove(storage_path);
+        self.assets
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(storage_path);
         Ok(())
     }
 
@@ -268,7 +271,10 @@ impl AssetStorage for InMemoryAssetStorage {
     }
 
     async fn exists(&self, storage_path: &str) -> bool {
-        self.assets.read().unwrap().contains_key(storage_path)
+        self.assets
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains_key(storage_path)
     }
 }
 

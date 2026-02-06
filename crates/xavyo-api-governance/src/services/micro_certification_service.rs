@@ -1332,8 +1332,18 @@ impl MicroCertificationService {
 
         // Revoke the assignment if it exists
         let revoked_assignment_id = if let Some(assignment_id) = cert.assignment_id {
-            let _ = GovEntitlementAssignment::revoke(&self.pool, tenant_id, assignment_id).await;
-            Some(assignment_id)
+            match GovEntitlementAssignment::revoke(&self.pool, tenant_id, assignment_id).await {
+                Ok(_) => Some(assignment_id),
+                Err(e) => {
+                    tracing::error!(
+                        tenant_id = %tenant_id,
+                        assignment_id = %assignment_id,
+                        error = %e,
+                        "Failed to revoke entitlement assignment during auto-revoke"
+                    );
+                    return Err(GovernanceError::Database(e));
+                }
+            }
         } else {
             None
         };

@@ -298,11 +298,12 @@ pub async fn request_cloud_credentials(
 
     // Add rate limit headers
     let mut headers = HeaderMap::new();
-    headers.insert("X-RateLimit-Remaining", "99".parse().unwrap()); // Placeholder
-    headers.insert(
-        "X-RateLimit-Reset",
-        chrono::Utc::now().timestamp().to_string().parse().unwrap(),
-    );
+    if let Ok(val) = "99".parse() {
+        headers.insert("X-RateLimit-Remaining", val);
+    }
+    if let Ok(val) = chrono::Utc::now().timestamp().to_string().parse() {
+        headers.insert("X-RateLimit-Reset", val);
+    }
 
     Ok((StatusCode::OK, headers, Json(dto)))
 }

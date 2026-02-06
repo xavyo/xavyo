@@ -18,6 +18,8 @@ use crate::services::{
 /// the `TenantLayer` middleware via `Extension<xavyo_core::TenantId>`.
 #[derive(Clone)]
 pub struct FederationState {
+    /// Database connection pool (for role lookups, etc.).
+    pub pool: PgPool,
     /// `IdP` configuration service.
     pub idp_config: IdpConfigService,
     /// Validation service.
@@ -60,6 +62,7 @@ impl FederationState {
         let token_issuer = TokenIssuerService::new_default();
 
         Self {
+            pool: config.pool.clone(),
             idp_config,
             validation,
             hrd,

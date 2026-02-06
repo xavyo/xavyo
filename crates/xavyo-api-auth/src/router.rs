@@ -328,9 +328,15 @@ impl AuthState {
         // Create device services (F026)
         let device_service = Arc::new(DeviceService::new(pool.clone()));
         let device_policy_service = Arc::new(DevicePolicyService::new(pool.clone()));
+        // Frontend base URL for email links (used by email change and admin invite)
+        let frontend_base_url = std::env::var("FRONTEND_BASE_URL")
+            .unwrap_or_else(|_| "https://app.xavyo.net".to_string());
         // Create profile services (F027)
         let profile_service = Arc::new(ProfileService::new(pool.clone()));
-        let email_change_service = Arc::new(EmailChangeService::new(pool.clone()));
+        let email_change_service = Arc::new(EmailChangeService::new(
+            pool.clone(),
+            frontend_base_url.clone(),
+        ));
         // Create IP restriction service (F028)
         let ip_restriction_service = Arc::new(IpRestrictionService::new(pool.clone()));
         // Create delegated admin service (F029)
@@ -361,8 +367,6 @@ impl AuthState {
         ));
 
         // Create admin invite service (F-ADMIN-INVITE)
-        let frontend_base_url = std::env::var("FRONTEND_BASE_URL")
-            .unwrap_or_else(|_| "https://app.xavyo.net".to_string());
         let admin_invite_service = Arc::new(AdminInviteService::new(
             pool.clone(),
             email_sender.clone(),

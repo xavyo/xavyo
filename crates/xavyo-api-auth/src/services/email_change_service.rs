@@ -23,13 +23,17 @@ const TOKEN_BYTES: usize = 32;
 #[derive(Clone)]
 pub struct EmailChangeService {
     pool: PgPool,
+    frontend_base_url: String,
 }
 
 impl EmailChangeService {
     /// Create a new email change service.
     #[must_use]
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    pub fn new(pool: PgPool, frontend_base_url: String) -> Self {
+        Self {
+            pool,
+            frontend_base_url,
+        }
     }
 
     /// Generate a secure random token.
@@ -141,19 +145,19 @@ impl EmailChangeService {
         .map_err(ApiAuthError::Database)?;
 
         // Send verification email to the new address
+        let verify_url = format!(
+            "{}/me/email/verify",
+            self.frontend_base_url.trim_end_matches('/'),
+        );
         let email_body = format!(
             "Hello,\n\n\
-            You have requested to change your email address to {}.\n\n\
+            You have requested to change your email address to {new_email}.\n\n\
             Please verify this email address by clicking the link below:\n\n\
-            {}?token={}\n\n\
-            This link will expire in {} hours.\n\n\
+            {verify_url}?token={token}\n\n\
+            This link will expire in {EMAIL_CHANGE_TOKEN_VALIDITY_HOURS} hours.\n\n\
             If you did not request this change, please ignore this email.\n\n\
             Best regards,\n\
             The xavyo Team",
-            new_email,
-            "https://example.com/verify-email", // TODO: Make configurable
-            token,
-            EMAIL_CHANGE_TOKEN_VALIDITY_HOURS,
         );
 
         email_sender

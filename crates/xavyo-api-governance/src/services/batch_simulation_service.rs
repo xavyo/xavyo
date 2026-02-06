@@ -281,6 +281,11 @@ impl BatchSimulationService {
     }
 
     /// Apply a batch simulation (commit changes).
+    ///
+    /// This method fetches all simulation results, then applies the access changes
+    /// described by the simulation's `change_spec` for each affected user. Changes
+    /// are applied inside a database transaction to ensure atomicity. If any
+    /// individual user change fails, the entire apply is rolled back.
     pub async fn apply(
         &self,
         tenant_id: Uuid,
@@ -304,29 +309,365 @@ impl BatchSimulationService {
             });
         }
 
-        // TODO: Actually apply the changes
-        // This requires:
-        // 1. Get all results for this simulation
-        // 2. For each user, apply the access changes
-        // 3. Create audit trail for each change
-        // 4. Handle failures gracefully (partial apply)
+        // Parse the change specification to know what operation to apply
+        let change_spec = simulation.parse_change_spec().ok_or_else(|| {
+            GovernanceError::Validation(
+                "Cannot apply simulation: invalid change specification".to_string(),
+            )
+        })?;
 
-        tracing::warn!(
-            simulation_id = %simulation_id,
-            "Batch simulation apply not yet implemented - marking as applied without changes"
-        );
+        // Fetch all affected results in batches and apply changes
+        let mut offset: i64 = 0;
+        let page_size: i64 = BATCH_CHUNK_SIZE as i64;
+        let mut applied_count: i64 = 0;
+        let mut skipped_count: i64 = 0;
+        let no_filter = BatchSimulationResultFilter::default();
 
-        let applied = GovBatchSimulation::apply(&self.pool, tenant_id, simulation_id, applied_by)
-            .await?
-            .ok_or(GovernanceError::BatchSimulationNotFound(simulation_id))?;
+        // Use a transaction for atomicity: either all changes apply or none do
+        let mut tx = self.pool.begin().await.map_err(GovernanceError::Database)?;
+
+        loop {
+            let results = GovBatchSimulationResult::list_by_simulation(
+                // Read results from the pool (not the tx) since they are read-only;
+                // all writes go through the transaction.
+                &self.pool,
+                simulation_id,
+                &no_filter,
+                page_size,
+                offset,
+            )
+            .await?;
+
+            if results.is_empty() {
+                break;
+            }
+
+            let batch_len = results.len() as i64;
+
+            for result in &results {
+                // Skip users with no actual changes
+                if !result.has_changes() {
+                    skipped_count += 1;
+                    continue;
+                }
+
+                self.apply_user_change(
+                    &mut tx,
+                    tenant_id,
+                    result.user_id,
+                    &change_spec,
+                    applied_by,
+                )
+                .await?;
+
+                applied_count += 1;
+            }
+
+            offset = offset.saturating_add(batch_len);
+
+            // If we got fewer results than the page size, we've reached the end
+            if batch_len < page_size {
+                break;
+            }
+        }
+
+        // Mark the simulation as applied (inside the transaction)
+        let applied = sqlx::query_as::<_, GovBatchSimulation>(
+            r"
+            UPDATE gov_batch_simulations
+            SET status = 'applied', applied_at = NOW(), applied_by = $3
+            WHERE id = $1 AND tenant_id = $2 AND status = 'executed'
+            RETURNING *
+            ",
+        )
+        .bind(simulation_id)
+        .bind(tenant_id)
+        .bind(applied_by)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(GovernanceError::Database)?
+        .ok_or(GovernanceError::BatchSimulationNotFound(simulation_id))?;
+
+        // Commit the transaction
+        tx.commit().await.map_err(GovernanceError::Database)?;
 
         tracing::info!(
             simulation_id = %simulation_id,
             applied_by = %applied_by,
-            "Applied batch simulation"
+            applied_count = applied_count,
+            skipped_count = skipped_count,
+            "Applied batch simulation changes"
         );
 
         Ok(applied)
+    }
+
+    /// Apply the change described by `change_spec` for a single user within a transaction.
+    async fn apply_user_change(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        tenant_id: Uuid,
+        user_id: Uuid,
+        change_spec: &ChangeSpec,
+        applied_by: Uuid,
+    ) -> Result<()> {
+        match change_spec.operation {
+            BatchSimulationType::EntitlementAdd => {
+                let entitlement_id = change_spec.entitlement_id.ok_or_else(|| {
+                    GovernanceError::Validation(
+                        "entitlement_id missing in change_spec for EntitlementAdd".to_string(),
+                    )
+                })?;
+
+                // Check if user already has this entitlement (idempotency)
+                let existing: i64 = sqlx::query_scalar(
+                    r"
+                    SELECT COUNT(*) FROM gov_entitlement_assignments
+                    WHERE tenant_id = $1 AND entitlement_id = $2
+                      AND target_type = 'user' AND target_id = $3
+                      AND status = 'active'
+                    ",
+                )
+                .bind(tenant_id)
+                .bind(entitlement_id)
+                .bind(user_id)
+                .fetch_one(&mut **tx)
+                .await
+                .map_err(GovernanceError::Database)?;
+
+                if existing == 0 {
+                    sqlx::query(
+                        r"
+                        INSERT INTO gov_entitlement_assignments (
+                            tenant_id, entitlement_id, target_type, target_id,
+                            assigned_by, justification
+                        )
+                        VALUES ($1, $2, 'user', $3, $4, $5)
+                        ",
+                    )
+                    .bind(tenant_id)
+                    .bind(entitlement_id)
+                    .bind(user_id)
+                    .bind(applied_by)
+                    .bind(change_spec.justification.as_deref())
+                    .execute(&mut **tx)
+                    .await
+                    .map_err(GovernanceError::Database)?;
+
+                    tracing::debug!(
+                        user_id = %user_id,
+                        entitlement_id = %entitlement_id,
+                        "Applied entitlement add"
+                    );
+                }
+            }
+            BatchSimulationType::EntitlementRemove => {
+                let entitlement_id = change_spec.entitlement_id.ok_or_else(|| {
+                    GovernanceError::Validation(
+                        "entitlement_id missing in change_spec for EntitlementRemove".to_string(),
+                    )
+                })?;
+
+                let rows = sqlx::query(
+                    r"
+                    DELETE FROM gov_entitlement_assignments
+                    WHERE tenant_id = $1 AND entitlement_id = $2
+                      AND target_type = 'user' AND target_id = $3
+                    ",
+                )
+                .bind(tenant_id)
+                .bind(entitlement_id)
+                .bind(user_id)
+                .execute(&mut **tx)
+                .await
+                .map_err(GovernanceError::Database)?;
+
+                tracing::debug!(
+                    user_id = %user_id,
+                    entitlement_id = %entitlement_id,
+                    rows_deleted = rows.rows_affected(),
+                    "Applied entitlement remove"
+                );
+            }
+            BatchSimulationType::RoleAdd => {
+                let role_id = change_spec.role_id.ok_or_else(|| {
+                    GovernanceError::Validation(
+                        "role_id missing in change_spec for RoleAdd".to_string(),
+                    )
+                })?;
+
+                // Resolve role name from gov_roles
+                let role_name: Option<String> = sqlx::query_scalar(
+                    "SELECT name FROM gov_roles WHERE id = $1 AND tenant_id = $2",
+                )
+                .bind(role_id)
+                .bind(tenant_id)
+                .fetch_optional(&mut **tx)
+                .await
+                .map_err(GovernanceError::Database)?;
+
+                let role_name = role_name.ok_or_else(|| {
+                    GovernanceError::Validation(format!(
+                        "Role {role_id} not found in tenant {tenant_id}"
+                    ))
+                })?;
+
+                // Insert into user_roles if not already present
+                let existing_role: i64 = sqlx::query_scalar(
+                    r"
+                    SELECT COUNT(*) FROM user_roles
+                    WHERE user_id = $1 AND role_name = $2
+                    ",
+                )
+                .bind(user_id)
+                .bind(&role_name)
+                .fetch_one(&mut **tx)
+                .await
+                .map_err(GovernanceError::Database)?;
+
+                if existing_role == 0 {
+                    sqlx::query(
+                        r"
+                        INSERT INTO user_roles (user_id, role_name)
+                        VALUES ($1, $2)
+                        ",
+                    )
+                    .bind(user_id)
+                    .bind(&role_name)
+                    .execute(&mut **tx)
+                    .await
+                    .map_err(GovernanceError::Database)?;
+                }
+
+                // Also create entitlement assignments for entitlements linked to this role
+                let role_entitlements: Vec<Uuid> = sqlx::query_scalar(
+                    r"
+                    SELECT entitlement_id FROM gov_role_entitlements
+                    WHERE role_id = $1 AND tenant_id = $2
+                    ",
+                )
+                .bind(role_id)
+                .bind(tenant_id)
+                .fetch_all(&mut **tx)
+                .await
+                .map_err(GovernanceError::Database)?;
+
+                for ent_id in role_entitlements {
+                    // Check if assignment already exists (idempotency)
+                    let ent_exists: i64 = sqlx::query_scalar(
+                        r"
+                        SELECT COUNT(*) FROM gov_entitlement_assignments
+                        WHERE tenant_id = $1 AND entitlement_id = $2
+                          AND target_type = 'user' AND target_id = $3
+                          AND status = 'active'
+                        ",
+                    )
+                    .bind(tenant_id)
+                    .bind(ent_id)
+                    .bind(user_id)
+                    .fetch_one(&mut **tx)
+                    .await
+                    .map_err(GovernanceError::Database)?;
+
+                    if ent_exists == 0 {
+                        sqlx::query(
+                            r"
+                            INSERT INTO gov_entitlement_assignments (
+                                tenant_id, entitlement_id, target_type, target_id,
+                                assigned_by, justification
+                            )
+                            VALUES ($1, $2, 'user', $3, $4, $5)
+                            ",
+                        )
+                        .bind(tenant_id)
+                        .bind(ent_id)
+                        .bind(user_id)
+                        .bind(applied_by)
+                        .bind(change_spec.justification.as_deref())
+                        .execute(&mut **tx)
+                        .await
+                        .map_err(GovernanceError::Database)?;
+                    }
+                }
+
+                tracing::debug!(
+                    user_id = %user_id,
+                    role_id = %role_id,
+                    role_name = %role_name,
+                    "Applied role add"
+                );
+            }
+            BatchSimulationType::RoleRemove => {
+                let role_id = change_spec.role_id.ok_or_else(|| {
+                    GovernanceError::Validation(
+                        "role_id missing in change_spec for RoleRemove".to_string(),
+                    )
+                })?;
+
+                // Resolve role name from gov_roles
+                let role_name: Option<String> = sqlx::query_scalar(
+                    "SELECT name FROM gov_roles WHERE id = $1 AND tenant_id = $2",
+                )
+                .bind(role_id)
+                .bind(tenant_id)
+                .fetch_optional(&mut **tx)
+                .await
+                .map_err(GovernanceError::Database)?;
+
+                if let Some(role_name) = role_name {
+                    // Remove from user_roles
+                    sqlx::query(
+                        r"
+                        DELETE FROM user_roles
+                        WHERE user_id = $1 AND role_name = $2
+                        ",
+                    )
+                    .bind(user_id)
+                    .bind(&role_name)
+                    .execute(&mut **tx)
+                    .await
+                    .map_err(GovernanceError::Database)?;
+
+                    // Also revoke entitlement assignments that came from this role
+                    let role_entitlements: Vec<Uuid> = sqlx::query_scalar(
+                        r"
+                        SELECT entitlement_id FROM gov_role_entitlements
+                        WHERE role_id = $1 AND tenant_id = $2
+                        ",
+                    )
+                    .bind(role_id)
+                    .bind(tenant_id)
+                    .fetch_all(&mut **tx)
+                    .await
+                    .map_err(GovernanceError::Database)?;
+
+                    for ent_id in role_entitlements {
+                        sqlx::query(
+                            r"
+                            DELETE FROM gov_entitlement_assignments
+                            WHERE tenant_id = $1 AND entitlement_id = $2
+                              AND target_type = 'user' AND target_id = $3
+                            ",
+                        )
+                        .bind(tenant_id)
+                        .bind(ent_id)
+                        .bind(user_id)
+                        .execute(&mut **tx)
+                        .await
+                        .map_err(GovernanceError::Database)?;
+                    }
+
+                    tracing::debug!(
+                        user_id = %user_id,
+                        role_id = %role_id,
+                        role_name = %role_name,
+                        "Applied role remove"
+                    );
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Cancel a batch simulation.

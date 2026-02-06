@@ -106,6 +106,9 @@ pub async fn create_agent(
     Json(request): Json<CreateAgentRequest>,
 ) -> ApiResult<(StatusCode, Json<AgentResponse>)> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
+    }
     let user_id = extract_actor_id(&claims)?;
     let agent = state
         .agent_service
@@ -165,6 +168,9 @@ pub async fn update_agent(
     Json(request): Json<UpdateAgentRequest>,
 ) -> ApiResult<Json<AgentResponse>> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
+    }
     let agent = state.agent_service.update(tenant_id, id, request).await?;
     Ok(Json(agent))
 }
@@ -191,6 +197,9 @@ pub async fn delete_agent(
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
+    }
     state.agent_service.delete(tenant_id, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -222,6 +231,9 @@ pub async fn suspend_agent(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<AgentResponse>> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
+    }
     let agent = state.agent_service.suspend(tenant_id, id).await?;
     Ok(Json(agent))
 }
@@ -249,6 +261,9 @@ pub async fn reactivate_agent(
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<AgentResponse>> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
+    }
     let agent = state.agent_service.reactivate(tenant_id, id).await?;
     Ok(Json(agent))
 }

@@ -146,8 +146,9 @@ pub async fn callback(
         .await?;
 
     // Generate Xavyo JWT for the user
-    // TODO: Load user roles from database
-    let roles = vec!["user".to_string()];
+    let roles = xavyo_db::UserRole::get_user_roles(&state.pool, user.id)
+        .await
+        .unwrap_or_else(|_| vec!["user".to_string()]);
     let xavyo_tokens = state
         .token_issuer
         .issue_tokens(user.id, token_result.session.tenant_id, roles, None)

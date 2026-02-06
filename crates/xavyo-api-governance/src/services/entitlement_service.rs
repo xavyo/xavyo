@@ -180,8 +180,10 @@ impl EntitlementService {
         // Verify entitlement exists
         let _existing = self.get_entitlement(tenant_id, entitlement_id).await?;
 
-        // TODO: Verify owner_id is a valid user in the tenant
-        // For now, we trust the caller has validated this
+        // Verify owner_id is a valid user in the tenant
+        if !xavyo_db::User::exists_in_tenant(&self.pool, tenant_id, owner_id).await? {
+            return Err(GovernanceError::UserNotFound(owner_id));
+        }
 
         GovEntitlement::set_owner(&self.pool, tenant_id, entitlement_id, owner_id)
             .await?

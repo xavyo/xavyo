@@ -246,6 +246,7 @@ impl GovLicenseReclamationRule {
             FROM gov_license_reclamation_rules
             WHERE tenant_id = $1 AND enabled = true
             ORDER BY license_pool_id, trigger_type
+            LIMIT 1000
             "#,
             tenant_id
         )
@@ -278,6 +279,7 @@ impl GovLicenseReclamationRule {
               AND enabled = true
               AND trigger_type = 'inactivity'
             ORDER BY license_pool_id
+            LIMIT 1000
             "#,
             tenant_id
         )

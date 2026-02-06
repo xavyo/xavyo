@@ -90,7 +90,7 @@ impl RateLimiter {
     /// Returns `None` if allowed, or `Some(wait_time)` if rate limited.
     #[must_use]
     pub fn try_acquire(&self, tenant_id: Uuid) -> Option<Duration> {
-        let mut buckets = self.buckets.lock().unwrap();
+        let mut buckets = self.buckets.lock().unwrap_or_else(|e| e.into_inner());
 
         let bucket = buckets
             .entry(tenant_id)
@@ -102,7 +102,7 @@ impl RateLimiter {
     /// Clean up old buckets that haven't been used recently.
     pub fn cleanup(&self, max_age: Duration) {
         let now = Instant::now();
-        let mut buckets = self.buckets.lock().unwrap();
+        let mut buckets = self.buckets.lock().unwrap_or_else(|e| e.into_inner());
 
         buckets.retain(|_, bucket| now.duration_since(bucket.last_refill) < max_age);
     }

@@ -234,6 +234,10 @@ pub enum ApiAgentsError {
     #[error("Secret type is not enabled: {0}")]
     SecretTypeDisabled(String),
 
+    /// Secret type is in use by permissions or credentials.
+    #[error("Secret type is in use: {0}")]
+    SecretTypeInUse(String),
+
     /// Agent does not have permission for the requested secret type.
     #[error("Agent does not have permission for secret type '{0}'")]
     SecretPermissionDenied(String),
@@ -741,6 +745,12 @@ impl ApiAgentsError {
                 StatusCode::FORBIDDEN,
             )
             .with_detail(format!("Secret type '{type_name}' is not enabled.")),
+            ApiAgentsError::SecretTypeInUse(msg) => ProblemDetails::new(
+                "secret-type-in-use",
+                "Secret Type In Use",
+                StatusCode::CONFLICT,
+            )
+            .with_detail(msg.clone()),
             ApiAgentsError::SecretPermissionDenied(type_name) => ProblemDetails::new(
                 "secret-permission-denied",
                 "Secret Permission Denied",
@@ -1156,6 +1166,7 @@ impl ApiAgentsError {
             | ApiAgentsError::ApprovalAlreadyDecided
             | ApiAgentsError::ApprovalExpired
             | ApiAgentsError::SecretTypeExists(_)
+            | ApiAgentsError::SecretTypeInUse(_)
             | ApiAgentsError::IdentityProviderExists
             | ApiAgentsError::DuplicateProviderName(_)
             | ApiAgentsError::IdentityProviderHasRoleMappings(_)

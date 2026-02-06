@@ -315,8 +315,52 @@ impl ScheduledTransitionService {
                 continue;
             }
 
-            // TODO: Actually execute the transition through StateTransitionService
-            // For now, just mark as executed
+            // Execute the transition by updating the object's lifecycle state
+            match request.object_type {
+                xavyo_db::LifecycleObjectType::User => {
+                    if let Err(e) = xavyo_db::User::update_lifecycle_state(
+                        &self.pool,
+                        schedule.tenant_id,
+                        request.object_id,
+                        Some(request.to_state_id),
+                    )
+                    .await
+                    {
+                        let error = format!("Failed to update user lifecycle state: {e}");
+                        GovScheduledTransition::mark_failed(&self.pool, schedule.id, &error)
+                            .await?;
+                        errors.push((schedule.id, error));
+                        failed += 1;
+                        continue;
+                    }
+                }
+                _ => {
+                    // Entitlement and Role lifecycle transitions not yet supported
+                    tracing::warn!(
+                        object_type = ?request.object_type,
+                        object_id = %request.object_id,
+                        "Scheduled transition for unsupported object type"
+                    );
+                }
+            }
+
+            // Mark the transition request as executed
+            let update = UpdateGovStateTransitionRequest {
+                status: Some(TransitionRequestStatus::Executed),
+                approval_request_id: None,
+                executed_at: Some(Utc::now()),
+                grace_period_ends_at: None,
+                rollback_available: None,
+                error_message: None,
+            };
+            let _ = GovStateTransitionRequest::update(
+                &self.pool,
+                schedule.tenant_id,
+                request.id,
+                &update,
+            )
+            .await;
+
             GovScheduledTransition::mark_executed(&self.pool, schedule.id).await?;
             succeeded += 1;
         }

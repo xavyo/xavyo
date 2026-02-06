@@ -13,6 +13,24 @@ use crate::providers::{ProviderFactory, SocialProvider};
 use crate::services::ConnectionResult;
 use crate::SocialState;
 
+/// Sanitize redirect_after to prevent open redirects.
+/// Only allows relative paths starting with `/` (rejects `//`, `://`, `\`).
+fn sanitize_redirect_after(redirect: &str) -> Option<&str> {
+    let trimmed = redirect.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    // Must start with /
+    if !trimmed.starts_with('/') {
+        return None;
+    }
+    // Reject protocol-relative URLs (//evil.com) and backslash tricks
+    if trimmed.starts_with("//") || trimmed.starts_with("/\\") || trimmed.contains("://") {
+        return None;
+    }
+    Some(trimmed)
+}
+
 /// Handle OAuth callback from provider (GET for Google/Microsoft).
 #[utoipa::path(
     get,
@@ -256,10 +274,13 @@ async fn process_callback(
             "Linked social account to existing user"
         );
 
-        // Redirect back to settings with success
-        let redirect_url = claims
+        // Redirect back to settings with success (sanitized to prevent open redirect)
+        let safe_path = claims
             .redirect_after
-            .unwrap_or_else(|| format!("{}/settings", state.frontend_url));
+            .as_deref()
+            .and_then(sanitize_redirect_after)
+            .unwrap_or("/settings");
+        let redirect_url = format!("{}{safe_path}", state.frontend_url);
         return Ok(
             Redirect::temporary(&format!("{redirect_url}?linked={provider_type}")).into_response(),
         );
@@ -388,10 +409,11 @@ fn redirect_with_tokens(
     redirect_after: &Option<String>,
     tokens: &JwtTokens,
 ) -> Response {
-    let base = redirect_after.as_ref().map_or_else(
-        || format!("{frontend_url}/"),
-        |r| format!("{frontend_url}{r}"),
-    );
+    let safe_path = redirect_after
+        .as_deref()
+        .and_then(sanitize_redirect_after)
+        .unwrap_or("/");
+    let base = format!("{frontend_url}{safe_path}");
 
     // Use fragment (#) instead of query (?) for token security
     let url = format!(

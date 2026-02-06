@@ -232,9 +232,7 @@ impl IntoResponse for SamlError {
                 "Metadata generation failed".to_string()
             }
             SamlError::SignatureValidationFailed(_) => "Signature validation failed".to_string(),
-            SamlError::InvalidAuthnRequest(_) => {
-                "Invalid SAML authentication request".to_string()
-            }
+            SamlError::InvalidAuthnRequest(_) => "Invalid SAML authentication request".to_string(),
             SamlError::InvalidSpCertificate(_) => {
                 "Invalid Service Provider certificate".to_string()
             }

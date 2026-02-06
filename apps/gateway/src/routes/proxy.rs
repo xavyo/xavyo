@@ -208,9 +208,13 @@ fn error_response(error: GatewayError, request_id: Option<uuid::Uuid>) -> Respon
 
     // Add Retry-After for rate limiting
     if let GatewayError::RateLimited { retry_after } = error {
-        response
-            .headers_mut()
-            .insert("Retry-After", retry_after.to_string().parse().unwrap());
+        response.headers_mut().insert(
+            "Retry-After",
+            retry_after
+                .to_string()
+                .parse()
+                .unwrap_or(HeaderValue::from_static("60")),
+        );
     }
 
     response

@@ -411,6 +411,7 @@ impl GovSodViolation {
               AND ea2.status = 'active'
               AND ea1.entitlement_id = $2
               AND ea2.entitlement_id = $3
+            LIMIT 50000
             ",
         )
         .bind(tenant_id)

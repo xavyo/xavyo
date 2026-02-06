@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::warn;
 use uuid::Uuid;
 
 use super::error::{SyncError, SyncResult};
@@ -220,9 +221,19 @@ impl InboundMapper {
         for (ext_attr, mapping) in &self.mappings {
             if let Some(value) = obj.get(ext_attr) {
                 // Apply transformation if present
-                let transformed = if let Some(ref _expr) = mapping.transform {
+                let transformed = if let Some(ref expr) = mapping.transform {
                     // TODO: Implement transformation expression evaluation
-                    // For now, just pass through
+                    warn!(
+                        external_attribute = %ext_attr,
+                        internal_attribute = %mapping.internal_attribute,
+                        transform_expression = %expr,
+                        "Attribute transformation configured but not yet implemented; \
+                         value passed through without transformation"
+                    );
+                    result.warnings.push(format!(
+                        "Transform '{}' on attribute '{}' was skipped (not implemented)",
+                        expr, ext_attr
+                    ));
                     value.clone()
                 } else {
                     value.clone()
@@ -410,6 +421,15 @@ mod tests {
         // Currently passthrough - when transform is implemented, this should be lowercase and trimmed
         assert!(result.is_success());
         assert!(result.attributes.get("email").is_some());
+        // Verify a warning is emitted about the skipped transform
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|w| w.contains("lowercase|trim") && w.contains("skipped")),
+            "Expected a warning about skipped transform, got: {:?}",
+            result.warnings
+        );
     }
 
     #[test]

@@ -378,6 +378,24 @@ impl AgentSecretPermission {
         Ok(result.rows_affected())
     }
 
+    /// Count permissions for a specific secret type (for deletion checks).
+    pub async fn count_by_secret_type(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        secret_type: &str,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM agent_secret_permissions
+            WHERE tenant_id = $1 AND secret_type = $2
+            ",
+        )
+        .bind(tenant_id)
+        .bind(secret_type)
+        .fetch_one(pool)
+        .await
+    }
+
     /// Delete expired permissions.
     pub async fn delete_expired(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(

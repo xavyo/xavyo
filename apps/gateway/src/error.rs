@@ -1,7 +1,7 @@
 //! Gateway error types and HTTP response handling.
 
 use axum::{
-    http::StatusCode,
+    http::{HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
@@ -100,9 +100,13 @@ impl IntoResponse for GatewayError {
 
         // Add Retry-After header for rate limiting
         if let GatewayError::RateLimited { retry_after } = &self {
-            response
-                .headers_mut()
-                .insert("Retry-After", retry_after.to_string().parse().unwrap());
+            response.headers_mut().insert(
+                "Retry-After",
+                retry_after
+                    .to_string()
+                    .parse()
+                    .unwrap_or(HeaderValue::from_static("60")),
+            );
         }
 
         response

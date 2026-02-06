@@ -9,6 +9,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::error::ApiAgentsError;
+use xavyo_db::models::agent_secret_permission::AgentSecretPermission;
+use xavyo_db::models::dynamic_credential::DynamicCredential;
 use xavyo_db::models::secret_type_config::{
     CreateSecretTypeConfiguration, SecretTypeConfigFilter, SecretTypeConfiguration,
     UpdateSecretTypeConfiguration,
@@ -188,14 +190,37 @@ impl SecretTypeService {
 
     /// Delete a secret type configuration.
     ///
-    /// Note: This will fail if there are active permissions referencing this type.
+    /// Fails if there are active permissions or credentials referencing this type.
     pub async fn delete(&self, tenant_id: Uuid, id: Uuid) -> Result<bool, ApiAgentsError> {
         // Check if configuration exists
-        SecretTypeConfiguration::find_by_id(&self.pool, tenant_id, id)
+        let config = SecretTypeConfiguration::find_by_id(&self.pool, tenant_id, id)
             .await?
             .ok_or_else(|| ApiAgentsError::SecretTypeNotFound(id.to_string()))?;
 
-        // TODO: Check if there are active permissions or credentials using this type
+        // Check if there are permissions using this type
+        let perm_count =
+            AgentSecretPermission::count_by_secret_type(&self.pool, tenant_id, &config.type_name)
+                .await?;
+        if perm_count > 0 {
+            return Err(ApiAgentsError::SecretTypeInUse(format!(
+                "Secret type '{}' has {} active permission(s)",
+                config.type_name, perm_count
+            )));
+        }
+
+        // Check if there are active credentials using this type
+        let cred_count = DynamicCredential::count_active_by_secret_type(
+            &self.pool,
+            tenant_id,
+            &config.type_name,
+        )
+        .await?;
+        if cred_count > 0 {
+            return Err(ApiAgentsError::SecretTypeInUse(format!(
+                "Secret type '{}' has {} active credential(s)",
+                config.type_name, cred_count
+            )));
+        }
 
         let deleted = SecretTypeConfiguration::delete(&self.pool, tenant_id, id).await?;
         Ok(deleted)

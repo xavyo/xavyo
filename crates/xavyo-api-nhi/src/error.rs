@@ -23,6 +23,10 @@ pub enum ApiNhiError {
     #[error("Bad request: {0}")]
     BadRequest(String),
 
+    /// Forbidden: insufficient permissions.
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+
     /// Conflict error (e.g., duplicate resource).
     #[error("Conflict: {0}")]
     Conflict(String),
@@ -111,6 +115,9 @@ impl IntoResponse for ApiNhiError {
                     ApiNhiError::NotFound(msg) => (StatusCode::NOT_FOUND, "not_found", msg.clone()),
                     ApiNhiError::BadRequest(msg) => {
                         (StatusCode::BAD_REQUEST, "bad_request", msg.clone())
+                    }
+                    ApiNhiError::Forbidden(msg) => {
+                        (StatusCode::FORBIDDEN, "forbidden", msg.clone())
                     }
                     ApiNhiError::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg.clone()),
                     ApiNhiError::Internal(msg) => {

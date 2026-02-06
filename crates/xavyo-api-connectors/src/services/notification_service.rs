@@ -166,17 +166,21 @@ This is an automated message. Do not reply to this email.
             "Sending schema change notification"
         );
 
-        // TODO: Actually send email via lettre when SMTP is configured
-        // For now, just log the notification
+        // SMTP sending is not yet implemented (requires lettre integration).
+        // Return an error so callers know the email was NOT actually sent.
         warn!(
             connector_id = %notification.connector_id,
             recipient = %notification.recipient_email,
-            "Email sending not implemented - notification logged only"
+            subject = %subject,
+            "Email notification skipped: SMTP not configured. \
+             Schema change notification was NOT delivered to recipient."
         );
 
-        debug!(body = %body, "Notification body");
+        debug!(body = %body, "Notification body that was not sent");
 
-        Ok(())
+        Err(NotificationError::SendFailed(
+            "Email notification skipped: SMTP sending not yet implemented".to_string(),
+        ))
     }
 }
 

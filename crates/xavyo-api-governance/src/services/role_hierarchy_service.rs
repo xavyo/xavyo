@@ -3,6 +3,8 @@
 //! Provides business role hierarchy management with parent-child relationships,
 //! entitlement inheritance, and cycle detection (F088).
 
+use std::collections::HashMap;
+
 use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -363,6 +365,80 @@ impl RoleHierarchyService {
     }
 
     // =========================================================================
+    // User Count Helpers
+    // =========================================================================
+
+    /// Count distinct users assigned to a single role via its effective entitlements.
+    ///
+    /// A user is considered "assigned" to a role if they have an active entitlement
+    /// assignment for any of the role's effective entitlements (direct + inherited).
+    async fn count_users_for_role(&self, tenant_id: Uuid, role_id: Uuid) -> Result<i64> {
+        let count: i64 = sqlx::query_scalar(
+            r"
+            SELECT COUNT(DISTINCT ea.target_id)
+            FROM gov_role_effective_entitlements ree
+            JOIN gov_entitlement_assignments ea
+                ON ea.entitlement_id = ree.entitlement_id
+                AND ea.tenant_id = ree.tenant_id
+            WHERE ree.tenant_id = $1
+                AND ree.role_id = $2
+                AND ea.target_type = 'user'
+                AND ea.status = 'active'
+            ",
+        )
+        .bind(tenant_id)
+        .bind(role_id)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or(0);
+
+        Ok(count)
+    }
+
+    /// Count distinct users for multiple roles in a single query.
+    ///
+    /// Returns a map of role_id -> user_count. Roles with zero users are included
+    /// with a count of 0.
+    async fn count_users_for_roles(
+        &self,
+        tenant_id: Uuid,
+        role_ids: &[Uuid],
+    ) -> Result<HashMap<Uuid, i64>> {
+        // Initialize all roles with 0
+        let mut counts: HashMap<Uuid, i64> = role_ids.iter().map(|id| (*id, 0i64)).collect();
+
+        if role_ids.is_empty() {
+            return Ok(counts);
+        }
+
+        let rows: Vec<(Uuid, i64)> = sqlx::query_as(
+            r"
+            SELECT ree.role_id, COUNT(DISTINCT ea.target_id) as user_count
+            FROM gov_role_effective_entitlements ree
+            JOIN gov_entitlement_assignments ea
+                ON ea.entitlement_id = ree.entitlement_id
+                AND ea.tenant_id = ree.tenant_id
+            WHERE ree.tenant_id = $1
+                AND ree.role_id = ANY($2)
+                AND ea.target_type = 'user'
+                AND ea.status = 'active'
+            GROUP BY ree.role_id
+            ",
+        )
+        .bind(tenant_id)
+        .bind(role_ids)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)?;
+
+        for (role_id, user_count) in rows {
+            counts.insert(role_id, user_count);
+        }
+
+        Ok(counts)
+    }
+
+    // =========================================================================
     // Tree View & Impact Analysis
     // =========================================================================
 
@@ -402,8 +478,9 @@ impl RoleHierarchyService {
                 .await
                 .unwrap_or(0);
 
-        // Get assigned user count (placeholder - would need role assignment table)
-        let user_count = 0i64; // TODO: Implement when role assignments exist
+        // Count distinct users with active entitlement assignments for this role's
+        // effective entitlements (direct + inherited).
+        let user_count = self.count_users_for_role(tenant_id, role.id).await?;
 
         // Get children and build their nodes
         let children_roles = GovRole::get_children(&self.pool, tenant_id, role.id).await?;
@@ -434,16 +511,25 @@ impl RoleHierarchyService {
         let role = self.get_role(tenant_id, role_id).await?;
         let descendants = self.get_descendants(tenant_id, role_id).await?;
 
-        // Count affected users (placeholder - would need role assignment table)
-        let total_affected_users = 0i64; // TODO: Implement when role assignments exist
+        // Collect all role IDs (this role + descendants) for a bulk user count query.
+        let mut all_role_ids: Vec<Uuid> = vec![role_id];
+        all_role_ids.extend(descendants.iter().map(|d| d.id));
+
+        let user_counts = self.count_users_for_roles(tenant_id, &all_role_ids).await?;
+
+        // Sum total affected users across all roles.
+        let total_affected_users: i64 = user_counts.values().sum();
 
         let descendant_details: Vec<_> = descendants
             .into_iter()
-            .map(|d| xavyo_db::models::GovRoleDescendant {
-                id: d.id,
-                name: d.name,
-                depth: d.hierarchy_depth,
-                assigned_user_count: 0, // TODO: Implement
+            .map(|d| {
+                let count = user_counts.get(&d.id).copied().unwrap_or(0);
+                xavyo_db::models::GovRoleDescendant {
+                    id: d.id,
+                    name: d.name,
+                    depth: d.hierarchy_depth,
+                    assigned_user_count: count,
+                }
             })
             .collect();
 
@@ -751,13 +837,20 @@ impl RoleHierarchyService {
         let mut affected_role_ids = vec![role.id];
         affected_role_ids.extend(descendants.iter().map(|d| d.id));
 
-        // Get users assigned to any of these roles
-        // Note: This queries the gov_user_role_assignments table
+        // Get users assigned to any of these roles via effective entitlements.
+        // We join gov_role_effective_entitlements -> gov_entitlement_assignments
+        // to find distinct users who hold entitlements granted by these roles.
         let user_count: i64 = sqlx::query_scalar(
             r"
-            SELECT COUNT(DISTINCT user_id)
-            FROM gov_user_role_assignments
-            WHERE tenant_id = $1 AND role_id = ANY($2)
+            SELECT COUNT(DISTINCT ea.target_id)
+            FROM gov_role_effective_entitlements ree
+            JOIN gov_entitlement_assignments ea
+                ON ea.entitlement_id = ree.entitlement_id
+                AND ea.tenant_id = ree.tenant_id
+            WHERE ree.tenant_id = $1
+                AND ree.role_id = ANY($2)
+                AND ea.target_type = 'user'
+                AND ea.status = 'active'
             ",
         )
         .bind(tenant_id)

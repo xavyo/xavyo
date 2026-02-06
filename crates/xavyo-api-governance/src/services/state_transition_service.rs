@@ -13,11 +13,12 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use xavyo_db::{
-    AuditActionType, CreateGovStateTransitionAudit, CreateGovStateTransitionRequest,
-    EntitlementAction, FailedOperationType, GovLifecycleConfig, GovLifecycleState,
-    GovLifecycleTransition, GovLifecycleTransitionWithStates, GovStateTransitionAudit,
-    GovStateTransitionRequest, LifecycleObjectType, OutputFormat, TransitionAuditFilter,
-    TransitionRequestFilter, TransitionRequestStatus, UpdateGovStateTransitionRequest, User,
+    AuditActionType, CreateGovScheduledTransition, CreateGovStateTransitionAudit,
+    CreateGovStateTransitionRequest, EntitlementAction, FailedOperationType, GovLifecycleConfig,
+    GovLifecycleState, GovLifecycleTransition, GovLifecycleTransitionWithStates,
+    GovScheduledTransition, GovStateTransitionAudit, GovStateTransitionRequest,
+    LifecycleObjectType, OutputFormat, TransitionAuditFilter, TransitionRequestFilter,
+    TransitionRequestStatus, UpdateGovStateTransitionRequest, User,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -33,8 +34,9 @@ use xavyo_events::{
 use crate::models::{
     ExecuteTransitionRequest, LifecycleStateResponse, LifecycleTransitionResponse,
     ListTransitionAuditQuery, ListTransitionRequestsQuery, ObjectLifecycleStatusResponse,
-    RollbackInfo, TransitionAuditListResponse, TransitionAuditResponse,
-    TransitionRequestListResponse, TransitionRequestResponse, TransitionStateInfo,
+    RollbackInfo, ScheduledTransitionResponse, TransitionAuditListResponse,
+    TransitionAuditResponse, TransitionRequestListResponse, TransitionRequestResponse,
+    TransitionStateInfo,
 };
 use crate::services::failed_operation_service::{EntitlementActionPayload, FailedOperationService};
 use crate::services::state_access_rule_service::StateAccessRuleService;
@@ -232,9 +234,35 @@ impl StateTransitionService {
         }
 
         // 8. Handle scheduled transitions
-        if request.scheduled_for.is_some() {
-            // TODO: Create scheduled transition record
-            // For now, return the request as pending
+        if let Some(scheduled_for) = request.scheduled_for {
+            // Validate the scheduled time is in the future
+            if scheduled_for <= Utc::now() {
+                return Err(GovernanceError::ScheduledTimeInPast);
+            }
+
+            // Create the scheduled transition record in gov_scheduled_transitions
+            let create_schedule = CreateGovScheduledTransition {
+                transition_request_id: transition_request.id,
+                scheduled_for,
+            };
+
+            if let Err(e) =
+                GovScheduledTransition::create(&self.pool, tenant_id, &create_schedule).await
+            {
+                warn!(
+                    request_id = %transition_request.id,
+                    error = %e,
+                    "Failed to create scheduled transition record"
+                );
+                return Err(GovernanceError::Database(e));
+            }
+
+            info!(
+                request_id = %transition_request.id,
+                scheduled_for = %scheduled_for,
+                "Created scheduled transition"
+            );
+
             return Ok((
                 StatusCode::ACCEPTED,
                 self.build_transition_response(
@@ -617,18 +645,18 @@ impl StateTransitionService {
                     .await
                     .map_err(GovernanceError::from)
             }
-            LifecycleObjectType::Entitlement => {
-                // TODO: Implement for entitlements
-                Err(GovernanceError::Validation(
-                    "Entitlement lifecycle states not yet implemented".to_string(),
-                ))
-            }
-            LifecycleObjectType::Role => {
-                // TODO: Implement for roles
-                Err(GovernanceError::Validation(
-                    "Role lifecycle states not yet implemented".to_string(),
-                ))
-            }
+            LifecycleObjectType::Entitlement => Err(GovernanceError::Validation(
+                "Lifecycle state transitions are not supported for entitlements: \
+                 the gov_entitlements table does not have a lifecycle_state_id column. \
+                 A database migration is required to enable this feature."
+                    .to_string(),
+            )),
+            LifecycleObjectType::Role => Err(GovernanceError::Validation(
+                "Lifecycle state transitions are not supported for roles: \
+                 the gov_roles table does not have a lifecycle_state_id column. \
+                 A database migration is required to enable this feature."
+                    .to_string(),
+            )),
         }
     }
 
@@ -650,10 +678,16 @@ impl StateTransitionService {
                 Ok(())
             }
             LifecycleObjectType::Entitlement => Err(GovernanceError::Validation(
-                "Entitlement lifecycle states not yet implemented".to_string(),
+                "Lifecycle state transitions are not supported for entitlements: \
+                 the gov_entitlements table does not have a lifecycle_state_id column. \
+                 A database migration is required to enable this feature."
+                    .to_string(),
             )),
             LifecycleObjectType::Role => Err(GovernanceError::Validation(
-                "Role lifecycle states not yet implemented".to_string(),
+                "Lifecycle state transitions are not supported for roles: \
+                 the gov_roles table does not have a lifecycle_state_id column. \
+                 A database migration is required to enable this feature."
+                    .to_string(),
             )),
         }
     }
@@ -744,13 +778,18 @@ impl StateTransitionService {
             None
         };
 
+        // Get pending scheduled transitions for this object
+        let pending_schedules = self
+            .get_pending_schedules_for_object(tenant_id, object_id)
+            .await?;
+
         Ok(ObjectLifecycleStatusResponse {
             object_id,
             object_type: obj_type,
             current_state,
             available_transitions,
             active_rollback,
-            pending_schedules: Vec::new(), // TODO: Get pending scheduled transitions
+            pending_schedules,
         })
     }
 
@@ -1315,6 +1354,52 @@ impl StateTransitionService {
             created_at: request.created_at,
             updated_at: request.updated_at,
         }
+    }
+
+    /// Get pending scheduled transitions for a specific object.
+    ///
+    /// Queries the `gov_scheduled_transitions` table (via JOIN with
+    /// `gov_state_transition_requests`) and enriches each record with
+    /// state/transition names from the associated transition request.
+    async fn get_pending_schedules_for_object(
+        &self,
+        tenant_id: Uuid,
+        object_id: Uuid,
+    ) -> Result<Vec<ScheduledTransitionResponse>> {
+        let pending =
+            GovScheduledTransition::find_pending_for_object(&self.pool, tenant_id, object_id, 100)
+                .await?;
+
+        let mut schedules = Vec::with_capacity(pending.len());
+        for schedule in pending {
+            // Get the associated transition request for state/transition names
+            if let Some(request) = GovStateTransitionRequest::find_by_id_with_states(
+                &self.pool,
+                tenant_id,
+                schedule.transition_request_id,
+            )
+            .await?
+            {
+                schedules.push(ScheduledTransitionResponse {
+                    id: schedule.id,
+                    transition_request_id: schedule.transition_request_id,
+                    object_id: request.object_id,
+                    object_type: request.object_type,
+                    transition_name: request.transition_name,
+                    from_state: request.from_state_name,
+                    to_state: request.to_state_name,
+                    scheduled_for: schedule.scheduled_for,
+                    status: schedule.status,
+                    executed_at: schedule.executed_at,
+                    cancelled_at: schedule.cancelled_at,
+                    cancelled_by: schedule.cancelled_by,
+                    error_message: schedule.error_message,
+                    created_at: schedule.created_at,
+                });
+            }
+        }
+
+        Ok(schedules)
     }
 
     /// Export transition audit records to CSV or JSON format.

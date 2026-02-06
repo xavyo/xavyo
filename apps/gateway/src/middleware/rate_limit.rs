@@ -74,19 +74,28 @@ impl RateLimitState {
                     );
 
                     // Get or create limiter for this tenant
-                    let limiters = self.tenant_limiters.read().unwrap();
+                    let limiters = self
+                        .tenant_limiters
+                        .read()
+                        .unwrap_or_else(|e| e.into_inner());
                     if let Some(limiter) = limiters.get(tid) {
                         return limiter.clone();
                     }
                     drop(limiters);
 
-                    let mut limiters = self.tenant_limiters.write().unwrap();
+                    let mut limiters = self
+                        .tenant_limiters
+                        .write()
+                        .unwrap_or_else(|e| e.into_inner());
                     let limiter = Arc::new(RateLimiter::direct(quota));
                     limiters.insert(tid.to_string(), limiter.clone());
                     limiter
                 } else {
                     // Use default quota for this tenant
-                    let limiters = self.tenant_limiters.read().unwrap();
+                    let limiters = self
+                        .tenant_limiters
+                        .read()
+                        .unwrap_or_else(|e| e.into_inner());
                     if let Some(limiter) = limiters.get(tid) {
                         return limiter.clone();
                     }
@@ -101,7 +110,10 @@ impl RateLimitState {
                             .unwrap_or(NonZeroU32::new(10).unwrap()),
                     );
 
-                    let mut limiters = self.tenant_limiters.write().unwrap();
+                    let mut limiters = self
+                        .tenant_limiters
+                        .write()
+                        .unwrap_or_else(|e| e.into_inner());
                     let limiter = Arc::new(RateLimiter::direct(quota));
                     limiters.insert(tid.to_string(), limiter.clone());
                     limiter

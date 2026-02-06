@@ -35,15 +35,16 @@ use xavyo_api_auth::{
     delegation_router, devices_router, jwt_auth_middleware, key_management_router, me_router,
     mfa_router, org_security_policy_router, passwordless_admin_router, passwordless_router,
     public_router, revocation_router, users_router as auth_users_router, AuditService, AuthService,
-    AuthState, EmailRateLimiter, JwtPublicKey, JwtPublicKeys, KeyService, LockoutService,
-    MfaService, MockEmailSender, RateLimitConfig, RateLimiter, RevocationCache, SessionService,
-    TokenConfig, TokenService, TotpEncryption,
+    AuthState, EmailConfig, EmailRateLimiter, JwtPublicKey, JwtPublicKeys, KeyService,
+    LockoutService, MfaService, MockEmailSender, RateLimitConfig, RateLimiter, RevocationCache,
+    SessionService, SmtpEmailSender, TokenConfig, TokenService, TotpEncryption,
 };
 use xavyo_api_authorization::authorization_router;
 use xavyo_api_connectors::{
-    connector_routes_full, reconciliation_global_routes, scim_target_routes, ConnectorService,
-    ConnectorState, MappingService, ReconciliationService, ReconciliationState, ScimTargetService,
-    ScimTargetState, SyncService, SyncState,
+    connector_routes_full, job_routes, operation_routes, reconciliation_global_routes,
+    scim_target_routes, ConnectorService, ConnectorState, JobService, JobState, MappingService,
+    OperationService, OperationState, ReconciliationService, ReconciliationState,
+    ScimTargetService, ScimTargetState, SyncService, SyncState,
 };
 use xavyo_api_governance::governance_router;
 use xavyo_api_import::{import_router, ImportState};
@@ -215,8 +216,25 @@ async fn main() {
 
     let email_rate_limiter = EmailRateLimiter::new();
 
-    // Use MockEmailSender for now (replace with SmtpEmailSender in production)
-    let email_sender = Arc::new(MockEmailSender::new());
+    // Use SmtpEmailSender when SMTP env vars are configured, otherwise fall back to mock
+    let email_sender: Arc<dyn xavyo_api_auth::EmailSender> = match EmailConfig::from_env() {
+        Ok(email_config) => {
+            info!(
+                smtp_host = %email_config.smtp_host,
+                from_address = %email_config.from_address,
+                "SMTP email sender configured"
+            );
+            Arc::new(SmtpEmailSender::new(email_config))
+        }
+        Err(_) => {
+            tracing::warn!(
+                target: "security",
+                "SMTP not configured — using mock email sender. Set EMAIL_SMTP_HOST, \
+                 EMAIL_SMTP_USERNAME, EMAIL_SMTP_PASSWORD, EMAIL_FROM_ADDRESS to enable real emails."
+            );
+            Arc::new(MockEmailSender::new())
+        }
+    };
 
     // Create MFA service for TOTP authentication
     let totp_encryption = match TotpEncryption::from_key(&config.mfa_encryption_key) {
@@ -755,10 +773,17 @@ async fn main() {
     let reconciliation_service = Arc::new(ReconciliationService::new(pool.clone()));
     let reconciliation_state = ReconciliationState::new(reconciliation_service);
 
-    // Combined connector routes with sync and reconciliation
+    // Operation tracking routes (F160 - Job Tracking)
+    let operation_service = Arc::new(OperationService::new(pool.clone()));
+    let operation_state = OperationState::new(operation_service);
+    let job_service = Arc::new(JobService::new(Arc::new(pool.clone())));
+    let job_state = JobState::new(job_service);
+
+    // Combined connector routes with sync, reconciliation, and job tracking
     // F113: Support both API key and JWT authentication for programmatic access
     let connector_routes =
         connector_routes_full(connector_state, sync_state, reconciliation_state.clone())
+            .merge(job_routes(job_state))
             .layer(axum::middleware::from_fn(jwt_auth_middleware))
             .layer(axum::middleware::from_fn(api_key_auth_middleware))
             .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
@@ -768,6 +793,18 @@ async fn main() {
                     .require_tenant(true)
                     .build(),
             ));
+
+    // Operation routes (F160 - provisioning operations, mounted at /operations)
+    let operation_api_routes = operation_routes(operation_state)
+        .layer(axum::middleware::from_fn(jwt_auth_middleware))
+        .layer(axum::middleware::from_fn(api_key_auth_middleware))
+        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+        .layer(axum::Extension(pool.clone()))
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(true)
+                .build(),
+        ));
 
     // Global reconciliation routes (F049 - not under /connectors)
     // F113: Support both API key and JWT authentication for programmatic access
@@ -1051,6 +1088,8 @@ async fn main() {
         .nest("/governance", governance_routes)
         // Connector routes (F045 - Connector Framework)
         .nest("/connectors", connector_routes)
+        // Provisioning operation routes (F160 - Job Tracking)
+        .nest("/operations", operation_api_routes)
         // Global reconciliation routes (F049 - at root level)
         .merge(reconciliation_global)
         // SCIM Outbound Provisioning Target routes (F087)
@@ -1431,16 +1470,14 @@ impl xavyo_api_social::AuthService for SocialAuthAdapter {
             .ok()
             .flatten();
 
+        // Fetch actual user roles from DB (same pattern as login.rs/verify.rs/recovery.rs)
+        let roles = xavyo_db::UserRole::get_user_roles(&self.pool, user_id)
+            .await
+            .unwrap_or_else(|_| vec!["user".to_string()]);
+
         // Issue tokens with 15 minute access token, 7 day refresh token
         match token_service
-            .create_tokens(
-                typed_user_id,
-                typed_tenant_id,
-                vec!["user".to_string()],
-                email,
-                None,
-                None,
-            )
+            .create_tokens(typed_user_id, typed_tenant_id, roles, email, None, None)
             .await
         {
             Ok((access_token, refresh_token, expires_in)) => {
