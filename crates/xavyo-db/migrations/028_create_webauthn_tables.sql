@@ -143,31 +143,19 @@ ALTER TABLE webauthn_audit_log ENABLE ROW LEVEL SECURITY;
 -- RLS Policies for tenant isolation
 CREATE POLICY tenant_isolation_webauthn_creds ON user_webauthn_credentials
     FOR ALL
-    USING (tenant_id = COALESCE(
-        NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-        tenant_id
-    ));
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 CREATE POLICY tenant_isolation_webauthn_challenges ON webauthn_challenges
     FOR ALL
-    USING (tenant_id = COALESCE(
-        NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-        tenant_id
-    ));
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 CREATE POLICY tenant_isolation_webauthn_policies ON tenant_webauthn_policies
     FOR ALL
-    USING (tenant_id = COALESCE(
-        NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-        tenant_id
-    ));
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 CREATE POLICY tenant_isolation_webauthn_audit ON webauthn_audit_log
     FOR ALL
-    USING (tenant_id = COALESCE(
-        NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-        tenant_id
-    ));
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- ============================================================================
 -- Trigger for updated_at timestamp

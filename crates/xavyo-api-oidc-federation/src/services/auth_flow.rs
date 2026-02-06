@@ -247,7 +247,7 @@ impl AuthFlowService {
             .await?;
 
         // Mark session as used
-        FederatedAuthSession::mark_used(&self.pool, session.id).await?;
+        FederatedAuthSession::mark_used(&self.pool, session.tenant_id, session.id).await?;
 
         tracing::info!(
             tenant_id = %session.tenant_id,

@@ -41,7 +41,7 @@ pub async fn list_campaigns(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
     let page = (offset / limit) + 1;
 
     let (campaigns, total) = state

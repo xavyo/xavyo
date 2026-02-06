@@ -386,8 +386,13 @@ impl WebhookService {
         url: &str,
         payload: &A2aTaskWebhookPayload,
     ) {
-        let payload_json =
-            serde_json::to_string(payload).expect("Failed to serialize webhook payload");
+        let payload_json = match serde_json::to_string(payload) {
+            Ok(json) => json,
+            Err(e) => {
+                error!(task_id = %task_id, error = %e, "Failed to serialize webhook payload");
+                return;
+            }
+        };
 
         for attempt in 1..=MAX_DELIVERY_ATTEMPTS {
             match self.deliver_once(url, &payload_json).await {
@@ -495,8 +500,9 @@ impl WebhookService {
 
         type HmacSha256 = Hmac<Sha256>;
 
-        let mut mac =
-            HmacSha256::new_from_slice(self.signing_secret.as_bytes()).expect("Invalid key length");
+        // SAFETY: HMAC-SHA256 accepts any key length, so new_from_slice never fails.
+        let mut mac = HmacSha256::new_from_slice(self.signing_secret.as_bytes())
+            .expect("HMAC-SHA256 accepts any key length");
         mac.update(payload.as_bytes());
         let result = mac.finalize();
 

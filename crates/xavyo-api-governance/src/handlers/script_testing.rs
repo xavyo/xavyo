@@ -9,6 +9,7 @@ use axum::{
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
+use validator::Validate;
 use xavyo_auth::JwtClaims;
 
 use crate::{
@@ -25,6 +26,29 @@ pub struct RawDryRunRequest {
 
     /// Simulated provisioning context for the dry run.
     pub context: serde_json::Value,
+}
+
+impl Validate for RawDryRunRequest {
+    fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        let mut errors = validator::ValidationErrors::new();
+        // Max 1MB script body
+        if self.script_body.len() > 1_048_576 {
+            let mut err = validator::ValidationError::new("length");
+            err.message = Some("script_body must be at most 1MB".into());
+            errors.add("script_body", err);
+        }
+        // Max 100KB context
+        if self.context.to_string().len() > 102_400 {
+            let mut err = validator::ValidationError::new("length");
+            err.message = Some("context must be at most 100KB".into());
+            errors.add("context", err);
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 /// Validate a script for syntax errors (without executing it).
@@ -128,6 +152,8 @@ pub async fn dry_run_raw(
     Extension(claims): Extension<JwtClaims>,
     Json(body): Json<RawDryRunRequest>,
 ) -> ApiResult<Json<DryRunResponse>> {
+    body.validate()
+        .map_err(|e| ApiGovernanceError::Validation(e.to_string()))?;
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

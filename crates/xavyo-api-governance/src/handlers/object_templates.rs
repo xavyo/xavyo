@@ -6,6 +6,7 @@
 
 use axum::{
     extract::{Path, Query, State},
+    http::StatusCode,
     Extension, Json,
 };
 use uuid::Uuid;
@@ -63,7 +64,7 @@ pub async fn list_templates(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = ObjectTemplateFilter {
         status: query.status,
@@ -247,7 +248,7 @@ pub async fn delete_template(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -259,7 +260,7 @@ pub async fn delete_template(
         .delete(tenant_id, id, actor_id)
         .await?;
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ============================================================================
@@ -371,7 +372,7 @@ pub async fn list_rules(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(100).min(500);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = TemplateRuleFilter {
         template_id: Some(template_id),
@@ -618,7 +619,7 @@ pub async fn list_versions(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (versions, total) = state
         .object_template_service
@@ -703,7 +704,7 @@ pub async fn list_events(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (events, total) = state
         .object_template_service
@@ -1192,7 +1193,7 @@ pub async fn delete_merge_policy(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path((template_id, policy_id)): Path<(Uuid, Uuid)>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -1209,7 +1210,7 @@ pub async fn delete_merge_policy(
         .delete(tenant_id, policy_id)
         .await?;
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ============================================================================
@@ -1334,7 +1335,7 @@ pub async fn delete_exclusion(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path((template_id, exclusion_id)): Path<(Uuid, Uuid)>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -1357,7 +1358,7 @@ pub async fn delete_exclusion(
         ));
     }
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ============================================================================

@@ -255,7 +255,7 @@ impl CertificateService {
                 .map_err(ApiAgentsError::Database)?;
 
         // Count total (we'd need a count query, for now use len as approximation if < limit)
-        let total = if certificates.len() < limit as usize && offset == 0 {
+        let total = if certificates.len() < limit.max(0) as usize && offset == 0 {
             certificates.len() as i64
         } else {
             // Would need a proper count query

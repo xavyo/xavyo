@@ -17,20 +17,34 @@ impl AssignRoleExecutor {
         Self
     }
 
+    /// Get role name from gov_roles by role_id and tenant_id.
+    async fn get_role_name(pool: &PgPool, tenant_id: Uuid, role_id: Uuid) -> Option<String> {
+        let result: Option<(String,)> =
+            sqlx::query_as("SELECT name FROM gov_roles WHERE id = $1 AND tenant_id = $2")
+                .bind(role_id)
+                .bind(tenant_id)
+                .fetch_optional(pool)
+                .await
+                .ok()
+                .flatten();
+
+        result.map(|(name,)| name)
+    }
+
     /// Check if the user already has the specified role.
     async fn user_has_role(
         pool: &PgPool,
         user_id: Uuid,
-        role_id: Uuid,
+        role_name: &str,
     ) -> Result<bool, sqlx::Error> {
         let count: (i64,) = sqlx::query_as(
             r#"
             SELECT COUNT(*) FROM user_roles
-            WHERE user_id = $1 AND role_id = $2
+            WHERE user_id = $1 AND role_name = $2
             "#,
         )
         .bind(user_id)
-        .bind(role_id)
+        .bind(role_name)
         .fetch_one(pool)
         .await?;
 
@@ -38,45 +52,20 @@ impl AssignRoleExecutor {
     }
 
     /// Assign the role to the user.
-    async fn assign_role(
-        pool: &PgPool,
-        tenant_id: Uuid,
-        user_id: Uuid,
-        role_id: Uuid,
-        granted_by: Uuid,
-        justification: &str,
-    ) -> Result<(), sqlx::Error> {
-        let assignment_id = Uuid::new_v4();
-
+    async fn assign_role(pool: &PgPool, user_id: Uuid, role_name: &str) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
-            INSERT INTO user_roles (id, tenant_id, user_id, role_id, granted_by, granted_at, justification, created_at)
-            VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW())
-            ON CONFLICT (user_id, role_id) DO NOTHING
+            INSERT INTO user_roles (user_id, role_name, created_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (user_id, role_name) DO NOTHING
             "#,
         )
-        .bind(assignment_id)
-        .bind(tenant_id)
         .bind(user_id)
-        .bind(role_id)
-        .bind(granted_by)
-        .bind(justification)
+        .bind(role_name)
         .execute(pool)
         .await?;
 
         Ok(())
-    }
-
-    /// Get role name for logging.
-    async fn get_role_name(pool: &PgPool, role_id: Uuid) -> Option<String> {
-        let result: Option<(String,)> = sqlx::query_as("SELECT name FROM gov_roles WHERE id = $1")
-            .bind(role_id)
-            .fetch_optional(pool)
-            .await
-            .ok()
-            .flatten();
-
-        result.map(|(name,)| name)
     }
 }
 
@@ -104,11 +93,15 @@ impl ActionExecutor for AssignRoleExecutor {
             None => return ExecutionResult::failure("Missing role_id parameter"),
         };
 
+        // Resolve role_id to role_name via gov_roles
+        let role_name = match Self::get_role_name(pool, ctx.tenant_id, role_id).await {
+            Some(name) => name,
+            None => return ExecutionResult::failure("Role not found for the given tenant"),
+        };
+
         // Check if user already has the role
-        match Self::user_has_role(pool, target_user_id, role_id).await {
+        match Self::user_has_role(pool, target_user_id, &role_name).await {
             Ok(true) => {
-                // User already has the role - skip
-                let role_name = Self::get_role_name(pool, role_id).await;
                 return ExecutionResult::skipped(serde_json::json!({
                     "has_role": true,
                     "role_id": role_id.to_string(),
@@ -122,31 +115,19 @@ impl ActionExecutor for AssignRoleExecutor {
         }
 
         // Assign the role
-        match Self::assign_role(
-            pool,
-            ctx.tenant_id,
-            target_user_id,
-            role_id,
-            ctx.initiated_by,
-            &ctx.justification,
-        )
-        .await
-        {
-            Ok(()) => {
-                let role_name = Self::get_role_name(pool, role_id).await;
-                ExecutionResult::success(
-                    serde_json::json!({
-                        "has_role": false,
-                        "role_id": role_id.to_string(),
-                        "role_name": role_name
-                    }),
-                    serde_json::json!({
-                        "has_role": true,
-                        "role_id": role_id.to_string(),
-                        "role_name": role_name
-                    }),
-                )
-            }
+        match Self::assign_role(pool, target_user_id, &role_name).await {
+            Ok(()) => ExecutionResult::success(
+                serde_json::json!({
+                    "has_role": false,
+                    "role_id": role_id.to_string(),
+                    "role_name": role_name
+                }),
+                serde_json::json!({
+                    "has_role": true,
+                    "role_id": role_id.to_string(),
+                    "role_name": role_name
+                }),
+            ),
             Err(e) => ExecutionResult::failure(format!("Failed to assign role: {e}")),
         }
     }
@@ -154,7 +135,7 @@ impl ActionExecutor for AssignRoleExecutor {
     async fn would_change(
         &self,
         pool: &PgPool,
-        _ctx: &ExecutionContext,
+        ctx: &ExecutionContext,
         target_user_id: Uuid,
         params: &serde_json::Value,
     ) -> (bool, Option<serde_json::Value>, Option<serde_json::Value>) {
@@ -166,7 +147,12 @@ impl ActionExecutor for AssignRoleExecutor {
             None => return (false, None, None),
         };
 
-        match Self::user_has_role(pool, target_user_id, role_id).await {
+        let role_name = match Self::get_role_name(pool, ctx.tenant_id, role_id).await {
+            Some(name) => name,
+            None => return (false, None, None),
+        };
+
+        match Self::user_has_role(pool, target_user_id, &role_name).await {
             Ok(true) => (false, Some(serde_json::json!({"has_role": true})), None),
             Ok(false) => (
                 true,

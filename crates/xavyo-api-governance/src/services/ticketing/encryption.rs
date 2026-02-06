@@ -63,14 +63,14 @@ pub fn encrypt_credentials(plaintext: &serde_json::Value) -> Result<String, Tick
     // Generate random nonce
     let mut nonce_bytes = [0u8; NONCE_LENGTH];
     OsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    let nonce = Nonce::from(nonce_bytes);
 
     // Serialize and encrypt
     let plaintext_bytes = serde_json::to_vec(plaintext)
         .map_err(|e| TicketingError::EncryptionError(format!("JSON serialization failed: {e}")))?;
 
     let ciphertext = cipher
-        .encrypt(nonce, plaintext_bytes.as_slice())
+        .encrypt(&nonce, plaintext_bytes.as_slice())
         .map_err(|e| TicketingError::EncryptionError(format!("Encryption failed: {e}")))?;
 
     // Combine nonce + ciphertext and encode as base64
@@ -102,11 +102,14 @@ pub fn decrypt_credentials(encrypted: &str) -> Result<serde_json::Value, Ticketi
 
     // Split nonce and ciphertext
     let (nonce_bytes, ciphertext) = combined.split_at(NONCE_LENGTH);
-    let nonce = Nonce::from_slice(nonce_bytes);
+    let nonce_array: [u8; NONCE_LENGTH] = nonce_bytes
+        .try_into()
+        .map_err(|_| TicketingError::EncryptionError("invalid nonce length".to_string()))?;
+    let nonce = Nonce::from(nonce_array);
 
     // Decrypt
     let plaintext_bytes = cipher
-        .decrypt(nonce, ciphertext)
+        .decrypt(&nonce, ciphertext)
         .map_err(|e| TicketingError::EncryptionError(format!("Decryption failed: {e}")))?;
 
     // Deserialize

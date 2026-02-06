@@ -129,7 +129,7 @@ impl MfaService {
             .map_err(ApiAuthError::DatabaseInternal)?;
 
         // Check if user already has MFA enabled
-        if let Some(existing) = UserTotpSecret::find_by_user_id(&mut *tx, user_id)
+        if let Some(existing) = UserTotpSecret::find_by_user_id(&mut *tx, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)?
         {
@@ -137,7 +137,7 @@ impl MfaService {
                 return Err(ApiAuthError::MfaAlreadyEnabled);
             }
             // Delete incomplete setup to allow retry
-            UserTotpSecret::delete_if_not_enabled(&mut *tx, user_id)
+            UserTotpSecret::delete_if_not_enabled(&mut *tx, tenant_id, user_id)
                 .await
                 .map_err(ApiAuthError::Database)?;
         }
@@ -246,7 +246,7 @@ impl MfaService {
             .map_err(ApiAuthError::DatabaseInternal)?;
 
         // Get pending TOTP secret
-        let secret = UserTotpSecret::find_by_user_id(&mut *tx, user_id)
+        let secret = UserTotpSecret::find_by_user_id(&mut *tx, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)?
             .ok_or(ApiAuthError::MfaSetupNotInitiated)?;
@@ -257,7 +257,7 @@ impl MfaService {
 
         if secret.is_setup_expired() {
             // Clean up expired setup
-            UserTotpSecret::delete_if_not_enabled(&mut *tx, user_id)
+            UserTotpSecret::delete_if_not_enabled(&mut *tx, tenant_id, user_id)
                 .await
                 .map_err(ApiAuthError::Database)?;
             return Err(ApiAuthError::MfaSetupExpired);
@@ -274,7 +274,7 @@ impl MfaService {
         }
 
         // Enable MFA
-        UserTotpSecret::enable(&mut *tx, user_id)
+        UserTotpSecret::enable(&mut *tx, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -322,7 +322,7 @@ impl MfaService {
             .map_err(ApiAuthError::DatabaseInternal)?;
 
         // Get TOTP secret
-        let secret = UserTotpSecret::find_by_user_id(&mut *tx, user_id)
+        let secret = UserTotpSecret::find_by_user_id(&mut *tx, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)?
             .ok_or(ApiAuthError::MfaNotEnabled)?;
@@ -368,7 +368,7 @@ impl MfaService {
 
         if self.verify_totp_code(&secret_bytes, code)? {
             // Success - record and return
-            UserTotpSecret::record_success(&mut *tx, user_id)
+            UserTotpSecret::record_success(&mut *tx, tenant_id, user_id)
                 .await
                 .map_err(ApiAuthError::Database)?;
 
@@ -392,6 +392,7 @@ impl MfaService {
             // Failure - record and possibly lock
             let attempts = UserTotpSecret::record_failure(
                 &mut *tx,
+                tenant_id,
                 user_id,
                 MAX_FAILED_ATTEMPTS,
                 LOCKOUT_MINUTES,
@@ -463,7 +464,7 @@ impl MfaService {
         let code_hash = Self::hash_recovery_code(&normalized);
 
         // Try to mark as used (constant-time lookup via database)
-        let marked = UserRecoveryCode::mark_used(&mut *tx, user_id, &code_hash)
+        let marked = UserRecoveryCode::mark_used(&mut *tx, tenant_id, user_id, &code_hash)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -484,7 +485,7 @@ impl MfaService {
             .map_err(ApiAuthError::Database)?;
 
             // Reset TOTP lockout since they successfully authenticated
-            UserTotpSecret::record_success(&mut *tx, user_id)
+            UserTotpSecret::record_success(&mut *tx, tenant_id, user_id)
                 .await
                 .map_err(ApiAuthError::Database)?;
 
@@ -492,7 +493,7 @@ impl MfaService {
             Ok(())
         } else {
             // Check if user has any remaining codes
-            let remaining = UserRecoveryCode::count_unused(&mut *tx, user_id)
+            let remaining = UserRecoveryCode::count_unused(&mut *tx, tenant_id, user_id)
                 .await
                 .map_err(ApiAuthError::Database)?;
 
@@ -522,7 +523,7 @@ impl MfaService {
             .map_err(ApiAuthError::DatabaseInternal)?;
 
         // Verify MFA is enabled
-        let secret = UserTotpSecret::find_by_user_id(&mut *tx, user_id)
+        let secret = UserTotpSecret::find_by_user_id(&mut *tx, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)?
             .ok_or(ApiAuthError::MfaNotEnabled)?;
@@ -532,7 +533,7 @@ impl MfaService {
         }
 
         // Delete existing codes
-        UserRecoveryCode::delete_all_for_user(&mut *tx, user_id)
+        UserRecoveryCode::delete_all_for_user(&mut *tx, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -610,7 +611,7 @@ impl MfaService {
             .map_err(ApiAuthError::DatabaseInternal)?;
 
         // Get TOTP secret
-        let secret = UserTotpSecret::find_by_user_id(&mut *tx, user_id)
+        let secret = UserTotpSecret::find_by_user_id(&mut *tx, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)?
             .ok_or(ApiAuthError::MfaNotEnabled)?;
@@ -630,11 +631,11 @@ impl MfaService {
         }
 
         // Delete TOTP secret and recovery codes
-        UserTotpSecret::delete(&mut *tx, user_id)
+        UserTotpSecret::delete(&mut *tx, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)?;
 
-        UserRecoveryCode::delete_all_for_user(&mut *tx, user_id)
+        UserRecoveryCode::delete_all_for_user(&mut *tx, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -707,7 +708,7 @@ impl MfaService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
-        let secret = UserTotpSecret::find_by_user_id(&mut *conn, user_id)
+        let secret = UserTotpSecret::find_by_user_id(&mut *conn, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -718,7 +719,7 @@ impl MfaService {
         };
 
         let recovery_codes_remaining = if totp_enabled {
-            UserRecoveryCode::count_unused(&mut *conn, user_id)
+            UserRecoveryCode::count_unused(&mut *conn, tenant_id, user_id)
                 .await
                 .map_err(ApiAuthError::Database)?
         } else {
@@ -744,7 +745,7 @@ impl MfaService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
-        let secret = UserTotpSecret::find_by_user_id(&mut *conn, user_id)
+        let secret = UserTotpSecret::find_by_user_id(&mut *conn, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)?;
 

@@ -126,7 +126,7 @@ impl HealthService {
 
         // Query database
         let health = self.get_health(tenant_id, connector_id).await?;
-        let is_online = health.map_or(true, |h| h.is_online); // Assume online if no record
+        let is_online = health.is_none_or(|h| h.is_online); // Assume online if no record
 
         // Update cache
         {

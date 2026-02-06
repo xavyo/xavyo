@@ -181,7 +181,7 @@ impl MetricsService {
         let user_count: i64 = sqlx::query_scalar(
             r"
             SELECT COUNT(DISTINCT user_id)
-            FROM user_groups
+            FROM group_memberships
             WHERE tenant_id = $1 AND group_id = $2
             ",
         )
@@ -196,10 +196,10 @@ impl MetricsService {
         let active_user_count: i64 = sqlx::query_scalar(
             r"
             SELECT COUNT(DISTINCT ug.user_id)
-            FROM user_groups ug
-            LEFT JOIN login_history lh ON lh.user_id = ug.user_id AND lh.tenant_id = ug.tenant_id
+            FROM group_memberships ug
+            LEFT JOIN sessions s ON s.user_id = ug.user_id AND s.tenant_id = ug.tenant_id
             WHERE ug.tenant_id = $1 AND ug.group_id = $2
-              AND (lh.created_at > NOW() - INTERVAL '30 days' OR ug.created_at > NOW() - INTERVAL '30 days')
+              AND (s.created_at > NOW() - INTERVAL '30 days' OR ug.created_at > NOW() - INTERVAL '30 days')
             ",
         )
         .bind(tenant_id)

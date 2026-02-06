@@ -6,6 +6,7 @@
 
 use axum::{
     extract::{Path, Query, State},
+    http::StatusCode,
     Extension, Json,
 };
 use uuid::Uuid;
@@ -59,7 +60,7 @@ pub async fn list_meta_roles(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = MetaRoleFilter {
         status: query.status,
@@ -277,7 +278,7 @@ pub async fn delete_meta_role(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -289,7 +290,7 @@ pub async fn delete_meta_role(
         .delete(tenant_id, id, deleted_by)
         .await?;
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Enable a meta-role.
@@ -717,7 +718,7 @@ pub async fn list_inheritances(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let inheritances = state
         .meta_role_matching_service
@@ -806,7 +807,7 @@ pub async fn list_conflicts(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (conflicts, total) = state
         .meta_role_conflict_service
@@ -1088,7 +1089,7 @@ pub async fn list_events(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     // Events are scoped to a specific meta-role
     let meta_role_id = query.meta_role_id.ok_or_else(|| {

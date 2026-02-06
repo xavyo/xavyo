@@ -205,9 +205,60 @@ impl IntoResponse for SamlError {
             }
         };
 
+        let message = match &self {
+            SamlError::DatabaseError(e) => {
+                tracing::error!("SAML database error: {:?}", e);
+                "A database error occurred".to_string()
+            }
+            SamlError::InternalError(msg) => {
+                tracing::error!("SAML internal error: {}", msg);
+                "An internal error occurred".to_string()
+            }
+            SamlError::SessionError(SessionError::StorageError(msg)) => {
+                tracing::error!("SAML session storage error: {}", msg);
+                "A session storage error occurred".to_string()
+            }
+            SamlError::CertificateParseError(_) => "Certificate parsing error".to_string(),
+            SamlError::PrivateKeyError(_) => {
+                tracing::error!("SAML private key error");
+                "A private key error occurred".to_string()
+            }
+            SamlError::AssertionGenerationFailed(_) => {
+                tracing::error!("SAML assertion generation failed");
+                "Assertion generation failed".to_string()
+            }
+            SamlError::MetadataGenerationFailed(_) => {
+                tracing::error!("SAML metadata generation failed");
+                "Metadata generation failed".to_string()
+            }
+            SamlError::SignatureValidationFailed(_) => "Signature validation failed".to_string(),
+            SamlError::InvalidAuthnRequest(_) => {
+                "Invalid SAML authentication request".to_string()
+            }
+            SamlError::InvalidSpCertificate(_) => {
+                "Invalid Service Provider certificate".to_string()
+            }
+            SamlError::AcsUrlMismatch { .. } => {
+                "ACS URL does not match any registered URL".to_string()
+            }
+            SamlError::InvalidAttributeMapping(_) => {
+                "Invalid attribute mapping configuration".to_string()
+            }
+            // Safe user-facing messages (contain only client-provided IDs/values)
+            SamlError::SessionError(_)
+            | SamlError::UnknownServiceProvider(_)
+            | SamlError::DisabledServiceProvider(_)
+            | SamlError::NoActiveCertificate
+            | SamlError::NotAuthenticated
+            | SamlError::UnsupportedNameIdFormat(_)
+            | SamlError::EntityIdConflict(_)
+            | SamlError::ServiceProviderNotFound(_)
+            | SamlError::CertificateNotFound(_) => self.to_string(),
+        };
+
         let body = ErrorResponse {
             error: error_code.to_string(),
-            message: self.to_string(),
+            message,
             saml_status: saml_status.map(String::from),
         };
 

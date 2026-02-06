@@ -161,6 +161,9 @@ pub async fn create_assignment(
     publisher: Option<Extension<EventPublisher>>,
     Json(request): Json<CreateAssignmentRequest>,
 ) -> ApiResult<(StatusCode, Json<AssignmentResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -295,6 +298,9 @@ pub async fn revoke_assignment(
     publisher: Option<Extension<EventPublisher>>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

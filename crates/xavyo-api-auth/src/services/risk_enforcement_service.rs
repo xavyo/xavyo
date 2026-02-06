@@ -543,7 +543,12 @@ impl RiskEnforcementService {
 
         // Normalize to 0-100
         let total_score = if total_weight > 0.0 {
-            ((total_weighted / total_weight) * 10.0).min(100.0) as i32
+            let raw = (total_weighted / total_weight) * 10.0;
+            if raw.is_finite() {
+                raw.clamp(0.0, 100.0) as i32
+            } else {
+                0
+            }
         } else {
             0
         };

@@ -291,9 +291,28 @@ impl UserService {
                     serde_json::json!({"min_length": 8, "actual": request.password.len()}),
                 ),
             });
+        } else if request.password.len() > 128 {
+            validation_errors.push(FieldValidationError {
+                field: "password".to_string(),
+                code: "too_long".to_string(),
+                message: "Password must not exceed 128 characters".to_string(),
+                constraints: Some(
+                    serde_json::json!({"max_length": 128, "actual": request.password.len()}),
+                ),
+            });
         }
 
         // Validate roles
+        if request.roles.len() > 20 {
+            validation_errors.push(FieldValidationError {
+                field: "roles".to_string(),
+                code: "too_many".to_string(),
+                message: "Cannot assign more than 20 roles".to_string(),
+                constraints: Some(
+                    serde_json::json!({"max_count": 20, "actual": request.roles.len()}),
+                ),
+            });
+        }
         if request.roles.is_empty() {
             validation_errors.push(FieldValidationError {
                 field: "roles".to_string(),
@@ -558,6 +577,16 @@ impl UserService {
 
         // Validate roles if provided
         if let Some(ref new_roles) = request.roles {
+            if new_roles.len() > 20 {
+                validation_errors.push(FieldValidationError {
+                    field: "roles".to_string(),
+                    code: "too_many".to_string(),
+                    message: "Cannot assign more than 20 roles".to_string(),
+                    constraints: Some(
+                        serde_json::json!({"max_count": 20, "actual": new_roles.len()}),
+                    ),
+                });
+            }
             if new_roles.is_empty() {
                 validation_errors.push(FieldValidationError {
                     field: "roles".to_string(),
@@ -914,6 +943,9 @@ mod tests {
             manager_id: None,
             // Custom attributes (F070)
             custom_attributes: serde_json::json!({}),
+            // Archetype fields (F058)
+            archetype_id: None,
+            archetype_custom_attrs: serde_json::json!({}),
         };
 
         let roles = vec!["admin".to_string(), "user".to_string()];
@@ -959,6 +991,9 @@ mod tests {
             manager_id: None,
             // Custom attributes (F070)
             custom_attributes: serde_json::json!({}),
+            // Archetype fields (F058)
+            archetype_id: None,
+            archetype_custom_attrs: serde_json::json!({}),
         };
 
         let roles = vec!["user".to_string()];

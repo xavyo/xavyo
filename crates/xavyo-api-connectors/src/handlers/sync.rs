@@ -473,8 +473,8 @@ pub async fn list_changes(
         .list_changes(
             connector_id,
             query.status.as_deref(),
-            query.limit.unwrap_or(50),
-            query.offset.unwrap_or(0),
+            query.limit.unwrap_or(50).min(100),
+            query.offset.unwrap_or(0).max(0),
         )
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?;
@@ -633,7 +633,7 @@ pub async fn list_sync_conflicts(
         .list_conflicts(
             connector_id,
             query.status.as_deref(),
-            query.limit.unwrap_or(50),
+            query.limit.unwrap_or(50).min(100),
         )
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?;

@@ -40,7 +40,7 @@ pub async fn list_templates(
         .as_uuid();
 
     let limit = query.limit.min(100);
-    let offset = query.offset;
+    let offset = query.offset.max(0);
 
     let (templates, total) = state
         .report_template_service

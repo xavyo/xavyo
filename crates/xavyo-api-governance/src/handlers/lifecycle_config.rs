@@ -709,14 +709,12 @@ pub async fn update_state_actions(
     let entry_actions_json = request
         .entry_actions
         .as_ref()
-        .map(|actions| serde_json::to_value(actions).ok())
-        .flatten();
+        .and_then(|actions| serde_json::to_value(actions).ok());
 
     let exit_actions_json = request
         .exit_actions
         .as_ref()
-        .map(|actions| serde_json::to_value(actions).ok())
-        .flatten();
+        .and_then(|actions| serde_json::to_value(actions).ok());
 
     // Update the state with new actions
     let updated_state = GovLifecycleState::update_actions(
@@ -840,11 +838,7 @@ pub async fn get_user_lifecycle_status(
         effective.map(|e| LifecycleModelInfo {
             id: e.model_id,
             name: e.model_name,
-            source: if e.is_inherited {
-                LifecycleModelSource::Archetype // Simplified - use Archetype for both
-            } else {
-                LifecycleModelSource::Archetype
-            },
+            source: LifecycleModelSource::Archetype, // Simplified - same source regardless
         })
     } else {
         None
@@ -864,7 +858,7 @@ pub async fn get_user_lifecycle_status(
                 description: s.description,
                 is_initial: s.is_initial,
                 is_terminal: s.is_terminal,
-                entitlement_action: s.entitlement_action.into(),
+                entitlement_action: s.entitlement_action,
                 position: s.position,
                 object_count: 0,
                 created_at: s.created_at,

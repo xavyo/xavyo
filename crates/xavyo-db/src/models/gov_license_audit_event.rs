@@ -456,9 +456,9 @@ impl LicenseAuditEventWithDetails {
                 e.action, e.actor_id, actor.email as actor_email,
                 e.details, e.created_at
             FROM gov_license_audit_events e
-            LEFT JOIN gov_license_pools p ON e.license_pool_id = p.id
-            LEFT JOIN users u ON e.user_id = u.id
-            JOIN users actor ON e.actor_id = actor.id
+            LEFT JOIN gov_license_pools p ON e.license_pool_id = p.id AND p.tenant_id = e.tenant_id
+            LEFT JOIN users u ON e.user_id = u.id AND u.tenant_id = e.tenant_id
+            JOIN users actor ON e.actor_id = actor.id AND actor.tenant_id = e.tenant_id
             WHERE e.tenant_id = $1
             ",
         );

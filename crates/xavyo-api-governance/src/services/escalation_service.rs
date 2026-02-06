@@ -730,16 +730,14 @@ impl EscalationService {
     /// Get tenant administrators for escalation.
     async fn get_tenant_admins(&self, tenant_id: Uuid) -> Result<Vec<Uuid>> {
         // Query users with admin role in this tenant
-        // This is a simplified implementation - in production, you'd check
-        // role assignments more thoroughly
+        // user_roles maps (user_id, role_name) — no role_id column
         let rows: Vec<(Uuid,)> = sqlx::query_as(
             r"
             SELECT DISTINCT u.id
             FROM users u
             JOIN user_roles ur ON ur.user_id = u.id
-            JOIN roles r ON r.id = ur.role_id
             WHERE u.tenant_id = $1
-              AND r.name IN ('admin', 'tenant_admin', 'governance_admin')
+              AND ur.role_name IN ('admin', 'tenant_admin', 'governance_admin')
               AND u.is_active = true
             ORDER BY u.id
             LIMIT 10

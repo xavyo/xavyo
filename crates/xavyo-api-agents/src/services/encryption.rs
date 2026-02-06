@@ -85,11 +85,11 @@ pub fn encrypt_credential_value(plaintext: &str) -> Result<String, EncryptionErr
     // Generate random nonce
     let mut nonce_bytes = [0u8; NONCE_LENGTH];
     OsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    let nonce = Nonce::from(nonce_bytes);
 
     // Encrypt
     let ciphertext = cipher
-        .encrypt(nonce, plaintext.as_bytes())
+        .encrypt(&nonce, plaintext.as_bytes())
         .map_err(|e| EncryptionError::EncryptionFailed(format!("Encryption failed: {e}")))?;
 
     // Combine nonce + ciphertext and encode as base64
@@ -122,11 +122,14 @@ pub fn decrypt_credential_value(encrypted: &str) -> Result<String, EncryptionErr
 
     // Split nonce and ciphertext
     let (nonce_bytes, ciphertext) = combined.split_at(NONCE_LENGTH);
-    let nonce = Nonce::from_slice(nonce_bytes);
+    let nonce_array: [u8; NONCE_LENGTH] = nonce_bytes
+        .try_into()
+        .map_err(|_| EncryptionError::DecryptionFailed("invalid nonce length".to_string()))?;
+    let nonce = Nonce::from(nonce_array);
 
     // Decrypt
     let plaintext_bytes = cipher
-        .decrypt(nonce, ciphertext)
+        .decrypt(&nonce, ciphertext)
         .map_err(|e| EncryptionError::DecryptionFailed(format!("Decryption failed: {e}")))?;
 
     String::from_utf8(plaintext_bytes)
@@ -194,9 +197,9 @@ impl EncryptionService {
 
         let mut nonce_bytes = [0u8; NONCE_LENGTH];
         OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::from(nonce_bytes);
 
-        let ciphertext = cipher.encrypt(nonce, plaintext.as_bytes()).map_err(|e| {
+        let ciphertext = cipher.encrypt(&nonce, plaintext.as_bytes()).map_err(|e| {
             crate::error::ApiAgentsError::EncryptionError(format!("Encryption failed: {e}"))
         })?;
 
@@ -224,9 +227,12 @@ impl EncryptionService {
         }
 
         let (nonce_bytes, ciphertext) = combined.split_at(NONCE_LENGTH);
-        let nonce = Nonce::from_slice(nonce_bytes);
+        let nonce_array: [u8; NONCE_LENGTH] = nonce_bytes.try_into().map_err(|_| {
+            crate::error::ApiAgentsError::EncryptionError("invalid nonce length".to_string())
+        })?;
+        let nonce = Nonce::from(nonce_array);
 
-        let plaintext_bytes = cipher.decrypt(nonce, ciphertext).map_err(|e| {
+        let plaintext_bytes = cipher.decrypt(&nonce, ciphertext).map_err(|e| {
             crate::error::ApiAgentsError::EncryptionError(format!("Decryption failed: {e}"))
         })?;
 

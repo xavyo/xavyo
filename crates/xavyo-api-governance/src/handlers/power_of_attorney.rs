@@ -133,7 +133,7 @@ pub async fn list_poa(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     // Parse status string to PoaStatus
     let status = query
@@ -278,13 +278,12 @@ pub async fn admin_list_poa(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    // TODO: Add admin role check here
-    // if !claims.has_role("admin") {
-    //     return Err(ApiGovernanceError::Forbidden);
-    // }
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let status = query
         .status
@@ -352,10 +351,9 @@ pub async fn admin_revoke_poa(
 
     let admin_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
-    // TODO: Add admin role check here
-    // if !claims.has_role("admin") {
-    //     return Err(ApiGovernanceError::Forbidden);
-    // }
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let poa = state
         .poa_service
@@ -571,7 +569,7 @@ pub async fn get_poa_audit_trail(
     }
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     // Parse event type filter
     let event_type = query.event_type.as_deref().and_then(parse_event_type);

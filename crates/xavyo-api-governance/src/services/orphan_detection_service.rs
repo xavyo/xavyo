@@ -47,7 +47,7 @@ impl OrphanDetectionService {
         };
 
         let limit = query.limit.unwrap_or(50).min(100);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         let detections = GovOrphanDetection::list(&self.pool, tenant_id, &filter, limit, offset)
             .await
@@ -740,7 +740,7 @@ impl OrphanDetectionService {
                 COALESCE(
                     (SELECT COUNT(*) FROM gov_entitlement_assignments ea
                      JOIN gov_entitlements e ON ea.entitlement_id = e.id
-                     WHERE ea.user_id = od.user_id AND ea.tenant_id = od.tenant_id
+                     WHERE ea.target_id = od.user_id AND ea.target_type = 'user' AND ea.tenant_id = od.tenant_id
                      AND e.risk_level = 'high'),
                     0
                 ) as sensitive_entitlements,

@@ -61,7 +61,6 @@ pub async fn resend_verification_handler(
     // Check rate limit
     if !rate_limiter.record_attempt(&email, ip) {
         tracing::warn!(
-            email = %email,
             ip = %ip,
             tenant_id = %tenant_id,
             "Resend verification rate limit exceeded"
@@ -83,7 +82,6 @@ pub async fn resend_verification_handler(
     {
         // Log the error but don't return it to prevent enumeration
         tracing::warn!(
-            email = %email,
             tenant_id = %tenant_id,
             error = %e,
             "Failed to process resend verification (not returned to user)"

@@ -2,6 +2,7 @@
 
 use axum::{
     extract::{Path, Query, State},
+    http::StatusCode,
     Extension, Json,
 };
 use uuid::Uuid;
@@ -78,7 +79,7 @@ pub async fn list_policy_simulations(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(20).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (simulations, total) = state
         .policy_simulation_service
@@ -352,7 +353,7 @@ pub async fn get_policy_simulation_results(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(20).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (results, total) = state
         .policy_simulation_service
@@ -432,7 +433,7 @@ pub async fn delete_policy_simulation(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(simulation_id): Path<Uuid>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -443,7 +444,7 @@ pub async fn delete_policy_simulation(
         .delete(tenant_id, simulation_id)
         .await?;
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ============================================================================

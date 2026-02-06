@@ -49,7 +49,7 @@ impl TicketSyncService {
         let tasks = sqlx::query_as::<_, GovManualProvisioningTask>(
             r"
             SELECT t.* FROM gov_manual_provisioning_tasks t
-            INNER JOIN gov_external_tickets et ON t.external_ticket_id = et.id
+            INNER JOIN gov_external_tickets et ON t.external_ticket_id = et.id AND et.tenant_id = t.tenant_id
             WHERE t.status IN ('ticket_created', 'in_progress', 'partially_completed')
             AND et.status_category NOT IN ('resolved', 'closed', 'rejected')
             ORDER BY t.created_at ASC

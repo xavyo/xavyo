@@ -52,7 +52,7 @@ pub async fn list_mining_jobs(
         .as_uuid();
 
     let limit = query.limit.min(100);
-    let offset = query.offset;
+    let offset = query.offset.max(0);
 
     let (jobs, total) = state
         .mining_service
@@ -230,7 +230,7 @@ pub async fn list_candidates(
         .as_uuid();
 
     let limit = query.limit.min(100);
-    let offset = query.offset;
+    let offset = query.offset.max(0);
 
     let (candidates, total) = state
         .mining_service
@@ -401,7 +401,7 @@ pub async fn list_access_patterns(
         .as_uuid();
 
     let limit = query.limit.min(100);
-    let offset = query.offset;
+    let offset = query.offset.max(0);
 
     let (patterns, total) = state
         .mining_service
@@ -485,7 +485,7 @@ pub async fn list_excessive_privileges(
         .as_uuid();
 
     let limit = query.limit.min(100);
-    let offset = query.offset;
+    let offset = query.offset.max(0);
 
     let (flags, total) = state
         .mining_service
@@ -618,7 +618,7 @@ pub async fn list_consolidation_suggestions(
         .as_uuid();
 
     let limit = query.limit.min(100);
-    let offset = query.offset;
+    let offset = query.offset.max(0);
 
     let (suggestions, total) = state
         .mining_service
@@ -741,7 +741,7 @@ pub async fn list_simulations(
         .as_uuid();
 
     let limit = query.limit.min(100);
-    let offset = query.offset;
+    let offset = query.offset.max(0);
 
     let (simulations, total) = state
         .simulation_service
@@ -971,7 +971,7 @@ pub async fn list_metrics(
         .as_uuid();
 
     let limit = query.limit.min(100);
-    let offset = query.offset;
+    let offset = query.offset.max(0);
 
     let (metrics, total) = state
         .metrics_service

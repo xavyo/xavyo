@@ -293,11 +293,12 @@ impl RoleConstructionService {
     /// In the future, this could check against the connectors table.
     async fn validate_connector(&self, _tenant_id: Uuid, connector_id: Uuid) -> Result<()> {
         // Check if connector exists in connectors table
-        let exists: bool =
-            sqlx::query_scalar(r"SELECT EXISTS(SELECT 1 FROM connectors WHERE id = $1)")
-                .bind(connector_id)
-                .fetch_one(&self.pool)
-                .await?;
+        let exists: bool = sqlx::query_scalar(
+            r"SELECT EXISTS(SELECT 1 FROM connector_configurations WHERE id = $1)",
+        )
+        .bind(connector_id)
+        .fetch_one(&self.pool)
+        .await?;
 
         if !exists {
             return Err(GovernanceError::ConnectorNotFound(connector_id));

@@ -38,7 +38,7 @@ pub async fn list_correlation_audit_events(
 
     let filter = build_audit_filter(&query)?;
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let response = state
         .correlation_audit_service

@@ -10,9 +10,16 @@ use std::env;
 use uuid::Uuid;
 
 /// Create a test database pool.
+///
+/// Uses `DATABASE_URL_SUPERUSER` (preferred) or `DATABASE_URL` for direct DB tests.
+/// These integration tests perform direct SQL INSERT/UPDATE/DELETE so they need
+/// superuser access (bypasses RLS).
 pub async fn create_test_pool() -> PgPool {
-    let database_url = env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/xavyo_test".to_string());
+    let database_url = env::var("DATABASE_URL_SUPERUSER")
+        .or_else(|_| env::var("DATABASE_URL"))
+        .unwrap_or_else(|_| {
+            "postgres://xavyo:xavyo_test_password@localhost:5434/xavyo_test".to_string()
+        });
 
     PgPoolOptions::new()
         .max_connections(5)
@@ -152,8 +159,8 @@ pub async fn create_test_assignment(
 
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, user_id, entitlement_id, status, granted_at, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, 'active', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', NOW(), NOW(), NOW())
         ",
     )
     .bind(assignment_id)
@@ -721,8 +728,8 @@ pub async fn create_test_entitlement_assignment(
 
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', NOW(), NOW(), NOW())
         ",
     )
     .bind(assignment_id)

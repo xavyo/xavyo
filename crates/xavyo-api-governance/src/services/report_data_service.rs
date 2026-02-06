@@ -89,9 +89,9 @@ impl ReportDataService {
                 ea.status::text,
                 ea.assigned_at
             FROM gov_entitlement_assignments ea
-            JOIN users u ON ea.target_id = u.id AND ea.target_type = 'user'
-            JOIN gov_entitlements e ON ea.entitlement_id = e.id
-            JOIN gov_applications a ON e.application_id = a.id
+            JOIN users u ON ea.target_id = u.id AND ea.target_type = 'user' AND u.tenant_id = ea.tenant_id
+            JOIN gov_entitlements e ON ea.entitlement_id = e.id AND e.tenant_id = ea.tenant_id
+            JOIN gov_applications a ON e.application_id = a.id AND a.tenant_id = ea.tenant_id
             WHERE ea.tenant_id = $1 AND ea.status = 'active'
             ORDER BY u.email, a.name, e.name
             LIMIT 10000
@@ -158,8 +158,8 @@ impl ReportDataService {
                 v.resolution_notes,
                 v.detected_at
             FROM gov_sod_violations v
-            JOIN users u ON v.user_id = u.id
-            JOIN gov_sod_rules r ON v.rule_id = r.id
+            JOIN users u ON v.user_id = u.id AND u.tenant_id = v.tenant_id
+            JOIN gov_sod_rules r ON v.rule_id = r.id AND r.tenant_id = v.tenant_id
             WHERE v.tenant_id = $1
             ORDER BY v.detected_at DESC
             LIMIT 10000
@@ -290,8 +290,8 @@ impl ReportDataService {
                 ea.status::text,
                 ea.assigned_at
             FROM gov_entitlement_assignments ea
-            JOIN gov_entitlements e ON ea.entitlement_id = e.id
-            JOIN gov_applications a ON e.application_id = a.id
+            JOIN gov_entitlements e ON ea.entitlement_id = e.id AND e.tenant_id = ea.tenant_id
+            JOIN gov_applications a ON e.application_id = a.id AND a.tenant_id = ea.tenant_id
             WHERE ea.tenant_id = $1
               AND ea.target_id = $2
               AND ea.target_type = 'user'
@@ -370,7 +370,7 @@ impl ReportDataService {
                 u.email as performed_by_email,
                 details
             FROM admin_audit_log a
-            LEFT JOIN users u ON a.performed_by = u.id
+            LEFT JOIN users u ON a.performed_by = u.id AND u.tenant_id = a.tenant_id
             WHERE a.tenant_id = $1
               AND a.performed_at >= $2
               AND a.performed_at <= $3

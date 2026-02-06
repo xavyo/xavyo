@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
+use validator::Validate;
 
 // ============================================================================
 // Request Models
@@ -16,6 +17,22 @@ pub struct RenameDeviceRequest {
     pub device_name: String,
 }
 
+impl Validate for RenameDeviceRequest {
+    fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        let mut errors = validator::ValidationErrors::new();
+        if self.device_name.is_empty() || self.device_name.len() > 100 {
+            let mut err = validator::ValidationError::new("length");
+            err.message = Some("device_name must be 1-100 characters".into());
+            errors.add("device_name", err);
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
 /// Request to trust a device.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct TrustDeviceRequest {
@@ -23,6 +40,24 @@ pub struct TrustDeviceRequest {
     /// Set to 0 for permanent trust.
     #[serde(default)]
     pub trust_duration_days: Option<i32>,
+}
+
+impl Validate for TrustDeviceRequest {
+    fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        let mut errors = validator::ValidationErrors::new();
+        if let Some(days) = self.trust_duration_days {
+            if !(0..=365).contains(&days) {
+                let mut err = validator::ValidationError::new("range");
+                err.message = Some("trust_duration_days must be 0-365".into());
+                errors.add("trust_duration_days", err);
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 /// Query parameters for admin listing user devices.
@@ -43,6 +78,24 @@ pub struct UpdateDevicePolicyRequest {
     /// Default trust duration in days (0 = permanent).
     #[serde(default)]
     pub trusted_device_duration_days: Option<i32>,
+}
+
+impl Validate for UpdateDevicePolicyRequest {
+    fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        let mut errors = validator::ValidationErrors::new();
+        if let Some(days) = self.trusted_device_duration_days {
+            if !(0..=365).contains(&days) {
+                let mut err = validator::ValidationError::new("range");
+                err.message = Some("trusted_device_duration_days must be 0-365".into());
+                errors.add("trusted_device_duration_days", err);
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 // ============================================================================

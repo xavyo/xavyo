@@ -15,6 +15,7 @@ pub struct SigningKey {
     pub tenant_id: Uuid,
     pub kid: String,
     pub algorithm: String,
+    #[serde(skip_serializing)]
     pub private_key_pem: String,
     pub public_key_pem: String,
     pub state: String,

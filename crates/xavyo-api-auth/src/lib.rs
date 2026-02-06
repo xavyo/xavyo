@@ -46,8 +46,8 @@ pub use models::{
 pub use router::{
     admin_invite_public_router, admin_invite_router, admin_router, alerts_router, audit_router,
     auth_router, branding_router, delegation_router, devices_router, key_management_router,
-    me_router, mfa_router, passwordless_admin_router, passwordless_router, public_router,
-    users_router, AuthState,
+    me_router, mfa_router, org_security_policy_router, passwordless_admin_router,
+    passwordless_router, public_router, users_router, AuthState,
 };
 pub use services::{
     generate_email_verification_token,

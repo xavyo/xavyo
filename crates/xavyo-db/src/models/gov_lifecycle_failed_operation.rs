@@ -166,37 +166,51 @@ impl GovLifecycleFailedOperation {
     }
 
     /// Mark operation as retrying.
-    pub async fn mark_retrying(pool: &sqlx::PgPool, id: Uuid) -> Result<(), sqlx::Error> {
+    pub async fn mark_retrying(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query(
             r"
             UPDATE gov_lifecycle_failed_operations
             SET status = 'retrying', last_attempted_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
         Ok(())
     }
 
     /// Mark operation as succeeded.
-    pub async fn mark_succeeded(pool: &sqlx::PgPool, id: Uuid) -> Result<(), sqlx::Error> {
+    pub async fn mark_succeeded(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query(
             r"
             UPDATE gov_lifecycle_failed_operations
             SET status = 'succeeded', resolved_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
         Ok(())
     }
 
     /// Increment retry count and schedule next retry with exponential backoff.
-    pub async fn schedule_next_retry(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
+    pub async fn schedule_next_retry(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
         // Exponential backoff: 1min, 2min, 4min, 8min, 16min
         let result = sqlx::query(
             r"
@@ -215,11 +229,12 @@ impl GovLifecycleFailedOperation {
                     WHEN retry_count + 1 >= max_retries THEN NOW()
                     ELSE NULL
                 END
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             RETURNING status
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .fetch_one(pool)
         .await?;
 

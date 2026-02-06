@@ -50,7 +50,7 @@ impl ManualTaskService {
         };
 
         let limit = query.limit.unwrap_or(50).min(100);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         let tasks = GovManualProvisioningTask::list_by_tenant(
             &self.pool, tenant_id, &filter, limit, offset,

@@ -431,6 +431,9 @@ mod tests {
                 "cost_center": "CC-1234",
                 "employee_id": "EMP-5678"
             }),
+            // Archetype fields (F058)
+            archetype_id: None,
+            archetype_custom_attrs: serde_json::json!({}),
         };
 
         let scim_user = mapper.to_scim_user(&user, vec![], "https://idp.xavyo.com");
@@ -539,6 +542,9 @@ mod tests {
             manager_id: None,
             // Custom attributes (F070)
             custom_attributes: serde_json::json!({}),
+            // Archetype fields (F058)
+            archetype_id: None,
+            archetype_custom_attrs: serde_json::json!({}),
         };
 
         let scim_user = mapper.to_scim_user(&user, vec![], "https://idp.xavyo.com");

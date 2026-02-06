@@ -93,9 +93,9 @@ impl GovRoleEffectiveEntitlement {
                 sr.name AS source_role_name,
                 ee.is_inherited
             FROM gov_role_effective_entitlements ee
-            JOIN gov_entitlements e ON ee.entitlement_id = e.id
-            LEFT JOIN gov_applications a ON e.application_id = a.id
-            JOIN gov_roles sr ON ee.source_role_id = sr.id
+            JOIN gov_entitlements e ON ee.entitlement_id = e.id AND e.tenant_id = ee.tenant_id
+            LEFT JOIN gov_applications a ON e.application_id = a.id AND a.tenant_id = ee.tenant_id
+            JOIN gov_roles sr ON ee.source_role_id = sr.id AND sr.tenant_id = ee.tenant_id
             WHERE ee.role_id = $1 AND ee.tenant_id = $2
             ORDER BY ee.is_inherited, e.name
             ",

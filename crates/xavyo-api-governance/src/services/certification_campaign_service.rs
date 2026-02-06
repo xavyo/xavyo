@@ -337,6 +337,7 @@ impl CertificationCampaignService {
     }
 
     /// Get all active user assignments.
+    /// Safety limit of 50,000 to prevent unbounded memory growth.
     async fn get_all_active_assignments(
         &self,
         tenant_id: Uuid,
@@ -349,6 +350,7 @@ impl CertificationCampaignService {
               AND target_type = 'user'
               AND status = 'active'
             ORDER BY created_at
+            LIMIT 50000
             ",
         )
         .bind(tenant_id)
@@ -372,6 +374,7 @@ impl CertificationCampaignService {
               AND a.target_type = 'user'
               AND a.status = 'active'
             ORDER BY a.created_at
+            LIMIT 50000
             ",
         )
         .bind(tenant_id)
@@ -395,6 +398,7 @@ impl CertificationCampaignService {
               AND target_type = 'user'
               AND status = 'active'
             ORDER BY created_at
+            LIMIT 50000
             ",
         )
         .bind(tenant_id)
@@ -420,6 +424,7 @@ impl CertificationCampaignService {
               AND a.target_type = 'user'
               AND a.status = 'active'
             ORDER BY a.created_at
+            LIMIT 50000
             ",
         )
         .bind(tenant_id)

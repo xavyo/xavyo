@@ -237,7 +237,7 @@ impl PoaAssumedSession {
             INSERT INTO poa_assumed_sessions (
                 tenant_id, poa_id, attorney_id, session_token_jti, ip_address, user_agent
             )
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES ($1, $2, $3, $4, $5::inet, $6)
             RETURNING *
             ",
         )

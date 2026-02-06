@@ -18,24 +18,35 @@ impl EnableUserExecutor {
     }
 
     /// Check if the user is currently active.
-    async fn is_user_active(pool: &PgPool, user_id: Uuid) -> Result<bool, sqlx::Error> {
-        let result: Option<(bool,)> = sqlx::query_as("SELECT is_active FROM users WHERE id = $1")
-            .bind(user_id)
-            .fetch_optional(pool)
-            .await?;
+    async fn is_user_active(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let result: Option<(bool,)> =
+            sqlx::query_as("SELECT is_active FROM users WHERE id = $1 AND tenant_id = $2")
+                .bind(user_id)
+                .bind(tenant_id)
+                .fetch_optional(pool)
+                .await?;
 
         Ok(result.map(|(active,)| active).unwrap_or(false))
     }
 
     /// Enable the user.
-    async fn enable_user(pool: &PgPool, user_id: Uuid) -> Result<bool, sqlx::Error> {
+    async fn enable_user(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r#"
             UPDATE users SET is_active = true, updated_at = NOW()
-            WHERE id = $1 AND is_active = false
+            WHERE id = $1 AND tenant_id = $2 AND is_active = false
             "#,
         )
         .bind(user_id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -54,12 +65,13 @@ impl ActionExecutor for EnableUserExecutor {
     async fn execute(
         &self,
         pool: &PgPool,
-        _ctx: &ExecutionContext,
+        ctx: &ExecutionContext,
         target_user_id: Uuid,
         _params: &serde_json::Value,
     ) -> ExecutionResult {
+        let tenant_id = ctx.tenant_id;
         // Check current state
-        match Self::is_user_active(pool, target_user_id).await {
+        match Self::is_user_active(pool, tenant_id, target_user_id).await {
             Ok(true) => {
                 // User already active - skip
                 return ExecutionResult::skipped(serde_json::json!({"is_active": true}));
@@ -71,7 +83,7 @@ impl ActionExecutor for EnableUserExecutor {
         }
 
         // Enable the user
-        match Self::enable_user(pool, target_user_id).await {
+        match Self::enable_user(pool, tenant_id, target_user_id).await {
             Ok(true) => ExecutionResult::success(
                 serde_json::json!({"is_active": false}),
                 serde_json::json!({"is_active": true}),
@@ -87,11 +99,11 @@ impl ActionExecutor for EnableUserExecutor {
     async fn would_change(
         &self,
         pool: &PgPool,
-        _ctx: &ExecutionContext,
+        ctx: &ExecutionContext,
         target_user_id: Uuid,
         _params: &serde_json::Value,
     ) -> (bool, Option<serde_json::Value>, Option<serde_json::Value>) {
-        match Self::is_user_active(pool, target_user_id).await {
+        match Self::is_user_active(pool, ctx.tenant_id, target_user_id).await {
             Ok(true) => (false, Some(serde_json::json!({"is_active": true})), None),
             Ok(false) => (
                 true,

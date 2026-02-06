@@ -37,7 +37,7 @@ pub async fn list_snapshots(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = AccessSnapshotFilter {
         user_id: query.user_id,
@@ -133,7 +133,7 @@ pub async fn list_user_snapshots(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let snapshots = GovAccessSnapshot::list_by_user(
         state.lifecycle_event_service.pool(),

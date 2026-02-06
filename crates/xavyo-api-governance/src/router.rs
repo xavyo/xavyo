@@ -281,7 +281,7 @@ use crate::services::{
 /// Shared state for governance API.
 #[derive(Clone)]
 pub struct GovernanceState {
-    pool: PgPool,
+    pub(crate) pool: PgPool,
     pub application_service: Arc<ApplicationService>,
     pub entitlement_service: Arc<EntitlementService>,
     pub assignment_service: Arc<AssignmentService>,

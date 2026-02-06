@@ -246,7 +246,7 @@ async fn test_user_created_in_tenant_a_not_visible_to_tenant_b() {
 
 #[tokio::test]
 #[ignore = "Requires database - run locally with DATABASE_URL"]
-async fn test_group_membership_tenant_isolation() {
+async fn test_group_membershipship_tenant_isolation() {
     let pool = create_test_pool().await;
     let tenant_a = create_test_tenant(&pool).await;
     let tenant_b = create_test_tenant(&pool).await;
@@ -260,19 +260,21 @@ async fn test_group_membership_tenant_isolation() {
     let _group_b = create_test_group(&pool, tenant_b, &unique_group_name()).await;
 
     // Verify group membership query is tenant-isolated
-    let count_a: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM group_members WHERE tenant_id = $1")
-        .bind(tenant_a)
-        .fetch_one(&pool)
-        .await
-        .expect("Query should succeed");
+    let count_a: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM group_memberships WHERE tenant_id = $1")
+            .bind(tenant_a)
+            .fetch_one(&pool)
+            .await
+            .expect("Query should succeed");
 
     assert_eq!(count_a.0, 1, "Tenant A should have 1 group member");
 
-    let count_b: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM group_members WHERE tenant_id = $1")
-        .bind(tenant_b)
-        .fetch_one(&pool)
-        .await
-        .expect("Query should succeed");
+    let count_b: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM group_memberships WHERE tenant_id = $1")
+            .bind(tenant_b)
+            .fetch_one(&pool)
+            .await
+            .expect("Query should succeed");
 
     assert_eq!(count_b.0, 0, "Tenant B should have 0 group members");
 

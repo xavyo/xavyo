@@ -221,6 +221,11 @@ pub async fn create_org_policy(
     Path(org_id): Path<Uuid>,
     Json(request): Json<CreateOrgSecurityPolicyRequest>,
 ) -> Result<(StatusCode, Json<OrgSecurityPolicyResponse>), ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     let tenant_id = claims
         .tenant_id()
         .map(|t| *t.as_uuid())
@@ -336,6 +341,11 @@ pub async fn upsert_org_policy(
     Path((org_id, policy_type_str)): Path<(Uuid, String)>,
     Json(request): Json<UpdateOrgSecurityPolicyRequest>,
 ) -> Result<(StatusCode, Json<OrgSecurityPolicyResponse>), ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     let tenant_id = claims
         .tenant_id()
         .map(|t| *t.as_uuid())
@@ -414,6 +424,11 @@ pub async fn delete_org_policy(
     Extension(claims): Extension<JwtClaims>,
     Path((org_id, policy_type_str)): Path<(Uuid, String)>,
 ) -> Result<StatusCode, ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     let tenant_id = claims
         .tenant_id()
         .map(|t| *t.as_uuid())

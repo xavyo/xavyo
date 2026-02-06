@@ -209,16 +209,22 @@ impl IntoResponse for ApiGovernanceError {
                         | GovernanceError::PersonaExtensionExceedsMax { .. } => {
                             (StatusCode::BAD_REQUEST, "validation_error", e.to_string())
                         }
-                        GovernanceError::Database(_) => (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            "database_error",
-                            "Database error".to_string(),
-                        ),
-                        _ => (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            "internal_error",
-                            e.to_string(),
-                        ),
+                        GovernanceError::Database(ref db_err) => {
+                            tracing::error!("GovernanceError::Database: {:?}", db_err);
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                "database_error",
+                                "Database error".to_string(),
+                            )
+                        }
+                        _ => {
+                            tracing::error!("Unhandled governance error: {:?}", e);
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                "internal_error",
+                                "An internal error occurred".to_string(),
+                            )
+                        }
                     }
                 }
             }
@@ -335,16 +341,22 @@ impl IntoResponse for ApiGovernanceError {
                 msg.clone(),
             ),
             Self::Conflict(msg) => (StatusCode::CONFLICT, "conflict", msg.clone()),
-            Self::Internal(msg) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "internal_error",
-                msg.clone(),
-            ),
-            Self::Database(_) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "database_error",
-                "Database error".to_string(),
-            ),
+            Self::Internal(msg) => {
+                tracing::error!("Internal error: {}", msg);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal_error",
+                    "An internal error occurred".to_string(),
+                )
+            }
+            Self::Database(ref e) => {
+                tracing::error!("Database error in governance: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "database_error",
+                    "Database error".to_string(),
+                )
+            }
             // Bulk Action Engine errors (F-064)
             Self::BulkActionNotFound(id) => (
                 StatusCode::NOT_FOUND,

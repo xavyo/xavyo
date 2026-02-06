@@ -581,8 +581,8 @@ impl GroupService {
                 if path.starts_with("members") || path.is_empty() {
                     // Add members
                     if let Some(value) = &op.value {
-                        let members = if value.is_array() {
-                            value.as_array().unwrap().clone()
+                        let members = if let Some(arr) = value.as_array() {
+                            arr.clone()
                         } else {
                             vec![value.clone()]
                         };

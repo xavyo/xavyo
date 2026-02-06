@@ -286,7 +286,7 @@ impl NhiRiskService {
         let entitlement_count: i64 = sqlx::query_scalar(
             r"
             SELECT COUNT(*) FROM gov_entitlement_assignments
-            WHERE tenant_id = $1 AND user_id = $2 AND status = 'active'
+            WHERE tenant_id = $1 AND target_id = $2 AND target_type = 'user' AND status = 'active'
             ",
         )
         .bind(tenant_id)

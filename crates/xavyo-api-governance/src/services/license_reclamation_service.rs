@@ -584,25 +584,40 @@ impl LicenseReclamationService {
         let mut outcomes: Vec<std::result::Result<bool, String>> = Vec::new();
 
         for candidate in candidates {
-            // Reclaim the assignment
-            match GovLicenseAssignment::reclaim(
-                &self.pool,
-                tenant_id,
-                candidate.assignment_id,
-                candidate.reason,
-            )
-            .await
-            {
-                Ok(Some(_reclaimed)) => {
-                    // Decrement pool count
-                    let _ = GovLicensePool::decrement_allocated(
-                        &self.pool,
-                        tenant_id,
-                        candidate.pool_id,
-                    )
-                    .await;
+            // Reclaim the assignment + decrement pool count in a single transaction
+            let tx_result: std::result::Result<bool, String> = async {
+                let mut tx = self.pool.begin().await.map_err(|e| e.to_string())?;
 
-                    // Log audit event
+                let reclaimed = GovLicenseAssignment::reclaim_in_tx(
+                    &mut tx,
+                    tenant_id,
+                    candidate.assignment_id,
+                    candidate.reason,
+                )
+                .await
+                .map_err(|e| {
+                    format!(
+                        "Failed to reclaim assignment {}: {}",
+                        candidate.assignment_id, e
+                    )
+                })?;
+
+                if reclaimed.is_none() {
+                    return Ok(false);
+                }
+
+                GovLicensePool::decrement_allocated_in_tx(&mut tx, tenant_id, candidate.pool_id)
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                tx.commit().await.map_err(|e| e.to_string())?;
+                Ok(true)
+            }
+            .await;
+
+            match tx_result {
+                Ok(true) => {
+                    // Log audit event (outside transaction — non-critical)
                     let reason_str = format!("{:?}", candidate.reason).to_lowercase();
                     let _ = self
                         .audit_service
@@ -618,14 +633,11 @@ impl LicenseReclamationService {
 
                     outcomes.push(Ok(true));
                 }
-                Ok(None) => {
+                Ok(false) => {
                     outcomes.push(Ok(false));
                 }
                 Err(e) => {
-                    outcomes.push(Err(format!(
-                        "Failed to reclaim assignment {}: {}",
-                        candidate.assignment_id, e
-                    )));
+                    outcomes.push(Err(e));
                 }
             }
         }

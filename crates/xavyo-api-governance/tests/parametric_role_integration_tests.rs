@@ -154,8 +154,8 @@ async fn test_full_parametric_role_lifecycle() {
 
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', $5, NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', $5, NOW(), NOW(), NOW())
         ",
     )
     .bind(assignment_id)
@@ -300,8 +300,8 @@ async fn test_multiple_assignments_different_params() {
 
         sqlx::query(
             r"
-            INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-            VALUES ($1, $2, 'user', $3, $4, 'active', $5, NOW(), NOW(), NOW())
+            INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+            VALUES ($1, $2, 'user', $3, $4, $3, 'active', $5, NOW(), NOW(), NOW())
             ",
         )
         .bind(assignment_id)
@@ -561,8 +561,8 @@ async fn test_temporal_validity_filtering() {
     let active_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'active_hash', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', 'active_hash', NOW(), NOW(), NOW())
         ",
     )
     .bind(active_id)
@@ -590,8 +590,8 @@ async fn test_temporal_validity_filtering() {
     let future_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, valid_from, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'future_hash', NOW() + INTERVAL '30 days', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, valid_from, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', 'future_hash', NOW() + INTERVAL '30 days', NOW(), NOW(), NOW())
         ",
     )
     .bind(future_id)
@@ -619,8 +619,8 @@ async fn test_temporal_validity_filtering() {
     let expired_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, valid_to, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'expired_hash', NOW() - INTERVAL '1 day', NOW() - INTERVAL '30 days', NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, valid_to, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', 'expired_hash', NOW() - INTERVAL '1 day', NOW() - INTERVAL '30 days', NOW(), NOW())
         ",
     )
     .bind(expired_id)
@@ -730,8 +730,8 @@ async fn test_audit_trail_completeness() {
     let assignment_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'audit_hash', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+        Values ($1, $2, 'user', $3, $4, $3, 'active', 'audit_hash', NOW(), NOW(), NOW())
         ",
     )
     .bind(assignment_id)

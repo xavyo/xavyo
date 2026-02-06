@@ -205,22 +205,22 @@ ALTER TABLE gov_license_audit_events ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies for tenant isolation
 CREATE POLICY tenant_isolation_license_pools ON gov_license_pools
-    USING (tenant_id = COALESCE(current_setting('app.tenant_id', true), '')::uuid);
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 CREATE POLICY tenant_isolation_license_assignments ON gov_license_assignments
-    USING (tenant_id = COALESCE(current_setting('app.tenant_id', true), '')::uuid);
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 CREATE POLICY tenant_isolation_license_entitlement_links ON gov_license_entitlement_links
-    USING (tenant_id = COALESCE(current_setting('app.tenant_id', true), '')::uuid);
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 CREATE POLICY tenant_isolation_license_reclamation_rules ON gov_license_reclamation_rules
-    USING (tenant_id = COALESCE(current_setting('app.tenant_id', true), '')::uuid);
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 CREATE POLICY tenant_isolation_license_incompatibilities ON gov_license_incompatibilities
-    USING (tenant_id = COALESCE(current_setting('app.tenant_id', true), '')::uuid);
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 CREATE POLICY tenant_isolation_license_audit_events ON gov_license_audit_events
-    USING (tenant_id = COALESCE(current_setting('app.tenant_id', true), '')::uuid);
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- ============================================================================
 -- TRIGGERS

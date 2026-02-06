@@ -253,7 +253,10 @@ impl SessionService {
     ) -> Result<(), ApiAuthError> {
         // Check throttle
         {
-            let cache = self.activity_cache.read().unwrap();
+            let cache = self
+                .activity_cache
+                .read()
+                .unwrap_or_else(|e| e.into_inner());
             if let Some(last_update) = cache.get(&session_id) {
                 if last_update.elapsed().as_secs() < ACTIVITY_UPDATE_THROTTLE_SECONDS {
                     return Ok(()); // Skip update, too recent
@@ -273,7 +276,10 @@ impl SessionService {
 
         // Update throttle cache
         {
-            let mut cache = self.activity_cache.write().unwrap();
+            let mut cache = self
+                .activity_cache
+                .write()
+                .unwrap_or_else(|e| e.into_inner());
             cache.insert(session_id, Instant::now());
 
             // Cleanup old entries periodically (every 1000 inserts)
@@ -282,7 +288,7 @@ impl SessionService {
                     .checked_sub(std::time::Duration::from_secs(
                         ACTIVITY_UPDATE_THROTTLE_SECONDS * 2,
                     ))
-                    .unwrap();
+                    .unwrap_or_else(Instant::now);
                 cache.retain(|_, v| *v > threshold);
             }
         }

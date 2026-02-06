@@ -65,12 +65,7 @@ DROP POLICY IF EXISTS org_security_policies_tenant_isolation ON org_security_pol
 CREATE POLICY org_security_policies_tenant_isolation
 ON org_security_policies
 FOR ALL
-USING (
-    tenant_id = COALESCE(
-        NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-        tenant_id
-    )
-);
+USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- Grant permissions
 GRANT SELECT, INSERT, UPDATE, DELETE ON org_security_policies TO authenticated;

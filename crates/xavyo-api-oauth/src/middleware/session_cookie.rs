@@ -115,7 +115,7 @@ pub fn clear_session_cookie(secure: bool) -> String {
 #[must_use]
 pub fn generate_csrf_token() -> String {
     let mut bytes = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut bytes);
+    rand::rngs::OsRng.fill_bytes(&mut bytes);
     URL_SAFE_NO_PAD.encode(bytes)
 }
 

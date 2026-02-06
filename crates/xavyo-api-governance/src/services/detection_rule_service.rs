@@ -46,7 +46,7 @@ impl DetectionRuleService {
         };
 
         let limit = query.limit.unwrap_or(50).min(100);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         let rules = GovDetectionRule::list(&self.pool, tenant_id, &filter, limit, offset)
             .await

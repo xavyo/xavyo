@@ -44,7 +44,7 @@ pub async fn disable_mfa(
             .ok_or(ApiAuthError::InvalidCredentials)?;
 
     let password_valid = xavyo_auth::verify_password(&request.password, &user.password_hash)
-        .map_err(|e| ApiAuthError::Internal(e.to_string()))?;
+        .map_err(|_| ApiAuthError::InvalidCredentials)?;
 
     if !password_valid {
         return Err(ApiAuthError::InvalidCredentials);

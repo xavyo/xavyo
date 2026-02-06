@@ -120,6 +120,9 @@ pub async fn create_entitlement(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateEntitlementRequest>,
 ) -> ApiResult<(StatusCode, Json<EntitlementResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     // Validate GDPR business rules
@@ -185,6 +188,9 @@ pub async fn update_entitlement(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateEntitlementRequest>,
 ) -> ApiResult<Json<EntitlementResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -254,6 +260,9 @@ pub async fn delete_entitlement(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

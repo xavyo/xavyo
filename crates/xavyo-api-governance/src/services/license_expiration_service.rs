@@ -338,15 +338,16 @@ impl LicenseExpirationService {
                 );
             }
             ExpirationAction::RevokeAllAssignments => {
-                // Revoke all active assignments for this pool
+                // Revoke all active assignments and reset pool count in a transaction
+                let mut tx = self.pool.begin().await.map_err(GovernanceError::Database)?;
+
                 let revoked_count =
-                    GovLicenseAssignment::expire_all_for_pool(&self.pool, tenant_id, pool_id)
-                        .await?;
+                    GovLicenseAssignment::expire_all_for_pool_in_tx(&mut tx, tenant_id, pool_id)
+                        .await
+                        .map_err(GovernanceError::Database)?;
                 assignments_revoked = revoked_count as i64;
 
                 // Reset allocated count to 0 since all assignments are revoked.
-                // We do this by setting status to expired which already happened,
-                // but we also need to zero out allocated_count.
                 sqlx::query(
                     r"
                     UPDATE gov_license_pools
@@ -356,8 +357,11 @@ impl LicenseExpirationService {
                 )
                 .bind(pool_id)
                 .bind(tenant_id)
-                .execute(&self.pool)
-                .await?;
+                .execute(&mut *tx)
+                .await
+                .map_err(GovernanceError::Database)?;
+
+                tx.commit().await.map_err(GovernanceError::Database)?;
 
                 info!(
                     pool_id = %pool_id,

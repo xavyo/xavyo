@@ -607,6 +607,9 @@ mod tests {
             manager_id: None,
             // Custom attributes (F070)
             custom_attributes: serde_json::json!({}),
+            // Archetype fields (F058)
+            archetype_id: None,
+            archetype_custom_attrs: serde_json::json!({}),
         };
 
         let op = ScimPatchOp {

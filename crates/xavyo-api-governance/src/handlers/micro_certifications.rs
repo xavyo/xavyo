@@ -46,7 +46,7 @@ pub async fn list_certifications(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = MicroCertificationFilter {
         entitlement_id: query.entitlement_id,
@@ -115,7 +115,7 @@ pub async fn my_pending(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let certs = state
         .micro_certification_service
@@ -416,7 +416,7 @@ pub async fn search_events(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = MicroCertEventFilter {
         micro_certification_id: query.micro_certification_id,

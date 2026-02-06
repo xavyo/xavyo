@@ -42,7 +42,7 @@ pub async fn list_exemptions(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let (exemptions, total) = state
         .sod_exemption_service
@@ -124,6 +124,9 @@ pub async fn create_exemption(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateSodExemptionRequest>,
 ) -> ApiResult<(StatusCode, Json<SodExemptionResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -175,6 +178,9 @@ pub async fn revoke_exemption(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<SodExemptionResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

@@ -577,8 +577,8 @@ async fn test_create_assignment_with_params() {
     let assignment_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', $5, NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', $5, NOW(), NOW(), NOW())
         ",
     )
     .bind(assignment_id)
@@ -864,8 +864,8 @@ async fn test_entitlement_includes_params() {
     let assignment_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'hash_finance_db', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', 'hash_finance_db', NOW(), NOW(), NOW())
         ",
     )
     .bind(assignment_id)
@@ -953,8 +953,8 @@ async fn test_same_role_different_params() {
     let assignment1_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'hash_production', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', 'hash_production', NOW(), NOW(), NOW())
         ",
     )
     .bind(assignment1_id)
@@ -984,8 +984,8 @@ async fn test_same_role_different_params() {
     let assignment2_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'hash_staging', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+        Values ($1, $2, 'user', $3, $4, $3, 'active', 'hash_staging', NOW(), NOW(), NOW())
         ",
     )
     .bind(assignment2_id)
@@ -1073,8 +1073,8 @@ async fn test_revoke_one_keeps_other() {
     ] {
         sqlx::query(
             r"
-            INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-            VALUES ($1, $2, 'user', $3, $4, 'active', $5, NOW(), NOW(), NOW())
+            INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+            VALUES ($1, $2, 'user', $3, $4, $3, 'active', $5, NOW(), NOW(), NOW())
             ",
         )
         .bind(id)
@@ -1120,8 +1120,8 @@ async fn test_duplicate_params_rejected() {
     // Create first assignment
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'same_hash', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', 'same_hash', NOW(), NOW(), NOW())
         ",
     )
     .bind(Uuid::new_v4())
@@ -1135,8 +1135,8 @@ async fn test_duplicate_params_rejected() {
     // Try to create second assignment with same hash - should fail due to unique constraint
     let result = sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'same_hash', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', 'same_hash', NOW(), NOW(), NOW())
         ",
     )
     .bind(Uuid::new_v4())
@@ -1497,8 +1497,8 @@ async fn test_valid_from_future() {
     let assignment_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, valid_from, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'hash_future', NOW() + INTERVAL '7 days', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, valid_from, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', 'hash_future', NOW() + INTERVAL '7 days', NOW(), NOW(), NOW())
         ",
     )
     .bind(assignment_id)
@@ -1547,8 +1547,8 @@ async fn test_valid_to_past() {
     let assignment_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, valid_to, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'hash_past', NOW() - INTERVAL '1 day', NOW() - INTERVAL '7 days', NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, valid_to, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', 'hash_past', NOW() - INTERVAL '1 day', NOW() - INTERVAL '7 days', NOW(), NOW())
         ",
     )
     .bind(assignment_id)
@@ -1587,8 +1587,8 @@ async fn test_within_validity_window() {
     let assignment_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, valid_from, valid_to, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'hash_valid', NOW() - INTERVAL '1 day', NOW() + INTERVAL '7 days', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, valid_from, valid_to, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', 'hash_valid', NOW() - INTERVAL '1 day', NOW() + INTERVAL '7 days', NOW(), NOW(), NOW())
         ",
     )
     .bind(assignment_id)
@@ -1653,8 +1653,8 @@ async fn test_audit_parameters_set() {
     let assignment_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'hash_audit', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', 'hash_audit', NOW(), NOW(), NOW())
         ",
     )
     .bind(assignment_id)
@@ -1732,8 +1732,8 @@ async fn test_audit_parameters_updated() {
     let assignment_id = Uuid::new_v4();
     sqlx::query(
         r"
-        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, status, parameter_hash, granted_at, created_at, updated_at)
-        VALUES ($1, $2, 'user', $3, $4, 'active', 'hash_update', NOW(), NOW(), NOW())
+        INSERT INTO gov_entitlement_assignments (id, tenant_id, target_type, target_id, entitlement_id, assigned_by, status, parameter_hash, assigned_at, created_at, updated_at)
+        VALUES ($1, $2, 'user', $3, $4, $3, 'active', 'hash_update', NOW(), NOW(), NOW())
         ",
     )
     .bind(assignment_id)

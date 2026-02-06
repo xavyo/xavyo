@@ -93,8 +93,8 @@ impl MappingService {
             let total = all.len() as i64;
             let items: Vec<MappingResponse> = all
                 .into_iter()
-                .skip(offset as usize)
-                .take(limit as usize)
+                .skip(offset.max(0) as usize)
+                .take(limit.max(0) as usize)
                 .map(MappingResponse::from)
                 .collect();
             return Ok(MappingListResponse {

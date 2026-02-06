@@ -35,12 +35,14 @@ impl ModifyAttributeExecutor {
     /// Get the current value of the attribute.
     async fn get_attribute_value(
         pool: &PgPool,
+        tenant_id: Uuid,
         user_id: Uuid,
         attribute: &str,
     ) -> Result<Option<serde_json::Value>, sqlx::Error> {
         let result: Option<(serde_json::Value,)> =
-            sqlx::query_as("SELECT custom_attributes FROM users WHERE id = $1")
+            sqlx::query_as("SELECT custom_attributes FROM users WHERE id = $1 AND tenant_id = $2")
                 .bind(user_id)
+                .bind(tenant_id)
                 .fetch_optional(pool)
                 .await?;
 
@@ -56,6 +58,7 @@ impl ModifyAttributeExecutor {
     /// Set the attribute value.
     async fn set_attribute_value(
         pool: &PgPool,
+        tenant_id: Uuid,
         user_id: Uuid,
         attribute: &str,
         value: &serde_json::Value,
@@ -66,15 +69,16 @@ impl ModifyAttributeExecutor {
             UPDATE users
             SET custom_attributes = jsonb_set(
                 COALESCE(custom_attributes, '{}'::jsonb),
-                $2::text[],
-                $3::jsonb,
+                $3::text[],
+                $4::jsonb,
                 true
             ),
             updated_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             "#,
         )
         .bind(user_id)
+        .bind(tenant_id)
         .bind(vec![attribute.to_string()])
         .bind(value)
         .execute(pool)
@@ -95,10 +99,11 @@ impl ActionExecutor for ModifyAttributeExecutor {
     async fn execute(
         &self,
         pool: &PgPool,
-        _ctx: &ExecutionContext,
+        ctx: &ExecutionContext,
         target_user_id: Uuid,
         params: &serde_json::Value,
     ) -> ExecutionResult {
+        let tenant_id = ctx.tenant_id;
         // Extract attribute and value from params
         let attribute = match params.get("attribute").and_then(|v| v.as_str()) {
             Some(attr) => attr,
@@ -119,10 +124,13 @@ impl ActionExecutor for ModifyAttributeExecutor {
         }
 
         // Get current value
-        let current_value = match Self::get_attribute_value(pool, target_user_id, attribute).await {
-            Ok(val) => val,
-            Err(e) => return ExecutionResult::failure(format!("Failed to get current value: {e}")),
-        };
+        let current_value =
+            match Self::get_attribute_value(pool, tenant_id, target_user_id, attribute).await {
+                Ok(val) => val,
+                Err(e) => {
+                    return ExecutionResult::failure(format!("Failed to get current value: {e}"))
+                }
+            };
 
         // Check if value would change
         if current_value.as_ref() == Some(&new_value) {
@@ -133,7 +141,9 @@ impl ActionExecutor for ModifyAttributeExecutor {
         }
 
         // Set the new value
-        match Self::set_attribute_value(pool, target_user_id, attribute, &new_value).await {
+        match Self::set_attribute_value(pool, tenant_id, target_user_id, attribute, &new_value)
+            .await
+        {
             Ok(true) => ExecutionResult::success(
                 serde_json::json!({
                     "attribute": attribute,
@@ -152,10 +162,11 @@ impl ActionExecutor for ModifyAttributeExecutor {
     async fn would_change(
         &self,
         pool: &PgPool,
-        _ctx: &ExecutionContext,
+        ctx: &ExecutionContext,
         target_user_id: Uuid,
         params: &serde_json::Value,
     ) -> (bool, Option<serde_json::Value>, Option<serde_json::Value>) {
+        let tenant_id = ctx.tenant_id;
         let attribute = match params.get("attribute").and_then(|v| v.as_str()) {
             Some(attr) => attr,
             None => return (false, None, None),
@@ -172,7 +183,7 @@ impl ActionExecutor for ModifyAttributeExecutor {
         }
 
         // Get current value
-        match Self::get_attribute_value(pool, target_user_id, attribute).await {
+        match Self::get_attribute_value(pool, tenant_id, target_user_id, attribute).await {
             Ok(current) => {
                 if current.as_ref() == Some(&new_value) {
                     (

@@ -11,13 +11,12 @@ use sqlx::PgPool;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use xavyo_core::TenantId;
 use xavyo_db::{
-    set_tenant_context, AuditActionType, CreateFailedOperation, CreateGovStateTransitionAudit,
-    FailedOperationType, GovEntitlementAssignment, GovLifecycleFailedOperation,
-    GovStateTransitionAudit, LifecycleObjectType, User,
+    AuditActionType, CreateFailedOperation, CreateGovStateTransitionAudit, FailedOperationType,
+    GovEntitlementAssignment, GovLifecycleFailedOperation, GovStateTransitionAudit,
+    LifecycleObjectType, User,
 };
-use xavyo_governance::error::{GovernanceError, Result};
+use xavyo_governance::error::Result;
 
 use crate::services::StateAccessRuleService;
 
@@ -157,7 +156,8 @@ impl FailedOperationService {
 
             // Mark as retrying
             if let Err(e) =
-                GovLifecycleFailedOperation::mark_retrying(&self.pool, operation.id).await
+                GovLifecycleFailedOperation::mark_retrying(&self.pool, tenant_id, operation.id)
+                    .await
             {
                 warn!(
                     operation_id = %operation.id,
@@ -191,7 +191,8 @@ impl FailedOperationService {
             if retry_success {
                 // Mark as succeeded
                 if let Err(e) =
-                    GovLifecycleFailedOperation::mark_succeeded(&self.pool, operation.id).await
+                    GovLifecycleFailedOperation::mark_succeeded(&self.pool, tenant_id, operation.id)
+                        .await
                 {
                     error!(
                         operation_id = %operation.id,
@@ -202,8 +203,12 @@ impl FailedOperationService {
                 result.succeeded += 1;
             } else {
                 // Schedule next retry or move to dead letter
-                match GovLifecycleFailedOperation::schedule_next_retry(&self.pool, operation.id)
-                    .await
+                match GovLifecycleFailedOperation::schedule_next_retry(
+                    &self.pool,
+                    tenant_id,
+                    operation.id,
+                )
+                .await
                 {
                     Ok(has_more_retries) => {
                         if has_more_retries {
@@ -240,12 +245,6 @@ impl FailedOperationService {
 
         for tenant_id in tenant_ids {
             stats.tenants_processed += 1;
-
-            // Set tenant context for RLS
-            let mut conn = self.pool.acquire().await?;
-            set_tenant_context(&mut *conn, TenantId::from_uuid(tenant_id))
-                .await
-                .map_err(|e| GovernanceError::Database(sqlx::Error::Protocol(e.to_string())))?;
 
             match self.process_retries(tenant_id, batch_size).await {
                 Ok(result) => {

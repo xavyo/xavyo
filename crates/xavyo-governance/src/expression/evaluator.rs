@@ -145,12 +145,8 @@ impl Evaluator {
         // Handle NULL comparisons specially
         if comp.value == Value::Null {
             return match comp.operator {
-                ComparisonOp::Equal => {
-                    Ok(attr_value.is_none() || attr_value.map_or(false, |v| v.is_null()))
-                }
-                ComparisonOp::NotEqual => {
-                    Ok(attr_value.is_some() && attr_value.map_or(true, |v| !v.is_null()))
-                }
+                ComparisonOp::Equal => Ok(attr_value.is_none_or(|v| v.is_null())),
+                ComparisonOp::NotEqual => Ok(attr_value.is_some_and(|v| !v.is_null())),
                 _ => Err(EvalError::TypeMismatch {
                     attribute: comp.attribute.clone(),
                     expected: "equality operator for NULL".to_string(),
@@ -335,22 +331,17 @@ impl Evaluator {
 
         regex_pattern.push('$');
 
-        regex::Regex::new(&regex_pattern)
-            .map_err(|_| EvalError::InvalidPattern(pattern.to_string()))?
-            .is_match(value)
-            .then_some(true)
-            .ok_or_else(|| EvalError::InvalidPattern(pattern.to_string()))
-            .or(Ok(regex::Regex::new(&regex_pattern)
-                .unwrap()
-                .is_match(value)))
+        let re = regex::Regex::new(&regex_pattern)
+            .map_err(|_| EvalError::InvalidPattern(pattern.to_string()))?;
+        Ok(re.is_match(value))
     }
 
     fn values_equal(json_val: &JsonValue, expr_val: &Value) -> bool {
         match (json_val, expr_val) {
             (JsonValue::String(a), Value::String(b)) => a == b,
-            (JsonValue::Number(n), Value::Integer(b)) => n.as_i64().map_or(false, |a| a == *b),
+            (JsonValue::Number(n), Value::Integer(b)) => n.as_i64().is_some_and(|a| a == *b),
             (JsonValue::Number(n), Value::Float(b)) => {
-                n.as_f64().map_or(false, |a| (a - b).abs() < f64::EPSILON)
+                n.as_f64().is_some_and(|a| (a - b).abs() < f64::EPSILON)
             }
             (JsonValue::Bool(a), Value::Boolean(b)) => *a == *b,
             (JsonValue::Null, Value::Null) => true,

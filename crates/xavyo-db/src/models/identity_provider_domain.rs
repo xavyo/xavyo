@@ -180,24 +180,33 @@ impl IdentityProviderDomain {
     }
 
     /// Delete a domain mapping.
-    pub async fn delete(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM identity_provider_domains WHERE id = $1")
-            .bind(id)
-            .execute(pool)
-            .await?;
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let result =
+            sqlx::query("DELETE FROM identity_provider_domains WHERE id = $1 AND tenant_id = $2")
+                .bind(id)
+                .bind(tenant_id)
+                .execute(pool)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 
     /// Delete all domains for an `IdP`.
     pub async fn delete_by_idp(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         identity_provider_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
-        let result =
-            sqlx::query("DELETE FROM identity_provider_domains WHERE identity_provider_id = $1")
-                .bind(identity_provider_id)
-                .execute(pool)
-                .await?;
+        let result = sqlx::query(
+            "DELETE FROM identity_provider_domains WHERE identity_provider_id = $1 AND tenant_id = $2",
+        )
+        .bind(identity_provider_id)
+        .bind(tenant_id)
+        .execute(pool)
+        .await?;
         Ok(result.rows_affected())
     }
 }

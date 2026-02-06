@@ -107,19 +107,25 @@ impl UserTotpSecret {
     /// Find a TOTP secret by user ID.
     pub async fn find_by_user_id<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<Option<Self>, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
-        sqlx::query_as("SELECT * FROM user_totp_secrets WHERE user_id = $1")
+        sqlx::query_as("SELECT * FROM user_totp_secrets WHERE user_id = $1 AND tenant_id = $2")
             .bind(user_id)
+            .bind(tenant_id)
             .fetch_optional(executor)
             .await
     }
 
     /// Enable MFA after successful setup verification.
-    pub async fn enable<'e, E>(executor: E, user_id: Uuid) -> Result<Self, sqlx::Error>
+    pub async fn enable<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Self, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
@@ -127,17 +133,22 @@ impl UserTotpSecret {
             r"
             UPDATE user_totp_secrets
             SET is_enabled = true, setup_completed_at = NOW(), failed_attempts = 0
-            WHERE user_id = $1
+            WHERE user_id = $1 AND tenant_id = $2
             RETURNING *
             ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .fetch_one(executor)
         .await
     }
 
     /// Record successful TOTP verification.
-    pub async fn record_success<'e, E>(executor: E, user_id: Uuid) -> Result<(), sqlx::Error>
+    pub async fn record_success<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
@@ -145,10 +156,11 @@ impl UserTotpSecret {
             r"
             UPDATE user_totp_secrets
             SET last_used_at = NOW(), failed_attempts = 0, locked_until = NULL
-            WHERE user_id = $1
+            WHERE user_id = $1 AND tenant_id = $2
             ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .execute(executor)
         .await?;
         Ok(())
@@ -158,6 +170,7 @@ impl UserTotpSecret {
     /// Returns the new `failed_attempts` count.
     pub async fn record_failure<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
         max_attempts: i32,
         lockout_minutes: i64,
@@ -171,14 +184,15 @@ impl UserTotpSecret {
             SET
                 failed_attempts = failed_attempts + 1,
                 locked_until = CASE
-                    WHEN failed_attempts + 1 >= $2 THEN NOW() + ($3 || ' minutes')::INTERVAL
+                    WHEN failed_attempts + 1 >= $3 THEN NOW() + ($4 || ' minutes')::INTERVAL
                     ELSE locked_until
                 END
-            WHERE user_id = $1
+            WHERE user_id = $1 AND tenant_id = $2
             RETURNING failed_attempts
             ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .bind(max_attempts)
         .bind(lockout_minutes.to_string())
         .fetch_one(executor)
@@ -187,30 +201,39 @@ impl UserTotpSecret {
     }
 
     /// Delete a TOTP secret (disable MFA).
-    pub async fn delete<'e, E>(executor: E, user_id: Uuid) -> Result<bool, sqlx::Error>
-    where
-        E: PgExecutor<'e>,
-    {
-        let result = sqlx::query("DELETE FROM user_totp_secrets WHERE user_id = $1")
-            .bind(user_id)
-            .execute(executor)
-            .await?;
-        Ok(result.rows_affected() > 0)
-    }
-
-    /// Delete an incomplete setup (for retry).
-    pub async fn delete_if_not_enabled<'e, E>(
+    pub async fn delete<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<bool, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
         let result =
-            sqlx::query("DELETE FROM user_totp_secrets WHERE user_id = $1 AND is_enabled = false")
+            sqlx::query("DELETE FROM user_totp_secrets WHERE user_id = $1 AND tenant_id = $2")
                 .bind(user_id)
+                .bind(tenant_id)
                 .execute(executor)
                 .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Delete an incomplete setup (for retry).
+    pub async fn delete_if_not_enabled<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<bool, sqlx::Error>
+    where
+        E: PgExecutor<'e>,
+    {
+        let result = sqlx::query(
+            "DELETE FROM user_totp_secrets WHERE user_id = $1 AND tenant_id = $2 AND is_enabled = false",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .execute(executor)
+        .await?;
         Ok(result.rows_affected() > 0)
     }
 }

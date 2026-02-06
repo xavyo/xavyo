@@ -228,9 +228,9 @@ impl GovLicenseIncompatibility {
                 rp.name as "requested_pool_name!",
                 i.reason
             FROM gov_license_incompatibilities i
-            JOIN gov_license_pools pa ON pa.id = i.pool_a_id
-            JOIN gov_license_pools pb ON pb.id = i.pool_b_id
-            JOIN gov_license_pools rp ON rp.id = $3
+            JOIN gov_license_pools pa ON pa.id = i.pool_a_id AND pa.tenant_id = i.tenant_id
+            JOIN gov_license_pools pb ON pb.id = i.pool_b_id AND pb.tenant_id = i.tenant_id
+            JOIN gov_license_pools rp ON rp.id = $3 AND rp.tenant_id = i.tenant_id
             WHERE i.tenant_id = $1
               AND (i.pool_a_id = $3 OR i.pool_b_id = $3)
               AND EXISTS (
@@ -310,8 +310,8 @@ impl GovLicenseIncompatibility {
                 pb.name as pool_b_name,
                 pb.vendor as pool_b_vendor
             FROM gov_license_incompatibilities i
-            LEFT JOIN gov_license_pools pa ON pa.id = i.pool_a_id
-            LEFT JOIN gov_license_pools pb ON pb.id = i.pool_b_id
+            LEFT JOIN gov_license_pools pa ON pa.id = i.pool_a_id AND pa.tenant_id = i.tenant_id
+            LEFT JOIN gov_license_pools pb ON pb.id = i.pool_b_id AND pb.tenant_id = i.tenant_id
             WHERE i.tenant_id = $1
               AND ($2::uuid IS NULL OR i.pool_a_id = $2 OR i.pool_b_id = $2)
             ORDER BY i.created_at DESC

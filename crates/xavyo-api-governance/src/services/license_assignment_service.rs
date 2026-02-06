@@ -108,6 +108,8 @@ impl LicenseAssignmentService {
     ///
     /// Validates pool existence, capacity, duplicate assignment, and
     /// incompatibility rules before creating the assignment.
+    /// The capacity increment and assignment creation are wrapped in a
+    /// transaction to prevent TOCTOU race conditions.
     pub async fn assign(
         &self,
         tenant_id: Uuid,
@@ -148,12 +150,16 @@ impl LicenseAssignmentService {
             return Err(GovernanceError::LicenseIncompatibilityConflict(message));
         }
 
-        // 4. Atomically increment pool capacity (returns None if no capacity)
-        GovLicensePool::increment_allocated(&self.pool, tenant_id, request.license_pool_id)
-            .await?
+        // 4+5. Atomically increment pool capacity and create assignment in a transaction.
+        // This prevents a leaked slot if the assignment INSERT fails after the
+        // capacity has been incremented.
+        let mut tx = self.pool.begin().await.map_err(GovernanceError::Database)?;
+
+        GovLicensePool::increment_allocated_in_tx(&mut tx, tenant_id, request.license_pool_id)
+            .await
+            .map_err(GovernanceError::Database)?
             .ok_or_else(|| GovernanceError::LicensePoolNoCapacity(request.license_pool_id))?;
 
-        // 5. Create the assignment
         let input = CreateGovLicenseAssignment {
             license_pool_id: request.license_pool_id,
             user_id: request.user_id,
@@ -164,9 +170,13 @@ impl LicenseAssignmentService {
             notes: request.notes,
         };
 
-        let assignment = GovLicenseAssignment::create(&self.pool, tenant_id, input).await?;
+        let assignment = GovLicenseAssignment::create_in_tx(&mut tx, tenant_id, input)
+            .await
+            .map_err(GovernanceError::Database)?;
 
-        // 6. Log audit event
+        tx.commit().await.map_err(GovernanceError::Database)?;
+
+        // 6. Log audit event (outside transaction — non-critical)
         let source_str = format!("{:?}", request.source).to_lowercase();
         self.audit_service
             .log_license_assigned(
@@ -187,6 +197,7 @@ impl LicenseAssignmentService {
     /// Deallocate (release) an active license assignment.
     ///
     /// Marks the assignment as released and decrements the pool's allocated count.
+    /// Both operations are wrapped in a transaction to prevent count drift.
     pub async fn deallocate(
         &self,
         tenant_id: Uuid,
@@ -205,16 +216,21 @@ impl LicenseAssignmentService {
             )));
         }
 
-        // Release the assignment
-        let released = GovLicenseAssignment::release(&self.pool, tenant_id, assignment_id)
-            .await?
+        // Release assignment + decrement pool count in a single transaction
+        let mut tx = self.pool.begin().await.map_err(GovernanceError::Database)?;
+
+        let released = GovLicenseAssignment::release_in_tx(&mut tx, tenant_id, assignment_id)
+            .await
+            .map_err(GovernanceError::Database)?
             .ok_or_else(|| GovernanceError::LicenseAssignmentNotFound(assignment_id))?;
 
-        // Decrement pool count
-        GovLicensePool::decrement_allocated(&self.pool, tenant_id, existing.license_pool_id)
-            .await?;
+        GovLicensePool::decrement_allocated_in_tx(&mut tx, tenant_id, existing.license_pool_id)
+            .await
+            .map_err(GovernanceError::Database)?;
 
-        // Log audit event
+        tx.commit().await.map_err(GovernanceError::Database)?;
+
+        // Log audit event (outside transaction — non-critical)
         self.audit_service
             .log_license_deallocated(
                 tenant_id,
@@ -379,25 +395,41 @@ impl LicenseAssignmentService {
                 continue;
             }
 
-            // Reclaim the assignment
-            match GovLicenseAssignment::reclaim(
-                &self.pool,
-                tenant_id,
-                *assignment_id,
-                LicenseReclaimReason::Manual,
-            )
-            .await
-            {
-                Ok(Some(_reclaimed)) => {
-                    // Decrement pool count
-                    let _ = GovLicensePool::decrement_allocated(
-                        &self.pool,
-                        tenant_id,
-                        assignment.license_pool_id,
-                    )
-                    .await;
+            // Reclaim the assignment + decrement pool count in a transaction
+            let tx_result: std::result::Result<(), String> = async {
+                let mut tx = self.pool.begin().await.map_err(|e| e.to_string())?;
 
-                    // Log individual reclamation audit event
+                let reclaimed = GovLicenseAssignment::reclaim_in_tx(
+                    &mut tx,
+                    tenant_id,
+                    *assignment_id,
+                    LicenseReclaimReason::Manual,
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+
+                if reclaimed.is_none() {
+                    return Err(format!(
+                        "Failed to reclaim assignment {assignment_id} (may not be active)"
+                    ));
+                }
+
+                GovLicensePool::decrement_allocated_in_tx(
+                    &mut tx,
+                    tenant_id,
+                    assignment.license_pool_id,
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+
+                tx.commit().await.map_err(|e| e.to_string())?;
+                Ok(())
+            }
+            .await;
+
+            match tx_result {
+                Ok(()) => {
+                    // Log individual reclamation audit event (outside tx — non-critical)
                     let _ = self
                         .audit_service
                         .log_license_reclaimed(
@@ -413,18 +445,10 @@ impl LicenseAssignmentService {
                     reclaimed_user_ids.push(assignment.user_id);
                     success_count += 1;
                 }
-                Ok(None) => {
-                    failures.push(BulkOperationFailure {
-                        item_id: *assignment_id,
-                        error: format!(
-                            "Failed to reclaim assignment {assignment_id} (may not be active)"
-                        ),
-                    });
-                }
                 Err(e) => {
                     failures.push(BulkOperationFailure {
                         item_id: *assignment_id,
-                        error: e.to_string(),
+                        error: e,
                     });
                 }
             }

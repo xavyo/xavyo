@@ -8,10 +8,12 @@ use crate::services::{DiscoveryService, EncryptionService};
 use sqlx::PgPool;
 use tracing::instrument;
 use uuid::Uuid;
+use xavyo_core::TenantId;
 use xavyo_db::models::{
     CreateDomain, CreateIdentityProvider, IdentityProviderDomain, ProviderType,
     TenantIdentityProvider, UpdateIdentityProvider, UserIdentityLink, ValidationStatus,
 };
+use xavyo_db::set_tenant_context;
 
 /// Service for managing identity provider configurations.
 #[derive(Clone)]
@@ -32,6 +34,15 @@ impl IdpConfigService {
         }
     }
 
+    /// Set the tenant context on the connection pool for RLS enforcement.
+    async fn set_rls_context(&self, tenant_id: Uuid) -> FederationResult<()> {
+        let mut conn = self.pool.acquire().await?;
+        set_tenant_context(&mut *conn, TenantId::from_uuid(tenant_id))
+            .await
+            .map_err(|e| FederationError::Internal(format!("Failed to set tenant context: {e}")))?;
+        Ok(())
+    }
+
     /// List identity providers for a tenant.
     #[instrument(skip(self))]
     pub async fn list(
@@ -40,6 +51,7 @@ impl IdpConfigService {
         offset: i64,
         limit: i64,
     ) -> FederationResult<(Vec<TenantIdentityProvider>, i64)> {
+        self.set_rls_context(tenant_id).await?;
         let idps =
             TenantIdentityProvider::list_by_tenant(&self.pool, tenant_id, offset, limit).await?;
         let total = TenantIdentityProvider::count_by_tenant(&self.pool, tenant_id).await?;
@@ -53,6 +65,7 @@ impl IdpConfigService {
         tenant_id: Uuid,
         idp_id: Uuid,
     ) -> FederationResult<TenantIdentityProvider> {
+        self.set_rls_context(tenant_id).await?;
         TenantIdentityProvider::find_by_id_and_tenant(&self.pool, idp_id, tenant_id)
             .await?
             .ok_or(FederationError::IdpNotFound(idp_id))
@@ -77,6 +90,8 @@ impl IdpConfigService {
         tenant_id: Uuid,
         req: CreateIdentityProviderRequest,
     ) -> FederationResult<TenantIdentityProvider> {
+        self.set_rls_context(tenant_id).await?;
+
         // Parse provider type
         let provider_type: ProviderType = req
             .provider_type
@@ -158,6 +173,8 @@ impl IdpConfigService {
         idp_id: Uuid,
         req: UpdateIdentityProviderRequest,
     ) -> FederationResult<TenantIdentityProvider> {
+        self.set_rls_context(tenant_id).await?;
+
         // Verify IdP exists and belongs to tenant
         let _existing = self.get(tenant_id, idp_id).await?;
 
@@ -217,6 +234,8 @@ impl IdpConfigService {
     /// Delete an identity provider.
     #[instrument(skip(self))]
     pub async fn delete(&self, tenant_id: Uuid, idp_id: Uuid) -> FederationResult<()> {
+        self.set_rls_context(tenant_id).await?;
+
         // Verify IdP exists and belongs to tenant
         let _ = self.get(tenant_id, idp_id).await?;
 
@@ -227,7 +246,7 @@ impl IdpConfigService {
         }
 
         // Delete domains first (cascade should handle this, but be explicit)
-        IdentityProviderDomain::delete_by_idp(&self.pool, idp_id).await?;
+        IdentityProviderDomain::delete_by_idp(&self.pool, tenant_id, idp_id).await?;
 
         // Delete the identity provider
         TenantIdentityProvider::delete(&self.pool, idp_id).await?;
@@ -244,6 +263,8 @@ impl IdpConfigService {
         idp_id: Uuid,
         is_enabled: bool,
     ) -> FederationResult<TenantIdentityProvider> {
+        self.set_rls_context(tenant_id).await?;
+
         // Verify IdP exists and belongs to tenant
         let _ = self.get(tenant_id, idp_id).await?;
 
@@ -311,7 +332,7 @@ impl IdpConfigService {
             return Err(FederationError::IdpNotFound(domain_id));
         }
 
-        IdentityProviderDomain::delete(&self.pool, domain_id).await?;
+        IdentityProviderDomain::delete(&self.pool, tenant_id, domain_id).await?;
 
         tracing::info!(idp_id = %idp_id, domain_id = %domain_id, "Removed domain from identity provider");
         Ok(())

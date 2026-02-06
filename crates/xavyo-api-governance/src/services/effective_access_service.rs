@@ -200,16 +200,16 @@ impl EffectiveAccessService {
         })
     }
 
-    /// Get user's roles from the `user_role` table.
-    async fn get_user_roles(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Vec<String>> {
-        // Query the user_role table for the user's roles
+    /// Get user's roles from the `user_roles` table.
+    async fn get_user_roles(&self, _tenant_id: Uuid, user_id: Uuid) -> Result<Vec<String>> {
+        // user_roles table does not have tenant_id; tenant isolation is enforced
+        // via the user_id FK to the users table (which is tenant-scoped).
         let roles: Vec<String> = sqlx::query_scalar(
             r"
             SELECT role_name FROM user_roles
-            WHERE tenant_id = $1 AND user_id = $2
+            WHERE user_id = $1
             ",
         )
-        .bind(tenant_id)
         .bind(user_id)
         .fetch_all(&self.pool)
         .await

@@ -209,6 +209,7 @@ impl ProvisioningService {
     ) -> FederationResult<UserIdentityLink> {
         let updated = UserIdentityLink::update(
             &self.pool,
+            link.tenant_id,
             link.id,
             UpdateUserIdentityLink {
                 raw_claims: Some(serde_json::to_value(claims).unwrap_or_default()),
@@ -232,7 +233,7 @@ impl ProvisioningService {
             .await?
             .ok_or(FederationError::LinkNotFound)?;
 
-        UserIdentityLink::delete(&self.pool, link.id).await?;
+        UserIdentityLink::delete(&self.pool, tenant_id, link.id).await?;
 
         tracing::info!(
             tenant_id = %tenant_id,

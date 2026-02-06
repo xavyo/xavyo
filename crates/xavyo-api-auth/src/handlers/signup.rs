@@ -163,7 +163,6 @@ pub async fn signup_handler(
     info!(
         user_id = %user_id,
         tenant_id = %SYSTEM_TENANT_ID,
-        email = %email,
         ip = %addr.ip(),
         "signup.success: New user signed up in system tenant"
     );

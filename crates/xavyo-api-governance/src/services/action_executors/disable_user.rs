@@ -18,24 +18,35 @@ impl DisableUserExecutor {
     }
 
     /// Check if the user is currently active.
-    async fn is_user_active(pool: &PgPool, user_id: Uuid) -> Result<bool, sqlx::Error> {
-        let result: Option<(bool,)> = sqlx::query_as("SELECT is_active FROM users WHERE id = $1")
-            .bind(user_id)
-            .fetch_optional(pool)
-            .await?;
+    async fn is_user_active(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let result: Option<(bool,)> =
+            sqlx::query_as("SELECT is_active FROM users WHERE id = $1 AND tenant_id = $2")
+                .bind(user_id)
+                .bind(tenant_id)
+                .fetch_optional(pool)
+                .await?;
 
         Ok(result.map(|(active,)| active).unwrap_or(false))
     }
 
     /// Disable the user.
-    async fn disable_user(pool: &PgPool, user_id: Uuid) -> Result<bool, sqlx::Error> {
+    async fn disable_user(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r#"
             UPDATE users SET is_active = false, updated_at = NOW()
-            WHERE id = $1 AND is_active = true
+            WHERE id = $1 AND tenant_id = $2 AND is_active = true
             "#,
         )
         .bind(user_id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -43,14 +54,19 @@ impl DisableUserExecutor {
     }
 
     /// Terminate all active sessions for the user.
-    async fn terminate_sessions(pool: &PgPool, user_id: Uuid) -> Result<i32, sqlx::Error> {
+    async fn terminate_sessions(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<i32, sqlx::Error> {
         let result = sqlx::query(
             r#"
             UPDATE sessions SET revoked_at = NOW()
-            WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
+            WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()
             "#,
         )
         .bind(user_id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -69,12 +85,13 @@ impl ActionExecutor for DisableUserExecutor {
     async fn execute(
         &self,
         pool: &PgPool,
-        _ctx: &ExecutionContext,
+        ctx: &ExecutionContext,
         target_user_id: Uuid,
         _params: &serde_json::Value,
     ) -> ExecutionResult {
+        let tenant_id = ctx.tenant_id;
         // Check current state
-        match Self::is_user_active(pool, target_user_id).await {
+        match Self::is_user_active(pool, tenant_id, target_user_id).await {
             Ok(false) => {
                 // User already disabled - skip
                 return ExecutionResult::skipped(serde_json::json!({"is_active": false}));
@@ -86,10 +103,10 @@ impl ActionExecutor for DisableUserExecutor {
         }
 
         // Disable the user
-        match Self::disable_user(pool, target_user_id).await {
+        match Self::disable_user(pool, tenant_id, target_user_id).await {
             Ok(true) => {
                 // Also terminate sessions
-                let sessions_terminated = Self::terminate_sessions(pool, target_user_id)
+                let sessions_terminated = Self::terminate_sessions(pool, tenant_id, target_user_id)
                     .await
                     .unwrap_or(0);
 
@@ -112,11 +129,11 @@ impl ActionExecutor for DisableUserExecutor {
     async fn would_change(
         &self,
         pool: &PgPool,
-        _ctx: &ExecutionContext,
+        ctx: &ExecutionContext,
         target_user_id: Uuid,
         _params: &serde_json::Value,
     ) -> (bool, Option<serde_json::Value>, Option<serde_json::Value>) {
-        match Self::is_user_active(pool, target_user_id).await {
+        match Self::is_user_active(pool, ctx.tenant_id, target_user_id).await {
             Ok(false) => (false, Some(serde_json::json!({"is_active": false})), None),
             Ok(true) => (
                 true,

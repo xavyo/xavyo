@@ -39,7 +39,7 @@ pub async fn list_actions(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = LifecycleActionFilter {
         event_id: query.event_id,

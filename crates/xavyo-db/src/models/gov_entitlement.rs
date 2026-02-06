@@ -652,12 +652,14 @@ impl GovEntitlement {
     }
 
     /// List all active entitlements for a tenant (used by role mining).
+    /// Safety limit of 10,000 to prevent unbounded memory growth.
     pub async fn list_all(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
             SELECT * FROM gov_entitlements
             WHERE tenant_id = $1 AND status = 'active'
             ORDER BY name
+            LIMIT 10000
             ",
         )
         .bind(tenant_id)

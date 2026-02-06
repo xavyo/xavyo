@@ -85,11 +85,11 @@ impl EncryptionService {
         // SECURITY: Use OsRng (CSPRNG) for cryptographic nonce generation
         let mut nonce_bytes = [0u8; NONCE_SIZE];
         rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::from(nonce_bytes);
 
         // Encrypt
         let ciphertext = cipher
-            .encrypt(nonce, plaintext.as_bytes())
+            .encrypt(&nonce, plaintext.as_bytes())
             .map_err(|e| FederationError::EncryptionFailed(e.to_string()))?;
 
         // Prepend nonce to ciphertext
@@ -116,11 +116,14 @@ impl EncryptionService {
 
         // Split nonce and ciphertext
         let (nonce_bytes, ciphertext) = encrypted.split_at(NONCE_SIZE);
-        let nonce = Nonce::from_slice(nonce_bytes);
+        let nonce_array: [u8; NONCE_SIZE] = nonce_bytes
+            .try_into()
+            .map_err(|_| FederationError::DecryptionFailed("invalid nonce length".to_string()))?;
+        let nonce = Nonce::from(nonce_array);
 
         // Decrypt
         let plaintext = cipher
-            .decrypt(nonce, ciphertext)
+            .decrypt(&nonce, ciphertext)
             .map_err(|e| FederationError::DecryptionFailed(e.to_string()))?;
 
         String::from_utf8(plaintext).map_err(|e| FederationError::DecryptionFailed(e.to_string()))

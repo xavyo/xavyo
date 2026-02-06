@@ -621,18 +621,24 @@ impl ApiAgentsError {
                 ProblemDetails::new("unauthorized", "Unauthorized", StatusCode::UNAUTHORIZED)
                     .with_detail("Authentication required.")
             }
-            ApiAgentsError::Internal(msg) => ProblemDetails::new(
-                "internal-error",
-                "Internal Server Error",
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )
-            .with_detail(msg.clone()),
-            ApiAgentsError::Database(err) => ProblemDetails::new(
-                "database-error",
-                "Database Error",
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )
-            .with_detail(err.to_string()),
+            ApiAgentsError::Internal(ref msg) => {
+                tracing::error!("Internal error: {}", msg);
+                ProblemDetails::new(
+                    "internal-error",
+                    "Internal Server Error",
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .with_detail("An internal error occurred")
+            }
+            ApiAgentsError::Database(ref err) => {
+                tracing::error!("Database error: {:?}", err);
+                ProblemDetails::new(
+                    "database-error",
+                    "Database Error",
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .with_detail("A database error occurred")
+            }
             ApiAgentsError::InvalidRiskLevel(level) => ProblemDetails::new(
                 "invalid-risk-level",
                 "Invalid Risk Level",
@@ -809,12 +815,15 @@ impl ApiAgentsError {
                 StatusCode::GONE,
             )
             .with_detail("The credential has been revoked and is no longer valid."),
-            ApiAgentsError::EncryptionError(msg) => ProblemDetails::new(
-                "encryption-error",
-                "Encryption Error",
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )
-            .with_detail(msg.clone()),
+            ApiAgentsError::EncryptionError(ref msg) => {
+                tracing::error!("Encryption error: {}", msg);
+                ProblemDetails::new(
+                    "encryption-error",
+                    "Encryption Error",
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .with_detail("An encryption error occurred")
+            }
             ApiAgentsError::ProviderAuthFailed(msg) => ProblemDetails::new(
                 "provider-auth-failed",
                 "Provider Authentication Failed",

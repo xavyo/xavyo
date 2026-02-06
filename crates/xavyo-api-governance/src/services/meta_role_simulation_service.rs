@@ -645,7 +645,7 @@ impl MetaRoleSimulationService {
     ) -> Result<Vec<SimulationRoleChange>> {
         let to_add: Vec<Uuid> = new_matches
             .difference(current_roles)
-            .take(limit as usize)
+            .take(limit.max(0) as usize)
             .copied()
             .collect();
 
@@ -667,7 +667,7 @@ impl MetaRoleSimulationService {
     ) -> Result<Vec<SimulationRoleChange>> {
         let to_remove: Vec<Uuid> = current_roles
             .difference(new_matches)
-            .take(limit as usize)
+            .take(limit.max(0) as usize)
             .copied()
             .collect();
 

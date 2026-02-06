@@ -168,6 +168,7 @@ impl UserIdentityLink {
     /// Update link (claims and last login).
     pub async fn update(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         input: UpdateUserIdentityLink,
     ) -> Result<Self, sqlx::Error> {
@@ -175,14 +176,15 @@ impl UserIdentityLink {
             r"
             UPDATE user_identity_links
             SET
-                raw_claims = COALESCE($2, raw_claims),
+                raw_claims = COALESCE($3, raw_claims),
                 last_login_at = NOW(),
                 updated_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             RETURNING *
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(&input.raw_claims)
         .fetch_one(pool)
         .await
@@ -208,32 +210,49 @@ impl UserIdentityLink {
     }
 
     /// Update last login timestamp.
-    pub async fn touch_last_login(pool: &sqlx::PgPool, id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE user_identity_links SET last_login_at = NOW() WHERE id = $1")
-            .bind(id)
-            .execute(pool)
-            .await?;
+    pub async fn touch_last_login(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE user_identity_links SET last_login_at = NOW() WHERE id = $1 AND tenant_id = $2",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .execute(pool)
+        .await?;
         Ok(())
     }
 
     /// Delete a link.
-    pub async fn delete(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM user_identity_links WHERE id = $1")
-            .bind(id)
-            .execute(pool)
-            .await?;
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let result =
+            sqlx::query("DELETE FROM user_identity_links WHERE id = $1 AND tenant_id = $2")
+                .bind(id)
+                .bind(tenant_id)
+                .execute(pool)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 
     /// Delete all links for an `IdP`.
     pub async fn delete_by_idp(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         identity_provider_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM user_identity_links WHERE identity_provider_id = $1")
-            .bind(identity_provider_id)
-            .execute(pool)
-            .await?;
+        let result = sqlx::query(
+            "DELETE FROM user_identity_links WHERE identity_provider_id = $1 AND tenant_id = $2",
+        )
+        .bind(identity_provider_id)
+        .bind(tenant_id)
+        .execute(pool)
+        .await?;
         Ok(result.rows_affected())
     }
 }

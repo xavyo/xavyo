@@ -793,9 +793,9 @@ impl IdentityMergeService {
                 r"
             SELECT e.id, e.name, a.name as application
             FROM gov_entitlement_assignments ea
-            JOIN gov_entitlements e ON e.id = ea.entitlement_id
-            LEFT JOIN gov_applications a ON a.id = e.application_id
-            WHERE ea.user_id = $1 AND ea.tenant_id = $2 AND ea.is_active = true
+            JOIN gov_entitlements e ON e.id = ea.entitlement_id AND e.tenant_id = ea.tenant_id
+            LEFT JOIN gov_applications a ON a.id = e.application_id AND a.tenant_id = ea.tenant_id
+            WHERE ea.target_id = $1 AND ea.target_type = 'user' AND ea.tenant_id = $2 AND ea.status = 'active'
             ",
             )
             .bind(source_id)
@@ -816,9 +816,9 @@ impl IdentityMergeService {
                 r"
             SELECT e.id, e.name, a.name as application
             FROM gov_entitlement_assignments ea
-            JOIN gov_entitlements e ON e.id = ea.entitlement_id
-            LEFT JOIN gov_applications a ON a.id = e.application_id
-            WHERE ea.user_id = $1 AND ea.tenant_id = $2 AND ea.is_active = true
+            JOIN gov_entitlements e ON e.id = ea.entitlement_id AND e.tenant_id = ea.tenant_id
+            LEFT JOIN gov_applications a ON a.id = e.application_id AND a.tenant_id = ea.tenant_id
+            WHERE ea.target_id = $1 AND ea.target_type = 'user' AND ea.tenant_id = $2 AND ea.status = 'active'
             ",
             )
             .bind(target_id)
@@ -1005,8 +1005,8 @@ impl IdentityMergeService {
         let result = sqlx::query(
             r"
             UPDATE sessions
-            SET is_valid = false, invalidated_at = NOW()
-            WHERE user_id = $1 AND tenant_id = $2 AND is_valid = true
+            SET revoked_at = NOW()
+            WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL
             ",
         )
         .bind(user_id)
@@ -1322,17 +1322,18 @@ impl IdentityMergeService {
                 let result = sqlx::query(
                     r"
                     INSERT INTO gov_entitlement_assignments
-                        (id, tenant_id, entitlement_id, user_id, assigned_by, justification, is_active, created_at)
+                        (id, tenant_id, entitlement_id, target_id, target_type, assigned_by, justification, status, created_at)
                     SELECT gen_random_uuid(), ea.tenant_id, ea.entitlement_id, $3,
-                           ea.assigned_by, 'Transferred during identity merge', true, NOW()
+                           'user', ea.assigned_by, 'Transferred during identity merge', 'active', NOW()
                     FROM gov_entitlement_assignments ea
-                    WHERE ea.user_id = $1 AND ea.tenant_id = $2 AND ea.is_active = true
+                    WHERE ea.target_id = $1 AND ea.target_type = 'user' AND ea.tenant_id = $2 AND ea.status = 'active'
                     AND NOT EXISTS (
                         SELECT 1 FROM gov_entitlement_assignments ea2
                         WHERE ea2.entitlement_id = ea.entitlement_id
-                        AND ea2.user_id = $3
+                        AND ea2.target_id = $3
+                        AND ea2.target_type = 'user'
                         AND ea2.tenant_id = $2
-                        AND ea2.is_active = true
+                        AND ea2.status = 'active'
                     )
                     ON CONFLICT DO NOTHING
                     ",
@@ -1360,18 +1361,19 @@ impl IdentityMergeService {
                     let result = sqlx::query(
                         r"
                         INSERT INTO gov_entitlement_assignments
-                            (id, tenant_id, entitlement_id, user_id, assigned_by, justification, is_active, created_at)
+                            (id, tenant_id, entitlement_id, target_id, target_type, assigned_by, justification, status, created_at)
                         SELECT gen_random_uuid(), ea.tenant_id, ea.entitlement_id, $3,
-                               ea.assigned_by, 'Transferred during identity merge (manual selection)', true, NOW()
+                               'user', ea.assigned_by, 'Transferred during identity merge (manual selection)', 'active', NOW()
                         FROM gov_entitlement_assignments ea
-                        WHERE ea.user_id = $1 AND ea.tenant_id = $2 AND ea.is_active = true
+                        WHERE ea.target_id = $1 AND ea.target_type = 'user' AND ea.tenant_id = $2 AND ea.status = 'active'
                         AND ea.entitlement_id = ANY($4)
                         AND NOT EXISTS (
                             SELECT 1 FROM gov_entitlement_assignments ea2
                             WHERE ea2.entitlement_id = ea.entitlement_id
-                            AND ea2.user_id = $3
+                            AND ea2.target_id = $3
+                            AND ea2.target_type = 'user'
                             AND ea2.tenant_id = $2
-                            AND ea2.is_active = true
+                            AND ea2.status = 'active'
                         )
                         ON CONFLICT DO NOTHING
                         ",

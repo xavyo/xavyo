@@ -77,12 +77,12 @@ impl EncryptionService {
         // Generate a random nonce
         let mut nonce_bytes = [0u8; NONCE_SIZE];
         OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::from(nonce_bytes);
 
         // Encrypt the plaintext
         let ciphertext =
             cipher
-                .encrypt(nonce, plaintext)
+                .encrypt(&nonce, plaintext)
                 .map_err(|e| SocialError::EncryptionError {
                     operation: format!("encrypt: {e}"),
                 })?;
@@ -112,12 +112,18 @@ impl EncryptionService {
             })?;
 
         // Extract nonce and ciphertext
-        let nonce = Nonce::from_slice(&ciphertext[..NONCE_SIZE]);
+        let nonce_array: [u8; NONCE_SIZE] =
+            ciphertext[..NONCE_SIZE]
+                .try_into()
+                .map_err(|_| SocialError::EncryptionError {
+                    operation: "invalid nonce length".to_string(),
+                })?;
+        let nonce = Nonce::from(nonce_array);
         let encrypted_data = &ciphertext[NONCE_SIZE..];
 
         // Decrypt
         cipher
-            .decrypt(nonce, encrypted_data)
+            .decrypt(&nonce, encrypted_data)
             .map_err(|e| SocialError::EncryptionError {
                 operation: format!("decrypt: {e}"),
             })

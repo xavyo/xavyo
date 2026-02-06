@@ -5,6 +5,7 @@
 
 use axum::{
     extract::{Path, Query, State},
+    http::StatusCode,
     Extension, Json,
 };
 use uuid::Uuid;
@@ -170,6 +171,9 @@ pub async fn create_archetype(
     State(state): State<GovernanceState>,
     Json(request): Json<CreateIdentityArchetypeRequest>,
 ) -> ApiResult<Json<IdentityArchetypeResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = claims
@@ -237,6 +241,9 @@ pub async fn update_archetype(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateIdentityArchetypeRequest>,
 ) -> ApiResult<Json<IdentityArchetypeResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = claims
@@ -319,7 +326,10 @@ pub async fn delete_archetype(
     Extension(claims): Extension<JwtClaims>,
     State(state): State<GovernanceState>,
     Path(id): Path<Uuid>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = claims
         .tenant_id()
         .map(|t| *t.as_uuid())
@@ -342,7 +352,7 @@ pub async fn delete_archetype(
 
     IdentityArchetype::delete(state.pool(), tenant_id, id).await?;
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// List policy bindings for an archetype.
@@ -409,6 +419,9 @@ pub async fn bind_archetype_policy(
     Path(id): Path<Uuid>,
     Json(request): Json<BindPolicyRequest>,
 ) -> ApiResult<Json<PolicyBindingResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = claims
@@ -452,7 +465,10 @@ pub async fn unbind_archetype_policy(
     Extension(claims): Extension<JwtClaims>,
     State(state): State<GovernanceState>,
     Path((id, policy_type_str)): Path<(Uuid, String)>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = claims
         .tenant_id()
         .map(|t| *t.as_uuid())
@@ -477,7 +493,7 @@ pub async fn unbind_archetype_policy(
         )));
     }
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Get effective policies for an archetype (resolved through inheritance).
@@ -614,6 +630,9 @@ pub async fn assign_user_archetype(
 ) -> ApiResult<Json<UserIdentityArchetypeResponse>> {
     use xavyo_db::models::User;
 
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = claims
@@ -698,9 +717,12 @@ pub async fn remove_user_archetype(
     Extension(claims): Extension<JwtClaims>,
     State(state): State<GovernanceState>,
     Path(user_id): Path<Uuid>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     use xavyo_db::models::User;
 
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = claims
         .tenant_id()
         .map(|t| *t.as_uuid())
@@ -713,7 +735,7 @@ pub async fn remove_user_archetype(
 
     User::remove_archetype(state.pool(), tenant_id, user_id).await?;
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ============================================================================
@@ -852,6 +874,9 @@ pub async fn assign_archetype_lifecycle(
     use crate::services::archetype_lifecycle_service::ArchetypeLifecycleService;
     use std::sync::Arc;
 
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = claims
         .tenant_id()
         .map(|t| *t.as_uuid())
@@ -917,6 +942,9 @@ pub async fn remove_archetype_lifecycle(
     use crate::services::archetype_lifecycle_service::ArchetypeLifecycleService;
     use std::sync::Arc;
 
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = claims
         .tenant_id()
         .map(|t| *t.as_uuid())

@@ -277,6 +277,34 @@ impl GovLicenseAssignment {
         .await
     }
 
+    /// Create a new assignment within a transaction.
+    pub async fn create_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        tenant_id: Uuid,
+        input: CreateGovLicenseAssignment,
+    ) -> Result<Self, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            INSERT INTO gov_license_assignments (
+                tenant_id, license_pool_id, user_id, assigned_by, source,
+                entitlement_link_id, session_id, notes
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+            ",
+        )
+        .bind(tenant_id)
+        .bind(input.license_pool_id)
+        .bind(input.user_id)
+        .bind(input.assigned_by)
+        .bind(input.source)
+        .bind(input.entitlement_link_id)
+        .bind(input.session_id)
+        .bind(&input.notes)
+        .fetch_one(&mut **tx)
+        .await
+    }
+
     /// Release (deallocate) an assignment.
     pub async fn release(
         pool: &sqlx::PgPool,
@@ -294,6 +322,26 @@ impl GovLicenseAssignment {
         .bind(id)
         .bind(tenant_id)
         .fetch_optional(pool)
+        .await
+    }
+
+    /// Release (deallocate) an assignment within a transaction.
+    pub async fn release_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            UPDATE gov_license_assignments
+            SET status = 'released', updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2 AND status = 'active'
+            RETURNING *
+            ",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .fetch_optional(&mut **tx)
         .await
     }
 
@@ -316,6 +364,28 @@ impl GovLicenseAssignment {
         .bind(tenant_id)
         .bind(reason)
         .fetch_optional(pool)
+        .await
+    }
+
+    /// Reclaim an assignment with reason within a transaction.
+    pub async fn reclaim_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        tenant_id: Uuid,
+        id: Uuid,
+        reason: LicenseReclaimReason,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            UPDATE gov_license_assignments
+            SET status = 'reclaimed', reclaimed_at = NOW(), reclaim_reason = $3, updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2 AND status = 'active'
+            RETURNING *
+            ",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .bind(reason)
+        .fetch_optional(&mut **tx)
         .await
     }
 
@@ -355,6 +425,27 @@ impl GovLicenseAssignment {
         .bind(tenant_id)
         .bind(license_pool_id)
         .execute(pool)
+        .await?;
+
+        Ok(result.rows_affected())
+    }
+
+    /// Expire all active assignments for a pool within a transaction.
+    pub async fn expire_all_for_pool_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        tenant_id: Uuid,
+        license_pool_id: Uuid,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r"
+            UPDATE gov_license_assignments
+            SET status = 'expired', reclaim_reason = 'expiration', updated_at = NOW()
+            WHERE tenant_id = $1 AND license_pool_id = $2 AND status = 'active'
+            ",
+        )
+        .bind(tenant_id)
+        .bind(license_pool_id)
+        .execute(&mut **tx)
         .await?;
 
         Ok(result.rows_affected())
@@ -493,8 +584,8 @@ impl LicenseAssignmentWithDetails {
                 a.assigned_at, a.assigned_by, a.source, a.status,
                 a.reclaimed_at, a.reclaim_reason, a.notes
             FROM gov_license_assignments a
-            JOIN gov_license_pools p ON a.license_pool_id = p.id
-            JOIN users u ON a.user_id = u.id
+            JOIN gov_license_pools p ON a.license_pool_id = p.id AND p.tenant_id = a.tenant_id
+            JOIN users u ON a.user_id = u.id AND u.tenant_id = a.tenant_id
             WHERE a.tenant_id = $1
             ",
         );

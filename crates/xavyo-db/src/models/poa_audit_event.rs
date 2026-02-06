@@ -245,7 +245,7 @@ impl PoaAuditEvent {
                 tenant_id, poa_id, event_type, actor_id, affected_user_id,
                 details, ip_address, user_agent
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES ($1, $2, $3, $4, $5, $6, $7::inet, $8)
             RETURNING *
             ",
         )

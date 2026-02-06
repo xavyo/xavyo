@@ -10,15 +10,23 @@ use axum::{extract::Path, Extension, Json};
 use std::sync::Arc;
 use uuid::Uuid;
 use validator::Validate;
+use xavyo_auth::JwtClaims;
+use xavyo_core::TenantId;
 
 /// Get lockout policy for a tenant.
 ///
 /// GET /admin/tenants/:tenant_id/lockout-policy
 pub async fn get_lockout_policy(
     Extension(lockout_service): Extension<Arc<LockoutService>>,
-    Path(tenant_id): Path<Uuid>,
+    Extension(tenant_id): Extension<TenantId>,
+    Path(path_tenant_id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<LockoutPolicyResponse>), ApiAuthError> {
-    let policy = lockout_service.get_lockout_policy(tenant_id).await?;
+    if *tenant_id.as_uuid() != path_tenant_id {
+        return Err(ApiAuthError::PermissionDenied(
+            "Cannot access other tenant's policy".to_string(),
+        ));
+    }
+    let policy = lockout_service.get_lockout_policy(path_tenant_id).await?;
     Ok((StatusCode::OK, Json(LockoutPolicyResponse::from(policy))))
 }
 
@@ -26,10 +34,22 @@ pub async fn get_lockout_policy(
 ///
 /// PUT /admin/tenants/:tenant_id/lockout-policy
 pub async fn update_lockout_policy(
+    Extension(claims): Extension<JwtClaims>,
     Extension(lockout_service): Extension<Arc<LockoutService>>,
-    Path(tenant_id): Path<Uuid>,
+    Extension(tenant_id): Extension<TenantId>,
+    Path(path_tenant_id): Path<Uuid>,
     Json(request): Json<UpdateLockoutPolicyRequest>,
 ) -> Result<(StatusCode, Json<LockoutPolicyResponse>), ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
+    if *tenant_id.as_uuid() != path_tenant_id {
+        return Err(ApiAuthError::PermissionDenied(
+            "Cannot access other tenant's policy".to_string(),
+        ));
+    }
     // Validate request
     request.validate().map_err(|e| {
         let errors: Vec<String> = e
@@ -49,7 +69,7 @@ pub async fn update_lockout_policy(
     })?;
 
     let policy = lockout_service
-        .update_lockout_policy(tenant_id, request.into_upsert())
+        .update_lockout_policy(path_tenant_id, request.into_upsert())
         .await?;
 
     Ok((StatusCode::OK, Json(LockoutPolicyResponse::from(policy))))

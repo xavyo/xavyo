@@ -433,9 +433,18 @@ impl OrgPolicyService {
                 let combined = configs
                     .into_iter()
                     .reduce(|a, b| a.most_restrictive(&b))
-                    .unwrap();
+                    .ok_or_else(|| {
+                        OrgPolicyError::InvalidConfig(
+                            "No password policy configs to combine".to_string(),
+                        )
+                    })?;
 
-                Ok((serde_json::to_value(combined).unwrap(), sources))
+                let value = serde_json::to_value(combined).map_err(|e| {
+                    OrgPolicyError::InvalidConfig(format!(
+                        "Failed to serialize combined password policy: {e}"
+                    ))
+                })?;
+                Ok((value, sources))
             }
             OrgPolicyType::Mfa => {
                 let configs: Result<Vec<MfaPolicyConfig>, _> = policies
@@ -447,9 +456,18 @@ impl OrgPolicyService {
                 let combined = configs
                     .into_iter()
                     .reduce(|a, b| a.most_restrictive(&b))
-                    .unwrap();
+                    .ok_or_else(|| {
+                        OrgPolicyError::InvalidConfig(
+                            "No MFA policy configs to combine".to_string(),
+                        )
+                    })?;
 
-                Ok((serde_json::to_value(combined).unwrap(), sources))
+                let value = serde_json::to_value(combined).map_err(|e| {
+                    OrgPolicyError::InvalidConfig(format!(
+                        "Failed to serialize combined MFA policy: {e}"
+                    ))
+                })?;
+                Ok((value, sources))
             }
             OrgPolicyType::Session => {
                 let configs: Result<Vec<SessionPolicyConfig>, _> = policies
@@ -461,9 +479,18 @@ impl OrgPolicyService {
                 let combined = configs
                     .into_iter()
                     .reduce(|a, b| a.most_restrictive(&b))
-                    .unwrap();
+                    .ok_or_else(|| {
+                        OrgPolicyError::InvalidConfig(
+                            "No session policy configs to combine".to_string(),
+                        )
+                    })?;
 
-                Ok((serde_json::to_value(combined).unwrap(), sources))
+                let value = serde_json::to_value(combined).map_err(|e| {
+                    OrgPolicyError::InvalidConfig(format!(
+                        "Failed to serialize combined session policy: {e}"
+                    ))
+                })?;
+                Ok((value, sources))
             }
             OrgPolicyType::IpRestriction => {
                 let configs: Result<Vec<IpRestrictionPolicyConfig>, _> = policies
@@ -475,9 +502,18 @@ impl OrgPolicyService {
                 let combined = configs
                     .into_iter()
                     .reduce(|a, b| a.most_restrictive(&b))
-                    .unwrap();
+                    .ok_or_else(|| {
+                        OrgPolicyError::InvalidConfig(
+                            "No IP restriction policy configs to combine".to_string(),
+                        )
+                    })?;
 
-                Ok((serde_json::to_value(combined).unwrap(), sources))
+                let value = serde_json::to_value(combined).map_err(|e| {
+                    OrgPolicyError::InvalidConfig(format!(
+                        "Failed to serialize combined IP restriction policy: {e}"
+                    ))
+                })?;
+                Ok((value, sources))
             }
         }
     }

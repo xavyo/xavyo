@@ -42,7 +42,7 @@ impl InMemoryRiskThresholdStore {
     pub fn get_all(&self) -> Vec<RiskThresholds> {
         self.thresholds
             .read()
-            .expect("lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .values()
             .cloned()
             .collect()
@@ -50,7 +50,10 @@ impl InMemoryRiskThresholdStore {
 
     /// Clear all thresholds (for testing).
     pub fn clear(&self) {
-        self.thresholds.write().expect("lock poisoned").clear();
+        self.thresholds
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
     }
 }
 
@@ -60,7 +63,7 @@ impl RiskThresholdStore for InMemoryRiskThresholdStore {
         Ok(self
             .thresholds
             .read()
-            .expect("lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .get(&tenant_id)
             .cloned())
     }
@@ -68,7 +71,7 @@ impl RiskThresholdStore for InMemoryRiskThresholdStore {
     async fn set(&self, thresholds: RiskThresholds) -> Result<(), GovernanceError> {
         self.thresholds
             .write()
-            .expect("lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .insert(thresholds.tenant_id, thresholds);
         Ok(())
     }
@@ -76,7 +79,7 @@ impl RiskThresholdStore for InMemoryRiskThresholdStore {
     async fn delete(&self, tenant_id: Uuid) -> Result<(), GovernanceError> {
         self.thresholds
             .write()
-            .expect("lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .remove(&tenant_id);
         Ok(())
     }

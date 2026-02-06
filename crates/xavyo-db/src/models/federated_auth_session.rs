@@ -121,11 +121,18 @@ impl FederatedAuthSession {
     }
 
     /// Mark session as used after successful callback.
-    pub async fn mark_used(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("UPDATE federated_auth_sessions SET is_used = true WHERE id = $1")
-            .bind(id)
-            .execute(pool)
-            .await?;
+    pub async fn mark_used(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE federated_auth_sessions SET is_used = true WHERE id = $1 AND tenant_id = $2",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .execute(pool)
+        .await?;
         Ok(result.rows_affected() > 0)
     }
 

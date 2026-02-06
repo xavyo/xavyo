@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS role_constructions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     role_id UUID NOT NULL REFERENCES gov_roles(id) ON DELETE CASCADE,
-    connector_id UUID NOT NULL REFERENCES connectors(id) ON DELETE RESTRICT,
+    connector_id UUID NOT NULL REFERENCES connector_configurations(id) ON DELETE RESTRICT,
     object_class VARCHAR(255) NOT NULL,
     account_type VARCHAR(100) NOT NULL DEFAULT 'default',
     attribute_mappings JSONB NOT NULL DEFAULT '{"mappings": [], "static_values": {}}',
@@ -62,12 +62,7 @@ ALTER TABLE role_constructions ENABLE ROW LEVEL SECURITY;
 -- RLS policy for tenant isolation
 DROP POLICY IF EXISTS role_construction_tenant_isolation ON role_constructions;
 CREATE POLICY role_construction_tenant_isolation ON role_constructions
-    USING (
-        tenant_id = COALESCE(
-            NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-            tenant_id
-        )
-    );
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- Comments for role_constructions
 COMMENT ON TABLE role_constructions IS 'Defines provisioning constructions triggered when a role is assigned (F-063)';
@@ -119,12 +114,7 @@ ALTER TABLE role_inducements ENABLE ROW LEVEL SECURITY;
 -- RLS policy for tenant isolation
 DROP POLICY IF EXISTS role_inducement_tenant_isolation ON role_inducements;
 CREATE POLICY role_inducement_tenant_isolation ON role_inducements
-    USING (
-        tenant_id = COALESCE(
-            NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-            tenant_id
-        )
-    );
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- Comments for role_inducements
 COMMENT ON TABLE role_inducements IS 'Links roles for automatic construction inheritance (F-063)';

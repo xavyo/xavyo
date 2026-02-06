@@ -155,7 +155,7 @@ impl NhiUsageService {
         };
 
         let limit = query.limit.unwrap_or(50);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         let events = GovNhiUsageEvent::list(&self.pool, tenant_id, &filter, limit, offset)
             .await

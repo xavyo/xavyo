@@ -596,16 +596,19 @@ pub async fn list_schema_versions(
 ) -> Result<Json<SchemaVersionListResponse>> {
     let tenant_id = extract_tenant_id(&claims)?;
 
+    let limit = query.limit.min(100);
+    let offset = query.offset.max(0);
+
     let (versions, total) = state
         .schema_service
-        .list_versions(tenant_id, id, query.limit, query.offset)
+        .list_versions(tenant_id, id, limit, offset)
         .await?;
 
     let response = SchemaVersionListResponse {
         versions,
         total,
-        limit: query.limit,
-        offset: query.offset,
+        limit,
+        offset,
     };
 
     Ok(Json(response))

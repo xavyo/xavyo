@@ -4,6 +4,7 @@
 
 use axum::{
     extract::{Path, Query, State},
+    http::StatusCode,
     Extension, Json,
 };
 use uuid::Uuid;
@@ -55,7 +56,7 @@ pub async fn list_archetypes(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = PersonaArchetypeFilter {
         is_active: query.is_active,
@@ -311,7 +312,7 @@ pub async fn delete_archetype(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
-) -> ApiResult<()> {
+) -> ApiResult<StatusCode> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -333,7 +334,7 @@ pub async fn delete_archetype(
         .log_archetype_deleted(tenant_id, actor_id, id, &name)
         .await?;
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Activate a persona archetype.
@@ -432,7 +433,7 @@ pub async fn list_personas(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = PersonaFilter {
         status: query.status,
@@ -866,7 +867,7 @@ pub async fn list_audit_events(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = xavyo_db::models::PersonaAuditEventFilter {
         persona_id: query.persona_id,
@@ -925,7 +926,7 @@ pub async fn get_persona_audit(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     // Verify persona exists
     let _ = state.persona_service.get(tenant_id, id).await?;
@@ -1140,7 +1141,7 @@ pub async fn list_context_sessions(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let sessions = state
         .persona_session_service

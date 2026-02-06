@@ -474,8 +474,8 @@ impl DelegationService {
         let total = all_work_items.len() as i64;
 
         // Apply pagination
-        let start = offset as usize;
-        let end = std::cmp::min(start + limit as usize, all_work_items.len());
+        let start = offset.max(0) as usize;
+        let end = std::cmp::min(start + limit.max(0) as usize, all_work_items.len());
         let paginated = if start < all_work_items.len() {
             all_work_items[start..end].to_vec()
         } else {

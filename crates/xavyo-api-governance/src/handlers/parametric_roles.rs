@@ -463,9 +463,83 @@ pub async fn create_parametric_assignment(
         ));
     }
 
+    // Resolve entitlement_id for the role:
+    // Look up the first entitlement linked to this role via gov_role_entitlements.
+    // If none exists, auto-create a synthetic "role membership" entitlement.
+    let entitlement_id: Uuid = {
+        let pool = &state.pool;
+        let existing: Option<(Uuid,)> = sqlx::query_as(
+            "SELECT entitlement_id FROM gov_role_entitlements WHERE tenant_id = $1 AND role_id = $2 LIMIT 1",
+        )
+        .bind(tenant_id)
+        .bind(role_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| ApiGovernanceError::Internal(format!("Failed to look up role entitlement: {e}")))?;
+
+        if let Some((eid,)) = existing {
+            eid
+        } else {
+            // Auto-create a synthetic entitlement for this role
+            let role = xavyo_db::models::GovRole::find_by_id(pool, tenant_id, role_id)
+                .await
+                .map_err(|e| ApiGovernanceError::Internal(format!("Failed to get role: {e}")))?
+                .ok_or_else(|| ApiGovernanceError::Internal("Role not found".to_string()))?;
+
+            // Find the first application for this tenant to attach the entitlement
+            let app_id: Option<Uuid> = sqlx::query_scalar(
+                "SELECT id FROM gov_applications WHERE tenant_id = $1 ORDER BY created_at LIMIT 1",
+            )
+            .bind(tenant_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| {
+                ApiGovernanceError::Internal(format!("Failed to look up application: {e}"))
+            })?;
+
+            let app_id = app_id.ok_or_else(|| {
+                ApiGovernanceError::Internal(
+                    "No application found. Create an application before making parametric role assignments.".to_string(),
+                )
+            })?;
+
+            let ent_name = format!("role:{}", role.name);
+            let ent: xavyo_db::GovEntitlement = sqlx::query_as(
+                r"INSERT INTO gov_entitlements (tenant_id, application_id, name, description, risk_level)
+                  VALUES ($1, $2, $3, $4, 'low')
+                  ON CONFLICT (tenant_id, application_id, name) DO UPDATE SET name = EXCLUDED.name
+                  RETURNING *",
+            )
+            .bind(tenant_id)
+            .bind(app_id)
+            .bind(&ent_name)
+            .bind(format!("Auto-created entitlement for parametric role: {}", role.name))
+            .fetch_one(pool)
+            .await
+            .map_err(|e| ApiGovernanceError::Internal(format!("Failed to create entitlement: {e}")))?;
+
+            // Link the entitlement to the role
+            sqlx::query(
+                r"INSERT INTO gov_role_entitlements (tenant_id, entitlement_id, role_name, created_by, role_id)
+                  VALUES ($1, $2, $3, $4, $5)
+                  ON CONFLICT DO NOTHING",
+            )
+            .bind(tenant_id)
+            .bind(ent.id)
+            .bind(&role.name)
+            .bind(actor_id)
+            .bind(role_id)
+            .execute(pool)
+            .await
+            .map_err(|e| ApiGovernanceError::Internal(format!("Failed to link entitlement to role: {e}")))?;
+
+            ent.id
+        }
+    };
+
     // Create the assignment
     let assignment_input = xavyo_db::CreateGovAssignment {
-        entitlement_id: role_id,
+        entitlement_id,
         target_type,
         target_id: request.target_id,
         assigned_by: actor_id,
@@ -624,7 +698,7 @@ pub async fn list_user_parametric_assignments(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
     let include_inactive = query.include_inactive.unwrap_or(false);
 
     // Get parametric assignments for the user
@@ -689,8 +763,8 @@ pub async fn list_user_parametric_assignments(
     // Apply pagination
     let paginated_items: Vec<_> = items
         .into_iter()
-        .skip(offset as usize)
-        .take(limit as usize)
+        .skip(offset.max(0) as usize)
+        .take(limit.max(0) as usize)
         .collect();
 
     Ok(Json(crate::models::ParametricAssignmentListResponse {
@@ -829,7 +903,7 @@ pub async fn list_parameter_audit(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = ParameterAuditFilter {
         assignment_id: query.assignment_id,

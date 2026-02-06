@@ -25,12 +25,7 @@ ALTER TABLE gov_role_inheritance_blocks ENABLE ROW LEVEL SECURITY;
 -- RLS policy for tenant isolation
 DROP POLICY IF EXISTS gov_role_inh_block_tenant_isolation ON gov_role_inheritance_blocks;
 CREATE POLICY gov_role_inh_block_tenant_isolation ON gov_role_inheritance_blocks
-    USING (
-        tenant_id = COALESCE(
-            NULLIF(current_setting('app.current_tenant', true), '')::uuid,
-            tenant_id
-        )
-    );
+    USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
 -- Comments for documentation
 COMMENT ON TABLE gov_role_inheritance_blocks IS 'Explicit blocks preventing specific entitlements from being inherited by a role (F088)';

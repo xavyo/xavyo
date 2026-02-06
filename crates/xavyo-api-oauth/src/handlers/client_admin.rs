@@ -11,24 +11,11 @@ use crate::models::{
 use crate::router::OAuthState;
 use axum::{
     extract::{Path, State},
-    http::HeaderMap,
-    Json,
+    http::StatusCode,
+    Extension, Json,
 };
 use uuid::Uuid;
-
-/// Extract `tenant_id` from X-Tenant-ID header.
-fn extract_tenant_id(headers: &HeaderMap) -> Result<Uuid, OAuthError> {
-    let tenant_header = headers
-        .get("X-Tenant-ID")
-        .ok_or_else(|| OAuthError::InvalidRequest("X-Tenant-ID header is required".to_string()))?;
-
-    let tenant_str = tenant_header
-        .to_str()
-        .map_err(|_| OAuthError::InvalidRequest("Invalid X-Tenant-ID header value".to_string()))?;
-
-    Uuid::parse_str(tenant_str)
-        .map_err(|_| OAuthError::InvalidRequest("X-Tenant-ID must be a valid UUID".to_string()))
-}
+use xavyo_core::TenantId;
 
 /// Lists all `OAuth2` clients for the current tenant.
 #[utoipa::path(
@@ -44,11 +31,11 @@ fn extract_tenant_id(headers: &HeaderMap) -> Result<Uuid, OAuthError> {
 )]
 pub async fn list_clients_handler(
     State(state): State<OAuthState>,
-    headers: HeaderMap,
+    Extension(tenant_id): Extension<TenantId>,
 ) -> Result<Json<ClientListResponse>, OAuthError> {
-    let tenant_id = extract_tenant_id(&headers)?;
+    let tid = *tenant_id.as_uuid();
 
-    let clients = state.client_service.list_clients(tenant_id).await?;
+    let clients = state.client_service.list_clients(tid).await?;
     let total = clients.len() as i64;
 
     Ok(Json(ClientListResponse { clients, total }))
@@ -72,12 +59,12 @@ pub async fn list_clients_handler(
 )]
 pub async fn get_client_handler(
     State(state): State<OAuthState>,
-    headers: HeaderMap,
+    Extension(tenant_id): Extension<TenantId>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ClientResponse>, OAuthError> {
-    let tenant_id = extract_tenant_id(&headers)?;
+    let tid = *tenant_id.as_uuid();
 
-    let client = state.client_service.get_client_by_id(tenant_id, id).await?;
+    let client = state.client_service.get_client_by_id(tid, id).await?;
 
     Ok(Json(client))
 }
@@ -98,10 +85,10 @@ pub async fn get_client_handler(
 )]
 pub async fn create_client_handler(
     State(state): State<OAuthState>,
-    headers: HeaderMap,
+    Extension(tenant_id): Extension<TenantId>,
     Json(request): Json<CreateClientRequest>,
 ) -> Result<Json<CreateClientResponse>, OAuthError> {
-    let tenant_id = extract_tenant_id(&headers)?;
+    let tid = *tenant_id.as_uuid();
 
     // Validate the request
     if request.name.is_empty() {
@@ -136,10 +123,7 @@ pub async fn create_client_handler(
         }
     }
 
-    let (client, secret) = state
-        .client_service
-        .create_client(tenant_id, request)
-        .await?;
+    let (client, secret) = state.client_service.create_client(tid, request).await?;
 
     Ok(Json(CreateClientResponse {
         client,
@@ -167,11 +151,11 @@ pub async fn create_client_handler(
 )]
 pub async fn update_client_handler(
     State(state): State<OAuthState>,
-    headers: HeaderMap,
+    Extension(tenant_id): Extension<TenantId>,
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateClientRequest>,
 ) -> Result<Json<ClientResponse>, OAuthError> {
-    let tenant_id = extract_tenant_id(&headers)?;
+    let tid = *tenant_id.as_uuid();
 
     // Validate grant types if provided
     if let Some(ref grant_types) = request.grant_types {
@@ -185,10 +169,7 @@ pub async fn update_client_handler(
         }
     }
 
-    let client = state
-        .client_service
-        .update_client(tenant_id, id, request)
-        .await?;
+    let client = state.client_service.update_client(tid, id, request).await?;
 
     Ok(Json(client))
 }
@@ -211,17 +192,14 @@ pub async fn update_client_handler(
 )]
 pub async fn delete_client_handler(
     State(state): State<OAuthState>,
-    headers: HeaderMap,
+    Extension(tenant_id): Extension<TenantId>,
     Path(id): Path<Uuid>,
-) -> Result<(), OAuthError> {
-    let tenant_id = extract_tenant_id(&headers)?;
+) -> Result<StatusCode, OAuthError> {
+    let tid = *tenant_id.as_uuid();
 
-    state
-        .client_service
-        .deactivate_client(tenant_id, id)
-        .await?;
+    state.client_service.deactivate_client(tid, id).await?;
 
-    Ok(())
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Regenerates the client secret for a confidential client.
@@ -243,14 +221,14 @@ pub async fn delete_client_handler(
 )]
 pub async fn regenerate_secret_handler(
     State(state): State<OAuthState>,
-    headers: HeaderMap,
+    Extension(tenant_id): Extension<TenantId>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<RegenerateSecretResponse>, OAuthError> {
-    let tenant_id = extract_tenant_id(&headers)?;
+    let tid = *tenant_id.as_uuid();
 
     let new_secret = state
         .client_service
-        .regenerate_client_secret(tenant_id, id)
+        .regenerate_client_secret(tid, id)
         .await?;
 
     Ok(Json(RegenerateSecretResponse {
@@ -263,40 +241,4 @@ pub async fn regenerate_secret_handler(
 pub struct RegenerateSecretResponse {
     /// The new client secret (only shown once).
     pub client_secret: String,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use axum::http::HeaderValue;
-
-    #[test]
-    fn test_extract_tenant_id_success() {
-        let mut headers = HeaderMap::new();
-        let tenant_id = Uuid::new_v4();
-        headers.insert(
-            "X-Tenant-ID",
-            HeaderValue::from_str(&tenant_id.to_string()).unwrap(),
-        );
-
-        let result = extract_tenant_id(&headers);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), tenant_id);
-    }
-
-    #[test]
-    fn test_extract_tenant_id_missing() {
-        let headers = HeaderMap::new();
-        let result = extract_tenant_id(&headers);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_extract_tenant_id_invalid_uuid() {
-        let mut headers = HeaderMap::new();
-        headers.insert("X-Tenant-ID", HeaderValue::from_static("not-a-uuid"));
-
-        let result = extract_tenant_id(&headers);
-        assert!(result.is_err());
-    }
 }

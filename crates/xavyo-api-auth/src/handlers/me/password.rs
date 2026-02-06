@@ -77,7 +77,7 @@ pub async fn me_password_change(
 
     // Verify current password
     let valid = verify_password(&request.current_password, &user.password_hash)
-        .map_err(|e| ApiAuthError::Internal(format!("Password verification failed: {e}")))?;
+        .map_err(|_| ApiAuthError::InvalidCredentials)?;
 
     if !valid {
         tracing::debug!(user_id = %user_id, "Invalid current password during password change");

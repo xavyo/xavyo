@@ -10,9 +10,16 @@ use std::env;
 use uuid::Uuid;
 
 /// Create a test database pool.
+///
+/// Uses `DATABASE_URL_SUPERUSER` (preferred) or `DATABASE_URL` for direct DB tests.
+/// These integration tests perform direct SQL INSERT/UPDATE/DELETE so they need
+/// superuser access (bypasses RLS).
 pub async fn create_test_pool() -> PgPool {
-    let database_url = env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/xavyo_test".to_string());
+    let database_url = env::var("DATABASE_URL_SUPERUSER")
+        .or_else(|_| env::var("DATABASE_URL"))
+        .unwrap_or_else(|_| {
+            "postgres://xavyo:xavyo_test_password@localhost:5434/xavyo_test".to_string()
+        });
 
     PgPoolOptions::new()
         .max_connections(5)
@@ -63,29 +70,29 @@ pub async fn create_test_user(pool: &PgPool, tenant_id: Uuid, email: &str) -> Uu
 }
 
 /// Create a test user with roles.
+/// Roles are stored in the `user_roles` table, not on the users table.
 pub async fn create_test_user_with_roles(
     pool: &PgPool,
     tenant_id: Uuid,
     email: &str,
     roles: &[&str],
 ) -> Uuid {
-    let user_id = Uuid::new_v4();
-    let roles_array: Vec<String> = roles.iter().map(std::string::ToString::to_string).collect();
+    let user_id = create_test_user(pool, tenant_id, email).await;
 
-    sqlx::query(
-        r"
-        INSERT INTO users (id, tenant_id, email, password_hash, roles, is_active, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())
-        ",
-    )
-    .bind(user_id)
-    .bind(tenant_id)
-    .bind(email)
-    .bind("$argon2id$v=19$m=65536,t=3,p=4$dummy$hash")
-    .bind(&roles_array)
-    .execute(pool)
-    .await
-    .expect("Failed to create test user with roles");
+    for role in roles {
+        sqlx::query(
+            r"
+            INSERT INTO user_roles (user_id, role_name, created_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (user_id, role_name) DO NOTHING
+            ",
+        )
+        .bind(user_id)
+        .bind(*role)
+        .execute(pool)
+        .await
+        .expect("Failed to assign role to test user");
+    }
 
     user_id
 }
@@ -96,7 +103,7 @@ pub async fn create_test_group(pool: &PgPool, tenant_id: Uuid, name: &str) -> Uu
 
     sqlx::query(
         r"
-        INSERT INTO groups (id, tenant_id, name, created_at, updated_at)
+        INSERT INTO groups (id, tenant_id, display_name, created_at, updated_at)
         VALUES ($1, $2, $3, NOW(), NOW())
         ",
     )
@@ -121,7 +128,7 @@ pub async fn create_test_group_with_parent(
 
     sqlx::query(
         r"
-        INSERT INTO groups (id, tenant_id, name, parent_group_id, created_at, updated_at)
+        INSERT INTO groups (id, tenant_id, display_name, parent_id, created_at, updated_at)
         VALUES ($1, $2, $3, $4, NOW(), NOW())
         ",
     )
@@ -140,7 +147,7 @@ pub async fn create_test_group_with_parent(
 pub async fn add_user_to_group(pool: &PgPool, tenant_id: Uuid, group_id: Uuid, user_id: Uuid) {
     sqlx::query(
         r"
-        INSERT INTO group_members (group_id, user_id, tenant_id, created_at)
+        INSERT INTO group_memberships (group_id, user_id, tenant_id, created_at)
         VALUES ($1, $2, $3, NOW())
         ",
     )
@@ -164,8 +171,8 @@ pub async fn create_test_attribute_definition(
 
     sqlx::query(
         r"
-        INSERT INTO user_attribute_definitions (id, tenant_id, name, display_name, data_type, required, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5::user_attribute_data_type, $6, NOW(), NOW())
+        INSERT INTO tenant_attribute_definitions (id, tenant_id, name, display_label, data_type, required, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
         ",
     )
     .bind(definition_id)
@@ -181,7 +188,7 @@ pub async fn create_test_attribute_definition(
     definition_id
 }
 
-/// Create a test attribute definition with validation regex.
+/// Create a test attribute definition with validation rules.
 pub async fn create_test_attribute_definition_with_regex(
     pool: &PgPool,
     tenant_id: Uuid,
@@ -192,10 +199,13 @@ pub async fn create_test_attribute_definition_with_regex(
 ) -> Uuid {
     let definition_id = Uuid::new_v4();
 
+    // Store regex in validation_rules JSONB column
+    let validation_rules = serde_json::json!({ "pattern": validation_regex });
+
     sqlx::query(
         r"
-        INSERT INTO user_attribute_definitions (id, tenant_id, name, display_name, data_type, required, validation_regex, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5::user_attribute_data_type, $6, $7, NOW(), NOW())
+        INSERT INTO tenant_attribute_definitions (id, tenant_id, name, display_label, data_type, required, validation_rules, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
         ",
     )
     .bind(definition_id)
@@ -204,7 +214,7 @@ pub async fn create_test_attribute_definition_with_regex(
     .bind(format!("Test {name}"))
     .bind(data_type)
     .bind(required)
-    .bind(validation_regex)
+    .bind(&validation_rules)
     .execute(pool)
     .await
     .expect("Failed to create test attribute definition with regex");
@@ -213,21 +223,35 @@ pub async fn create_test_attribute_definition_with_regex(
 }
 
 /// Set a custom attribute value on a user.
+///
+/// Looks up the attribute name from `tenant_attribute_definitions` by `definition_id`,
+/// then sets the value on the user's `custom_attributes` JSONB column.
 pub async fn set_user_custom_attribute(
     pool: &PgPool,
     user_id: Uuid,
     definition_id: Uuid,
     value: serde_json::Value,
 ) {
+    // Look up attribute name from definition
+    let row: (String,) =
+        sqlx::query_as("SELECT name FROM tenant_attribute_definitions WHERE id = $1")
+            .bind(definition_id)
+            .fetch_one(pool)
+            .await
+            .expect("Failed to look up attribute definition");
+    let attr_name = row.0;
+
+    // Set the attribute in the user's custom_attributes JSONB
     sqlx::query(
         r"
-        INSERT INTO user_custom_attributes (user_id, definition_id, value, created_at, updated_at)
-        VALUES ($1, $2, $3, NOW(), NOW())
-        ON CONFLICT (user_id, definition_id) DO UPDATE SET value = $3, updated_at = NOW()
+        UPDATE users
+        SET custom_attributes = jsonb_set(COALESCE(custom_attributes, '{}'), $2, $3),
+            updated_at = NOW()
+        WHERE id = $1
         ",
     )
     .bind(user_id)
-    .bind(definition_id)
+    .bind(&[attr_name.as_str()] as &[&str]) // path array for jsonb_set
     .bind(&value)
     .execute(pool)
     .await
@@ -255,28 +279,29 @@ pub fn unique_attribute_name() -> String {
 pub async fn cleanup_test_tenant(pool: &PgPool, tenant_id: Uuid) {
     // Delete in reverse order of dependencies
 
-    // Custom attributes
+    // Attribute definitions
+    let _ = sqlx::query("DELETE FROM tenant_attribute_definitions WHERE tenant_id = $1")
+        .bind(tenant_id)
+        .execute(pool)
+        .await;
+
+    // User roles
     let _ = sqlx::query(
-        "DELETE FROM user_custom_attributes WHERE user_id IN (SELECT id FROM users WHERE tenant_id = $1)",
+        "DELETE FROM user_roles WHERE user_id IN (SELECT id FROM users WHERE tenant_id = $1)",
     )
     .bind(tenant_id)
     .execute(pool)
     .await;
 
-    let _ = sqlx::query("DELETE FROM user_attribute_definitions WHERE tenant_id = $1")
+    // Group memberships
+    let _ = sqlx::query("DELETE FROM group_memberships WHERE tenant_id = $1")
         .bind(tenant_id)
         .execute(pool)
         .await;
 
-    // Group members
-    let _ = sqlx::query("DELETE FROM group_members WHERE tenant_id = $1")
-        .bind(tenant_id)
-        .execute(pool)
-        .await;
-
-    // Groups (need to delete children first due to parent_group_id constraint)
+    // Groups (need to delete children first due to parent_id constraint)
     // First, remove parent references
-    let _ = sqlx::query("UPDATE groups SET parent_group_id = NULL WHERE tenant_id = $1")
+    let _ = sqlx::query("UPDATE groups SET parent_id = NULL WHERE tenant_id = $1")
         .bind(tenant_id)
         .execute(pool)
         .await;

@@ -118,7 +118,7 @@ impl BulkActionService {
         };
 
         let limit = query.limit.unwrap_or(50);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         let actions =
             GovBulkAction::list_by_tenant(&self.pool, tenant_id, &filter, limit, offset).await?;
@@ -155,7 +155,7 @@ impl BulkActionService {
         }
 
         let limit = query.limit.unwrap_or(100);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         // Fetch users that might match (we'll filter in-memory using the expression evaluator)
         // In a production system, we might want to translate the expression to SQL for efficiency
@@ -190,7 +190,7 @@ impl BulkActionService {
             }
         }
 
-        let total_matched = (would_change_count + no_change_count) as i64;
+        let total_matched = would_change_count + no_change_count;
 
         Ok(BulkActionPreviewResponse {
             total_matched,
@@ -329,7 +329,7 @@ impl BulkActionService {
                     .and_then(|s| Uuid::parse_str(s).ok());
 
                 if let Some(rid) = role_id {
-                    let has_role = self.user_has_role(user.id, rid).await?;
+                    let has_role = self.user_has_role(user.id, action.tenant_id, rid).await?;
                     if has_role {
                         Ok((false, Some(serde_json::json!(true)), None))
                     } else {
@@ -352,7 +352,7 @@ impl BulkActionService {
                     .and_then(|s| Uuid::parse_str(s).ok());
 
                 if let Some(rid) = role_id {
-                    let has_role = self.user_has_role(user.id, rid).await?;
+                    let has_role = self.user_has_role(user.id, action.tenant_id, rid).await?;
                     if !has_role {
                         Ok((false, Some(serde_json::json!(false)), None))
                     } else {
@@ -388,16 +388,34 @@ impl BulkActionService {
         }
     }
 
-    /// Check if a user has a specific role.
-    async fn user_has_role(&self, user_id: Uuid, role_id: Uuid) -> ApiResult<bool> {
+    /// Check if a user has a specific role by resolving role_id to role_name.
+    async fn user_has_role(
+        &self,
+        user_id: Uuid,
+        tenant_id: Uuid,
+        role_id: Uuid,
+    ) -> ApiResult<bool> {
+        // Resolve role_id to role_name via gov_roles
+        let role_name: Option<(String,)> =
+            sqlx::query_as("SELECT name FROM gov_roles WHERE id = $1 AND tenant_id = $2")
+                .bind(role_id)
+                .bind(tenant_id)
+                .fetch_optional(&self.pool)
+                .await?;
+
+        let role_name = match role_name {
+            Some((name,)) => name,
+            None => return Ok(false),
+        };
+
         let count: (i64,) = sqlx::query_as(
             r#"
             SELECT COUNT(*) FROM user_roles
-            WHERE user_id = $1 AND role_id = $2
+            WHERE user_id = $1 AND role_name = $2
             "#,
         )
         .bind(user_id)
-        .bind(role_id)
+        .bind(role_name)
         .fetch_one(&self.pool)
         .await?;
 
@@ -464,7 +482,7 @@ impl BulkActionService {
         for user in users {
             if self.evaluate_user(&action.filter_expression, &user)? {
                 let result = self
-                    .process_single_user(&executor, &ctx, user.id, &action.action_params)
+                    .process_single_user(executor.as_ref(), &ctx, user.id, &action.action_params)
                     .await;
 
                 processed_count += 1;
@@ -525,7 +543,7 @@ impl BulkActionService {
     /// Process a single user with the executor.
     async fn process_single_user(
         &self,
-        executor: &Box<dyn super::action_executors::ActionExecutor>,
+        executor: &dyn super::action_executors::ActionExecutor,
         ctx: &super::action_executors::ExecutionContext,
         user_id: Uuid,
         params: &serde_json::Value,

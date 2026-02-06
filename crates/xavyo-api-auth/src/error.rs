@@ -529,24 +529,33 @@ impl ApiAuthError {
                 StatusCode::TOO_MANY_REQUESTS,
             )
             .with_detail("Too many login attempts. Please try again later."),
-            ApiAuthError::Internal(msg) => ProblemDetails::new(
-                "internal-error",
-                "Internal Server Error",
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )
-            .with_detail(msg.clone()),
-            ApiAuthError::Database(err) => ProblemDetails::new(
-                "database-error",
-                "Database Error",
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )
-            .with_detail(err.to_string()),
-            ApiAuthError::DatabaseInternal(err) => ProblemDetails::new(
-                "database-error",
-                "Database Error",
-                StatusCode::INTERNAL_SERVER_ERROR,
-            )
-            .with_detail(err.to_string()),
+            ApiAuthError::Internal(ref msg) => {
+                tracing::error!("Internal error: {}", msg);
+                ProblemDetails::new(
+                    "internal-error",
+                    "Internal Server Error",
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .with_detail("An internal error occurred")
+            }
+            ApiAuthError::Database(ref err) => {
+                tracing::error!("Database error: {:?}", err);
+                ProblemDetails::new(
+                    "database-error",
+                    "Database Error",
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .with_detail("A database error occurred")
+            }
+            ApiAuthError::DatabaseInternal(ref err) => {
+                tracing::error!("Database internal error: {:?}", err);
+                ProblemDetails::new(
+                    "database-error",
+                    "Database Error",
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .with_detail("A database error occurred")
+            }
             ApiAuthError::Validation(msg) => ProblemDetails::new(
                 "validation-error",
                 "Validation Error",

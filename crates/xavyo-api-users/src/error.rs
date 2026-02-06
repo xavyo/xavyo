@@ -201,16 +201,19 @@ impl IntoResponse for ApiUsersError {
                     errors: None,
                 },
             ),
-            ApiUsersError::Internal(msg) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                ProblemDetails {
-                    problem_type: "https://xavyo.net/problems/internal-error".to_string(),
-                    title: "Internal Server Error".to_string(),
-                    status: 500,
-                    detail: Some(msg.clone()),
-                    errors: None,
-                },
-            ),
+            ApiUsersError::Internal(msg) => {
+                tracing::error!("Internal error: {}", msg);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    ProblemDetails {
+                        problem_type: "https://xavyo.net/problems/internal-error".to_string(),
+                        title: "Internal Server Error".to_string(),
+                        status: 500,
+                        detail: Some("An internal error occurred".to_string()),
+                        errors: None,
+                    },
+                )
+            }
             ApiUsersError::Database(e) => {
                 tracing::error!("Database error: {:?}", e);
                 (

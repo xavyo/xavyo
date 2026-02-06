@@ -445,7 +445,7 @@ impl CatalogService {
             SELECT COUNT(DISTINCT entitlement_id)
             FROM gov_entitlement_assignments
             WHERE tenant_id = $1
-              AND user_id = $2
+              AND target_id = $2 AND target_type = 'user'
               AND entitlement_id = ANY($3)
               AND (expires_at IS NULL OR expires_at > NOW())
             ",

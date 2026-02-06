@@ -355,8 +355,8 @@ impl EntitlementStore for InMemoryEntitlementStore {
         // Apply pagination
         Ok(results
             .into_iter()
-            .skip(options.offset as usize)
-            .take(options.limit as usize)
+            .skip(options.offset.max(0) as usize)
+            .take(options.limit.max(0) as usize)
             .collect())
     }
 

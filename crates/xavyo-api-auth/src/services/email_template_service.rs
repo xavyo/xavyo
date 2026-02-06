@@ -55,7 +55,7 @@ impl EmailTemplateService {
             .map_err(ApiAuthError::DatabaseInternal)?;
 
         // Get all customized templates for this tenant
-        let custom_templates = EmailTemplate::list_by_tenant(&self.pool, tenant_id)
+        let custom_templates = EmailTemplate::list_by_tenant(&mut *conn, tenant_id)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -136,7 +136,7 @@ impl EmailTemplateService {
         let type_str = template_type.to_string();
 
         // Try to find custom template
-        if let Some(custom) = EmailTemplate::find(&self.pool, tenant_id, &type_str, locale)
+        if let Some(custom) = EmailTemplate::find(&mut *conn, tenant_id, &type_str, locale)
             .await
             .map_err(ApiAuthError::Database)?
         {
@@ -201,6 +201,11 @@ impl EmailTemplateService {
 
         // Validate subject if provided
         let subject = if let Some(ref subj) = request.subject {
+            if subj.len() > 500 {
+                return Err(ApiAuthError::Validation(
+                    "Subject must not exceed 500 characters".to_string(),
+                ));
+            }
             // Validate Handlebars syntax
             self.validate_template(subj)?;
             subj.clone()
@@ -212,12 +217,26 @@ impl EmailTemplateService {
 
         // Validate body_html if provided
         let body_html = if let Some(ref html) = request.body_html {
+            if html.len() > 100_000 {
+                return Err(ApiAuthError::Validation(
+                    "HTML body must not exceed 100,000 characters".to_string(),
+                ));
+            }
             self.validate_template(html)?;
             html.clone()
         } else {
             let current = self.get_template(tenant_id, template_type, locale).await?;
             current.body_html
         };
+
+        // Validate body_text if provided
+        if let Some(ref text) = request.body_text {
+            if text.len() > 50_000 {
+                return Err(ApiAuthError::Validation(
+                    "Text body must not exceed 50,000 characters".to_string(),
+                ));
+            }
+        }
 
         // Set tenant context
         let mut conn = self.pool.acquire().await.map_err(ApiAuthError::Database)?;
@@ -236,7 +255,7 @@ impl EmailTemplateService {
         };
 
         let template =
-            EmailTemplate::upsert(&self.pool, tenant_id, data, default.variables, user_id)
+            EmailTemplate::upsert(&mut *conn, tenant_id, data, default.variables, user_id)
                 .await
                 .map_err(ApiAuthError::Database)?;
 
@@ -333,7 +352,7 @@ impl EmailTemplateService {
             .map_err(ApiAuthError::DatabaseInternal)?;
 
         // Delete the custom template
-        let deleted = EmailTemplate::delete(&self.pool, tenant_id, &type_str, locale)
+        let deleted = EmailTemplate::delete(&mut *conn, tenant_id, &type_str, locale)
             .await
             .map_err(ApiAuthError::Database)?;
 

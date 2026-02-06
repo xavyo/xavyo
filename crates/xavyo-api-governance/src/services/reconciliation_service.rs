@@ -482,7 +482,7 @@ impl ReconciliationService {
         };
 
         let limit = query.limit.unwrap_or(20);
-        let offset = query.offset.unwrap_or(0);
+        let offset = query.offset.unwrap_or(0).max(0);
 
         let runs = GovReconciliationRun::list(&self.pool, tenant_id, &filter, limit, offset)
             .await

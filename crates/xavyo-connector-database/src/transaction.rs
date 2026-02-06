@@ -120,6 +120,15 @@ impl<'a> DatabaseTransaction<'a> {
             self.savepoint_counter += 1;
             format!("sp_{}", self.savepoint_counter)
         } else {
+            // SECURITY: Validate savepoint name to prevent SQL injection.
+            // Only allow alphanumeric characters and underscores.
+            if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                return Err(ConnectorError::InvalidData {
+                    message:
+                        "Savepoint name must contain only alphanumeric characters and underscores"
+                            .to_string(),
+                });
+            }
             name.to_string()
         };
 

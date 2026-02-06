@@ -748,7 +748,7 @@ pub async fn list_requests(
         pending_only: query.pending_only,
     };
     let limit = query.limit.unwrap_or(50);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
     let result = state
         .request_service
         .list_requests(tenant_id, filter, limit, offset)
@@ -807,7 +807,7 @@ pub async fn get_my_pending_requests(
     let tenant_id = extract_tenant_id(&claims)?;
     let user_id = extract_actor_id(&claims)?;
     let limit = query.limit.unwrap_or(50);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
     let result = state
         .request_service
         .get_my_pending_requests(tenant_id, user_id, limit, offset)

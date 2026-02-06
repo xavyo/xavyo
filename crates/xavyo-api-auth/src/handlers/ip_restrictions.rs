@@ -73,6 +73,11 @@ pub async fn update_ip_settings(
     Extension(ip_service): Extension<Arc<IpRestrictionService>>,
     Json(request): Json<UpdateIpSettingsRequest>,
 ) -> Result<Json<IpSettingsResponse>, ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     let tenant_uuid = *tenant_id.as_uuid();
     let user_id = Uuid::parse_str(&claims.sub).ok();
 
@@ -131,6 +136,11 @@ pub async fn create_ip_rule(
     Extension(ip_service): Extension<Arc<IpRestrictionService>>,
     Json(request): Json<CreateIpRuleRequest>,
 ) -> Result<(StatusCode, Json<IpRuleResponse>), ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     // Validate request
     request
         .validate()
@@ -193,10 +203,16 @@ pub async fn get_ip_rule(
 )]
 pub async fn update_ip_rule(
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Extension(ip_service): Extension<Arc<IpRestrictionService>>,
     Path(rule_id): Path<Uuid>,
     Json(request): Json<UpdateIpRuleRequest>,
 ) -> Result<Json<IpRuleResponse>, ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     // Validate request
     request
         .validate()
@@ -228,9 +244,15 @@ pub async fn update_ip_rule(
 )]
 pub async fn delete_ip_rule(
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Extension(ip_service): Extension<Arc<IpRestrictionService>>,
     Path(rule_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     let tenant_uuid = *tenant_id.as_uuid();
     ip_service.delete_rule(tenant_uuid, rule_id).await?;
 

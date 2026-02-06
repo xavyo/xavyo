@@ -177,14 +177,14 @@ impl ImportError {
             ImportError::InvalidToken => ProblemDetails::new(
                 "invalid-token",
                 "Invalid Token",
-                StatusCode::NOT_FOUND,
+                StatusCode::UNAUTHORIZED,
             )
             .with_detail("The invitation token is invalid."),
 
             ImportError::TokenExpired => ProblemDetails::new(
                 "token-expired",
                 "Token Expired",
-                StatusCode::NOT_FOUND,
+                StatusCode::UNAUTHORIZED,
             )
             .with_detail("The invitation token has expired. Please request a new invitation."),
 
@@ -241,8 +241,8 @@ impl ImportError {
             ImportError::ConcurrentImport => StatusCode::CONFLICT,
             ImportError::JobNotFound => StatusCode::NOT_FOUND,
             ImportError::UserNotFound => StatusCode::NOT_FOUND,
-            ImportError::InvalidToken => StatusCode::NOT_FOUND,
-            ImportError::TokenExpired => StatusCode::NOT_FOUND,
+            ImportError::InvalidToken => StatusCode::UNAUTHORIZED,
+            ImportError::TokenExpired => StatusCode::UNAUTHORIZED,
             ImportError::TokenAlreadyUsed => StatusCode::GONE,
             ImportError::PasswordPolicyViolation(_) => StatusCode::BAD_REQUEST,
             ImportError::Unauthorized => StatusCode::UNAUTHORIZED,

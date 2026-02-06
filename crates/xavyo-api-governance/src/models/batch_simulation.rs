@@ -3,6 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use validator::Validate;
 
 use utoipa::{IntoParams, ToSchema};
 
@@ -58,11 +59,45 @@ pub struct ApplyBatchSimulationRequest {
     pub acknowledge_scope_warning: bool,
 }
 
+impl Validate for ApplyBatchSimulationRequest {
+    fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        let mut errors = validator::ValidationErrors::new();
+        if self.justification.trim().is_empty() || self.justification.len() > 5000 {
+            let mut err = validator::ValidationError::new("length");
+            err.message = Some("justification must be 1-5000 characters".into());
+            errors.add("justification", err);
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
 /// Request to update simulation notes.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdateBatchSimulationNotesRequest {
     /// Notes/comments on the simulation (null to clear).
     pub notes: Option<String>,
+}
+
+impl Validate for UpdateBatchSimulationNotesRequest {
+    fn validate(&self) -> Result<(), validator::ValidationErrors> {
+        let mut errors = validator::ValidationErrors::new();
+        if let Some(ref n) = self.notes {
+            if n.len() > 10_000 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("notes must be at most 10,000 characters".into());
+                errors.add("notes", err);
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 // ============================================================================
@@ -306,6 +341,10 @@ impl CreateBatchSimulationRequest {
 
         if self.name.len() > 255 {
             return Err("Name must be 255 characters or less".to_string());
+        }
+
+        if self.user_ids.len() > 10_000 {
+            return Err("user_ids must contain at most 10,000 entries".to_string());
         }
 
         match self.selection_mode {

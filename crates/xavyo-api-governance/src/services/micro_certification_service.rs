@@ -1007,7 +1007,7 @@ impl MicroCertificationService {
         pending.sort_by(|a, b| a.deadline.cmp(&b.deadline));
 
         // Truncate to limit
-        pending.truncate(limit as usize);
+        pending.truncate(limit.max(0) as usize);
 
         Ok(pending)
     }

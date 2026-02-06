@@ -49,7 +49,7 @@ pub async fn list_duplicates(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = DuplicateCandidateFilter {
         status: query.status,
@@ -373,7 +373,7 @@ pub async fn list_merge_operations(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = MergeOperationFilter {
         status: query.status,
@@ -449,7 +449,7 @@ pub async fn list_merge_audits(
         .as_uuid();
 
     let limit = query.limit.unwrap_or(50).min(100);
-    let offset = query.offset.unwrap_or(0);
+    let offset = query.offset.unwrap_or(0).max(0);
 
     let filter = xavyo_db::models::MergeAuditFilter {
         operation_id: None,

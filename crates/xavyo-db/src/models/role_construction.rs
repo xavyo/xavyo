@@ -172,11 +172,9 @@ pub struct RoleConstruction {
     pub account_type: String,
 
     /// Attribute mapping configuration as JSONB.
-    #[sqlx(json)]
     pub attribute_mappings: serde_json::Value,
 
     /// Optional condition expression as JSONB.
-    #[sqlx(json)]
     pub condition: Option<serde_json::Value>,
 
     /// Policy for handling deprovisioning.

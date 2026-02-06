@@ -134,6 +134,11 @@ pub async fn update_webauthn_policy(
     Path(path_tenant_id): Path<Uuid>,
     Json(request): Json<UpdateWebAuthnPolicyRequest>,
 ) -> Result<(StatusCode, Json<WebAuthnPolicyResponse>), ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     // Verify tenant access
     if *tenant_id.as_uuid() != path_tenant_id {
         return Err(ApiAuthError::PermissionDenied(
@@ -245,6 +250,11 @@ pub async fn admin_list_user_credentials(
     Extension(tenant_id): Extension<TenantId>,
     Path(target_user_id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<AdminCredentialListResponse>), ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     let admin_user_id = claims
         .sub
         .parse::<Uuid>()
@@ -304,6 +314,11 @@ pub async fn admin_revoke_credential(
     Extension(user_agent): Extension<Option<String>>,
     Path((target_user_id, credential_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
     let admin_user_id = claims
         .sub
         .parse::<Uuid>()

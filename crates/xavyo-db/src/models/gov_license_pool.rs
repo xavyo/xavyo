@@ -458,6 +458,28 @@ impl GovLicensePool {
         .await
     }
 
+    /// Increment allocated count within a transaction.
+    pub async fn increment_allocated_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            UPDATE gov_license_pools
+            SET allocated_count = allocated_count + 1, updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2
+              AND allocated_count < total_capacity
+              AND status = 'active'
+            RETURNING *
+            ",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .fetch_optional(&mut **tx)
+        .await
+    }
+
     /// Decrement allocated count atomically.
     pub async fn decrement_allocated(
         pool: &sqlx::PgPool,
@@ -475,6 +497,26 @@ impl GovLicensePool {
         .bind(id)
         .bind(tenant_id)
         .fetch_optional(pool)
+        .await
+    }
+
+    /// Decrement allocated count within a transaction.
+    pub async fn decrement_allocated_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            UPDATE gov_license_pools
+            SET allocated_count = allocated_count - 1, updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2 AND allocated_count > 0
+            RETURNING *
+            ",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .fetch_optional(&mut **tx)
         .await
     }
 

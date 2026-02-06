@@ -118,12 +118,12 @@ impl CredentialEncryption {
         use rand::RngCore;
         let mut nonce_bytes = [0u8; NONCE_LENGTH];
         OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::from(nonce_bytes);
 
         // Encrypt
         let ciphertext =
             cipher
-                .encrypt(nonce, plaintext)
+                .encrypt(&nonce, plaintext)
                 .map_err(|e| ConnectorError::EncryptionFailed {
                     message: format!("encryption failed: {e}"),
                 })?;
@@ -160,12 +160,18 @@ impl CredentialEncryption {
 
         // Extract nonce and ciphertext
         let (nonce_bytes, encrypted) = ciphertext.split_at(NONCE_LENGTH);
-        let nonce = Nonce::from_slice(nonce_bytes);
+        let nonce_array: [u8; NONCE_LENGTH] =
+            nonce_bytes
+                .try_into()
+                .map_err(|_| ConnectorError::DecryptionFailed {
+                    message: "invalid nonce length".to_string(),
+                })?;
+        let nonce = Nonce::from(nonce_array);
 
         // Decrypt
         let plaintext =
             cipher
-                .decrypt(nonce, encrypted)
+                .decrypt(&nonce, encrypted)
                 .map_err(|e| ConnectorError::DecryptionFailed {
                     message: format!("decryption failed: {e}"),
                 })?;

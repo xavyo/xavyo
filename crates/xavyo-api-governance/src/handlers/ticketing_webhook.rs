@@ -167,7 +167,9 @@ pub async fn trigger_ticket_sync(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    // TODO: Check for admin permissions
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let result = state
         .ticket_sync_service

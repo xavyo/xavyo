@@ -203,7 +203,8 @@ impl GdprReportService {
             INNER JOIN gov_entitlement_assignments ea
                 ON ea.entitlement_id = e.id AND ea.tenant_id = e.tenant_id
             WHERE e.tenant_id = $1
-              AND ea.user_id = $2
+              AND ea.target_id = $2
+              AND ea.target_type = 'user'
               AND ea.status = 'active'
               AND e.data_protection_classification != 'none'
             ORDER BY e.name

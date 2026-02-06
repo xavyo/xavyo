@@ -153,6 +153,7 @@ impl Expression {
 
     /// Create a new NOT expression.
     #[must_use]
+    #[allow(clippy::should_implement_trait)]
     pub fn not(expr: Expression) -> Self {
         Expression::Not(Box::new(expr))
     }

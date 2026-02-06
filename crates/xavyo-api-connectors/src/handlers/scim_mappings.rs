@@ -134,6 +134,9 @@ pub async fn replace_mappings(
     Path(target_id): Path<Uuid>,
     Json(body): Json<ReplaceMappingsRequest>,
 ) -> Result<Json<MappingListResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let pool = state.scim_target_service.pool();
 
@@ -221,6 +224,9 @@ pub async fn reset_mapping_defaults(
     Extension(claims): Extension<JwtClaims>,
     Path(target_id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<MappingListResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let pool = state.scim_target_service.pool();
 

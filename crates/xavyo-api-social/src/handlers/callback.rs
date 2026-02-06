@@ -230,7 +230,6 @@ async fn process_callback(
     info!(
         provider = %provider_type,
         provider_user_id = %user_info.provider_user_id,
-        email = ?user_info.email,
         "Retrieved user info from provider"
     );
 

@@ -203,7 +203,7 @@ pub async fn login_handler(
                 ip_str.as_deref(),
                 user_agent.as_deref(),
                 "failure",
-                &format!("Login failed for email: {}", request.email),
+                "Login failed: invalid credentials",
             );
             // F085: Publish auth.login.failed webhook event
             if let Some(ref publisher) = publisher {
@@ -214,7 +214,6 @@ pub async fn login_handler(
                     actor_id: None,
                     timestamp: chrono::Utc::now(),
                     data: serde_json::json!({
-                        "email": request.email,
                         "ip_address": ip_str,
                         "user_agent": user_agent,
                     }),

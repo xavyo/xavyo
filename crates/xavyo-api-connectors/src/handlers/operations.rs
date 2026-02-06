@@ -94,8 +94,8 @@ pub async fn list_operations(
         user_id: query.user_id,
         status: query.status,
         operation_type: query.operation_type,
-        limit: query.limit,
-        offset: query.offset,
+        limit: query.limit.min(100),
+        offset: query.offset.max(0),
     };
 
     let response = state
@@ -343,7 +343,12 @@ pub async fn list_dead_letter(
 
     let response = state
         .operation_service
-        .list_dead_letter(tenant_id, query.connector_id, query.limit, query.offset)
+        .list_dead_letter(
+            tenant_id,
+            query.connector_id,
+            query.limit.min(100),
+            query.offset.max(0),
+        )
         .await?;
 
     Ok(Json(response))
@@ -462,8 +467,11 @@ pub async fn list_conflicts(
         pending_only: query.pending_only,
     };
 
+    let limit = query.limit.min(100);
+    let offset = query.offset.max(0);
+
     let conflicts = conflict_service
-        .list_conflicts(tenant_id, &filter, query.limit, query.offset)
+        .list_conflicts(tenant_id, &filter, limit, offset)
         .await
         .map_err(|e| ConnectorApiError::Conflict(e.to_string()))?;
 
@@ -475,8 +483,8 @@ pub async fn list_conflicts(
     let response = ConflictListResponse {
         conflicts: conflicts.iter().map(ConflictResponse::from).collect(),
         pending_count,
-        offset: query.offset,
-        limit: query.limit,
+        offset,
+        limit,
     };
 
     Ok(Json(response))

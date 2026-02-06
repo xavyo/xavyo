@@ -216,7 +216,8 @@ impl PoaService {
 
             // Apply pagination to merged result
             let total = outgoing_count + incoming_count;
-            let poas: Vec<PowerOfAttorney> = all_poas.into_iter().take(limit as usize).collect();
+            let poas: Vec<PowerOfAttorney> =
+                all_poas.into_iter().take(limit.max(0) as usize).collect();
 
             Ok((poas, total))
         } else {

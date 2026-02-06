@@ -17,20 +17,34 @@ impl RevokeRoleExecutor {
         Self
     }
 
+    /// Get role name from gov_roles by role_id and tenant_id.
+    async fn get_role_name(pool: &PgPool, tenant_id: Uuid, role_id: Uuid) -> Option<String> {
+        let result: Option<(String,)> =
+            sqlx::query_as("SELECT name FROM gov_roles WHERE id = $1 AND tenant_id = $2")
+                .bind(role_id)
+                .bind(tenant_id)
+                .fetch_optional(pool)
+                .await
+                .ok()
+                .flatten();
+
+        result.map(|(name,)| name)
+    }
+
     /// Check if the user has the specified role.
     async fn user_has_role(
         pool: &PgPool,
         user_id: Uuid,
-        role_id: Uuid,
+        role_name: &str,
     ) -> Result<bool, sqlx::Error> {
         let count: (i64,) = sqlx::query_as(
             r#"
             SELECT COUNT(*) FROM user_roles
-            WHERE user_id = $1 AND role_id = $2
+            WHERE user_id = $1 AND role_name = $2
             "#,
         )
         .bind(user_id)
-        .bind(role_id)
+        .bind(role_name)
         .fetch_one(pool)
         .await?;
 
@@ -38,31 +52,23 @@ impl RevokeRoleExecutor {
     }
 
     /// Revoke the role from the user.
-    async fn revoke_role(pool: &PgPool, user_id: Uuid, role_id: Uuid) -> Result<bool, sqlx::Error> {
+    async fn revoke_role(
+        pool: &PgPool,
+        user_id: Uuid,
+        role_name: &str,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r#"
             DELETE FROM user_roles
-            WHERE user_id = $1 AND role_id = $2
+            WHERE user_id = $1 AND role_name = $2
             "#,
         )
         .bind(user_id)
-        .bind(role_id)
+        .bind(role_name)
         .execute(pool)
         .await?;
 
         Ok(result.rows_affected() > 0)
-    }
-
-    /// Get role name for logging.
-    async fn get_role_name(pool: &PgPool, role_id: Uuid) -> Option<String> {
-        let result: Option<(String,)> = sqlx::query_as("SELECT name FROM gov_roles WHERE id = $1")
-            .bind(role_id)
-            .fetch_optional(pool)
-            .await
-            .ok()
-            .flatten();
-
-        result.map(|(name,)| name)
     }
 }
 
@@ -77,7 +83,7 @@ impl ActionExecutor for RevokeRoleExecutor {
     async fn execute(
         &self,
         pool: &PgPool,
-        _ctx: &ExecutionContext,
+        ctx: &ExecutionContext,
         target_user_id: Uuid,
         params: &serde_json::Value,
     ) -> ExecutionResult {
@@ -90,11 +96,15 @@ impl ActionExecutor for RevokeRoleExecutor {
             None => return ExecutionResult::failure("Missing role_id parameter"),
         };
 
+        // Resolve role_id to role_name via gov_roles
+        let role_name = match Self::get_role_name(pool, ctx.tenant_id, role_id).await {
+            Some(name) => name,
+            None => return ExecutionResult::failure("Role not found for the given tenant"),
+        };
+
         // Check if user has the role
-        match Self::user_has_role(pool, target_user_id, role_id).await {
+        match Self::user_has_role(pool, target_user_id, &role_name).await {
             Ok(false) => {
-                // User doesn't have the role - skip
-                let role_name = Self::get_role_name(pool, role_id).await;
                 return ExecutionResult::skipped(serde_json::json!({
                     "has_role": false,
                     "role_id": role_id.to_string(),
@@ -108,22 +118,19 @@ impl ActionExecutor for RevokeRoleExecutor {
         }
 
         // Revoke the role
-        match Self::revoke_role(pool, target_user_id, role_id).await {
-            Ok(true) => {
-                let role_name = Self::get_role_name(pool, role_id).await;
-                ExecutionResult::success(
-                    serde_json::json!({
-                        "has_role": true,
-                        "role_id": role_id.to_string(),
-                        "role_name": role_name
-                    }),
-                    serde_json::json!({
-                        "has_role": false,
-                        "role_id": role_id.to_string(),
-                        "role_name": role_name
-                    }),
-                )
-            }
+        match Self::revoke_role(pool, target_user_id, &role_name).await {
+            Ok(true) => ExecutionResult::success(
+                serde_json::json!({
+                    "has_role": true,
+                    "role_id": role_id.to_string(),
+                    "role_name": role_name
+                }),
+                serde_json::json!({
+                    "has_role": false,
+                    "role_id": role_id.to_string(),
+                    "role_name": role_name
+                }),
+            ),
             Ok(false) => {
                 // Race condition - role was already removed
                 ExecutionResult::skipped(serde_json::json!({
@@ -138,7 +145,7 @@ impl ActionExecutor for RevokeRoleExecutor {
     async fn would_change(
         &self,
         pool: &PgPool,
-        _ctx: &ExecutionContext,
+        ctx: &ExecutionContext,
         target_user_id: Uuid,
         params: &serde_json::Value,
     ) -> (bool, Option<serde_json::Value>, Option<serde_json::Value>) {
@@ -150,7 +157,12 @@ impl ActionExecutor for RevokeRoleExecutor {
             None => return (false, None, None),
         };
 
-        match Self::user_has_role(pool, target_user_id, role_id).await {
+        let role_name = match Self::get_role_name(pool, ctx.tenant_id, role_id).await {
+            Some(name) => name,
+            None => return (false, None, None),
+        };
+
+        match Self::user_has_role(pool, target_user_id, &role_name).await {
             Ok(true) => (
                 true,
                 Some(serde_json::json!({"has_role": true})),

@@ -114,7 +114,7 @@ impl SiemDestinationService {
         let export_fmt =
             xavyo_siem::models::ExportFormat::from_str_value(&destination.export_format);
 
-        if dest_type.is_none() || export_fmt.is_none() {
+        let (Some(dest_type), Some(_export_fmt)) = (dest_type, export_fmt) else {
             return Ok((
                 false,
                 None,
@@ -123,9 +123,7 @@ impl SiemDestinationService {
                     destination.destination_type, destination.export_format
                 )),
             ));
-        }
-
-        let dest_type = dest_type.unwrap();
+        };
         let port = destination
             .endpoint_port
             .map_or_else(|| dest_type.default_port(), |p| p as u16);

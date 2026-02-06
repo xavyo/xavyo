@@ -184,7 +184,7 @@ impl SimulationService {
         let affected_users: Vec<Uuid> = sqlx::query_scalar(
             r"
             SELECT DISTINCT user_id
-            FROM user_groups
+            FROM group_memberships
             WHERE tenant_id = $1 AND group_id = $2
             ",
         )
@@ -230,7 +230,7 @@ impl SimulationService {
         let affected_users: Vec<Uuid> = sqlx::query_scalar(
             r"
             SELECT DISTINCT ug.user_id
-            FROM user_groups ug
+            FROM group_memberships ug
             INNER JOIN gov_entitlement_assignments ea ON ea.target_id = ug.group_id
                 AND ea.target_type = 'group'
                 AND ea.entitlement_id = $3
@@ -301,7 +301,7 @@ impl SimulationService {
         let affected_users: Vec<Uuid> = sqlx::query_scalar(
             r"
             SELECT DISTINCT user_id
-            FROM user_groups
+            FROM group_memberships
             WHERE tenant_id = $1 AND group_id = $2
             ",
         )
@@ -356,7 +356,7 @@ impl SimulationService {
         let affected_users: Vec<Uuid> = sqlx::query_scalar(
             r"
             SELECT DISTINCT user_id
-            FROM user_groups
+            FROM group_memberships
             WHERE tenant_id = $1 AND group_id = $2
             ",
         )
@@ -578,7 +578,7 @@ impl SimulationService {
 
         // Check if group with this name already exists
         let existing: Option<Uuid> =
-            sqlx::query_scalar(r"SELECT id FROM groups WHERE tenant_id = $1 AND name = $2")
+            sqlx::query_scalar(r"SELECT id FROM groups WHERE tenant_id = $1 AND display_name = $2")
                 .bind(tenant_id)
                 .bind(role_name)
                 .fetch_optional(&self.pool)
@@ -598,7 +598,7 @@ impl SimulationService {
 
         let group_id: Uuid = sqlx::query_scalar(
             r"
-            INSERT INTO groups (tenant_id, name, description, created_at, updated_at)
+            INSERT INTO groups (tenant_id, display_name, description, created_at, updated_at)
             VALUES ($1, $2, $3, NOW(), NOW())
             RETURNING id
             ",
@@ -668,7 +668,7 @@ impl SimulationService {
         // Remove all user memberships from this group
         sqlx::query(
             r"
-            DELETE FROM user_groups
+            DELETE FROM group_memberships
             WHERE tenant_id = $1 AND group_id = $2
             ",
         )

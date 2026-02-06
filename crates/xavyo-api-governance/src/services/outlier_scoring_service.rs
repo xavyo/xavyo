@@ -819,10 +819,11 @@ impl OutlierScoringService {
             LEFT JOIN LATERAL (
                 SELECT
                     COUNT(DISTINCT ea.entitlement_id) as entitlement_count,
-                    COUNT(DISTINCT e.role_id) as role_count
+                    COUNT(DISTINCT re.role_id) as role_count
                 FROM gov_entitlement_assignments ea
-                JOIN gov_entitlements e ON ea.entitlement_id = e.id
-                WHERE ea.user_id = u.id AND ea.tenant_id = u.tenant_id
+                JOIN gov_entitlements e ON ea.entitlement_id = e.id AND e.tenant_id = ea.tenant_id
+                LEFT JOIN gov_role_entitlements re ON re.entitlement_id = e.id AND re.tenant_id = ea.tenant_id
+                WHERE ea.target_id = u.id AND ea.target_type = 'user' AND ea.tenant_id = u.tenant_id
                 AND ea.status = 'active'
             ) ec ON true
             LEFT JOIN LATERAL (
@@ -833,7 +834,7 @@ impl OutlierScoringService {
             LEFT JOIN LATERAL (
                 SELECT r.overall_score
                 FROM gov_outlier_results r
-                JOIN gov_outlier_analyses a ON r.analysis_id = a.id
+                JOIN gov_outlier_analyses a ON r.analysis_id = a.id AND a.tenant_id = r.tenant_id
                 WHERE r.user_id = u.id AND r.tenant_id = u.tenant_id
                 AND a.status = 'completed'
                 ORDER BY r.created_at DESC

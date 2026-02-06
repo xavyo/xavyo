@@ -423,14 +423,15 @@ impl UserWebAuthnCredential {
     }
 
     /// Disable a credential (soft delete).
-    pub async fn disable<'e, E>(executor: E, id: Uuid) -> Result<bool, sqlx::Error>
+    pub async fn disable<'e, E>(executor: E, tenant_id: Uuid, id: Uuid) -> Result<bool, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
         let result = sqlx::query(
-            "UPDATE user_webauthn_credentials SET is_enabled = false, updated_at = NOW() WHERE id = $1",
+            "UPDATE user_webauthn_credentials SET is_enabled = false, updated_at = NOW() WHERE id = $1 AND tenant_id = $2",
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(executor)
         .await?;
         Ok(result.rows_affected() > 0)

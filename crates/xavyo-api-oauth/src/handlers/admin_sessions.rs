@@ -157,7 +157,7 @@ pub async fn list_active_sessions_handler(
         SELECT
             rt.id,
             rt.client_id,
-            COALESCE(oc.client_name, oc.client_id::text) AS client_name,
+            COALESCE(oc.name, oc.client_id::text) AS client_name,
             rt.scope,
             rt.created_at,
             rt.expires_at

@@ -1194,7 +1194,7 @@ impl NhiCertificationService {
                    i.decision, i.decided_by, i.decided_at, i.comment,
                    i.delegated_by, i.original_reviewer_id, i.created_at
             FROM gov_nhi_certification_items i
-            JOIN gov_service_accounts s ON i.nhi_id = s.id
+            JOIN gov_service_accounts s ON i.nhi_id = s.id AND s.tenant_id = i.tenant_id
             WHERE i.tenant_id = $1
             ",
         );
@@ -1203,7 +1203,7 @@ impl NhiCertificationService {
             r"
             SELECT COUNT(*)
             FROM gov_nhi_certification_items i
-            JOIN gov_service_accounts s ON i.nhi_id = s.id
+            JOIN gov_service_accounts s ON i.nhi_id = s.id AND s.tenant_id = i.tenant_id
             WHERE i.tenant_id = $1
             ",
         );

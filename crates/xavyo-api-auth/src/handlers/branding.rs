@@ -7,6 +7,7 @@
 use axum::{Extension, Json};
 use std::sync::Arc;
 use uuid::Uuid;
+use validator::Validate;
 use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
 
@@ -59,6 +60,14 @@ pub async fn update_branding(
     Extension(branding_service): Extension<Arc<BrandingService>>,
     Json(request): Json<UpdateBrandingRequest>,
 ) -> Result<Json<BrandingResponse>, ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
+    request
+        .validate()
+        .map_err(|e| ApiAuthError::Validation(e.to_string()))?;
     let tenant_uuid = *tenant_id.as_uuid();
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiAuthError::Unauthorized)?;
 

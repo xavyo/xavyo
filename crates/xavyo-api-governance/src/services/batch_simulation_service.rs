@@ -514,14 +514,15 @@ impl BatchSimulationService {
             query.push_str(&format!(" AND u.attributes->>'title' ILIKE ${param_count}"));
         }
 
-        // Filter by role membership
+        // Filter by role membership (resolve role UUIDs to names via gov_roles)
         if let Some(ref role_ids) = filter.role_ids {
             if !role_ids.is_empty() {
                 param_count += 1;
                 query.push_str(&format!(
                     " AND EXISTS (
                         SELECT 1 FROM user_roles ur
-                        WHERE ur.user_id = u.id AND ur.role_id = ANY(${param_count})
+                        JOIN gov_roles gr ON gr.name = ur.role_name AND gr.tenant_id = u.tenant_id
+                        WHERE ur.user_id = u.id AND gr.id = ANY(${param_count})
                     )"
                 ));
             }
@@ -534,7 +535,7 @@ impl BatchSimulationService {
                 query.push_str(&format!(
                     " AND EXISTS (
                         SELECT 1 FROM gov_entitlement_assignments ea
-                        WHERE ea.user_id = u.id
+                        WHERE ea.target_id = u.id AND ea.target_type = 'user'
                           AND ea.entitlement_id = ANY(${param_count})
                           AND ea.status = 'active'
                     )"
@@ -799,24 +800,28 @@ impl BatchSimulationService {
     }
 
     /// Get role name by ID.
-    async fn get_role_name(&self, _tenant_id: Uuid, role_id: Uuid) -> Result<String> {
-        let name: Option<String> = sqlx::query_scalar(r"SELECT name FROM roles WHERE id = $1")
-            .bind(role_id)
-            .fetch_optional(&self.pool)
-            .await
-            .unwrap_or(None);
+    async fn get_role_name(&self, tenant_id: Uuid, role_id: Uuid) -> Result<String> {
+        let name: Option<String> =
+            sqlx::query_scalar(r"SELECT name FROM gov_roles WHERE id = $1 AND tenant_id = $2")
+                .bind(role_id)
+                .bind(tenant_id)
+                .fetch_optional(&self.pool)
+                .await
+                .unwrap_or(None);
 
         Ok(name.unwrap_or_else(|| format!("Role {role_id}")))
     }
 
     /// Get entitlement name by ID.
-    async fn get_entitlement_name(&self, _tenant_id: Uuid, entitlement_id: Uuid) -> Result<String> {
-        let name: Option<String> =
-            sqlx::query_scalar(r"SELECT name FROM gov_entitlements WHERE id = $1")
-                .bind(entitlement_id)
-                .fetch_optional(&self.pool)
-                .await
-                .unwrap_or(None);
+    async fn get_entitlement_name(&self, tenant_id: Uuid, entitlement_id: Uuid) -> Result<String> {
+        let name: Option<String> = sqlx::query_scalar(
+            r"SELECT name FROM gov_entitlements WHERE id = $1 AND tenant_id = $2",
+        )
+        .bind(entitlement_id)
+        .bind(tenant_id)
+        .fetch_optional(&self.pool)
+        .await
+        .unwrap_or(None);
 
         Ok(name.unwrap_or_else(|| format!("Entitlement {entitlement_id}")))
     }
@@ -843,22 +848,35 @@ impl BatchSimulationService {
         Ok(entitlements)
     }
 
-    /// Check if user has a specific role.
+    /// Check if user has a specific role (resolve role UUID to name via gov_roles).
     async fn user_has_role(&self, tenant_id: Uuid, user_id: Uuid, role_id: Uuid) -> Result<bool> {
-        let count: i64 = sqlx::query_scalar(
-            r"
-            SELECT COUNT(*)
-            FROM user_roles
-            WHERE user_id = $1 AND role_id = $2
-            ",
-        )
-        .bind(user_id)
-        .bind(role_id)
-        .fetch_one(&self.pool)
-        .await
-        .unwrap_or(0);
+        // Resolve role_id to role_name via gov_roles
+        let role_name: Option<String> =
+            sqlx::query_scalar("SELECT name FROM gov_roles WHERE id = $1 AND tenant_id = $2")
+                .bind(role_id)
+                .bind(tenant_id)
+                .fetch_optional(&self.pool)
+                .await
+                .unwrap_or(None);
 
-        // Also check if user has role via assignments
+        let count = if let Some(ref name) = role_name {
+            sqlx::query_scalar::<_, i64>(
+                r"
+                SELECT COUNT(*)
+                FROM user_roles
+                WHERE user_id = $1 AND role_name = $2
+                ",
+            )
+            .bind(user_id)
+            .bind(name)
+            .fetch_one(&self.pool)
+            .await
+            .unwrap_or(0)
+        } else {
+            0
+        };
+
+        // Also check if user has role via entitlement assignments
         let assignment_count: i64 = sqlx::query_scalar(
             r"
             SELECT COUNT(*)
@@ -875,7 +893,6 @@ impl BatchSimulationService {
         .await
         .unwrap_or(0);
 
-        let _ = tenant_id; // Used for logging if needed
         Ok(count > 0 || assignment_count > 0)
     }
 

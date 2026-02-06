@@ -115,6 +115,9 @@ pub async fn create_role_inducement(
     Path(role_id): Path<Uuid>,
     Json(request): Json<CreateInducementRequest>,
 ) -> ApiResult<(StatusCode, Json<InducementResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -156,6 +159,9 @@ pub async fn delete_role_inducement(
     Extension(claims): Extension<JwtClaims>,
     Path((role_id, inducement_id)): Path<(Uuid, Uuid)>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -191,6 +197,9 @@ pub async fn enable_role_inducement(
     Extension(claims): Extension<JwtClaims>,
     Path((role_id, inducement_id)): Path<(Uuid, Uuid)>,
 ) -> ApiResult<Json<InducementResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -226,6 +235,9 @@ pub async fn disable_role_inducement(
     Extension(claims): Extension<JwtClaims>,
     Path((role_id, inducement_id)): Path<(Uuid, Uuid)>,
 ) -> ApiResult<Json<InducementResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

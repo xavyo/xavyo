@@ -381,8 +381,12 @@ pub struct Config {
     /// Application environment (development or production).
     pub app_env: AppEnvironment,
 
-    /// `PostgreSQL` connection string
+    /// `PostgreSQL` connection string (superuser — used for bootstrap/migrations only)
     pub database_url: String,
+
+    /// `PostgreSQL` connection string for the app user (non-superuser, RLS enforced).
+    /// Falls back to `database_url` if not set.
+    pub app_database_url: Option<String>,
 
     /// RS256 private key in PEM format for signing JWTs (single-key fallback)
     pub jwt_private_key: String,
@@ -514,6 +518,8 @@ impl Config {
         // Required variables
         let database_url = env::var("DATABASE_URL")
             .map_err(|_| ConfigError::MissingVar("DATABASE_URL".to_string()))?;
+
+        let app_database_url = env::var("APP_DATABASE_URL").ok();
 
         let jwt_private_key = env::var("JWT_PRIVATE_KEY")
             .map_err(|_| ConfigError::MissingVar("JWT_PRIVATE_KEY".to_string()))?;
@@ -676,6 +682,7 @@ impl Config {
         Ok(Config {
             app_env,
             database_url,
+            app_database_url,
             jwt_private_key,
             jwt_public_key,
             jwt_key_id,
@@ -1033,6 +1040,7 @@ mod tests {
         Config {
             app_env: AppEnvironment::Development,
             database_url: "postgres://localhost/test".to_string(),
+            app_database_url: None,
             jwt_private_key: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
                 .to_string(),
             jwt_public_key: "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----"
@@ -1081,6 +1089,7 @@ mod tests {
         Config {
             app_env: AppEnvironment::Production,
             database_url: "postgres://localhost/test".to_string(),
+            app_database_url: None,
             jwt_private_key: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
                 .to_string(),
             jwt_public_key: "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----"
