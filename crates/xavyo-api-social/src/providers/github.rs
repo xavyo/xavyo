@@ -56,7 +56,10 @@ impl GithubProvider {
         Self {
             client_id,
             client_secret,
-            http_client: Client::new(),
+            http_client: Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .unwrap_or_else(|_| Client::new()),
         }
     }
 

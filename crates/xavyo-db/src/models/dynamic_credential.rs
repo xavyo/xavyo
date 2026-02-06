@@ -356,6 +356,24 @@ impl DynamicCredential {
         .await
     }
 
+    /// Count active credentials for a specific secret type (for deletion checks).
+    pub async fn count_active_by_secret_type(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        secret_type: &str,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM dynamic_credentials
+            WHERE tenant_id = $1 AND secret_type = $2 AND status = 'active'
+            ",
+        )
+        .bind(tenant_id)
+        .bind(secret_type)
+        .fetch_one(pool)
+        .await
+    }
+
     /// Find credentials by lease ID (for provider revocation callbacks).
     pub async fn find_by_lease_id(
         pool: &sqlx::PgPool,

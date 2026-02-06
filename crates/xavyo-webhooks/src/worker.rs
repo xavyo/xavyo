@@ -181,7 +181,9 @@ async fn process_pending_retries(delivery_service: &DeliveryService) {
         let service = delivery_service.clone();
 
         let handle = tokio::spawn(async move {
-            let _permit = sem.acquire().await.expect("semaphore closed");
+            let Ok(_permit) = sem.acquire().await else {
+                return;
+            };
             service.process_retry(&delivery).await;
         });
 

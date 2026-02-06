@@ -129,7 +129,11 @@ pub async fn metrics_handler(State(state): State<crate::state::AppState>) -> imp
 
     // Encode registered metrics (http_requests_total, http_request_duration_seconds)
     {
-        let registry = state.metrics.registry.lock().unwrap();
+        let registry = state
+            .metrics
+            .registry
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if let Err(e) = prometheus_client::encoding::text::encode(&mut buf, &registry) {
             tracing::error!(error = %e, "Failed to encode metrics");
             return (

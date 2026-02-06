@@ -149,8 +149,10 @@ pub async fn delete_tenant_handler(
 
     Ok(Json(DeleteTenantResponse {
         tenant_id,
-        deleted_at: deleted_tenant.deleted_at.unwrap(),
-        scheduled_purge_at: deleted_tenant.scheduled_purge_at.unwrap(),
+        deleted_at: deleted_tenant.deleted_at.unwrap_or_else(chrono::Utc::now),
+        scheduled_purge_at: deleted_tenant
+            .scheduled_purge_at
+            .unwrap_or_else(chrono::Utc::now),
         reason: request.reason,
     }))
 }
@@ -315,8 +317,8 @@ pub async fn list_deleted_tenants_handler(
             id: t.id,
             name: t.name,
             slug: t.slug,
-            deleted_at: t.deleted_at.unwrap(),
-            scheduled_purge_at: t.scheduled_purge_at.unwrap(),
+            deleted_at: t.deleted_at.unwrap_or_else(chrono::Utc::now),
+            scheduled_purge_at: t.scheduled_purge_at.unwrap_or_else(chrono::Utc::now),
             deletion_reason: t.deletion_reason,
         })
         .collect();

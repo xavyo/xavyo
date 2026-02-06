@@ -60,7 +60,9 @@ pub async fn verify_recovery_code(
         .ok_or(ApiAuthError::InvalidCredentials)?;
 
     // Generate full tokens using the shared token_service
-    let roles = vec!["user".to_string()]; // TODO: fetch from database
+    let roles = xavyo_db::UserRole::get_user_roles(&state.pool, user_id)
+        .await
+        .unwrap_or_else(|_| vec!["user".to_string()]);
     let tokens = state
         .token_service
         .create_tokens(

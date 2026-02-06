@@ -52,10 +52,15 @@ pub async fn link_account(
     // Validate state
     let claims = state.oauth_service.validate_state(&request.state)?;
 
-    // Verify this linking flow was initiated for this user
+    // Verify this linking flow was initiated for this user and tenant
     if claims.user_id != Some(user_id) {
         return Err(SocialError::InvalidState {
             reason: "State was not created for this user".to_string(),
+        });
+    }
+    if claims.tenant_id != tenant_id {
+        return Err(SocialError::InvalidState {
+            reason: "State was not created for this tenant".to_string(),
         });
     }
 
@@ -116,17 +121,23 @@ pub async fn link_account(
             let team_id = additional
                 .get("team_id")
                 .and_then(|v| v.as_str())
-                .unwrap()
+                .ok_or(SocialError::ConfigurationError {
+                    message: "Apple config missing team_id".to_string(),
+                })?
                 .to_string();
             let key_id = additional
                 .get("key_id")
                 .and_then(|v| v.as_str())
-                .unwrap()
+                .ok_or(SocialError::ConfigurationError {
+                    message: "Apple config missing key_id".to_string(),
+                })?
                 .to_string();
             let private_key = additional
                 .get("private_key")
                 .and_then(|v| v.as_str())
-                .unwrap()
+                .ok_or(SocialError::ConfigurationError {
+                    message: "Apple config missing private_key".to_string(),
+                })?
                 .to_string();
 
             let p = crate::providers::ProviderFactory::apple(
@@ -278,17 +289,23 @@ pub async fn initiate_link(
             let team_id = additional
                 .get("team_id")
                 .and_then(|v| v.as_str())
-                .unwrap()
+                .ok_or(SocialError::ConfigurationError {
+                    message: "Apple config missing team_id".to_string(),
+                })?
                 .to_string();
             let key_id = additional
                 .get("key_id")
                 .and_then(|v| v.as_str())
-                .unwrap()
+                .ok_or(SocialError::ConfigurationError {
+                    message: "Apple config missing key_id".to_string(),
+                })?
                 .to_string();
             let private_key = additional
                 .get("private_key")
                 .and_then(|v| v.as_str())
-                .unwrap()
+                .ok_or(SocialError::ConfigurationError {
+                    message: "Apple config missing private_key".to_string(),
+                })?
                 .to_string();
 
             let p = crate::providers::ProviderFactory::apple(

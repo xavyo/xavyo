@@ -57,16 +57,17 @@ pub mod services;
 
 // Re-export for convenience
 pub use error::{ConnectorApiError, Result};
+pub use handlers::jobs::JobState;
 pub use handlers::scim_targets::ScimTargetState;
 pub use models::*;
 pub use router::{
-    connector_routes, connector_routes_full, operation_routes, reconciliation_global_routes,
-    reconciliation_routes, scim_target_routes, sync_routes, ConnectorState, OperationState,
-    ReconciliationState, SyncState,
+    connector_routes, connector_routes_full, job_routes, operation_routes,
+    reconciliation_global_routes, reconciliation_routes, scim_target_routes, sync_routes,
+    ConnectorState, OperationState, ReconciliationState, SyncState,
 };
 pub use services::{
     compute_next_run_at, validate_schedule_config, AttributeResponse, ConnectorService,
-    CreateMappingRequest, DiscoveryStateManager, MappingResponse, MappingService,
+    CreateMappingRequest, DiscoveryStateManager, JobService, MappingResponse, MappingService,
     ObjectClassResponse, OperationFilter, OperationListResponse, OperationLogResponse,
     OperationResponse, OperationService, PreviewMappingRequest, PreviewMappingResponse,
     QueueStatsResponse, ReconciliationService, ScheduleError, ScheduleResult, ScheduleService,

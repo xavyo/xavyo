@@ -864,7 +864,7 @@ impl TemplateExpressionService {
     fn get_or_compile_regex(&self, pattern: &str) -> ExpressionResult<Regex> {
         // Try read lock first
         {
-            let cache = self.regex_cache.read().unwrap();
+            let cache = self.regex_cache.read().unwrap_or_else(|e| e.into_inner());
             if let Some(regex) = cache.get(pattern) {
                 return Ok(regex.clone());
             }
@@ -873,7 +873,7 @@ impl TemplateExpressionService {
         // Compile and cache
         let regex = Regex::new(pattern).map_err(|e| ExpressionError::RegexError(e.to_string()))?;
 
-        let mut cache = self.regex_cache.write().unwrap();
+        let mut cache = self.regex_cache.write().unwrap_or_else(|e| e.into_inner());
         cache.insert(pattern.to_string(), regex.clone());
         Ok(regex)
     }

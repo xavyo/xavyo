@@ -79,14 +79,12 @@ pub async fn request_credentials(
         Ok((response, rate_info)) => {
             // Build response with rate limit headers
             let mut resp = (StatusCode::OK, Json(response)).into_response();
-            resp.headers_mut().insert(
-                "X-RateLimit-Remaining",
-                rate_info.remaining.to_string().parse().unwrap(),
-            );
-            resp.headers_mut().insert(
-                "X-RateLimit-Reset",
-                rate_info.reset_at.to_rfc3339().parse().unwrap(),
-            );
+            if let Ok(val) = rate_info.remaining.to_string().parse() {
+                resp.headers_mut().insert("X-RateLimit-Remaining", val);
+            }
+            if let Ok(val) = rate_info.reset_at.to_rfc3339().parse() {
+                resp.headers_mut().insert("X-RateLimit-Reset", val);
+            }
             Ok(resp)
         }
         Err(e) => {

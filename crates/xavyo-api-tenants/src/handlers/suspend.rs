@@ -91,7 +91,7 @@ pub async fn suspend_tenant_handler(
         );
         return Ok(Json(SuspendTenantResponse {
             tenant_id,
-            suspended_at: target_tenant.suspended_at.unwrap(),
+            suspended_at: target_tenant.suspended_at.unwrap_or_else(chrono::Utc::now),
             suspension_reason: target_tenant.suspension_reason.unwrap_or_default(),
         }));
     }
@@ -133,7 +133,9 @@ pub async fn suspend_tenant_handler(
 
     Ok(Json(SuspendTenantResponse {
         tenant_id,
-        suspended_at: suspended_tenant.suspended_at.unwrap(),
+        suspended_at: suspended_tenant
+            .suspended_at
+            .unwrap_or_else(chrono::Utc::now),
         suspension_reason: request.reason,
     }))
 }

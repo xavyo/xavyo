@@ -50,7 +50,13 @@ pub async fn disable_mfa(
         return Err(ApiAuthError::InvalidCredentials);
     }
 
-    // TODO: Check tenant MFA policy - reject if 'required'
+    // Check tenant MFA policy - reject if 'required'
+    let mfa_policy = xavyo_db::TenantMfaPolicy::get(&state.pool, *tenant_id.as_uuid())
+        .await
+        .map_err(ApiAuthError::Database)?;
+    if mfa_policy.mfa_policy == xavyo_db::MfaPolicy::Required {
+        return Err(ApiAuthError::CannotDisableMfaRequired);
+    }
 
     // Disable MFA (verifies TOTP code internally)
     state

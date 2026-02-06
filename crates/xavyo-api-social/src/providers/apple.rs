@@ -6,7 +6,7 @@
 //! - User info is only provided on first authorization
 
 use super::async_trait;
-use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -17,6 +17,10 @@ use crate::error::{ProviderType, SocialError, SocialResult};
 /// Apple `OAuth2` endpoints.
 const AUTHORIZATION_ENDPOINT: &str = "https://appleid.apple.com/auth/authorize";
 const TOKEN_ENDPOINT: &str = "https://appleid.apple.com/auth/token";
+/// Apple JWKS endpoint for ID token signature verification.
+const APPLE_JWKS_URL: &str = "https://appleid.apple.com/auth/keys";
+/// Apple issuer for token validation.
+const APPLE_ISSUER: &str = "https://appleid.apple.com";
 
 /// Maximum client secret lifetime (6 months in seconds).
 const CLIENT_SECRET_LIFETIME: u64 = 86400 * 180;
@@ -49,6 +53,24 @@ struct AppleIdTokenClaims {
     email: Option<String>,
     email_verified: Option<String>,
     is_private_email: Option<String>,
+}
+
+/// Apple JWKS response structure.
+#[derive(Debug, Deserialize)]
+struct AppleJwkSet {
+    keys: Vec<AppleJwk>,
+}
+
+/// Individual JWK from Apple's JWKS endpoint.
+#[derive(Debug, Deserialize)]
+struct AppleJwk {
+    kid: String,
+    #[allow(dead_code)]
+    kty: String,
+    #[allow(dead_code)]
+    alg: Option<String>,
+    n: String,
+    e: String,
 }
 
 /// Apple Sign In provider.
@@ -87,7 +109,10 @@ impl AppleProvider {
             team_id,
             key_id,
             private_key: encoding_key,
-            http_client: Client::new(),
+            http_client: Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .unwrap_or_else(|_| Client::new()),
         })
     }
 
@@ -114,32 +139,65 @@ impl AppleProvider {
         encode(&header, &claims, &self.private_key).map_err(SocialError::from)
     }
 
-    /// Decode the Apple ID token to extract user info.
-    fn decode_id_token(&self, id_token: &str) -> SocialResult<AppleIdTokenClaims> {
-        // Apple ID tokens should be verified with Apple's public keys
-        // For simplicity, we decode without verification here
-        // In production, use jwks from https://appleid.apple.com/auth/keys
-
-        let parts: Vec<&str> = id_token.split('.').collect();
-        if parts.len() != 3 {
-            return Err(SocialError::InvalidCallback {
-                reason: "Invalid ID token format".to_string(),
-            });
-        }
-
-        let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .decode(parts[1])
-            .map_err(|e| SocialError::InvalidCallback {
-                reason: format!("Failed to decode ID token payload: {e}"),
+    /// Verify and decode the Apple ID token using Apple's JWKS public keys.
+    ///
+    /// Fetches Apple's public keys from their JWKS endpoint, finds the key
+    /// matching the token's `kid` header, and verifies the RS256 signature.
+    /// Also validates issuer and audience claims.
+    async fn verify_and_decode_id_token(&self, id_token: &str) -> SocialResult<AppleIdTokenClaims> {
+        // Decode header to get the key ID (kid)
+        let header =
+            jsonwebtoken::decode_header(id_token).map_err(|e| SocialError::InvalidCallback {
+                reason: format!("Failed to decode ID token header: {e}"),
             })?;
 
-        serde_json::from_slice(&payload).map_err(|e| SocialError::InvalidCallback {
-            reason: format!("Failed to parse ID token claims: {e}"),
-        })
+        let kid = header.kid.ok_or_else(|| SocialError::InvalidCallback {
+            reason: "Apple ID token missing kid in header".to_string(),
+        })?;
+
+        // Fetch Apple's JWKS
+        let jwks: AppleJwkSet = self
+            .http_client
+            .get(APPLE_JWKS_URL)
+            .send()
+            .await
+            .map_err(|e| SocialError::InternalError {
+                message: format!("Failed to fetch Apple JWKS: {e}"),
+            })?
+            .json()
+            .await
+            .map_err(|e| SocialError::InternalError {
+                message: format!("Failed to parse Apple JWKS: {e}"),
+            })?;
+
+        // Find the matching key by kid
+        let jwk = jwks.keys.iter().find(|k| k.kid == kid).ok_or_else(|| {
+            SocialError::InvalidCallback {
+                reason: format!("No matching Apple public key found for kid '{kid}'"),
+            }
+        })?;
+
+        // Build the RSA decoding key from JWK components
+        let decoding_key = DecodingKey::from_rsa_components(&jwk.n, &jwk.e).map_err(|e| {
+            SocialError::InternalError {
+                message: format!("Failed to build RSA decoding key from Apple JWK: {e}"),
+            }
+        })?;
+
+        // Configure validation: RS256 algorithm, check issuer and audience
+        let mut validation = Validation::new(Algorithm::RS256);
+        validation.set_audience(&[&self.client_id]);
+        validation.set_issuer(&[APPLE_ISSUER]);
+
+        // Decode and verify the token
+        let token_data = decode::<AppleIdTokenClaims>(id_token, &decoding_key, &validation)
+            .map_err(|e| SocialError::InvalidCallback {
+                reason: format!("Apple ID token verification failed: {e}"),
+            })?;
+
+        Ok(token_data.claims)
     }
 }
-
-use base64::Engine;
 
 #[async_trait]
 impl SocialProvider for AppleProvider {
@@ -214,7 +272,7 @@ impl SocialProvider for AppleProvider {
             provider: ProviderType::Apple,
         })?;
 
-        let claims = self.decode_id_token(id_token)?;
+        let claims = self.verify_and_decode_id_token(id_token).await?;
 
         let email_verified = claims.email_verified.as_ref().is_some_and(|v| v == "true");
 

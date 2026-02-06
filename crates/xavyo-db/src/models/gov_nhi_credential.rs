@@ -352,6 +352,7 @@ impl GovNhiCredential {
             WHERE is_active = true
                 AND valid_from <= NOW()
                 AND valid_until > NOW()
+            LIMIT 10000
             ",
         )
         .fetch_all(pool)
@@ -370,6 +371,7 @@ impl GovNhiCredential {
                 AND valid_from <= NOW()
                 AND valid_until > NOW()
                 AND nhi_type = $1
+            LIMIT 10000
             ",
         )
         .bind(nhi_type.to_string())

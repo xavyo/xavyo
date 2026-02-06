@@ -11,7 +11,10 @@ use sqlx::PgPool;
 use tracing::info;
 use uuid::Uuid;
 
-use xavyo_db::models::{GovPersona, GovPersonaArchetype, GovPersonaSession, PersonaStatus};
+use xavyo_db::models::{
+    GovPersona, GovPersonaArchetype, GovPersonaAuditEvent, GovPersonaSession,
+    PersonaAuditEventFilter, PersonaAuditEventType, PersonaStatus,
+};
 use xavyo_governance::error::{GovernanceError, Result};
 
 use super::persona_audit_service::PersonaAuditService;
@@ -468,14 +471,34 @@ impl PersonaExpirationService {
             "Persona validity extended"
         );
 
+        // Count previous extensions from audit trail (the event we just logged above
+        // is included, so this reflects the total including the current extension)
+        let extension_count = self
+            .count_extensions(tenant_id, persona_id)
+            .await
+            .unwrap_or(1) as i32;
+
         Ok(ExtensionResult {
             persona_id,
             previous_valid_until: persona.valid_until,
             new_valid_until,
             extension_days,
             required_approval: requires_approval && !is_owner, // Flag if approval was required
-            extension_count: 1, // TODO: Track actual extension count from persona history
+            extension_count,
         })
+    }
+
+    /// Count the number of extension events for a persona from the audit trail.
+    async fn count_extensions(&self, tenant_id: Uuid, persona_id: Uuid) -> Result<i64> {
+        let filter = PersonaAuditEventFilter {
+            persona_id: Some(persona_id),
+            event_type: Some(PersonaAuditEventType::PersonaExtended),
+            ..Default::default()
+        };
+        let count = GovPersonaAuditEvent::count_by_tenant(&self.pool, tenant_id, &filter)
+            .await
+            .map_err(GovernanceError::Database)?;
+        Ok(count)
     }
 
     // =========================================================================
@@ -580,10 +603,11 @@ mod tests {
             new_valid_until: Utc::now() + Duration::days(30),
             extension_days: 30,
             required_approval: false,
-            extension_count: 1,
+            extension_count: 3,
         };
 
         assert_eq!(result.extension_days, 30);
         assert!(!result.required_approval);
+        assert_eq!(result.extension_count, 3);
     }
 }

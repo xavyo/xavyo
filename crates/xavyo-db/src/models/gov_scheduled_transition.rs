@@ -441,4 +441,34 @@ impl GovScheduledTransition {
         .fetch_all(pool)
         .await
     }
+
+    /// Find pending scheduled transitions for a specific object.
+    ///
+    /// Joins with `gov_state_transition_requests` to filter by `object_id`.
+    pub async fn find_pending_for_object(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        object_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            SELECT s.*
+            FROM gov_scheduled_transitions s
+            JOIN gov_state_transition_requests r
+              ON s.transition_request_id = r.id
+              AND r.tenant_id = s.tenant_id
+            WHERE s.tenant_id = $1
+              AND r.object_id = $2
+              AND s.status = 'pending'
+            ORDER BY s.scheduled_for ASC
+            LIMIT $3
+            ",
+        )
+        .bind(tenant_id)
+        .bind(object_id)
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+    }
 }

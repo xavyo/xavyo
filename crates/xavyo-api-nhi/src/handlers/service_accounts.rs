@@ -134,6 +134,9 @@ pub async fn create_service_account(
     Json(request): Json<CreateNhiRequest>,
 ) -> ApiResult<(StatusCode, Json<NhiResponse>)> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
+    }
     let actor_id = extract_actor_id(&claims)?;
     let nhi = state
         .nhi_service
@@ -167,6 +170,9 @@ pub async fn update_service_account(
     Json(request): Json<UpdateNhiRequest>,
 ) -> ApiResult<Json<NhiResponse>> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
+    }
     let actor_id = extract_actor_id(&claims)?;
     let nhi = state
         .nhi_service
@@ -197,6 +203,9 @@ pub async fn delete_service_account(
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
+    }
     let actor_id = extract_actor_id(&claims)?;
     state.nhi_service.delete(tenant_id, id, actor_id).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -231,6 +240,9 @@ pub async fn suspend_service_account(
     Json(request): Json<SuspendNhiRequest>,
 ) -> ApiResult<Json<NhiResponse>> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
+    }
     let actor_id = extract_actor_id(&claims)?;
     let nhi = state
         .nhi_service
@@ -264,6 +276,9 @@ pub async fn reactivate_service_account(
     Json(request): Json<ReactivateNhiRequest>,
 ) -> ApiResult<Json<NhiResponse>> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
+    }
     let actor_id = extract_actor_id(&claims)?;
     let nhi = state
         .nhi_service
@@ -297,6 +312,9 @@ pub async fn transfer_ownership(
     Json(request): Json<TransferOwnershipRequest>,
 ) -> ApiResult<Json<NhiResponse>> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
+    }
     let actor_id = extract_actor_id(&claims)?;
     let nhi = state
         .nhi_service
