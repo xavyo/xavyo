@@ -120,6 +120,16 @@ impl Config {
     pub fn signup_url(&self) -> String {
         format!("{}/auth/signup", self.auth_url)
     }
+
+    /// Get the resend verification endpoint URL
+    pub fn resend_verification_url(&self) -> String {
+        format!("{}/auth/resend-verification", self.auth_url)
+    }
+
+    /// Get the user profile endpoint URL
+    pub fn profile_url(&self) -> String {
+        format!("{}/me/profile", self.auth_url)
+    }
 }
 
 #[cfg(test)]

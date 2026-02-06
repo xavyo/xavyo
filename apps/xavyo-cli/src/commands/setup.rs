@@ -2,14 +2,16 @@
 //!
 //! Guides users through the complete setup process:
 //! 1. Authentication (signup or login)
-//! 2. Tenant creation
+//! 2. Email verification
+//! 3. Tenant creation
 
+use crate::api::{get_profile, ApiClient};
 use crate::commands::{init, login, signup};
-use crate::config::{Config, ConfigPaths};
+use crate::config::ConfigPaths;
 use crate::credentials::get_credential_store;
 use crate::error::{CliError, CliResult};
 use crate::models::Session;
-use crate::output::{print_info, print_success};
+use crate::output::{print_info, print_success, print_warning};
 use clap::Args;
 use dialoguer::{Confirm, Select};
 
@@ -66,18 +68,28 @@ fn check_tenant_state(paths: &ConfigPaths) -> CliResult<TenantState> {
     }
 }
 
+/// Check if current user's email is verified via the profile API.
+/// Returns Ok(true) if verified, Ok(false) if not, Err if we can't check.
+async fn check_email_verified(api_client: &ApiClient) -> CliResult<bool> {
+    let profile = get_profile(api_client).await?;
+    Ok(profile.email_verified)
+}
+
 /// Execute the setup command
 pub async fn execute(args: SetupArgs) -> CliResult<()> {
     let paths = ConfigPaths::new()?;
-    let _config = Config::load(&paths)?;
-
     // Check current state
     let auth_state = check_auth_state(&paths)?;
     let tenant_state = check_tenant_state(&paths)?;
 
     // Non-interactive check mode
     if args.check {
-        return execute_check_mode(&auth_state, &tenant_state);
+        let api_client = if auth_state.is_logged_in() {
+            Some(ApiClient::from_defaults()?)
+        } else {
+            None
+        };
+        return execute_check_mode(&auth_state, &tenant_state, api_client.as_ref()).await;
     }
 
     println!();
@@ -130,11 +142,49 @@ pub async fn execute(args: SetupArgs) -> CliResult<()> {
         }
     }
 
+    // Step 2: Email verification check (only if logged in after step 1)
+    let auth_after_step1 = check_auth_state(&paths)?;
+    if auth_after_step1.is_logged_in() {
+        let api_client = ApiClient::from_defaults()?;
+        println!("Step 2: Email Verification");
+        match check_email_verified(&api_client).await {
+            Ok(true) => {
+                print_success("Email is verified");
+                println!();
+            }
+            Ok(false) => {
+                print_warning("Email is not yet verified.");
+                print_info("Please check your inbox for the verification link.");
+                print_info("You can resend it with: xavyo verify resend");
+                print_info("Check status with: xavyo verify status");
+                println!();
+
+                let proceed = Confirm::new()
+                    .with_prompt("Continue setup without email verification?")
+                    .default(false)
+                    .interact()
+                    .map_err(|e| CliError::InputError(format!("Confirmation failed: {e}")))?;
+
+                if !proceed {
+                    println!();
+                    print_info("Run 'xavyo setup' again after verifying your email.");
+                    return Ok(());
+                }
+                println!();
+            }
+            Err(_) => {
+                // Could not check verification (e.g. token issue), continue
+                print_info("Could not check email verification status. Continuing...");
+                println!();
+            }
+        }
+    }
+
     // Reload state after potential auth change
     let tenant_state = check_tenant_state(&paths)?;
 
-    // Step 2: Tenant
-    println!("Step 2: Tenant");
+    // Step 3: Tenant
+    println!("Step 3: Tenant");
     match &tenant_state {
         TenantState::NoTenant => {
             println!("  Status: No tenant configured");
@@ -189,6 +239,26 @@ pub async fn execute(args: SetupArgs) -> CliResult<()> {
         }
     }
 
+    let email_verified = if final_auth.is_logged_in() {
+        let api_client = ApiClient::from_defaults()?;
+        match check_email_verified(&api_client).await {
+            Ok(true) => {
+                print_success("Email: Verified");
+                true
+            }
+            Ok(false) => {
+                print_warning("Email: Not verified");
+                false
+            }
+            Err(_) => {
+                print_warning("Email: Could not check");
+                false
+            }
+        }
+    } else {
+        false
+    };
+
     match &final_tenant {
         TenantState::HasTenant { name, slug } => {
             print_success(&format!("Tenant: {name} ({slug})"));
@@ -198,8 +268,9 @@ pub async fn execute(args: SetupArgs) -> CliResult<()> {
         }
     }
 
-    // Check if fully set up
+    // Check if fully set up (auth + email verified + tenant)
     if matches!(final_auth, AuthState::LoggedIn { .. })
+        && email_verified
         && matches!(final_tenant, TenantState::HasTenant { .. })
     {
         println!();
@@ -210,7 +281,11 @@ pub async fn execute(args: SetupArgs) -> CliResult<()> {
 }
 
 /// Execute check mode (non-interactive)
-fn execute_check_mode(auth_state: &AuthState, tenant_state: &TenantState) -> CliResult<()> {
+async fn execute_check_mode(
+    auth_state: &AuthState,
+    tenant_state: &TenantState,
+    api_client: Option<&ApiClient>,
+) -> CliResult<()> {
     println!("Setup Status");
     println!("============");
 
@@ -225,6 +300,26 @@ fn execute_check_mode(auth_state: &AuthState, tenant_state: &TenantState) -> Cli
         }
     };
 
+    // Check email verification if authenticated
+    let email_ok = if let Some(client) = api_client {
+        match check_email_verified(client).await {
+            Ok(true) => {
+                print_success("Email: Verified");
+                true
+            }
+            Ok(false) => {
+                print_warning("Email: Not verified");
+                false
+            }
+            Err(_) => {
+                print_warning("Email: Could not check verification status");
+                false
+            }
+        }
+    } else {
+        false
+    };
+
     let tenant_ok = match tenant_state {
         TenantState::HasTenant { name, slug } => {
             print_success(&format!("Tenant: {name} ({slug})"));
@@ -236,7 +331,7 @@ fn execute_check_mode(auth_state: &AuthState, tenant_state: &TenantState) -> Cli
         }
     };
 
-    if auth_ok && tenant_ok {
+    if auth_ok && email_ok && tenant_ok {
         println!();
         print_success("Setup complete!");
         Ok(())
@@ -245,6 +340,12 @@ fn execute_check_mode(auth_state: &AuthState, tenant_state: &TenantState) -> Cli
         print_info("Run 'xavyo setup' to complete setup.");
         // Return error to indicate incomplete setup (exit code 1)
         Err(CliError::Validation("Setup incomplete".to_string()))
+    }
+}
+
+impl AuthState {
+    fn is_logged_in(&self) -> bool {
+        matches!(self, AuthState::LoggedIn { .. })
     }
 }
 
@@ -273,6 +374,15 @@ mod tests {
 
         assert_eq!(not_logged, AuthState::NotLoggedIn);
         assert!(matches!(logged, AuthState::LoggedIn { .. }));
+    }
+
+    #[test]
+    fn test_auth_state_is_logged_in() {
+        assert!(!AuthState::NotLoggedIn.is_logged_in());
+        assert!(AuthState::LoggedIn {
+            email: "a@b.com".to_string()
+        }
+        .is_logged_in());
     }
 
     #[test]
