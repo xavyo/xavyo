@@ -50,9 +50,9 @@ xavyo-auth = { path = "../../crates/xavyo-auth" }
 xavyo-core = { path = "../../crates/xavyo-core" }
 
 [dev-dependencies]
-axum-test = "14"
-tokio-test = "0.4"
-wiremock = "0.5"
+axum-test = { workspace = true }
+tokio-test = { workspace = true }
+wiremock = "0.6"
 
 [[bin]]
 name = "gateway"

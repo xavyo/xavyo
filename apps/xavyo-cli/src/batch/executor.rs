@@ -168,14 +168,35 @@ impl BatchExecutor {
                 continue;
             }
 
-            // Build request
-            let request = CreateAgentRequest::new(
-                entry.name.clone().unwrap(),
-                entry.agent_type.clone().unwrap(),
-            )
-            .with_risk_level(entry.risk_level.clone().unwrap())
-            .with_model(entry.model_provider.clone(), entry.model_name.clone())
-            .with_description(entry.description.clone());
+            // Build request — validate required fields
+            let name = match entry.name.clone() {
+                Some(n) => n,
+                None => {
+                    result.add_failure(i, entry.name_or_id(), "Missing required field 'name'".to_string());
+                    if let Some(ref pb) = progress { pb.inc(); }
+                    continue;
+                }
+            };
+            let agent_type = match entry.agent_type.clone() {
+                Some(t) => t,
+                None => {
+                    result.add_failure(i, entry.name_or_id(), "Missing required field 'agent_type'".to_string());
+                    if let Some(ref pb) = progress { pb.inc(); }
+                    continue;
+                }
+            };
+            let risk_level = match entry.risk_level.clone() {
+                Some(r) => r,
+                None => {
+                    result.add_failure(i, entry.name_or_id(), "Missing required field 'risk_level'".to_string());
+                    if let Some(ref pb) = progress { pb.inc(); }
+                    continue;
+                }
+            };
+            let request = CreateAgentRequest::new(name, agent_type)
+                .with_risk_level(risk_level)
+                .with_model(entry.model_provider.clone(), entry.model_name.clone())
+                .with_description(entry.description.clone());
 
             // Execute create
             match self.client.create_agent(request).await {
@@ -498,7 +519,14 @@ impl BatchExecutor {
                 continue;
             }
 
-            let agent_id = entry.id.unwrap();
+            let agent_id = match entry.id {
+                Some(id) => id,
+                None => {
+                    result.add_failure(i, entry.name_or_id(), "Missing required field 'id' for update".to_string());
+                    if let Some(ref pb) = progress { pb.inc(); }
+                    continue;
+                }
+            };
 
             // Build update - using patch semantics (only specified fields)
             // Note: This would need an UpdateAgentRequest type
@@ -651,11 +679,23 @@ impl BatchExecutor {
                 .clone()
                 .unwrap_or(serde_json::json!({"type": "object"}));
 
-            let mut request = CreateToolRequest::new(
-                entry.name.clone().unwrap(),
-                schema,
-                entry.risk_level.clone().unwrap(),
-            );
+            let name = match entry.name.clone() {
+                Some(n) => n,
+                None => {
+                    result.add_failure(i, entry.name_or_id(), "Missing required field 'name'".to_string());
+                    if let Some(ref pb) = progress { pb.inc(); }
+                    continue;
+                }
+            };
+            let risk_level = match entry.risk_level.clone() {
+                Some(r) => r,
+                None => {
+                    result.add_failure(i, entry.name_or_id(), "Missing required field 'risk_level'".to_string());
+                    if let Some(ref pb) = progress { pb.inc(); }
+                    continue;
+                }
+            };
+            let mut request = CreateToolRequest::new(name, schema, risk_level);
 
             if let Some(ref desc) = entry.description {
                 request = request.with_description(Some(desc.clone()));
@@ -984,7 +1024,14 @@ impl BatchExecutor {
                 continue;
             }
 
-            let tool_id = entry.id.unwrap();
+            let tool_id = match entry.id {
+                Some(id) => id,
+                None => {
+                    result.add_failure(i, entry.name_or_id(), "Missing required field 'id' for update".to_string());
+                    if let Some(ref pb) = progress { pb.inc(); }
+                    continue;
+                }
+            };
 
             // Get existing tool and update
             match self.client.get_tool(tool_id).await {
