@@ -96,7 +96,7 @@ xavyo-siem = { path = "../xavyo-siem" }
 [dev-dependencies]
 tokio = { version = "1.35", features = ["full", "test-util"] }
 tower = { version = "0.4", features = ["util"] }
-axum-test = "14"
+axum-test = { workspace = true }
 sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "macros"] }
 xavyo-events = { path = "../xavyo-events" }
 futures = "0.3"
