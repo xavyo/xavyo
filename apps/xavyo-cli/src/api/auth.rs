@@ -5,7 +5,7 @@ use crate::error::{CliError, CliResult};
 use crate::models::token::OAuthError;
 use crate::models::{DeviceCodeResponse, SignupResponse, TokenResponse};
 use reqwest::Client;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Request a device code for authentication
 pub async fn request_device_code(
@@ -88,6 +88,54 @@ pub async fn poll_device_token(
             .error_description
             .unwrap_or_else(|| error.error.clone()),
     ))
+}
+
+/// Resend verification request payload
+#[derive(Debug, Serialize)]
+struct ResendVerificationRequest<'a> {
+    email: &'a str,
+}
+
+/// Resend verification response
+#[derive(Debug, Deserialize)]
+pub struct ResendVerificationResponse {
+    pub message: String,
+}
+
+/// Resend email verification for an unverified account
+pub async fn resend_verification(
+    client: &Client,
+    config: &Config,
+    email: &str,
+    tenant_id: &str,
+) -> CliResult<ResendVerificationResponse> {
+    let request = ResendVerificationRequest { email };
+
+    let response = client
+        .post(config.resend_verification_url())
+        .header("X-Tenant-ID", tenant_id)
+        .json(&request)
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        let resend_response: ResendVerificationResponse = response.json().await.map_err(|e| {
+            CliError::AuthenticationFailed(format!("Invalid resend verification response: {e}"))
+        })?;
+        return Ok(resend_response);
+    }
+
+    if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+        return Err(CliError::Validation(
+            "Too many requests. Please wait a moment and try again.".to_string(),
+        ));
+    }
+
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    Err(CliError::AuthenticationFailed(format!(
+        "Resend verification failed: {status} - {body}"
+    )))
 }
 
 /// Signup request payload
@@ -180,5 +228,21 @@ mod tests {
         };
         let json = serde_json::to_string(&request).unwrap();
         assert!(!json.contains("display_name"));
+    }
+
+    #[test]
+    fn test_resend_verification_request_serialization() {
+        let request = ResendVerificationRequest {
+            email: "user@example.com",
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        assert_eq!(json, r#"{"email":"user@example.com"}"#);
+    }
+
+    #[test]
+    fn test_resend_verification_response_deserialization() {
+        let json = r#"{"message":"If an unverified account exists with this email, you will receive a verification link."}"#;
+        let response: ResendVerificationResponse = serde_json::from_str(json).unwrap();
+        assert!(response.message.contains("verification link"));
     }
 }

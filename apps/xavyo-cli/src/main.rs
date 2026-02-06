@@ -92,7 +92,7 @@ enum Commands {
     /// Pre-configured templates for quick setup
     Templates(commands::templates::TemplatesArgs),
 
-    /// Manage tenant contexts (list, switch, current)
+    /// Show current tenant context
     Tenant(commands::tenant::TenantArgs),
 
     /// Check for updates and upgrade the CLI
@@ -103,6 +103,9 @@ enum Commands {
 
     /// Manage groups (admin)
     Groups(commands::groups::GroupsArgs),
+
+    /// Manage active sessions
+    Sessions(commands::sessions::SessionsArgs),
 
     /// Manage service accounts (NHI)
     ServiceAccounts(commands::service_accounts::ServiceAccountsArgs),
@@ -119,14 +122,14 @@ enum Commands {
     /// View audit logs
     Audit(commands::audit::AuditArgs),
 
-    /// Manage identity providers (federation)
-    IdentityProviders(commands::identity_providers::IdentityProvidersArgs),
-
     /// Manage security policies (session, password, MFA, etc.)
     Policies(commands::policies::PoliciesArgs),
 
     /// Provisioning operations and job tracking
     Operations(commands::operations::OperationsArgs),
+
+    /// Check email verification status or resend verification email
+    Verify(commands::verify::VerifyArgs),
 }
 
 #[tokio::main]
@@ -168,13 +171,14 @@ async fn run(cli: Cli) -> CliResult<()> {
         Commands::Upgrade(args) => commands::upgrade::execute(args).await,
         Commands::Users(args) => commands::users::execute(args).await,
         Commands::Groups(args) => commands::groups::execute(args).await,
+        Commands::Sessions(args) => commands::sessions::execute(args).await,
         Commands::ServiceAccounts(args) => commands::service_accounts::execute(args).await,
         Commands::Governance(args) => commands::governance::execute(args).await,
         Commands::Connectors(args) => commands::connectors::execute(args).await,
         Commands::Webhooks(args) => commands::webhooks::execute(args).await,
         Commands::Audit(args) => commands::audit::execute(args).await,
-        Commands::IdentityProviders(args) => commands::identity_providers::execute(args).await,
         Commands::Policies(args) => commands::policies::execute(args).await,
         Commands::Operations(args) => commands::operations::execute(args).await,
+        Commands::Verify(args) => commands::verify::execute(args).await,
     }
 }

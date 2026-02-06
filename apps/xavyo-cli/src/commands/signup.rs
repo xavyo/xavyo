@@ -128,7 +128,15 @@ pub async fn execute(args: SignupArgs) -> CliResult<()> {
     println!();
 
     if !response.email_verified {
-        print_info("Please check your email to verify your account.");
+        print_info(
+            "A verification email has been sent. Please check your inbox (and spam folder).",
+        );
+        println!();
+        print_info("To check verification status:");
+        println!("  xavyo verify status");
+        println!();
+        print_info("To resend the verification email:");
+        println!("  xavyo verify resend");
         println!();
     }
 
