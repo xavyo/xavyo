@@ -2,21 +2,31 @@
 
 pub mod agent;
 pub mod api_key;
+pub mod audit;
 pub mod authorize;
 pub mod config;
+pub mod connector;
 mod credentials;
 mod device_code;
 pub mod doctor;
+pub mod governance;
+pub mod group;
 mod health;
+pub mod identity_provider;
+pub mod operation;
 pub mod platform;
+pub mod policy;
 mod provision;
 pub mod release;
+pub mod service_account;
 mod session;
 mod signup;
 pub mod tenant;
 pub mod token;
 pub mod tool;
 pub mod upgrade;
+pub mod user;
+pub mod webhook;
 
 // Public re-exports for external consumers of the crate
 #[allow(unused_imports)]

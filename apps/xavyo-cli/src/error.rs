@@ -117,6 +117,9 @@ pub enum CliError {
     // Proxy errors
     #[error("Invalid proxy URL '{url}': {reason}")]
     InvalidProxyUrl { url: String, reason: String },
+
+    #[error("Invalid date range: 'since' must be before 'until'")]
+    InvalidDateRange,
 }
 
 impl CliError {
@@ -163,6 +166,7 @@ impl CliError {
             CliError::PluginExecutionError { .. } => 1,
             // Proxy errors
             CliError::InvalidProxyUrl { .. } => 4,
+            CliError::InvalidDateRange => 4,
         }
     }
 

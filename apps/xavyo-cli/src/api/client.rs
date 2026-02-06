@@ -18,6 +18,13 @@ pub struct ApiClient {
 }
 
 impl ApiClient {
+    /// Create an API client from default config paths
+    pub fn from_defaults() -> CliResult<Self> {
+        let paths = ConfigPaths::new()?;
+        let config = Config::load(&paths)?;
+        Self::new(config, paths)
+    }
+
     /// Create a new API client
     pub fn new(config: Config, paths: ConfigPaths) -> CliResult<Self> {
         let client = Client::builder()
@@ -171,6 +178,12 @@ impl ApiClient {
         }
 
         request.send().await.map_err(Into::into)
+    }
+
+    /// Get the current access token (refreshing if needed)
+    pub async fn get_access_token(&self) -> CliResult<String> {
+        let credentials = self.get_valid_credentials().await?;
+        Ok(credentials.access_token)
     }
 
     /// Make an authenticated PATCH request with JSON body (F-051)

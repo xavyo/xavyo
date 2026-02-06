@@ -20,6 +20,7 @@ mod config;
 mod credentials;
 mod error;
 mod interactive;
+mod logging;
 mod models;
 mod output;
 
@@ -96,6 +97,36 @@ enum Commands {
 
     /// Check for updates and upgrade the CLI
     Upgrade(commands::upgrade::UpgradeArgs),
+
+    /// Manage users (admin)
+    Users(commands::users::UsersArgs),
+
+    /// Manage groups (admin)
+    Groups(commands::groups::GroupsArgs),
+
+    /// Manage service accounts (NHI)
+    ServiceAccounts(commands::service_accounts::ServiceAccountsArgs),
+
+    /// Governance: roles, entitlements, access requests
+    Governance(commands::governance::GovernanceArgs),
+
+    /// Manage connectors and provisioning
+    Connectors(commands::connectors::ConnectorsArgs),
+
+    /// Manage webhook subscriptions
+    Webhooks(commands::webhooks::WebhooksArgs),
+
+    /// View audit logs
+    Audit(commands::audit::AuditArgs),
+
+    /// Manage identity providers (federation)
+    IdentityProviders(commands::identity_providers::IdentityProvidersArgs),
+
+    /// Manage security policies (session, password, MFA, etc.)
+    Policies(commands::policies::PoliciesArgs),
+
+    /// Provisioning operations and job tracking
+    Operations(commands::operations::OperationsArgs),
 }
 
 #[tokio::main]
@@ -135,5 +166,15 @@ async fn run(cli: Cli) -> CliResult<()> {
         Commands::Templates(args) => commands::templates::execute(args).await,
         Commands::Tenant(args) => commands::tenant::execute(args).await,
         Commands::Upgrade(args) => commands::upgrade::execute(args).await,
+        Commands::Users(args) => commands::users::execute(args).await,
+        Commands::Groups(args) => commands::groups::execute(args).await,
+        Commands::ServiceAccounts(args) => commands::service_accounts::execute(args).await,
+        Commands::Governance(args) => commands::governance::execute(args).await,
+        Commands::Connectors(args) => commands::connectors::execute(args).await,
+        Commands::Webhooks(args) => commands::webhooks::execute(args).await,
+        Commands::Audit(args) => commands::audit::execute(args).await,
+        Commands::IdentityProviders(args) => commands::identity_providers::execute(args).await,
+        Commands::Policies(args) => commands::policies::execute(args).await,
+        Commands::Operations(args) => commands::operations::execute(args).await,
     }
 }

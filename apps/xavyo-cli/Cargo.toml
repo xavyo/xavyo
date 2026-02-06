@@ -31,6 +31,12 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], defau
 # Async streams (for download progress)
 futures-util = "0.3"
 
+# Server-Sent Events (for audit log streaming)
+reqwest-eventsource = "0.6"
+
+# CSV output support
+csv = "1"
+
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -93,7 +99,6 @@ urlencoding = "2"
 [dev-dependencies]
 tempfile = "3"
 wiremock = "0.6"
-csv = "1"
 
 [features]
 default = []
