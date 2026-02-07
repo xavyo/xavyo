@@ -91,6 +91,16 @@ Traditional IAM solutions weren't built for this. They focus on humans, not mach
 | **Segregation of Duties** | Prevent toxic combinations automatically |
 | **Connectors** | LDAP, Active Directory, databases, REST APIs |
 
+### 💻 CLI (`xavyo-cli`)
+| Feature | Description |
+|---------|-------------|
+| **32 Commands** | Full API coverage — agents, users, groups, governance, connectors, and more |
+| **Setup Wizard** | Interactive onboarding: signup → email verification → tenant creation |
+| **Email Verification** | `verify status` and `verify resend` with session-aware defaults |
+| **Multi-Tenant Switching** | `tenant switch` to change context between organizations |
+| **JSON Output** | `--json` flag on all commands for scripting and CI pipelines |
+| **Shell Completions** | Bash, Zsh, Fish, PowerShell via `completions` command |
+
 ---
 
 ## 🚀 Quick Start
@@ -116,6 +126,26 @@ cargo run -p idp-api
 **That's it!** API running at `http://localhost:8080`
 
 📖 **Swagger UI**: `http://localhost:8080/swagger-ui/`
+
+### Using the CLI
+
+```bash
+# Install the CLI
+cargo install --path apps/xavyo-cli
+
+# Interactive setup (signup, verify email, create tenant)
+xavyo setup
+
+# Or step by step:
+xavyo signup                    # Create an account
+xavyo verify status             # Check email verification
+xavyo verify resend             # Resend verification email
+xavyo login                     # Authenticate via device code flow
+xavyo init "My Organization"    # Create a tenant
+
+# Check setup status
+xavyo setup --check
+```
 
 ### Test it works
 
@@ -144,7 +174,7 @@ curl -X POST http://localhost:8080/auth/login \
 - **Rust** — Memory-safe, no GC pauses, predictable latency
 - **Axum** — Async-first, tower middleware ecosystem
 - **PostgreSQL RLS** — Tenant isolation at the database level
-- **100+ migrations** — Battle-tested schema
+- **149 migrations** — Battle-tested schema
 
 ---
 
@@ -170,12 +200,12 @@ xavyo/
 ├── apps/
 │   ├── idp-api/           # Main API service (Axum)
 │   ├── gateway/           # API Gateway
-│   └── xavyo-cli/         # CLI tool
+│   └── xavyo-cli/         # CLI tool (32 commands)
 │
 ├── crates/
 │   ├── xavyo-core/        # Shared types & errors
 │   ├── xavyo-auth/        # JWT, passwords, MFA
-│   ├── xavyo-db/          # PostgreSQL + 127 migrations
+│   ├── xavyo-db/          # PostgreSQL + 149 migrations
 │   ├── xavyo-tenant/      # Multi-tenant middleware
 │   ├── xavyo-events/      # Kafka event bus
 │   ├── xavyo-api-auth/    # Auth endpoints
@@ -188,7 +218,7 @@ xavyo/
 └── docker/                # Development environment
 ```
 
-**34 Rust crates** | **127 SQL migrations** | **1,400+ source files**
+**32 Rust crates** | **149 SQL migrations** | **1,400+ source files**
 
 ---
 
