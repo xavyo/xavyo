@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to verify a magic link token.","required":["token"],"properties":{"token":{"type":"string","description":"Magic link token from email."}},"title":"MagicLinkVerifyRequest"}}},"required":true}}

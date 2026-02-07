@@ -1,0 +1,1 @@
+{"responses":{"201":{"description":"Certificate uploaded"},"400":{"description":"Invalid certificate"},"401":{"description":"Not authenticated"},"403":{"description":"Not authorized"}}}

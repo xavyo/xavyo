@@ -1,0 +1,70 @@
+---
+id: diff-schema-versions
+title: "Compare schema versions."
+description: "Computes diff between two schema versions, identifying added/removed/modified"
+sidebar_label: "Compare schema versions."
+hide_title: true
+hide_table_of_contents: true
+api: eJzNVcGO2zYQ/RViTimgSN40h0C37e4mcBG0i+wWPaRGQJEjiYlEKuTIiSHo34uhJNuxgiQIUKAXWySHM28eHx8HIFkFyN/Cg6qxleLWBOX26A+wS0BjUN50ZJyFHG5c2/WEQWhTlqJA+oRoBX1yIkx79+iDcTYkwmi0ZMqDsZWQWqPOPLZujzprnTalQf2PdcV7VCRUI0PAIKTVQhJ5U3CNJI5rU9WNqWriPIVH+YE/VC1thSGFBFyHXjK8rYYcGNe7Ccu7BQsk0EkvWyT03OcAVrYIORgNCRjuq5NUw7pZa1GR82J7Cwl4/Ngbjxpy8j0mMFWBfAA6dJwukDe2ggRK51tJkEPfGw3jmBwrlt61C66l9seeqb4s/uB6r3DhU5TOC+XaTnoTnE1/BI6xhBX6czzG0q/PvgBE7sfgPEpfIf1HcHa8PXTOBgy849lmw38XhEwC4wOGBJSzhJY4THZdY1SUQPY+cOywrj4pbc3ylJTbmT5vTVm+mbFwW2SowWPg+SqM4zgm8HzzfI31T4vCeVE4qo83QlhHonS9jYqAFql2rNgKKQqUasghU4vmQjYYPWZTI9ncdUC/XzTc+wZyqIm6PMsap2RTu0D5i82LzarNW9xj47oWLYkpB7AGTilCnmVGd+lnuT+41OKaqXvvdK94cMywY0Cq94YOkZ7p8AqUHv11z/0c6ecaMIuCx1MQJPPHy0URv//9GNkxtnRx+0x/xCWu77crXNtoM3QQ997tjUbPUfFA455ZKlJFqcyin7I9omxhTKAxCvk8T+u/Pbx+epVeQXLBUGWo7otUuTaLKebfonFF1spA6LPX25u7Px7uOO9yr3LYpFfphqc6F6iV9qzUTbxEeGmf6WWfw0nx/0cTno+Z8DNlXSON5W4jecMs7bdwkjYkkEfvna9pEm2bXxuWMMcOQyED/uWbceTpyZNY9doEWTRsM6VsAn6DpSdvZkf6RXzXS78K/wMe1o69l03PofH+/BSY7zrpN8B84dYnKDseeMNYfp6ki9fuqyjmSWkP5/UXdPzW7cYEapQafUQyLVwrhR2dbVlZNrdwdMRXd2wC/wLtM/uE
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Compare schema versions."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/connectors/{id}/schema/diff"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Computes diff between two schema versions, identifying added/removed/modified
+object classes and attributes, and highlighting breaking changes.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./diff-schema-versions.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./diff-schema-versions.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./diff-schema-versions.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

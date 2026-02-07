@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Create role template request.","required":["name","permissions"],"properties":{"description":{"type":"string","nullable":true},"name":{"type":"string"},"permissions":{"type":"array","items":{"type":"string"}}},"title":"CreateRoleTemplateRequest"}}},"required":true}}

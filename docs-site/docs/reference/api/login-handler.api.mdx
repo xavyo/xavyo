@@ -1,0 +1,71 @@
+---
+id: login-handler
+title: "Handle user login."
+description: "Authenticates the user with email and password, then either issues"
+sidebar_label: "Handle user login."
+hide_title: true
+hide_table_of_contents: true
+api: eJzVVk1v4zYQ/SvEnFpAazvboNjVzbubRVMkrZEP9JAE2TE1trihSC05km0Y/u/FUHKsxEDTQy/NwZGo+eKb94bcAuMyQn4H04ZLcmw0svEOHjIoKOpg6vSaD79TVFySaiIFtTJcKqrQWIWuUDXGuPKhyMTCKTJcUlAmxobivUOtKcZkGGgRKJaK/RO5qH4yC3X5dapMVM6zIodzS8XPygcViJvgosJ7V2Ngg7ZzUoF+NCYYt0yeLQWz6KsfQQa+ppBezgvIwfqlcY8lusJSgAzElyJ/8sUG8i1o75gcyyPWte3DjL9H2foWoi6pQnniTU2Qg59/J83wGqMLyaL62KrGjfVYjPp0JlAhQCewIIM9VAJ1HaRcNhQlSWdxyBZZdnmU7Vbw76EvikAxjmA3iPvvAuzNR/fugtySS9WiNUUCQNWBWnIc1bcv/vqbQmbUT1G1BhWtOVBFdqOsd8vnMPHecYmstG9sobR3salI0Voab1pSn2e3qmhS10qMpXHLEex2GbBhS3sIrzoEYSdfDthxaCgtxNq72GH1fjKRfy83Jnx4dsv+q+5e9XnVSqhtn3ttAkWh4OtG92x9TGyFDKoFPg6qonUtno/GHTMAWzRWJPBYEZe+iIPqMATcQAaGqYpvN3m6D5VU0oWTSsk1lVTJnmvIYEVzbLh0aQ/atxQ2Uta+LZcLvEyuwrC3E0S18EFxaWKaEomXg/0eijaOaZkUufChQu6Wfj092sZNknyKsVHGqUjau6Jj/AtgD7Hn3ltCdxTq3BX9FOsnzt63l8+wa2/CO3sxkmTXx8NoyO/LBV716fZ8EprvMjidnBwz+dwlNSodqJDpizbKTEStfeNYWa+fKPXkdPLLsfe0NzNRGYeaTUvJ9v3HY9srZFLWVIaTWqmQuAJu1/Ycah85jS0uIYexsGWcRAAZRAotBTlHttAECzmUzHU+Hluv0ZY+cv5h8mFyhN4Xasn6uiLHqosBu2wYIubjsSnq0RrbjR85OlblLPii0Wla7SM8SEG6CYY316LtTlNzwkBBjrFBVyWH1J/MhDPJCLL+4euelL//dZPQkJlxdTg7ztZY1dLX56F94MlhDu/XdhkYt/ApfU+HtC81nZ0fszT1mzdqFnxrCgpilQiWfPqxhjqNNYfVIdoNYSW5rNEk9Dp8/3R98e5kdALZK4SXhstmPtK+GqcQ/e/c+vm4wsgUxhfnn8/+uD6TuNLprsbJ6GQ0SaLxkSt0g1S/paO2uyMkloxe73Bw6v7vLhc9e5jWPK4tGicgJEy3vUDuQAQCWXfzkFEqKpD17XaOkW6D3e1k+Ucjoza/e8igxWCkNHnbZVASFhSSpp5oAzl87vB6dyPZxdw26UB4faaJhDqPqdZU8z/aPgwkPvvz+ka439+KKl+IT8CVnAq4ghzSxUq8k6TS2hYsumWDS7HtYsrf3/mxnp0=
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Handle user login."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/auth/login"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Authenticates the user with email and password, then either issues
+access and refresh tokens (if MFA is not enabled) or returns a
+partial token requiring MFA verification.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./login-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./login-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

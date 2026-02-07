@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"IP rule deleted"},"401":{"description":"Not authenticated"},"403":{"description":"Not authorized"},"404":{"description":"Rule not found"}}}

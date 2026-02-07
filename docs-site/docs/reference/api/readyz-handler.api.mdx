@@ -1,0 +1,70 @@
+---
+id: readyz-handler
+title: "Readiness probe handler (`GET /readyz`)."
+description: "Checks all critical and non-critical dependencies:"
+sidebar_label: "Readiness probe handler (`GET /readyz`)."
+hide_title: true
+hide_table_of_contents: true
+api: eJztV9tu4zYQ/RWCT3Gg2HIu21RvaeosUgTdIEnRhziIKXJscUORWnLkrGsY6Ef0C/slxUj0Nd7FvhbIi8egOLczZ4bknKOYBJ498k95AD8VuTYaZ/wp4QqC9LpC7SzP+GUB8iUwYQyTXqOWwjBhFbPOHq0WFFRgFVipIWRDe8QOD5VAkYsAh4fsYLmvk7HR/eBmcPnA+iP2qrFg0tmxntRe5AYY6hJcjexAwVjUBtlx6LTWXsT4RZCpTbedjOXevYAnKxYk6qnGGZtqwQoQhqwLY3IhX9YWT8LSS2doh/YOsPa2jfk4TduYRkPe6s+GfMReC7Bt+i0SlQhhd7uCiRcK1Gr/FjpRcSy0YXmNaxyXps7Sk5Wp2u763mvHeUZl0xKYDiwUNaK2E6bcq6W8Dq7ujtL0OGGNPI3yLMoPUZ5H+XMr+2mU/Sijfv+kwxPuKvCCSHGteMY9CDX767kQVhnwPOEeQuVsgMCzOT9OUxLbTLpfx9tos4OYKSWzRJA8SWcRLJIFUVVGy8Zt73MgM3MeZAGloH84q4Bn3OWfQSLfZe4dCKUthMAq73JgywjZwVX60ykDWwgrQXW6BNi1VeQHAmGOBXiGBWxC3IaMjgkpoUKGXozHWrJ81tZF28nQ/niXdBvIvtTag6IuDCiwDpR8U2Se8Cn4QIkkvK6Iss8BpLMqUItWnqqBukU7quwBRCilCQ1hbrc0vg/cr8s4Y2qEHPWOttLUChTTtoGjBXdV+G+mZASSsedyT+zgvfMbIQX02k54wm1tDA0FnqGvYbFlZb1dW4RJw7+x86XAdunDKU94qa0u65Jn6SJZxvLGz2KRcNRIbjbSbmZe8+2bem+q8kMx7TZEo8qCtnLNtYDCY+Tov3//Ezu4091NacmPPdhtu7lY9xCLSmzsXckuhZ+4LrrS7HO3Cc2qle5isfliQd/P0pPv9rl1uOz11Vx77/D3Dn/v8P9Hhy8SXgIWjk78CRCPKoEFz3ivPf95wikp8HSTnPPaG57xArHKej3jpDCFC5idp+fpHgpOwbiqBIustcEXyaaJkPV6WlXdr2I6c10Lb1l8652qZZP10sITBSRrr3F2T0OkpWAOwoO/qCn0FZbkg+JvtvEsbuJJ/HO1rOxvfz40SGk7do16RKyJi13cXr+J61qBRbqJ3no31Qo87WJj51mjE+efkM38s6JcW3sAURLzjJZANVh//+X+5qjf7dOs2EJoorGo8650Za8xEX9z4/JeKQKC791cXw5+vx/wTUbxtNvvprRUuYClsBuudqdqvOOxg9HHwQOLlR81dN3Ke74e6++vhvdXQ/tqiM2G8BV7lRHaNoOVKDyPs+QxviXo5KBxQSvzOZHgD28WC1r+UoOf8ezxKeFT4XV7aDw+LRJCXIFvhs8LzGgUNmc3Ha7C1OT5zf2CZsRqqH0cUHP/BywLJ5g=
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Readiness probe handler (`GET /readyz`)."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/readyz"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Checks all critical and non-critical dependencies:
+- **database** (critical): `SELECT 1` with configurable timeout (default 2s)
+- **kafka** (non-critical): broker connectivity via health callback (default 3s timeout)
+
+Returns:
+- 200 with `"healthy"` when all checks pass
+- 200 with `"degraded"` when non-critical checks fail but critical pass
+- 503 with `"unhealthy"` when critical checks fail or service is shutting down
+
+(FR-002, FR-004, FR-005, FR-006, FR-008, FR-009, FR-010, FR-011, FR-012, FR-013)
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./readyz-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./readyz-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

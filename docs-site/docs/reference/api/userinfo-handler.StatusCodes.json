@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"User claims"},"401":{"description":"Invalid or missing access token"},"403":{"description":"Insufficient scope"}}}

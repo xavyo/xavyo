@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to move a group to a new parent (or make it a root group).","properties":{"parent_id":{"type":"string","format":"uuid","description":"New parent group ID. Set to null to make a root group.","nullable":true}},"title":"MoveGroupRequest"}}},"required":true}}

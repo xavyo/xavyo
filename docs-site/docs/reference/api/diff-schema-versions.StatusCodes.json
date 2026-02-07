@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Schema diff","content":{"application/json":{"schema":{"type":"object","description":"Schema for SchemaDiffResponse.","title":"SchemaDiffResponse"}}}},"404":{"description":"One or both versions not found"}}}

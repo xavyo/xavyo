@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to switch back to physical user.","properties":{"reason":{"type":"string","description":"Reason for switching back.","nullable":true}},"title":"SwitchBackRequest"}}},"required":true}}

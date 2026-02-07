@@ -1,0 +1,70 @@
+---
+id: delete-config
+title: "Delete a lifecycle configuration."
+description: "Deletes a lifecycle configuration. This will also delete all associated"
+sidebar_label: "Delete a lifecycle configuration."
+hide_title: true
+hide_table_of_contents: true
+api: eJzNVFFv00AM/isnP4EUkhQNaeRtrJ1UVKGJFfFQqumaOM3B5S67c8pClP+OnGRtt47BIy9tfGd/9ufP5xZIbj0kK1ioHNMm1SgurcnVtnaSlDWwDiBDnzpV9WYCU9RI6IUUeh+SHoeEYlkoL34qrYXU3oqsjxCSbe9tqiRh9s14kj2OyQQ5abziYB+KK6m0FyoX0jTCbr5jSl5Ih6L2ymwFMfjjhBCArXAw5hkkMGS8HbwggEo6WSKhY6otGFkiJDBc36oMAlBMrZJUwFO+i+dZivkUAnB4VyuHGSTkagzApwWWEpIWqKk4hyenDJeQW1dKggTqWmXQdWsO9pU1Hj37v43P+O/fcg/8MugCOIsnp3FfjKypsE79enB6BvyRzsJYErmtzej//m/+ygtlRO2R/d/F8an/3BA6I7Xw6HboBDpnHXRdAB7T2ilqejE2KB26Wy4YktWaG1MiFfagYy8g30K0tTvGNClG++mLht74qN0L2gEn4ayD4LXTkEBBVCVRpG0qdWE9JefxeXyi9xR3qG1VoqGxcuiCYwifRJHKqvBe7hobGqQTiGtnszrt2/SAsD6wvuEZGUQfuF/01PcjwzlgHCW2BycIxo+rh0H6+HXZd1OZ3PbhijT793WJi+v5SV3zDA0pasS1szuVoWMvkVsn+hgI+EmQTInhxkcyoC1Rliy0Vikaj0f3H24WbybhBIInHdoqKupNmNoy6iHG3422m6iUntBFi/nl7NPNjHFZqaHGOJyEMR9V1lMpzVGq6bhH/rh4nhJuez5o6L9dW6PkhPcUVVoqw8z7RrbjzK/gMPPAAozFD2Lx3EMAyWGVrQPg2ebAtt1Ij1+c7jo+vqvR8ZNbB7CTTskNT8uqhUx5/s4gyaX2+EIPX30e191r8eJWfJbVeChNA1yArtmCAH5g82gXd+vuaANMZ4vZcgZd9xsmd1NI
+sidebar_class_name: "delete api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Delete a lifecycle configuration."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"delete"}
+  path={"/governance/lifecycle/configs/{config_id}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Deletes a lifecycle configuration. This will also delete all associated
+states and transitions. Fails if any objects are using this configuration.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./delete-config.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./delete-config.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./delete-config.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

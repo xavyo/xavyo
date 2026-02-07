@@ -1,0 +1,1 @@
+{"parameters":[{"name":"id","in":"path","description":"Schedule ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

@@ -1,0 +1,72 @@
+---
+id: get-effective-access
+title: "Get effective access for a user."
+description: "Returns all entitlements the user has access to, consolidated from:"
+sidebar_label: "Get effective access for a user."
+hide_title: true
+hide_table_of_contents: true
+api: eJzNWE1v2zgQ/SsETymgWM6iuwh0y27SwIuiDZIUPXQNg5bGFhuKVMiRt67h/74YUrJkyUnsnvaSCCTnzZsPDme84SiWjiff+K1ZgdVCp8DO2c1iASnKFbCrNAXn+DTiGbjUyhKl0Tzh94CV1Y4JpRholKigAI2OYQ6scmBZLhwTXpqhiVhqtDNKZgIhYwtriuQffc6upYUUg4BwTi61R6GtW2uqkhVQzMG6XJZ+8d4oYIUoS6mXjkfclGAFUZpkPOFLwBk01GdBOY94KawoAMGSoRuuRQE84aRzJjMecUkGlQJz3rfyC/GaXPOIW3iupIWMJ2griLhLcygETzYc1yXBObRSL3nEF8YWAklBJTO+3UY7jaIslUw93Y7i5wrseqD5s/8Qii2kQrBsvmYdcTa5Hu2RWgjlTmAVcV0pJeYKgj3b7ZTQXGm0A0fyv43H9G+fVJsWdWAXxvrY8YinRiNoJKEO0fi7I8nNkJmZf4cUB3bf1yQ8NPT1eV/tW/6tE0gELTSG725S0pZBoSiNS0s5gzKYuXeqJSesFRQTiVC4t0lf6Q7VDiT7V2LOJDrmTGVTcOzs6m7CbMfGQuC7vkEdhIEtM59L0TCXrHRPMwUrUDzitbqhvT2xIxKlZ2kvB7dRn+3JkDcdfx2ADHdnCPoyCEl4mI5L3gS4l+6J+bNetHHgKylhNHxe+ILST45uLP3eIAxBYsgJdFWQVObLIp9uffl4PfkmOgcrm6rKlr2y2U8uvx9SJnzWCXWY6O70yWEN5bsOaEfTm5EIgrsgvuUqD/1LnrL0lpwpWIp0zQLu+Vw4yPyOG1xLWn3dW+2Jt/ONlB9tJAEfZ+MHnwPtW+6NzCVYYdN8zc4+jC8vD1sWqkjHxnAHZu1md6E+I91MNl590S17h1or58YoEHpgwtccMAe7V0ilY3I/ekIzMtChsd7IcONrridn62Neu2py3XYw0tU9CWQMTavguAjvIOn4q6A9R/8S+YDRsUEgW1rRdGRdX54VYs3msHPfuwGJ4w3sqj3+yprVbJfRg87yIUCaBYW4y7vtD19+RjNJUIXUAo0lDnUmrj+FFsxTIoqEuv9uBL1N/0GHek+fUrtnvHUvw1y6Ls0RtXwtftMWdBS9ruJgI+FCJ4E5SNuQCK7edTynZ40XbSp06I9aEKkRlr6x26FIjX+8H8KQIEtNpZFiVmn5XO1z9/hNk3YyzboFf8GtYTxpPUolkr8fXwx71y9aVJgbK39CRoR+P9TgTjRS4VTMgV1RCbLWWK/ZQVpZiWv/4M9BWLAzAuTJtynlcAGYm3oG8SMHbfG4rcQxecDFm9oR23gX6PPdoBK0himlsoonPEcskzhWJhUqNw6Ty/HleOCja+pbTOmvRsDg9FK0EC6JY5mVox9itTYjDcN3486arEp9X9cgTFurH6h7D8U82H7lTd/FknTwevzwpd0f4lH98aGJ8N9fH703pV4YL17H0/NiV3eT4Zud+VRasztrVjIDS6f8cOBl6sFDpH7wqOesgPYIoqBAK5kC5Ua7/+fDx/OL0QWPeh5aSsyr+Sg1Rewh6r9zZeZxIRyCjT9O/rr59HBDuBSpwHE8uhiNaak0DguhO6puAYdTDLEX/jUY9e3dtHPU/2XErkOM8APjUgmp/XW2vliENPcVvU5zHq46CSbtYDbI9WnEKZ1JdrOhpuuLVdstLYdxmG5AJh1NqO10+6KnjhqWD9rxBOtDg/lKqIoO+0uwElaGUfkkUmf3dYf1jrU/Ixwk0UwYet1V3ZBrvLidbiOeg8jAeiZhlwpgiR25wfC9V51ub+gC/geimEUi
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get effective access for a user."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/governance/users/{user_id}/effective-access"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns all entitlements the user has access to, consolidated from:
+- Direct user assignments
+- Group memberships
+- Role mappings
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-effective-access.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-effective-access.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-effective-access.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

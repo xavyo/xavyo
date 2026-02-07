@@ -1,0 +1,63 @@
+---
+id: start-webauthn-authentication
+title: "POST /auth/mfa/webauthn/authenticate/start"
+description: "Start `WebAuthn` authentication for MFA."
+sidebar_label: "POST /auth/mfa/webauthn/authenticate/start"
+hide_title: true
+hide_table_of_contents: true
+api: eJzVVE2P2zYQ/SvEnBpAlbxBD6lu2zQB3KZZI3aRg2PEI2psMaFIhRx51zD034Oh5V17XQS59qIPcj4e33vDAzBuI5RL+EjVbc+NU/+8vYVVBjVFHUzHxjsoYc4YWK1PQWuFPTfk2GiUCLXxQRLzT+4DfetNoKhQ7dCaWnUY2KBV7L+SU5vgW8UNKeu3xqmN9fcpifvgotINWktuSwpdrdBaf0+10oFq6YU2pkZrhzuzRfYhP9vKt8S/vFjnkIHvKCRc0xpKiIL98z1Vgtl9vkQOGQSKnXeRIpQHeDmZyOvy9LeXh/VpPaqQUFMNGWjvmBxLKnadHSOLL1HyDxB1Qy2mXWvvNlAuD8D7jqAEX30hzfCc8EVDzzk+tWWvOozp/WMmPrlFY6IyMRF+Jt561lfW6L9p//oxS3SjyHfHJmsVOfSa+0A5DNlztMOVQT6MJCphAo0zbvsDu4xHEa3YsKUrjkcYp6owDMOQwW//Jc57rx69e+6UQFsTmQLVyTQsVPSRAqRCN9eFpu5oWB8UPXRGEi+8mxJf/n6duPBetej2aoPGUq2QmdqOIwjmlrjxYsPOR5G5Q26ghEIYKdoNFidjFmccUZFMCxlECjsKMTmmDxZKaJi7siis12gbH7l8NXk1ufLPn7Qj67uWHKtjjSTjU4lYFoWpu/wBd3ufO7q24Cz4utdJr1OFlQDSfTC8n4uljzNTEQYKooD8jU6RHoI/hUE5BkE2frz1oUWGEv76uEg8GbfxKX30Q8KlbmfTK1zTJDHv1Sz4nakpSFTSOOWM04g6TaPD9qnagrAVFa3RJK562v9j/u7Xm/wGsmcMbQ03fZVr3xapxPisrK+KFsVexbvp6zfv52+krih1xDjJb/KJLInqLbqzVrO7+UL9rPwXJz88XTP/swt59ATTAxedRZNmKTF9GAdiCXIAyKDdIGRwYgUyOOdFDJWYWWUg3pe8w6HCSP8GOwyy/K2nsIdyucpgh8FgJW5aroYMGsKaQpqkr7SXK0dr6oTlHdpe8F1d3WL4xwEW4WAYvgPY+4xm
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"POST /auth/mfa/webauthn/authenticate/start"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/auth/mfa/webauthn/authenticate/start"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Start `WebAuthn` authentication for MFA.
+Requires a valid partial token from the login flow.
+Returns challenge and allowed credentials for `navigator.credentials.get()`.
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./start-webauthn-authentication.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./start-webauthn-authentication.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

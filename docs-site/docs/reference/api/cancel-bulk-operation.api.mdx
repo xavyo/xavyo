@@ -1,0 +1,70 @@
+---
+id: cancel-bulk-operation
+title: "Cancel a bulk operation."
+description: "Cancels a pending or in-progress bulk operation."
+sidebar_label: "Cancel a bulk operation."
+hide_title: true
+hide_table_of_contents: true
+api: eJzFVU1v20gM/SsDnraAYjmLLlDoljQp4EWxCeoWe8gawWhEW9OOZlQO5dYr6L8XHCm2YwftsRdbH+Tje+QbqgfWmwjFA1x37otasmZUdy2SZht8hFUGFUZDtpV7KOCt9gZdVFq16CvrNyqQsv6ipbAhjFGVghOeEGb/+bvyMxqOimvNqtZbVNoR6mqnSkSvWgoGY8RKfbPOKcJGW6+sV1yjJeXxm4rCagYZ7GEXFRRgEpVHKfi4fwMZtJp0g4wkunrwukEoDrmPtoIMrIhpNddwqvD6mQC1uIEMCL92lrCCgqnDDKKpsdFQ9MC7VtAjk/UbyGAdqNEMBXSdrWAYVpIc2+AjRon/cz6Xv+cl9w1XoyaHQtEEz+hZwnXbOmtSSP45Sk5/ziGkRp/pWaY4tQ6kRNq+1oeJljSWLTuctJ8FwDAMQwavf8ncB1YlHmlIWZfnWZ+87rgOZP9/Cnr9M2jBXYfOp9i/XqKx8IzktVMRaYukkCgQCOuIpiPLu2SFEjUhPUpxKB5WMpwGuQ7ipjZETuaRd5BvwlYQvcHc2TWanXGYi9Uu9taIeX9sqiEfhYMUFRaj/TpyUEDN3BZ57oLRrg6RizfzN/OzUd3gFl1oG/Q8KYEhO4aIRZ7bqp1919tdmHk8n/Y9haozqW1PCKtDF5IXRiOOvbhKrdhbSGrAZG+5H4Mgmy7ePZn7738/pu5avw4pffJP4qWu7hdnvBYVera8U/cUtrZCkqhkypQz2V2bZPfpyI5oH1E3MnhnDYobD++vl+8vLmeXkJ10aGO57sqZCU2eIKbf0oUyb3RkpPz94u3tP8tbwZVJjRzns8vZXB6JFxrtj0qNa0/p0/V2qrM/nNrfuyqngTJ+57x12nrRldrUTx5/gIPHQdo7uVym/dznkEFxsj4nq68yEDcLWN+XOuIncsMgj792SHLoVhlsNVldij8eeqhslOsKirV2EX/Svj8+TEv3lXppJb8ocHqo/Q6kruvkDjL4grvTT8CwGjKoUVdIidgYcmUMtnyUfLZ5ny2N+7ulHIQfRNSI5g==
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Cancel a bulk operation."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/governance/lifecycle/bulk-operations/{operation_id}/cancel"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Cancels a pending or in-progress bulk operation.
+Objects that have already been processed will remain in their new state.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./cancel-bulk-operation.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./cancel-bulk-operation.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./cancel-bulk-operation.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

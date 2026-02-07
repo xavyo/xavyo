@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","required":["jti"],"properties":{"jti":{"type":"string","description":"The JWT ID (jti) of the token to revoke."},"reason":{"type":"string","description":"Optional reason for revocation.","nullable":true}},"title":"RevokeTokenRequest"}}},"required":true}}

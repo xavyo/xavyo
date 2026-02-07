@@ -1,0 +1,1 @@
+{"parameters":[{"name":"transition_id","in":"path","description":"Transition ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"object_id","in":"path","description":"Object ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

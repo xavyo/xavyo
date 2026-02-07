@@ -1,0 +1,71 @@
+---
+id: list-object-class-attributes
+title: "List attributes for object class."
+description: "Returns all attributes for a specific object class with source info"
+sidebar_label: "List attributes for object class."
+hide_title: true
+hide_table_of_contents: true
+api: eJzdVU1v2zgQ/SvEnFpAlZxFD4WAPaRtWngR7AZJix5aI6XJscUuRarkyIkh6L8XQ8nfTrHtcS/+EIczb968eeqA5DJC+RnuVIW1FK+Df4jGLWGWgcaogmnIeAcl3CK1wUUhrRWSKJh5SxjFwgchRWxQmYVRws+/oSKhrIxRPBiqRPRtUCiMW/gvzjhtlCTjluKhQqowCJSq2iUUJgptAiqya6FxYRxq4YMwrsJgCHX+xX2MKL4ap2yr8X578OdC2ohfBXmBj+lsd2kPcA4Z+AaD5LamGkqwJtL9gPs+4b7fRUMGjQyyRsLANHXgZI1QgtGQgWFeGkkVHJP1xjuHinwQ07eQQcDvrQmooaTQYgYxkQ1lB7RuOF2kwKRnsPChlgQltK3R0PfZtmL6+lnNf/apH6P/a+H9QifMbqp+bzGsT8pO3dNki2caF7K1JLj88/wAUZrXGUhz7y1KB30/4/DYeBcxcsAfkwl/Hda/NpGEX4iDoSnvCB1xtGwamzTnXfEt8pXutOYw/pPexqVgjV9u0nO92xEVN0SGLKc4GwB93/cZvJy8PAV+OC9PYuFbl2YONVLlWZtLpCRBqqCEQm1UFYvO6L4Y2igG8C9SIoxFx3PsiwM+IobVRsFtsFBCRdSURWG9krbykcpXk1eTEwLe4gqtb2p0JIYcwErZpYhlURjd5I9ytfa5w1MOb4LXreI/2wwzBqTaYGidGB6mO0cZMFy23Ot2MFwDRpEkcaQgyMYf7zbr8tenD4k5tpl0fZxKwiUub6anutXoyNBa3AS/MhoDR6VRpzujiKRKIhpXY8j2AWUNfQbWKOQZ785f312/uMgvIDtiaGmoaue58nWRUoyfc+vnRS0jYSiup2+u/r674rw8qQHjJL/IJ/yo8ZFq6fZKJdkf+fC++ebHDXe7pfg/efmoE8JHKhorjWO6EvvduDefYbc3kEGZrHt0gAwOl4fPR+vc259ZBrwinKrr5jLix2D7nh8PlshbpU2Uc7vna0+S/4uGebbBf3H9hFOvpG05Pm3ZSgbDqH4R4bPb0aSfi6MX2Vkw40Pp1vv1tyB1sozfqn7ulfYbENLNftZnUKHUGBIdw9GlUtjQ3qWT1wXzuPXj91dsMz8Av8Q5Jw==
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"List attributes for object class."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/connectors/{id}/schema/object-classes/{name}/attributes"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns all attributes for a specific object class with source info
+indicating whether each attribute is directly defined or inherited.
+Use `include_inherited=false` to exclude inherited attributes.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./list-object-class-attributes.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./list-object-class-attributes.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./list-object-class-attributes.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

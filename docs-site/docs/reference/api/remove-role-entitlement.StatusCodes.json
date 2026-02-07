@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Entitlement removed"},"401":{"description":"Unauthorized"},"404":{"description":"Role or mapping not found"},"500":{"description":"Internal server error"}}}

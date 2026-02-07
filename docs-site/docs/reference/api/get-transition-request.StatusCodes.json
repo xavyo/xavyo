@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Transition request details","content":{"application/json":{"schema":{"type":"object","description":"Schema for TransitionRequestResponse.","title":"TransitionRequestResponse"}}}},"401":{"description":"Unauthorized"},"404":{"description":"Request not found"},"500":{"description":"Internal server error"}}}

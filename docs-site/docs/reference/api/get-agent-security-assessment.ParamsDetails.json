@@ -1,0 +1,1 @@
+{"parameters":[{"name":"agent_id","in":"path","description":"Agent ID to assess","required":true,"schema":{"type":"string","format":"uuid"}}]}

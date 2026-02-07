@@ -1,0 +1,72 @@
+---
+id: authorize-handler
+title: "Initiates the authorization code flow. Validates the request and"
+description: "redirects to login/consent if not authenticated."
+sidebar_label: "Initiates the authorization code flow. Validates the request and"
+hide_title: true
+hide_table_of_contents: true
+api: eJzdVttu20YQ/ZXFvNQBGFF2Lwj4lspKwTZoDMluUdiGsuKOxIXJXXp3qEQV9O/FLKmLZVty5fSlL7qQszNnz9zOAkhOPSTX8Ol9TfkZ3Eag0GdOV6StgQQcKu0wIy/IisJOtYkzazwaEnoijCUha8rRkM4koercmBsz7PeuBunlX4m4zLUXaFRltSExk4VWktALylF8Xrke1U5/FnIqtfEUXmWFRkPf+RvjcKo9oUMlrgZpAFE5nHF4W6ERKx9CEsnszgtpVEBknf5b8h1EZhWy1wl1IAJboQvPUwUJrCxxlEujCnQQQSWdLJHQMS8LMLLEwIOv+N4jmlcIEWgm575GN4ddygatqWBTcVLWnsQYxQ0wkht4wzAc3tfaoYKEXI0R+CzHUkKygOA/AU9Omyksl9EaQsPKSKv94XvBTKTnx8bZzsuhm7bsXw3S9qKlpCwXD9N29I19Zg+TfV+jJ1QiGHtx4iuZ4VuPnEdCdXxwknQg+JBNxMQ60RsOPojKWcKM3x2dYqtwlOWyKNBMDwS/+K3Xb4p7feDbhB2VSLk9UGVPRBfNue2KH579+NMrKt5Ykx1g4VN63hPBTpxglltUQhuRnguyd2h2Ik9k4feEjsDURSHHBTYgl8vbaN34nu2/757x1zNdsJqQwjqxGpKVnCIsI/ih2318MjVhJO4MLNeUNDMBbSoSmCKF2UQ5JBBbPhGvpxdE4NHNViOrdgUkkBNVSRwXNpNFbj0l77rvuo/4O8cZFrYqGWvjAzgBGxc+iWOtqs5XOZvbjgkwdkrBWVWHsl97uGVAWe00zYdMdsPeGKVDx4tmi3uOAW1O+H9jBFH744N1pSRI4Nc/LwMj2kxsOK6J8wQBl3h/kT7ClSpeSzQXF87OtELHVqFbwxmIILOGZEbsrq24xtslypKTVugMjcet9z8PP7497ZxCtMPQVFNejzuZLePgov0cF3Ycl5JHYfwx7fV/H/bZL2eqwdjtnHa6/KiynkpptkKlRpNeb8sndtqksF864o8HS7WtHV6Du3wswnXR0P9wq7e1RPiV4qqQ2jClIUOLtmeuIfQMRJudz2KHG4NfLhZj6fHKFcslP25mDfeS0p4HwmZ4PMvpyaCdM2/ESxTAk5DvcP6E1pjJombb0JlHAXqgCfZE3pYYr4/6b+TBXjoe6JFvgeslmmEPopUueT2UvQpiH4JWnLwewTMyYl+R7IqU/wTEfjXxYngbMXMkyhcIjD1gVgpmE/yW/zjdqIzr2+0d/0ufV9w/AJysFw==
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Initiates the authorization code flow. Validates the request and"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/oauth/authorize"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+redirects to login/consent if not authenticated.
+
+SECURITY: This endpoint validates the `redirect_uri` against the client's
+registered URIs to prevent open redirect attacks and authorization code theft.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./authorize-handler.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./authorize-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./authorize-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

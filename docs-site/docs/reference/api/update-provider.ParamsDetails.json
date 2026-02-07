@@ -1,0 +1,1 @@
+{"parameters":[{"name":"provider","in":"path","description":"Social provider (google, microsoft, apple)","required":true,"schema":{"type":"string"}}]}

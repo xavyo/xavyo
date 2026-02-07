@@ -1,0 +1,1 @@
+{"parameters":[{"name":"sp_id","in":"path","description":"Service Provider ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

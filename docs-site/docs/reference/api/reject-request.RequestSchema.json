@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to reject an access request.","required":["comments"],"properties":{"comments":{"type":"string","description":"Required comments explaining the rejection."}},"title":"RejectRequestRequest"}}},"required":true}}

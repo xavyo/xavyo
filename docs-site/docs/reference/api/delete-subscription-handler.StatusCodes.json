@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Subscription deleted"},"401":{"description":"Unauthorized"},"404":{"description":"Subscription not found"}}}

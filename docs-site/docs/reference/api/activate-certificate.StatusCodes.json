@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Certificate activated"},"401":{"description":"Not authenticated"},"403":{"description":"Not authorized"},"404":{"description":"Certificate not found"}}}

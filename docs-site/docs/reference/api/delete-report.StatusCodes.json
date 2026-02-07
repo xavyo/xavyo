@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Report deleted"},"400":{"description":"Cannot delete completed/generating report"},"401":{"description":"Unauthorized"},"404":{"description":"Report not found"},"500":{"description":"Internal server error"}}}

@@ -1,0 +1,1 @@
+{"parameters":[{"name":"step_id","in":"path","description":"Approval Step ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

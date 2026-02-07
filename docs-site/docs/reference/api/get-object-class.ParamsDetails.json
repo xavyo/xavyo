@@ -1,0 +1,1 @@
+{"parameters":[{"name":"id","in":"path","description":"Connector ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"object_class","in":"path","description":"Object class name","required":true,"schema":{"type":"string"}}]}

@@ -1,0 +1,1 @@
+{"parameters":[{"name":"audit_id","in":"path","description":"Audit record ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

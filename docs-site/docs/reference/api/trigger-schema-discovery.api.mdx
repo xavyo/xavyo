@@ -1,0 +1,70 @@
+---
+id: trigger-schema-discovery
+title: "Trigger schema discovery (async)."
+description: "Initiates schema discovery for a connector. Returns immediately with status."
+sidebar_label: "Trigger schema discovery (async)."
+hide_title: true
+hide_table_of_contents: true
+api: eJzFVU1v2zgQ/SvEnFqAlZwih1a3NMkCLoo2sF3sIWsUtDi22ZVIlRw5EQT998WQ8sfaQW5FfbAlej7em3kz7IHUJkDxCPNyi7USdyaUboe+g6UEjaH0piHjLBQwtYaMIgwiJFu9txVr54USpbMWS3I+EzOk1tsgTF2jZqeqE0+GtiKQojZk/9i9xfXkozDrk1gmCFV5VLoTxorGu43HEDKQ4Br0isFMNRRA3mw26H8kMD8OAUBCo7yqkdAzsx6sqhEKMBokGGbSKNrCOb3bPXoxvQMJHn+1xqOGgnyLElIaKHqgruFwgbyxG5Cwdr5WBAW0rdEwDMvkjIE+Od2xR+ksoSV+VE1TmTKyyH8GTtxfhnarn1jSBcKxRVzsfZvS0Syl4xqRoYpDvGgAwzCcM4sHoXE2YGAI7yfv+ef/mQ+q4P55Qq7k7yPVzaNIZiOsl2idmTCxQcL15PoS+7Gv1pFYu9ZqiLYfX+P5ggSBU9RIW8fya1ygKDXaQgH5Qfsh740e8kQ/36sSJAT0u70iW19BAVuipsjzypWq2rpAxYfJh8lFge5wh5VrarQkUgwY5GmIUOS50U32rHadyyxe1vjBO92W/HKIsGRAZesNdbEDqfkrVB79TcucDo3jHDAOAL8nI5Djw197+X/+exFLxAqYHQfg/lnVDTevH3j81i6GHvsZMYubh+kF5qlGS4Y68eDdzmj0bBVlEn1GAaoyCnCc8BRtgarmDlemRNbG8f9P8y/vrrIrkGfV2xjatqusdHUeQ4zfq8qt8loFQp9/md7ef53fc1zuYsI4ya6yCR+xGGplT1It0na6XJVvVOhs+TY7J3yyJf78ph07T/hMeVMpY5lkrFk/Kv4RjooHCUVcruPMSzjIfimBlc32fb9SAb/7ahj4+FfLu7p4XErYKW/UivXw2LMrP2so1qoK+EqV3szGRfZWnO3uF+GPh8ryDbFTVctvIOFf7NLlMCwHCVtUGn1Ekv64TfneLdj96Hix8ngmk8dNWWJDr9ouTxbJw7f5godpvCtqp9nHqye+hNRTAuki/zij8ayHStlNqzZsm2Ly5z9mo7jM
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Trigger schema discovery (async)."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/connectors/{id}/schema/discover"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Initiates schema discovery for a connector. Returns immediately with status.
+Returns 409 if discovery is already in progress.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./trigger-schema-discovery.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./trigger-schema-discovery.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./trigger-schema-discovery.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

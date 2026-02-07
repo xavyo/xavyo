@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Role template deleted"},"401":{"description":"Not authenticated"},"403":{"description":"Not authorized"},"404":{"description":"Template not found"},"409":{"description":"Cannot delete system template"}}}

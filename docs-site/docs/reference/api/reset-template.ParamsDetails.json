@@ -1,0 +1,1 @@
+{"parameters":[{"name":"template_type","in":"path","description":"Template type","required":true,"schema":{"type":"string"}},{"name":"locale","in":"query","description":"Locale (optional, defaults to \"en\").","required":false,"schema":{"type":"string","nullable":true}}]}

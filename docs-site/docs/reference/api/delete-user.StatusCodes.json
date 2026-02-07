@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"User deleted"},"401":{"description":"Not authenticated"},"404":{"description":"User not found"}}}

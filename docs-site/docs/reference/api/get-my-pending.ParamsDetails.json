@@ -1,0 +1,1 @@
+{"parameters":[{"name":"page","in":"query","description":"Page number (1-indexed)","required":false,"schema":{"type":"integer","format":"int64","nullable":true}},{"name":"per_page","in":"query","description":"Items per page (max 100)","required":false,"schema":{"type":"integer","format":"int64","nullable":true}}]}

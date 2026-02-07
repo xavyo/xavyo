@@ -1,0 +1,1 @@
+{"parameters":[{"name":"id","in":"path","description":"Approval Workflow ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

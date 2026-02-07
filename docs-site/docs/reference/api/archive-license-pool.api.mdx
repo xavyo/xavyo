@@ -1,0 +1,70 @@
+---
+id: archive-license-pool
+title: "Archive a license pool."
+description: "Archived pools preserve all data but cannot accept new assignments."
+sidebar_label: "Archive a license pool."
+hide_title: true
+hide_table_of_contents: true
+api: eJzVV91v2zYQ/1eIe2oBxXa6Dtj0lq7dkKFbjSbFHjLDOFNniw1FsiTl1DX0vw9H0V+RkeR1L4lEHe9+d/e7D28h4ipAeQd/2DV5g0aSuBAflSQTSPyFBlfUkIkwK6CiIL1yUVkDJVx5Was1VcJZq4NwngL5NQnUWlQYUSzaKCQaY6NAKclFYehBYAhqZVhlGP1rbmsVhAoi1iQ8Sds0ZCqqBDrnLcpaLK3PBja2FcYKbc2KvDBEVbLwgCaKaMU9kUvS2FYqCtd6ZwOFERRgHXlk1NcVlIA97rnufZyzdijAoceGInmOxhYMNgQlqAoKUOyuw1jD4xjs4sQ6xPV7KMDTt1Z5qqCMvqUCgqypQSi3EDeONYbolVlBAUvrG4xQQtuqCrpuxpeDsyZQYPk3kwn/e8Jg9oQhSmsiZ6ncAjqnlUz+jr8GvrUdorCLryTj0/7s0IxO3LrrY5LiU8CaTGU9FBBtRD2X6FCquIECUGsrMVI1l7Y1bArXqDQuNO1P2qi0+pGgzh15SelUtt6TkaxkobRWZsUflWWzu6QlNwqg7075fN9qle48oDd8p8JNgAJCxNjyg/SU4GCy7KrDy+7LYsMsd575ElWfhcduHEKoTKQV+eNMKhN/egPd0NWX3Xrk7RnOnGbrXS8vevlE/hwfIW2IInqU98qsOIFk2oaT11gTa50SZEyLifnkHUV+nhUQVdR0YEI2Me0RdUy0EBngrnxyjD4tU9U8za6bxMKE8z1J1aBmZDuL+Qi4EEyrU/j6KupOkvdUKXFSL6JqCLqTtD5ffke0Gwh3jxwZKhvgPSImY3oh6KcVZYY/S4tpkuOeSGZpvSTxUJMRuCdHqu6kuO+PO24stJX3c0MPqeDX9p7mqHUuqbk1enOGIR/2AHu7HC11lryDiJ8U87Nu7XoTS5WC+08lXjnyDRoy8WiuvBbWC2lNn9AoXi21xajM6vWxs0lB3zmz4BnnbhlRl7vdOV7k7vJi8Cn0Wi1JbqQm0V8/hoUyqvW+tSWE+zY/xDe1Vt/0ELpBD35Z0znqhC+urHN9+3DZtM3i1FhlW+Z0t58X50J50rdfgr07G47PeWpB17HE28nlcIp+MdjG2nr1gxIR307ePjNqeYlZ2tZk8V+H4mybNxnUnrDaHIZzV8DP50b5tYm8cGmR1iYvyHvrk1eBZOtTBu+2sCD05OcMGMq7GXfHhmLN8wGcDTGtLvwNxqv9CjfOpXWRVqfxVlXdOAPikZgM9ntO6zWUUMfoyvGYR52ubYjlL5NfJgMSv6c1aeu4xjJo6IpjFaEcj1XlRt9xvbEjQ8MRMPW2aiW/7DXMDg6nAdHP3d7tq+T1ngtsA/JOxe+9EO8J6eH3HUH+/Oc2BVKZpU3XM00SLnE1vR7guq7IRBU3YurtWlXkWSpNqnQnb1goE8/zbthruyVsjprZ0fd3Nx8vLkeXvG2cRGilYt0uRtI246Qi/11ouxg3GCL58cfr3z78ffOhrxgfeoyT0eVowkec9gbNkam8iz/q8aPHbm4Pe+L/aH3PyY/0PY6dRmVSC+KQbjP17+BA/cOS2JMfCijVURvlLsoU51vb7QIDffG66/j4W0uei25WwBq96ufw3RYqFfi5gnKJOtATQX31Oe/Jr8Xwp8FZP/IhGl7J1qhbfoMC7mnT//zoZl0BNWFFPoHpP1yljBxdGWz9J41i+umGK+I/B3LapQ==
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Archive a license pool."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/governance/license-pools/{id}/archive"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Archived pools preserve all data but cannot accept new assignments.
+This is the recommended approach for pools you no longer need but want to keep for audit purposes.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./archive-license-pool.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./archive-license-pool.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./archive-license-pool.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

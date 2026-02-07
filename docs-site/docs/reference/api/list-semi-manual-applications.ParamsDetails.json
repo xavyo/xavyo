@@ -1,0 +1,1 @@
+{"parameters":[{"name":"limit","in":"query","description":"Maximum results to return","required":false,"schema":{"type":"integer","format":"int64","nullable":true}},{"name":"offset","in":"query","description":"Results to skip","required":false,"schema":{"type":"integer","format":"int64","nullable":true}}]}

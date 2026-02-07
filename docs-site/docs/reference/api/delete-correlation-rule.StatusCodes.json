@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Correlation rule deleted"},"401":{"description":"Unauthorized"},"404":{"description":"Correlation rule not found"},"409":{"description":"Correlation rule is in use"},"500":{"description":"Internal server error"}}}

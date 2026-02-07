@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to dismiss a consolidation suggestion.","properties":{"reason":{"type":"string","nullable":true}},"title":"DismissConsolidationRequest"}}},"required":true}}

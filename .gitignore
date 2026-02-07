@@ -185,3 +185,7 @@ specs/
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+docs-site/node_modules/
+docs-site/build/
+docs-site/.docusaurus/
+docs-site/screenshot-*.png

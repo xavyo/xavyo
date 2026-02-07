@@ -1,0 +1,70 @@
+---
+id: scan-rule
+title: "Scan a specific rule for violations."
+description: "Detects all users who currently have both conflicting entitlements"
+sidebar_label: "Scan a specific rule for violations."
+hide_title: true
+hide_table_of_contents: true
+api: eJy9VE1vEzEQ/SvWnEDaZlMEEtpbIYCCEFQthUOJKseeZF289jKeDYTV/nc03u0HTcWRS7K2xzPvzXueHlhvE1SX8C7ukIIOBtWROo8L9cVFr9nFkGBVgMVkyLWyhgoWyGg4Ke296hJSUj/rqExHhIH9XtV6h2oduVYmho13hl3YKgzs2GODgdO3oINVhlAzJrW7qaUITSSb1CaS4hqbGRQQW6R8urRQQTI6XFHnEQpoNekGGUko9BB0g1CBs1CAE5yt5hoeghdyZ51HtVwojkryQQGEPzpHaKFi6rCAZGpsNFQ98L6VrInJhS0UsInUaIYKus5ZGIaVXE5tDAmTxD+bz+XvQVGjgzKxaT0yCj4TA2NgidRt653JDMvrJOH9Yfm4vkbDh2RyXG6XlBBeZxMYaV1u+FT+/hkMwzAU8Hx+fAj1IuiO60juN1rIQc8f4RMXSkRQIbLaxC7k0BePUV8GFmd5lZB2SAqJIoGUT2g6crzP4q1RE9KV1IbqciVtbZDrKJq3MXGWW86g3N56tUzRHgmOVPbODuUk5lhpNEVHHiqomduqLH002tcxcfVy/nJ+0M0F7tDHVhw6oYWhuJ8iVWXpbDv7pXf7OAt4KMgpRduZ7OWbDKs7plmu0SYj35NM91ZlqQGT+WQ9BkExfby9sd77r59zB13YxHx90jnjUienywNcS5uf316dUtw5iyRR2Tf5zuRIbbIjp4c0ZvuMuhFxvTMo1rk7f3X+4eh4dgzFgw5tHdfdemZiU+YU0+/ax3XZ6MRI5Yfl6zcfz99IXlFqxDifHc/msiV6NzrcK5Xfj1apReM2zozeE/S3oyPNHnLu7x7Zf55Yk5qMv7hsvXZBSOUe9ZOJL+HOxCL4jY2hgCrPr+zkVQFiVgnv+7VOeEF+GGT7R4ck72ZVwE6T02uR/7IH65J8W6g22if8R0eenE0T76l6fCI+SmLa1GEPUtl3soICvuN+nLzDaiigRm2RMqDx4MQYbPnelYOZ99d7P/10Lv7+AwQPSP4=
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Scan a specific rule for violations."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/governance/sod-rules/{id}/scan"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Detects all users who currently have both conflicting entitlements
+and creates violation records for them.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./scan-rule.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./scan-rule.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./scan-rule.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

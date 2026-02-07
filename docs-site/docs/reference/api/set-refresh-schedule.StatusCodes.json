@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Schedule updated","content":{"application/json":{"schema":{"type":"object","description":"Schema for RefreshScheduleResponse.","title":"RefreshScheduleResponse"}}}},"400":{"description":"Invalid schedule configuration"}}}

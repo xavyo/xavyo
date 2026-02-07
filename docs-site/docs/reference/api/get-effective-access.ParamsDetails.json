@@ -1,0 +1,1 @@
+{"parameters":[{"name":"user_id","in":"path","description":"User ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"application_id","in":"query","description":"Optional filter by application ID.","required":false,"schema":{"type":"string","format":"uuid","nullable":true}}]}

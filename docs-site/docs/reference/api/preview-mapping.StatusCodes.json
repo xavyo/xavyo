@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Preview result","content":{"application/json":{"schema":{"type":"object","description":"Schema for PreviewMappingResponse.","title":"PreviewMappingResponse"}}}},"400":{"description":"Invalid request"},"404":{"description":"Mapping not found"}}}

@@ -1,0 +1,1 @@
+{"parameters":[{"name":"id","in":"path","description":"Detection rule ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

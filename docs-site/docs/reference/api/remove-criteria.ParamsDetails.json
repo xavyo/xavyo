@@ -1,0 +1,1 @@
+{"parameters":[{"name":"id","in":"path","description":"Meta-role ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"criteria_id","in":"path","description":"Criteria ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

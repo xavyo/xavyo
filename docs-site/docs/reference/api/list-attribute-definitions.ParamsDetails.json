@@ -1,0 +1,1 @@
+{"parameters":[{"name":"is_active","in":"query","description":"Filter by active status.","required":false,"schema":{"type":"boolean","nullable":true}},{"name":"data_type","in":"query","description":"Filter by data type (string, number, boolean, date, json).","required":false,"schema":{"type":"string","nullable":true}}]}

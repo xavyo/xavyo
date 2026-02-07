@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Logout request payload.","required":["refresh_token"],"properties":{"refresh_token":{"type":"string","description":"Refresh token to invalidate."}},"title":"LogoutRequest"}}},"required":true}}

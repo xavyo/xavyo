@@ -1,0 +1,63 @@
+---
+id: startupz-handler
+title: "Startup probe handler (`GET /startupz`)."
+description: "Returns 503 during initialization and 200 once startup is complete."
+sidebar_label: "Startup probe handler (`GET /startupz`)."
+hide_title: true
+hide_table_of_contents: true
+api: eJztVdtO3DAQ/RVrnkAySbhURXmjLSAq1CKg6gO7AicZNqaObezJlmUVqR/RL+yXVJPNslwqVarUh0p9ycWZy5lzZiZzIDWJkF/AxyJimKpCG00zGEuoMJZBe9LOQg6nSG2wUbzKtkXVBm0nQltNWhl9r9hGKFuJrSwTzpYoIqlArRc6itI13iBhMrLntY58pISzuEG6QTFRhPnC52pwulx6XLFtRBLkBIUWpaBax5FFW3mnLQllvqpZFGHAxtnXDk43smxbCr5v7qwnIMF5DD3GowpyGLLcX9bKVgYDSAgYvbMRI+Rz2Moyvj0t/2yoZwkNJJTOElpiW+W90WWfIr2J7DCHWNbYKH6imUfIwRU3WBI8J3YZ2QdXoFgiEWsH2esd8ePbd7EoaD0Z2ZH9rQryDyXoM/Vumh7zKfnd4hSDCHylmPR83bY6YMV9E0lRG7lhfGCiSS9oHM5X9UdivNB1EkiTwVXtp0PR0HX89VW2/SsBtDGLmrjq1v9X4G8p0ElokGrHwzJB5ssrqiGHdDk6IIGXBQbeHHNog4EcaiKfp6lxpTK1i5TvZrvZC7Lf4RSN8w1aEosY0MnHIWKeprryyZ2azlxi8aVeJ8FVbdnvnGWEMQMq26BpdsaqLwgoUAUMey2DfyCBczD+3gzywQjk8HDgQqMIcnj/+bxnSttr17sPjPW4xN7J0QtcRxVa0jQTJ8FNdYWBrcS1C6L3GRpWlX3DWtWsop2jaqCTYHSJrMLq+5uz443NZBPkM4Ymmuq2SErXpH2I4VoYV6SNioQhPT56u//hbJ/jslILjFmymWR85F2kRtlHqZ6OwbAcxdrV4f65eFD+ql+oT+qer+bwn/5LDP1BeEepN0pbpqlnfT4MwMXDv4OHjXucz+bzQkX8FEzX8fFti2EG+cVYwlQFrQrumotxJ6FGVWHoJ+YLziCHvbJEz/09Vabl3C+2GDf2wywe7nNH/gQ/rasY
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Startup probe handler (`GET /startupz`)."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/startupz"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns 503 during initialization and 200 once startup is complete.
+This is a one-time gate: once `startup_complete` is set to true, this
+endpoint always returns 200 (FR-003, FR-014).
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./startupz-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./startupz-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

@@ -1,0 +1,1 @@
+{"parameters":[{"name":"locale","in":"query","description":"Filter by locale (optional, defaults to \"en\").","required":false,"schema":{"type":"string","nullable":true}}]}

@@ -1,0 +1,1 @@
+{"parameters":[{"name":"ticket_id","in":"path","description":"Ticket ID to sync","required":true,"schema":{"type":"string","format":"uuid"}}]}

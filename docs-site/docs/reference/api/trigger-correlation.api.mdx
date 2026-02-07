@@ -1,0 +1,71 @@
+---
+id: trigger-correlation
+title: "Trigger correlation evaluation for a connector's uncorrelated accounts."
+description: "Accepts an optional list of account IDs to evaluate. If omitted, all"
+sidebar_label: "Trigger correlation evaluation for a connector's uncorrelated accounts."
+hide_title: true
+hide_table_of_contents: true
+api: eJzdV8Fu2zgQ/RViLtsCsuWkidv1rU2zCxdFGyQuekgCg6ZGNlOJVMiRW6/hf18MKduK7O0uipw2B8eSqTfDN28eR2sgOfcwuoU/7RKdkUah6IkL6xwWkrQ14tLMtUG4TyBDr5yu+C6M4K1SWJEX0ggb7slCFNqTsLmQStnakBi/94KswKUsaknYF+Nc2FITYZYIWRR3pjaqiYXZ9jEvcusELVAoawwqsk5IhzuYrC+ukWpnvJDidHB6Z2IumAmHvrLGo/iuaSGkeLAzoTM0pHONLuI6qb5pMxeVs3OH3vchAVuhC9sdZzACcno+RzdVexoggUo6WSKhY77WYGSJMIJdilOdQQKaqakkLaDL18VuL+P3kIDDx1o7zGBErsYEvFpgKWG0BlpVDOzJaTOHBHLrSkkwgrrWGWw29/Fh9PTOZit+QllDaIi/yqoqtAoppw+eA68Poe3sARUdZHgdUbliDQOixUAgT+5LwrRVjokjjT7EjuWb6sy3gknn5IqZISz9f9hfN6vPXXH5CpXOtfpHld2ZjszEr6kMEjB1UchZgbFKm00CpIkvYRIZanVKQx9seNnT8oYbUZmBgtPBKf/rCmTPNetWNqKG5PkK3HQH40ltuAtUJ6onSTV3dfakQfb7uYUHO4tij2shAbIki+mW2CgMhd5j1r4pa7JTZU2uXRm29Vhjjdk0t27qcKnxOzNup6Ukxf2DzlnnYxxHjEVsQx3RPQXdc6AN4RxdW2Da0PDsgJVPdTlD17ItLxi0twPtsyiVLasCmyx+puJMEvZIl3gQ6OsCTRAc87zDEy90LnJttF9g9vKI6HZEPM/eaCFJoAlX6DATET1ssqnsvzZpN8wXox9r7LhtQNyV83mSD7ZurAiYIre1idU5orfnCbgDFt6KXMZNHer2eYJF3OBLpTS1LESED0FbTfAM8mvQtsjcxkdQOwZVO4eG2jbxAvvzfiLuwNWG7eQO+GKn7XiZS13w95chWscrfoG5CSMIc0TarUMA2mbdstYPdnYTct+aIfv1JoGzweDQksdmKQvNY0Vj7bzu5HDdFyNrWlin/8Jwgp0fByOesArh0S3Rxb4LaXpUtdO0CnPFDKVDN2VAGN3e83FfIi0sDyaV9RQmEf4N0vluZkt3Z5hP1+2RZJO2DD7dssOeGpKIo0ztChjBgqgapWlhlSwW1tPozeDN4ID897jEwlYlCyFiwCZpQ/hRmuqs6v+Qy5XtGzw8hq6czWoVTpwtwv2ehBs+zKK3RyreBiZ2MuEY0MxLfB0XQdJ8+WOrnQ9fJ4FcPiSv9/PS5Q/J4jyYV27hVS7fnOfDs97565PXvbPz4Wlv9ipXvVP1+/BVPhzKXA7hfsMzXm5DQo26wk7F26vxwU7HwQxpJa6cXeoMHa8K/R2eaU52qUJLNwNlRJugLFlJhVbIIt3//u7mY++kfwJJh/O5pkU96ytbpgGi+ZwVdpaW0hO69OP44vLTzSXjcu1jjoP+SX8QPNR6KqVphZocmQIbCR0ZCH/zx+esfpeW1sD6/3qLaBRK+IPSqpDaMK2hSuumZ29h37Ox+k3XQgKjzqvE07ePXeveJ8DdyVjr9Ux6/OKKzYZvP9bo2EPuE1hKp+MIcbuGTHv+nsEol4XHn1TjxXUz5r0UndeVo1vbTviG53vOj68ggW+46r4ZbbhxFigzdCGnuOQiRu5NGGgPcTDjssPEJ2KNfrq2bZhXn28mbA3Ni1JpM37GSZ40+TOkG4UXHCfcW0MhzbyWc14bMfnvb841UYM=
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Trigger correlation evaluation for a connector's uncorrelated accounts."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/governance/connectors/{connector_id}/correlation/evaluate"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Accepts an optional list of account IDs to evaluate. If omitted, all
+uncorrelated accounts for the connector are evaluated. Returns a 202
+Accepted response with a job identifier for tracking progress.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./trigger-correlation.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./trigger-correlation.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./trigger-correlation.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

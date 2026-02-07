@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Domain removed"},"401":{"description":"Not authenticated"},"403":{"description":"Not authorized"},"404":{"description":"Domain or identity provider not found"}}}

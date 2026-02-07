@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Webhook processed successfully","content":{"application/json":{"schema":{"type":"object","description":"Schema for WebhookCallbackResponse.","title":"WebhookCallbackResponse"}}}},"401":{"description":"Invalid or missing webhook secret"},"404":{"description":"Configuration not found"},"500":{"description":"Internal server error"}}}

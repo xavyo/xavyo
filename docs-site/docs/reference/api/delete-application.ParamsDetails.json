@@ -1,0 +1,1 @@
+{"parameters":[{"name":"id","in":"path","description":"Application ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

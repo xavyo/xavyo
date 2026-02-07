@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Alert deleted"},"401":{"description":"Unauthorized"},"404":{"description":"Alert not found"},"500":{"description":"Internal server error"}}}

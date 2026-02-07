@@ -2,6 +2,9 @@
 
 > This file contains the full documentation for all 32 xavyo crates.
 > Generated from individual CRATE.md files. Use llms.txt for navigation.
+>
+> For functional documentation (guides, concepts, API reference), see the
+> Docusaurus site in `docs-site/` (866 pages). Run: `cd docs-site && npm run serve`
 
 ## Maturity Legend
 

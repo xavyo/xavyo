@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to reject an NHI request.","required":["reason"],"properties":{"reason":{"type":"string","description":"Reason for rejection."}},"title":"RejectNhiRequestRequest"}}},"required":true}}

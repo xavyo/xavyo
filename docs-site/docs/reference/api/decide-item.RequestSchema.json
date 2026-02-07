@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to make a certification decision.","required":["decision"],"properties":{"comment":{"type":"string","nullable":true},"decision":{"type":"string"}},"title":"DecisionRequest"}}},"required":true}}

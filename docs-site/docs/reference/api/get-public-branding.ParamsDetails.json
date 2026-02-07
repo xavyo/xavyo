@@ -1,0 +1,1 @@
+{"parameters":[{"name":"tenant_slug","in":"path","description":"Tenant slug","required":true,"schema":{"type":"string"}}]}

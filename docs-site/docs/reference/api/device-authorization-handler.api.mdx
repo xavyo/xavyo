@@ -1,0 +1,73 @@
+---
+id: device-authorization-handler
+title: "Request a device authorization code."
+description: "POST /oauth/device/code"
+sidebar_label: "Request a device authorization code."
+hide_title: true
+hide_table_of_contents: true
+api: eJzdVt9PGzkQ/leseQJpyQauqtC+UUolTtwVQap7ABQce5J167Vd27shjfK/n8brkITQcjrd0/EAy3g8v79vvITIZwGqO/h81sb6hH3ETglk51YiPBQgMQivXFTWQAXXn29HrLS8jXUpk2IprMR7c29GtQpMBRZrZFPlQ2QhomPKJEmvzEiZTbWdD9ioRia0QhNZQCMDUzHcm8deNFbykXEjmcfvLYaIkgVhHYYiSwWqDgPj7LG3PCbLj+xgaj1zVmtlZof3hnQf24B+fRwtkyo4zRcs2hQYnR4OoADr0HNK81JCBdkqJWq9+pEOxjU3UqOHAnJYH6xcQLUEYU1EE+mTO6eVSPrl10BFW0IQNTacvuLCIVRgJ19RRHhZ3ZveKqMkflLpQXauPEpq2nO5qFfOUxJRYUhBPR9tHIfolZntOU6tX3dDSTRRTRX6AawKSHV/28St4wKPAjruObVLqxCZne41kBIwrdZ8ohGq6FtcrQqIKtK/0A/f2XbVc1FgRXqb1NNNEgRnTegzPhkO6c9uYHmedzrJ1teg+O9611v8VfPYwc2nc3b6/uT08GUft6YYCngeWSigQ6+mOapx6xUUgE9OeQxjZaAAZSL6juv9Adi2+Xb/UHiMGaDWs2i/oVlDiR1Iy4yN2+DJwFnthLNxQ2HNElam1jc89qL3715zbAn+rYlKv4Bztpy8POf5lo/fTvZ8/KGMatqGhexrgnGOW+nlIe0dbYr/ZtGIJNkup9DtVMCJt3P6RhP9Ihne6+Sb9r/cXLF5jb6nKRZq22rJOhVUJF9IJWE9Lbxifyxs4zTGf5BIcqSIAygj5/FoqrRGyQ5sUuGaCWs6NAqNwMN/AeKMt1WC8bvXgHppOq7VM+VD0jv+uZ71rDVrWKPM9AVkv8FYW6JxZwNB1fFYQwX7iIQCAvoOPW3AJbReQwV1jK4qS20F17UNsTodng73SvYRO9TWNf0CIxuwKrZNhKoslXSDJ94t7MDgPmdceytbkQhpbeGBAhKtV3FxS8zTI3mC3KOnim61knxQ/EkNqqwERf74tIbE73+NUlGI0W42e+viidN0vNgUmwHJvL8WJARObfKf+5wSY2fXl3uJXaYVEhfs2ttOSfSklVCR7mTW5SKxruHNxtoIeUO+tBJI87I5/3B7dXQ8OCZ23CnxTMW6nQyEbcpkIv+eaDspGx4i+vLq8vziz9uLjJHQxzgcHA+GJKIZabjZcrXew3z9bNldHus9vJPz1iPg//xKyrMX8SmWTnNlEmP6xMo9yu4gJZ7qQz5Ts/u3JIGJFJbLCQ/4xevVisTfW/QLqO4eCui4Vz2p3D2sCqiRS/QJmt9wkQg31fhoRGGQum4pnL3FTUjsb5wJgS7+UvdhizCodQSh/LBr0hoAz+e0r/kcKkhPRbqdkJlkS9DczFo+I93eJv38DWIW+yw=
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Request a device authorization code."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/oauth/device/code"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+POST /oauth/device/code
+
+This is the first step in the device code flow. The client sends its
+`client_id` and requested scopes, and receives a `device_code` (for polling)
+and `user_code` (to display to the user).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./device-authorization-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./device-authorization-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

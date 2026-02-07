@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to deactivate a persona.","required":["reason"],"properties":{"reason":{"type":"string","description":"Reason for deactivation (5-1000 characters)."}},"title":"DeactivatePersonaRequest"}}},"required":true}}

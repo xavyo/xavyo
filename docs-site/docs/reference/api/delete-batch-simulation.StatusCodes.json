@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Simulation deleted"},"401":{"description":"Unauthorized"},"404":{"description":"Simulation not found"},"500":{"description":"Internal server error"}}}

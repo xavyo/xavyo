@@ -1,0 +1,1 @@
+{"parameters":[{"name":"SAMLRequest","in":"query","required":true,"schema":{"type":"string"}},{"name":"RelayState","in":"query","required":false,"schema":{"type":"string","nullable":true}},{"name":"SigAlg","in":"query","required":false,"schema":{"type":"string","nullable":true}},{"name":"Signature","in":"query","required":false,"schema":{"type":"string","nullable":true}}]}

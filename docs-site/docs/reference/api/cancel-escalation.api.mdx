@@ -1,0 +1,76 @@
+---
+id: cancel-escalation
+title: "Cancel pending escalation for an access request."
+description: "Stops the escalation timer but keeps the current assignee (the escalation"
+sidebar_label: "Cancel pending escalation for an access request."
+hide_title: true
+hide_table_of_contents: true
+api: eJztVktv20YQ/iuLOdkALdppCgS8uYlbqEhaI3bggy0YK3IkbrTcZWZnZasC/3sxS+plCe2xl14kPubxzcw3H3cNrOcBikf4zS+RnHYlqgv14Gkxs/5F3YRSW83GO5hkUGEoybTptoA79m1QXKPCrZVi0yCpaWS1QBxel5EIHSsdgpk7RHV26PTkWNMcWb3UXhGWaJZYJc8XTwtlGJvzkbqvURH+iBhYETbauKA0K8Nhk+DJ7QGxuESrZp6UjpVh1UZqfcAwenJP7r42QZmgYsBZtOqlRlc8uQt17RS+svTBKlwK5kYvMOwXGJ3DEkPQtBKP+1P1OcQqqMYTpn6oF8O1j6xmkbhGOij9Qn3RLmqrjGMkySlZTFAyDzKVcfPUCh3ZN5pNqVryAgAy8C1SCjOuoIBShmefd8Ehg1aTbpCRZMZrcLpBKGBo47OpIAMjs2w11/B2wNel5FFfh6aPP0GWXA1hBQVTxAxCWWOjoVgDr1qJHZiMm0MGM0+NZiggRlNB103EObTeBQxi/+7yUv4OU+74pvpyLFYqxARkFq1dQQald4yOxVm3rTVlss+/B4mwPkbkp9+x5KPqvg5gEkf6ZPtz3vZ2dFD1IwxopLmES+NjeE5cE2Q9EZ43ROgb3Ahb5igL1JKEZdN34JT5vzbybRlCwBiQ0vIMEe1K1TocbpA6W2ArHN3S9HwE3Q7dicSHib70hqp/Ot3wkjBEyynUm37sIgq150j7tRjHP707WczRDnOtWb0I8JLNEtUUZ7JZAz+GGXXZdjC7vFPvLWp3lOahxrSHSZz2wqQsO7aNoOsyYMNWgn1MhjuCbvgDXSdm70/RebM6Mg3nWU0R3aZArCC5XR27fXM6cu3J/LUxen9sNGznRhIl/MxHlxx+PgVm7AZlC6IzpJDIUyoxYBnJ8CppxBQ1IT0LAigeJ7K3DXLtRWJaHzipiryDfL79ZuQ6obkY0IR8vdOYLu97fHGgTD2IXpYiWSigZm6LPLe+1Lb2gYsPlx8uj2b3STjh20YEt48BXbYfIhR5bqp29KqXKz9yeLz5t+SrWKaBbyJMdk24E/3oF7RvxXXqxJZUkgMG4UskS0aQDRe/bhj++8N9aq5xM5/cBx4lXOr6dnyEa1yJ+vNK3ZJfmgpJrJI8JZ9B+nSZpG+Q8j7aPepG5m5NiULJ3ftf7j5fXI2uIHvTobnhOk5HpW/yFGL4nVo/zRsdGCn/PP5488fdjcSVSfUYL0dXo8u07D5wo91eqn5BVIsufbT29jh9hZ3SB4wdva1/vVP2/88W//nZYmA74yvnrdXGydATh9bD/j/Cbv8hgzcKABkUB+eMYxGYZCB7LpHW66kO+I1s18njHxFJ1GiSwVKT0VPZnMc1VCbIdQXFTNuA/0Cgs6/DJ/tcnTrGnKxueKidnDKW2ka5gwwWuDo8NHWTLoMadYWUYPUGkqflPdej08mBlt7+eScC8TepKBf3
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Cancel pending escalation for an access request."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/governance/access-requests/{request_id}/cancel-escalation"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Stops the escalation timer but keeps the current assignee (the escalation
+target who received the work item). The request remains at its current
+escalation level for audit purposes.
+
+This is useful when:
+- An external event makes escalation unnecessary
+- The current assignee needs more time without further escalation
+- Manual intervention is overriding the automatic process
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./cancel-escalation.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./cancel-escalation.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./cancel-escalation.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

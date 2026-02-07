@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"User deactivated"},"400":{"description":"Invalid user ID format"},"401":{"description":"Not authenticated"},"403":{"description":"Not authorized"},"404":{"description":"User not found"}}}

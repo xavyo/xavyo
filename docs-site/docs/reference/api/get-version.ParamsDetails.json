@@ -1,0 +1,1 @@
+{"parameters":[{"name":"template_id","in":"path","description":"Template ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"version_id","in":"path","description":"Version ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

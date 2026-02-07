@@ -1,0 +1,1 @@
+{"parameters":[{"name":"group_id","in":"path","description":"Peer group ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

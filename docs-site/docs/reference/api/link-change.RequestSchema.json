@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to manually link a change.","required":["user_id"],"properties":{"user_id":{"type":"string","format":"uuid"}},"title":"LinkChangeRequest"}}},"required":true}}

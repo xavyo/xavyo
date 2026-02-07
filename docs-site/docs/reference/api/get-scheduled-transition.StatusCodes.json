@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Scheduled transition details","content":{"application/json":{"schema":{"type":"object","description":"Schema for ScheduledTransitionResponse.","title":"ScheduledTransitionResponse"}}}},"401":{"description":"Unauthorized"},"404":{"description":"Scheduled transition not found"},"500":{"description":"Internal server error"}}}

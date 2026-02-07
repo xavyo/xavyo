@@ -1,0 +1,1 @@
+{"parameters":[{"name":"result_id","in":"path","description":"Result ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

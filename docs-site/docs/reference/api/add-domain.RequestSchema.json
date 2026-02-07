@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to add a domain to an identity provider.","required":["domain"],"properties":{"domain":{"type":"string"},"priority":{"type":"integer","format":"int32"}},"title":"CreateDomainRequest"}}},"required":true}}

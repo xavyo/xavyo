@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Expired reports deleted","content":{"application/json":{"schema":{"type":"object","description":"Response for cleanup operation.","required":["deleted_count"],"properties":{"deleted_count":{"type":"integer","format":"int64"}},"title":"CleanupResponse"}}}},"401":{"description":"Unauthorized"},"500":{"description":"Internal server error"}}}

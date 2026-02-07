@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Logout successful"},"400":{"description":"Missing refresh token"}}}

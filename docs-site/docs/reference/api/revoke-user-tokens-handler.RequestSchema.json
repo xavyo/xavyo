@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","required":["user_id"],"properties":{"reason":{"type":"string","description":"Optional reason for revocation.","nullable":true},"user_id":{"type":"string","format":"uuid","description":"The user ID whose tokens should be revoked."}},"title":"RevokeUserTokensRequest"}}},"required":true}}

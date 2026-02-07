@@ -1,0 +1,1 @@
+{"parameters":[{"name":"offset","in":"query","required":false,"schema":{"type":"integer","format":"int64"}},{"name":"limit","in":"query","required":false,"schema":{"type":"integer","format":"int64"}},{"name":"is_enabled","in":"query","description":"Filter by enabled status.","required":false,"schema":{"type":"boolean","nullable":true}}]}

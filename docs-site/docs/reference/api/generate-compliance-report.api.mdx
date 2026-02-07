@@ -1,0 +1,72 @@
+---
+id: generate-compliance-report
+title: "Generate a license compliance report."
+description: "Produces a point-in-time compliance snapshot covering pool utilization,"
+sidebar_label: "Generate a license compliance report."
+hide_title: true
+hide_table_of_contents: true
+api: eJzlVcFu4zYQ/RVizrLkFC2w0C2bpgsv0k0QZ9GDYwRjaixxS5FcknLiFfTvxVCK7Y3bBdprfTBsaubNezPzqB4i1gHKFXywO/IGjSQxEzdKkgkkfkeDNbVkIqwzqChIr1xU1kAJd95WnaQgUDirTJwpM4uqJSFt67RKSMGgC42NQjK6MrVw1mrRRaXVN2Sg7NFgCKo2XOS71IixC5mgF6d8ChXP6I0ydcgEmkpgV6koQte26BWF/NFcGmETO9Ti4/L2k9jYai8kGmHQe/ssYkPCk7M+imhFcCTVVsnEKWRiR6ayPmSPxnqBosJIwqOpKYcMrKORxaKCEmoy/JeejoSfRmDIwNPXjkJ8b6s9lP2brt2+EtwqHckHsbU+8TqRfkCS1kTufdkDOqeVTAyKL4GhegiyoRbTU61vt1Cueoh7R1CC3XwhyRDfV1+mjFTz6lDvPpW7H1mz1qiiZpB/CIFhnYHptMYNh0Xf0TAMo27lqYJyizpQOgnOmkCBOf40n5+34+qtavHa2urf6P/Pqn8kF4Yk6+f5xTnvzwa72FivvlEFQwa//J24hYlsKS0C+R15Qd5bD4wZSHZexX0a2YbQk39iQChXa+5uS7GxvGjOBtbjkJ9BUR9MWujRorOxbaE47g8wPhcMCb7zGkpoYnRlUWgrUTc2xPLd/N38rFO/0o60dcmLIwYM2SlEKItCVS5/wd3e5obOmz1eC8mvrwjro+A0inEfRtmXSfVhglyD+acwKKcgyKYfv1nfYoQSPv7xkBrJq3B/9Nv1C7aOh9kPGSiztQl6mm/iLC7vFmecFxWZqOJe3Hm7UxV5jkr7knKmTUSZNtFge0R7IGx5/tM0Tp6/X97MLvILyN50r1ax6Ta5tG2RIKbvjbabosUQyRc3i6vrT8trxuUpjhzn+UU+5yNeiRbNSakPk2UEionH+W2SvxXdH931P7vKp1WL9BILp1EZ7moaUj8ZbQVHo8FhuK9WS+twMNs6A/YTJ/X9BgN99noY+PhrR54dvs5gh16Nt+VqPWTQEFbkkzv/pH26etIoZg9MjcN1xxTPLj0245hxKSW5+MPY03vk7nb5wC6a3kmtrTjH4zO/r/AZSkjvOM5O5kxnPWg0dYc1x46Y/PkLdx/oGA==
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Generate a license compliance report."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/governance/license-reports/compliance"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Produces a point-in-time compliance snapshot covering pool utilization,
+assignment compliance status, expiration warnings, and audit summaries.
+An optional JSON body can narrow the report to specific pools, vendors,
+or a date range.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./generate-compliance-report.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./generate-compliance-report.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

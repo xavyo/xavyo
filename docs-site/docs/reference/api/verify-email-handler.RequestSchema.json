@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Verify email request payload.","required":["token"],"properties":{"token":{"type":"string","description":"Email verification token from email."}},"title":"VerifyEmailRequest"}}},"required":true}}

@@ -1,0 +1,1 @@
+{"parameters":[{"name":"limit","in":"query","required":false,"schema":{"type":"integer","format":"int32"}},{"name":"offset","in":"query","required":false,"schema":{"type":"integer","format":"int32"}},{"name":"enabled","in":"query","required":false,"schema":{"type":"boolean","nullable":true}}]}

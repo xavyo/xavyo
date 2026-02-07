@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to simulate a policy against user attributes.","required":["attributes"],"properties":{"attributes":{"description":"User attributes to test against (e.g., {\"department\": \"Engineering\", \"location\": \"US\"})."}},"title":"SimulatePolicyRequest"}}},"required":true}}

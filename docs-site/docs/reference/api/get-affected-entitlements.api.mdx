@@ -1,0 +1,70 @@
+---
+id: get-affected-entitlements
+title: "Preview entitlements affected by a transition."
+description: "Returns a list of entitlements that would be affected (paused or revoked)"
+sidebar_label: "Preview entitlements affected by a transition."
+hide_title: true
+hide_table_of_contents: true
+api: eJzNVVGP2zYM/isCn1rAjXNFBxR+u7XXIkWxHXpX7OEWHGSJjtXakivR6WWG//tA2Ymd83UDupe9JJZN8iM/fqQ6ILkLkN3BDUlCceulDYaMswG2CWgMypuGz5DBJ6TW2yCkqEwg4QqBlgxVWKOlIKiUJL67ttIiRyGLAhWhFs8a2QbUwnnhce++on7+pzWFoBJFaFCZwqAWdAIWJgh8QNWys7PRzuVfUNEKEnANeslmGw0Z7JDuj0D382QggUZ6WSOh5/I6sLJGyGDCuTcaEjBcWCOphMfVTlSIzVtIwOO31njUkJFvMYGgSqwlZB3QoeHQgbyxO0igcL6WBBm0rdHQ98kJfajj35B/j1b/FXXLzqFxNmBg+5frNf+dQ10eu3TWycbj3uB3SEA5S2iJHWXTVEZF7tMvgb27ZTZDgYuKbqKdKJwXUWdH2KsZKnc3ntj+R0bQ932fwKv1xbKWz1a2VDpv/kIN0ejV0mjWVetIFK610fiXp9jZWEJvZSUC+j16gd47zw2FgKr1hg5RWjlKj/6e0SG72zLzNVLpRoVGLfInSHduzwGtwrQyBaqDqjCdJBnS7kyffXoU94t5f9LupKMeOBdOblB56yvIoCRqsjStnJJV6QJlr9ev14umvMU9Vq7hkGOBwFKdQoQsTY1uVg9yf3Ari8u+XnunWxXZPEbYTuTErg/iGyi6jAydxMIYMEqaz4MRJOPDu6OgP/xxG0k3tnDRfVRJzEtcXm8WeW105Osgrr3bG42eraL8os8obKmisMfZHKLdoqxZD5VRaAPOvv968/HFxeoCkkcM7QyVbb5Srk5jiPE3r1ye1jIQ+vTj5s3VbzdXHJc7NeS4Xl2s1vyqcYFqaWdQ18P8nQ/laaHmByFn+3L1uPpumtr/xcoeu034QGlTSWO56MhhNw7GHUyDAcz9OBrsPLuQEl6C5+v7yflgw2nTbhPgGWCUrstlwM++6nt+/a1FzxO8TWAvvZE5q+quA20CP2vIClkF/Ad6n30a1/Nz8fi6eLLq8aW0B2DMquUTJPAVD4u7iWfxpzKZXx8/kcXEXL/tEyhRavSRl+H7pVLY0MxzcTGcLcD3Vzy8fwP+nO+V
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Preview entitlements affected by a transition."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/governance/lifecycle/transitions/{transition_id}/affected-entitlements/{object_id}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns a list of entitlements that would be affected (paused or revoked)
+if the specified transition is executed on the object.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-affected-entitlements.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-affected-entitlements.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-affected-entitlements.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

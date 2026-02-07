@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"SoD rule deleted"},"401":{"description":"Unauthorized"},"404":{"description":"SoD rule not found"},"500":{"description":"Internal server error"}}}

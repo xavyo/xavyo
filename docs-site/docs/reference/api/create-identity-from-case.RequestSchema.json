@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to create a new identity from an unmatched correlation case.","properties":{"reason":{"type":"string","description":"Optional reason for creating a new identity.","nullable":true}},"title":"CreateIdentityFromCaseRequest"}}},"required":true}}

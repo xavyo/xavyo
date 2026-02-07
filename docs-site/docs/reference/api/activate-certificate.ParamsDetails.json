@@ -1,0 +1,1 @@
+{"parameters":[{"name":"cert_id","in":"path","description":"Certificate ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

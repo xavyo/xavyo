@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to reject all candidates for a correlation case.","properties":{"reason":{"type":"string","description":"Optional reason for the rejection.","nullable":true}},"title":"RejectCaseRequest"}}},"required":true}}

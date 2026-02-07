@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"List of SCIM users"},"401":{"description":"Not authenticated"}}}

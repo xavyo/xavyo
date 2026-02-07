@@ -1,0 +1,1 @@
+{"parameters":[{"name":"provider","in":"path","description":"Social provider to disable","required":true,"schema":{"type":"string"}}]}

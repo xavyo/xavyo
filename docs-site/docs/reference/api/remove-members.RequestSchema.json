@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to modify group members.","required":["member_ids"],"properties":{"member_ids":{"type":"array","items":{"type":"string","format":"uuid"},"description":"Member user IDs to add or remove."}},"title":"ModifyMembersRequest"}}},"required":true}}

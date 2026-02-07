@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Cached schema","content":{"application/json":{"schema":{"type":"object","description":"Schema for SchemaResponse.","title":"SchemaResponse"}}}},"404":{"description":"Schema not found"}}}

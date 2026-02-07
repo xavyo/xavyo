@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"IdP-initiated SSO request","properties":{"relay_state":{"type":"string","nullable":true}},"title":"InitiateSsoRequest"}}},"required":true}}

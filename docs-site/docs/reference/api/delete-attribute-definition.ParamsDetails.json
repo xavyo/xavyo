@@ -1,0 +1,1 @@
+{"parameters":[{"name":"id","in":"path","description":"Attribute definition ID","required":true,"schema":{"type":"string"}},{"name":"force","in":"query","description":"Force delete even if user data exists (default: false).","required":false,"schema":{"type":"boolean","nullable":true}}]}

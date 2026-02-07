@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"IdP metadata XML"},"500":{"description":"Failed to generate metadata"}}}

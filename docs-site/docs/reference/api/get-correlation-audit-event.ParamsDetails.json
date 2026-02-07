@@ -1,0 +1,1 @@
+{"parameters":[{"name":"event_id","in":"path","description":"Correlation audit event ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

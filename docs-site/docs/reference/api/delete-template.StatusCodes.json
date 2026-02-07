@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Template deleted"},"401":{"description":"Unauthorized"},"404":{"description":"Template not found"},"409":{"description":"Conflict - template has active children"},"500":{"description":"Internal server error"}}}

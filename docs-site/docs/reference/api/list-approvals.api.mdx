@@ -1,0 +1,70 @@
+---
+id: list-approvals
+title: "GET /approvals - List approval requests."
+description: "Returns a paginated list of approval requests with optional filtering."
+sidebar_label: "GET /approvals - List approval requests."
+hide_title: true
+hide_table_of_contents: true
+api: eJzNVt9v20YM/lcOfGoBxXa6dij05q1p4SHbgibDHjIjPUu0fc3pTr2jXBuG/veBJ8mSI8dxjT3sxdb9IPmRR37kFkguPMT3MJ6I8QINiXGeO7uS2sM0ghR94lROyhqI4TNS4YwXUuRyoYwkTIVWnoSdC1mLCYffCvTkxXdFS2GDrNRirjShU2Yx+MfcFnluHfl2U8w2wpOkwotXOZpUmUVUq8Q0Eikaxf+4zpXD9LWQJhVfJON9UOmXAURgc3SSbU1SiIFRtY5EkEsnMyR07OsWjMwQYqgsQgSKvftWoNvAU58/Bogtvli8jA8i4CiEz3gutccIfLLETEK8BdrklXF2HCIwhdZyphFicgWWZbTD1zh4KsJwX0w+/Jj9uXWZJIihKIKp5/FolSk6DuZ3uVZZkQlTZDN0nBgOfaHJi1cpzmWhSbwbRSKTa3E5Gr0+CakyhAt0XajK0E9vjmK187nHF8D+Ge6IuXVNQitrWqD/Pbwp6/O5NR49a3gzGvHfPqrr5yoKIkisITTEQjLPtUoC5OFXz5LbPjY7+4oJ9RwPJhokwf+escGe7/egCDNGQJakZmrIHZccqcqT6rg1LJ2THPCn+88Aui2yTLpNcNv0wASEgWhWCr/3oXHWdmql+gx5wHitrrbDV727q3yn/OODT6zDWil6wvRBMsSqmj0vev7uzL1YUOUeoN71cs/OMW2pJLwglSHLnGh5z6OTlXeCckKal7twHnKuif8paNsX6mviY0VcStAQe5004ayipnOKMmqo4jzhqh5ekv357UEPuA4/12UIZclX3h6ihIlZSa3SXT102lkQueyLjAtaoqGaIcSuXsoI3h02Qei4UXt0K3QCnbMugPaYFE7RJnTOGUqHjpVDfD9lQsuQlpZ77iLQbS75CIay030rlVXrLZyGGJZEeTwcaptIvbSe4vej96MeK3zAFWqbZ9zVKh3ADN+q8PFwqNJ8sJarjR0Y7BPLjbNpkYQQNBqmrUu3zJdVQXcd2z0m24Ca8nldXYKo/vjYvPBvf9+FUCkzt0G8fueAS4xvJj1ck5QfhzbixtmVStHxrcBzQaamepmEtKxbWqXtDmUGIeMT5LRpz3+5vb64HFxC9CRCC0XLYjZIbDYMKurfmbazYSY9oRteT369+uP2ivXyS1UYR4PLwYi3cuspk6Zj6tPVnWifWFyI0FEONpE9v7dtB/tfT5P1+xOuaZhrqQyHIUR1W2f4PcjuoMxJzJvb7Ux6/MvpsuTtau7gvE+VZ95o54hn43LmxHkQ8iNuunPuSuqCL4UyOgdRZ8I8Yq/Ti8+0+ONj5BE4zdh6JpZTpsQj1neDaGt+ygunqj5yPy0jWKJM0YVEqaTGSYJ5V6o37u1x76erOx589tnrCVsF7c14ZjYd3dttdePOPqIpS2igE6+hnJZl+S9c7OJ5
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"GET /approvals - List approval requests."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/approvals"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns a paginated list of approval requests with optional filtering.
+Supports filtering by status (pending, approved, denied, expired) and `agent_id`.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./list-approvals.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./list-approvals.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./list-approvals.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

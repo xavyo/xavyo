@@ -1,0 +1,70 @@
+---
+id: get-correlation-job-status
+title: "Get the status of a correlation job."
+description: "Returns current progress including counts of auto-confirmed, review-queued,"
+sidebar_label: "Get the status of a correlation job."
+hide_title: true
+hide_table_of_contents: true
+api: eJy9Vt9v2zgM/lcEPm2Aa6eH3WHw227rDR2GoWhX7KENAsWmY/VsyaWobL0g//uBkvNjSbABu+JeEsuWPpIfP5JaAeuFh/IO3rslktW2QnWm3joi7DQbZ9WFXRiLMM2gRl+RGeQtlHCNHMh6VQUitKwGcgtC75WxVRdqYxeqcsGyV65ROrA7q5xtDPVYZ4pwafDr2WPAgHV2b6076zVXbaa0rRUSOcJa6Soh5JCBG5CiQ5c1lLBAnlU7J2cPbj7zrDl4yGDQpHtkJAlsBVb3CCVUzlqs2NHM1JCBkRgGzS0cBvZ2s1FdvoMMCB+DIayhZAqYga9a7DWUK+CnQYA9k7ELyKBx1GuGEkIwNazX2da2uPdTqzvKH9z8v9qeymE/OOvRy/7fJhP5+7HNxKAiZDK4RHG4cpbRspzVw9CZKu4uHrwArI4dcvMHrPgouuvRFyV42tikjpPWRQAbLeXfcXC343Gba3asu9lGKJJ8chV6j/X+S5HfbCs/yCAJb9Y4miUpQgbWzaIGIYMoQJ/sEAsWSwEMJCpkkyg9AN1xYCzjAmk/K8byH6+OWPkU+jlSrI/R14NCyWEtKeiHDkcvfpT6WjOesenxyNCXFq3iFiPPWzz1wjSqMdb4FuuXwrUNXafnHSa9rbdEPE9s3GpWaOMKpb4TegxyzOxPlX1o5taax5DiMjVaNo1BiojbdD6P818Nt8o6FTFV44JN2Tmht+cxuAVW3qlGp6COdfs8xhKuahypXtugu7FDR6N7RfAM8hvRNshSxidQDxrVOGP22sQLzBd5pu6BgpV2cg+y2Go7LRttOnl+Ga0d9IpfYO6zICh7QtpO4VJ3QTPm0vmBDUsZ7bfYD25+E33fNENYr2Xrq8n5cWu+tTpw68j8gzXETa9+3r+t46RMOfH7qY5/KZVndac80hIpVWB02GMVyPBTHJlz1IQ0ExegvJvKNOmRWzeO3jhj5RMUi+21odgOWF+s9oftutjr9MWDm/tilcp9LR02OpImdaAOSmiZh7IoOlfprnWey9eT15OjVLzDJXZu6EUWCQNk4O4gfFkUph7yb3r55HKLx0PpilwdqsjeBmG6I+JGRlvq9ImON5GNrWjEBowjWdZpE2Tjw18bJX348jkSbGzj4vFRGdEv9ebq8sivy9jI+EldkVuaGkl2xdqMZ8aprKtYjuMNI6F9Rt1L7jtToQhs9/3Pm49n5/k5ZAcMLQy3YZ5Xri8ixPg779y86LVnpOLj5duLTzcXgiuZSj5O8vN8Evuf89xru2fqPXIs9rFQpUwOZ31+GPNqd9H4vy+WYzoZv3ExdNpYiSqStBpVfgc7lSfyR51DBuXBtXIvUIhTLW4ap9s0AxG0IK5Wc+3xlrr1Wl4/BiQpvWkGS00mzeC7FdTGy3MNZaM7jz9g7cX1eE96qQ4usCcDHF9q+wRisguyggz+xqfDu7KU1S/6ceJK+wvejOytp+sMWtQ1UuQmfXxTVTjw3rGja+p33ev9hVTjv8MHhZQ=
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get the status of a correlation job."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/governance/connectors/{connector_id}/correlation/jobs/{job_id}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns current progress including counts of auto-confirmed, review-queued,
+no-match, and errored accounts.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-correlation-job-status.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-correlation-job-status.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-correlation-job-status.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

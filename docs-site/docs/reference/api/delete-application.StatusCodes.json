@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Application deleted"},"401":{"description":"Unauthorized"},"404":{"description":"Application not found"},"412":{"description":"Cannot delete application with entitlements"},"500":{"description":"Internal server error"}}}

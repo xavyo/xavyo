@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request body for denying an approval request.","required":["reason"],"properties":{"reason":{"type":"string"}},"title":"DenyRequest"}}},"required":true}}

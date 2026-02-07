@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request for previewing changes.","required":["discrepancy_ids"],"properties":{"discrepancy_ids":{"type":"array","items":{"type":"string","format":"uuid"}}},"title":"PreviewRequest"}}},"required":true}}

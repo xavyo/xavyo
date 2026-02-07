@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Group deleted"},"401":{"description":"Unauthorized"},"404":{"description":"Group not found"},"412":{"description":"Group is in use by escalation rules"},"500":{"description":"Internal server error"}}}

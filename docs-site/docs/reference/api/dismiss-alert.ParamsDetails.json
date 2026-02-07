@@ -1,0 +1,1 @@
+{"parameters":[{"name":"alert_id","in":"path","description":"Alert ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

@@ -1,0 +1,71 @@
+---
+id: execute-transition
+title: "Execute a state transition."
+description: "Initiates a state transition for an object. The transition may be executed"
+sidebar_label: "Execute a state transition."
+hide_title: true
+hide_table_of_contents: true
+api: eJzVVcFu2zgQ/RVizqrkBF2g0C3tZgEXxTaIXezBNYqxOLbZpUiVHDnxCvr3xVCq5cRpbwtsfZAl8s3jm+EbsgPGXYRyBQtGJrUM6KJh412EdQaaYhVMI99QwtwZNsgUFaqY4HyCq60PCp3ym69Uca6W+yezNR7VhhQ9UtUy6c/O1DVpIbNH5YOK1Z50a0knHotMIVfzreKnNIG+tSaIgKYJ/oA2++zQnb7SPEVWJqoqEDLpHDLwDQWU+LmGEkYNXyZayGAMfOv1EcoOKu+YHMsrNo01VQovvkapQweitkZ542NDUMKQNTwv2CLhUkq3w6pTfe+HFUUfG7bC8iMM9H0/SDSBNJQcWkoDsfEuUhQh17OZ/D1df2I6VV6dFR6y/yDRC/X3o8zzTH8IklT7DK5n1z/NZrKLD6ohp43bnVzw/03r9UubNHcHtEafvOvDueOdZ4XW+gfSkBiuLhk+OWx574P55zvo9SXoY0rxBfatb10K++1ldUzBoVWRwoGCohB8AEkmUtUGw0coVx1sCAOFL6IDytW6X2dQE++9NFzjo5S2QZmDYucPwugqKqzZUnWsLBV8du4ItawVE3MbLJSwZ27KorC+Qrv3kcs3szezi/36nQ5kfVOT41Ev9Nk5RSyLwugmf8TD0eeOLrf8LnjdVoPJRob1lGsyxNBwQ8Y3KeGTj2QN0Z9gUI4gyMaXP3yokaGE938tUw3FkPfT0XP7iHUjTur6DIzb+kQ9mitpVjd38wvNc02ODR/VXfAHoykIKrk2xYz9gFXqB4f1xLYkrGXrralIbDrNv118eHWVX0H2rHo7w/t2k1e+LhLF+NxYvylqjEyh+DB/d/vn4lZ4ZRcHjbP8Kp/JkLihRne21HjsvXCp5M9TPTuZf9nbaLQK0yMXjUXjpCqpyN3YIyuYegRkc8YukeCn97O0guC7boORPgXb9zL8raUgfbnO4IDB4EYMtFr3GewJNYXUWH/TEUp4N9Tz1VJUCdy2ou7i1JQ+GiJuqooa/in2vPvvPi6W0gDjzVp7LTEBH+TWxQcoId3QQ0plN4x1YNHtWtwJduCU3799HxRC
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Execute a state transition."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/governance/lifecycle/transitions"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Initiates a state transition for an object. The transition may be executed
+immediately or scheduled for later. If the transition requires approval,
+an approval request is created.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./execute-transition.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./execute-transition.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

@@ -1,0 +1,1 @@
+{"parameters":[{"name":"flag_id","in":"path","description":"Flag ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

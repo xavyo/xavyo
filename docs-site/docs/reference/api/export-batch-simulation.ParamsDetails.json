@@ -1,0 +1,1 @@
+{"parameters":[{"name":"simulation_id","in":"path","description":"Simulation ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"format","in":"query","description":"Export format: json or csv.","required":false,"schema":{"type":"string","nullable":true},"example":"json"}]}

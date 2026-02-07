@@ -1,0 +1,69 @@
+---
+id: delete-role-parameter
+title: "Delete a role parameter."
+description: "A parameter can only be deleted if no assignments are using it (FR-012)."
+sidebar_label: "Delete a role parameter."
+hide_title: true
+hide_table_of_contents: true
+api: eJytVO9r2zAQ/VfEfWpBsZ3SQadvXZOOjDJCf7APIRTFvsRituRKcmhm/L+Ps13HTdYOun1JJPn07t3d06vAy40DsYCvZotWSx0jG7G5tDJHb1XMbk2GDpYcEnSxVYVXRoOAS1a0MWhZLDUzOtuxFbIEM/SYMLVm2jDpnNroHLV3TFpkpVN6w5RnJ9e3o2h8dhoAB1OglQQ7S0BAC/BoTYaPfQrg0K+JbQVa5ggCmjCVAAdFrArpUzikShWwE9Re+QyJyymbTYCDxadSWUxAeFsiBxenmEsQFfhdQeDOW6U3wGFtbC49CChLlUBd8z5/z+pvJOZ9t/4x95Iuu8Joh47iz6Jz+nsrWzcPqDmcR+PjyActS58aq369BL0LZyyjljNtPFubUnd3Ph/fuZKagtr8bDSQSyodk7FXWxzqg4A+RdEx0Ex7EmbGHNotWobWGktDAIdxaZXfNYJYobRoH6kaEIsl9SlHn5q9phoR0VcIN73YQyrHhVUnpDrc6yyshtOtgRISg1aApc1AQOp9IcIwM7HMUuO8uIguoqPhT3CLmSmozq4KIA3tIZwIQ5UUwbPc7kyg0R/rx5qkjGnTIyz3Hbgj+bR6aPtw2bShVxPlgE5ltG+DgHeL6xeNfftx33RW6bVprtOTAQENL3Y5nx3xmiXNw9qxuTVblaClKLY2ljV3gENstJexJ7ju0bRo9yhzGnqmYtQOB9+/3N2MxsEY+EGHNsqn5SqITR42EN3vKjOrMJfOow1vZlfT73dTwqVJtRyjYBxEdFQY53OpB6kmrTxlq+p+3sFhnVVTBmr/f62vG4/HZx8WmVSaWDZFV51WF7DXKvlG48YcxN74BsbIQbwypCUHEiWhVNVKOnywWV3T8VOJlt7NksNWWiVXNOZFBYlytE5ArGXm8J0unNx2FnbK3jLYP1bXHUq9A8qdlbQDDj9xN/Bzeh4f4nLgsx+g8KqD9bIe+MhkejO9n0Jd/wb/A3d/
+sidebar_class_name: "delete api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Delete a role parameter."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"delete"}
+  path={"/governance/roles/{role_id}/parameters/{parameter_id}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+A parameter can only be deleted if no assignments are using it (FR-012).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./delete-role-parameter.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./delete-role-parameter.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./delete-role-parameter.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to update an existing provisioning script metadata.","properties":{"description":{"type":"string","description":"Updated description.","nullable":true},"name":{"type":"string","description":"Updated name.","nullable":true}},"title":"UpdateScriptRequest"}}},"required":true}}

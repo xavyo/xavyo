@@ -1,0 +1,66 @@
+---
+id: health-handler
+title: "Health check handler (legacy `GET /health`)."
+description: "Returns the current service health status including:"
+sidebar_label: "Health check handler (legacy `GET /health`)."
+hide_title: true
+hide_table_of_contents: true
+api: eJzVVcFu2zgQ/RViTi2gSM5isSh0y6ZpN4tiEdQp9pA1WpqcSGwpkiVHRgVD/16MRNlOHKDn9cESKM7Mm8f3hnsg2SSoH6BFaamFTQEak4omkPEOaviI1EeXBLUoVB8jOhIJ484oFHOMSCSpT8I4ZXttXFP/5y7Eel58Ne8ZCqGxiVKjLkTv8uJr3ngVgjVKcjmxw5iMd7z8KZDpUBgnEirvdOLFt5LkViYUyjuHiszO0MAfrjMyjkkkuwAF+IBxSnuroc79fW6l0xYjFBAxBe8SJqj38NtqxY+nra9fahMKUN4ROuIAeQRffU0ctYekWuwkv9EQEGrw26+oCJ4z+9cT9hY44pXFRqpBfKnmul8EOh28cfS6nGB/701EzWd2QJR5gwL6ibbPmTMo4MjIpoAQmRQyc9M6s3kCNVE0rjmD+iLvGTmDcr21cmsRaoo9jsWC7JeJTzhAga7vOBs/j5IcpqBZO9zgIh7uhwxx0ZyGJYcwnvb8AoBHHztJUHP7eMFbz1B9XM7ikKjktM+4PeY2jrCZRHVIbhz98ftZ4vUcKpJxCg82SiQjoebWO+NMx92vxuOp/pLFFywkHqPvxLWMjS/Jd7aEcXzO19ImjPwroENqPXulQVZrkNRCDVmGUADjxcjTYg99tGwqolBXlfVK2tYnqt+s3qzO1YM7tD50y+jACGNxmiLVVWV0KH/I3eBLh+deuYte92pqcMmwYUCqj4aGNTtu1vQWZcR41TP0A21cg/FP26DOm6DIL++WQ/v73/uJJuMe/RSe6Zpwiau72zNctxodsRfuot8ZjZF3iUcfxRSTh4VU07Bwsjtmu0fZsaisUehmD+bvf64/XFyWl6z1Jww1htp+WyrfVVOK/L+1flt1MhHG6sPt9c0/6xs4FQ+systyxUvBJ+qkOymV7adaVN9EHo3HAfT+5l4sQ2iaPU963x/n4P/4ksgKIfxBVbDSuMnozPs+G+D0amSN88p+zwU+RTuOvPy9xzhA/bApYCejmSfhw2YsOFRjnBzzDQe2qlIYWN87aXuufHaDsLAPTnx/w4r8CZWorac=
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Health check handler (legacy `GET /health`)."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/health"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns the current service health status including:
+- Status (healthy, degraded, unhealthy)
+- Application version
+- Uptime in seconds
+- Database connectivity
+- Current timestamp
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./health-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./health-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

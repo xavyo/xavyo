@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request for bulk certification decisions.","required":["item_ids","decision"],"properties":{"comment":{"type":"string","nullable":true},"decision":{"type":"string"},"item_ids":{"type":"array","items":{"type":"string","format":"uuid"}}},"title":"BulkDecisionRequest"}}},"required":true}}

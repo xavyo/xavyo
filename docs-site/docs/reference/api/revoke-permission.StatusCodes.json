@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Permission revoked"},"401":{"description":"Authentication required"},"404":{"description":"Permission not found"}}}

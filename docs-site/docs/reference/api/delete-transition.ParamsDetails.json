@@ -1,0 +1,1 @@
+{"parameters":[{"name":"config_id","in":"path","description":"Lifecycle configuration ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"transition_id","in":"path","description":"Lifecycle transition ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

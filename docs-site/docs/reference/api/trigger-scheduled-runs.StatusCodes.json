@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Number of runs triggered","content":{"application/json":{"schema":{"type":"array","items":{"type":"array","items":{"allOf":[{"type":"string","format":"uuid"},{"type":"string","format":"uuid"}]}}}}}},"401":{"description":"Unauthorized"},"500":{"description":"Internal server error"}}}

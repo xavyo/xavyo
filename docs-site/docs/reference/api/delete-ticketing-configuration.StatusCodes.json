@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Ticketing configuration deleted"},"401":{"description":"Unauthorized"},"404":{"description":"Ticketing configuration not found"},"409":{"description":"Ticketing configuration is in use"},"500":{"description":"Internal server error"}}}

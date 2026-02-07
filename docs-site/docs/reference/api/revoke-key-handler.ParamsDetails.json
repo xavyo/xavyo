@@ -1,0 +1,1 @@
+{"parameters":[{"name":"kid","in":"path","description":"Key ID to revoke","required":true,"schema":{"type":"string"}}]}

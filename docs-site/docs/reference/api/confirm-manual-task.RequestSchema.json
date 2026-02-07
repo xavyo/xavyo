@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to confirm a manual task.","properties":{"notes":{"type":"string","description":"Optional completion notes.","nullable":true}},"title":"ConfirmManualTaskRequest"}}},"required":true}}

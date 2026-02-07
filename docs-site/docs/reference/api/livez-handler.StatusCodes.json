@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Process is alive","content":{"application/json":{"schema":{"type":"object","description":"Liveness probe response.\n\nIndicates the process is alive and not deadlocked. Does not check\ndependencies — a failing liveness probe restarts the pod.","required":["status"],"properties":{"status":{"type":"string"}},"title":"LivenessResponse"}}}}}}

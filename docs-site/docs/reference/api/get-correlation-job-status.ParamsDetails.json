@@ -1,0 +1,1 @@
+{"parameters":[{"name":"connector_id","in":"path","description":"Connector ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"job_id","in":"path","description":"Correlation job ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

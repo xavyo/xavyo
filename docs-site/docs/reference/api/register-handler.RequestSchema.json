@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Registration request payload.","required":["email","password"],"properties":{"email":{"type":"string","description":"User email address."},"password":{"type":"string","description":"User password."}},"title":"RegisterRequest"}}},"required":true}}

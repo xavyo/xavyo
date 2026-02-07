@@ -1,0 +1,1 @@
+{"parameters":[{"name":"request_id","in":"path","description":"Transition request ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

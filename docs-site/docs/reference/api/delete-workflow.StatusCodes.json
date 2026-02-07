@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Workflow deleted"},"401":{"description":"Unauthorized"},"404":{"description":"Workflow not found"},"412":{"description":"Cannot delete workflow with pending requests"},"500":{"description":"Internal server error"}}}

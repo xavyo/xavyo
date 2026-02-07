@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to trigger a new outlier analysis.","required":["triggered_by"],"properties":{"triggered_by":{"type":"string","description":"How the analysis was triggered.","enum":["scheduled","manual","api"],"title":"OutlierTriggerType"}},"title":"TriggerAnalysisRequest"}}},"required":true}}

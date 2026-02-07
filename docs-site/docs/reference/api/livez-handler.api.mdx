@@ -1,0 +1,63 @@
+---
+id: livez-handler
+title: "Liveness probe handler (`GET /livez`)."
+description: "Returns 200 immediately — no dependency checks. A failing liveness probe"
+sidebar_label: "Liveness probe handler (`GET /livez`)."
+hide_title: true
+hide_table_of_contents: true
+api: eJzVVNtu1DAQ/ZXRPIEUkpQnlLcCBS1UULVFPHQrcOzpxtSxjT1ZEVYr8RF8IV+CJptub+IDyEMuE8/4zDlnvEFWq4zNBX5sM6W1aq2zPOJlgYayTjayDR4bPCUeks/wvK7B9j0Zq5jcCH9+/QYfwFAkb8jrEXRH+jqXcAhXyjrrV+DsmjzlDDGFlpZeqyFThvdDS8kTUwYOkCizSgzcEcRgCsgBuLMZgncj6OCvbOrz7ncKmnJeepslLQaf7ZrgyZvTZ3V98LTEAkOkpAT6wmCDAuDnl0554yhhgXMSZWw2+Lyu5XG/3ZPdFmAzKMnGAnXwTJ5lrYrRWT3Vr75lSdhg1h31St54jIQNhvYbacaHRB7fI+MGP5VLv/QLb6Qs3WtzjwGUN+ADgyFlXNDXZEp4HShPwYn2pd8LYSlP4qh/yHBDeL5hvJyI+T7YREYMkVnxkMUJMQmdbHd8zfHbRjMn61e43RbIlh3dafJ07g63chXYE3dBFFmRMBMVd9hgNemDBYoDKYkdNzgkhw12zLGpKhe0cl3I3LyoX9SPOH1Na3Ih9uQZdjVwW9wtkZuqsiaWP9R6DKWnx7KcpGAGLR/7CpcCSA/J8ngm4u7ab0klSoeDIN9TIHsI/mkZNvMiLOaXNyH1irHBd5/PJ56svwpT+szXhAsOTxaPcC0MebY8wkkKa2soySq4CgmmnNmXSk++9Kq/rXZOqsdtgc5qEglu/788O352UB5g8YChleVuaEsd+moqMd9bF9qqV5kpVceLV0cfzo6krii1w1iXB2UtoRgy98rf2eqB2+cRhCdf3x6dw073r9PA3ut6czts/9vBMxuC6QdX0SnrhZeJ5s1s94vdcSSDJY6WwGbTqkyfkttuJfx9oDRic3FZ4Folq1rxyMXltsCOlKE0zcc1jdjgodYUxc1r5QbZ+NHRJDbej93bI/HfXyiGFrw=
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Liveness probe handler (`GET /livez`)."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/livez"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns 200 immediately — no dependency checks. A failing liveness probe
+causes Kubernetes to restart the pod, so this only confirms the process
+is responsive (FR-001).
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./livez-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./livez-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

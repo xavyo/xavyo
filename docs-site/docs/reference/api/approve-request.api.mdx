@@ -1,0 +1,71 @@
+---
+id: approve-request
+title: "POST /approvals/{id}/approve - Approve a pending request."
+description: "Approves a pending approval request. The user must be authorized"
+sidebar_label: "POST /approvals/{id}/approve - Approve a pending request."
+hide_title: true
+hide_table_of_contents: true
+api: eJzVVktv2zgQ/ivEnFpAsZO2C3R1S9sU8KJog8SLPaRGQIsTi41EquTIiSvovy+GpG3Fdh4F9rIXm6TmPd88OiC58JBfwelEnC7QkDhtGmeXsvIwy0ChL5xuSFsDOcRP6IUUDRqlzULIRC0c/mzR00hMSxStRyfq1pOYo5AtldbpX6i+m1cy6LB3Bp2wThDKWtRYz9G9FmSTOByJb0GnrERhjdJ89qKQ5rthgUSyKFExA5W4sWEEGdgGnWTyiYIckriLaBtk0EgnayR07HMHRtYIOWgFGWj2sJFUwmG3tz6KySfIgC/aoYKcXIsZ+KLEWkLeAa0alurJabOADG6sqyVBDm2rFfT9LDKjpw9WrZijsIbQEB9l01S6CC6Mf3jW3+2LtvMfWNCeoclPMbdqJW6sS5EJeTL7qeJ4OA4YafTJjBRrvpm2quS8wuhgz0bLZNCuhzukfQakia9ryKwz0Pf9buTCg2+s8dGIN8fH/PdIChZOGkLO138Us89tVe2FRigkqSs/epDnqwiUAOHrwTGgKAOytorP4ZReB4hLNt+zEZ4ktfzktL+99oV1CBtYoLqWTIT3jXbo+TLbzdXGiucB98DOPfI+ey7va6vzLl6W6HwI9iPq9wQoLLSKTj1lrZKER6RD2B6VMV897/Ej7J5NfjGIH4T/ZWb3GbwwIcM+1PU7iX+xsgF2tjzaEC7QDZm0obdvmMGj97+RtwTSQ5BZg/0lzm7L4ZAknhXX2nhybRFr8vf7i6wuUgvhDtNn8O5QE5mYpay0Whc5BLqTA82mpRINpY4iNg0g0L/dp/9qaTDkBmNMUKn9Q3Xvnuht6+ZjLIkb25qk8c8nWGTlUKqVSNXBIzWiNvD+cTgKhI4nq0e3RCfQOeugD+goWqdpFUbjHKVDx6GA/GrGM6tGKi1P1camWcrfYLxunn7cadWnK9dwVBAnbesqyKEkavLxuLKFrErrKX9//P54ryV/wiVWtql5U4gyoM+GInw+HmvVjO7lcmVHBve7+rmzKsJpI2G2dfCSZ0Nso0M3N7hjHZAmOt8jEWTp8HkN8L/+mYbA8cy52E70s3tZN1VA+7rbDPCuzY0NuhKCgxPi9Hyy58REMQppJc55iCt0TBXmeuBJ80QWoWOkVSZKm6KsWVelC+Si2H7/cPnl6GR0AtlOOBeaynY+Kmw9DiLS77yy83EtPaEbf5l8PPt6ecZyOa3RxuPRyeg4dDTrqZZmoOr82+VUPIIOcZT2TBzskoO95EEgBvvR/2EFTSDikTluKqlN6HIc7S7VzBVsogIZ5HGVSGUzy4Arg4m6bi49/u2qvufnny06rs1ZBkvpdOyHVx0o7fmsIL+RlccngvfqIrWy1+LwTnvQ9PQozQpYc9XyDTK4xVXcnftZn0GJUqELBsUPH6Paoymzbxn3djUu7chxWhTY0JO0wzbE+OKaTDt0bRXzOHnHi5S8i0baZrPXhLcOKmkWrVwwbZTJFSwfNoCdgg9eHQxD10WKqb1F0/ebqBDfOTB9/y9Cz6rW
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"POST /approvals/{id}/approve - Approve a pending request."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/approvals/{id}/approve"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Approves a pending approval request. The user must be authorized
+(agent owner or team member) to approve. Optional conditions can
+be attached to the approval.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./approve-request.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./approve-request.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./approve-request.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

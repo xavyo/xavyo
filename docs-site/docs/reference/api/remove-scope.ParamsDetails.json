@@ -1,0 +1,1 @@
+{"parameters":[{"name":"template_id","in":"path","description":"Template ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"scope_id","in":"path","description":"Scope ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

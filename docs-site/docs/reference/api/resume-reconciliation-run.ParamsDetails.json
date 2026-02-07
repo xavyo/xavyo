@@ -1,0 +1,1 @@
+{"parameters":[{"name":"connector_id","in":"path","description":"Connector ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"run_id","in":"path","description":"Reconciliation run ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

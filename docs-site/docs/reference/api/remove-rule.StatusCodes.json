@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Rule removed"},"401":{"description":"Unauthorized"},"404":{"description":"Template or rule not found"},"500":{"description":"Internal server error"}}}

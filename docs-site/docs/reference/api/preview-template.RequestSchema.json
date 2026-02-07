@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to preview an email template.","properties":{"locale":{"type":"string","nullable":true},"sample_data":{"type":"object","additionalProperties":{"type":"string"},"nullable":true}},"title":"PreviewEmailTemplateRequest"}}},"required":true}}

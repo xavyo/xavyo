@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to reassign an item to a different reviewer.","required":["new_reviewer_id"],"properties":{"new_reviewer_id":{"type":"string","format":"uuid","description":"New reviewer user ID."}},"title":"ReassignRequest"}}},"required":true}}

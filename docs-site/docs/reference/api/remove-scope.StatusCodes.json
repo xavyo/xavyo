@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Scope removed"},"401":{"description":"Unauthorized"},"404":{"description":"Template or scope not found"},"500":{"description":"Internal server error"}}}

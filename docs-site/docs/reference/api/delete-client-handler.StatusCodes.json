@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"OAuth2 client deactivated"},"401":{"description":"Not authenticated"},"403":{"description":"Not authorized"},"404":{"description":"Client not found"}}}

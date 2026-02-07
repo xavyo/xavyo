@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Audit trail retrieved","content":{"application/json":{"schema":{"type":"object","description":"Schema for AuditTrailResponse.","title":"AuditTrailResponse"}}}},"401":{"description":"Unauthorized"},"500":{"description":"Internal server error"}}}

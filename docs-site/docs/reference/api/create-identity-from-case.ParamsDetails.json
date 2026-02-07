@@ -1,0 +1,1 @@
+{"parameters":[{"name":"case_id","in":"path","description":"Correlation case ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

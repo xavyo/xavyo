@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request body for approving an approval request.","properties":{"conditions":{"nullable":true},"reason":{"type":"string","nullable":true}},"title":"ApproveRequest"}}},"required":true}}

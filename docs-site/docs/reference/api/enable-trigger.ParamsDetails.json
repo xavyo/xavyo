@@ -1,0 +1,1 @@
+{"parameters":[{"name":"id","in":"path","description":"Trigger Rule ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

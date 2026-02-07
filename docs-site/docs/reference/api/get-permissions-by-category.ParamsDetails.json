@@ -1,0 +1,1 @@
+{"parameters":[{"name":"category","in":"path","description":"Permission category","required":true,"schema":{"type":"string"}}]}

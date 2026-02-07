@@ -1,0 +1,70 @@
+---
+id: verify-email-handler
+title: "Handle verify email request."
+description: "Verifies the user's email address using the token from email."
+sidebar_label: "Handle verify email request."
+hide_title: true
+hide_table_of_contents: true
+api: eJzFVVFv2zYQ/ivEvWwFFMkp9lDoLe0y1EWxBbW3PWRGcBbPFluKZEnKiWDovw9HKrEXNd3TMD/YNHm8++6+745HiLgPUN/CVR9bMlE1GJU1sClAUmi8culvDX+QVztFQcSWRB/I/xAEdai0QCk9hSD6oMw+HUf7hYzYedtlk/Ivs5TUORvJRHEhQt80RDKIvceGdr3Wg1A7gdoTykEccihZQgHWkU+IlhJqSCfDXXJ616KRmjwU4OlrTyG+tXKA+giNNRyIl+icnlKqPgdO5AihaalDXsXBEdRgt5+pifDNjIcpySmEcDhoiwkabylPkquXMuaiOc+Io6KQAqTtU6QQvTL7WaTrFCKnncHOSwjjWEBUUdMTtHTtUwYGI5+fIEXfU9oIzpqQ0bxeLPjn5dgkofiPqpdhvFS+jkLAPUEBkwbungDNajqzOEHZWqsJzQzL2vfEAstg7jHMpCZ+VE8CfVXCWDxB+lfyVizmEMR04TtE5RowU2MBP32LjKU5oFbyUW2Q7C5ftrNe0IPjKmbBpNgdxdZytzgbmBeHsYUaKuxjW+UOukiVgAIC+QN5HgBH6L2GGtoYXV1V2jaoWxti/WbxZjFL+mc6kLau437OPmAszl2EuqqUdOUDHgZbGpoL5MZb2TdJ7I8eNgyo6b2Kw4pllgnfEnryPJ/OyOAYjD+ZMfXJCIpp8Yv1HUao4cOf61QUlu+n05i4fsDOaTrr0Ud6xwKU2dl0MpGYchBXN8tZDkvJIzMO4sbbg5Lk2UrsrBfpztRN2KRuMtidvK0JO46lVUMsitP529XHi8vyEopn1dyr2PbbsrFdlVxM31ttt1WHIZKvPi7fXf+6uma/zGrGuCgvywVvsRw6NGeh3qcJmpvg2aArn+d6Nlb/r7dgoj7SQ6ycRmU4q1Sk4yTyW2CRQwH/kPmmAFYyHx+PWwz0u9fjyNtfe/ID1LebAg7oFW6Z79vNWEBLKMmnvvhCA9TwLmd/sWYQbK57BjMbkdwG+cZV05CL37XdnHXrzW+rNet3esQ6K/mOx3uelXgPNaTnkG+ntkh7R9Bo9n0aVJB98udv/BO94A==
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Handle verify email request."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/auth/verify-email"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Verifies the user's email address using the token from email.
+Idempotent - succeeds gracefully if already verified.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./verify-email-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./verify-email-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

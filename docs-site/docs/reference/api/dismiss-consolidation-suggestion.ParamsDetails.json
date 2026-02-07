@@ -1,0 +1,1 @@
+{"parameters":[{"name":"suggestion_id","in":"path","description":"Suggestion ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

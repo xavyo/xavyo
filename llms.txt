@@ -4,10 +4,29 @@
 
 ## Documentation
 
+- [Documentation Site](docs-site/): Comprehensive Docusaurus docs (866 pages) — run `cd docs-site && npm run serve`
 - [Architecture](docs/ARCHITECTURE.md): System overview and design principles
+- [INSTALL](INSTALL.md): Development environment setup
 - [Crate Index](docs/crates/index.md): All 32 crates organized by layer
 - [Maturity Matrix](docs/crates/maturity-matrix.md): Crate stability assessment
 - [Dependency Graph](docs/crates/dependency-graph.md): How crates relate
+- [OpenAPI Spec](docs/api/openapi.json): 700 paths, 933 operations
+
+## Documentation Site Structure
+
+The `docs-site/` contains a full Docusaurus documentation site:
+
+- **Getting Started**: [What is xavyo](docs-site/docs/getting-started/what-is-xavyo.md), [Key Concepts](docs-site/docs/getting-started/key-concepts.md), [Quick Tour](docs-site/docs/getting-started/quick-tour.md)
+- **Admin Guides**: [Tenant Setup](docs-site/docs/guides/admin/tenant-setup.md), [Users](docs-site/docs/guides/admin/user-management.md), [Authentication](docs-site/docs/guides/admin/authentication.md), [Authorization](docs-site/docs/guides/admin/authorization.md), [Connectors](docs-site/docs/guides/admin/connectors.md), [Governance](docs-site/docs/guides/admin/governance.md), [Security](docs-site/docs/guides/admin/security-hardening.md), [NHI](docs-site/docs/guides/admin/nhi-management.md)
+- **Developer Guides**: [API Overview](docs-site/docs/guides/developer/api-overview.md), [Auth Flows](docs-site/docs/guides/developer/authentication-flows.md), [SCIM](docs-site/docs/guides/developer/scim-integration.md), [Webhooks](docs-site/docs/guides/developer/webhooks.md), [NHI](docs-site/docs/guides/developer/nhi-machine-identities.md)
+- **End User Guides**: [Self-Service](docs-site/docs/guides/end-user/self-service.md), [MFA Setup](docs-site/docs/guides/end-user/mfa-setup.md), [Access Requests](docs-site/docs/guides/end-user/access-requests.md)
+- **Concepts**: [IGA](docs-site/docs/concepts/identity-governance.md), [Zero Trust](docs-site/docs/concepts/zero-trust.md), [Multi-Tenancy](docs-site/docs/concepts/multi-tenancy.md), [Lifecycle](docs-site/docs/concepts/lifecycle-management.md), [SoD](docs-site/docs/concepts/separation-of-duties.md), [NHI](docs-site/docs/concepts/non-human-identities.md), [GDPR](docs-site/docs/concepts/compliance-gdpr.md)
+- **Reference**: [Error Codes](docs-site/docs/reference/error-codes.md), [Rate Limits](docs-site/docs/reference/rate-limits.md), [Glossary](docs-site/docs/reference/glossary.md), 837 auto-generated API pages
+
+## Test Suite
+
+- **1,755 functional tests** across 12 batches: `tests/functional/run-all-batches.sh`
+- **177 comprehensive API tests**: `tests/functional/test-all-endpoints.sh`
 
 ## Maturity Legend
 
@@ -29,7 +48,7 @@
 - [xavyo-connector](crates/xavyo-connector/CRATE.md): 🟢 Connector framework
 - [xavyo-provisioning](crates/xavyo-provisioning/CRATE.md): 🟡 Sync engine
 - [xavyo-governance](crates/xavyo-governance/CRATE.md): 🟢 IGA logic
-- [xavyo-authorization - Authorization engine (PDP) 🟡 Policy engine
+- [xavyo-authorization](crates/xavyo-authorization/CRATE.md): 🟡 Policy engine
 - [xavyo-webhooks](crates/xavyo-webhooks/CRATE.md): 🟡 Event delivery
 - [xavyo-siem](crates/xavyo-siem/CRATE.md): 🟡 Audit export
 - [xavyo-secrets](crates/xavyo-secrets/CRATE.md): 🟢 Secret providers

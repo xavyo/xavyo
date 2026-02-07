@@ -1,0 +1,1 @@
+{"parameters":[{"name":"id","in":"path","description":"Connector ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"version","in":"query","description":"Specific version to retrieve (default is latest).","required":false,"schema":{"type":"integer","format":"int32","nullable":true}}]}

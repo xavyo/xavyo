@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to set (full replace) a user's custom attributes.","required":["attributes"],"properties":{"attributes":{"description":"The complete set of custom attributes to apply."}},"title":"SetCustomAttributesRequest"}}},"required":true}}

@@ -1,0 +1,1 @@
+{"parameters":[{"name":"connector_id","in":"query","required":false,"schema":{"type":"string","format":"uuid","nullable":true}},{"name":"from","in":"query","required":false,"schema":{"type":"string","format":"date-time","nullable":true}},{"name":"to","in":"query","required":false,"schema":{"type":"string","format":"date-time","nullable":true}}]}

@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to request deletion of an orphan account.","required":["justification"],"properties":{"justification":{"type":"string","description":"Justification for deletion."}},"title":"DeleteOrphanRequest"}}},"required":true}}

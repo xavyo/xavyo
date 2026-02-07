@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"SSO POST form data","required":["SAMLRequest"],"properties":{"RelayState":{"type":"string","nullable":true},"SAMLRequest":{"type":"string"}},"title":"SsoPostForm"}}},"required":true}}

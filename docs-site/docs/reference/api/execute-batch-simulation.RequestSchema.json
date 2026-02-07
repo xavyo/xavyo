@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to execute a batch simulation.","properties":{"acknowledge_scope_warning":{"type":"boolean","description":"Acknowledge scope warning (required if >100 users affected)."}},"title":"ExecuteBatchSimulationRequest"}}},"required":true}}

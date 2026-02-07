@@ -1,0 +1,1 @@
+{"parameters":[{"name":"candidate_id","in":"path","description":"Candidate ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to initiate passwordless authentication (magic link or email OTP).","required":["email"],"properties":{"email":{"type":"string","description":"User email address."}},"title":"PasswordlessRequest"}}},"required":true}}

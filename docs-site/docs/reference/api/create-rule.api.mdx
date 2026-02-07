@@ -1,0 +1,71 @@
+---
+id: create-rule
+title: "Create a new reclamation rule."
+description: "Defines when licenses should be automatically reclaimed from users"
+sidebar_label: "Create a new reclamation rule."
+hide_title: true
+hide_table_of_contents: true
+api: eJzVV9tu2zgQ/RVinlJAvuTe1VuadhdZZNsgSbEPqeGOpZHELkWqJOXUa+jfF0PJtXzZJCj60jwkjjWXM8M5h6MleMwdxA/wh5mT1agTEgNxLRPSjsRfqDGnkrSHSQQpucTKykujIYa3lElNTjwWpIVqHZxwhalVKmYksPamRC8TVGohLCUKZUmpyKwpRe3Iuk96ho5SYbSQGhMv59IvxIE2QplcapEZK96LFBfulTBWKJlRskgUCefRk0gK1Dm5T/qAhvkwCjGFJ1tKjZ7SV0OIwFRkkQFfpRBDYgk9TW2tCCKw9LUm59+YdAHxEhKjPRcaLwGrSskk+I2+OK52CS4pqET+5BcVQQxm9oUSD9ttuW2jCm9Em05gW3wZ4glOPuyyS0sp977r3rQyRk1lChF4K/Oc7DTkmkRQWa7ES3KMYNt+Dcp5K3UOEWTGlughhroOATdB3he0OjLBQYQvpAvQRKidnPBmCE0E35s+DU3fl2oz9PXWKfkCvejKcRudOFi1IBz0561Mn1dO4Rx1rRTOFEHsbU1NBNp4mXVnNOURmc4oM7YPUGpPOdl+M6T2x0c7kN/iwonWfQOgNyKkWbSjdZBShrXysTh/FXrjC0uuMCoNAH44s8n6478Hx2ajerZPdmhjhJ49tvvWWrBVSLM9s46TkK5LHtg1BtgdkUkEXnpGAp2O3K5jdXmgadZWl4EnPaPbWlHHI2jYck2WrjhLrjIsOFzZ0fiQ/2zzcBN/x0bmwk9j+laGFahtegcCPsPxJyaa284nG6C3RUyR4dRVuv5n9WS22NWLntdTUsHRBl6WxMPdi/esvDRriGvbmTGKUPPDl0hUs9uil/k8q08/VTuaCAI8jeXLkgXrOenU2BfZ/4io/Grc3xjdF05kTy92lKKlHUtFE8HJeLyrBld6jkqmwq5Uhe32qMZHjbUvjJX/UtoanewaXfdvTm28yEytg/np/tyeNyslHNk5WUHWmlYAHSW15UbGD0uYEVqyU84P8cOkmURQki8MLy6VcczxCvkZjPLvu9qo48ygd2SDcGTA4TmfC9FrqyCGwvsqHo2USVAVxvn49fj1ePdWojkpU/Ha12GGJuqHcPFoJNNq+A3nCzPUtKuNN9akdRIGaBVhsq73jhW2laa26otQ9PdB4ByMP5ixlAQjiLoPv6/G48+/70MfWblv19vcu29YVor2bkpwnOHr0+zsZHB6fng+ODk9OxrMjrNkcJT8dnacnZ1hhmd7BrtP2f+Vj/EufcfbZOzzh6VRZyZU3s12aKm4uLnaaelVStrzrX9jzVymZNkq0DX4dPcaJoFRrTx10e4Jy56+9p6/ubseHA4P+S7ZONxc+qKeDRNTjkKI7vdMmdmoROfJjq6vLt+9v3vHcXnIWozj4eFw3Gqk8yXqXqrL1TKs6XHvQrxRbW8d/zVeNLrD9fTNjyqFMtx7oanLjrYPsKbteh/YQ9xJBMxN9lguGfhHq5qGv/5ak2WxmEQwRytbyX+YNBEUhCnZwPR/aMHtbts3uG+XizmqmvHt7DtM7NbjIkmo8k/a9iXp5sPdPTOye3sqTco+Fh95+cFHiCG8frF3IHr4bgkKdV5jzrZtTP75Dz8sGsw=
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Create a new reclamation rule."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/governance/license-reclamation-rules"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Defines when licenses should be automatically reclaimed from users
+based on inactivity (no login for N days) or lifecycle state changes
+(e.g., user terminated).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./create-rule.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./create-rule.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

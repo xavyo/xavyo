@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to validate a script body without saving.","required":["script_body"],"properties":{"script_body":{"type":"string","description":"The script body content to validate."}},"title":"ValidateScriptRequest"}}},"required":true}}

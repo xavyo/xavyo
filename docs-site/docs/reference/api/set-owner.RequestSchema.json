@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to set entitlement owner.","required":["owner_id"],"properties":{"owner_id":{"type":"string","format":"uuid","description":"The user ID to set as owner."}},"title":"SetOwnerRequest"}}},"required":true}}

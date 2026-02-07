@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"SAML Response form"},"400":{"description":"Invalid SAML request"},"401":{"description":"Not authenticated"},"404":{"description":"Service provider not found"}}}

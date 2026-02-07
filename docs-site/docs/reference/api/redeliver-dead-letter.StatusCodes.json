@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Re-delivery result","content":{"application/json":{"schema":{"type":"object","description":"Re-delivery result.","required":["events_requeued"],"properties":{"events_requeued":{"type":"integer","format":"int64","minimum":0}},"title":"RedeliverResponse"}}}},"401":{"description":"Unauthorized"},"404":{"description":"Destination not found"}}}

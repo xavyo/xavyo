@@ -1,0 +1,71 @@
+---
+id: register-handler
+title: "Handle user registration."
+description: "Creates a new user account with the provided email and password."
+sidebar_label: "Handle user registration."
+hide_title: true
+hide_table_of_contents: true
+api: eJzVVU2P2zYQ/SvEnLWSt2iBVLdNskEdBO1ivWkPGyOgybHFLEUy5MhewfB/D4aSP7B2iubQQ3ywZXE+3sybN9wCyVWC+hFuOmrQkVGSjHcwL0BjUtGE/LeGNxElYRJSONyILmEUUinfORIbQ42gBkWIfm00aoGtNFZIp0WQKW181OUn97e0RucYxoWOCqEaVE9JLH0UuguWU+PoyiGNy0EJnXRUfHIcLqHTjGGN0SxHrKML+WzOyEoowAeM+XiqoYaIK5MI4+dGOm0xQgERv3aY6LXXPdRbUN4ROuJHGQYwxrvqS+Lqt5BUg63kJ+oDQg1+8QUVwcs23edEQ2YxphBB9tZLXY5ZTUTNLc+4oYB9j7jpITJwMpg412BxTJooGrc6S/qR2Rh7rnXElErYncT9bwEOVMFuVwAZsngoCOP9UAvs+PBYBcUO84sUvEsD6l8m1/xzIYXKQ6RF6pTClJadtT0U/1PvB0Tfa77RUBwYGHF9lnTOwcnZhT4ufWz5BHiyr8i0eAbrZpRJDsTQ2CqRbENm6Yc5zl7mIqsHNF2X67sQYvr2e/wO/WKCdwX8Opmcczh1a9bwOGo+ig3Kp8PcQHb7/dztdphMG1HqXhjHGs2qp8akUd/s/NulnDOMa648Rh8z8Bap8azp4BNl9VADNVSyo6ba6xwKSNmRd9sWumihhoYo1FVlvZK28YnqV5NXk7MuvcU1Wh9adCSGGLArTkOkuqqMDuWzXPe+dHg+iHfR605lrvcR5gxIddFQP+NxHmZrgTJi5NV7wibnYPzZDOrRCIrx4d2e4/f/POSGsEzuj8vs9lm2gak9rI/jfBw3wv4dj5Jb+px+nIhcl7i5m57VNdV8Q1Av7oZFH9kqM5l9RiVLlZXiZHuM9oCy5VzWKOQhO56/nn24ui6voXjR4ZWhpluUyrdVDjF+L6xfVK1kjqsP0ze3f85uOS4zPWCclNflJG8/n6iV7iTVH3n3D3dXPNkV5ctCT26Dn+7eG4eI8JmqYKVx3Ivc2u0olUdgqeR1OIplXgDrgY+224VM+DHa3Y5ff+0w9lA/zgtYy2jkgifkcb4roEGpMWZ1PWHPjRpadvXAANjcdgzkbKGzmAaPG6Uw0L/azk/0fvfX7IFVMF7YrdfsE+WGS5EbqCFf++ydxZXfbcFKt+rkim2HmPz5BpC2IZo=
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Handle user registration."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/auth/register"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Creates a new user account with the provided email and password.
+Validates input, checks for duplicate email within the tenant,
+and sends a verification email to the user.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./register-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./register-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

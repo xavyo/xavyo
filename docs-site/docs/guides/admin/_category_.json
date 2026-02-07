@@ -1,0 +1,8 @@
+{
+  "label": "Admin Guides",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "Comprehensive administration guides for xavyo-idp covering tenant setup, user management, authentication, authorization, connectors, governance, security, and non-human identity management."
+  }
+}

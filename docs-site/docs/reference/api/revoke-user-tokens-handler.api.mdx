@@ -1,0 +1,70 @@
+---
+id: revoke-user-tokens-handler
+title: "POST /auth/tokens/revoke-user"
+description: "Revoke all active tokens for a user ('sign out everywhere')."
+sidebar_label: "POST /auth/tokens/revoke-user"
+hide_title: true
+hide_table_of_contents: true
+api: eJztV0tv2zgQ/ivEXLYFZMvOw011S9ss1otuEiQO9pAYAS2NLTYUqZKUHdfQf18MyfgRtwmw28MeerFpcZ7ffDMar8DxmYXsFkb6ARW7wrnOuRNawTiBAm1uRO1/ZkB3D8i4lIznTsyROdKxbKoN46yxaNibO7BipphuHMM5muWiRIN38LZ7p06LSijLcq6YiabU0qv9ZqOpLruxaIKMVnL5JOhKFIbphepCArpG40McFpBBkLgnM/fByH3JVSHRQAIGvzZo3QddLCFbQa6VQ+XoyOtaipBp+sVSfiuweYkVp5Nb1ggZ6MkXzF20IwwWBJT3JArCpzYUixNoSckgj4aiunVGqBk8x/HCH7hkQcHDZ9a4U4aqkZJPJELmTINtsvb5HdtTbSruIIOmEcWer1GJoTDDT2xRaruumS11Iws2wQhx0YW2TcAJR25jrakYnhf2KgAJLQlt0IjhGbS1VjbAcNDr0dduHKdShjii++iU2SbP0dppI+USkp9boAQiH6IzL+ZP95x0KrSWz3C/kE8Xr1byj6biqmOQF1QtZh13jWVRvQvtjsNXrQ2vL9jJoNdnTlRoHa9qpqdsUaIi/j8ht0CzXbO9JDduhHI4822w5ohQbnC05/i8qSZoyNludbz5/069Hd49C3+LckS2zfi5ipQixrUJHPX6+6S6UbxxpTbiGxbsTSWsFWrGtGFCzbkURfD59mfxCo3R5iXeBIFX6/wXz0uhcMMbr8dyXQTO/Fv6BTMb9j1r55DzGQntgXu4D+65Vh1OE5uGsdJuM7O1K9Hszu1fEL8C8fH3huJQOTT0IrBo5mjYU/a/oPwxlG0CFvPGCLeE7HYFE+QGzWnjSshux+2YAnKlps2g1pZAqTndQUqzIg10TQOXO8RhIIMEv/X2GiMhg9K5OktTqXMuS21ddtI76e1l9AnnKHVdoXKxhNAm2yZslqaiqLuPfL7UXYVuz8Sl0UWT04+1hfEmw2uqdKjWdp5rpMkHxe/FIItCkMTD70/z+c+/Rx5gYtDVZiU6e+RVLXF7d9kUbz334XDKT46ng6PO8bv+u87R8eCgMzmc5p2D/P3gcDoY8CkfEBOEmmofXCyjz5qdXg7333QFKifckl0aPRcFGpLye5DXiS3Ac98CilcbayPkFfmSIkeixOb+w/XnTr/bp8h38J8JVzaTbq6r1JuInxOpJ2nFrUOTfh5+PDu/PiO7xIMQY6/b7/boEdGo4mrL1eXF9Yi9wKedZLe2zv/NBh3p4/DRpbXkQvkXPcG2iu1yC5TeeoVar04hxXEC1BUktlpNuMUbI9uWHn9t0FBjjhOYcyPCEns7bhMokRdofI894BIy+Bhg6YwoGBKXDQW1N/GopYLGaZ5j7V6U3e5/KhP1Qlz+K12QjuELyoYvIAP/Z4K0w/5Oz1YguZo1fqJBsEmdw3cb71mj+aziFVfLrQhXqyDht+i2hSSm4mGFdty27T9BObe8
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"POST /auth/tokens/revoke-user"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/auth/tokens/revoke-user"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Revoke all active tokens for a user ("sign out everywhere").
+Admins can revoke any user's tokens. Users can only revoke their own.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./revoke-user-tokens-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./revoke-user-tokens-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

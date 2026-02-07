@@ -1,0 +1,1 @@
+{"responses":{"302":{"description":"Redirect with authorization code or error"},"400":{"description":"Invalid consent request"}}}

@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to archive a persona.","required":["reason"],"properties":{"reason":{"type":"string","description":"Reason for archiving (5-1000 characters)."}},"title":"ArchivePersonaRequest"}}},"required":true}}

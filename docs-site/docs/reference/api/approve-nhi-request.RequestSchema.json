@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to approve an NHI request.","properties":{"comments":{"type":"string","description":"Approver comments.","nullable":true}},"title":"ApproveNhiRequestRequest"}}},"required":true}}

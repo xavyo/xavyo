@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Report data","content":{"application/json":{"schema":{}}}},"400":{"description":"Report not completed"},"401":{"description":"Unauthorized"},"404":{"description":"Report not found or no inline data"},"500":{"description":"Internal server error"}}}

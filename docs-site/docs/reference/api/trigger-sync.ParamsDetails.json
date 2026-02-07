@@ -1,0 +1,1 @@
+{"parameters":[{"name":"target_id","in":"path","description":"SCIM target ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

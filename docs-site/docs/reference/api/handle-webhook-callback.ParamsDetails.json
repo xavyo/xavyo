@@ -1,0 +1,1 @@
+{"parameters":[{"name":"configuration_id","in":"path","description":"Ticketing configuration ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"secret","in":"query","description":"Webhook callback secret for authentication","required":false,"schema":{"type":"string","nullable":true}}]}

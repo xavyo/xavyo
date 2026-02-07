@@ -1,0 +1,70 @@
+---
+id: get-script-analytics
+title: "Get detailed analytics for a specific provisioning script."
+description: "Returns per-script statistics including success rate, average and p95"
+sidebar_label: "Get detailed analytics for a specific provisioning script."
+hide_title: true
+hide_table_of_contents: true
+api: eJzNV11v2zYU/SvEfWoB2VaGZGj0li1pkKEpgjpFEWSGQUvXFjuJVMkrI67h/z5cUrYk20mG7GF7SSSZPDz33E+ugeTCQfII12aJVkudohiIO2uWyimjlV6IcWpVRQ4mEWTo/IsyGhL4glRb7USFdhC+C0eSlCOVOqF0WtQZA7g6TdE5YSVhJOQSrVygkDoT1fnZnzqrrWREF4lMqmIl8AnTmr8IsqgzF/m1ZCqB1horSnROLtANIQJTYdh9k0ECC6RpYDKVWhYrJgIRVNLKEgktW7oGLUuEBJqFKoMIFNtTScph38hgvbi5hAgs/qiVxQwSsjVG4NIcSwnJGmhVeUiySi8ggrmxpSRIoK5VBpvNhDe7ymiHjtf/Esf87+hRO+YikyQhgtRoQk28QVZVoVJv8Oi7413rQxZm9h1TOrDkEkmqArPOAXNjhRRO6UWBIqwd9ux87KnkhYuADMliuvMSK9y4eMouhgjkcjHdunVaehecn+198b6eBg970Grq3esDrbLsWFJBrX241lRdlzO0XcEzU88KPDD+oom6Nra2gEJpUaqiUA5TozM3hM0eufY4aa1ccbgQ9mg8o/hVP5C9P/uaZ3K1L3gWJDwmL/LzXKqitv5xX5f/VjjBdubKhy02KhIey469uJSEjPXw8PAwuL0dXF6KQMpjdHRokZQmXPTpK02/nh5g33OottyPcNzJ+Qb0jyGfXoJvPfcG/HHYPK9fMmETASkq0CupitU9h5pXf0/lY6XVcwz18DU3NdWJF/td+xn9htg6P6Ocu0eKmlTxj5OzLUmvVt5nq3nXOaFqvYH/uNPYhHRCbo3hhHkXD2MxECdxPIzf++M6Je7NJWVcl6W0K2HmQgqLaW3Z7tAY9yuJ/zhtuqXvI7VmxEI6mpqU92J2WDTCsjeE62evG1MjVaILURpadi6d2J4Y0rrH7dXgu8+x3/w9SN+Ql4KBc2XArA6Qv+Wou0wZs0u1k15XvKBxwGGC3RpHYs76o6YA5hq377XLf1/HhPdRn10I7Yttb//SjBuw2fCq0/jkcOD4qmVNubHqJ/qKcRqfPjuVaENibupQWs6OjS83mniCLIRDu0QbJPAUHcepopWfvmYoLdopnwzJ44RHoxIpN8385sc1/glGi91IOgrnDHaTS/PBjda7YrDhPulPDlNebQtIICeqktGoMKkscuMo+RB/iI+MRkssTFWy5wIGbKIuhEtGI5VVwye5XJmhxsPEvLMmq1PvnC3CpLV8zDNaSK9g/4U3fxcIfAY0AyW/h0UQNQ8ft9Hxx7d7r6jSc+O3N873vMTF3c0Br5uMiyutwkyfoeVVfgjxe5rxUqY+45vJOKDdoyx9lqkUOZDa338bfxqcDE8g2lNooSivZ8PUlCMP0fydFWY2KqUjtKNPN79ffR5fMS57KnCMhyfD2PcU46iUunPUNZLInh1cK0zVXKWi6t5X2jm2p8S6naP/FzeXxvOETzSqCqk0C+D1XDcZ8AhtBsC27Q26F5smCyCCpG2Kkwg40nn/ej2TDr/aYrPhzz9qtJyEkwiW0irJPY1TJVOOnzNI5rJw+IJw7740/eW96F6MjtqybXCa29tSFjW/QQR/4ap3+9pMNhHkKDO0nk34/SJNsaLOzoOrT69yXF9xYvwNVCUtsg==
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get detailed analytics for a specific provisioning script."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/governance/script-analytics/scripts/{script_id}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns per-script statistics including success rate, average and p95
+durations, daily execution trends, and top error messages.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-script-analytics.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-script-analytics.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-script-analytics.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

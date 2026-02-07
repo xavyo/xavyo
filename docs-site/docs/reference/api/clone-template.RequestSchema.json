@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to clone a report template.","required":["name"],"properties":{"description":{"type":"string","nullable":true},"name":{"type":"string"}},"title":"CloneReportTemplateRequest"}}},"required":true}}

@@ -1,0 +1,70 @@
+---
+id: revoke-token-handler
+title: "POST /auth/tokens/revoke"
+description: "Revoke a specific JWT access token by its JTI claim."
+sidebar_label: "POST /auth/tokens/revoke"
+hide_title: true
+hide_table_of_contents: true
+api: eJztV01v2zgQ/SvEXDYFFMnZLwS6pW0W66DbBImDHrJGQFMTiwlFqiRlR2vovy+GpD8aZ5NDC+wlF1siZ4bz3huSoxV4PndQ3sDEPKBml7gwgntpNEwzqNAJK9vwWgLNPSDjzLUo5J0U7OzLhHEh0Dnmg/usZ9I7djYZM6G4bPK/9UnVSO2Y4JrZFED30Txn1w5tnDNa9WsDX6O0zCx1DhmYFm1IaFxBCdHiNrjf1lxXCi1kYPFrh86/N1UP5QqE0R61p0fetkpGRMW9IxwrcKLGhtOT71uEEszsHoVPcaTFigi595I4aC1l4CU6cqDBrZ/zVuo5PCVqUmOgZvyRHdx7+Y6ZO8KUOPIm4cxhoBV5yurlmOfhgSsWHdidsSFMhEZE6U4pPlMIpbcdDkMGXnp6TcIFgS8jUTAMwy7a4EEDrjXaRag/j0b09wRagBDzr5jrgvh3nVI9ZD+O9izpXN1ymm7QOT7H71FjMl6LsM49ViBJsA7/aqQ/u4brQ4u8Ip6Z89x3jiX3pOYm7Vejja/O2fHvoyPmZYPO86alFJc1lcimWJbcrTPO4ammkd/LJBppOmTw63OyjfWCK1mxtE/YATat7yMtdl1S3himjJ6/+1FSorXGvqRfNHiVqb+4qKXGLfPBjwlT4XcJGMNs9XuW3lMy2uP4aJ/ja807Xxsr/8GKHTTSOannRK9M5AdF38h9ndxf9sn9bPQhp5uELgtt/PYuMb5GyzqH9qd0C70x/ArDvz1/RHi0dME4tAu0bI3+jcr/pnLIwKHorPQ9lDcrmCG3aE86X0N5Mx2mlJCvDTUurXFESstpDgo6KopQra6IpQwUi5h3IVRnFZRQe9+WRaGM4Ko2zpfHo+PRHpiPuEBl2ga1T+rBkO2GcGVRyKrNH/miN7lGvxfiwpqqE/SyiTDdgrsikaNQuxA3JNMalH8wgzIZQZYe/jC2oRsRzr5MArdUPJfblu30kTetws2NvhVt3R2tR4YMpL4zYemkT8DETi7G+xdshdpL37MLaxayQktWoXEKPqm2uQi1rXmzjTZB3tBaSgokrbfz768+HR7lR5A9YXcufd3NcmGaIoRIvzNlZkXDnUdbfBp/OP18dUpxSeWY4yg/ykc0RPXRcL2z1MX51YQ9Xyjf4Nxpd/+nFj1VgcdHX7SKS02AAj+rVPA3QDjINCDZNHh0EFBdk8VqNeMOr60aBhr+2qGlXTXNYMGtjJ3tzXTIoEZeoQ275AF7KOFDxH84oTzIXHWUz95xRZsiepwIga1/0XZ385IUVM3p86IxFflYviQgfAklhA8V8g6bJIytQHE978JxBDEm1T7/dus82SoBVZriut/JcLWKFqEDHwbIEpR45Q3TYRj+BSgBz9w=
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"POST /auth/tokens/revoke"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/auth/tokens/revoke"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Revoke a specific JWT access token by its JTI claim.
+Admins can revoke any token. Users can only revoke their own.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./revoke-token-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./revoke-token-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

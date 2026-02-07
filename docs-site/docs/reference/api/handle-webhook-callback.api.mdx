@@ -1,0 +1,71 @@
+---
+id: handle-webhook-callback
+title: "Handle webhook callback from external ticketing system."
+description: "This endpoint is called by external ticketing systems (`ServiceNow`, Jira, or custom webhooks)"
+sidebar_label: "Handle webhook callback from external ticketing system."
+hide_title: true
+hide_table_of_contents: true
+api: eJzlVk1vGzkM/SsCTy0w8TiLLlDMLU2zuy6KbpB40UNrtLSG9qjRSFN9ODGM+e8LauSPZtIAvexlfbDHMkk9PvKR3kHAtYfqE/xpN+QMGkniTMyVvKOgzFp8pGVj7Z2HRQE1eelUF5Q1UMG8UV6QqTurTBDKC4laUy2WW0EPgWNpEQ5x/NYHar148fWW3EZJ+mDvvxbinXJYCOuEjD7YVtzn615+NsEKY4NabUX0wq5yLOEDhuiFbNCsyU/EvKEjCoyhIROUxEBeRM83o/ANOqqFJ+kofDYdek+1QC9QfI/ktqJDhy0FcoykIazJTaAA25FDznZWQwUNmlrTl4zwC2e7RHkHBRzcmcgdGGwJKpDWrNQ6DhG+qBoKUMxbh6GBEZkHon5wE7O3UICj71E5qqEKLlIBXjbUIlQ7CNuOr/LBKbOGAlbWtRigghhVDX1fHNAMye8xpLRHIHKtxT61zJhYWXfKLBufglqh9s+iMlFrXGoa8Pf9YvAmH97Yesse0ppAJvAjdp3Ot5TfPOPajUPb5TeSYZTAbbJLeHMulzmVm+E+rmpQgaHA0xbQ9/1jxtOB76zx5BnEb9MpfzxNXuespNRgPkp+WkWtmev/IMcB47NJDiacZV/Aq+n5OJGZ2aBWNUuhVT5JKPd87gdInq/Gnpc/tK6x3DnR1Gz/+1OUzUweE57chpwg56zjroWWQmNZdJ31ISksNFBBuT4MqXI/KcrDjCl3jyXXQwFD7EGZ0WkWcghdVZbaStSN9aF6PX09HfH8ljakbdeSCRkfsJyOIXxVlqruJg+42dqJoXGprp2to0xk7CMsGJCMToVtKuTQUEtCR+4icpKH+vMdkGXF3wcjKPLDH3upv/s4T5xxI90cZXX1gG3HPbDrWfQrm0LntkiYxcX1bIR5VrPKw1ZcO7tRNTm2St2WfHIfo0x9nGfLEG1O2HKptZLELXb8/c3t+7PzyTkUj9hbq9DE5UTatkwh8vtS22XZog/kyvezy6sPt1ccl6s4YJxOzidTPuLuaNGcXPVXGtKHhj1MspWz7c/X0uQxDScT6X+w53LDBXoIZadRGeY2lWqXlfcJjsqDAvbo06DJmUMB1WjlLQpghXGA3W6Jnv5xuu/5eNhALMpaeV4Ox0Xy00r80n56Mqk72p7uwg3qyEZJlxt0athSvwTqxU3eFS/Fs0v8STz5EM32FM0e54jOftEXMNQtoRzMLgcsZ3MOdgwzWjI8vgaPCympC8/aLk6G8PXft3OeO3lZt7ZmH4f3/DcA7wfINnGTxlk624FGs464ZtshJr/+BVRrrpM=
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Handle webhook callback from external ticketing system."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/governance/webhooks/ticketing/{configuration_id}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+This endpoint is called by external ticketing systems (`ServiceNow`, Jira, or custom webhooks)
+to notify us of ticket status changes. The endpoint authenticates using a shared secret
+passed as a query parameter or header.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./handle-webhook-callback.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./handle-webhook-callback.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./handle-webhook-callback.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

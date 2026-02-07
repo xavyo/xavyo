@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Entitlement removed"},"401":{"description":"Unauthorized"},"404":{"description":"Meta-role or entitlement not found"},"500":{"description":"Internal server error"}}}

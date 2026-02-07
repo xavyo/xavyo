@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Script hook binding deleted"},"401":{"description":"Unauthorized"},"404":{"description":"Binding not found"},"500":{"description":"Internal server error"}}}

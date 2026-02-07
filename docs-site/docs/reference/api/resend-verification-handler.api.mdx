@@ -1,0 +1,71 @@
+---
+id: resend-verification-handler
+title: "Handle resend verification request."
+description: "Resends the email verification link for unverified accounts."
+sidebar_label: "Handle resend verification request."
+hide_title: true
+hide_table_of_contents: true
+api: eJzVVU1v20YQ/SvEnGlSDnpIeXNSp1URtIbttAdHCEa7Y3Hj5S6zO5RNCPrvwSzXFmO5CVCgh+pAkcv5ePNm3nAHjJsIzQ2cDdySY6OQjXewKkFTVMH06bGBS4rkdCy4pYI6NLbYUjC32b6wxt0Vtz4Ug5vOSReolB8cx+qjW7otWqORKRboxqIPtDV+iN8GYX9HTszP7D2OsQjEQ3CxiINSFGPBPjmS4wyB3NBRSM4VlOD7/LDU0EBIiD/NM3xq0WlLAUoI9GWgyG+8HqHZgfKOybHcYt/bbF9/jlL8DqJqqUO547EnaMCvP5NieJmlb6vKmYoeR+tRVzm5CaSF+FSJ8N0Hwc+GouSZjg8JIwfjNkcJP0QKmQzUOlCMFez3JbBhS0+A/prhuZzgwF7MDkA4DJQOYu9dnDC8Wizk73mJuZzgpSmkofxv2ZsAPdH30f3r+ZjT3lGMuKFj4h9f/JD6X8lRMOope3b8Mf9TQdKAfQk/vcRxlkuu4taHDhnE+NXPLzQEmQprOsMFPSgiTTpB6IhbL0LofRSue+QWGqhx4LaexHEypxpKiBS2FGQf7GAIFhpomfumrq1XaFsfuXm9eL04ouIX2pL1fSfMTzFgX85DxKauje6rB9yOvnJ03PuL4PWgUssfI6wEkBqC4fFKJmjqz5owUJB1NWuR5BD8yQyabARlvnk3MdjA739fJ25kMi8PG+D8Abve0kx3j03fl2DcrU+pcktTDcXZxfKohqWWDcpjcRH81mgKYpW2YvLJQkGVhOKwO0S7JuwklzWKZDYO799cvT85rU6hfMbmxnA7rCvluzqFyNe19eu6w8gU6vfLt+d/XJ1LXOnqhHFRnVYLOZKp6NDNUv2WlmMR/nmHVc9Lni3O/8UXIo8L0wPXvUXjhIlE7C7r4wZEH2lZHCtkVYKIQKx2uzVG+hDsfi/HXwYKIzQ3qxK2GAyuZVRuVvsSWkJNIUnqjkZo4O3E2Mm1YBFzOwimo8UpCpo8zpSinr9ru5rp/eLPq2sZ/fxp67wWn4D3UhXeQwPpWyneSVHpbAcW3WZImw+mmPL7CpEH4nU=
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Handle resend verification request."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/auth/resend-verification"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Resends the email verification link for unverified accounts.
+Invalidates any previous verification tokens.
+Always returns success to prevent email enumeration.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./resend-verification-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./resend-verification-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

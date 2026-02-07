@@ -1,0 +1,70 @@
+---
+id: get-user-risk-enforcement
+title: "Get risk enforcement action required for a user."
+description: "Returns the action that should be taken based on the user's risk score"
+sidebar_label: "Get risk enforcement action required for a user."
+hide_title: true
+hide_table_of_contents: true
+api: eJzNVk1v20YQ/SuLudQBaFJOUyDgTUkcQ4VbGP5AD67grJYjcePlLjO7VKMQ/O/FLClTMt0avfUikfsx8+btm7dsIciNh/weLtwWyUqrUJyKa+0fxY1ypO0GlgkU6BXpOmhnIYdrDA1ZL0KJQioeFKGUQfjSNaYQKxRBPqIVK+mxEHEWReORfvKCOLJXjvBPK20hlLNrvWkICxFKQl86U3hxMjdIIRFfrvFbowl/+zz/kghH4oNx6vFNCgm4Gkly7kUBOWwwPHCGB47/gHbtSGGFNkACtSRZYUDiOluwskLIIa7WBSSguaZahhKeF3rnkcTiEyRAPY4C8kANJuBViZWEvIWwqzmcD5GrBNaOKhk4QaML6Lolb/a1sx49r387m/HfM0aZlQPUA62QgHI2cBl5C7KujVax5uyr533tFIdbfUUVJpVMEqgS1aPYI0uPSrw/ICceFc8yrwa3aCCBAd0ygZr4HILuaxvGX2DlGM35pFKxzz6KhjMyLrRNxZisswxEsjJGuA/VWkICK9YFAwo6GDxOMe9RdUdFvIoxMhbXCmWk93o9cH+Iybi/IIEKC91UkECpNywiRTpoJc0hHg53GTN3e1JHCNoG3CAdqkfb8PPbCaiPDRGTFgOkHOqpafi4XpXj83i3+919AwfSmw32vfjU2id6LaTdxaazjTFyxQVxGxyl79vqNVbHhLz+xZB77f3nYoZuTaHrjnk/0ML1IHjoOl71bnY2bcY7K5tQOtI/sIC46N0/dGw8BmFdEGvX2EKsHUWf412/vNTnCxvYZI3wSFskgUSOIl6PqiEddtGiVigJ6YFhQH6/ZA+pMJRucLroaTwF2ebJtTNO7LN2oK/LWOynx07YZ+1tsCEDOZQh1HmWGaekKZ0P+fvZ+9mE2U8sXFfHfu1jQJcchvB5lumiTr/L7c6lFqcGdEWuaHpB7SMsx6pv2MZ6D+lrn8fSnxTAOWBwXX7vF3Hfx4fPe138+sdtZFPbtYvbBxVEXGJ+tZjgWhRogw47cUVuqwskXhUPMu4ZHFiq6MDD1dFHu0VZ8UEbrZAVNc5/uLk8PUvPIHnG0EaHslmlylVZDDH8roxbZZX0ASm7XHw8//3mnOPySfUYZ+lZOuOh2vlQSXuQ6gJDf6VOL4/RUrkaGYWZPq+/HS+Y/8e1Phx4wO8hq43U0bcjje0g+nsYRQ+9XXhIIB/vrInylwmwuHlv2zL8OzJdx8PfGiTuuWUCW0m6N6L7Fgrt+bmAfC2Nx39h7WSopXgjxs+FF6sYBqXdAWczDb9BAo+4O/ge6ZZdAiXKAiki6WfnSmEdDvZNPgaOTOLinPvgbxoRagI=
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get risk enforcement action required for a user."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/governance/users/{user_id}/risk-enforcement"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns the action that should be taken based on the user's risk score
+and configured thresholds (Alert, `RequireMFA`, or Block).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-user-risk-enforcement.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-user-risk-enforcement.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-user-risk-enforcement.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

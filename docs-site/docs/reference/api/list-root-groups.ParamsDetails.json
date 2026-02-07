@@ -1,0 +1,1 @@
+{"parameters":[{"name":"limit","in":"query","description":"Maximum number of items to return (default: 50, max: 200).","required":false,"schema":{"type":"integer","format":"int64","nullable":true}},{"name":"offset","in":"query","description":"Offset for pagination (default: 0).","required":false,"schema":{"type":"integer","format":"int64","nullable":true}}]}

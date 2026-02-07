@@ -1,0 +1,1 @@
+{"parameters":[{"name":"object_type","in":"path","description":"Object type (user, role, entitlement)","required":true,"schema":{"type":"string"}},{"name":"object_id","in":"path","description":"Object ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

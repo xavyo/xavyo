@@ -1,0 +1,75 @@
+---
+id: reset-escalation
+title: "Reset escalation to original approver."
+description: "Returns the work item to the original approver and restarts the escalation"
+sidebar_label: "Reset escalation to original approver."
+hide_title: true
+hide_table_of_contents: true
+api: eJztVk2P2zYQ/SvEnBJAlrxpCgS6bZtt4SJNF7sb7GHXMChpZDFLkQo5suMa+u/FULK1ttz20Gsv/iCHM29m3jxyDyTXHtIn+NVu0BlpchQz8WjdS6ntVtz4XGpJyhpYRlCgz51qwt8U7pBaZ7ygCsXWuhehCGtBNixYp9bKSC1k0zh2LaQphENP0lF/Bo++nw2pGp0ona3DVoZrZYwy61g8nFgKjRvUQnl2hcTR5vGzeTYPlfK83HosWy22FZr02czC8SkW5YWxWyE3UmmZaWTLa1ErT/IFxVZ6UcsChTJnQEXjbI7eHzw7/NaiJ2EQC89gQnqidOgrsVVUndZiO5QVIrANuuByUUAKIZnVGAciaKSTNRI67s4ejKwxGIaAK1VABIq70Eiq4Lw11zmjFHcDvMVHiMJR5bCAlFyLEfi8wlpCugfaNezbk1NmDRGU1tWSIIW2VQV03ZIP+8Yaj57t383n/HUacmTK0BrfBhBlq/UOIsitITTEB2XTaJUH2+Sr59P7KRqbfcWcJpndDUBEad0Q6FV7jlWNTxJ+ggEM19XhRtnWrwKTuBNDd1YHdvTFrdF7uUamfePYL6k++8PGhcKdQv29NxT9aqbMOrDBoW81xdBFYHC7KlAWWpmL/o6NKCThjGdkEuQzbsXBRagJh+gzkVq8UaUYqp1pfMtVMa0OlO9p0P1N/v/KinMcl+dsW9kwaJU8k4mQ/lkrxpjKEK7RvQ6qDP3w7mLUiThQJSnMsMxJbVhMSuuwJ0uIeyDDGDCzVqM0E/+PFVKF7tA37P2OzI6h6yIgRVxP5ibSOAcHqkLXsdX7S1NzmFAukLEkMkRzyAgLYZ3IpeGNgqWg5iZPqgzB+dXU+RcjW6qsU39i0Ru9nxoNUnFUMkuitK0JB368BHlhiC8KLTw67jE6Z12og8e8dYp2QbAylA7dihFA+rRkEamRKsty11hPQeJ4D5L18epJZEAzG9D4ZD8KXpeEDsxOVLLH0Etk6zSkUBE1aZJom0tdWU/ph/mH+aSxH5kptqnR0JAHdNFrFz5NElU08Xe52dnY4FSJbp0t2jzw7uBhOdbgnvWsF4y+EtehEEfGcQwYRDgwMBhBNPz45cD73x4fQm2VKW04PnAt4BLXt4sJrkWBhhTtxK2zG1WgY6sgDeHMIMUyD1I8XCu9tweUNbddqxyZt+P+T/efZlfxFURnFVorqtoszm2dBBfDZ6ZtltTSE7rk0+Lnm8/3N+yXO9VjnMdX8TxIgPVUS/Mq1N25ppOdUj4+z3o/3i//v0v+y7tkoCfhd0oaLZXhLoWm74d5fYJxXiGCs4mFCNKTR8pkaJcR8Fyyo/0+kx6/ON11vPytRcfisYxgI53qb6mnPRTK8+8C0lJqj//Q+jd3w53/Vlx6Al1MbliUhl8pG6lb/gcRvODu9MHVLbsIKpQFugCrN+A4Db06OnndnEjf7R/3PNB/Afr5DWI=
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Reset escalation to original approver."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/governance/access-requests/{request_id}/reset-escalation"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Returns the work item to the original approver and restarts the escalation
+timer from the beginning. The escalation level is reset to 0.
+
+This is useful when:
+- The original approver is now available
+- A mistake was made in the escalation process
+- The request needs to start fresh with the original workflow
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./reset-escalation.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./reset-escalation.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./reset-escalation.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

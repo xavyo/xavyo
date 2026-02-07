@@ -1,0 +1,1 @@
+{"parameters":[{"name":"role_id","in":"path","description":"Role ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"block_id","in":"path","description":"Inheritance block ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

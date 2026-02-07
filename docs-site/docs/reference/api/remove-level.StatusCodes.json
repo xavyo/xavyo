@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Level removed"},"401":{"description":"Unauthorized"},"404":{"description":"Level not found"},"500":{"description":"Internal server error"}}}

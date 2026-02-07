@@ -1,0 +1,1 @@
+{"parameters":[{"name":"script_id","in":"path","description":"Script ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"version_number","in":"path","description":"Version number","required":true,"schema":{"type":"integer","format":"int32"}}]}

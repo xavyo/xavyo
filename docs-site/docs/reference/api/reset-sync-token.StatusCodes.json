@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Token reset"},"401":{"description":"Unauthorized"},"404":{"description":"Connector not found"}}}

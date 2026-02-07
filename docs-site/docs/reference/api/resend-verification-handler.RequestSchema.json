@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Resend verification request payload.","required":["email"],"properties":{"email":{"type":"string","description":"User email address."}},"title":"ResendVerificationRequest"}}},"required":true}}

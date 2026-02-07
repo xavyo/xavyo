@@ -1,0 +1,1 @@
+{"title":"Body","body":{"description":"","content":{"application/json":{"schema":{"type":"object","description":"Request to upload a new certificate","required":["certificate","private_key"],"properties":{"certificate":{"type":"string"},"private_key":{"type":"string"}},"title":"UploadCertificateRequest"}}},"required":true}}

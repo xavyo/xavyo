@@ -1,0 +1,70 @@
+---
+id: delete-state
+title: "Delete a lifecycle state."
+description: "Removes a state from the configuration. Fails if any objects are in this state"
+sidebar_label: "Delete a lifecycle state."
+hide_title: true
+hide_table_of_contents: true
+api: eJzFVE2P0zAQ/SvWnEAKSReBBLkBW6SiFVqxizgs1cpNJo3BscN4UlGi/Hc0TvqxW1ghOHBpY3vm+c2b5+mB9TpAfgMXpsJiW1hUb7yrzLojzcY7WCZQYijItHGZwwds/AaD0iqwZlQV+UZxjao4zkvVW21sUKZS2m2VX33BgoPShMo4xbUJY/pn50mCmLQLRjKDIqyQ0BV4FJdCAr7FEXxRQg4lWmS8jaeQQKtJN8hIUk0PTjcIOYycbk0JCRhh32qu4X5Jh9rv1KAW55AA4bfOEJaQM3WYQChqbDTkPfC2lTsCk3FrSKDy1GiGHLrOlDAMyZ5GJPnnLEZh//H2pSSH1ruAQeKfzp7J38N3jqKWMCTwbHZ2Gv/R6Y5rT+bHLugXoFcRynlWle/cFPfyd3EmiCO6gBL3fDY7jVs4RnLaqoC0QVJI5En0hYBFR4a3seUr1IR0KwQhv1mKAA1y7Q9miTaRU8jWfiOYrsDM7jTIxu6HrN/bZsiiLiHrdy0cQK4VHqPROrKQQ83c5llmfaFt7QPnL2YvZicdPscNWt826HiqBcQkB4iQZ5kp2/S73mx96pBPIC7Jl10R3blDWB50uBJ3jO0e1XgVxdibRe6AyUSyHoMgmT7e7iz07tN11Ne4ysd0w1biIy/16nJxwmtRomPDW3VJfmNKJIlSlScVcyCRp8i6YIGbXsWIdo26kdZbU6ALeHT++uriyVl6Bsk9hdaG626VFr7JIsT0u7J+lTU6MFJ2sXgzf381F1zp1Mhxlp6lM9lqfeBGu6OrzqM/lFb27oNI7xfaxzrQ8X+dhFM7Gb9z1lptnFQVReonh9/AweEg4k5ljY0Ql0MC+fF4HI0uu/tptUxAzCxofb/SAT+SHQbZ/tYhyatbJrDRZPRK7HHTQ2mCfJeQV9oGfEC8Rx+myfZYPTh+f1nqtKndFoSA7WQFCXzF7Z2hL6/rHykdzeK/oLKXclgOR+PofH4xv57DMPwECo6XAw==
+sidebar_class_name: "delete api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Delete a lifecycle state."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"delete"}
+  path={"/governance/lifecycle/configs/{config_id}/states/{state_id}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Removes a state from the configuration. Fails if any objects are in this state
+or if transitions reference this state.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./delete-state.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./delete-state.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./delete-state.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

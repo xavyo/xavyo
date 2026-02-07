@@ -1,0 +1,70 @@
+---
+id: rollback-transition
+title: "Rollback a transition within its grace period."
+description: "Reverts an executed transition back to its original state. Only available"
+sidebar_label: "Rollback a transition within its grace period."
+hide_title: true
+hide_table_of_contents: true
+api: eJy9Vk1v3DYQ/SvEnFpAkdZpCgS6OYkLbBE0xtpBD+7CmJVmV0woUiFHsrcL/fdgKK21H7ZPRX1YS+R8vcd5Q+2AcRMgv4MbRiZ169EGzdrZAMsESgqF1428Qw4L6shzUGgVPVLRMpWKnxzUCovvip3SHJTzeqMtGhUkbKq+WLNV2KE2uDL0j32otCHFFamNx4JUQ167UumgsGDdUQoJuIY8SuR5CTl4Z4xkuJ8yQgINeqyJyQuGHVisSWzpR0uB73UJCWgpvUGu4BTPBFaNHmr+CZLorj2VkLNvKYFQVFQj5DvgbSPxA3ttN5DA2vkaGXJoW11C3y+Tfe4PrtyKR+Esk2V5xKYxuoiIsm9BKtidh3arb1TwWamLsT52ak+EQjVYyCKqxlOnXRtURz5oZ9MjIHfA6DfE9+OuHG7jhWHWFCS/JxxrOgV5XMmX+IBGDQ5q7Xw8x31Zkte2Jp7zQGCfnCafkmjLtCF/SKW2/Nvb87OqaI9M2bZekT/igl0KvSTSLGlhMW6MvEEvm8fnGhdC42wYCHg7m8m/l1vEGUNl7HJI/qtzvYl2kcQp1Vj0YqxOGN3jetFIEPYJvHsOxJ4MZR1PIlTOH4uPHpvITgxzcR7mq8WWK+f1v3ujd68TNvasZF271kan358rcG6ZfJwW5Dvyirx3Pp5noKL1mrdR3StCT/5eqoD8bilqq4krJ+OhcYHjPJA9yDauk4i2oMzoNRXbwlA2TY6Q7aYZ0Wf7NgJJKBUM06T1BnKomJs8y4wr0FQucP5+9n52dpCfqCPjmposjyigTw5DhDzLdNmkj9htXWrpvBeuvSvbIlK3j7CcGIidMnTqwMNlpOGpwSQHjLNK3gcjSMaHP/by+vPv28isdOpimlVXj1g30mLTJJgmwKl8Z72M1bWL6cfOjLjU5fX8DNe8JMuat+rau06X5MUqtnz0GcWERRTTOMGHaLeEtTSN0QVJj0/7H24+v7lILyA5YXijuWpXaeHqLIYYf1fGrbIaA5PPPs8/Xv11cyVxnwDBLL1IZ7IkfVSjPUi1mObtwWX3oLnSNt51hyJKT9Ef3AD/9/05NgbTI2eNQW0FX6RrN+rkDiadgNA8KkWcDz4EEsiPbtQnuSwTEEVIoN1uhYG+etP3svyjJS+iXSbQodfDZXC3g1IHeS4hX6MJ9ApZvyzGaf2reumefhbguIh2C5LbtPIGCXyn7fGXQb/sE6gIS/KxtMHg41DAm1sJMwU4m/Ei7sHjsiio4VdtDwfV9ZebW1Hl+H1QuzJ+seCDEIsPQ7GuGZgXNcraDgzaTYsbsR1iyt9PZqtrpQ==
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Rollback a transition within its grace period."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/governance/lifecycle/transitions/{request_id}/rollback"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Reverts an executed transition back to its original state. Only available
+while the grace period is active.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./rollback-transition.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./rollback-transition.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./rollback-transition.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      
