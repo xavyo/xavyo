@@ -7,12 +7,19 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: Users with various department and lifecycle_state attributes should exist to test filter expressions. At least one governance role must exist for assign_role/revoke_role action types.
+
 ## Nominal Cases
 
 ### TC-GOV-BULK-001: Create bulk action with filter expression
 - **Category**: Nominal
 - **Standard**: IGA Mass Operations
-- **Preconditions**: Authenticated as admin; users exist with department attributes
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated as admin; users exist with department attributes
 - **Input**:
   ```json
   POST /governance/admin/bulk-actions
@@ -41,6 +48,7 @@
 ### TC-GOV-BULK-002: Create bulk revoke role action
 - **Category**: Nominal
 - **Standard**: Least Privilege Enforcement
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Users with roles and lifecycle_state attributes exist
 - **Input**:
   ```json
   POST /governance/admin/bulk-actions
@@ -58,6 +66,7 @@
 
 ### TC-GOV-BULK-003: Create bulk disable action
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active users exist with various last_login dates
 - **Input**:
   ```json
   POST /governance/admin/bulk-actions
@@ -75,7 +84,7 @@
 
 ### TC-GOV-BULK-004: List bulk actions
 - **Category**: Nominal
-- **Preconditions**: Multiple bulk actions exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Multiple bulk actions exist
 - **Input**:
   ```
   GET /governance/admin/bulk-actions?limit=20&offset=0
@@ -88,6 +97,7 @@
 
 ### TC-GOV-BULK-005: Get bulk action details
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Bulk action exists
 - **Input**:
   ```
   GET /governance/admin/bulk-actions/<action-id>
@@ -110,7 +120,7 @@
 ### TC-GOV-BULK-006: Preview bulk action (dry run)
 - **Category**: Nominal
 - **Standard**: IGA Impact Assessment
-- **Preconditions**: Bulk action in "pending" status
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Bulk action in "pending" status
 - **Input**:
   ```
   POST /governance/admin/bulk-actions/<action-id>/preview
@@ -130,7 +140,7 @@
 ### TC-GOV-BULK-007: Execute bulk action
 - **Category**: Nominal
 - **Standard**: IGA Mass Provisioning
-- **Preconditions**: Bulk action in "pending" status, preview reviewed
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Bulk action in "pending" status, preview reviewed
 - **Input**:
   ```
   POST /governance/admin/bulk-actions/<action-id>/execute
@@ -144,7 +154,7 @@
 
 ### TC-GOV-BULK-008: Cancel executing bulk action
 - **Category**: Nominal
-- **Preconditions**: Bulk action in "executing" status
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Bulk action in "executing" status
 - **Input**:
   ```
   POST /governance/admin/bulk-actions/<action-id>/cancel
@@ -157,7 +167,7 @@
 
 ### TC-GOV-BULK-009: Delete completed bulk action record
 - **Category**: Nominal
-- **Preconditions**: Bulk action is completed or cancelled
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Bulk action is completed or cancelled
 - **Input**:
   ```
   DELETE /governance/admin/bulk-actions/<action-id>
@@ -170,6 +180,7 @@
 ### TC-GOV-BULK-010: Validate filter expression
 - **Category**: Nominal
 - **Standard**: IGA Expression Safety
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/admin/bulk-actions/validate-expression
@@ -183,6 +194,7 @@
 
 ### TC-GOV-BULK-011: Bulk action with modify_attribute type
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Users with department attributes exist
 - **Input**:
   ```json
   POST /governance/admin/bulk-actions
@@ -201,7 +213,7 @@
 ### TC-GOV-BULK-012: Bulk action progress tracking
 - **Category**: Nominal
 - **Standard**: IGA Operational Monitoring
-- **Preconditions**: Bulk action is executing
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Bulk action is executing
 - **Steps**:
   1. Execute bulk action
   2. Poll GET `/governance/admin/bulk-actions/<id>` periodically
@@ -215,6 +227,7 @@
 
 ### TC-GOV-BULK-020: Invalid filter expression
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/admin/bulk-actions/validate-expression
@@ -228,6 +241,7 @@
 
 ### TC-GOV-BULK-021: Empty filter expression
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/admin/bulk-actions
@@ -246,6 +260,7 @@
 
 ### TC-GOV-BULK-022: Justification too short
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/admin/bulk-actions
@@ -264,7 +279,7 @@
 
 ### TC-GOV-BULK-023: Execute already-completed bulk action
 - **Category**: Edge Case
-- **Preconditions**: Bulk action status is "completed"
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Bulk action status is "completed"
 - **Input**:
   ```
   POST /governance/admin/bulk-actions/<action-id>/execute
@@ -277,6 +292,7 @@
 
 ### TC-GOV-BULK-024: Filter matching zero users
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/admin/bulk-actions
@@ -295,7 +311,7 @@
 
 ### TC-GOV-BULK-025: Delete executing bulk action
 - **Category**: Edge Case
-- **Preconditions**: Bulk action is "executing"
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Bulk action is "executing"
 - **Input**:
   ```
   DELETE /governance/admin/bulk-actions/<action-id>
@@ -308,6 +324,7 @@
 
 ### TC-GOV-BULK-026: Filter expression at maximum length (10000 chars)
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: Valid expression with many conditions totaling 10000 characters
 - **Expected Output**:
   ```
@@ -321,7 +338,7 @@
 ### TC-GOV-BULK-030: Create bulk action without admin role
 - **Category**: Security
 - **Standard**: NIST SP 800-53 AC-6 (Least Privilege)
-- **Preconditions**: JWT with non-admin role
+- **Preconditions**: Fixtures: `TEST_TENANT`. JWT with non-admin role
 - **Input**:
   ```json
   POST /governance/admin/bulk-actions
@@ -334,6 +351,7 @@
 
 ### TC-GOV-BULK-031: Execute bulk action without admin role
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`. Bulk action exists; authenticated with non-admin JWT
 - **Input**:
   ```
   POST /governance/admin/bulk-actions/<id>/execute
@@ -346,7 +364,7 @@
 
 ### TC-GOV-BULK-032: Cross-tenant bulk action access
 - **Category**: Security
-- **Preconditions**: Bulk action in tenant A; JWT for tenant B admin
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Bulk action in tenant A; JWT for tenant B admin (second tenant required)
 - **Input**:
   ```
   GET /governance/admin/bulk-actions/<tenant-a-action-id>
@@ -359,6 +377,7 @@
 ### TC-GOV-BULK-033: SQL injection via filter expression
 - **Category**: Security
 - **Standard**: OWASP Top 10 (Injection)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/admin/bulk-actions
@@ -382,6 +401,7 @@
 ### TC-GOV-BULK-040: Bulk action audit trail for SOX compliance
 - **Category**: Compliance
 - **Standard**: SOX Section 404 (Change Management)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Users with filterable attributes exist
 - **Steps**:
   1. Create bulk action
   2. Preview (record of who previewed)
@@ -392,6 +412,7 @@
 ### TC-GOV-BULK-041: Justification requirement for bulk operations
 - **Category**: Compliance
 - **Standard**: ISO 27001 A.12.1.2 (Change Management)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Attempt bulk action without justification -> rejected
   2. Attempt bulk action with justification < 10 chars -> rejected
@@ -401,6 +422,7 @@
 ### TC-GOV-BULK-042: Preview-before-execute pattern
 - **Category**: Compliance
 - **Standard**: IGA Change Approval
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Users with filterable attributes exist
 - **Steps**:
   1. Create bulk action
   2. Execute preview to see affected users

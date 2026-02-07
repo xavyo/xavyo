@@ -46,7 +46,7 @@ impl MiningJobStatus {
 }
 
 /// Parameters for a mining job.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct MiningJobParameters {
     /// Minimum users required to form a candidate role.
@@ -80,6 +80,21 @@ pub struct MiningJobParameters {
     /// Deviation percentage threshold for excessive privilege detection.
     #[serde(default = "default_deviation_threshold")]
     pub deviation_threshold: f64,
+}
+
+impl Default for MiningJobParameters {
+    fn default() -> Self {
+        Self {
+            min_users: default_min_users(),
+            min_entitlements: default_min_entitlements(),
+            confidence_threshold: default_confidence_threshold(),
+            include_excessive_privilege: true,
+            include_consolidation: true,
+            peer_group_attribute: None,
+            consolidation_threshold: default_consolidation_threshold(),
+            deviation_threshold: default_deviation_threshold(),
+        }
+    }
 }
 
 fn default_min_users() -> i32 {

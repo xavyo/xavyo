@@ -47,7 +47,7 @@ use xavyo_api_connectors::{
     ScimTargetService, ScimTargetState, SyncService, SyncState,
 };
 use xavyo_api_governance::governance_router;
-use xavyo_api_import::{import_router, ImportState};
+use xavyo_api_import::{import_admin_router, import_public_router, ImportState};
 use xavyo_api_nhi::router as nhi_router;
 use xavyo_api_oauth::router::{
     admin_oauth_router, device_router, oauth_router, well_known_router, OAuthState,
@@ -209,12 +209,36 @@ async fn main() {
     };
     let token_service = TokenService::new(token_config.clone(), pool.clone());
 
+    let login_rate_max: usize = std::env::var("LOGIN_RATE_LIMIT_MAX")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(5);
+    let login_rate_window: u64 = std::env::var("LOGIN_RATE_LIMIT_WINDOW_SECS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(60);
     let rate_limiter = RateLimiter::new(RateLimitConfig {
-        max_attempts: 5,
-        window: Duration::from_secs(60),
+        max_attempts: login_rate_max,
+        window: Duration::from_secs(login_rate_window),
     });
 
-    let email_rate_limiter = EmailRateLimiter::new();
+    let email_rate_max: usize = std::env::var("EMAIL_RATE_LIMIT_MAX")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3);
+    let email_ip_rate_max: usize = std::env::var("EMAIL_IP_RATE_LIMIT_MAX")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(10);
+    let email_rate_window: u64 = std::env::var("EMAIL_RATE_LIMIT_WINDOW_SECS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3600);
+    let email_rate_limiter = EmailRateLimiter::with_config(
+        email_rate_max,
+        email_ip_rate_max,
+        email_rate_window,
+    );
 
     // Use SmtpEmailSender when SMTP env vars are configured, otherwise fall back to mock
     let email_sender: Arc<dyn xavyo_api_auth::EmailSender> = match EmailConfig::from_env() {
@@ -775,7 +799,8 @@ async fn main() {
 
     // Operation tracking routes (F160 - Job Tracking)
     let operation_service = Arc::new(OperationService::new(pool.clone()));
-    let operation_state = OperationState::new(operation_service);
+    let conflict_service = Arc::new(xavyo_api_connectors::ConflictService::new(pool.clone()));
+    let operation_state = OperationState::with_conflict_service(operation_service, conflict_service);
     let job_service = Arc::new(JobService::new(Arc::new(pool.clone())));
     let job_state = JobState::new(job_service);
 
@@ -865,7 +890,7 @@ async fn main() {
     // Bulk user import routes (F086 - Import & Invitation)
     // F113: Support both API key and JWT authentication for programmatic access
     let import_state = ImportState::new(pool.clone(), auth_state.email_sender.clone());
-    let import_routes = import_router(import_state)
+    let import_admin_routes = import_admin_router(import_state.clone())
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::middleware::from_fn(api_key_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
@@ -873,6 +898,14 @@ async fn main() {
         .layer(TenantLayer::with_config(
             xavyo_tenant::TenantConfig::builder()
                 .require_tenant(true)
+                .build(),
+        ));
+    // Public invitation routes (no auth — invitees don't have accounts yet)
+    let import_public_routes = import_public_router(import_state)
+        .layer(axum::Extension(pool.clone()))
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(false)
                 .build(),
         ));
 
@@ -1098,8 +1131,10 @@ async fn main() {
         .merge(authorization_routes)
         // Webhooks routes (F085 - Webhooks & Event Subscriptions)
         .merge(webhooks_routes)
-        // Bulk user import routes (F086 - Import & Invitation)
-        .merge(import_routes)
+        // Bulk user import admin routes (F086 - Import, JWT/API key auth)
+        .merge(import_admin_routes)
+        // Public invitation routes (F086 - no auth, invitees have no account)
+        .merge(import_public_routes)
         // NOTE: AI Agent Security routes (/agents/*, /tools/*, /approvals/*) have been
         // consolidated under /nhi/* by F109 - NHI API Consolidation
         // MCP routes (F091 - Model Context Protocol)

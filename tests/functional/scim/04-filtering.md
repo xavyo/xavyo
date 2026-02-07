@@ -6,12 +6,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `SCIM_TOKEN`, `TEST_TENANT`, `ADMIN_JWT`
+- **Special Setup**: SCIM provisioning enabled for tenant
+
+---
+
 ## Nominal Cases - Filter Operators
 
 ### TC-SCIM-FILTER-001: Filter by userName eq (exact match)
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.2
-- **Preconditions**: User `alice@example.com` exists
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User `alice@example.com` exists
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName eq "alice@example.com"
@@ -33,7 +42,7 @@
 ### TC-SCIM-FILTER-002: Filter by displayName co (contains)
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.2
-- **Preconditions**: Users with displayName containing "John" exist
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Users with displayName containing "John" exist
 - **Input**:
   ```
   GET /scim/v2/Users?filter=displayName co "John"
@@ -48,7 +57,7 @@
 ### TC-SCIM-FILTER-003: Filter by userName sw (starts with)
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.2
-- **Preconditions**: Users with emails starting with "admin" exist
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Users with emails starting with "admin" exist
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName sw "admin"
@@ -63,7 +72,7 @@
 ### TC-SCIM-FILTER-004: Filter by externalId pr (present / not null)
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.2
-- **Preconditions**: Some users have externalId, some do not
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Some users have externalId, some do not
 - **Input**:
   ```
   GET /scim/v2/Users?filter=externalId pr
@@ -77,6 +86,7 @@
 ### TC-SCIM-FILTER-005: Filter by active eq true
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=active eq true
@@ -90,6 +100,7 @@
 ### TC-SCIM-FILTER-006: Filter with AND logical operator
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName eq "alice@example.com" and active eq true
@@ -104,6 +115,7 @@
 ### TC-SCIM-FILTER-007: Filter with OR logical operator
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName eq "alice@example.com" or userName eq "bob@example.com"
@@ -118,7 +130,7 @@
 ### TC-SCIM-FILTER-008: Filter by nested attribute (name.givenName)
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.2
-- **Preconditions**: Users with first_name "John" exist
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Users with first_name "John" exist
 - **Input**:
   ```
   GET /scim/v2/Users?filter=name.givenName eq "John"
@@ -132,7 +144,7 @@
 ### TC-SCIM-FILTER-009: Filter groups by displayName
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.2
-- **Preconditions**: Group "Engineering" exists
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group "Engineering" exists
 - **Input**:
   ```
   GET /scim/v2/Groups?filter=displayName eq "Engineering"
@@ -146,7 +158,7 @@
 ### TC-SCIM-FILTER-010: Pagination with startIndex and count
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.4
-- **Preconditions**: 50 users exist
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. 50 users exist
 - **Input**:
   ```
   GET /scim/v2/Users?startIndex=11&count=10
@@ -171,6 +183,7 @@
 ### TC-SCIM-FILTER-020: Filter with NOT operator
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=not (active eq false)
@@ -185,6 +198,7 @@
 ### TC-SCIM-FILTER-021: Filter with grouped expression
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=(userName co "john" or userName co "jane") and active eq true
@@ -199,6 +213,7 @@
 ### TC-SCIM-FILTER-022: Filter with ne (not equal) operator
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=active ne true
@@ -213,6 +228,7 @@
 ### TC-SCIM-FILTER-023: Filter with ew (ends with) operator
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName ew "@example.com"
@@ -227,6 +243,7 @@
 ### TC-SCIM-FILTER-024: Filter with gt (greater than) operator
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName gt "m"
@@ -240,6 +257,7 @@
 ### TC-SCIM-FILTER-025: Filter with ge (greater than or equal) operator
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName ge "alice@example.com"
@@ -249,6 +267,7 @@
 ### TC-SCIM-FILTER-026: Filter with lt (less than) operator
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName lt "m"
@@ -258,6 +277,7 @@
 ### TC-SCIM-FILTER-027: Filter with le (less than or equal) operator
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName le "alice@example.com"
@@ -267,6 +287,7 @@
 ### TC-SCIM-FILTER-028: Filter with unknown attribute
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=unknownAttr eq "value"
@@ -285,6 +306,7 @@
 ### TC-SCIM-FILTER-029: Filter with invalid operator
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName invalidop "value"
@@ -297,6 +319,7 @@
 
 ### TC-SCIM-FILTER-030: Filter with unterminated string
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName eq "unterminated
@@ -309,6 +332,7 @@
 
 ### TC-SCIM-FILTER-031: Filter with missing value after operator
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName eq
@@ -321,6 +345,7 @@
 
 ### TC-SCIM-FILTER-032: Filter with empty string
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=
@@ -334,6 +359,7 @@
 
 ### TC-SCIM-FILTER-033: Filter with unbalanced parentheses
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=(userName eq "alice@example.com"
@@ -346,6 +372,7 @@
 
 ### TC-SCIM-FILTER-034: Filter with NOT missing parentheses
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=not active eq true
@@ -363,6 +390,7 @@
 ### TC-SCIM-FILTER-040: Default pagination (no params)
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.4
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users
@@ -372,6 +400,7 @@
 ### TC-SCIM-FILTER-041: Count exceeds maximum (clamped to 100)
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.4
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?count=999
@@ -385,6 +414,7 @@
 
 ### TC-SCIM-FILTER-042: Negative startIndex (adjusted to 1)
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?startIndex=-5
@@ -397,6 +427,7 @@
 
 ### TC-SCIM-FILTER-043: Zero count (clamped to 1)
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?count=0
@@ -410,7 +441,7 @@
 ### TC-SCIM-FILTER-044: startIndex beyond totalResults
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.4
-- **Preconditions**: Only 5 users exist
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Only 5 users exist
 - **Input**:
   ```
   GET /scim/v2/Users?startIndex=1000
@@ -428,7 +459,7 @@
 ### TC-SCIM-FILTER-045: Pagination through full result set
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.4
-- **Preconditions**: 30 users exist
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. 30 users exist
 - **Input**: Sequence of requests:
   1. `GET /scim/v2/Users?startIndex=1&count=10` --> 10 users
   2. `GET /scim/v2/Users?startIndex=11&count=10` --> 10 users
@@ -439,6 +470,7 @@
 ### TC-SCIM-FILTER-046: Sorting by userName ascending
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.3
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?sortBy=userName&sortOrder=ascending
@@ -448,6 +480,7 @@
 ### TC-SCIM-FILTER-047: Sorting by userName descending
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.3
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?sortBy=userName&sortOrder=descending
@@ -457,6 +490,7 @@
 ### TC-SCIM-FILTER-048: Sorting by displayName
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.3
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?sortBy=displayName
@@ -465,6 +499,7 @@
 
 ### TC-SCIM-FILTER-049: Sorting by unsupported attribute defaults to created_at
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?sortBy=unknownField
@@ -477,7 +512,7 @@
 
 ### TC-SCIM-FILTER-050: Filter combined with pagination
 - **Category**: Edge Case
-- **Preconditions**: 20 active users, 5 inactive users
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. 20 active users, 5 inactive users
 - **Input**:
   ```
   GET /scim/v2/Users?filter=active eq true&startIndex=1&count=10
@@ -490,6 +525,7 @@
 
 ### TC-SCIM-FILTER-051: Filter combined with sorting
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=active eq true&sortBy=userName&sortOrder=descending
@@ -499,6 +535,7 @@
 ### TC-SCIM-FILTER-052: Case-insensitive filter operators
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName EQ "alice@example.com"
@@ -509,6 +546,7 @@
 ### TC-SCIM-FILTER-053: emails.value attribute mapping
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=emails.value eq "alice@example.com"
@@ -517,6 +555,7 @@
 
 ### TC-SCIM-FILTER-054: Filter by name.familyName
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=name.familyName eq "Smith"
@@ -529,6 +568,7 @@
 
 ### TC-SCIM-FILTER-060: SQL injection via filter value
 - **Category**: Security
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName eq "'; DROP TABLE users; --"
@@ -541,6 +581,7 @@
 
 ### TC-SCIM-FILTER-061: SQL injection via attribute name
 - **Category**: Security
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=id; DROP TABLE users;-- eq "test"
@@ -554,7 +595,7 @@
 
 ### TC-SCIM-FILTER-062: Filter does not bypass tenant isolation
 - **Category**: Security
-- **Preconditions**: Tenant A has user `alice@a.com`; Bearer token for Tenant B
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Tenant A has user `alice@a.com`; Bearer token for Tenant B
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName eq "alice@a.com"
@@ -569,6 +610,7 @@
 
 ### TC-SCIM-FILTER-063: Oversized filter string
 - **Category**: Security
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: Filter string with 10,000+ characters (potential DoS via complex parsing)
 - **Expected Output**:
   ```
@@ -579,6 +621,7 @@
 ### TC-SCIM-FILTER-064: Filter with escaped quotes in value
 - **Category**: Security
 - **Standard**: RFC 7644 Section 3.4.2.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Users?filter=displayName eq "O\"Brien"

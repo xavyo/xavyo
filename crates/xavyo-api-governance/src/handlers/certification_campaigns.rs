@@ -78,6 +78,9 @@ pub async fn create_campaign(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateCampaignRequest>,
 ) -> ApiResult<(StatusCode, Json<CampaignResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate().map_err(ApiGovernanceError::from)?;
 
     let tenant_id = *claims
@@ -173,6 +176,9 @@ pub async fn update_campaign(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateCampaignRequest>,
 ) -> ApiResult<Json<CampaignResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate().map_err(ApiGovernanceError::from)?;
 
     let tenant_id = *claims
@@ -216,6 +222,9 @@ pub async fn delete_campaign(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -251,6 +260,9 @@ pub async fn launch_campaign(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<CampaignWithProgressResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -294,6 +306,9 @@ pub async fn cancel_campaign(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<CampaignResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

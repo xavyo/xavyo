@@ -257,7 +257,7 @@ impl ReconciliationEngine {
                 c.name as connector_name,
                 u.email as triggered_by_name
             FROM gov_connector_reconciliation_runs r
-            LEFT JOIN gov_connectors c ON c.id = r.connector_id
+            LEFT JOIN connector_configurations c ON c.id = r.connector_id
             LEFT JOIN users u ON u.id = r.triggered_by
             WHERE r.id = $1 AND r.tenant_id = $2
             ",

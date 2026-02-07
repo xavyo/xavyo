@@ -12,6 +12,13 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `USER_JWT`, `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: User must be authenticated; WebAuthn tests require simulated authenticator
+
 ## Nominal Cases
 
 ### TC-MFA-WEBAUTHN-001: Begin passkey registration
@@ -87,7 +94,7 @@
 
 ### TC-MFA-WEBAUTHN-014: Delete last passkey when MFA required
 - **Category**: Edge Case
-- **Preconditions**: Tenant requires MFA, only 1 passkey registered, no TOTP
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Tenant requires MFA, only 1 passkey registered, no TOTP
 - **Input**: `DELETE /me/passkeys/:id`
 - **Expected Output**: Status 403 "Cannot remove last MFA method"
 

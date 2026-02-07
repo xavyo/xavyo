@@ -25,5 +25,6 @@ pub struct GroupResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GroupListResponse {
     pub groups: Vec<GroupResponse>,
-    pub total: i64,
+    #[serde(default)]
+    pub pagination: Option<crate::models::user::PaginationInfo>,
 }

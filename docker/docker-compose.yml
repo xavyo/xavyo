@@ -56,6 +56,29 @@ services:
       - xavyo-network
 
   # ===========================================================================
+  # Mailpit - Email Testing (catches all outbound emails)
+  # ===========================================================================
+  # Web UI:  http://localhost:8025
+  # SMTP:    localhost:1025
+  # REST API: http://localhost:8025/api/v1/messages
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: xavyo-mailpit
+    restart: unless-stopped
+    ports:
+      - '${MAILPIT_SMTP_PORT:-1025}:1025'
+      - '${MAILPIT_UI_PORT:-8025}:8025'
+    environment:
+      # Max stored messages (0 = unlimited)
+      MP_MAX_MESSAGES: 500
+      # Database path for persistence
+      MP_DATABASE: /data/mailpit.db
+    volumes:
+      - mailpit_data:/data
+    networks:
+      - xavyo-network
+
+  # ===========================================================================
   # PostgreSQL Database
   # ===========================================================================
   postgres:
@@ -85,6 +108,41 @@ services:
     networks:
       - xavyo-network
 
+  # ===========================================================================
+  # OpenLDAP - Directory Server for Connector Testing
+  # ===========================================================================
+  # LDAP:   localhost:1389
+  # LDAPS:  localhost:1636
+  # Admin:  cn=admin,dc=xavyo,dc=dev / admin_password
+  # Base:   dc=xavyo,dc=dev
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: xavyo-openldap
+    restart: unless-stopped
+    environment:
+      LDAP_ORGANISATION: Xavyo Dev
+      LDAP_DOMAIN: xavyo.dev
+      LDAP_BASE_DN: dc=xavyo,dc=dev
+      LDAP_ADMIN_PASSWORD: admin_password
+      LDAP_CONFIG_PASSWORD: config_password
+      LDAP_READONLY_USER: 'true'
+      LDAP_READONLY_USER_USERNAME: readonly
+      LDAP_READONLY_USER_PASSWORD: readonly_password
+    ports:
+      - '${LDAP_PORT:-1389}:389'
+      - '${LDAPS_PORT:-1636}:636'
+    volumes:
+      - openldap_data:/var/lib/ldap
+      - openldap_config:/etc/ldap/slapd.d
+    healthcheck:
+      test: ['CMD', 'ldapsearch', '-x', '-H', 'ldap://localhost', '-b', 'dc=xavyo,dc=dev', '-D', 'cn=admin,dc=xavyo,dc=dev', '-w', 'admin_password']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - xavyo-network
+
 # =============================================================================
 # Networks
 # =============================================================================
@@ -99,5 +157,11 @@ networks:
 volumes:
   postgres_data:
     name: xavyo-postgres-data
+  mailpit_data:
+    name: xavyo-mailpit-data
   kafka_data:
     name: xavyo-kafka-data
+  openldap_data:
+    name: xavyo-openldap-data
+  openldap_config:
+    name: xavyo-openldap-config

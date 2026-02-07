@@ -25,4 +25,4 @@ pub mod validation;
 
 // Re-export public API
 pub use error::ImportError;
-pub use router::{import_router, ImportState};
+pub use router::{import_admin_router, import_public_router, import_router, ImportState};

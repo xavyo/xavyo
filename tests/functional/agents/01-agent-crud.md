@@ -15,12 +15,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: Some test cases require a pre-existing agent (created via TC-AGENT-CRUD-001 or equivalent)
+
+---
+
 ## Nominal Cases
 
 ### TC-AGENT-CRUD-001: Create agent with all required fields
 - **Category**: Nominal
 - **Standard**: NIST SP 800-63C, NHI management best practices
-- **Preconditions**: Authenticated user with `admin` role in tenant
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated user with `admin` role in tenant
 - **Input**:
   ```json
   POST /nhi/agents
@@ -55,7 +64,7 @@
 
 ### TC-AGENT-CRUD-002: Create agent with minimal fields (defaults applied)
 - **Category**: Nominal
-- **Preconditions**: Authenticated admin user
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated admin user
 - **Input**:
   ```json
   POST /nhi/agents
@@ -82,6 +91,7 @@
 
 ### TC-AGENT-CRUD-003: Create agent with all optional fields
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated admin user
 - **Input**:
   ```json
   POST /nhi/agents
@@ -107,7 +117,7 @@
 
 ### TC-AGENT-CRUD-004: List agents returns paginated results
 - **Category**: Nominal
-- **Preconditions**: 5 agents exist in tenant
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. 5 agents exist in tenant
 - **Input**:
   ```
   GET /nhi/agents?limit=2&offset=0
@@ -125,29 +135,31 @@
 
 ### TC-AGENT-CRUD-005: List agents with status filter
 - **Category**: Nominal
-- **Preconditions**: Mix of active and suspended agents
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Mix of active and suspended agents
 - **Input**: `GET /nhi/agents?status=active`
 - **Expected Output**: Status 200, only active agents returned
 
 ### TC-AGENT-CRUD-006: List agents with agent_type filter
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. At least one agent with type `copilot` exists
 - **Input**: `GET /nhi/agents?agent_type=copilot`
 - **Expected Output**: Status 200, only copilot agents returned
 
 ### TC-AGENT-CRUD-007: List agents with name search
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. At least one agent with name containing "sales" exists
 - **Input**: `GET /nhi/agents?name=sales`
 - **Expected Output**: Status 200, agents matching name prefix "sales"
 
 ### TC-AGENT-CRUD-008: Get agent by ID
 - **Category**: Nominal
-- **Preconditions**: Agent `<agent-id>` exists in tenant
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent `<agent-id>` exists in tenant
 - **Input**: `GET /nhi/agents/<agent-id>`
 - **Expected Output**: Status 200, full agent object with all fields
 
 ### TC-AGENT-CRUD-009: Update agent description and risk level
 - **Category**: Nominal
-- **Preconditions**: Agent `<agent-id>` exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent `<agent-id>` exists
 - **Input**:
   ```json
   PATCH /nhi/agents/<agent-id>
@@ -165,14 +177,14 @@
 
 ### TC-AGENT-CRUD-010: Delete agent
 - **Category**: Nominal
-- **Preconditions**: Agent `<agent-id>` exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent `<agent-id>` exists
 - **Input**: `DELETE /nhi/agents/<agent-id>`
 - **Expected Output**: Status 204 No Content
 - **Verification**: Subsequent `GET /nhi/agents/<agent-id>` returns 404
 
 ### TC-AGENT-CRUD-011: Suspend active agent
 - **Category**: Nominal
-- **Preconditions**: Agent is `active`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent is `active`
 - **Input**: `POST /nhi/agents/<agent-id>/suspend`
 - **Expected Output**:
   ```json
@@ -183,7 +195,7 @@
 
 ### TC-AGENT-CRUD-012: Reactivate suspended agent
 - **Category**: Nominal
-- **Preconditions**: Agent is `suspended`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent is `suspended`
 - **Input**: `POST /nhi/agents/<agent-id>/reactivate`
 - **Expected Output**:
   ```json
@@ -193,11 +205,13 @@
 
 ### TC-AGENT-CRUD-013: Create agents with each valid agent_type
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated admin user
 - **Input**: Create agents with `agent_type` values: `autonomous`, `copilot`, `workflow`, `orchestrator`
 - **Expected Output**: Status 201 for each type
 
 ### TC-AGENT-CRUD-014: Update agent model provider and name
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent exists in tenant
 - **Input**:
   ```json
   PATCH /nhi/agents/<agent-id>
@@ -215,7 +229,7 @@
 
 ### TC-AGENT-CRUD-020: Create agent with duplicate name in same tenant
 - **Category**: Edge Case
-- **Preconditions**: Agent named "sales-assistant" already exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Agent named "sales-assistant" already exists
 - **Input**:
   ```json
   POST /nhi/agents
@@ -225,48 +239,55 @@
 
 ### TC-AGENT-CRUD-021: Create agent with same name in different tenant
 - **Category**: Edge Case
-- **Preconditions**: Agent "sales-assistant" exists in Tenant A
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Agent "sales-assistant" exists in Tenant A; second tenant available
 - **Input**: Authenticated as Tenant B admin, create agent with same name
 - **Expected Output**: Status 201 (names are unique per-tenant, not globally)
 
 ### TC-AGENT-CRUD-022: Get agent with non-existent UUID
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `GET /nhi/agents/00000000-0000-0000-0000-000000000099`
 - **Expected Output**: Status 404
 
 ### TC-AGENT-CRUD-023: Get agent with invalid UUID format
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `GET /nhi/agents/not-a-uuid`
 - **Expected Output**: Status 400 or 422
 
 ### TC-AGENT-CRUD-024: Update agent with empty body
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent exists in tenant
 - **Input**: `PATCH /nhi/agents/<id>` with `{}`
 - **Expected Output**: Status 200 (no-op update, returns current state)
 
 ### TC-AGENT-CRUD-025: Delete already-deleted agent
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent exists to be deleted first
 - **Input**: Delete agent, then delete same ID again
 - **Expected Output**: Status 404 on second call
 
 ### TC-AGENT-CRUD-026: Suspend already-suspended agent
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent is already suspended
 - **Input**: Suspend active agent, then suspend again
 - **Expected Output**: Status 409 Conflict (already suspended)
 
 ### TC-AGENT-CRUD-027: Reactivate agent that is not suspended
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent is active (not suspended)
 - **Input**: Reactivate an active agent
 - **Expected Output**: Status 409 Conflict (not suspended)
 
 ### TC-AGENT-CRUD-028: List agents with offset beyond total count
 - **Category**: Edge Case
-- **Preconditions**: 5 agents exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. 5 agents exist
 - **Input**: `GET /nhi/agents?offset=100`
 - **Expected Output**: Status 200, `agents: []`, `total: 5`
 
 ### TC-AGENT-CRUD-029: Create agent with past expiration date
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /nhi/agents
@@ -276,11 +297,13 @@
 
 ### TC-AGENT-CRUD-030: Update agent with invalid risk_level
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent exists in tenant
 - **Input**: `{ "risk_level": "extreme" }`
 - **Expected Output**: Status 400 (valid values: low, medium, high, critical)
 
 ### TC-AGENT-CRUD-031: Create agent with name containing special characters
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "name": "agent/with<special>chars&more", "agent_type": "copilot" }`
 - **Expected Output**: Status 400 (if name validation enforced) OR Status 201
 
@@ -291,54 +314,62 @@
 ### TC-AGENT-CRUD-040: Create agent without admin role
 - **Category**: Security
 - **Standard**: NIST SP 800-53 AC-6 (Least Privilege)
-- **Preconditions**: Authenticated user with `viewer` role only
+- **Preconditions**: Fixtures: `TEST_TENANT`. Authenticated user with `viewer` role only
 - **Input**: `POST /nhi/agents { "name": "unauthorized", "agent_type": "copilot" }`
 - **Expected Output**: Status 403 Forbidden ("Admin role required")
 
 ### TC-AGENT-CRUD-041: Update agent without admin role
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`, `TEST_AGENT`. Authenticated non-admin user
 - **Input**: `PATCH /nhi/agents/<id> { "description": "hacked" }`
 - **Expected Output**: Status 403 Forbidden
 
 ### TC-AGENT-CRUD-042: Delete agent without admin role
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`, `TEST_AGENT`. Authenticated non-admin user
 - **Input**: `DELETE /nhi/agents/<id>`
 - **Expected Output**: Status 403 Forbidden
 
 ### TC-AGENT-CRUD-043: Suspend agent without admin role
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`, `TEST_AGENT`. Authenticated non-admin user
 - **Input**: `POST /nhi/agents/<id>/suspend`
 - **Expected Output**: Status 403 Forbidden
 
 ### TC-AGENT-CRUD-044: Access agent from different tenant (cross-tenant isolation)
 - **Category**: Security
 - **Standard**: SOC 2 CC6.1
-- **Preconditions**: Agent created in Tenant A
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Agent created in Tenant A; second tenant JWT available
 - **Input**: Authenticated as Tenant B admin, `GET /nhi/agents/<tenant-a-agent-id>`
 - **Expected Output**: Status 404 (tenant isolation must prevent access)
 
 ### TC-AGENT-CRUD-045: Create agent without authentication
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`. No authentication header provided
 - **Input**: `POST /nhi/agents` without Authorization header
 - **Expected Output**: Status 401 Unauthorized
 
 ### TC-AGENT-CRUD-046: Create agent with missing tenant_id in JWT
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`. JWT crafted without `tid` claim
 - **Input**: JWT without `tid` claim
 - **Expected Output**: Status 400 or 401
 
 ### TC-AGENT-CRUD-047: SQL injection in agent name
 - **Category**: Security
 - **Standard**: OWASP ASVS 5.3.4
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "name": "'; DROP TABLE agents; --", "agent_type": "copilot" }`
 - **Expected Output**: Status 400 or 201 (parameterized queries prevent injection), no SQL execution
 
 ### TC-AGENT-CRUD-048: Response does not leak internal errors
 - **Category**: Security
 - **Standard**: OWASP ASVS 7.4.1
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Verification**: All error responses contain sanitized messages, no stack traces or SQL fragments
 
 ### TC-AGENT-CRUD-049: Pagination limit clamped to maximum 100
 - **Category**: Security
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `GET /nhi/agents?limit=10000`
 - **Expected Output**: Status 200, response contains at most 100 agents (limit clamped)

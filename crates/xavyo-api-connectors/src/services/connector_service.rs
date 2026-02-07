@@ -546,6 +546,11 @@ impl ConnectorService {
 
         let mut ldap_config = LdapConfig::new(host, base_dn, bind_dn);
 
+        // Apply port
+        if let Some(port) = config.get("port").and_then(serde_json::Value::as_u64) {
+            ldap_config.port = port as u16;
+        }
+
         // Apply SSL
         if let Some(ssl) = config.get("use_ssl").and_then(serde_json::Value::as_bool) {
             if ssl {

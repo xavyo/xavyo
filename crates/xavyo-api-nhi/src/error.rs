@@ -203,6 +203,12 @@ impl IntoResponse for ApiNhiError {
 /// Result type alias for NHI API operations.
 pub type ApiResult<T> = Result<T, ApiNhiError>;
 
+impl From<validator::ValidationErrors> for ApiNhiError {
+    fn from(err: validator::ValidationErrors) -> Self {
+        Self::BadRequest(err.to_string())
+    }
+}
+
 /// Conversion from governance domain error to API error.
 impl From<xavyo_governance::error::GovernanceError> for ApiNhiError {
     fn from(e: xavyo_governance::error::GovernanceError) -> Self {

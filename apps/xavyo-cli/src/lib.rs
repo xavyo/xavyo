@@ -202,12 +202,9 @@ pub mod models {
         PlannedRotationChanges,
     };
     pub use api_session::{ApiSession, DeviceType, Location, RevokeResponse, SessionListResponse};
-    pub use audit::{AuditAction, AuditEntry, AuditFilter, AuditListResponse, AuditUser};
+    pub use audit::{AuditEntry, AuditFilter, AuditListResponse};
     pub use session::Session;
-    pub use tenant::{
-        TenantCurrentOutput, TenantInfo, TenantListResponse, TenantRole, TenantSwitchOutput,
-        TenantSwitchRequest, TenantSwitchResponse,
-    };
+    pub use tenant::{TenantCurrentOutput, TenantRole};
 }
 
 // Re-export command argument types for testing

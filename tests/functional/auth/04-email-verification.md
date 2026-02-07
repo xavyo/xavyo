@@ -8,11 +8,18 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `SYS_TENANT`, `TEST_TENANT`
+- **Special Setup**: Some tests need a freshly signed-up user (unverified); CLI tests need authenticated session
+
 ## Nominal Cases
 
 ### TC-AUTH-VERIFY-001: Verification email sent on signup
 - **Category**: Nominal
-- **Preconditions**: Fresh signup
+- **Preconditions**: Fixtures: `SYS_TENANT`. Fresh signup
 - **Verification**: Email sent with verification link containing token
 
 ### TC-AUTH-VERIFY-002: Verify email with valid token
@@ -27,7 +34,7 @@
 
 ### TC-AUTH-VERIFY-003: Profile reflects verified status
 - **Category**: Nominal
-- **Preconditions**: Email verified
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Email verified
 - **Input**: `GET /me/profile` (authenticated)
 - **Expected Output**: `"email_verified": true`
 
@@ -47,7 +54,7 @@
 
 ### TC-AUTH-VERIFY-005: Login blocked until email verified
 - **Category**: Nominal
-- **Preconditions**: Email not verified
+- **Preconditions**: Fixtures: `SYS_TENANT`. Email not verified
 - **Input**: `POST /auth/login` with valid credentials
 - **Expected Output**: Status 401 or 403 (email verification required)
 
@@ -96,13 +103,13 @@
 
 ### TC-AUTH-VERIFY-020: CLI verify status (verified)
 - **Category**: Nominal
-- **Preconditions**: Logged in, email verified
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Logged in, email verified
 - **Input**: `xavyo verify status`
 - **Expected Output**: `Email <email> is verified.` (exit code 0)
 
 ### TC-AUTH-VERIFY-021: CLI verify status (unverified)
 - **Category**: Nominal
-- **Preconditions**: Logged in, email not verified
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Logged in, email not verified
 - **Input**: `xavyo verify status`
 - **Expected Output**: `Email <email> is NOT verified.` (exit code 0)
 
@@ -113,7 +120,7 @@
 
 ### TC-AUTH-VERIFY-023: CLI verify resend
 - **Category**: Nominal
-- **Preconditions**: Logged in
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Logged in
 - **Input**: `xavyo verify resend`
 - **Expected Output**: Success message, email inferred from session
 
@@ -124,7 +131,7 @@
 
 ### TC-AUTH-VERIFY-025: CLI verify resend not logged in
 - **Category**: Edge Case
-- **Preconditions**: Not logged in, no --email
+- **Preconditions**: Fixtures: `SYS_TENANT`. Not logged in, no --email
 - **Input**: `xavyo verify resend`
 - **Expected Output**: Error: "No email specified and not logged in" (exit code 4)
 

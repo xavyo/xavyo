@@ -121,6 +121,9 @@ pub async fn create_config(
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
     let config = state
         .lifecycle_config_service
         .create_config(tenant_id, request)
@@ -158,6 +161,9 @@ pub async fn update_config(
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
     let config = state
         .lifecycle_config_service
         .update_config(tenant_id, config_id, request)
@@ -194,6 +200,9 @@ pub async fn delete_config(
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
     state
         .lifecycle_config_service
         .delete_config(tenant_id, config_id)
@@ -232,6 +241,9 @@ pub async fn add_state(
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
     let lifecycle_state = state
         .lifecycle_config_service
         .add_state(tenant_id, config_id, request)
@@ -270,6 +282,9 @@ pub async fn update_state(
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
     let lifecycle_state = state
         .lifecycle_config_service
         .update_state(tenant_id, config_id, state_id, request)
@@ -307,6 +322,9 @@ pub async fn delete_state(
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
     state
         .lifecycle_config_service
         .delete_state(tenant_id, config_id, state_id)
@@ -345,6 +363,9 @@ pub async fn add_transition(
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
     let transition = state
         .lifecycle_config_service
         .add_transition(tenant_id, config_id, request)
@@ -381,6 +402,9 @@ pub async fn delete_transition(
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
     state
         .lifecycle_config_service
         .delete_transition(tenant_id, config_id, transition_id)
@@ -490,6 +514,9 @@ pub async fn update_transition_conditions(
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
 
     // Get the transition to verify it exists and belongs to the config
     let transition = GovLifecycleTransition::find_by_id(state.pool(), tenant_id, transition_id)
@@ -688,6 +715,9 @@ pub async fn update_state_actions(
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
 
     // Find the state
     let lifecycle_state = GovLifecycleState::find_by_id(state.pool(), tenant_id, state_id)

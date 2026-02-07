@@ -204,6 +204,9 @@ pub async fn update_sync_config(
     Path(connector_id): Path<Uuid>,
     Json(request): Json<UpdateSyncConfigRequest>,
 ) -> Result<Json<SyncConfigResponse>, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let _tenant_id = extract_tenant_id(&claims)?;
 
     let config = state
@@ -251,6 +254,9 @@ pub async fn enable_sync(
     Extension(claims): Extension<JwtClaims>,
     Path(connector_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let _tenant_id = extract_tenant_id(&claims)?;
 
     state
@@ -282,6 +288,9 @@ pub async fn disable_sync(
     Extension(claims): Extension<JwtClaims>,
     Path(connector_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let _tenant_id = extract_tenant_id(&claims)?;
 
     state
@@ -395,6 +404,9 @@ pub async fn reset_sync_token(
     Extension(claims): Extension<JwtClaims>,
     Path(connector_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let _tenant_id = extract_tenant_id(&claims)?;
 
     state
@@ -426,6 +438,9 @@ pub async fn trigger_sync(
     Extension(claims): Extension<JwtClaims>,
     Path(connector_id): Path<Uuid>,
 ) -> Result<Json<SyncTriggerResponse>, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let _tenant_id = extract_tenant_id(&claims)?;
 
     let result = state
@@ -559,6 +574,9 @@ pub async fn retry_change(
     Extension(claims): Extension<JwtClaims>,
     Path((connector_id, change_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let _tenant_id = extract_tenant_id(&claims)?;
 
     state
@@ -593,6 +611,9 @@ pub async fn link_change(
     Path((connector_id, change_id)): Path<(Uuid, Uuid)>,
     Json(request): Json<LinkChangeRequest>,
 ) -> Result<StatusCode, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let _tenant_id = extract_tenant_id(&claims)?;
 
     state
@@ -677,6 +698,9 @@ pub async fn resolve_sync_conflict(
     Path((connector_id, conflict_id)): Path<(Uuid, Uuid)>,
     Json(request): Json<ResolveConflictRequest>,
 ) -> Result<StatusCode, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let _tenant_id = extract_tenant_id(&claims)?;
 
     state

@@ -31,6 +31,13 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiNhiError> {
         .ok_or(ApiNhiError::Unauthorized)
 }
 
+fn require_admin(claims: &JwtClaims) -> Result<(), ApiNhiError> {
+    if !claims.has_role("admin") {
+        return Err(ApiNhiError::Forbidden("Admin role required".into()));
+    }
+    Ok(())
+}
+
 // ============================================================================
 // Tool CRUD Handlers
 // ============================================================================
@@ -81,6 +88,7 @@ pub async fn create_tool(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateToolRequest>,
 ) -> ApiResult<(StatusCode, Json<ToolResponse>)> {
+    require_admin(&claims)?;
     let tenant_id = extract_tenant_id(&claims)?;
     let tool = state.tool_service.create(tenant_id, request).await?;
     Ok((StatusCode::CREATED, Json(tool)))
@@ -136,6 +144,7 @@ pub async fn update_tool(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateToolRequest>,
 ) -> ApiResult<Json<ToolResponse>> {
+    require_admin(&claims)?;
     let tenant_id = extract_tenant_id(&claims)?;
     let tool = state.tool_service.update(tenant_id, id, request).await?;
     Ok(Json(tool))
@@ -162,6 +171,7 @@ pub async fn delete_tool(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    require_admin(&claims)?;
     let tenant_id = extract_tenant_id(&claims)?;
     state.tool_service.delete(tenant_id, id).await?;
     Ok(StatusCode::NO_CONTENT)

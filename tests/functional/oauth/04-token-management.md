@@ -21,6 +21,11 @@
 
 ## Prerequisites
 
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `OAUTH_CC_CLIENT`, `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: Confidential client for introspection/revocation, issued access and refresh tokens
+
 All tests assume:
 - A valid tenant with ID `{TENANT_ID}`
 - Admin JWT for `/admin/oauth/clients` operations
@@ -49,7 +54,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-001: Introspect active access token
 - **Category**: Nominal
 - **Standard**: RFC 7662 Section 2.2
-- **Preconditions**: Valid access token (JWT) issued via client_credentials
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid access token (JWT) issued via client_credentials
 - **Input**:
   ```
   POST /oauth/introspect
@@ -79,7 +84,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-002: Introspect active refresh token
 - **Category**: Nominal
 - **Standard**: RFC 7662 Section 2.2
-- **Preconditions**: Valid refresh token (opaque) from device code flow
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid refresh token (opaque) from device code flow
 - **Input**:
   ```
   POST /oauth/introspect
@@ -106,7 +111,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-003: Introspect with access_token hint
 - **Category**: Nominal
 - **Standard**: RFC 7662 Section 2.1 (token_type_hint)
-- **Preconditions**: Valid access token
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid access token
 - **Input**:
   ```
   token={access_token}&token_type_hint=access_token
@@ -119,7 +124,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-004: Introspect with refresh_token hint
 - **Category**: Nominal
 - **Standard**: RFC 7662 Section 2.1 (token_type_hint)
-- **Preconditions**: Valid refresh token
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid refresh token
 - **Input**:
   ```
   token={refresh_token}&token_type_hint=refresh_token
@@ -132,7 +137,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-005: Introspect with wrong hint still works
 - **Category**: Nominal
 - **Standard**: RFC 7662 Section 2.1 ("the server SHOULD check other types as well")
-- **Preconditions**: Valid access token
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid access token
 - **Input**:
   ```
   token={access_token}&token_type_hint=refresh_token
@@ -145,7 +150,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-006: Introspect expired access token
 - **Category**: Nominal
 - **Standard**: RFC 7662 Section 2.2
-- **Preconditions**: Access token past its `exp` time
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Access token past its `exp` time
 - **Input**:
   ```
   token={expired_access_token}
@@ -157,7 +162,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-007: Introspect revoked access token
 - **Category**: Nominal
 - **Standard**: RFC 7662 Section 2.2
-- **Preconditions**: Access token was revoked via `/oauth/revoke`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Access token was revoked via `/oauth/revoke`
 - **Input**:
   ```
   token={revoked_access_token}
@@ -169,7 +174,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-008: Introspect unknown token
 - **Category**: Nominal
 - **Standard**: RFC 7662 Section 2.2 ("MUST return active=false for unknown tokens")
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   token=completely-random-garbage-token
@@ -182,7 +187,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-009: Introspect via body credentials (not Basic Auth)
 - **Category**: Nominal
 - **Standard**: RFC 7662 Section 2.1 (client authentication)
-- **Preconditions**: Valid client credentials
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client credentials
 - **Input**:
   ```
   POST /oauth/introspect
@@ -198,7 +203,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-010: Introspect revoked refresh token
 - **Category**: Nominal
 - **Standard**: RFC 7662 Section 2.2
-- **Preconditions**: Refresh token was revoked
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Refresh token was revoked
 - **Input**:
   ```
   token={revoked_refresh_token}&token_type_hint=refresh_token
@@ -214,7 +219,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-011: Missing token parameter
 - **Category**: Edge Case
 - **Standard**: RFC 7662 Section 2.1 (REQUIRED)
-- **Preconditions**: Authenticated client
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Authenticated client
 - **Input**:
   ```
   POST /oauth/introspect
@@ -230,7 +235,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-012: Missing client credentials
 - **Category**: Edge Case
 - **Standard**: RFC 7662 Section 2.1 (client authentication REQUIRED)
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   POST /oauth/introspect
@@ -246,7 +251,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-013: Wrong client_secret for introspection
 - **Category**: Edge Case
 - **Standard**: RFC 7662 Section 2.1
-- **Preconditions**: Valid client_id, wrong secret
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client_id, wrong secret
 - **Input**:
   ```
   Authorization: Basic base64({client_id}:wrong-secret)
@@ -259,7 +264,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-014: Missing X-Tenant-ID header
 - **Category**: Edge Case
 - **Standard**: Platform-specific (multi-tenancy)
-- **Preconditions**: Valid client credentials
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client credentials
 - **Input**:
   ```
   POST /oauth/introspect
@@ -275,7 +280,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-015: Invalid token_type_hint value
 - **Category**: Edge Case
 - **Standard**: RFC 7662 Section 2.1 (server MAY ignore invalid hints)
-- **Preconditions**: Valid client, valid token
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client, valid token
 - **Input**:
   ```
   token={access_token}&token_type_hint=bearer_token
@@ -288,7 +293,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-016: Empty token string
 - **Category**: Edge Case
 - **Standard**: RFC 7662 Section 2.1
-- **Preconditions**: Authenticated client
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Authenticated client
 - **Input**:
   ```
   token=
@@ -300,7 +305,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-017: Very long token string (boundary test)
 - **Category**: Edge Case
 - **Standard**: RFC 7662 Section 2.1
-- **Preconditions**: Authenticated client
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Authenticated client
 - **Input**:
   ```
   token={10000-character-random-string}
@@ -312,7 +317,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-018: Inactive response has no extra fields
 - **Category**: Edge Case
 - **Standard**: RFC 7662 Section 2.2 ("only `active` is REQUIRED for inactive")
-- **Preconditions**: Unknown token
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Unknown token
 - **Input**: Introspect garbage token
 - **Expected Output**:
   - Serialized JSON is exactly `{"active":false}` (no optional fields)
@@ -320,7 +325,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-019: Introspect token from different tenant
 - **Category**: Edge Case
 - **Standard**: RFC 7662 Section 2.1, platform-specific (tenant isolation)
-- **Preconditions**: Token issued for `TENANT_A`, introspection from `TENANT_B`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Token issued for `TENANT_A`, introspection from `TENANT_B`
 - **Input**:
   ```
   Authorization: Basic base64({tenant_B_client_id}:{secret})
@@ -335,7 +340,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-020: Introspect after user revoke-all
 - **Category**: Edge Case
 - **Standard**: RFC 7662 Section 2.2, platform-specific (admin revocation)
-- **Preconditions**: Access token issued, then admin revokes all user tokens via `POST /admin/oauth/revoke-user`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Access token issued, then admin revokes all user tokens via `POST /admin/oauth/revoke-user`
 - **Input**:
   ```
   token={access_token_issued_before_revoke_all}
@@ -351,7 +356,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-021: Revocation cache fail-closed on error
 - **Category**: Security
 - **Standard**: OWASP Fail-Closed Principle
-- **Preconditions**: Revocation cache configured, simulate cache failure
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Revocation cache configured, simulate cache failure
 - **Input**: Introspect a valid token while cache is unavailable
 - **Expected Output**:
   - Status: `200 OK`
@@ -360,7 +365,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-022: No information leakage on inactive tokens
 - **Category**: Security
 - **Standard**: RFC 7662 Section 4 (Security Considerations)
-- **Preconditions**: Token is expired, revoked, or unknown
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Token is expired, revoked, or unknown
 - **Input**: Introspect various inactive tokens
 - **Expected Output**:
   - Response is always `{ "active": false }` with no additional fields
@@ -370,7 +375,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-023: Cross-tenant token introspection isolation
 - **Category**: Security
 - **Standard**: Platform-specific (multi-tenancy)
-- **Preconditions**: Active token for `TENANT_A`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Active token for `TENANT_A`
 - **Input**: Introspect from `TENANT_B`
 - **Expected Output**:
   - Body: `{ "active": false }` (token invisible cross-tenant)
@@ -379,7 +384,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-024: SQL injection in token parameter
 - **Category**: Security
 - **Standard**: OWASP Injection Prevention
-- **Preconditions**: Authenticated client
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Authenticated client
 - **Input**:
   ```
   token=' OR 1=1 --&token_type_hint=refresh_token
@@ -392,7 +397,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TI-025: Revoke-all sentinel prevents stale introspection
 - **Category**: Security
 - **Standard**: Platform-specific (sentinel revocation pattern)
-- **Preconditions**: Token issued at time T, revoke-all sentinel at T+1
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Token issued at time T, revoke-all sentinel at T+1
 - **Input**: Introspect token after sentinel created
 - **Expected Output**:
   - Body: `{ "active": false }`
@@ -407,7 +412,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-001: Revoke access token
 - **Category**: Nominal
 - **Standard**: RFC 7009 Section 2.1
-- **Preconditions**: Valid access token (JWT)
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid access token (JWT)
 - **Input**:
   ```
   POST /oauth/revoke
@@ -425,7 +430,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-002: Revoke refresh token
 - **Category**: Nominal
 - **Standard**: RFC 7009 Section 2.1
-- **Preconditions**: Valid refresh token (opaque)
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid refresh token (opaque)
 - **Input**:
   ```
   POST /oauth/revoke
@@ -443,7 +448,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-003: Revoke with access_token hint
 - **Category**: Nominal
 - **Standard**: RFC 7009 Section 2.1
-- **Preconditions**: Valid access token
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid access token
 - **Input**:
   ```
   token={access_token}&token_type_hint=access_token
@@ -455,7 +460,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-004: Revoke already-revoked token
 - **Category**: Nominal
 - **Standard**: RFC 7009 Section 2.1 ("no error even if token was already invalidated")
-- **Preconditions**: Token already revoked
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Token already revoked
 - **Input**:
   ```
   token={already_revoked_token}
@@ -466,7 +471,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-005: Revoke unknown token
 - **Category**: Nominal
 - **Standard**: RFC 7009 Section 2.1 ("always respond with 200 OK")
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   token=unknown-garbage-token-abc123
@@ -481,7 +486,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-006: Missing token parameter
 - **Category**: Edge Case
 - **Standard**: RFC 7009 Section 2.1 (REQUIRED)
-- **Preconditions**: Authenticated client
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Authenticated client
 - **Input**: Empty body
 - **Expected Output**:
   - Status: `400 Bad Request`
@@ -490,7 +495,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-007: Missing client credentials for revocation
 - **Category**: Edge Case
 - **Standard**: RFC 7009 Section 2.1 (client auth REQUIRED)
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   POST /oauth/revoke
@@ -506,7 +511,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-008: Wrong client_secret for revocation
 - **Category**: Edge Case
 - **Standard**: RFC 7009 Section 2.1
-- **Preconditions**: Valid client_id, wrong secret
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client_id, wrong secret
 - **Input**:
   ```
   Authorization: Basic base64({client_id}:wrong-secret)
@@ -519,7 +524,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-009: Revoke token from different tenant
 - **Category**: Edge Case
 - **Standard**: RFC 7009 Section 2.1, platform-specific (isolation)
-- **Preconditions**: Token issued in `TENANT_A`, revocation from `TENANT_B`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Token issued in `TENANT_A`, revocation from `TENANT_B`
 - **Input**:
   ```
   Authorization: Basic base64({tenant_B_client_id}:{secret})
@@ -534,7 +539,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-010: Revoke expired token
 - **Category**: Edge Case
 - **Standard**: RFC 7009 Section 2.1
-- **Preconditions**: Expired access token
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Expired access token
 - **Input**:
   ```
   token={expired_access_token}&token_type_hint=access_token
@@ -550,7 +555,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-011: Cascade revocation from refresh token
 - **Category**: Security
 - **Standard**: OAuth 2.0 Security BCP Section 4.14.2
-- **Preconditions**: Refresh token and access token issued for same user
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Refresh token and access token issued for same user
 - **Input**: Revoke the refresh token
 - **Expected Output**:
   - Refresh token marked revoked
@@ -560,7 +565,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-012: Revocation cache invalidation
 - **Category**: Security
 - **Standard**: Platform-specific (real-time revocation)
-- **Preconditions**: In-memory revocation cache active
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. In-memory revocation cache active
 - **Input**: Revoke access token
 - **Expected Output**:
   - JTI immediately invalidated in cache
@@ -570,7 +575,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-013: Revocation does not affect other users' tokens
 - **Category**: Security
 - **Standard**: RFC 7009 Section 2.1 (precision)
-- **Preconditions**: Tokens for user_A and user_B
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Tokens for user_A and user_B
 - **Input**: Revoke user_A's access token
 - **Expected Output**:
   - user_A's token: `active: false` on introspection
@@ -579,7 +584,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-014: Revocation sets RLS tenant context
 - **Category**: Security
 - **Standard**: Platform-specific (RLS enforcement)
-- **Preconditions**: Valid client in `TENANT_A`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client in `TENANT_A`
 - **Input**: Revoke a token
 - **Expected Output**:
   - `set_config('app.current_tenant', ...)` called before INSERT into `revoked_tokens`
@@ -588,7 +593,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-TR-015: No information leakage from revocation endpoint
 - **Category**: Security
 - **Standard**: RFC 7009 Section 2.1
-- **Preconditions**: Various inputs
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Various inputs
 - **Input**: Revoke valid token, invalid token, unknown token, empty token
 - **Expected Output**:
   - All return `200 OK`
@@ -604,7 +609,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-001: Create confidential client
 - **Category**: Nominal
 - **Standard**: RFC 6749 Section 2
-- **Preconditions**: Admin JWT with `TenantId` extension
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Admin JWT with `TenantId` extension
 - **Input**:
   ```
   POST /admin/oauth/clients
@@ -642,7 +647,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-002: Create public client
 - **Category**: Nominal
 - **Standard**: RFC 6749 Section 2.1
-- **Preconditions**: Admin JWT
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Admin JWT
 - **Input**:
   ```json
   {
@@ -660,7 +665,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-003: List all clients
 - **Category**: Nominal
 - **Standard**: Platform-specific (admin API)
-- **Preconditions**: Multiple clients created
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Multiple clients created
 - **Input**:
   ```
   GET /admin/oauth/clients
@@ -680,7 +685,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-004: Get client by ID
 - **Category**: Nominal
 - **Standard**: Platform-specific
-- **Preconditions**: Client created with known ID
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Client created with known ID
 - **Input**:
   ```
   GET /admin/oauth/clients/{id}
@@ -693,7 +698,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-005: Update client name
 - **Category**: Nominal
 - **Standard**: Platform-specific
-- **Preconditions**: Client exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Client exists
 - **Input**:
   ```
   PUT /admin/oauth/clients/{id}
@@ -712,7 +717,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-006: Update client redirect_uris
 - **Category**: Nominal
 - **Standard**: RFC 6749 Section 2
-- **Preconditions**: Client exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Client exists
 - **Input**:
   ```json
   {
@@ -726,7 +731,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-007: Update client scopes
 - **Category**: Nominal
 - **Standard**: RFC 6749 Section 2
-- **Preconditions**: Client exists with scopes `["openid", "profile"]`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Client exists with scopes `["openid", "profile"]`
 - **Input**:
   ```json
   {
@@ -740,7 +745,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-008: Deactivate (soft delete) client
 - **Category**: Nominal
 - **Standard**: Platform-specific (soft delete)
-- **Preconditions**: Active client
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active client
 - **Input**:
   ```
   DELETE /admin/oauth/clients/{id}
@@ -754,7 +759,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-009: Regenerate client secret
 - **Category**: Nominal
 - **Standard**: Platform-specific (secret rotation)
-- **Preconditions**: Confidential client exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Confidential client exists
 - **Input**:
   ```
   POST /admin/oauth/clients/{id}/regenerate-secret
@@ -774,7 +779,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-010: Update client grant_types
 - **Category**: Nominal
 - **Standard**: RFC 6749 Section 2
-- **Preconditions**: Client with `grant_types: ["authorization_code"]`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Client with `grant_types: ["authorization_code"]`
 - **Input**:
   ```json
   {
@@ -792,7 +797,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-011: Create client with empty name
 - **Category**: Edge Case
 - **Standard**: Platform-specific (validation)
-- **Preconditions**: Admin JWT
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Admin JWT
 - **Input**:
   ```json
   {
@@ -810,7 +815,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-012: Create client with empty grant_types
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 2
-- **Preconditions**: Admin JWT
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Admin JWT
 - **Input**:
   ```json
   {
@@ -828,7 +833,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-013: Create client with invalid grant_type
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 4
-- **Preconditions**: Admin JWT
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Admin JWT
 - **Input**:
   ```json
   {
@@ -846,7 +851,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-014: Create authorization_code client without redirect_uris
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 3.1.2
-- **Preconditions**: Admin JWT
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Admin JWT
 - **Input**:
   ```json
   {
@@ -864,7 +869,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-015: Get non-existent client
 - **Category**: Edge Case
 - **Standard**: Platform-specific
-- **Preconditions**: Admin JWT
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Admin JWT
 - **Input**:
   ```
   GET /admin/oauth/clients/00000000-0000-0000-0000-ffffffffffff
@@ -875,7 +880,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-016: Update non-existent client
 - **Category**: Edge Case
 - **Standard**: Platform-specific
-- **Preconditions**: Admin JWT
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Admin JWT
 - **Input**:
   ```
   PUT /admin/oauth/clients/00000000-0000-0000-0000-ffffffffffff
@@ -887,7 +892,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-017: Delete non-existent client
 - **Category**: Edge Case
 - **Standard**: Platform-specific
-- **Preconditions**: Admin JWT
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Admin JWT
 - **Input**:
   ```
   DELETE /admin/oauth/clients/00000000-0000-0000-0000-ffffffffffff
@@ -898,7 +903,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-018: Regenerate secret for public client
 - **Category**: Edge Case
 - **Standard**: Platform-specific
-- **Preconditions**: Public client exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Public client exists
 - **Input**:
   ```
   POST /admin/oauth/clients/{public_client_id}/regenerate-secret
@@ -910,7 +915,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-019: Update client with invalid grant_type
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 4
-- **Preconditions**: Client exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Client exists
 - **Input**:
   ```json
   {
@@ -924,7 +929,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-020: Invalid UUID in path parameter
 - **Category**: Edge Case
 - **Standard**: Platform-specific
-- **Preconditions**: Admin JWT
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Admin JWT
 - **Input**:
   ```
   GET /admin/oauth/clients/not-a-valid-uuid
@@ -939,7 +944,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-021: Client CRUD requires admin authentication
 - **Category**: Security
 - **Standard**: Platform-specific (admin authorization)
-- **Preconditions**: No JWT or non-admin JWT
+- **Preconditions**: Fixtures: `TEST_TENANT`. No JWT or non-admin JWT
 - **Input**:
   ```
   POST /admin/oauth/clients
@@ -954,7 +959,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-022: Non-admin user cannot manage clients
 - **Category**: Security
 - **Standard**: Platform-specific (RBAC)
-- **Preconditions**: JWT for regular user (not admin)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. JWT for regular user (not admin)
 - **Input**:
   ```
   GET /admin/oauth/clients
@@ -966,7 +971,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-023: Client list is tenant-isolated
 - **Category**: Security
 - **Standard**: Platform-specific (multi-tenancy)
-- **Preconditions**: Clients in `TENANT_A` and `TENANT_B`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Clients in `TENANT_A` and `TENANT_B`
 - **Input**: Admin in `TENANT_A` lists clients
 - **Expected Output**:
   - Only `TENANT_A` clients returned
@@ -975,7 +980,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-024: Client secret shown only once
 - **Category**: Security
 - **Standard**: OWASP Credential Management
-- **Preconditions**: Confidential client created
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Confidential client created
 - **Input**:
   1. `POST /admin/oauth/clients` -- response includes `client_secret`
   2. `GET /admin/oauth/clients/{id}` -- response does NOT include `client_secret`
@@ -987,7 +992,7 @@ A confidential client capable of authenticating to introspection/revocation endp
 ### TC-OAUTH-CL-025: Regenerate secret invalidates old secret
 - **Category**: Security
 - **Standard**: OWASP Credential Rotation
-- **Preconditions**: Confidential client with known secret
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Confidential client with known secret
 - **Input**:
   1. Authenticate with old secret: `200 OK` (success)
   2. Regenerate secret: `POST /admin/oauth/clients/{id}/regenerate-secret`

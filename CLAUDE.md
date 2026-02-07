@@ -22,6 +22,40 @@ cargo fmt --check
 
 # Run all tests
 cargo test --workspace
+
+# Start dev environment (PostgreSQL, Kafka, Mailpit)
+docker compose -f docker/docker-compose.yml up -d
+```
+
+## Dev Email Testing (Mailpit)
+
+Mailpit catches all outbound emails in development. No real emails are ever sent.
+
+- **SMTP**: `localhost:1025` (no TLS, any credentials accepted)
+- **Web UI**: http://localhost:8025 (browse all captured emails)
+- **REST API**: http://localhost:8025/api/v1/messages (programmatic access)
+
+Configuration in `.env`:
+```bash
+EMAIL_SMTP_HOST=localhost
+EMAIL_SMTP_PORT=1025
+EMAIL_SMTP_TLS=false          # Required for Mailpit (plain SMTP)
+EMAIL_SMTP_USERNAME=dev
+EMAIL_SMTP_PASSWORD=dev
+EMAIL_FROM_ADDRESS=noreply@xavyo.local
+FRONTEND_BASE_URL=http://localhost:3000
+```
+
+Useful for testing:
+```bash
+# List all captured emails
+curl http://localhost:8025/api/v1/messages
+
+# Clear all emails
+curl -X DELETE http://localhost:8025/api/v1/messages
+
+# Search emails by query
+curl "http://localhost:8025/api/v1/search?query=to:user@test.com"
 ```
 
 ## Critical Rules

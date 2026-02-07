@@ -26,7 +26,7 @@ pub struct RoleResponse {
 /// Role list response
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RoleListResponse {
-    pub roles: Vec<RoleResponse>,
+    pub items: Vec<RoleResponse>,
     pub total: i64,
 }
 
@@ -50,7 +50,7 @@ pub struct EntitlementResponse {
 /// Entitlement list response
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EntitlementListResponse {
-    pub entitlements: Vec<EntitlementResponse>,
+    pub items: Vec<EntitlementResponse>,
     pub total: i64,
 }
 
@@ -77,7 +77,7 @@ pub struct AccessRequestResponse {
 /// Access request list response
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccessRequestListResponse {
-    pub access_requests: Vec<AccessRequestResponse>,
+    pub items: Vec<AccessRequestResponse>,
     pub total: i64,
 }
 
@@ -108,7 +108,7 @@ pub struct ArchetypeResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ArchetypeListResponse {
-    pub archetypes: Vec<ArchetypeResponse>,
+    pub items: Vec<ArchetypeResponse>,
     pub total: i64,
 }
 
@@ -130,7 +130,7 @@ pub struct LifecycleConfigResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LifecycleConfigListResponse {
-    pub configs: Vec<LifecycleConfigResponse>,
+    pub items: Vec<LifecycleConfigResponse>,
     pub total: i64,
 }
 
@@ -154,7 +154,7 @@ pub struct SodRuleResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SodRuleListResponse {
-    pub rules: Vec<SodRuleResponse>,
+    pub items: Vec<SodRuleResponse>,
     pub total: i64,
 }
 
@@ -174,7 +174,7 @@ pub struct SodViolationResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SodViolationListResponse {
-    pub violations: Vec<SodViolationResponse>,
+    pub items: Vec<SodViolationResponse>,
     pub total: i64,
 }
 
@@ -196,7 +196,7 @@ pub struct CampaignResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CampaignListResponse {
-    pub campaigns: Vec<CampaignResponse>,
+    pub items: Vec<CampaignResponse>,
     pub total: i64,
 }
 
@@ -218,7 +218,7 @@ pub struct ObjectTemplateResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ObjectTemplateListResponse {
-    pub templates: Vec<ObjectTemplateResponse>,
+    pub items: Vec<ObjectTemplateResponse>,
     pub total: i64,
 }
 
@@ -235,7 +235,7 @@ pub struct CatalogCategoryResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CatalogCategoryListResponse {
-    pub categories: Vec<CatalogCategoryResponse>,
+    pub items: Vec<CatalogCategoryResponse>,
     pub total: i64,
 }
 
@@ -276,7 +276,7 @@ pub struct BulkActionResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BulkActionListResponse {
-    pub bulk_actions: Vec<BulkActionResponse>,
+    pub items: Vec<BulkActionResponse>,
     pub total: i64,
 }
 
@@ -300,7 +300,7 @@ pub struct DelegationResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DelegationListResponse {
-    pub delegations: Vec<DelegationResponse>,
+    pub items: Vec<DelegationResponse>,
     pub total: i64,
 }
 
@@ -309,10 +309,16 @@ pub struct DelegationListResponse {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GdprReportResponse {
     #[serde(default)]
-    pub user_id: Option<Uuid>,
-    #[serde(default)]
-    pub data: Option<serde_json::Value>,
+    pub tenant_id: Option<Uuid>,
     pub generated_at: DateTime<Utc>,
+    #[serde(default)]
+    pub total_entitlements: Option<i64>,
+    #[serde(default)]
+    pub classified_entitlements: Option<i64>,
+    #[serde(default)]
+    pub classification_summary: Option<serde_json::Value>,
+    #[serde(default)]
+    pub legal_basis_summary: Option<serde_json::Value>,
 }
 
 // --- Risk ---
@@ -348,7 +354,7 @@ pub struct RiskAlertResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RiskAlertListResponse {
-    pub alerts: Vec<RiskAlertResponse>,
+    pub items: Vec<RiskAlertResponse>,
     pub total: i64,
 }
 
@@ -369,7 +375,7 @@ pub struct ReportResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ReportListResponse {
-    pub reports: Vec<ReportResponse>,
+    pub items: Vec<ReportResponse>,
     pub total: i64,
 }
 
@@ -389,6 +395,6 @@ pub struct ApprovalWorkflowResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApprovalWorkflowListResponse {
-    pub workflows: Vec<ApprovalWorkflowResponse>,
+    pub items: Vec<ApprovalWorkflowResponse>,
     pub total: i64,
 }

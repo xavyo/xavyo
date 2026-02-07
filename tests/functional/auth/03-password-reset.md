@@ -8,6 +8,13 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `REGULAR_USER`, `TEST_TENANT`
+- **Special Setup**: User must exist with verified email for reset flow
+
 ## Nominal Cases
 
 ### TC-AUTH-RESET-001: Request password reset for existing user
@@ -27,7 +34,7 @@
 
 ### TC-AUTH-RESET-002: Execute password reset with valid token
 - **Category**: Nominal
-- **Preconditions**: Reset token generated via TC-AUTH-RESET-001
+- **Preconditions**: Fixtures: `REGULAR_USER`, `TEST_TENANT`. Reset token generated via TC-AUTH-RESET-001
 - **Input**:
   ```json
   POST /auth/reset-password
@@ -42,13 +49,13 @@
 
 ### TC-AUTH-RESET-003: Login with new password after reset
 - **Category**: Nominal
-- **Preconditions**: Password reset completed
+- **Preconditions**: Fixtures: `REGULAR_USER`, `TEST_TENANT`. Password reset completed
 - **Input**: Login with new password
 - **Expected Output**: Status 200 (login succeeds)
 
 ### TC-AUTH-RESET-004: Old password rejected after reset
 - **Category**: Nominal
-- **Preconditions**: Password reset completed
+- **Preconditions**: Fixtures: `REGULAR_USER`, `TEST_TENANT`. Password reset completed
 - **Input**: Login with old password
 - **Expected Output**: Status 401
 
@@ -69,14 +76,14 @@
 
 ### TC-AUTH-RESET-012: Expired reset token
 - **Category**: Edge Case
-- **Preconditions**: Reset token older than expiry window (e.g., 1 hour)
+- **Preconditions**: Fixtures: `REGULAR_USER`, `TEST_TENANT`. Reset token older than expiry window (e.g., 1 hour)
 - **Input**: `POST /auth/reset-password` with expired token
 - **Expected Output**: Status 400 "Token expired or invalid"
 
 ### TC-AUTH-RESET-013: Already-used reset token (replay)
 - **Category**: Edge Case
 - **Standard**: OWASP ASVS 2.5.6
-- **Preconditions**: Token used once successfully
+- **Preconditions**: Fixtures: `REGULAR_USER`, `TEST_TENANT`. Token used once successfully
 - **Input**: Same token used again
 - **Expected Output**: Status 400 "Token expired or invalid"
 
@@ -132,7 +139,7 @@
 ### TC-AUTH-RESET-024: Reset revokes all active sessions
 - **Category**: Security
 - **Standard**: OWASP ASVS 2.5.4
-- **Preconditions**: User has active sessions
+- **Preconditions**: Fixtures: `REGULAR_USER`, `TEST_TENANT`. User has active sessions
 - **Input**: Successful password reset
 - **Verification**: All sessions for user are revoked in DB
 

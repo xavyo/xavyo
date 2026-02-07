@@ -15,6 +15,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use validator::Validate;
 use xavyo_core::TenantId;
+use xavyo_db::set_tenant_context;
 
 /// Handle user registration.
 ///
@@ -121,7 +122,10 @@ async fn send_verification_email(
     let (token, token_hash) = generate_email_verification_token();
     let expires_at = Utc::now() + Duration::hours(EMAIL_VERIFICATION_TOKEN_VALIDITY_HOURS);
 
-    // Store token hash in database
+    // Store token hash in database (within a transaction with tenant context for RLS)
+    let mut tx = pool.begin().await?;
+    set_tenant_context(&mut *tx, tenant_id).await?;
+
     sqlx::query(
         r"
         INSERT INTO email_verification_tokens (tenant_id, user_id, token_hash, expires_at, ip_address)
@@ -133,8 +137,10 @@ async fn send_verification_email(
     .bind(&token_hash)
     .bind(expires_at)
     .bind(ip.to_string())
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     // Send email
     email_sender

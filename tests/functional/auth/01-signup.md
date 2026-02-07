@@ -7,12 +7,19 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `SYS_TENANT`
+- **Special Setup**: None (public endpoint, no authentication needed)
+
 ## Nominal Cases
 
 ### TC-AUTH-SIGNUP-001: Successful signup with valid credentials
 - **Category**: Nominal
 - **Standard**: NIST SP 800-63A IAL1
-- **Preconditions**: No existing account with the given email
+- **Preconditions**: Fixtures: `SYS_TENANT`. No existing account with the given email
 - **Input**:
   ```json
   POST /auth/signup
@@ -42,7 +49,7 @@
 ### TC-AUTH-SIGNUP-002: Signup without display_name
 - **Category**: Nominal
 - **Standard**: NIST SP 800-63A
-- **Preconditions**: No existing account
+- **Preconditions**: Fixtures: `SYS_TENANT`. No existing account
 - **Input**:
   ```json
   POST /auth/signup
@@ -57,7 +64,7 @@
 
 ### TC-AUTH-SIGNUP-003: Signup creates user in system tenant
 - **Category**: Nominal
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `SYS_TENANT`. API server running
 - **Input**:
   ```json
   POST /auth/signup
@@ -81,7 +88,7 @@
 
 ### TC-AUTH-SIGNUP-010: Duplicate email address
 - **Category**: Edge Case
-- **Preconditions**: Account exists with `existing@example.com`
+- **Preconditions**: Fixtures: `SYS_TENANT`. Account exists with `existing@example.com`
 - **Input**:
   ```json
   POST /auth/signup

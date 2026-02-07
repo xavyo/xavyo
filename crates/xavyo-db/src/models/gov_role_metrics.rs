@@ -102,7 +102,11 @@ impl GovRoleMetrics {
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_role_metrics
+            SELECT id, tenant_id, role_id, calculated_at,
+                utilization_rate::float8 as utilization_rate,
+                coverage_rate::float8 as coverage_rate,
+                user_count, active_user_count, entitlement_usage, trend_direction, created_at
+            FROM gov_role_metrics
             WHERE tenant_id = $1 AND role_id = $2
             ORDER BY calculated_at DESC
             LIMIT 1
@@ -122,7 +126,11 @@ impl GovRoleMetrics {
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_role_metrics
+            SELECT id, tenant_id, role_id, calculated_at,
+                utilization_rate::float8 as utilization_rate,
+                coverage_rate::float8 as coverage_rate,
+                user_count, active_user_count, entitlement_usage, trend_direction, created_at
+            FROM gov_role_metrics
             WHERE id = $1 AND tenant_id = $2
             ",
         )
@@ -142,7 +150,11 @@ impl GovRoleMetrics {
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_role_metrics
+            SELECT id, tenant_id, role_id, calculated_at,
+                utilization_rate::float8 as utilization_rate,
+                coverage_rate::float8 as coverage_rate,
+                user_count, active_user_count, entitlement_usage, trend_direction, created_at
+            FROM gov_role_metrics
             WHERE tenant_id = $1 AND role_id = $2
             ORDER BY calculated_at DESC
             LIMIT $3 OFFSET $4
@@ -167,7 +179,10 @@ impl GovRoleMetrics {
         // Use DISTINCT ON to get latest metrics per role
         let mut query = String::from(
             r"
-            SELECT DISTINCT ON (role_id) *
+            SELECT DISTINCT ON (role_id) id, tenant_id, role_id, calculated_at,
+                utilization_rate::float8 as utilization_rate,
+                coverage_rate::float8 as coverage_rate,
+                user_count, active_user_count, entitlement_usage, trend_direction, created_at
             FROM gov_role_metrics
             WHERE tenant_id = $1
             ",
@@ -280,7 +295,10 @@ impl GovRoleMetrics {
                 user_count, active_user_count, entitlement_usage, trend_direction
             )
             VALUES ($1, $2, NOW(), $3, $4, $5, $6, $7, $8)
-            RETURNING *
+            RETURNING id, tenant_id, role_id, calculated_at,
+                utilization_rate::float8 as utilization_rate,
+                coverage_rate::float8 as coverage_rate,
+                user_count, active_user_count, entitlement_usage, trend_direction, created_at
             ",
         )
         .bind(tenant_id)

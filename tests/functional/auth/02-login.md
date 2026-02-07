@@ -7,12 +7,19 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `REGULAR_USER`, `USER_JWT`, `TEST_TENANT`
+- **Special Setup**: User must have verified email before login tests
+
 ## Nominal Cases
 
 ### TC-AUTH-LOGIN-001: Successful login with valid credentials
 - **Category**: Nominal
 - **Standard**: NIST SP 800-63B AAL1
-- **Preconditions**: User exists with verified email
+- **Preconditions**: Fixtures: `REGULAR_USER`, `TEST_TENANT`. User exists with verified email
 - **Input**:
   ```json
   POST /auth/login
@@ -47,7 +54,7 @@
 
 ### TC-AUTH-LOGIN-003: Login with case-insensitive email
 - **Category**: Nominal
-- **Preconditions**: User registered as `user@example.com`
+- **Preconditions**: Fixtures: `REGULAR_USER`, `TEST_TENANT`. User registered as `user@example.com`
 - **Input**: `"email": "USER@Example.COM"`
 - **Expected Output**: Status 200 (login succeeds)
 
@@ -58,7 +65,7 @@
 
 ### TC-AUTH-LOGIN-005: Login with tenant-scoped user
 - **Category**: Nominal
-- **Preconditions**: User belongs to specific tenant
+- **Preconditions**: Fixtures: `REGULAR_USER`, `TEST_TENANT`. User belongs to specific tenant
 - **Input**: Login with correct `X-Tenant-ID`
 - **Expected Output**: JWT `tid` claim matches the tenant_id
 
@@ -91,19 +98,19 @@
 
 ### TC-AUTH-LOGIN-013: Unverified email login attempt
 - **Category**: Edge Case
-- **Preconditions**: User signed up but email not verified
+- **Preconditions**: Fixtures: `TEST_TENANT`. User signed up but email not verified
 - **Input**: Valid credentials
 - **Expected Output**: Status 401 or 403 with message about email verification required
 
 ### TC-AUTH-LOGIN-014: Disabled/suspended account login
 - **Category**: Edge Case
-- **Preconditions**: User account is suspended
+- **Preconditions**: Fixtures: `TEST_TENANT`. User account is suspended
 - **Input**: Valid credentials
 - **Expected Output**: Status 401 (generic "Invalid credentials" — no account status leak)
 
 ### TC-AUTH-LOGIN-015: Deleted account login
 - **Category**: Edge Case
-- **Preconditions**: User account soft-deleted
+- **Preconditions**: Fixtures: `TEST_TENANT`. User account soft-deleted
 - **Input**: Valid credentials for deleted account
 - **Expected Output**: Status 401
 
@@ -134,7 +141,7 @@
 
 ### TC-AUTH-LOGIN-021: Login with expired but existing credentials
 - **Category**: Edge Case
-- **Preconditions**: User's password_changed_at is older than password policy max_age
+- **Preconditions**: Fixtures: `REGULAR_USER`, `TEST_TENANT`. User's password_changed_at is older than password policy max_age
 - **Input**: Correct credentials
 - **Expected Output**: Status 401 or 403 with message to change password
 
@@ -150,7 +157,7 @@
 ### TC-AUTH-LOGIN-030: Account lockout after failed attempts
 - **Category**: Security
 - **Standard**: NIST SP 800-63B, OWASP ASVS 2.2.1
-- **Preconditions**: Clean login state
+- **Preconditions**: Fixtures: `REGULAR_USER`, `TEST_TENANT`. Clean login state
 - **Input**: 5 consecutive failed login attempts
 - **Expected Output**: 6th attempt returns 429 Too Many Requests
 - **Verification**: Rate limit window is documented (e.g., 60 seconds)
@@ -188,13 +195,13 @@
 
 ### TC-AUTH-LOGIN-037: Concurrent session limit enforcement
 - **Category**: Security
-- **Preconditions**: Tenant policy limits concurrent sessions to 3
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Tenant policy limits concurrent sessions to 3
 - **Input**: Login 4 times (4 different sessions)
 - **Expected Output**: 4th login either revokes oldest session or is rejected
 
 ### TC-AUTH-LOGIN-038: Cross-tenant login isolation
 - **Category**: Security
-- **Preconditions**: User in tenant A
+- **Preconditions**: Fixtures: `REGULAR_USER`, `TEST_TENANT`. User in tenant A
 - **Input**: Login with `X-Tenant-ID` of tenant B
 - **Expected Output**: Status 401 (user not found in tenant B)
 

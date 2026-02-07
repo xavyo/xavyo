@@ -468,12 +468,31 @@ impl GroupService {
         request.validate().map_err(ScimError::InvalidPatchOp)?;
 
         // Get current group
+        let original_name = {
+            let g = self.find_group(tenant_id, group_id).await?;
+            g.display_name.clone()
+        };
         let mut group = self.find_group(tenant_id, group_id).await?;
 
         // Apply each operation
         for op in &request.operations {
             self.apply_patch_op(tenant_id, group_id, &mut group, op)
                 .await?;
+        }
+
+        // Check for displayName conflicts if it was changed
+        if group.display_name != original_name {
+            let existing =
+                Group::find_by_name(&self.pool, tenant_id, &group.display_name).await?;
+            if let Some(ex) = existing {
+                if ex.id != group_id {
+                    return Err(ScimError::Conflict {
+                        resource_type: "group".to_string(),
+                        field: "displayName".to_string(),
+                        value: group.display_name.clone(),
+                    });
+                }
+            }
         }
 
         // Update group attributes if changed

@@ -1,181 +1,56 @@
 //! Audit log data models for the xavyo CLI
 //!
-//! This module provides data structures for representing audit log entries
+//! This module provides data structures for representing login history entries
 //! returned from the API, including filtering and pagination support.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::fmt;
 use uuid::Uuid;
 
 // ============================================================================
-// AuditUser
+// AuditEntry (Login History)
 // ============================================================================
 
-/// Represents the user who performed an audited action.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuditUser {
-    /// User unique identifier
-    pub id: Uuid,
-
-    /// User email address
-    pub email: String,
-
-    /// User display name (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub display_name: Option<String>,
-}
-
-// ============================================================================
-// AuditAction
-// ============================================================================
-
-/// Enumeration of possible audit action types.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AuditAction {
-    // Authentication
-    Login,
-    Logout,
-    LoginFailed,
-    MfaVerified,
-
-    // CRUD operations
-    Create,
-    Read,
-    Update,
-    Delete,
-
-    // Agent/Tool specific
-    CredentialRotate,
-    CredentialRevoke,
-    Authorize,
-
-    // Session management
-    SessionCreate,
-    SessionRevoke,
-
-    // Configuration
-    ConfigApply,
-    ConfigExport,
-
-    // Catch-all for unknown actions
-    #[serde(other)]
-    Other,
-}
-
-impl fmt::Display for AuditAction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            Self::Login => "login",
-            Self::Logout => "logout",
-            Self::LoginFailed => "login_failed",
-            Self::MfaVerified => "mfa_verified",
-            Self::Create => "create",
-            Self::Read => "read",
-            Self::Update => "update",
-            Self::Delete => "delete",
-            Self::CredentialRotate => "credential_rotate",
-            Self::CredentialRevoke => "credential_revoke",
-            Self::Authorize => "authorize",
-            Self::SessionCreate => "session_create",
-            Self::SessionRevoke => "session_revoke",
-            Self::ConfigApply => "config_apply",
-            Self::ConfigExport => "config_export",
-            Self::Other => "other",
-        };
-        write!(f, "{}", s)
-    }
-}
-
-impl AuditAction {
-    /// Parse an action string into an AuditAction
-    #[allow(dead_code)]
-    pub fn parse(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
-            "login" => Self::Login,
-            "logout" => Self::Logout,
-            "login_failed" => Self::LoginFailed,
-            "mfa_verified" => Self::MfaVerified,
-            "create" => Self::Create,
-            "read" => Self::Read,
-            "update" => Self::Update,
-            "delete" => Self::Delete,
-            "credential_rotate" => Self::CredentialRotate,
-            "credential_revoke" => Self::CredentialRevoke,
-            "authorize" => Self::Authorize,
-            "session_create" => Self::SessionCreate,
-            "session_revoke" => Self::SessionRevoke,
-            "config_apply" => Self::ConfigApply,
-            "config_export" => Self::ConfigExport,
-            _ => Self::Other,
-        }
-    }
-
-    /// Get all valid action type strings
-    #[allow(dead_code)]
-    pub fn all_types() -> &'static [&'static str] {
-        &[
-            "login",
-            "logout",
-            "login_failed",
-            "mfa_verified",
-            "create",
-            "read",
-            "update",
-            "delete",
-            "credential_rotate",
-            "credential_revoke",
-            "authorize",
-            "session_create",
-            "session_revoke",
-            "config_apply",
-            "config_export",
-        ]
-    }
-}
-
-// ============================================================================
-// AuditEntry
-// ============================================================================
-
-/// Represents a single audit log record returned from the API.
+/// Represents a single login history record returned from the API.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditEntry {
-    /// Unique identifier for the audit entry
+    /// Unique identifier for the entry
     pub id: Uuid,
 
-    /// When the event occurred (ISO 8601 format)
-    pub timestamp: DateTime<Utc>,
+    /// User ID who attempted login
+    #[serde(default)]
+    pub user_id: Option<Uuid>,
 
-    /// User who performed the action
-    pub user: AuditUser,
+    /// User email
+    #[serde(default)]
+    pub email: Option<String>,
 
-    /// Type of action performed
-    pub action: AuditAction,
+    /// Whether the login was successful
+    #[serde(default)]
+    pub success: bool,
 
-    /// Type of resource affected
-    pub resource_type: String,
-
-    /// Identifier of the affected resource
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub resource_id: Option<Uuid>,
-
-    /// Display name of the affected resource
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub resource_name: Option<String>,
+    /// Authentication method used (password, mfa, etc.)
+    #[serde(default)]
+    pub auth_method: Option<String>,
 
     /// IP address of the client
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub ip_address: Option<String>,
 
     /// User agent string
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub user_agent: Option<String>,
 
-    /// Additional metadata (action-specific)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<serde_json::Value>,
+    /// Whether this was a new device
+    #[serde(default)]
+    pub is_new_device: bool,
+
+    /// Whether this was a new location
+    #[serde(default)]
+    pub is_new_location: bool,
+
+    /// When the event occurred
+    pub created_at: DateTime<Utc>,
 }
 
 // ============================================================================
@@ -288,17 +163,19 @@ impl AuditFilter {
 // AuditListResponse
 // ============================================================================
 
-/// API response for audit list endpoint.
+/// API response for login history list endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditListResponse {
-    /// List of audit entries
-    pub entries: Vec<AuditEntry>,
+    /// List of login history entries
+    pub items: Vec<AuditEntry>,
 
     /// Total count of matching entries (for pagination)
+    #[serde(default)]
     pub total: i64,
 
-    /// Whether more entries are available
-    pub has_more: bool,
+    /// Cursor for next page
+    #[serde(default)]
+    pub next_cursor: Option<String>,
 }
 
 // ============================================================================
@@ -308,25 +185,6 @@ pub struct AuditListResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_audit_action_display() {
-        assert_eq!(AuditAction::Login.to_string(), "login");
-        assert_eq!(AuditAction::Logout.to_string(), "logout");
-        assert_eq!(AuditAction::Create.to_string(), "create");
-        assert_eq!(AuditAction::Delete.to_string(), "delete");
-        assert_eq!(
-            AuditAction::CredentialRotate.to_string(),
-            "credential_rotate"
-        );
-    }
-
-    #[test]
-    fn test_audit_action_parse() {
-        assert_eq!(AuditAction::parse("login"), AuditAction::Login);
-        assert_eq!(AuditAction::parse("LOGIN"), AuditAction::Login);
-        assert_eq!(AuditAction::parse("unknown"), AuditAction::Other);
-    }
 
     #[test]
     fn test_audit_filter_default() {
@@ -368,76 +226,45 @@ mod tests {
     }
 
     #[test]
-    fn test_audit_user_deserialize() {
-        let json =
-            r#"{"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "email": "alice@example.com"}"#;
-        let user: AuditUser = serde_json::from_str(json).unwrap();
-        assert_eq!(user.email, "alice@example.com");
-        assert!(user.display_name.is_none());
-    }
-
-    #[test]
     fn test_audit_entry_deserialize() {
         let json = r#"{
             "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "timestamp": "2026-02-04T10:30:00Z",
-            "user": {
-                "id": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
-                "email": "alice@example.com"
-            },
-            "action": "login",
-            "resource_type": "session"
+            "user_id": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
+            "email": "alice@example.com",
+            "success": true,
+            "auth_method": "password",
+            "ip_address": "127.0.0.1",
+            "user_agent": "curl/8.5.0",
+            "is_new_device": false,
+            "is_new_location": false,
+            "created_at": "2026-02-04T10:30:00Z"
         }"#;
 
         let entry: AuditEntry = serde_json::from_str(json).unwrap();
-        assert_eq!(entry.action, AuditAction::Login);
-        assert_eq!(entry.resource_type, "session");
-        assert_eq!(entry.user.email, "alice@example.com");
+        assert_eq!(entry.email.as_deref(), Some("alice@example.com"));
+        assert!(entry.success);
+        assert_eq!(entry.auth_method.as_deref(), Some("password"));
     }
 
     #[test]
     fn test_audit_list_response_deserialize() {
         let json = r#"{
-            "entries": [{
+            "items": [{
                 "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                "timestamp": "2026-02-04T10:30:00Z",
-                "user": {
-                    "id": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
-                    "email": "alice@example.com"
-                },
-                "action": "login",
-                "resource_type": "session"
+                "user_id": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
+                "email": "alice@example.com",
+                "success": true,
+                "auth_method": "password",
+                "ip_address": "127.0.0.1",
+                "created_at": "2026-02-04T10:30:00Z"
             }],
             "total": 100,
-            "has_more": true
+            "next_cursor": "2026-02-04T10:30:00Z"
         }"#;
 
         let response: AuditListResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(response.entries.len(), 1);
+        assert_eq!(response.items.len(), 1);
         assert_eq!(response.total, 100);
-        assert!(response.has_more);
-    }
-
-    #[test]
-    fn test_audit_action_unknown() {
-        let json = r#"{"action": "unknown_action"}"#;
-
-        #[derive(Deserialize)]
-        struct TestStruct {
-            action: AuditAction,
-        }
-
-        let result: TestStruct = serde_json::from_str(json).unwrap();
-        assert_eq!(result.action, AuditAction::Other);
-    }
-
-    #[test]
-    fn test_all_action_types() {
-        let types = AuditAction::all_types();
-        assert!(types.contains(&"login"));
-        assert!(types.contains(&"logout"));
-        assert!(types.contains(&"create"));
-        assert!(types.contains(&"delete"));
-        assert!(!types.contains(&"other")); // other is the catch-all
+        assert!(response.next_cursor.is_some());
     }
 }

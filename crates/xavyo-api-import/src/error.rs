@@ -107,6 +107,10 @@ pub enum ImportError {
     #[error("Password policy violation: {0}")]
     PasswordPolicyViolation(String),
 
+    /// Forbidden: insufficient permissions.
+    #[error("Forbidden: admin role required")]
+    Forbidden,
+
     /// Missing or invalid authentication.
     #[error("Unauthorized")]
     Unauthorized,
@@ -202,6 +206,11 @@ impl ImportError {
             )
             .with_detail(msg.clone()),
 
+            ImportError::Forbidden => {
+                ProblemDetails::new("forbidden", "Forbidden", StatusCode::FORBIDDEN)
+                    .with_detail("Admin role required.")
+            }
+
             ImportError::Unauthorized => {
                 ProblemDetails::new("unauthorized", "Unauthorized", StatusCode::UNAUTHORIZED)
                     .with_detail("Authentication required.")
@@ -238,6 +247,7 @@ impl ImportError {
             ImportError::InvalidFileType(_) => StatusCode::BAD_REQUEST,
             ImportError::MissingHeaders(_) => StatusCode::BAD_REQUEST,
             ImportError::InvalidCsv(_) => StatusCode::BAD_REQUEST,
+            ImportError::Forbidden => StatusCode::FORBIDDEN,
             ImportError::ConcurrentImport => StatusCode::CONFLICT,
             ImportError::JobNotFound => StatusCode::NOT_FOUND,
             ImportError::UserNotFound => StatusCode::NOT_FOUND,

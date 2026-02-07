@@ -137,7 +137,12 @@ impl GovPeerGroup {
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_peer_groups
+            SELECT id, tenant_id, name, group_type, attribute_key, attribute_value,
+                user_count,
+                avg_entitlements::float8 as avg_entitlements,
+                stddev_entitlements::float8 as stddev_entitlements,
+                created_at, updated_at
+            FROM gov_peer_groups
             WHERE id = $1 AND tenant_id = $2
             ",
         )
@@ -156,7 +161,12 @@ impl GovPeerGroup {
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_peer_groups
+            SELECT id, tenant_id, name, group_type, attribute_key, attribute_value,
+                user_count,
+                avg_entitlements::float8 as avg_entitlements,
+                stddev_entitlements::float8 as stddev_entitlements,
+                created_at, updated_at
+            FROM gov_peer_groups
             WHERE tenant_id = $1 AND group_type = $2 AND attribute_value = $3
             ",
         )
@@ -175,7 +185,12 @@ impl GovPeerGroup {
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_peer_groups
+            SELECT id, tenant_id, name, group_type, attribute_key, attribute_value,
+                user_count,
+                avg_entitlements::float8 as avg_entitlements,
+                stddev_entitlements::float8 as stddev_entitlements,
+                created_at, updated_at
+            FROM gov_peer_groups
             WHERE tenant_id = $1 AND group_type = $2
             ORDER BY name ASC
             ",
@@ -194,7 +209,12 @@ impl GovPeerGroup {
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_peer_groups
+            SELECT id, tenant_id, name, group_type, attribute_key, attribute_value,
+                user_count,
+                avg_entitlements::float8 as avg_entitlements,
+                stddev_entitlements::float8 as stddev_entitlements,
+                created_at, updated_at
+            FROM gov_peer_groups
             WHERE tenant_id = $1 AND user_count >= $2
             ORDER BY group_type, name ASC
             ",
@@ -215,7 +235,12 @@ impl GovPeerGroup {
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
             r"
-            SELECT * FROM gov_peer_groups
+            SELECT id, tenant_id, name, group_type, attribute_key, attribute_value,
+                user_count,
+                avg_entitlements::float8 as avg_entitlements,
+                stddev_entitlements::float8 as stddev_entitlements,
+                created_at, updated_at
+            FROM gov_peer_groups
             WHERE tenant_id = $1
             ",
         );
@@ -309,7 +334,11 @@ impl GovPeerGroup {
                 tenant_id, name, group_type, attribute_key, attribute_value
             )
             VALUES ($1, $2, $3, $4, $5)
-            RETURNING *
+            RETURNING id, tenant_id, name, group_type, attribute_key, attribute_value,
+                user_count,
+                avg_entitlements::float8 as avg_entitlements,
+                stddev_entitlements::float8 as stddev_entitlements,
+                created_at, updated_at
             ",
         )
         .bind(tenant_id)
@@ -337,7 +366,11 @@ impl GovPeerGroup {
                 name = EXCLUDED.name,
                 attribute_key = EXCLUDED.attribute_key,
                 updated_at = NOW()
-            RETURNING *
+            RETURNING id, tenant_id, name, group_type, attribute_key, attribute_value,
+                user_count,
+                avg_entitlements::float8 as avg_entitlements,
+                stddev_entitlements::float8 as stddev_entitlements,
+                created_at, updated_at
             ",
         )
         .bind(tenant_id)
@@ -361,7 +394,11 @@ impl GovPeerGroup {
             UPDATE gov_peer_groups
             SET user_count = $3, avg_entitlements = $4, stddev_entitlements = $5, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
-            RETURNING *
+            RETURNING id, tenant_id, name, group_type, attribute_key, attribute_value,
+                user_count,
+                avg_entitlements::float8 as avg_entitlements,
+                stddev_entitlements::float8 as stddev_entitlements,
+                created_at, updated_at
             ",
         )
         .bind(id)

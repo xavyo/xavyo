@@ -29,11 +29,25 @@ pub struct UserResponse {
     pub last_login_at: Option<DateTime<Utc>>,
 }
 
+/// Pagination info from the API
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PaginationInfo {
+    #[serde(default)]
+    pub total_count: Option<i64>,
+    #[serde(default)]
+    pub offset: Option<i64>,
+    #[serde(default)]
+    pub limit: Option<i64>,
+    #[serde(default)]
+    pub has_more: Option<bool>,
+}
+
 /// User list response
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserListResponse {
     pub users: Vec<UserResponse>,
-    pub total: i64,
+    #[serde(default)]
+    pub pagination: Option<PaginationInfo>,
 }
 
 /// Create user request

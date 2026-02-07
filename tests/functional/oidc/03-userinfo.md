@@ -18,6 +18,15 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `USER_JWT`, `TEST_TENANT`
+- **Special Setup**: Access tokens with various scope combinations (openid, email, profile)
+
+---
+
 ## Nominal Cases
 
 ### TC-OIDC-UI-001: Successful UserInfo request with openid scope only
@@ -46,7 +55,7 @@
 ### TC-OIDC-UI-002: UserInfo with openid and email scope
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Sections 5.3 and 5.4
-- **Preconditions**: Access token with scopes/roles: `openid email`
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Access token with scopes/roles: `openid email`
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -68,7 +77,7 @@
 ### TC-OIDC-UI-003: UserInfo with openid and profile scope
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Sections 5.3 and 5.4
-- **Preconditions**: Access token with scopes/roles: `openid profile`; user has display_name
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Access token with scopes/roles: `openid profile`; user has display_name
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -87,7 +96,7 @@
 ### TC-OIDC-UI-004: UserInfo with all scopes (openid email profile)
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 5.4
-- **Preconditions**: Access token with scopes/roles: `openid email profile`
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Access token with scopes/roles: `openid email profile`
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -107,7 +116,7 @@
 ### TC-OIDC-UI-005: UserInfo for user with unverified email
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 5.1
-- **Preconditions**: Access token with `openid email` scope; user's email is NOT verified
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Access token with `openid email` scope; user's email is NOT verified
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -126,7 +135,7 @@
 ### TC-OIDC-UI-006: UserInfo sub claim is consistent with ID token sub
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 5.3
-- **Preconditions**: Both an ID token and access token obtained from the same authorization
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Both an ID token and access token obtained from the same authorization
 - **Input**:
   1. Decode the ID token -- extract `sub`
   2. `GET /oauth/userinfo` with the access token -- extract `sub`
@@ -137,7 +146,7 @@
 ### TC-OIDC-UI-007: UserInfo for user with no display_name
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 5.1
-- **Preconditions**: User has `display_name = NULL` in database; token has `openid profile` scope
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. User has `display_name = NULL` in database; token has `openid profile` scope
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -156,7 +165,7 @@
 ### TC-OIDC-UI-008: UserInfo omits claims for scopes not granted
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 5.4
-- **Preconditions**: Token has only `openid` scope (no `email` or `profile`)
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Token has only `openid` scope (no `email` or `profile`)
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -176,7 +185,7 @@
 ### TC-OIDC-UI-010: UserInfo without Authorization header
 - **Category**: Edge Case
 - **Standard**: RFC 6750, Section 3.1
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -191,7 +200,7 @@
 ### TC-OIDC-UI-011: UserInfo with Basic auth instead of Bearer
 - **Category**: Edge Case
 - **Standard**: RFC 6750, Section 2.1
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -206,7 +215,7 @@
 ### TC-OIDC-UI-012: UserInfo with empty Bearer token
 - **Category**: Edge Case
 - **Standard**: RFC 6750, Section 2.1
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -222,7 +231,7 @@
 ### TC-OIDC-UI-013: UserInfo with expired access token
 - **Category**: Edge Case
 - **Standard**: RFC 6750, Section 3.1
-- **Preconditions**: Access token has `exp` in the past
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Access token has `exp` in the past
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -237,7 +246,7 @@
 ### TC-OIDC-UI-014: UserInfo with malformed JWT
 - **Category**: Edge Case
 - **Standard**: RFC 7519, Section 7.2
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -252,7 +261,7 @@
 ### TC-OIDC-UI-015: UserInfo for non-existent user (deleted after token issued)
 - **Category**: Edge Case
 - **Standard**: Operational
-- **Preconditions**: Valid token issued, then user deleted from database
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Valid token issued, then user deleted from database
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -268,7 +277,7 @@
 ### TC-OIDC-UI-016: UserInfo for inactive user
 - **Category**: Edge Case
 - **Standard**: Operational
-- **Preconditions**: User account deactivated (`is_active = false`) after token was issued
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. User account deactivated (`is_active = false`) after token was issued
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -283,7 +292,7 @@
 ### TC-OIDC-UI-017: POST request to UserInfo endpoint
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Core 1.0, Section 5.3.1
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   POST /oauth/userinfo
@@ -297,7 +306,7 @@
 ### TC-OIDC-UI-018: UserInfo with token missing tenant_id (tid) claim
 - **Category**: Edge Case
 - **Standard**: Xavyo Multi-Tenancy Architecture
-- **Preconditions**: Crafted token without `tid` claim
+- **Preconditions**: Fixtures: `TEST_TENANT`. Crafted token without `tid` claim
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -312,7 +321,7 @@
 ### TC-OIDC-UI-019: UserInfo with token having invalid sub (non-UUID)
 - **Category**: Edge Case
 - **Standard**: Xavyo Implementation
-- **Preconditions**: Crafted token with `sub: "not-a-uuid"`
+- **Preconditions**: Fixtures: `TEST_TENANT`. Crafted token with `sub: "not-a-uuid"`
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -331,7 +340,7 @@
 ### TC-OIDC-UI-020: UserInfo without openid scope returns 403
 - **Category**: Security
 - **Standard**: OpenID Connect Core 1.0, Section 5.3
-- **Preconditions**: Access token with roles `["user", "admin"]` but NOT `"openid"`
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Access token with roles `["user", "admin"]` but NOT `"openid"`
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -368,7 +377,7 @@
 ### TC-OIDC-UI-022: UserInfo does not leak sensitive fields
 - **Category**: Security
 - **Standard**: OWASP ASVS 3.6
-- **Preconditions**: Valid access token with all scopes
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Valid access token with all scopes
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -384,7 +393,7 @@
 ### TC-OIDC-UI-023: UserInfo with revoked token is rejected
 - **Category**: Security
 - **Standard**: RFC 7009 / F084
-- **Preconditions**: Token was revoked via `POST /oauth/revoke`
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Token was revoked via `POST /oauth/revoke`
 - **Input**:
   ```
   GET /oauth/userinfo
@@ -399,7 +408,7 @@
 ### TC-OIDC-UI-024: UserInfo response does not include CORS wildcard
 - **Category**: Security
 - **Standard**: OWASP ASVS 14.5
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /oauth/userinfo

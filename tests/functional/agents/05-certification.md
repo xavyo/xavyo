@@ -18,12 +18,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`, `TEST_SA`
+- **Special Setup**: Both agents and service accounts must exist in tenant for campaign creation and item generation
+
+---
+
 ## Nominal Cases
 
 ### TC-NHI-CERT-001: Create certification campaign for service accounts
 - **Category**: Nominal
 - **Standard**: SOC 2 CC6.1, CC6.2
-- **Preconditions**: Authenticated admin, service accounts exist in tenant
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_SA`. Authenticated admin, service accounts exist in tenant
 - **Input**:
   ```json
   POST /nhi/certifications/campaigns
@@ -54,6 +63,7 @@
 
 ### TC-NHI-CERT-002: Create campaign for both NHI types
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`, `TEST_SA`. Both agent and service account types exist
 - **Input**:
   ```json
   POST /nhi/certifications/campaigns
@@ -69,6 +79,7 @@
 ### TC-NHI-CERT-003: Create campaign with filter criteria
 - **Category**: Nominal
 - **Standard**: Risk-based access review
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`, `TEST_SA`. NHIs with various risk levels exist
 - **Input**:
   ```json
   POST /nhi/certifications/campaigns
@@ -87,6 +98,7 @@
 
 ### TC-NHI-CERT-004: Create campaign with owner filter
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_SA`. Service accounts with known owner exist
 - **Input**:
   ```json
   POST /nhi/certifications/campaigns
@@ -103,7 +115,7 @@
 ### TC-NHI-CERT-005: Launch a draft campaign
 - **Category**: Nominal
 - **Standard**: SOC 2 CC6.2 (initiate review)
-- **Preconditions**: Campaign in `draft` status, matching NHIs exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`, `TEST_SA`. Campaign in `draft` status, matching NHIs exist
 - **Input**: `POST /nhi/certifications/campaigns/<campaign-id>/launch`
 - **Expected Output**:
   ```json
@@ -123,6 +135,7 @@
 
 ### TC-NHI-CERT-006: List campaigns with pagination
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaigns exist in tenant
 - **Input**: `GET /nhi/certifications/campaigns?page=1&per_page=10`
 - **Expected Output**:
   ```json
@@ -137,11 +150,13 @@
 
 ### TC-NHI-CERT-007: List campaigns filtered by status
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active campaigns exist
 - **Input**: `GET /nhi/certifications/campaigns?status=active`
 - **Expected Output**: Status 200, only active campaigns
 
 ### TC-NHI-CERT-008: Get campaign details with item counts
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active campaign with items exists
 - **Input**: `GET /nhi/certifications/campaigns/<campaign-id>`
 - **Expected Output**:
   ```json
@@ -161,6 +176,7 @@
 
 ### TC-NHI-CERT-009: List items in a campaign with filters
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_SA`. Active campaign with pending service account items
 - **Input**: `GET /nhi/certifications/campaigns/<id>/items?status=pending&nhi_type=service_account`
 - **Expected Output**:
   ```json
@@ -189,6 +205,7 @@
 ### TC-NHI-CERT-010: Certify an NHI item (approve access)
 - **Category**: Nominal
 - **Standard**: SOC 2 CC6.2 (certify continued need)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`, `TEST_SA`. Active campaign with pending items; current user is reviewer
 - **Input**:
   ```json
   POST /nhi/certifications/items/<item-id>/decide
@@ -213,6 +230,7 @@
 ### TC-NHI-CERT-011: Revoke an NHI item (deny continued access)
 - **Category**: Nominal
 - **Standard**: SOC 2 CC6.2 (revoke unnecessary access)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`, `TEST_SA`. Active campaign with pending items; current user is reviewer
 - **Input**:
   ```json
   POST /nhi/certifications/items/<item-id>/decide
@@ -230,6 +248,7 @@
 
 ### TC-NHI-CERT-012: Get campaign summary statistics
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active campaign with mixed item statuses
 - **Input**: `GET /nhi/certifications/campaigns/<id>/summary`
 - **Expected Output**:
   ```json
@@ -250,6 +269,7 @@
 
 ### TC-NHI-CERT-013: Bulk certify multiple items
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`, `TEST_SA`. Active campaign with multiple pending items
 - **Input**:
   ```json
   POST /nhi/certifications/items/bulk-decide
@@ -272,7 +292,7 @@
 
 ### TC-NHI-CERT-014: Get my pending certification items
 - **Category**: Nominal
-- **Preconditions**: Current user is assigned as reviewer for multiple items
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`, `TEST_SA`. Current user is assigned as reviewer for multiple items
 - **Input**: `GET /nhi/certifications/my-pending?page=1&per_page=20`
 - **Expected Output**:
   ```json
@@ -287,6 +307,7 @@
 
 ### TC-NHI-CERT-015: Cancel a campaign
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active campaign exists
 - **Input**: `POST /nhi/certifications/campaigns/<campaign-id>/cancel`
 - **Expected Output**:
   ```json
@@ -300,49 +321,55 @@
 
 ### TC-NHI-CERT-020: Create campaign with due date in the past
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "name": "Past Due", "nhi_types": ["service_account"], "due_date": "2020-01-01T00:00:00Z", ... }`
 - **Expected Output**: Status 400 ("Due date must be in the future")
 
 ### TC-NHI-CERT-021: Create campaign with empty nhi_types
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "name": "No Types", "nhi_types": [], "reviewer_id": "<uuid>", "due_date": "2027-01-01T00:00:00Z" }`
 - **Expected Output**: Status 400 ("At least one NHI type must be selected")
 
 ### TC-NHI-CERT-022: Launch campaign that is not in draft status
 - **Category**: Edge Case
-- **Preconditions**: Campaign already active or completed
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign already active or completed
 - **Input**: `POST /nhi/certifications/campaigns/<active-campaign>/launch`
 - **Expected Output**: Status 400 ("Campaign is not in draft status")
 
 ### TC-NHI-CERT-023: Launch campaign with no matching NHIs
 - **Category**: Edge Case
-- **Preconditions**: Campaign filter matches zero NHIs
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign filter matches zero NHIs
 - **Input**: Launch campaign
 - **Expected Output**: Status 400 ("No matching NHIs found for campaign")
 
 ### TC-NHI-CERT-024: Decide on already-decided item
 - **Category**: Edge Case
-- **Preconditions**: Item already has decision = "certify"
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Item already has decision = "certify"
 - **Input**: `POST /nhi/certifications/items/<id>/decide { "decision": "revoke" }`
 - **Expected Output**: Status 400 ("Item has already been decided")
 
 ### TC-NHI-CERT-025: Decide with invalid decision value
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Pending certification item exists
 - **Input**: `{ "decision": "maybe" }`
 - **Expected Output**: Status 400 ("Decision must be 'certify' or 'revoke'")
 
 ### TC-NHI-CERT-026: Cancel already-completed campaign
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign with status = "completed" exists
 - **Input**: Cancel a campaign with status = "completed"
 - **Expected Output**: Status 400 ("Campaign cannot be cancelled")
 
 ### TC-NHI-CERT-027: Get non-existent campaign
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `GET /nhi/certifications/campaigns/<nonexistent-uuid>`
 - **Expected Output**: Status 404
 
 ### TC-NHI-CERT-028: Bulk decide with mix of valid and already-decided items
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`, `TEST_SA`. Active campaign with mix of pending and already-decided items
 - **Input**: `{ "item_ids": ["<pending>", "<already-decided>", "<pending>"], "decision": "certify" }`
 - **Expected Output**:
   ```json
@@ -356,16 +383,19 @@
 
 ### TC-NHI-CERT-029: List items with pagination beyond total
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active campaign with items
 - **Input**: `GET /nhi/certifications/campaigns/<id>/items?page=100`
 - **Expected Output**: Status 200, empty items, total reflects actual count
 
 ### TC-NHI-CERT-030: Create campaign with invalid nhi_type value
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "nhi_types": ["robot", "service_account"], ... }`
 - **Expected Output**: Status 400 (invalid NHI type) OR ignored (only valid types processed)
 
 ### TC-NHI-CERT-031: Bulk decide with empty item_ids array
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "item_ids": [], "decision": "certify" }`
 - **Expected Output**: Status 400 ("At least one item ID required")
 
@@ -376,49 +406,56 @@
 ### TC-NHI-CERT-040: Cross-tenant campaign isolation
 - **Category**: Security
 - **Standard**: SOC 2 CC6.1
-- **Preconditions**: Campaign created in Tenant A
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign created in Tenant A; second tenant JWT available
 - **Input**: Tenant B attempts `GET /nhi/certifications/campaigns/<tenant-a-campaign>`
 - **Expected Output**: Status 404
 
 ### TC-NHI-CERT-041: Cross-tenant item decision
 - **Category**: Security
-- **Preconditions**: Certification item belongs to Tenant A campaign
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Certification item belongs to Tenant A campaign; second tenant JWT available
 - **Input**: Tenant B attempts to decide on Tenant A item
 - **Expected Output**: Status 404
 
 ### TC-NHI-CERT-042: Campaign creation without authentication
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`. No authentication header provided
 - **Input**: `POST /nhi/certifications/campaigns` without Authorization header
 - **Expected Output**: Status 401
 
 ### TC-NHI-CERT-043: Decision records actor identity
 - **Category**: Security
 - **Standard**: SOC 2 CC7.2 (audit trail)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`, `TEST_SA`. Active campaign with pending items
 - **Input**: Make a certification decision
 - **Verification**: `decided_by` field matches the JWT subject (user_id), not a system default
 
 ### TC-NHI-CERT-044: Missing tenant_id in JWT
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`. JWT crafted without `tid` claim
 - **Input**: JWT without `tid` claim attempts campaign creation
 - **Expected Output**: Status 400 ("Tenant ID is required")
 
 ### TC-NHI-CERT-045: Invalid user_id in JWT
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`. JWT crafted with non-UUID `sub` claim
 - **Input**: JWT with non-UUID `sub` claim
 - **Expected Output**: Status 400 ("Invalid user ID in token")
 
 ### TC-NHI-CERT-046: Pagination per_page clamped to 100
 - **Category**: Security
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active campaign with items
 - **Input**: `GET /nhi/certifications/campaigns/<id>/items?per_page=5000`
 - **Expected Output**: Status 200, at most 100 items returned (clamped to 1..100)
 
 ### TC-NHI-CERT-047: SQL injection in campaign name
 - **Category**: Security
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "name": "'; DROP TABLE nhi_certification_campaigns; --", ... }`
 - **Expected Output**: Status 201 or 400, no SQL execution
 
 ### TC-NHI-CERT-048: Bulk decide with non-existent item IDs
 - **Category**: Security
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "item_ids": ["<nonexistent-uuid>"], "decision": "certify" }`
 - **Expected Output**:
   ```json
@@ -432,12 +469,12 @@
 ### TC-NHI-CERT-049: Campaign auto-completes when all items decided
 - **Category**: Security
 - **Standard**: SOC 2 CC6.2 (completeness of review)
-- **Preconditions**: Active campaign with 3 pending items
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`, `TEST_SA`. Active campaign with 3 pending items
 - **Input**: Decide all 3 items (mix of certify/revoke)
 - **Verification**: Campaign status transitions to `completed`, `completed_at` is set
 
 ### TC-NHI-CERT-050: My-pending only shows items assigned to current user
 - **Category**: Security
-- **Preconditions**: Items assigned to User A and User B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`, `TEST_SA`. Items assigned to User A and User B
 - **Input**: User A calls `GET /nhi/certifications/my-pending`
 - **Expected Output**: Only items where `reviewer_id` matches User A's ID

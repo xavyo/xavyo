@@ -10,12 +10,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`
+- **Special Setup**: SP must be registered with valid entity_id and ACS URL; tenant must have an active IdP signing certificate for assertion signing tests
+
+---
+
 ## Nominal Cases
 
 ### TC-SAML-SSO-001: SP-initiated SSO via HTTP-Redirect binding with valid AuthnRequest
 - **Category**: Nominal
 - **Standard**: SAML 2.0 Profiles 4.1.2 (SP-Initiated SSO)
-- **Preconditions**:
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
   - Tenant `T1` exists with active IdP signing certificate
   - Service Provider `SP1` registered with entity_id `https://sp.example.com/saml/metadata`, ACS URL `https://sp.example.com/saml/acs`, enabled=true
   - User `U1` authenticated with valid JWT for tenant `T1`
@@ -59,7 +68,7 @@
 ### TC-SAML-SSO-002: SP-initiated SSO via HTTP-POST binding with valid AuthnRequest
 - **Category**: Nominal
 - **Standard**: SAML 2.0 Bindings 3.5 (HTTP-POST)
-- **Preconditions**: Same as TC-SAML-SSO-001
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. Same as TC-SAML-SSO-001
 - **Input**:
   ```
   POST /saml/sso
@@ -80,7 +89,7 @@
 ### TC-SAML-SSO-003: SSO with NameID format emailAddress
 - **Category**: Nominal
 - **Standard**: SAML 2.0 Core 8.3 (Name Identifier Format Identifiers)
-- **Preconditions**: SP configured with name_id_format `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP configured with name_id_format `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress`
 - **Input**: Valid AuthnRequest with `<samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"/>`
 - **Expected Output**: SAML Response where `<saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">user@example.com</saml:NameID>`
 - **Verification**: NameID value equals the authenticated user's email address
@@ -88,7 +97,7 @@
 ### TC-SAML-SSO-004: SSO with NameID format persistent
 - **Category**: Nominal
 - **Standard**: SAML 2.0 Core 8.3.7
-- **Preconditions**: SP configured with name_id_format `urn:oasis:names:tc:SAML:2.0:nameid-format:persistent`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP configured with name_id_format `urn:oasis:names:tc:SAML:2.0:nameid-format:persistent`
 - **Input**: Valid AuthnRequest
 - **Expected Output**: SAML Response where `<saml:NameID Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"><user_uuid></saml:NameID>`
 - **Verification**: NameID value equals the user's UUID and remains consistent across logins
@@ -96,7 +105,7 @@
 ### TC-SAML-SSO-005: SSO with default attribute mapping
 - **Category**: Nominal
 - **Standard**: SAML 2.0 Core 2.7.3 (Attribute Statement)
-- **Preconditions**: SP has no custom attribute_mapping (empty `{}`)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP has no custom attribute_mapping (empty `{}`)
 - **Input**: Valid AuthnRequest from authenticated user with email `test@example.com`
 - **Expected Output**: SAML Response contains `<saml:AttributeStatement>` with:
   - `<saml:Attribute Name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress">` with value `test@example.com`
@@ -105,7 +114,7 @@
 
 ### TC-SAML-SSO-006: SSO with custom attribute mapping
 - **Category**: Nominal
-- **Preconditions**: SP configured with custom attribute_mapping:
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP configured with custom attribute_mapping:
   ```json
   {
     "name_id_source": "email",
@@ -125,14 +134,14 @@
 ### TC-SAML-SSO-007: SSO with RelayState preserved
 - **Category**: Nominal
 - **Standard**: SAML 2.0 Bindings 3.4.3
-- **Preconditions**: Standard SP setup
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. Standard SP setup
 - **Input**: AuthnRequest with `RelayState=https%3A%2F%2Fsp.example.com%2Fdeep%2Flink`
 - **Expected Output**: HTML form includes `<input type="hidden" name="RelayState" value="https://sp.example.com/deep/link"/>`
 - **Verification**: RelayState is passed through unmodified to the auto-submit form
 
 ### TC-SAML-SSO-008: SSO without RelayState
 - **Category**: Nominal
-- **Preconditions**: Standard SP setup
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. Standard SP setup
 - **Input**: AuthnRequest without RelayState parameter
 - **Expected Output**: HTML form does NOT contain a RelayState hidden input
 - **Verification**: Absence of RelayState input in the form
@@ -140,7 +149,7 @@
 ### TC-SAML-SSO-009: SSO with signed assertions enabled
 - **Category**: Nominal
 - **Standard**: SAML 2.0 Core 5.4 (XML Signature Profile)
-- **Preconditions**: SP configured with `sign_assertions=true`, IdP has active signing certificate
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP configured with `sign_assertions=true`, IdP has active signing certificate
 - **Input**: Valid AuthnRequest
 - **Expected Output**: Decoded SAML Response contains `<ds:Signature>` element within `<saml:Assertion>`:
   - `<ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>`
@@ -152,7 +161,7 @@
 
 ### TC-SAML-SSO-010: SSO with unsigned assertions
 - **Category**: Nominal
-- **Preconditions**: SP configured with `sign_assertions=false`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP configured with `sign_assertions=false`
 - **Input**: Valid AuthnRequest
 - **Expected Output**: Decoded SAML Response does NOT contain `<ds:Signature>` element
 - **Verification**: No signature present in the Response or Assertion
@@ -160,7 +169,7 @@
 ### TC-SAML-SSO-011: SSO preserves InResponseTo in SubjectConfirmationData
 - **Category**: Nominal
 - **Standard**: SAML 2.0 Core 2.4.1.2
-- **Preconditions**: Standard SP setup
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. Standard SP setup
 - **Input**: AuthnRequest with `ID="_request_abc_123"`
 - **Expected Output**: SAML Response contains:
   - `<samlp:Response ... InResponseTo="_request_abc_123">`
@@ -174,21 +183,21 @@
 ### TC-SAML-SSO-012: AuthnRequest without AssertionConsumerServiceURL
 - **Category**: Edge Case
 - **Standard**: SAML 2.0 Core 3.4.1 (ACS URL optional in AuthnRequest)
-- **Preconditions**: SP registered with ACS URLs `["https://sp.example.com/saml/acs"]`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP registered with ACS URLs `["https://sp.example.com/saml/acs"]`
 - **Input**: AuthnRequest XML without `AssertionConsumerServiceURL` attribute
 - **Expected Output**: Status 200, form action uses the first configured ACS URL from SP registration
 - **Verification**: `<form method="POST" action="https://sp.example.com/saml/acs">`
 
 ### TC-SAML-SSO-013: AuthnRequest with ACS URL matching one of multiple registered URLs
 - **Category**: Edge Case
-- **Preconditions**: SP registered with ACS URLs `["https://sp.example.com/saml/acs", "https://sp.example.com/saml/acs-alt"]`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP registered with ACS URLs `["https://sp.example.com/saml/acs", "https://sp.example.com/saml/acs-alt"]`
 - **Input**: AuthnRequest with `AssertionConsumerServiceURL="https://sp.example.com/saml/acs-alt"`
 - **Expected Output**: Status 200, form action uses the requested ACS URL `https://sp.example.com/saml/acs-alt`
 
 ### TC-SAML-SSO-014: AuthnRequest with ACS URL not matching any registered URL
 - **Category**: Edge Case
 - **Standard**: SAML 2.0 Profiles 4.1.4.1
-- **Preconditions**: SP registered with ACS URLs `["https://sp.example.com/saml/acs"]`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP registered with ACS URLs `["https://sp.example.com/saml/acs"]`
 - **Input**: AuthnRequest with `AssertionConsumerServiceURL="https://evil.example.com/steal"`
 - **Expected Output**:
   ```
@@ -202,7 +211,7 @@
 
 ### TC-SAML-SSO-015: AuthnRequest from unknown/unregistered SP entity ID
 - **Category**: Edge Case
-- **Preconditions**: No SP registered with entity_id `https://unknown-sp.example.com`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. No SP registered with entity_id `https://unknown-sp.example.com`
 - **Input**: AuthnRequest with `<saml:Issuer>https://unknown-sp.example.com</saml:Issuer>`
 - **Expected Output**:
   ```
@@ -215,7 +224,7 @@
 
 ### TC-SAML-SSO-016: AuthnRequest from disabled SP
 - **Category**: Edge Case
-- **Preconditions**: SP registered with `enabled=false`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP registered with `enabled=false`
 - **Input**: Valid AuthnRequest from disabled SP
 - **Expected Output**:
   ```
@@ -229,14 +238,14 @@
 ### TC-SAML-SSO-017: AuthnRequest with ForceAuthn=true
 - **Category**: Edge Case
 - **Standard**: SAML 2.0 Core 3.4.1 (ForceAuthn attribute)
-- **Preconditions**: Standard SP, user already authenticated
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. Standard SP, user already authenticated
 - **Input**: AuthnRequest with `ForceAuthn="true"`
 - **Expected Output**: Status 200 (SSO completes since user is authenticated). The `force_authn` field is parsed from the request. If re-authentication enforcement is implemented, user is prompted to re-authenticate.
 
 ### TC-SAML-SSO-018: AuthnRequest with IsPassive=true and unauthenticated user
 - **Category**: Edge Case
 - **Standard**: SAML 2.0 Core 3.4.1 (IsPassive attribute)
-- **Preconditions**: No authenticated user session
+- **Preconditions**: Fixtures: `TEST_TENANT`, `SAML_SP`. No authenticated user session
 - **Input**: AuthnRequest with `IsPassive="true"` and no JWT token
 - **Expected Output**:
   ```
@@ -251,6 +260,7 @@
 
 ### TC-SAML-SSO-019: AuthnRequest with empty Issuer
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: AuthnRequest XML with `<saml:Issuer></saml:Issuer>` (empty element)
 - **Expected Output**:
   ```
@@ -265,6 +275,7 @@
 ### TC-SAML-SSO-020: AuthnRequest missing ID attribute
 - **Category**: Edge Case
 - **Standard**: SAML 2.0 Core 3.2.1 (ID is required)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: AuthnRequest XML without `ID` attribute
 - **Expected Output**:
   ```
@@ -279,12 +290,14 @@
 ### TC-SAML-SSO-021: AuthnRequest with very long RelayState (> 80 bytes)
 - **Category**: Edge Case
 - **Standard**: SAML 2.0 Bindings 3.4.3 (RelayState SHOULD be <= 80 bytes)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: AuthnRequest with RelayState of 500 characters
 - **Expected Output**: Status 200 (RelayState length enforcement is SHOULD, not MUST). RelayState is passed through.
 - **Verification**: HTML form contains the full RelayState value
 
 ### TC-SAML-SSO-022: Malformed base64 in SAMLRequest (HTTP-POST)
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**:
   ```
   POST /saml/sso
@@ -302,6 +315,7 @@
 
 ### TC-SAML-SSO-023: Malformed deflate data in SAMLRequest (HTTP-Redirect)
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**: `GET /saml/sso?SAMLRequest=<valid base64 but invalid deflate data>`
 - **Expected Output**:
   ```
@@ -316,13 +330,14 @@
 ### TC-SAML-SSO-024: AuthnRequest with unsupported SAML Version
 - **Category**: Edge Case
 - **Standard**: SAML 2.0 Core 3.2.1
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: AuthnRequest with `Version="1.1"`
 - **Expected Output**: Status 200 or 400 depending on version check enforcement. If no explicit check, the parser processes it normally.
 - **Note**: The current parser does not enforce Version="2.0" validation; test documents this behavior
 
 ### TC-SAML-SSO-025: SSO when no IdP signing certificate is active
 - **Category**: Edge Case
-- **Preconditions**: Tenant has no active certificate, SP has `sign_assertions=true`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. Tenant has no active certificate, SP has `sign_assertions=true`
 - **Input**: Valid AuthnRequest
 - **Expected Output**:
   ```
@@ -337,6 +352,7 @@
 ### TC-SAML-SSO-026: AuthnRequest with NameIDPolicy requesting unsupported format
 - **Category**: Edge Case
 - **Standard**: SAML 2.0 Core 3.4.1.1
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: AuthnRequest with `<samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:2.0:nameid-format:kerberos"/>`
 - **Expected Output**: Status 200 (defaults to SP's configured name_id_format) or Status 400 if strict format enforcement is applied.
 - **Note**: Current implementation falls back to email for unrecognized formats
@@ -348,6 +364,7 @@
 ### TC-SAML-SSO-027: Unauthenticated user attempting SSO
 - **Category**: Security
 - **Standard**: SAML 2.0 Profiles 4.1.3 (Authentication Required)
+- **Preconditions**: Fixtures: `TEST_TENANT`, `SAML_SP`.
 - **Input**: Valid AuthnRequest with no Authorization header / no user session
 - **Expected Output**:
   ```
@@ -363,7 +380,7 @@
 ### TC-SAML-SSO-028: Cross-tenant SSO attempt
 - **Category**: Security
 - **Standard**: Tenant Isolation
-- **Preconditions**: SP registered under tenant `T1`, user authenticated under tenant `T2`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP registered under tenant `T1`, user authenticated under tenant `T2`
 - **Input**: AuthnRequest referencing SP entity_id registered to `T1`, but request sent with tenant context `T2`
 - **Expected Output**:
   ```
@@ -374,7 +391,7 @@
 
 ### TC-SAML-SSO-029: Signature validation required but no SP certificate configured
 - **Category**: Security
-- **Preconditions**: SP configured with `validate_signatures=true`, `certificate=null`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP configured with `validate_signatures=true`, `certificate=null`
 - **Input**: Valid AuthnRequest (unsigned)
 - **Expected Output**:
   ```
@@ -388,7 +405,7 @@
 
 ### TC-SAML-SSO-030: Signature validation required, SP cert configured, but AuthnRequest unsigned (Redirect)
 - **Category**: Security
-- **Preconditions**: SP with `validate_signatures=true` and valid certificate
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP with `validate_signatures=true` and valid certificate
 - **Input**: HTTP-Redirect AuthnRequest without `SigAlg` and `Signature` query parameters
 - **Expected Output**:
   ```
@@ -403,7 +420,7 @@
 ### TC-SAML-SSO-031: AuthnRequest with tampered signature (Redirect binding)
 - **Category**: Security
 - **Standard**: SAML 2.0 Bindings 3.4.4.1 (Redirect Signature Verification)
-- **Preconditions**: SP with `validate_signatures=true` and valid certificate
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP with `validate_signatures=true` and valid certificate
 - **Input**: HTTP-Redirect with valid `SigAlg` and `Signature` but modified `SAMLRequest` content after signing
 - **Expected Output**:
   ```
@@ -418,6 +435,7 @@
 ### TC-SAML-SSO-032: XSS in RelayState value
 - **Category**: Security
 - **Standard**: OWASP ASVS 5.3.3
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: AuthnRequest with `RelayState=<script>alert('xss')</script>`
 - **Expected Output**: Status 200, but the HTML auto-submit form HTML-escapes the RelayState:
   ```html
@@ -428,13 +446,14 @@
 ### TC-SAML-SSO-033: XSS in ACS URL via AuthnRequest
 - **Category**: Security
 - **Standard**: OWASP ASVS 5.3.3
-- **Preconditions**: SP registered with ACS URL containing the malicious value (should not happen in practice)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP registered with ACS URL containing the malicious value (should not happen in practice)
 - **Input**: AuthnRequest with `AssertionConsumerServiceURL` containing JS injection
 - **Expected Output**: ACS URL mismatch error (400) since it won't match registered URLs. If somehow registered, the HTML form HTML-escapes the `action` attribute.
 
 ### TC-SAML-SSO-034: Error responses do not leak internal details
 - **Category**: Security
 - **Standard**: OWASP ASVS 7.4.1
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**: Various malformed requests triggering database or internal errors
 - **Expected Output**: Error messages contain sanitized text:
   - Database errors return "A database error occurred" (not SQL/connection details)
@@ -445,7 +464,7 @@
 ### TC-SAML-SSO-035: SAML Response Conditions contain proper time bounds
 - **Category**: Security
 - **Standard**: SAML 2.0 Core 2.5.1 (Conditions)
-- **Preconditions**: SP with `assertion_validity_seconds=300`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`. SP with `assertion_validity_seconds=300`
 - **Input**: Valid AuthnRequest
 - **Expected Output**: SAML Response `<saml:Conditions>` element contains:
   - `NotBefore` = approximately (now - 2 minutes) for clock skew tolerance
@@ -456,6 +475,7 @@
 ### TC-SAML-SSO-036: SAML decompression bomb protection (HTTP-Redirect)
 - **Category**: Security
 - **Standard**: OWASP XML Security
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**: SAMLRequest containing deflated data that expands to > 1 MB
 - **Expected Output**:
   ```
@@ -471,12 +491,14 @@
 ### TC-SAML-SSO-037: SAML Response Version is 2.0
 - **Category**: Compliance
 - **Standard**: SAML 2.0 Core 3.2.2
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: Valid AuthnRequest
 - **Expected Output**: Decoded SAML Response contains `Version="2.0"` on both `<samlp:Response>` and `<saml:Assertion>` elements
 
 ### TC-SAML-SSO-038: SAML Response contains proper namespace declarations
 - **Category**: Compliance
 - **Standard**: SAML 2.0 Core
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: Valid AuthnRequest
 - **Expected Output**: Decoded SAML Response includes:
   - `xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"` on Response element
@@ -485,6 +507,7 @@
 ### TC-SAML-SSO-039: SAML Assertion Subject Confirmation Method is bearer
 - **Category**: Compliance
 - **Standard**: SAML 2.0 Core 2.4.1.4 (Bearer)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: Valid AuthnRequest
 - **Expected Output**: `<saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">`
 - **Verification**: SubjectConfirmationData includes NotOnOrAfter and Recipient
@@ -492,18 +515,21 @@
 ### TC-SAML-SSO-040: SAML AuthnStatement contains AuthnContextClassRef
 - **Category**: Compliance
 - **Standard**: SAML 2.0 Core 2.7.2.2
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: Valid AuthnRequest
 - **Expected Output**: `<saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef>`
 
 ### TC-SAML-SSO-041: SAML Response IDs are unique and properly formatted
 - **Category**: Compliance
 - **Standard**: SAML 2.0 Core 1.3.4 (ID Values)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: Two successive valid AuthnRequests
 - **Expected Output**: Each SAML Response has unique `ID` attributes (prefixed with `_resp_`) and each Assertion has unique `ID` attributes (prefixed with `_assert_`). IDs must not start with a digit per XML NCName specification.
 
 ### TC-SAML-SSO-042: NIST SP 800-63C federation assurance level
 - **Category**: Compliance
 - **Standard**: NIST SP 800-63C Section 5
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: Valid SP-initiated SSO flow
 - **Verification**:
   - Assertions are signed (when configured) using RSA-SHA256
@@ -515,6 +541,7 @@
 ### TC-SAML-SSO-043: XML Signature uses Exclusive Canonicalization (C14N)
 - **Category**: Compliance
 - **Standard**: XML Signature (W3C), SAML 2.0 Core 5.4.1
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `SAML_SP`.
 - **Input**: Valid AuthnRequest with sign_assertions=true
 - **Expected Output**: Signature uses:
   - `CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"`

@@ -52,47 +52,62 @@ impl CompareOp {
     /// SECURITY: Column names are quoted with double quotes to prevent SQL injection
     /// through identifier manipulation. Even though columns come from a whitelist,
     /// quoting provides defense-in-depth.
-    fn to_sql(&self, column: &str, value: &str, param_num: usize) -> (String, Option<String>) {
+    ///
+    /// When `is_boolean` is true, the parameter is cast to `::boolean` in SQL
+    /// so that string values like `"true"` / `"false"` are properly compared
+    /// against PostgreSQL BOOLEAN columns.
+    fn to_sql(
+        &self,
+        column: &str,
+        value: &str,
+        param_num: usize,
+        is_boolean: bool,
+    ) -> (String, Option<String>) {
         // SECURITY: Quote column identifier to prevent SQL injection.
         // PostgreSQL uses double quotes for identifiers.
         let quoted_col = format!("\"{}\"", column.replace('"', "\"\""));
+        let param_ref = if is_boolean {
+            format!("${param_num}::boolean")
+        } else {
+            format!("${param_num}")
+        };
 
         match self {
             CompareOp::Eq => (
-                format!("{quoted_col} = ${param_num}"),
+                format!("{quoted_col} = {param_ref}"),
                 Some(value.to_string()),
             ),
             CompareOp::Ne => (
-                format!("{quoted_col} <> ${param_num}"),
+                format!("{quoted_col} <> {param_ref}"),
                 Some(value.to_string()),
             ),
             CompareOp::Co => (
-                format!("{quoted_col} ILIKE ${param_num}"),
+                format!("{quoted_col} ILIKE {param_ref}"),
                 Some(format!("%{value}%")),
             ),
             CompareOp::Sw => (
-                format!("{quoted_col} ILIKE ${param_num}"),
+                format!("{quoted_col} ILIKE {param_ref}"),
                 Some(format!("{value}%")),
             ),
             CompareOp::Ew => (
-                format!("{quoted_col} ILIKE ${param_num}"),
+                format!("{quoted_col} ILIKE {param_ref}"),
                 Some(format!("%{value}")),
             ),
             CompareOp::Pr => (format!("{quoted_col} IS NOT NULL"), None),
             CompareOp::Gt => (
-                format!("{quoted_col} > ${param_num}"),
+                format!("{quoted_col} > {param_ref}"),
                 Some(value.to_string()),
             ),
             CompareOp::Ge => (
-                format!("{quoted_col} >= ${param_num}"),
+                format!("{quoted_col} >= {param_ref}"),
                 Some(value.to_string()),
             ),
             CompareOp::Lt => (
-                format!("{quoted_col} < ${param_num}"),
+                format!("{quoted_col} < {param_ref}"),
                 Some(value.to_string()),
             ),
             CompareOp::Le => (
-                format!("{quoted_col} <= ${param_num}"),
+                format!("{quoted_col} <= {param_ref}"),
                 Some(value.to_string()),
             ),
         }
@@ -384,6 +399,8 @@ impl<'a> FilterParser<'a> {
 #[derive(Debug, Clone)]
 pub struct AttributeMapper {
     mappings: Vec<(String, String)>,
+    /// Column names that are boolean type in PostgreSQL.
+    boolean_columns: Vec<String>,
 }
 
 impl AttributeMapper {
@@ -400,6 +417,7 @@ impl AttributeMapper {
                 ("name.familyName".to_string(), "last_name".to_string()),
                 ("emails.value".to_string(), "email".to_string()),
             ],
+            boolean_columns: vec!["is_active".to_string()],
         }
     }
 
@@ -411,6 +429,7 @@ impl AttributeMapper {
                 ("displayName".to_string(), "display_name".to_string()),
                 ("externalId".to_string(), "external_id".to_string()),
             ],
+            boolean_columns: vec![],
         }
     }
 
@@ -421,6 +440,12 @@ impl AttributeMapper {
             .iter()
             .find(|(s, _)| s.eq_ignore_ascii_case(scim_attr))
             .map(|(_, c)| c.as_str())
+    }
+
+    /// Check if a SQL column is a boolean type.
+    #[must_use]
+    pub fn is_boolean(&self, column: &str) -> bool {
+        self.boolean_columns.iter().any(|c| c == column)
     }
 }
 
@@ -462,7 +487,9 @@ impl SqlFilter {
                 })?;
 
                 let param_num = start_param + params.len();
-                let (sql, param) = op.to_sql(column, value.as_deref().unwrap_or(""), param_num);
+                let is_boolean = mapper.is_boolean(column);
+                let (sql, param) =
+                    op.to_sql(column, value.as_deref().unwrap_or(""), param_num, is_boolean);
 
                 if let Some(p) = param {
                     params.push(p);
@@ -553,7 +580,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(result.clause, "(\"email\" = $1 AND \"is_active\" = $2)");
+        assert_eq!(
+            result.clause,
+            "(\"email\" = $1 AND \"is_active\" = $2::boolean)"
+        );
         assert_eq!(result.params, vec!["john@example.com", "true"]);
     }
 
@@ -576,7 +606,7 @@ mod tests {
         let mapper = AttributeMapper::for_users();
         let result = parse_filter(r#"not (active eq false)"#, &mapper, 1).unwrap();
 
-        assert_eq!(result.clause, "NOT (\"is_active\" = $1)");
+        assert_eq!(result.clause, "NOT (\"is_active\" = $1::boolean)");
         assert_eq!(result.params, vec!["false"]);
     }
 
@@ -593,7 +623,7 @@ mod tests {
         // The grouped expression gets wrapped in extra parens - this is valid SQL
         assert_eq!(
             result.clause,
-            "(((\"email\" ILIKE $1 OR \"email\" ILIKE $2)) AND \"is_active\" = $3)"
+            "(((\"email\" ILIKE $1 OR \"email\" ILIKE $2)) AND \"is_active\" = $3::boolean)"
         );
         assert_eq!(result.params, vec!["%john%", "%jane%", "true"]);
     }

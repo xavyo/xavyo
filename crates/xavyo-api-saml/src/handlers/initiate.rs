@@ -9,7 +9,7 @@ use crate::services::{AssertionBuilder, GroupService, SpService};
 use axum::{
     extract::{Path, State},
     response::{Html, IntoResponse, Response},
-    Extension, Json,
+    Extension, Form,
 };
 use uuid::Uuid;
 use xavyo_core::TenantId;
@@ -36,7 +36,7 @@ pub async fn initiate_sso(
     Extension(tenant_id): Extension<TenantId>,
     Extension(user): Extension<Option<User>>,
     Path(sp_id): Path<Uuid>,
-    Json(req): Json<InitiateSsoRequest>,
+    Form(req): Form<InitiateSsoRequest>,
 ) -> Response {
     match initiate_sso_inner(
         &state,

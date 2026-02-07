@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use validator::Validate;
 use xavyo_core::TenantId;
+use xavyo_db::set_tenant_context;
 
 /// Email verification token row from database query.
 type EmailVerificationTokenRow = (
@@ -135,20 +136,26 @@ pub async fn verify_email_handler(
         return Err(ApiAuthError::TokenExpired);
     }
 
+    // Use a transaction with tenant context for RLS compliance
+    let mut tx = pool.begin().await?;
+    set_tenant_context(&mut *tx, tenant_id).await?;
+
     // Mark user as verified (include tenant_id for defense-in-depth)
     sqlx::query(
         "UPDATE users SET email_verified = true, email_verified_at = NOW(), updated_at = NOW() WHERE id = $1 AND tenant_id = $2"
     )
     .bind(user_id)
     .bind(*tenant_id.as_uuid())
-    .execute(&pool)
+    .execute(&mut *tx)
     .await?;
 
     // Mark token as used
     sqlx::query("UPDATE email_verification_tokens SET verified_at = NOW() WHERE id = $1")
         .bind(token_id)
-        .execute(&pool)
+        .execute(&mut *tx)
         .await?;
+
+    tx.commit().await?;
 
     tracing::info!(
         user_id = %user_id,

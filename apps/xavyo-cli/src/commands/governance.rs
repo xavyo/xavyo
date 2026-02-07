@@ -309,13 +309,13 @@ async fn execute_roles(cmd: RolesCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.roles.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No roles found.");
             } else {
-                print_role_table(&response.roles);
+                print_role_table(&response.items);
                 println!(
                     "\nShowing {} of {} roles",
-                    response.roles.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -347,13 +347,13 @@ async fn execute_entitlements(cmd: EntitlementsCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.entitlements.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No entitlements found.");
             } else {
-                print_entitlement_table(&response.entitlements);
+                print_entitlement_table(&response.items);
                 println!(
                     "\nShowing {} of {} entitlements",
-                    response.entitlements.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -385,13 +385,13 @@ async fn execute_access_requests(cmd: AccessRequestsCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.access_requests.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No access requests found.");
             } else {
-                print_ar_table(&response.access_requests);
+                print_ar_table(&response.items);
                 println!(
                     "\nShowing {} of {} access requests",
-                    response.access_requests.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -449,13 +449,13 @@ async fn execute_archetypes(cmd: ArchetypesCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.archetypes.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No archetypes found.");
             } else {
-                print_archetype_table(&response.archetypes);
+                print_archetype_table(&response.items);
                 println!(
                     "\nShowing {} of {} archetypes",
-                    response.archetypes.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -487,13 +487,13 @@ async fn execute_lifecycle(cmd: LifecycleCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.configs.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No lifecycle configurations found.");
             } else {
-                print_lifecycle_table(&response.configs);
+                print_lifecycle_table(&response.items);
                 println!(
                     "\nShowing {} of {} configs",
-                    response.configs.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -525,13 +525,13 @@ async fn execute_sod(cmd: SodCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.rules.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No SoD rules found.");
             } else {
-                print_sod_rule_table(&response.rules);
+                print_sod_rule_table(&response.items);
                 println!(
                     "\nShowing {} of {} rules",
-                    response.rules.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -570,13 +570,13 @@ async fn execute_sod(cmd: SodCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.violations.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No SoD violations found.");
             } else {
-                print_violation_table(&response.violations);
+                print_violation_table(&response.items);
                 println!(
                     "\nShowing {} of {} violations",
-                    response.violations.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -596,13 +596,13 @@ async fn execute_campaigns(cmd: CampaignsCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.campaigns.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No campaigns found.");
             } else {
-                print_campaign_table(&response.campaigns);
+                print_campaign_table(&response.items);
                 println!(
                     "\nShowing {} of {} campaigns",
-                    response.campaigns.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -648,13 +648,13 @@ async fn execute_templates(cmd: TemplatesCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.templates.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No object templates found.");
             } else {
-                print_template_table(&response.templates);
+                print_template_table(&response.items);
                 println!(
                     "\nShowing {} of {} templates",
-                    response.templates.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -686,17 +686,17 @@ async fn execute_catalog(cmd: CatalogCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.categories.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No catalog categories found.");
             } else {
                 println!("{:<38} {:<30}", "ID", "NAME");
                 println!("{}", "-".repeat(70));
-                for cat in &response.categories {
+                for cat in &response.items {
                     println!("{:<38} {:<30}", cat.id, truncate(&cat.name, 28));
                 }
                 println!(
                     "\nShowing {} of {} categories",
-                    response.categories.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -747,13 +747,13 @@ async fn execute_bulk_actions(cmd: BulkActionsCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.bulk_actions.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No bulk actions found.");
             } else {
-                print_bulk_action_table(&response.bulk_actions);
+                print_bulk_action_table(&response.items);
                 println!(
                     "\nShowing {} of {} bulk actions",
-                    response.bulk_actions.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -785,13 +785,13 @@ async fn execute_delegations(cmd: DelegationsCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.delegations.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No delegations found.");
             } else {
-                print_delegation_table(&response.delegations);
+                print_delegation_table(&response.items);
                 println!(
                     "\nShowing {} of {} delegations",
-                    response.delegations.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -864,13 +864,13 @@ async fn execute_risk(cmd: RiskCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.alerts.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No risk alerts found.");
             } else {
-                print_risk_alert_table(&response.alerts);
+                print_risk_alert_table(&response.items);
                 println!(
                     "\nShowing {} of {} alerts",
-                    response.alerts.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -897,13 +897,13 @@ async fn execute_reports(cmd: ReportsCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.reports.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No reports found.");
             } else {
-                print_report_table(&response.reports);
+                print_report_table(&response.items);
                 println!(
                     "\nShowing {} of {} reports",
-                    response.reports.len(),
+                    response.items.len(),
                     response.total
                 );
             }
@@ -935,12 +935,12 @@ async fn execute_workflows(cmd: WorkflowsCommands) -> CliResult<()> {
 
             if a.json {
                 println!("{}", serde_json::to_string_pretty(&response)?);
-            } else if response.workflows.is_empty() {
+            } else if response.items.is_empty() {
                 println!("No approval workflows found.");
             } else {
                 println!("{:<38} {:<25} {:<10}", "ID", "NAME", "DEFAULT");
                 println!("{}", "-".repeat(75));
-                for wf in &response.workflows {
+                for wf in &response.items {
                     println!(
                         "{:<38} {:<25} {:<10}",
                         wf.id,
@@ -950,7 +950,7 @@ async fn execute_workflows(cmd: WorkflowsCommands) -> CliResult<()> {
                 }
                 println!(
                     "\nShowing {} of {} workflows",
-                    response.workflows.len(),
+                    response.items.len(),
                     response.total
                 );
             }

@@ -2,6 +2,7 @@
 
 pub mod agent;
 pub mod api_key;
+pub mod api_session;
 pub mod audit;
 pub mod authorize;
 pub mod config;
@@ -12,7 +13,6 @@ pub mod doctor;
 pub mod governance;
 pub mod group;
 mod health;
-pub mod identity_provider;
 pub mod operation;
 pub mod platform;
 pub mod policy;
@@ -50,10 +50,7 @@ pub use release::{Asset, GitHubAsset, GitHubRelease, Release};
 pub use session::Session;
 pub use signup::SignupResponse;
 #[allow(unused_imports)]
-pub use tenant::{
-    TenantCurrentOutput, TenantInfo, TenantListResponse, TenantRole, TenantSwitchOutput,
-    TenantSwitchRequest, TenantSwitchResponse,
-};
+pub use tenant::{TenantCurrentOutput, TenantRole};
 pub use token::TokenResponse;
 #[allow(unused_imports)]
 pub use tool::{CreateToolRequest, ToolListResponse, ToolResponse};

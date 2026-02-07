@@ -10,19 +10,22 @@ pub struct WebhookResponse {
     pub id: Uuid,
     #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
     pub url: String,
     #[serde(default)]
     pub events: Vec<String>,
     #[serde(default)]
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    #[serde(default)]
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 /// Webhook list response
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WebhookListResponse {
-    pub webhooks: Vec<WebhookResponse>,
+    pub items: Vec<WebhookResponse>,
+    #[serde(default)]
     pub total: i64,
 }
 

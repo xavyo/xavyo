@@ -559,11 +559,10 @@ impl IdentityMergeService {
         let row: Option<(
             Option<String>,
             Option<String>,
-            Option<String>,
             Option<serde_json::Value>,
         )> = sqlx::query_as(
             r"
-            SELECT email, display_name, department, attributes
+            SELECT email, display_name, custom_attributes
             FROM users
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -575,11 +574,11 @@ impl IdentityMergeService {
         .map_err(GovernanceError::Database)?;
 
         match row {
-            Some((email, display_name, department, attributes)) => Ok(IdentitySummary {
+            Some((email, display_name, attributes)) => Ok(IdentitySummary {
                 id: user_id,
                 email,
                 display_name,
-                department,
+                department: None,
                 attributes: attributes.unwrap_or_else(|| json!({})),
             }),
             None => Err(GovernanceError::IdentityNotFound(user_id)),

@@ -371,6 +371,17 @@ pub async fn create_campaign(
     Extension(claims): Extension<JwtClaims>,
     Json(req): Json<CreateCampaignRequest>,
 ) -> impl IntoResponse {
+    if !claims.has_role("admin") {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                error: "forbidden".to_string(),
+                message: "Admin role required".to_string(),
+            }),
+        )
+            .into_response();
+    }
+
     let tenant_id = match claims.tenant_id() {
         Some(tid) => *tid.as_uuid(),
         None => {
@@ -576,6 +587,17 @@ pub async fn launch_campaign(
     Extension(claims): Extension<JwtClaims>,
     Path(campaign_id): Path<Uuid>,
 ) -> impl IntoResponse {
+    if !claims.has_role("admin") {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                error: "forbidden".to_string(),
+                message: "Admin role required".to_string(),
+            }),
+        )
+            .into_response();
+    }
+
     let tenant_id = match claims.tenant_id() {
         Some(tid) => *tid.as_uuid(),
         None => {
@@ -630,6 +652,17 @@ pub async fn cancel_campaign(
     Extension(claims): Extension<JwtClaims>,
     Path(campaign_id): Path<Uuid>,
 ) -> impl IntoResponse {
+    if !claims.has_role("admin") {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ErrorResponse {
+                error: "forbidden".to_string(),
+                message: "Admin role required".to_string(),
+            }),
+        )
+            .into_response();
+    }
+
     let tenant_id = match claims.tenant_id() {
         Some(tid) => *tid.as_uuid(),
         None => {

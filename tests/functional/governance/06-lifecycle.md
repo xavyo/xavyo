@@ -7,12 +7,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: Some tests require existing lifecycle configurations with states and transitions, and users with lifecycle state assignments
+
+---
+
 ## Nominal Cases
 
 ### TC-GOV-LIFE-001: Create lifecycle configuration
 - **Category**: Nominal
 - **Standard**: NIST SP 800-53 AC-2
-- **Preconditions**: Authenticated as tenant admin
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated as tenant admin
 - **Input**:
   ```json
   POST /governance/lifecycle/configs
@@ -40,6 +49,7 @@
 
 ### TC-GOV-LIFE-002: List lifecycle configurations
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```
   GET /governance/lifecycle/configs?object_type=user&limit=10&offset=0
@@ -52,6 +62,7 @@
 
 ### TC-GOV-LIFE-003: Get lifecycle configuration by ID
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Lifecycle config exists with known ID
 - **Input**:
   ```
   GET /governance/lifecycle/configs/<config-id>
@@ -64,6 +75,7 @@
 
 ### TC-GOV-LIFE-004: Update lifecycle configuration
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Lifecycle config exists
 - **Input**:
   ```json
   PUT /governance/lifecycle/configs/<config-id>
@@ -80,7 +92,7 @@
 ### TC-GOV-LIFE-005: Add states to lifecycle configuration
 - **Category**: Nominal
 - **Standard**: NIST SP 800-53 AC-2 (Account Management)
-- **Preconditions**: Lifecycle config exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Lifecycle config exists
 - **Steps**:
   1. Add "pre_hire" state (initial):
      ```json
@@ -108,7 +120,7 @@
 ### TC-GOV-LIFE-006: Add transitions between states
 - **Category**: Nominal
 - **Standard**: NIST SP 800-53 AC-2 (Joiner-Mover-Leaver)
-- **Preconditions**: States exist in lifecycle config
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. States exist in lifecycle config
 - **Steps**:
   1. Add "onboard" transition (pre_hire -> active):
      ```json
@@ -132,7 +144,7 @@
 ### TC-GOV-LIFE-007: Execute state transition
 - **Category**: Nominal
 - **Standard**: NIST SP 800-53 AC-2
-- **Preconditions**: User is in "pre_hire" state; "onboard" transition exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User is in "pre_hire" state; "onboard" transition exists
 - **Input**:
   ```json
   POST /governance/lifecycle/transitions
@@ -156,7 +168,7 @@
 
 ### TC-GOV-LIFE-008: Get object current state
 - **Category**: Nominal
-- **Preconditions**: Object has been transitioned
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Object has been transitioned
 - **Input**:
   ```
   GET /governance/lifecycle/objects/user/<user-id>/state
@@ -169,6 +181,7 @@
 
 ### TC-GOV-LIFE-009: List transition requests
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```
   GET /governance/lifecycle/transitions?limit=50&offset=0
@@ -181,6 +194,7 @@
 
 ### TC-GOV-LIFE-010: Get transition request details
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Transition request exists
 - **Input**:
   ```
   GET /governance/lifecycle/transitions/<request-id>
@@ -193,7 +207,7 @@
 ### TC-GOV-LIFE-011: Rollback transition
 - **Category**: Nominal
 - **Standard**: IGA Error Recovery
-- **Preconditions**: Transition was recently executed
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Transition was recently executed
 - **Input**:
   ```
   POST /governance/lifecycle/transitions/<request-id>/rollback
@@ -207,7 +221,7 @@
 ### TC-GOV-LIFE-012: Get affected entitlements preview
 - **Category**: Nominal
 - **Standard**: IGA Impact Analysis
-- **Preconditions**: Transition has entitlement actions configured
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Transition has entitlement actions configured
 - **Input**:
   ```
   GET /governance/lifecycle/transitions/<transition-id>/affected-entitlements/<user-id>
@@ -221,6 +235,7 @@
 ### TC-GOV-LIFE-013: Get transition audit trail
 - **Category**: Nominal
 - **Standard**: SOC 2 CC7.2
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```
   GET /governance/lifecycle/audit?limit=50&offset=0
@@ -234,6 +249,7 @@
 ### TC-GOV-LIFE-014: Export transition audit as CSV
 - **Category**: Nominal
 - **Standard**: SOX Section 404 (Audit Evidence)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```
   GET /governance/lifecycle/audit/export
@@ -247,7 +263,7 @@
 ### TC-GOV-LIFE-015: Schedule future transition
 - **Category**: Nominal
 - **Standard**: NIST SP 800-53 AC-2 (Automated Account Management)
-- **Preconditions**: User is "active"; "terminate" transition exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User is "active"; "terminate" transition exists
 - **Input**:
   ```json
   POST /governance/lifecycle/transitions
@@ -267,7 +283,7 @@
 
 ### TC-GOV-LIFE-016: Trigger due scheduled transitions
 - **Category**: Nominal
-- **Preconditions**: Scheduled transitions past their execution time
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Scheduled transitions past their execution time
 - **Input**:
   ```
   POST /governance/lifecycle/scheduled/trigger-due
@@ -280,7 +296,7 @@
 
 ### TC-GOV-LIFE-017: Cancel scheduled transition
 - **Category**: Nominal
-- **Preconditions**: Scheduled transition exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Scheduled transition exists
 - **Input**:
   ```
   POST /governance/lifecycle/scheduled/<schedule-id>/cancel
@@ -293,6 +309,7 @@
 ### TC-GOV-LIFE-018: Get transition conditions
 - **Category**: Nominal
 - **Standard**: IGA Conditional Transitions (F-193)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Lifecycle config with transitions exists
 - **Input**:
   ```
   GET /governance/lifecycle/configs/<config-id>/transitions/<transition-id>/conditions
@@ -305,7 +322,7 @@
 
 ### TC-GOV-LIFE-019: Evaluate transition conditions
 - **Category**: Nominal
-- **Preconditions**: Conditions configured on transition
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Conditions configured on transition
 - **Input**:
   ```json
   POST /governance/lifecycle/configs/<config-id>/transitions/<transition-id>/conditions/evaluate
@@ -320,6 +337,7 @@
 ### TC-GOV-LIFE-020: Get user lifecycle status
 - **Category**: Nominal
 - **Standard**: NIST SP 800-53 AC-2
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User exists with lifecycle state
 - **Input**:
   ```
   GET /governance/users/<user-id>/lifecycle/status
@@ -336,7 +354,7 @@
 
 ### TC-GOV-LIFE-025: Execute invalid transition (not allowed from current state)
 - **Category**: Edge Case
-- **Preconditions**: User is in "terminated" state; only "pre_hire -> active" transition exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User is in "terminated" state; only "pre_hire -> active" transition exists
 - **Input**:
   ```json
   POST /governance/lifecycle/transitions
@@ -350,7 +368,7 @@
 
 ### TC-GOV-LIFE-026: Delete state that is part of active transitions
 - **Category**: Edge Case
-- **Preconditions**: State is referenced by transitions
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. State is referenced by transitions
 - **Input**:
   ```
   DELETE /governance/lifecycle/configs/<config-id>/states/<state-id>
@@ -362,6 +380,7 @@
 
 ### TC-GOV-LIFE-027: Delete lifecycle config with objects in non-initial states
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Lifecycle config has objects in non-initial states
 - **Input**:
   ```
   DELETE /governance/lifecycle/configs/<config-id>
@@ -373,7 +392,7 @@
 
 ### TC-GOV-LIFE-028: Create bulk state operation
 - **Category**: Edge Case
-- **Preconditions**: Multiple users need state transition
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Multiple users need state transition
 - **Input**:
   ```json
   POST /governance/lifecycle/bulk-operations
@@ -396,6 +415,7 @@
 ### TC-GOV-LIFE-030: Create lifecycle config without admin role
 - **Category**: Security
 - **Standard**: NIST SP 800-53 AC-6
+- **Preconditions**: Fixtures: `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/lifecycle/configs
@@ -409,7 +429,7 @@
 
 ### TC-GOV-LIFE-031: Execute transition cross-tenant
 - **Category**: Security
-- **Preconditions**: User in tenant A; JWT for tenant B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User in tenant A; JWT for tenant B (second tenant required)
 - **Input**:
   ```json
   POST /governance/lifecycle/transitions
@@ -422,6 +442,7 @@
 
 ### TC-GOV-LIFE-032: Access audit trail from different tenant
 - **Category**: Security
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. JWT for tenant B; only tenant B records should be returned (second tenant required)
 - **Input**:
   ```
   GET /governance/lifecycle/audit
@@ -436,6 +457,7 @@
 ### TC-GOV-LIFE-040: NIST SP 800-53 AC-2 - Complete Joiner-Mover-Leaver cycle
 - **Category**: Compliance
 - **Standard**: NIST SP 800-53 AC-2
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Configure lifecycle: pre_hire -> active -> suspended -> terminated
   2. Create user (assigned to pre_hire state)
@@ -448,6 +470,7 @@
 ### TC-GOV-LIFE-041: ISO 27001 A.9.2.6 - Removal of access rights
 - **Category**: Compliance
 - **Standard**: ISO 27001 A.9.2.6
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Configure terminate transition with entitlement revocation actions
   2. Execute terminate transition
@@ -458,6 +481,7 @@
 ### TC-GOV-LIFE-042: Scheduled transition for planned departures
 - **Category**: Compliance
 - **Standard**: NIST SP 800-53 AC-2(2) (Automated Temporary Accounts)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Schedule terminate transition for contractor's end date
   2. Verify scheduled transition visible in list
@@ -468,6 +492,7 @@
 ### TC-GOV-LIFE-043: Lifecycle audit trail completeness
 - **Category**: Compliance
 - **Standard**: SOC 2 CC7.2
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Execute multiple lifecycle transitions
   2. Export audit trail

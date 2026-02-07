@@ -10,11 +10,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: MFA enforcement tests require users with/without TOTP/WebAuthn enrollment
+
+---
+
 ## Nominal Cases
 
 ### TC-POLICY-MFA-001: Get current MFA policy
 - **Category**: Nominal
 - **Standard**: NIST SP 800-63B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `GET /system/tenants/:id/settings`
 - **Expected Output**: Status 200, mfa_policy section:
   ```json
@@ -31,6 +41,7 @@
 ### TC-POLICY-MFA-002: Set MFA as required for all users
 - **Category**: Nominal
 - **Standard**: NIST SP 800-63B AAL2
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   PATCH /system/tenants/:id/settings
@@ -46,7 +57,7 @@
 
 ### TC-POLICY-MFA-003: Login with MFA required - user has TOTP enrolled
 - **Category**: Nominal
-- **Preconditions**: MFA required by policy, user has TOTP set up
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. MFA required by policy, user has TOTP set up
 - **Steps**:
   1. `POST /auth/login` with valid credentials
   2. Response: `mfa_required: true`
@@ -55,7 +66,7 @@
 
 ### TC-POLICY-MFA-004: Login with MFA required - user has no MFA enrolled
 - **Category**: Nominal
-- **Preconditions**: MFA required by policy, user has NOT enrolled MFA
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. MFA required by policy, user has NOT enrolled MFA
 - **Input**: `POST /auth/login` with valid credentials
 - **Expected Output**: Login response indicates MFA enrollment required:
   ```json
@@ -68,12 +79,13 @@
 
 ### TC-POLICY-MFA-005: Disable MFA blocked by tenant policy
 - **Category**: Nominal
-- **Preconditions**: MFA required by tenant policy, user has TOTP enrolled
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. MFA required by tenant policy, user has TOTP enrolled
 - **Input**: `POST /auth/mfa/totp/disable` with valid TOTP code
 - **Expected Output**: Status 403 "MFA required by tenant policy"
 
 ### TC-POLICY-MFA-006: Set MFA as optional
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   PATCH /system/tenants/:id/settings
@@ -84,6 +96,7 @@
 
 ### TC-POLICY-MFA-007: Configure allowed MFA methods
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   PATCH /system/tenants/:id/settings
@@ -94,6 +107,7 @@
 
 ### TC-POLICY-MFA-008: Set MFA grace period
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   PATCH /system/tenants/:id/settings
@@ -108,6 +122,7 @@
 
 ### TC-POLICY-MFA-009: Set MFA required with empty allowed_methods
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   { "mfa_policy": { "required": true, "allowed_methods": [] } }
@@ -116,23 +131,25 @@
 
 ### TC-POLICY-MFA-010: Grace period login within window
 - **Category**: Edge Case
-- **Preconditions**: MFA required, grace_period_days = 7, user created 3 days ago, no MFA enrolled
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. MFA required, grace_period_days = 7, user created 3 days ago, no MFA enrolled
 - **Input**: `POST /auth/login` with valid credentials
 - **Expected Output**: Login succeeds WITHOUT MFA (within grace period), warning returned
 
 ### TC-POLICY-MFA-011: Grace period login after window
 - **Category**: Edge Case
-- **Preconditions**: MFA required, grace_period_days = 7, user created 10 days ago, no MFA enrolled
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. MFA required, grace_period_days = 7, user created 10 days ago, no MFA enrolled
 - **Input**: `POST /auth/login` with valid credentials
 - **Expected Output**: Login returns MFA enrollment required (grace period expired)
 
 ### TC-POLICY-MFA-012: Set invalid MFA method
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "mfa_policy": { "allowed_methods": ["sms"] } }` (SMS not supported)
 - **Expected Output**: Status 400 "Unsupported MFA method: sms"
 
 ### TC-POLICY-MFA-013: Set negative grace period
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "mfa_policy": { "grace_period_days": -1 } }`
 - **Expected Output**: Status 400 "Grace period must be non-negative"
 
@@ -142,10 +159,12 @@
 
 ### TC-POLICY-MFA-014: Non-admin cannot change MFA policy
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`. Authenticated as regular (non-admin) user
 - **Input**: Regular user calls `PATCH /system/tenants/:id/settings` with MFA changes
 - **Expected Output**: Status 403 Forbidden
 
 ### TC-POLICY-MFA-015: Audit trail for MFA policy changes
 - **Category**: Security
 - **Standard**: SOC 2 CC6.1
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. MFA policy changes performed
 - **Verification**: Audit log records: who changed MFA policy, old value, new value, timestamp

@@ -8,12 +8,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: Some tests require existing applications, entitlements with assignments, roles, and users with effective access
+
+---
+
 ## Nominal Cases
 
 ### TC-GOV-ENT-001: Create entitlement with required fields
 - **Category**: Nominal
 - **Standard**: IGA Entitlement Catalog
-- **Preconditions**: Application exists in governance registry
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Application exists in governance registry
 - **Input**:
   ```json
   POST /governance/entitlements
@@ -41,6 +50,7 @@
 ### TC-GOV-ENT-002: Create entitlement with full metadata
 - **Category**: Nominal
 - **Standard**: IGA Entitlement Lifecycle
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Application and owner user exist
 - **Input**:
   ```json
   POST /governance/entitlements
@@ -64,6 +74,7 @@
 ### TC-GOV-ENT-003: Create entitlement with GDPR data protection fields
 - **Category**: Nominal
 - **Standard**: GDPR Article 6 (Lawful Basis)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Application exists
 - **Input**:
   ```json
   POST /governance/entitlements
@@ -87,7 +98,7 @@
 
 ### TC-GOV-ENT-004: List entitlements with pagination
 - **Category**: Nominal
-- **Preconditions**: Multiple entitlements exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Multiple entitlements exist
 - **Input**:
   ```
   GET /governance/entitlements?limit=10&offset=0
@@ -100,7 +111,7 @@
 
 ### TC-GOV-ENT-005: Get entitlement by ID
 - **Category**: Nominal
-- **Preconditions**: Entitlement exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlement exists
 - **Input**:
   ```
   GET /governance/entitlements/<entitlement-id>
@@ -113,7 +124,7 @@
 
 ### TC-GOV-ENT-006: Update entitlement
 - **Category**: Nominal
-- **Preconditions**: Entitlement exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlement exists
 - **Input**:
   ```json
   PUT /governance/entitlements/<entitlement-id>
@@ -131,7 +142,7 @@
 
 ### TC-GOV-ENT-007: Delete entitlement
 - **Category**: Nominal
-- **Preconditions**: Entitlement exists with no active assignments
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlement exists with no active assignments
 - **Input**:
   ```
   DELETE /governance/entitlements/<entitlement-id>
@@ -144,7 +155,7 @@
 ### TC-GOV-ENT-008: Set entitlement owner
 - **Category**: Nominal
 - **Standard**: IGA Entitlement Ownership
-- **Preconditions**: Entitlement and user exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlement and user exist
 - **Input**:
   ```json
   PUT /governance/entitlements/<entitlement-id>/owner
@@ -157,7 +168,7 @@
 
 ### TC-GOV-ENT-009: Remove entitlement owner
 - **Category**: Nominal
-- **Preconditions**: Entitlement has an owner
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlement has an owner
 - **Input**:
   ```
   DELETE /governance/entitlements/<entitlement-id>/owner
@@ -170,7 +181,7 @@
 ### TC-GOV-ENT-010: Create entitlement assignment (direct)
 - **Category**: Nominal
 - **Standard**: IGA Assignment Management
-- **Preconditions**: Entitlement and target user exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlement and target user exist
 - **Input**:
   ```json
   POST /governance/assignments
@@ -189,6 +200,7 @@
 ### TC-GOV-ENT-011: Bulk create assignments
 - **Category**: Nominal
 - **Standard**: IGA Operational Efficiency
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Multiple entitlements and users exist
 - **Input**:
   ```json
   POST /governance/assignments/bulk
@@ -207,7 +219,7 @@
 
 ### TC-GOV-ENT-012: List assignments with filters
 - **Category**: Nominal
-- **Preconditions**: Assignments exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Assignments exist
 - **Input**:
   ```
   GET /governance/assignments?entitlement_id=<ent-id>&limit=50&offset=0
@@ -221,7 +233,7 @@
 ### TC-GOV-ENT-013: Revoke assignment
 - **Category**: Nominal
 - **Standard**: IGA Entitlement Revocation
-- **Preconditions**: Assignment exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Assignment exists
 - **Input**:
   ```
   DELETE /governance/assignments/<assignment-id>
@@ -234,7 +246,7 @@
 ### TC-GOV-ENT-014: Map entitlement to role
 - **Category**: Nominal
 - **Standard**: NIST RBAC Permission-Role Assignment
-- **Preconditions**: Role and entitlement exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Role and entitlement exist
 - **Input**:
   ```json
   POST /governance/role-entitlements
@@ -248,7 +260,7 @@
 ### TC-GOV-ENT-015: Get user effective access
 - **Category**: Nominal
 - **Standard**: IGA Effective Access Computation
-- **Preconditions**: User has direct assignments + role-based assignments
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User has direct assignments + role-based assignments
 - **Input**:
   ```
   GET /governance/users/<user-id>/effective-access
@@ -265,7 +277,7 @@
 
 ### TC-GOV-ENT-016: Check specific entitlement access for user
 - **Category**: Nominal
-- **Preconditions**: User has the entitlement (via role or direct)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User has the entitlement (via role or direct)
 - **Input**:
   ```
   GET /governance/users/<user-id>/entitlements/<entitlement-id>/check
@@ -282,6 +294,7 @@
 
 ### TC-GOV-ENT-020: Create entitlement with non-existent application
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/entitlements
@@ -299,7 +312,7 @@
 
 ### TC-GOV-ENT-021: Delete entitlement with active assignments
 - **Category**: Edge Case
-- **Preconditions**: Entitlement has active assignments
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlement has active assignments
 - **Input**:
   ```
   DELETE /governance/entitlements/<entitlement-id>
@@ -312,7 +325,7 @@
 
 ### TC-GOV-ENT-022: Create duplicate entitlement name in same application
 - **Category**: Edge Case
-- **Preconditions**: Entitlement "Read Reports" exists for application
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlement "Read Reports" exists for application
 - **Input**:
   ```json
   POST /governance/entitlements
@@ -325,6 +338,7 @@
 
 ### TC-GOV-ENT-023: Set owner to non-existent user
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlement exists
 - **Input**:
   ```json
   PUT /governance/entitlements/<ent-id>/owner
@@ -337,7 +351,7 @@
 
 ### TC-GOV-ENT-024: Assign entitlement that is in deprecated status
 - **Category**: Edge Case
-- **Preconditions**: Entitlement status is "deprecated"
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlement status is "deprecated"
 - **Input**:
   ```json
   POST /governance/assignments
@@ -351,6 +365,7 @@
 
 ### TC-GOV-ENT-025: Name exceeding 255 characters
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/entitlements
@@ -364,6 +379,7 @@
 
 ### TC-GOV-ENT-026: Negative retention period
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/entitlements
@@ -381,7 +397,7 @@
 ### TC-GOV-ENT-030: Create entitlement without admin role
 - **Category**: Security
 - **Standard**: NIST SP 800-53 AC-6
-- **Preconditions**: JWT with non-admin role
+- **Preconditions**: Fixtures: `TEST_TENANT`. JWT with non-admin role
 - **Input**:
   ```json
   POST /governance/entitlements
@@ -395,7 +411,7 @@
 ### TC-GOV-ENT-031: Access entitlement from different tenant
 - **Category**: Security
 - **Standard**: ISO 27001 A.9.4.1
-- **Preconditions**: Entitlement in tenant A; JWT for tenant B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlement in tenant A; JWT for tenant B (second tenant required)
 - **Input**:
   ```
   GET /governance/entitlements/<tenant-a-ent-id>
@@ -408,7 +424,7 @@
 ### TC-GOV-ENT-032: View other user's effective access cross-tenant
 - **Category**: Security
 - **Standard**: Multi-tenancy isolation
-- **Preconditions**: User in tenant A; JWT for tenant B admin
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User in tenant A; JWT for tenant B admin (second tenant required)
 - **Input**:
   ```
   GET /governance/users/<tenant-a-user>/effective-access
@@ -425,7 +441,7 @@
 ### TC-GOV-ENT-040: GDPR data protection report
 - **Category**: Compliance
 - **Standard**: GDPR Article 30 (Records of Processing Activities)
-- **Preconditions**: Entitlements with data protection classifications exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlements with data protection classifications exist
 - **Input**:
   ```
   GET /governance/gdpr/report
@@ -444,7 +460,7 @@
 ### TC-GOV-ENT-041: GDPR user data protection summary
 - **Category**: Compliance
 - **Standard**: GDPR Article 15 (Right of Access)
-- **Preconditions**: User has assignments to entitlements with GDPR classifications
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User has assignments to entitlements with GDPR classifications
 - **Input**:
   ```
   GET /governance/gdpr/users/<user-id>/data-protection
@@ -458,6 +474,7 @@
 ### TC-GOV-ENT-042: Entitlement risk classification supports SOX controls
 - **Category**: Compliance
 - **Standard**: SOX Section 404
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Create entitlement with `risk_level: "critical"` and metadata `{ "compliance_tag": "SOX-critical" }`
   2. Verify entitlement appears in risk reports
@@ -467,6 +484,7 @@
 ### TC-GOV-ENT-043: Entitlement ownership required for certification
 - **Category**: Compliance
 - **Standard**: SOC 2 CC6.1 (Logical Access Controls)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Create entitlement without owner
   2. Attempt to include in certification campaign

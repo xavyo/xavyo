@@ -100,7 +100,7 @@ pub async fn create_archetype(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateArchetypeRequest>,
-) -> ApiResult<Json<ArchetypeResponse>> {
+) -> ApiResult<(StatusCode, Json<ArchetypeResponse>)> {
     request.validate()?;
 
     let tenant_id = *claims
@@ -164,7 +164,7 @@ pub async fn create_archetype(
         .log_archetype_created(tenant_id, actor_id, archetype.id, &archetype.name)
         .await?;
 
-    Ok(Json(ArchetypeResponse::from(archetype)))
+    Ok((StatusCode::CREATED, Json(ArchetypeResponse::from(archetype))))
 }
 
 /// Get a persona archetype by ID.
@@ -477,7 +477,7 @@ pub async fn create_persona(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreatePersonaRequest>,
-) -> ApiResult<Json<PersonaResponse>> {
+) -> ApiResult<(StatusCode, Json<PersonaResponse>)> {
     request.validate()?;
 
     let tenant_id = *claims
@@ -513,7 +513,7 @@ pub async fn create_persona(
         )
         .await?;
 
-    Ok(Json(PersonaResponse::from(persona)))
+    Ok((StatusCode::CREATED, Json(PersonaResponse::from(persona))))
 }
 
 /// Get a persona by ID.

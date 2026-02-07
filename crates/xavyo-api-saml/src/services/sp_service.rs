@@ -27,7 +27,9 @@ impl SpService {
             SELECT id, tenant_id, entity_id, name, acs_urls, certificate,
                    attribute_mapping, name_id_format, sign_assertions,
                    validate_signatures, assertion_validity_seconds, enabled,
-                   metadata_url, created_at, updated_at
+                   metadata_url, created_at, updated_at,
+                   group_attribute_name, group_value_format, group_filter,
+                   include_groups, omit_empty_groups, group_dn_base
             FROM saml_service_providers
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -50,7 +52,9 @@ impl SpService {
             SELECT id, tenant_id, entity_id, name, acs_urls, certificate,
                    attribute_mapping, name_id_format, sign_assertions,
                    validate_signatures, assertion_validity_seconds, enabled,
-                   metadata_url, created_at, updated_at
+                   metadata_url, created_at, updated_at,
+                   group_attribute_name, group_value_format, group_filter,
+                   include_groups, omit_empty_groups, group_dn_base
             FROM saml_service_providers
             WHERE entity_id = $1 AND tenant_id = $2
             ",
@@ -76,7 +80,9 @@ impl SpService {
                 SELECT id, tenant_id, entity_id, name, acs_urls, certificate,
                        attribute_mapping, name_id_format, sign_assertions,
                        validate_signatures, assertion_validity_seconds, enabled,
-                       metadata_url, created_at, updated_at
+                       metadata_url, created_at, updated_at,
+                       group_attribute_name, group_value_format, group_filter,
+                       include_groups, omit_empty_groups, group_dn_base
                 FROM saml_service_providers
                 WHERE tenant_id = $1 AND enabled = $2
                 ORDER BY name ASC
@@ -95,7 +101,9 @@ impl SpService {
                 SELECT id, tenant_id, entity_id, name, acs_urls, certificate,
                        attribute_mapping, name_id_format, sign_assertions,
                        validate_signatures, assertion_validity_seconds, enabled,
-                       metadata_url, created_at, updated_at
+                       metadata_url, created_at, updated_at,
+                       group_attribute_name, group_value_format, group_filter,
+                       include_groups, omit_empty_groups, group_dn_base
                 FROM saml_service_providers
                 WHERE tenant_id = $1
                 ORDER BY name ASC
@@ -165,7 +173,9 @@ impl SpService {
             RETURNING id, tenant_id, entity_id, name, acs_urls, certificate,
                       attribute_mapping, name_id_format, sign_assertions,
                       validate_signatures, assertion_validity_seconds, enabled,
-                      metadata_url, created_at, updated_at
+                      metadata_url, created_at, updated_at,
+                      group_attribute_name, group_value_format, group_filter,
+                      include_groups, omit_empty_groups, group_dn_base
             ",
         )
         .bind(tenant_id)
@@ -227,7 +237,9 @@ impl SpService {
             RETURNING id, tenant_id, entity_id, name, acs_urls, certificate,
                       attribute_mapping, name_id_format, sign_assertions,
                       validate_signatures, assertion_validity_seconds, enabled,
-                      metadata_url, created_at, updated_at
+                      metadata_url, created_at, updated_at,
+                      group_attribute_name, group_value_format, group_filter,
+                      include_groups, omit_empty_groups, group_dn_base
             ",
         )
         .bind(sp_id)

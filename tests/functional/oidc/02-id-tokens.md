@@ -14,6 +14,15 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`
+- **Special Setup**: OAuth client with authorization_code grant and openid scope
+
+---
+
 ## Nominal Cases
 
 ### TC-OIDC-IDT-001: ID token issued on authorization_code grant with openid scope
@@ -48,7 +57,7 @@
 ### TC-OIDC-IDT-002: ID token contains required OIDC claims
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 2
-- **Preconditions**: ID token obtained from TC-OIDC-IDT-001
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. ID token obtained from TC-OIDC-IDT-001
 - **Input**: Decode the JWT payload of the `id_token`
 - **Expected Output**: Decoded payload contains:
   ```json
@@ -71,7 +80,7 @@
 ### TC-OIDC-IDT-003: ID token includes nonce when provided in authorization request
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.7 (item 11)
-- **Preconditions**: Authorization request included `nonce=test-nonce-value-123`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Authorization request included `nonce=test-nonce-value-123`
 - **Input**: Decode the JWT payload of the `id_token`
 - **Expected Output**:
   - `nonce` claim is present in the ID token
@@ -81,7 +90,7 @@
 ### TC-OIDC-IDT-004: ID token includes email claims with email scope
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 5.4
-- **Preconditions**: Token issued with scope `openid email`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Token issued with scope `openid email`
 - **Input**: Decode the JWT payload of the `id_token`
 - **Expected Output**:
   - `email` claim is present with the user's email address
@@ -90,7 +99,7 @@
 ### TC-OIDC-IDT-005: ID token includes profile claims with profile scope
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 5.4
-- **Preconditions**: Token issued with scope `openid profile`; user has display_name set
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Token issued with scope `openid profile`; user has display_name set
 - **Input**: Decode the JWT payload of the `id_token`
 - **Expected Output**:
   - `name` claim is present (if user has display_name)
@@ -99,7 +108,7 @@
 ### TC-OIDC-IDT-006: ID token signature verifiable with JWKS public key
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.7 (item 6)
-- **Preconditions**: ID token obtained and JWKS fetched
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. ID token obtained and JWKS fetched
 - **Input**:
   1. `GET /.well-known/jwks.json` -- extract the key matching the token's `kid` header
   2. Verify the RS256 signature of the `id_token` using the extracted public key
@@ -111,7 +120,7 @@
 ### TC-OIDC-IDT-007: ID token includes Xavyo custom claims (tenant_id, roles)
 - **Category**: Nominal
 - **Standard**: RFC 7519, Section 4.2 (Private Claims)
-- **Preconditions**: Token issued for a user in a specific tenant with roles
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Token issued for a user in a specific tenant with roles
 - **Input**: Decode the JWT payload
 - **Expected Output**:
   - `tid` claim is present as a UUID (tenant_id)
@@ -121,7 +130,7 @@
 ### TC-OIDC-IDT-008: ID token not issued for client_credentials grant
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.3
-- **Preconditions**: Valid confidential client with client_credentials grant type
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid confidential client with client_credentials grant type
 - **Input**:
   ```
   POST /oauth/token
@@ -147,7 +156,7 @@
 ### TC-OIDC-IDT-009: ID token exp is in the future relative to iat
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 2 / RFC 7519, Section 4.1.4
-- **Preconditions**: Fresh ID token obtained
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Fresh ID token obtained
 - **Input**: Decode the JWT payload
 - **Expected Output**:
   - `exp` > `iat`
@@ -157,7 +166,7 @@
 ### TC-OIDC-IDT-010: ID token issued with device_code grant includes id_token
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.3 / RFC 8628
-- **Preconditions**: Device code flow completed (user authorized)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Device code flow completed (user authorized)
 - **Input**:
   ```
   POST /oauth/token
@@ -177,7 +186,7 @@
 ### TC-OIDC-IDT-020: ID token without openid scope is not issued
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.2.1
-- **Preconditions**: Authorization code issued with scope `profile email` (no `openid`)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Authorization code issued with scope `profile email` (no `openid`)
 - **Input**: Exchange the authorization code at `/oauth/token`
 - **Expected Output**:
   - `id_token` is absent from the response
@@ -187,7 +196,7 @@
 ### TC-OIDC-IDT-021: ID token with multiple audience values
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Core 1.0, Section 2
-- **Preconditions**: Client configured with multiple audiences
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Client configured with multiple audiences
 - **Input**: Exchange authorization code
 - **Expected Output**:
   - `aud` claim is an array containing all intended audiences
@@ -196,7 +205,7 @@
 ### TC-OIDC-IDT-022: Expired authorization code rejects token issuance
 - **Category**: Edge Case
 - **Standard**: RFC 6749, Section 4.1.2
-- **Preconditions**: Authorization code was issued more than 10 minutes ago
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Authorization code was issued more than 10 minutes ago
 - **Input**:
   ```
   POST /oauth/token
@@ -211,7 +220,7 @@
 ### TC-OIDC-IDT-023: Reused authorization code rejects token issuance
 - **Category**: Edge Case
 - **Standard**: RFC 6749, Section 4.1.2 / OpenID Connect Core 1.0, Section 3.1.3.4
-- **Preconditions**: Authorization code already exchanged successfully
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Authorization code already exchanged successfully
 - **Input**: Attempt to exchange the same code again
 - **Expected Output**:
   ```
@@ -223,7 +232,7 @@
 ### TC-OIDC-IDT-024: ID token with very long subject claim
 - **Category**: Edge Case
 - **Standard**: RFC 7519, Section 4.1.2
-- **Preconditions**: User ID is a standard UUID (36 characters)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. User ID is a standard UUID (36 characters)
 - **Input**: Exchange authorization code for the user
 - **Expected Output**:
   - `sub` claim is the full UUID string (e.g., `550e8400-e29b-41d4-a716-446655440000`)
@@ -232,7 +241,7 @@
 ### TC-OIDC-IDT-025: Token request with mismatched redirect_uri
 - **Category**: Edge Case
 - **Standard**: RFC 6749, Section 4.1.3
-- **Preconditions**: Authorization code was issued with `redirect_uri=https://app.example.com/callback`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Authorization code was issued with `redirect_uri=https://app.example.com/callback`
 - **Input**:
   ```
   POST /oauth/token
@@ -247,7 +256,7 @@
 ### TC-OIDC-IDT-026: Token request with invalid PKCE code_verifier
 - **Category**: Edge Case
 - **Standard**: RFC 7636, Section 4.6
-- **Preconditions**: Authorization code issued with PKCE S256 challenge
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Authorization code issued with PKCE S256 challenge
 - **Input**:
   ```
   POST /oauth/token
@@ -262,7 +271,7 @@
 ### TC-OIDC-IDT-027: Token request missing required code_verifier
 - **Category**: Edge Case
 - **Standard**: RFC 7636, Section 4.6
-- **Preconditions**: Authorization code issued with PKCE
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Authorization code issued with PKCE
 - **Input**:
   ```
   POST /oauth/token
@@ -278,7 +287,7 @@
 ### TC-OIDC-IDT-028: ID token iat claim is close to current server time
 - **Category**: Edge Case
 - **Standard**: RFC 7519, Section 4.1.6
-- **Preconditions**: Fresh token just issued
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Fresh token just issued
 - **Input**: Decode the JWT payload; compare `iat` to current time
 - **Expected Output**:
   - `|current_time - iat|` < 5 seconds (accounting for processing time)
@@ -287,7 +296,7 @@
 ### TC-OIDC-IDT-029: Token request with unsupported grant_type
 - **Category**: Edge Case
 - **Standard**: RFC 6749, Section 4.1.3
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   POST /oauth/token
@@ -302,7 +311,7 @@
 ### TC-OIDC-IDT-030: Token request with empty grant_type
 - **Category**: Edge Case
 - **Standard**: RFC 6749, Section 4.1.3
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   POST /oauth/token
@@ -317,7 +326,7 @@
 ### TC-OIDC-IDT-031: Refresh token grant issues new access token but no new ID token
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Core 1.0, Section 12.2
-- **Preconditions**: Valid refresh token obtained from an authorization_code exchange
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Valid refresh token obtained from an authorization_code exchange
 - **Input**:
   ```
   POST /oauth/token
@@ -335,7 +344,7 @@
 ### TC-OIDC-IDT-032: Token request with client credentials in both header and body
 - **Category**: Edge Case
 - **Standard**: RFC 6749, Section 2.3
-- **Preconditions**: Valid client
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Valid client
 - **Input**:
   ```
   POST /oauth/token
@@ -350,7 +359,7 @@
 ### TC-OIDC-IDT-033: Each ID token has a unique jti claim
 - **Category**: Edge Case
 - **Standard**: RFC 7519, Section 4.1.7
-- **Preconditions**: Same user, same client
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Same user, same client
 - **Input**: Issue two separate ID tokens for the same user in quick succession
 - **Expected Output**:
   - Both tokens have `jti` claims
@@ -359,7 +368,7 @@
 ### TC-OIDC-IDT-034: ID token with inactive user account
 - **Category**: Edge Case
 - **Standard**: Operational
-- **Preconditions**: User account has been deactivated (`is_active = false`)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. User account has been deactivated (`is_active = false`)
 - **Input**: Attempt to exchange authorization code for this user
 - **Expected Output**:
   - Token issuance fails
@@ -373,7 +382,7 @@
 ### TC-OIDC-IDT-040: ID token uses RS256 algorithm (not none)
 - **Category**: Security
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.7 (item 6) / CVE-2015-9235
-- **Preconditions**: ID token obtained
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. ID token obtained
 - **Input**: Decode the JWT header of the `id_token`
 - **Expected Output**:
   - `alg` is `"RS256"` (never `"none"` or `"HS256"`)
@@ -383,7 +392,7 @@
 ### TC-OIDC-IDT-041: Algorithm substitution attack rejected
 - **Category**: Security
 - **Standard**: RFC 7515, Section 4.1.1 / JWT Algorithm Confusion
-- **Preconditions**: Attacker crafts a token with `alg: "HS256"` signed with the public key
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Attacker crafts a token with `alg: "HS256"` signed with the public key
 - **Input**: Present the crafted token to any protected endpoint
 - **Expected Output**:
   - Token is rejected (401 Unauthorized)
@@ -393,7 +402,7 @@
 ### TC-OIDC-IDT-042: Token with tampered payload is rejected
 - **Category**: Security
 - **Standard**: RFC 7515, Section 5.2
-- **Preconditions**: Valid ID token obtained
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Valid ID token obtained
 - **Input**:
   1. Decode the JWT payload
   2. Modify a claim (e.g., change `sub` to a different user ID)
@@ -408,7 +417,7 @@
 ### TC-OIDC-IDT-043: Token with forged signature is rejected
 - **Category**: Security
 - **Standard**: RFC 7515, Section 5.2
-- **Preconditions**: Attacker generates their own RSA key pair
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Attacker generates their own RSA key pair
 - **Input**: Create a JWT signed with the attacker's private key but claiming the server's issuer
 - **Expected Output**:
   - Token is rejected at all protected endpoints
@@ -417,7 +426,7 @@
 ### TC-OIDC-IDT-044: Expired ID token is rejected
 - **Category**: Security
 - **Standard**: RFC 7519, Section 4.1.4
-- **Preconditions**: Token with `exp` in the past
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Token with `exp` in the past
 - **Input**: Present the expired token to a protected endpoint
 - **Expected Output**:
   ```
@@ -428,7 +437,7 @@
 ### TC-OIDC-IDT-045: Token with future iat is suspicious
 - **Category**: Security
 - **Standard**: RFC 7519, Section 4.1.6
-- **Preconditions**: Crafted token with `iat` far in the future
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Crafted token with `iat` far in the future
 - **Input**: Present the crafted token to a protected endpoint
 - **Expected Output**:
   - Server MAY reject tokens with `iat` significantly in the future
@@ -437,7 +446,7 @@
 ### TC-OIDC-IDT-046: Cross-tenant ID token rejected
 - **Category**: Security
 - **Standard**: Xavyo Multi-Tenancy Architecture
-- **Preconditions**: Token issued for tenant A, user attempts to access tenant B resources
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Token issued for tenant A, user attempts to access tenant B resources
 - **Input**: Present a valid token from tenant A with an `X-Tenant-ID: {tenant_B_uuid}` header
 - **Expected Output**:
   - Request is rejected (403 Forbidden or 401 Unauthorized)
@@ -447,7 +456,7 @@
 ### TC-OIDC-IDT-047: Revoked token (via JTI blacklist) is rejected
 - **Category**: Security
 - **Standard**: RFC 7009 (Token Revocation) / F084 Feature
-- **Preconditions**: Token has been revoked via `POST /oauth/revoke`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Token has been revoked via `POST /oauth/revoke`
 - **Input**: Present the revoked token to a protected endpoint
 - **Expected Output**:
   ```
@@ -458,7 +467,7 @@
 ### TC-OIDC-IDT-048: Token with missing kid header is rejected or handled gracefully
 - **Category**: Security
 - **Standard**: RFC 7515, Section 4.1.4
-- **Preconditions**: Crafted JWT without `kid` in the header
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Crafted JWT without `kid` in the header
 - **Input**: Present the crafted token
 - **Expected Output**:
   - If server has only one key, it MAY attempt verification with that key
@@ -468,7 +477,7 @@
 ### TC-OIDC-IDT-049: Token from a different issuer is rejected
 - **Category**: Security
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.7 (item 2)
-- **Preconditions**: Valid JWT from a different OIDC provider (e.g., Google)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Valid JWT from a different OIDC provider (e.g., Google)
 - **Input**: Present the foreign token to xavyo's protected endpoints
 - **Expected Output**:
   ```
@@ -484,7 +493,7 @@
 ### TC-OIDC-IDT-050: ID token conforms to JWT format (3-part base64url-encoded)
 - **Category**: Compliance
 - **Standard**: RFC 7519, Section 3.1
-- **Preconditions**: ID token obtained
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. ID token obtained
 - **Input**: Parse the `id_token` string
 - **Expected Output**:
   - Token has exactly 3 parts separated by `.` (header.payload.signature)
@@ -495,7 +504,7 @@
 ### TC-OIDC-IDT-051: ID token header contains required fields
 - **Category**: Compliance
 - **Standard**: RFC 7515, Section 4.1
-- **Preconditions**: ID token obtained
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. ID token obtained
 - **Input**: Decode the JWT header
 - **Expected Output**:
   ```json
@@ -509,7 +518,7 @@
 ### TC-OIDC-IDT-052: sub claim is a locally unique identifier
 - **Category**: Compliance
 - **Standard**: OpenID Connect Core 1.0, Section 2
-- **Preconditions**: ID tokens for two different users
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. ID tokens for two different users
 - **Input**: Compare `sub` claims
 - **Expected Output**:
   - `sub` is a non-empty string
@@ -520,7 +529,7 @@
 ### TC-OIDC-IDT-053: aud claim matches the client_id
 - **Category**: Compliance
 - **Standard**: OpenID Connect Core 1.0, Section 2
-- **Preconditions**: ID token obtained for a specific client
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. ID token obtained for a specific client
 - **Input**: Decode the JWT payload
 - **Expected Output**:
   - `aud` contains the `client_id` used to obtain the token
@@ -529,7 +538,7 @@
 ### TC-OIDC-IDT-054: exp and iat are numeric Unix timestamps
 - **Category**: Compliance
 - **Standard**: RFC 7519, Sections 4.1.4 and 4.1.6
-- **Preconditions**: ID token obtained
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. ID token obtained
 - **Input**: Decode the JWT payload
 - **Expected Output**:
   - `exp` is a JSON number (not a string, not a formatted date)
@@ -540,7 +549,7 @@
 ### TC-OIDC-IDT-055: Token response Content-Type is application/json
 - **Category**: Compliance
 - **Standard**: RFC 6749, Section 5.1
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**: Any successful `POST /oauth/token` request
 - **Expected Output**:
   - Response `Content-Type` is `application/json`
@@ -550,7 +559,7 @@
 ### TC-OIDC-IDT-056: Error responses follow RFC 6749 Section 5.2 format
 - **Category**: Compliance
 - **Standard**: RFC 6749, Section 5.2
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**: Any failed `POST /oauth/token` request
 - **Expected Output**:
   ```json
@@ -565,7 +574,7 @@
 ### TC-OIDC-IDT-057: token_type is always Bearer
 - **Category**: Compliance
 - **Standard**: RFC 6749, Section 5.1 / RFC 6750
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**: Any successful `POST /oauth/token` request
 - **Expected Output**:
   - `token_type` is `"Bearer"` (case-insensitive per RFC 6750, but should be exactly `"Bearer"`)
@@ -573,7 +582,7 @@
 ### TC-OIDC-IDT-058: expires_in matches actual token lifetime
 - **Category**: Compliance
 - **Standard**: RFC 6749, Section 5.1
-- **Preconditions**: Fresh token issued
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Fresh token issued
 - **Input**:
   1. Record `expires_in` from the token response
   2. Decode the JWT to get `exp` and `iat`
@@ -584,7 +593,7 @@
 ### TC-OIDC-IDT-059: ID token claims use correct JSON types
 - **Category**: Compliance
 - **Standard**: OpenID Connect Core 1.0, Section 2 / RFC 7519
-- **Preconditions**: ID token obtained
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. ID token obtained
 - **Input**: Decode the JWT payload and validate JSON types
 - **Expected Output**:
   - `iss`: JSON string

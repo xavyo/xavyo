@@ -26,6 +26,15 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: OIDC identity provider configured with domain mapping and client credentials
+
+---
+
 ## Nominal Cases
 
 ### TC-OIDC-FED-001: Home realm discovery for federated domain
@@ -58,7 +67,7 @@
 ### TC-OIDC-FED-002: Home realm discovery for non-federated domain
 - **Category**: Nominal
 - **Standard**: Home Realm Discovery
-- **Preconditions**: No IdP configured for the email domain `gmail.com`
+- **Preconditions**: Fixtures: `TEST_TENANT`. No IdP configured for the email domain `gmail.com`
 - **Input**:
   ```
   POST /auth/federation/discover
@@ -107,7 +116,7 @@
 ### TC-OIDC-FED-004: Authorization URL includes PKCE S256 challenge
 - **Category**: Nominal
 - **Standard**: RFC 7636, Section 4.2
-- **Preconditions**: Federated auth initiated (TC-OIDC-FED-003)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Federated auth initiated (TC-OIDC-FED-003)
 - **Input**: Parse the `Location` header from the redirect
 - **Expected Output**:
   - `code_challenge` parameter is present (base64url-encoded SHA-256 hash)
@@ -118,7 +127,7 @@
 ### TC-OIDC-FED-005: Authorization URL includes nonce parameter
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.2.1
-- **Preconditions**: Federated auth initiated
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Federated auth initiated
 - **Input**: Parse the `Location` header from the redirect
 - **Expected Output**:
   - `nonce` parameter is present and is a randomly generated value
@@ -162,7 +171,7 @@
 ### TC-OIDC-FED-008: Callback performs token exchange with IdP
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.1
-- **Preconditions**: Valid session and authorization code
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Valid session and authorization code
 - **Input**: Internal behavior during callback processing
 - **Expected Output**: Token exchange request to the IdP includes:
   - `grant_type=authorization_code`
@@ -175,7 +184,7 @@
 ### TC-OIDC-FED-009: Callback decodes external IdP's ID token
 - **Category**: Nominal
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.5
-- **Preconditions**: Token exchange returned an ID token
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Token exchange returned an ID token
 - **Input**: Internal behavior during callback processing
 - **Expected Output**: Decoded ID token claims include:
   - `sub` (subject identifier at the IdP)
@@ -188,7 +197,7 @@
 ### TC-OIDC-FED-010: Callback issues Xavyo JWT with user roles from database
 - **Category**: Nominal
 - **Standard**: Xavyo Implementation
-- **Preconditions**: User provisioned/synced during callback
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User provisioned/synced during callback
 - **Input**: Xavyo token issuance step of the callback
 - **Expected Output**:
   - Access token is a valid Xavyo JWT
@@ -200,7 +209,7 @@
 ### TC-OIDC-FED-011: Callback with redirect_uri returns fragment-based redirect
 - **Category**: Nominal
 - **Standard**: OAuth 2.0 Implicit Grant (fragment encoding for security)
-- **Preconditions**: Session stored with `redirect_uri` starting with `http`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Session stored with `redirect_uri` starting with `http`
 - **Input**:
   ```
   GET /auth/federation/callback?code={code}&state={state}
@@ -215,7 +224,7 @@
 ### TC-OIDC-FED-012: Federation logout cleans up expired sessions
 - **Category**: Nominal
 - **Standard**: Operational
-- **Preconditions**: Some expired federation sessions exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Some expired federation sessions exist
 - **Input**:
   ```
   POST /auth/federation/logout
@@ -234,7 +243,7 @@
 ### TC-OIDC-FED-020: Callback with expired session (older than 10 minutes)
 - **Category**: Edge Case
 - **Standard**: Security (session timeout)
-- **Preconditions**: Federation session created more than 10 minutes ago
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Federation session created more than 10 minutes ago
 - **Input**:
   ```
   GET /auth/federation/callback?code={code}&state={expired_session_state}
@@ -249,7 +258,7 @@
 ### TC-OIDC-FED-021: Callback with unknown state parameter
 - **Category**: Edge Case
 - **Standard**: RFC 6749, Section 10.12 (CSRF Protection)
-- **Preconditions**: No session exists for the given state value
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. No session exists for the given state value
 - **Input**:
   ```
   GET /auth/federation/callback?code={code}&state=nonexistent-state-value
@@ -263,7 +272,7 @@
 ### TC-OIDC-FED-022: Callback without authorization code (error from IdP)
 - **Category**: Edge Case
 - **Standard**: RFC 6749, Section 4.1.2.1
-- **Preconditions**: User denied consent at the external IdP
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User denied consent at the external IdP
 - **Input**:
   ```
   GET /auth/federation/callback?state={state}&error=access_denied&error_description=User+denied+consent
@@ -277,7 +286,7 @@
 ### TC-OIDC-FED-023: Callback without code and without error
 - **Category**: Edge Case
 - **Standard**: RFC 6749, Section 4.1.2
-- **Preconditions**: Malformed callback
+- **Preconditions**: Fixtures: `TEST_TENANT`. Malformed callback
 - **Input**:
   ```
   GET /auth/federation/callback?state={state}
@@ -292,7 +301,7 @@
 ### TC-OIDC-FED-024: Authorize with disabled IdP
 - **Category**: Edge Case
 - **Standard**: Operational
-- **Preconditions**: IdP exists but `is_enabled = false`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. IdP exists but `is_enabled = false`
 - **Input**:
   ```
   GET /auth/federation/authorize?idp_id={disabled_idp_uuid}
@@ -307,7 +316,7 @@
 ### TC-OIDC-FED-025: Authorize with non-existent IdP
 - **Category**: Edge Case
 - **Standard**: Operational
-- **Preconditions**: IdP UUID does not exist for this tenant
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. IdP UUID does not exist for this tenant
 - **Input**:
   ```
   GET /auth/federation/authorize?idp_id={nonexistent_uuid}
@@ -322,7 +331,7 @@
 ### TC-OIDC-FED-026: Authorize with IdP whose discovery endpoint is unreachable
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Discovery 1.0
-- **Preconditions**: IdP's `issuer_url` points to an unreachable server
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. IdP's `issuer_url` points to an unreachable server
 - **Input**:
   ```
   GET /auth/federation/authorize?idp_id={idp_uuid}
@@ -337,7 +346,7 @@
 ### TC-OIDC-FED-027: Callback with token exchange failure (IdP returns error)
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.4
-- **Preconditions**: Valid session, but external IdP rejects the code exchange (e.g., code expired)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Valid session, but external IdP rejects the code exchange (e.g., code expired)
 - **Input**:
   ```
   GET /auth/federation/callback?code={invalid_code}&state={state}
@@ -351,7 +360,7 @@
 ### TC-OIDC-FED-028: Callback with invalid ID token from IdP
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.5
-- **Preconditions**: IdP returns a malformed ID token (not valid JWT format)
+- **Preconditions**: Fixtures: `TEST_TENANT`. IdP returns a malformed ID token (not valid JWT format)
 - **Input**: Callback processing where `decode_id_token` receives `"not.a.jwt"`
 - **Expected Output**:
   ```
@@ -362,7 +371,7 @@
 ### TC-OIDC-FED-029: Discover with invalid email format
 - **Category**: Edge Case
 - **Standard**: RFC 5322
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   POST /auth/federation/discover
@@ -394,7 +403,7 @@
 ### TC-OIDC-FED-031: Callback with IdP returning no email claim
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Core 1.0, Section 5.1
-- **Preconditions**: IdP ID token has no `email` claim and no email in mapped claims
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. IdP ID token has no `email` claim and no email in mapped claims
 - **Input**: Callback processing
 - **Expected Output**:
   ```
@@ -405,7 +414,7 @@
 ### TC-OIDC-FED-032: Multiple IdPs configured for same domain (priority-based)
 - **Category**: Edge Case
 - **Standard**: Home Realm Discovery
-- **Preconditions**: Two IdPs configured for `example.com` with different priorities
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Two IdPs configured for `example.com` with different priorities
 - **Input**:
   ```
   POST /auth/federation/discover
@@ -421,7 +430,7 @@
 ### TC-OIDC-FED-033: Authorize without redirect_uri uses default
 - **Category**: Edge Case
 - **Standard**: RFC 6749, Section 3.1.2
-- **Preconditions**: IdP configured, no redirect_uri in request
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. IdP configured, no redirect_uri in request
 - **Input**:
   ```
   GET /auth/federation/authorize?idp_id={idp_uuid}
@@ -434,7 +443,7 @@
 ### TC-OIDC-FED-034: Callback when IdP returns additional unknown claims
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Core 1.0, Section 5.1 (extensibility)
-- **Preconditions**: IdP ID token contains non-standard claims (e.g., `department`, `employee_id`)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. IdP ID token contains non-standard claims (e.g., `department`, `employee_id`)
 - **Input**: Callback processing
 - **Expected Output**:
   - Additional claims are captured in `raw_claims` (via `#[serde(flatten)]` on `additional` field)
@@ -448,7 +457,7 @@
 ### TC-OIDC-FED-040: CSRF protection via state parameter
 - **Category**: Security
 - **Standard**: RFC 6749, Section 10.12
-- **Preconditions**: Federated auth initiated (session created)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Federated auth initiated (session created)
 - **Input**:
   1. Attacker crafts a callback URL with their own `state` value: `GET /auth/federation/callback?code={code}&state=attacker-forged-state`
 - **Expected Output**:
@@ -461,7 +470,7 @@
 ### TC-OIDC-FED-041: Nonce verification prevents ID token replay
 - **Category**: Security
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.7 (item 11)
-- **Preconditions**: Federation auth uses nonce
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Federation auth uses nonce
 - **Input**: Internal verification: session nonce is compared against ID token nonce claim
 - **Expected Output**:
   - If nonce in ID token does not match the session nonce, authentication fails
@@ -470,7 +479,7 @@
 ### TC-OIDC-FED-042: Session replay prevention (is_used flag)
 - **Category**: Security
 - **Standard**: Security best practice
-- **Preconditions**: Session already used (`is_used = true` via `find_by_state` filtering)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Session already used (`is_used = true` via `find_by_state` filtering)
 - **Input**:
   ```
   GET /auth/federation/callback?code={same_code}&state={same_state}
@@ -485,7 +494,7 @@
 ### TC-OIDC-FED-043: Client secret encrypted at rest
 - **Category**: Security
 - **Standard**: OWASP Cryptographic Failures
-- **Preconditions**: IdP configured with client_secret
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. IdP configured with client_secret
 - **Input**: Inspect the `tenant_identity_providers.client_secret_encrypted` column
 - **Expected Output**:
   - `client_secret_encrypted` is not the plaintext secret
@@ -495,7 +504,7 @@
 ### TC-OIDC-FED-044: PKCE verifier protects code exchange
 - **Category**: Security
 - **Standard**: RFC 7636, Section 1
-- **Preconditions**: Authorization flow initiated with PKCE
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authorization flow initiated with PKCE
 - **Input**: Attacker intercepts the authorization code but does not have the PKCE verifier
 - **Expected Output**:
   - Code exchange fails at the external IdP because `code_verifier` does not match `code_challenge`
@@ -505,7 +514,7 @@
 ### TC-OIDC-FED-045: Cross-tenant IdP access prevented
 - **Category**: Security
 - **Standard**: Xavyo Multi-Tenancy Architecture
-- **Preconditions**: IdP belongs to tenant A
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. IdP belongs to tenant A
 - **Input**:
   ```
   GET /auth/federation/authorize?idp_id={tenant_A_idp_uuid}
@@ -521,7 +530,7 @@
 ### TC-OIDC-FED-046: Discovery endpoint uses HTTPS with no redirect following
 - **Category**: Security
 - **Standard**: SSRF Prevention
-- **Preconditions**: IdP configured with an HTTPS issuer URL
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. IdP configured with an HTTPS issuer URL
 - **Input**: Internal behavior when `DiscoveryService::discover()` fetches metadata
 - **Expected Output**:
   - HTTP client created with `redirect(Policy::none())` (no redirect following)
@@ -531,7 +540,7 @@
 ### TC-OIDC-FED-047: Provisioning rejects unverified email from IdP
 - **Category**: Security
 - **Standard**: OpenID Connect Core 1.0, Section 5.1 / Account takeover prevention
-- **Preconditions**: IdP ID token has `email_verified: false`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. IdP ID token has `email_verified: false`
 - **Input**: Callback processing with unverified email
 - **Expected Output**:
   - Provisioning should reject or flag the user (implementation may vary)
@@ -541,7 +550,7 @@
 ### TC-OIDC-FED-048: Open redirect prevention on callback redirect_uri
 - **Category**: Security
 - **Standard**: OWASP Open Redirect
-- **Preconditions**: Attacker sets `redirect_uri` to an external malicious site
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Attacker sets `redirect_uri` to an external malicious site
 - **Input**:
   ```
   GET /auth/federation/authorize?idp_id={uuid}&redirect_uri=https://evil.example.com/steal-token
@@ -555,7 +564,7 @@
 ### TC-OIDC-FED-049: ID token signature verification (JWKS-based)
 - **Category**: Security
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.7 (items 6-7)
-- **Preconditions**: `TokenVerifierService` is wired into the callback flow
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. `TokenVerifierService` is wired into the callback flow
 - **Input**: ID token from external IdP
 - **Expected Output**:
   - Token signature verified using the IdP's JWKS (fetched from `jwks_uri`)

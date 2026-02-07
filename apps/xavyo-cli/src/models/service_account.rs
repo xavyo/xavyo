@@ -18,13 +18,15 @@ pub struct ServiceAccountResponse {
     #[serde(default)]
     pub risk_level: Option<String>,
     pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    #[serde(default)]
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 /// Service account list response
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServiceAccountListResponse {
-    pub service_accounts: Vec<ServiceAccountResponse>,
+    pub items: Vec<ServiceAccountResponse>,
+    #[serde(default)]
     pub total: i64,
 }
 

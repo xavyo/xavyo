@@ -319,6 +319,9 @@ pub async fn list_jobs(
     Query(query): Query<ListJobsQuery>,
 ) -> Result<Json<JobListResponse>, ApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiError::Forbidden);
+    }
 
     // Validate and clamp pagination
     let limit = query.limit.clamp(1, 100);
@@ -351,6 +354,9 @@ pub async fn get_job(
     Path(job_id): Path<Uuid>,
 ) -> Result<Json<JobDetailResponse>, ApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiError::Forbidden);
+    }
 
     let response = state.job_service.get_job_detail(tenant_id, job_id).await?;
 
@@ -372,6 +378,9 @@ pub async fn cancel_job(
     Path(job_id): Path<Uuid>,
 ) -> Result<Json<CancelJobResponse>, ApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiError::Forbidden);
+    }
     let cancelled_by = extract_user_id(&claims)?;
 
     let response = state
@@ -400,6 +409,9 @@ pub async fn list_dlq(
     Query(query): Query<ListDlqQuery>,
 ) -> Result<Json<DlqListResponse>, ApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiError::Forbidden);
+    }
 
     // Validate and clamp pagination
     let limit = query.limit.clamp(1, 100);
@@ -425,6 +437,9 @@ pub async fn replay_dlq_entry(
     Json(request): Json<ReplayRequest>,
 ) -> Result<Json<ReplayResponse>, ApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiError::Forbidden);
+    }
 
     let response = state
         .job_service
@@ -445,6 +460,9 @@ pub async fn bulk_replay_dlq(
     Json(request): Json<BulkReplayRequest>,
 ) -> Result<Json<BulkReplayResponse>, ApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ApiError::Forbidden);
+    }
 
     // Limit bulk operations to 100 entries
     if request.ids.len() > 100 {

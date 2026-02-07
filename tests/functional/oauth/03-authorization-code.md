@@ -20,6 +20,11 @@ tests are fully executable.
 
 ## Prerequisites
 
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `OAUTH_CC_CLIENT`, `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: Confidential and public authorization code clients with registered redirect URIs
+
 All tests assume:
 - A valid tenant exists with ID `{TENANT_ID}` (UUID)
 - A user exists with `{USER_ID}`, email `user@example.com`, verified, active
@@ -66,7 +71,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-001: Initiate authorization code flow
 - **Category**: Nominal
 - **Standard**: RFC 6749 Section 4.1.1, RFC 7636 Section 4.3
-- **Preconditions**: Client with `authorization_code` grant type, registered redirect_uri
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Client with `authorization_code` grant type, registered redirect_uri
 - **Input**:
   ```
   GET /oauth/authorize?response_type=code&client_id={client_id}&redirect_uri=https://app.example.com/callback&scope=openid+profile&state=xyz123&code_challenge={code_challenge}&code_challenge_method=S256
@@ -81,7 +86,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-002: Authorization with OIDC nonce
 - **Category**: Nominal
 - **Standard**: OIDC Core Section 3.1.2.1 (nonce parameter)
-- **Preconditions**: Valid client and PKCE values
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client and PKCE values
 - **Input**:
   ```
   GET /oauth/authorize?response_type=code&client_id={client_id}&redirect_uri=https://app.example.com/callback&scope=openid+profile&state=xyz123&code_challenge={code_challenge}&code_challenge_method=S256&nonce=n-0S6_WzA2Mj
@@ -94,7 +99,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-003: Consent denial redirects with access_denied [PLACEHOLDER]
 - **Category**: Nominal
 - **Standard**: RFC 6749 Section 4.1.2.1
-- **Preconditions**: User authenticated, consent form displayed
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. User authenticated, consent form displayed
 - **Input**:
   ```
   POST /oauth/authorize/consent
@@ -110,7 +115,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-004: Token exchange with authorization code [PLACEHOLDER]
 - **Category**: Nominal
 - **Standard**: RFC 6749 Section 4.1.3, RFC 7636 Section 4.5
-- **Preconditions**: Authorization code issued after user consent
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Authorization code issued after user consent
 - **Input**:
   ```
   POST /oauth/token
@@ -137,7 +142,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-005: Token exchange derives tenant from auth code
 - **Category**: Nominal
 - **Standard**: Platform-specific (multi-tenant token exchange)
-- **Preconditions**: Auth code issued in `TENANT_A`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Auth code issued in `TENANT_A`
 - **Input**:
   ```
   POST /oauth/token
@@ -154,7 +159,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-006: Refresh token grant [PLACEHOLDER]
 - **Category**: Nominal
 - **Standard**: RFC 6749 Section 6
-- **Preconditions**: Valid refresh_token from previous token exchange
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid refresh_token from previous token exchange
 - **Input**:
   ```
   POST /oauth/token
@@ -172,7 +177,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-007: Refresh token rotation issues new refresh token
 - **Category**: Nominal
 - **Standard**: OAuth 2.0 Security BCP (refresh token rotation)
-- **Preconditions**: Valid refresh_token
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid refresh_token
 - **Input**: Same as TC-OAUTH-AC-006
 - **Expected Output**:
   - New `refresh_token` is different from the original
@@ -181,7 +186,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-008: Public client token exchange with PKCE only [PLACEHOLDER]
 - **Category**: Nominal
 - **Standard**: RFC 7636 Section 4.5 (PKCE for public clients)
-- **Preconditions**: Public client, auth code issued
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Public client, auth code issued
 - **Input**:
   ```
   POST /oauth/token
@@ -197,7 +202,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-009: Authorization code hash uses SHA-256
 - **Category**: Nominal
 - **Standard**: Platform-specific (secure code storage)
-- **Preconditions**: Auth code issued [PLACEHOLDER]
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Auth code issued [PLACEHOLDER]
 - **Input**: Inspect database `authorization_codes` table
 - **Expected Output**:
   - Column `code_hash` contains SHA-256 hex digest (64 characters)
@@ -206,7 +211,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-010: Redirect URI exact match validation
 - **Category**: Nominal
 - **Standard**: RFC 6749 Section 3.1.2.3 (exact match)
-- **Preconditions**: Client has `redirect_uris: ["https://app.example.com/callback"]`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Client has `redirect_uris: ["https://app.example.com/callback"]`
 - **Input**:
   ```
   GET /oauth/authorize?...&redirect_uri=https://app.example.com/callback
@@ -222,7 +227,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-011: Missing response_type parameter
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 4.1.1 (REQUIRED)
-- **Preconditions**: Valid client
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client
 - **Input**:
   ```
   GET /oauth/authorize?client_id={client_id}&redirect_uri=https://app.example.com/callback&scope=openid&state=xyz&code_challenge={cc}&code_challenge_method=S256
@@ -234,7 +239,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-012: response_type is not "code"
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 4.1.1
-- **Preconditions**: Valid client
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client
 - **Input**:
   ```
   GET /oauth/authorize?response_type=token&client_id={client_id}&...
@@ -246,7 +251,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-013: Missing code_challenge (PKCE required)
 - **Category**: Edge Case
 - **Standard**: RFC 7636 Section 4.4.1
-- **Preconditions**: Valid client, PKCE is mandatory
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client, PKCE is mandatory
 - **Input**:
   ```
   GET /oauth/authorize?response_type=code&client_id={client_id}&redirect_uri=https://app.example.com/callback&scope=openid&state=xyz&code_challenge_method=S256
@@ -258,7 +263,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-014: Unsupported code_challenge_method
 - **Category**: Edge Case
 - **Standard**: RFC 7636 Section 4.2 (only S256 recommended)
-- **Preconditions**: Valid client
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client
 - **Input**:
   ```
   GET /oauth/authorize?...&code_challenge={cc}&code_challenge_method=plain
@@ -270,7 +275,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-015: Redirect URI not registered
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 3.1.2.3
-- **Preconditions**: Client has `redirect_uris: ["https://app.example.com/callback"]`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Client has `redirect_uris: ["https://app.example.com/callback"]`
 - **Input**:
   ```
   GET /oauth/authorize?...&redirect_uri=https://evil.example.com/callback
@@ -283,7 +288,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-016: Redirect URI with extra path segment
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 3.1.2.3 (exact match required)
-- **Preconditions**: Client has `redirect_uris: ["https://app.example.com/callback"]`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Client has `redirect_uris: ["https://app.example.com/callback"]`
 - **Input**:
   ```
   GET /oauth/authorize?...&redirect_uri=https://app.example.com/callback/extra
@@ -295,7 +300,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-017: Redirect URI with query string appended
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 3.1.2 (no fragment, exact match)
-- **Preconditions**: Registered URI has no query string
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Registered URI has no query string
 - **Input**:
   ```
   GET /oauth/authorize?...&redirect_uri=https://app.example.com/callback?extra=param
@@ -306,7 +311,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-018: Invalid client_id format
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 2.2
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /oauth/authorize?response_type=code&client_id=not-a-uuid&...
@@ -318,7 +323,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-019: Deactivated client on authorize
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 4.1.2.1
-- **Preconditions**: Client deactivated via `DELETE /admin/oauth/clients/{id}`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `ADMIN_JWT`, `TEST_TENANT`. Client deactivated via `DELETE /admin/oauth/clients/{id}`
 - **Input**:
   ```
   GET /oauth/authorize?response_type=code&client_id={deactivated_client_id}&...
@@ -330,7 +335,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-020: Client not authorized for authorization_code grant
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 4.1
-- **Preconditions**: Client with `grant_types: ["client_credentials"]`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Client with `grant_types: ["client_credentials"]`
 - **Input**:
   ```
   GET /oauth/authorize?response_type=code&client_id={cc_client_id}&...
@@ -342,7 +347,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-021: Missing state parameter
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 4.1.1 (RECOMMENDED, enforced as REQUIRED here)
-- **Preconditions**: Valid client
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client
 - **Input**:
   ```
   GET /oauth/authorize?response_type=code&client_id={client_id}&redirect_uri=...&scope=openid&code_challenge={cc}&code_challenge_method=S256
@@ -355,7 +360,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-022: Auth code expired before exchange [PLACEHOLDER]
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 4.1.2 (short-lived codes)
-- **Preconditions**: Auth code issued, wait beyond expiration (e.g., 10 minutes)
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Auth code issued, wait beyond expiration (e.g., 10 minutes)
 - **Input**:
   ```
   POST /oauth/token
@@ -368,7 +373,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-023: Auth code replay (used twice) [PLACEHOLDER]
 - **Category**: Edge Case
 - **Standard**: RFC 6749 Section 4.1.2 ("MUST NOT be used more than once")
-- **Preconditions**: Auth code successfully exchanged once
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Auth code successfully exchanged once
 - **Input**: Exchange same auth code again
 - **Expected Output**:
   - Status: `400 Bad Request`
@@ -378,7 +383,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-024: PKCE code_verifier mismatch [PLACEHOLDER]
 - **Category**: Edge Case
 - **Standard**: RFC 7636 Section 4.6
-- **Preconditions**: Auth code issued with code_challenge from verifier_A
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Auth code issued with code_challenge from verifier_A
 - **Input**: Exchange with different code_verifier_B
 - **Expected Output**:
   - Status: `400 Bad Request`
@@ -387,7 +392,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-025: Missing code_verifier on token exchange [PLACEHOLDER]
 - **Category**: Edge Case
 - **Standard**: RFC 7636 Section 4.5 (REQUIRED when code_challenge was sent)
-- **Preconditions**: Auth code issued with PKCE
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Auth code issued with PKCE
 - **Input**:
   ```
   POST /oauth/token
@@ -405,7 +410,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-026: Open redirect prevention
 - **Category**: Security
 - **Standard**: RFC 6749 Section 10.15, OWASP Open Redirect
-- **Preconditions**: Client has registered `redirect_uris`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Client has registered `redirect_uris`
 - **Input**:
   ```
   GET /oauth/authorize?...&redirect_uri=https://attacker.com/steal
@@ -418,7 +423,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-027: CSRF protection on consent form (F082-US6)
 - **Category**: Security
 - **Standard**: RFC 6749 Section 10.12, OWASP CSRF Prevention
-- **Preconditions**: Authorization flow initiated
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Authorization flow initiated
 - **Input**: Submit consent form without valid CSRF token
   ```
   POST /oauth/authorize/consent
@@ -435,7 +440,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-028: CSRF token HMAC tampered
 - **Category**: Security
 - **Standard**: OWASP CSRF Prevention (double-submit with HMAC)
-- **Preconditions**: CSRF token obtained from authorize redirect
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. CSRF token obtained from authorize redirect
 - **Input**:
   ```
   POST /oauth/authorize/consent
@@ -449,7 +454,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-029: CSRF cookie mismatch with form token
 - **Category**: Security
 - **Standard**: OWASP CSRF Prevention (double-submit cookie)
-- **Preconditions**: Two different CSRF tokens
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Two different CSRF tokens
 - **Input**:
   ```
   POST /oauth/authorize/consent
@@ -463,7 +468,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-030: Refresh token replay detection [PLACEHOLDER]
 - **Category**: Security
 - **Standard**: OAuth 2.0 Security BCP Section 4.14.2
-- **Preconditions**: Refresh token rotated (old token invalidated)
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Refresh token rotated (old token invalidated)
 - **Input**: Use the old (rotated) refresh token
 - **Expected Output**:
   - Status: `400 Bad Request`
@@ -473,7 +478,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-031: Missing X-Tenant-ID on authorize
 - **Category**: Security
 - **Standard**: Platform-specific (tenant isolation)
-- **Preconditions**: Valid client
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client
 - **Input**:
   ```
   GET /oauth/authorize?response_type=code&client_id={client_id}&...
@@ -486,7 +491,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-032: Cross-tenant client access
 - **Category**: Security
 - **Standard**: Platform-specific (tenant isolation)
-- **Preconditions**: Client registered in `TENANT_A`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Client registered in `TENANT_A`
 - **Input**:
   ```
   GET /oauth/authorize?response_type=code&client_id={client_id_from_tenant_A}&...
@@ -499,7 +504,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-033: Authorization code bound to redirect_uri [PLACEHOLDER]
 - **Category**: Security
 - **Standard**: RFC 6749 Section 4.1.3 (redirect_uri MUST match)
-- **Preconditions**: Auth code issued with `redirect_uri=https://app.example.com/callback`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Auth code issued with `redirect_uri=https://app.example.com/callback`
 - **Input**: Exchange code with different redirect_uri
   ```
   POST /oauth/token
@@ -512,7 +517,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-034: State parameter echoed in error redirect
 - **Category**: Security
 - **Standard**: RFC 6749 Section 4.1.2.1 (state MUST be included in error redirect)
-- **Preconditions**: Consent denied by user
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Consent denied by user
 - **Input**: Same as TC-OAUTH-AC-003 (consent denied)
 - **Expected Output**:
   - Redirect URL query contains `state=xyz123`
@@ -521,7 +526,7 @@ code_challenge_method = S256
 ### TC-OAUTH-AC-035: Redirect URI fragment prevention
 - **Category**: Security
 - **Standard**: RFC 6749 Section 3.1.2 ("MUST NOT include a fragment component")
-- **Preconditions**: Valid client
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client
 - **Input**:
   ```
   GET /oauth/authorize?...&redirect_uri=https://app.example.com/callback#fragment

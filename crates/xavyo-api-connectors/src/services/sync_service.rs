@@ -243,7 +243,7 @@ impl SyncService {
     /// Get tenant ID for a connector (helper method).
     async fn get_tenant_for_connector(&self, connector_id: Uuid) -> SyncServiceResult<Uuid> {
         let row: Option<(Uuid,)> =
-            sqlx::query_as("SELECT tenant_id FROM gov_connectors WHERE id = $1")
+            sqlx::query_as("SELECT tenant_id FROM connector_configurations WHERE id = $1")
                 .bind(connector_id)
                 .fetch_optional(&self.pool)
                 .await

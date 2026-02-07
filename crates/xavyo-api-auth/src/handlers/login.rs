@@ -166,7 +166,8 @@ pub async fn login_handler(
                 }
             } else {
                 // Unknown email - log but don't reveal
-                lockout_service
+                // Best-effort: don't propagate DB errors (e.g. non-existent tenant)
+                if let Err(e) = lockout_service
                     .record_login_attempt(
                         *tenant_id.as_uuid(),
                         None,
@@ -174,7 +175,14 @@ pub async fn login_handler(
                         ip_str.as_deref(),
                         FailureReason::UnknownEmail,
                     )
-                    .await?;
+                    .await
+                {
+                    tracing::warn!(
+                        tenant_id = %tenant_id,
+                        error = %e,
+                        "Failed to record login attempt for unknown email"
+                    );
+                }
 
                 // Record audit trail for unknown email (F025)
                 let _ = audit_service
@@ -227,7 +235,7 @@ pub async fn login_handler(
                 .get_user_by_email(tenant_id, &request.email)
                 .await
             {
-                lockout_service
+                if let Err(e) = lockout_service
                     .record_login_attempt(
                         *tenant_id.as_uuid(),
                         Some(user.id),
@@ -235,7 +243,14 @@ pub async fn login_handler(
                         ip_str.as_deref(),
                         FailureReason::AccountInactive,
                     )
-                    .await?;
+                    .await
+                {
+                    tracing::warn!(
+                        tenant_id = %tenant_id,
+                        error = %e,
+                        "Failed to record login attempt for inactive account"
+                    );
+                }
 
                 // Record audit trail for inactive account (F025)
                 let _ = audit_service

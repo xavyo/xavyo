@@ -19,6 +19,11 @@
 
 ## Prerequisites
 
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `OAUTH_CC_CLIENT`, `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: Public device code client and confidential device code client needed
+
 All tests assume:
 - A valid tenant exists with ID `{TENANT_ID}` (UUID)
 - A user exists with `{USER_ID}`, email `user@example.com`, verified, active
@@ -56,7 +61,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-001: Request device authorization code
 - **Category**: Nominal
 - **Standard**: RFC 8628 Section 3.1
-- **Preconditions**: Public client with `device_code` grant type exists
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Public client with `device_code` grant type exists
 - **Input**:
   ```
   POST /oauth/device/code
@@ -82,7 +87,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-002: Request device authorization with scopes
 - **Category**: Nominal
 - **Standard**: RFC 8628 Section 3.1 (scope parameter)
-- **Preconditions**: Client has scopes `["openid", "profile", "read", "write"]`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Client has scopes `["openid", "profile", "read", "write"]`
 - **Input**:
   ```
   POST /oauth/device/code
@@ -99,7 +104,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-003: User code format is XXXX-XXXX
 - **Category**: Nominal
 - **Standard**: RFC 8628 Section 6.1 (user-friendly codes)
-- **Preconditions**: Device authorization issued
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device authorization issued
 - **Input**: Inspect `user_code` from TC-OAUTH-DC-001 response
 - **Expected Output**:
   - `user_code` matches pattern `[A-Z0-9]{4}-[A-Z0-9]{4}` (8 characters + dash)
@@ -108,7 +113,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-004: Poll with pending authorization (authorization_pending)
 - **Category**: Nominal
 - **Standard**: RFC 8628 Section 3.5
-- **Preconditions**: Device code issued, user has NOT yet authorized
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued, user has NOT yet authorized
 - **Input**:
   ```
   POST /oauth/token
@@ -130,7 +135,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-005: Poll too frequently (slow_down)
 - **Category**: Nominal
 - **Standard**: RFC 8628 Section 3.5
-- **Preconditions**: Device code issued with `interval=5`, client polls faster
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued with `interval=5`, client polls faster
 - **Input**: Send two poll requests within 5 seconds
 - **Expected Output** (second request):
   - Status: `400 Bad Request`
@@ -146,7 +151,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-006: User approves device -- token issued
 - **Category**: Nominal
 - **Standard**: RFC 8628 Section 3.5 (successful response)
-- **Preconditions**: Device code issued, user approves via `/device/authorize`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued, user approves via `/device/authorize`
 - **Input**:
   1. User approves: `POST /device/authorize` with `action=approve&user_code={user_code}`
   2. Client polls: `POST /oauth/token` with `device_code={device_code}`
@@ -166,7 +171,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-007: User denies device authorization
 - **Category**: Nominal
 - **Standard**: RFC 8628 Section 3.5 (access_denied)
-- **Preconditions**: Device code issued, user denies
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued, user denies
 - **Input**:
   1. User denies: `POST /device/authorize` with `action=deny&user_code={user_code}`
   2. Client polls: `POST /oauth/token` with `device_code={device_code}`
@@ -183,7 +188,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-008: Device code expires
 - **Category**: Nominal
 - **Standard**: RFC 8628 Section 3.5 (expired_token)
-- **Preconditions**: Device code issued with `expires_in=600`, wait until expired
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued with `expires_in=600`, wait until expired
 - **Input**: Poll after expiration:
   ```
   grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code={expired_device_code}&client_id={client_id}
@@ -201,7 +206,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-009: Verification page renders correctly
 - **Category**: Nominal
 - **Standard**: RFC 8628 Section 3.3 (end-user verification)
-- **Preconditions**: Device code issued
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued
 - **Input**:
   ```
   GET /device
@@ -216,7 +221,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-010: Verification page with pre-filled code
 - **Category**: Nominal
 - **Standard**: RFC 8628 Section 3.3.1 (verification_uri_complete)
-- **Preconditions**: Device code issued with `verification_uri_complete`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued with `verification_uri_complete`
 - **Input**:
   ```
   GET /device?code=ABCD-1234
@@ -228,7 +233,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-011: Verify valid user code
 - **Category**: Nominal
 - **Standard**: RFC 8628 Section 3.3
-- **Preconditions**: Device code issued with valid user_code, user authenticated
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued with valid user_code, user authenticated
 - **Input**:
   ```
   POST /device/verify
@@ -245,7 +250,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-012: Device login flow (F112) -- unauthenticated user
 - **Category**: Nominal
 - **Standard**: F112 (platform-specific login integration)
-- **Preconditions**: Device code issued, user NOT authenticated
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued, user NOT authenticated
 - **Input**:
   ```
   POST /device/verify
@@ -262,7 +267,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-013: Device login with credentials (F112)
 - **Category**: Nominal
 - **Standard**: F112 (device flow login)
-- **Preconditions**: Device code issued, user not yet authenticated
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued, user not yet authenticated
 - **Input**:
   ```
   POST /device/login
@@ -279,7 +284,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-014: Device MFA verification (F112)
 - **Category**: Nominal
 - **Standard**: F112 (device flow MFA)
-- **Preconditions**: Login returned `mfa_required=true` with `mfa_session_id`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Login returned `mfa_required=true` with `mfa_session_id`
 - **Input**:
   ```
   POST /device/login/mfa
@@ -295,7 +300,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-015: Token response includes refresh_token for device flow
 - **Category**: Nominal
 - **Standard**: RFC 8628 Section 3.5 (token response)
-- **Preconditions**: User approved device code
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. User approved device code
 - **Input**: Poll for tokens after approval
 - **Expected Output**:
   - Status: `200 OK`
@@ -309,7 +314,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-016: Invalid user code on verify
 - **Category**: Edge Case
 - **Standard**: RFC 8628 Section 3.3
-- **Preconditions**: No matching device code
+- **Preconditions**: Fixtures: `TEST_TENANT`. No matching device code
 - **Input**:
   ```
   POST /device/verify
@@ -322,7 +327,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-017: Poll with non-existent device_code
 - **Category**: Edge Case
 - **Standard**: RFC 8628 Section 3.5
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code=non-existent-code&client_id={client_id}
@@ -334,7 +339,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-018: Poll with mismatched client_id
 - **Category**: Edge Case
 - **Standard**: RFC 8628 Section 3.4 (client_id binding)
-- **Preconditions**: Device code issued for `client_A`, polling with `client_B`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued for `client_A`, polling with `client_B`
 - **Input**:
   ```
   grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code={device_code}&client_id={client_B_id}
@@ -346,7 +351,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-019: Missing device_code in token request
 - **Category**: Edge Case
 - **Standard**: RFC 8628 Section 3.4
-- **Preconditions**: Valid client_id
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client_id
 - **Input**:
   ```
   grant_type=urn:ietf:params:oauth:grant-type:device_code&client_id={client_id}
@@ -358,7 +363,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-020: Missing client_id in device authorization request
 - **Category**: Edge Case
 - **Standard**: RFC 8628 Section 3.1 (REQUIRED)
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   POST /oauth/device/code
@@ -373,7 +378,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-021: Client without device_code grant type
 - **Category**: Edge Case
 - **Standard**: RFC 8628 Section 3.1
-- **Preconditions**: Confidential client with `grant_types: ["client_credentials"]`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Confidential client with `grant_types: ["client_credentials"]`
 - **Input**:
   ```
   POST /oauth/device/code
@@ -386,7 +391,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-022: Invalid scope in device authorization
 - **Category**: Edge Case
 - **Standard**: RFC 8628 Section 3.1 (scope validation)
-- **Preconditions**: Client has scopes `["read", "write"]`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Client has scopes `["read", "write"]`
 - **Input**:
   ```
   POST /oauth/device/code
@@ -399,7 +404,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-023: Poll after code already exchanged (replay)
 - **Category**: Edge Case
 - **Standard**: RFC 8628 Section 3.5
-- **Preconditions**: Device code was already successfully exchanged for tokens
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code was already successfully exchanged for tokens
 - **Input**: Poll again with same device_code
 - **Expected Output**:
   - Status: `400 Bad Request`
@@ -408,7 +413,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-024: Missing X-Tenant-ID on device authorization
 - **Category**: Edge Case
 - **Standard**: Platform-specific (multi-tenant)
-- **Preconditions**: Valid client_id
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid client_id
 - **Input**:
   ```
   POST /oauth/device/code
@@ -422,7 +427,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-025: CSRF validation failure on verify
 - **Category**: Edge Case
 - **Standard**: OWASP CSRF Prevention
-- **Preconditions**: Device code issued
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued
 - **Input**:
   ```
   POST /device/verify
@@ -436,7 +441,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-026: CSRF validation failure on authorize
 - **Category**: Edge Case
 - **Standard**: OWASP CSRF Prevention
-- **Preconditions**: User verified code, CSRF token mismatch on approve
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. User verified code, CSRF token mismatch on approve
 - **Input**:
   ```
   POST /device/authorize
@@ -450,7 +455,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-027: Invalid action value on authorize
 - **Category**: Edge Case
 - **Standard**: Platform-specific
-- **Preconditions**: Valid user code and CSRF
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Valid user code and CSRF
 - **Input**:
   ```
   POST /device/authorize
@@ -463,7 +468,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-028: Device login with invalid credentials (F112)
 - **Category**: Edge Case
 - **Standard**: F112 (device flow login)
-- **Preconditions**: Device code issued
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued
 - **Input**:
   ```
   POST /device/login
@@ -477,7 +482,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-029: Device login with locked account (F112)
 - **Category**: Edge Case
 - **Standard**: F112 (device flow login)
-- **Preconditions**: User account is locked
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. User account is locked
 - **Input**:
   ```
   POST /device/login
@@ -490,7 +495,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-030: Concurrent device codes for same client
 - **Category**: Edge Case
 - **Standard**: RFC 8628 Section 3.1
-- **Preconditions**: Same client requests multiple device codes
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Same client requests multiple device codes
 - **Input**: Issue 3 device codes for the same `client_id`
 - **Expected Output**:
   - All 3 requests succeed with `200 OK`
@@ -504,7 +509,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-031: Device code brute-force resistance
 - **Category**: Security
 - **Standard**: RFC 8628 Section 5.1 (user code entropy)
-- **Preconditions**: Device code issued
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued
 - **Input**: Attempt to guess `user_code` with 1000 random codes via `POST /device/verify`
 - **Expected Output**:
   - All attempts fail (statistically negligible collision probability)
@@ -514,7 +519,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-032: Device code not leaked in verification_uri
 - **Category**: Security
 - **Standard**: RFC 8628 Section 5.4
-- **Preconditions**: Device authorization response
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device authorization response
 - **Input**: Inspect `verification_uri` and `verification_uri_complete`
 - **Expected Output**:
   - `verification_uri` does NOT contain `device_code`
@@ -524,7 +529,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-033: Cross-tenant device code isolation
 - **Category**: Security
 - **Standard**: Platform-specific (multi-tenancy)
-- **Preconditions**: Device code issued in `TENANT_A`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code issued in `TENANT_A`
 - **Input**: Attempt to verify user_code via `POST /device/verify` with `X-Tenant-ID: {TENANT_B}`
 - **Expected Output**:
   - HTML shows "Invalid or expired code"
@@ -533,7 +538,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-034: Authorize without authentication
 - **Category**: Security
 - **Standard**: RFC 8628 Section 3.3 (user identification)
-- **Preconditions**: Valid user_code verified, but no session cookie
+- **Preconditions**: Fixtures: `TEST_TENANT`. Valid user_code verified, but no session cookie
 - **Input**:
   ```
   POST /device/authorize
@@ -547,7 +552,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-035: Storm-2372 remediation -- IP mismatch warning (F117)
 - **Category**: Security
 - **Standard**: F117 (Storm-2372 mitigation)
-- **Preconditions**: Device code requested from IP `10.0.0.1`, user approving from IP `192.168.1.1`
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code requested from IP `10.0.0.1`, user approving from IP `192.168.1.1`
 - **Input**: User verifies code and sees approval page
 - **Expected Output**:
   - Approval page shows info banner about different origin IP
@@ -557,7 +562,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-036: Storm-2372 remediation -- stale code warning (F117)
 - **Category**: Security
 - **Standard**: F117 (Storm-2372 mitigation)
-- **Preconditions**: Device code older than 5 minutes
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code older than 5 minutes
 - **Input**: User verifies the stale code
 - **Expected Output**:
   - Approval page shows warning banner about code age
@@ -567,7 +572,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-037: Storm-2372 remediation -- unknown application warning (F117)
 - **Category**: Security
 - **Standard**: F117 (Storm-2372 mitigation)
-- **Preconditions**: Client has no `client_name` in database (or name is null)
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Client has no `client_name` in database (or name is null)
 - **Input**: User verifies user code for unknown application
 - **Expected Output**:
   - Approval page shows warning: "Unknown Application"
@@ -577,7 +582,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-038: Device code single-use enforcement
 - **Category**: Security
 - **Standard**: RFC 8628 Section 5.3 (one-time use)
-- **Preconditions**: Device code already exchanged for tokens
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device code already exchanged for tokens
 - **Input**: Attempt to exchange the same device_code again
 - **Expected Output**:
   - Status: `400 Bad Request`
@@ -587,7 +592,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-039: XSS protection in HTML pages
 - **Category**: Security
 - **Standard**: OWASP XSS Prevention
-- **Preconditions**: Device verification flow
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Device verification flow
 - **Input**:
   ```
   GET /device?code=<script>alert('xss')</script>
@@ -600,7 +605,7 @@ Created via `POST /admin/oauth/clients`:
 ### TC-OAUTH-DC-040: Email confirmation token validation (F117)
 - **Category**: Security
 - **Standard**: F117 (Storm-2372 email confirmation)
-- **Preconditions**: Confirmation email sent with token
+- **Preconditions**: Fixtures: `OAUTH_CC_CLIENT`, `TEST_TENANT`. Confirmation email sent with token
 - **Input**:
   ```
   GET /device/confirm/{valid_token}

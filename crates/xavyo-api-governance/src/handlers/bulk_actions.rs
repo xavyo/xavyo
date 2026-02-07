@@ -108,6 +108,9 @@ pub async fn create_bulk_action(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     // Validate request
@@ -151,6 +154,9 @@ pub async fn preview_bulk_action(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let preview = state
         .bulk_action_service
@@ -222,6 +228,9 @@ pub async fn execute_bulk_action(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     let result = state
@@ -261,6 +270,9 @@ pub async fn cancel_bulk_action(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let result = state
         .bulk_action_service
@@ -298,6 +310,9 @@ pub async fn delete_bulk_action(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     state
         .bulk_action_service

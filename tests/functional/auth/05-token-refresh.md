@@ -6,6 +6,13 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `USER_JWT`, `TEST_TENANT`
+- **Special Setup**: Valid refresh token obtained from a prior login
+
 ## Nominal Cases
 
 ### TC-AUTH-REFRESH-001: Refresh access token with valid refresh token
@@ -53,14 +60,14 @@
 
 ### TC-AUTH-REFRESH-011: Revoked refresh token
 - **Category**: Edge Case
-- **Preconditions**: Session revoked via logout
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Session revoked via logout
 - **Input**: Use the revoked refresh token
 - **Expected Output**: Status 401
 
 ### TC-AUTH-REFRESH-012: Reuse of rotated refresh token (replay detection)
 - **Category**: Edge Case / Security
 - **Standard**: OWASP ASVS 3.5.2
-- **Preconditions**: Refresh token rotated (new one issued)
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Refresh token rotated (new one issued)
 - **Input**: Use the old refresh token
 - **Expected Output**: Status 401, AND all sessions for this user should be revoked (theft detection)
 
@@ -76,7 +83,7 @@
 
 ### TC-AUTH-REFRESH-015: Refresh for suspended user
 - **Category**: Edge Case
-- **Preconditions**: User suspended after token was issued
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. User suspended after token was issued
 - **Input**: Valid refresh token for suspended user
 - **Expected Output**: Status 401 (no new tokens issued)
 

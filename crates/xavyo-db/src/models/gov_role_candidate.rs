@@ -104,7 +104,11 @@ impl GovRoleCandidate {
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_role_candidates
+            SELECT id, tenant_id, job_id, proposed_name,
+                confidence_score::float8 as confidence_score,
+                member_count, entitlement_ids, user_ids,
+                promotion_status, promoted_role_id, dismissed_reason, created_at
+            FROM gov_role_candidates
             WHERE id = $1 AND tenant_id = $2
             ",
         )
@@ -125,7 +129,11 @@ impl GovRoleCandidate {
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
             r"
-            SELECT * FROM gov_role_candidates
+            SELECT id, tenant_id, job_id, proposed_name,
+                confidence_score::float8 as confidence_score,
+                member_count, entitlement_ids, user_ids,
+                promotion_status, promoted_role_id, dismissed_reason, created_at
+            FROM gov_role_candidates
             WHERE tenant_id = $1 AND job_id = $2
             ",
         );
@@ -225,7 +233,10 @@ impl GovRoleCandidate {
                 member_count, entitlement_ids, user_ids
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING *
+            RETURNING id, tenant_id, job_id, proposed_name,
+                confidence_score::float8 as confidence_score,
+                member_count, entitlement_ids, user_ids,
+                promotion_status, promoted_role_id, dismissed_reason, created_at
             ",
         )
         .bind(tenant_id)
@@ -265,7 +276,10 @@ impl GovRoleCandidate {
             UPDATE gov_role_candidates
             SET promotion_status = 'promoted', promoted_role_id = $3
             WHERE id = $1 AND tenant_id = $2 AND promotion_status = 'pending'
-            RETURNING *
+            RETURNING id, tenant_id, job_id, proposed_name,
+                confidence_score::float8 as confidence_score,
+                member_count, entitlement_ids, user_ids,
+                promotion_status, promoted_role_id, dismissed_reason, created_at
             ",
         )
         .bind(id)
@@ -287,7 +301,10 @@ impl GovRoleCandidate {
             UPDATE gov_role_candidates
             SET promotion_status = 'dismissed', dismissed_reason = $3
             WHERE id = $1 AND tenant_id = $2 AND promotion_status = 'pending'
-            RETURNING *
+            RETURNING id, tenant_id, job_id, proposed_name,
+                confidence_score::float8 as confidence_score,
+                member_count, entitlement_ids, user_ids,
+                promotion_status, promoted_role_id, dismissed_reason, created_at
             ",
         )
         .bind(id)

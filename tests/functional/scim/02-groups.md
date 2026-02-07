@@ -7,12 +7,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `SCIM_TOKEN`, `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: SCIM bearer token provisioned for the test tenant; test users for membership operations
+
+---
+
 ## Nominal Cases
 
 ### TC-SCIM-GROUP-001: Create group with display name only
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.3
-- **Preconditions**: Valid SCIM Bearer token for tenant; no group named "Engineering"
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Valid SCIM Bearer token for tenant; no group named "Engineering"
 - **Input**:
   ```json
   POST /scim/v2/Groups
@@ -54,7 +63,7 @@
 ### TC-SCIM-GROUP-002: Create group with members
 - **Category**: Nominal
 - **Standard**: RFC 7643 Section 4.2
-- **Preconditions**: Users `<user1-id>` and `<user2-id>` exist in tenant
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Users `<user1-id>` and `<user2-id>` exist in tenant
 - **Input**:
   ```json
   POST /scim/v2/Groups
@@ -78,7 +87,7 @@
 ### TC-SCIM-GROUP-003: Create group with xavyo hierarchy extension
 - **Category**: Nominal
 - **Standard**: RFC 7643 Section 3.3 (extensions)
-- **Preconditions**: Parent group with externalId "dept-root" exists
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Parent group with externalId "dept-root" exists
 - **Input**:
   ```json
   POST /scim/v2/Groups
@@ -105,7 +114,7 @@
 ### TC-SCIM-GROUP-004: Get group by ID
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.1
-- **Preconditions**: Group `<group-id>` exists in tenant with 2 members
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group `<group-id>` exists in tenant with 2 members
 - **Input**:
   ```
   GET /scim/v2/Groups/<group-id>
@@ -142,7 +151,7 @@
 ### TC-SCIM-GROUP-005: List groups with default pagination
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2
-- **Preconditions**: Multiple groups exist in tenant
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Multiple groups exist in tenant
 - **Input**:
   ```
   GET /scim/v2/Groups
@@ -163,7 +172,7 @@
 ### TC-SCIM-GROUP-006: Replace group (PUT) with updated members
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.5.1
-- **Preconditions**: Group exists with members [user1]; user2 and user3 also exist
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group exists with members [user1]; user2 and user3 also exist
 - **Input**:
   ```json
   PUT /scim/v2/Groups/<group-id>
@@ -186,7 +195,7 @@
 ### TC-SCIM-GROUP-007: Patch group - add member
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.5.2
-- **Preconditions**: Group exists; user `<user-id>` exists and is not a member
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group exists; user `<user-id>` exists and is not a member
 - **Input**:
   ```json
   PATCH /scim/v2/Groups/<group-id>
@@ -210,7 +219,7 @@
 ### TC-SCIM-GROUP-008: Patch group - remove specific member
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.5.2
-- **Preconditions**: Group has member `<user-id>`
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group has member `<user-id>`
 - **Input**:
   ```json
   PATCH /scim/v2/Groups/<group-id>
@@ -252,7 +261,7 @@
 ### TC-SCIM-GROUP-010: Delete group
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.6
-- **Preconditions**: Group exists with no child groups
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group exists with no child groups
 - **Input**:
   ```
   DELETE /scim/v2/Groups/<group-id>
@@ -271,7 +280,7 @@
 ### TC-SCIM-GROUP-020: Create group with duplicate displayName
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.3 (uniqueness)
-- **Preconditions**: Group "Engineering" already exists
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group "Engineering" already exists
 - **Input**:
   ```json
   POST /scim/v2/Groups
@@ -305,7 +314,7 @@
 
 ### TC-SCIM-GROUP-022: Replace group causing displayName conflict
 - **Category**: Edge Case
-- **Preconditions**: Group A is "Alpha", Group B is "Beta"
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group A is "Alpha", Group B is "Beta"
 - **Input**:
   ```json
   PUT /scim/v2/Groups/<group-A-id>
@@ -322,7 +331,7 @@
 
 ### TC-SCIM-GROUP-023: Delete group with child groups
 - **Category**: Edge Case
-- **Preconditions**: Group has child groups in hierarchy (F071)
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group has child groups in hierarchy (F071)
 - **Input**:
   ```
   DELETE /scim/v2/Groups/<parent-group-id>
@@ -373,13 +382,13 @@
 
 ### TC-SCIM-GROUP-026: Create group with all valid groupType values
 - **Category**: Edge Case
-- **Preconditions**: No groups with the test names exist
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. No groups with the test names exist
 - **Input**: Create groups with each groupType: `organizational_unit`, `department`, `team`, `security_group`, `distribution_list`, `custom`
 - **Expected Output**: All return `201 Created`
 
 ### TC-SCIM-GROUP-027: Create group with parent that exceeds max depth (10)
 - **Category**: Edge Case
-- **Preconditions**: Hierarchy chain of 9 levels already exists
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Hierarchy chain of 9 levels already exists
 - **Input**: Create group at level 11 (child of level 10 group)
 - **Expected Output**:
   ```
@@ -389,7 +398,7 @@
 
 ### TC-SCIM-GROUP-028: Patch group - replace all members
 - **Category**: Edge Case
-- **Preconditions**: Group has 3 existing members
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group has 3 existing members
 - **Input**:
   ```json
   PATCH /scim/v2/Groups/<group-id>
@@ -449,7 +458,7 @@
 
 ### TC-SCIM-GROUP-031: Move group creating hierarchy cycle
 - **Category**: Edge Case
-- **Preconditions**: Group A is parent of Group B; Group B is parent of Group C
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group A is parent of Group B; Group B is parent of Group C
 - **Input**: Replace Group A with parentExternalId pointing to Group C
 - **Expected Output**:
   ```
@@ -474,7 +483,7 @@
 
 ### TC-SCIM-GROUP-033: List groups with empty result set
 - **Category**: Edge Case
-- **Preconditions**: Tenant has no groups
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Tenant has no groups
 - **Input**:
   ```
   GET /scim/v2/Groups
@@ -507,7 +516,7 @@
 
 ### TC-SCIM-GROUP-050: Cross-tenant group access
 - **Category**: Security
-- **Preconditions**: Group belongs to Tenant A; Bearer token belongs to Tenant B
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group belongs to Tenant A; Bearer token belongs to Tenant B
 - **Input**:
   ```
   GET /scim/v2/Groups/<tenant-A-group-id>
@@ -521,7 +530,7 @@
 
 ### TC-SCIM-GROUP-051: Cross-tenant group listing
 - **Category**: Security
-- **Preconditions**: Tenant A has 5 groups; Tenant B has 3 groups
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Tenant A has 5 groups; Tenant B has 3 groups
 - **Input**:
   ```
   GET /scim/v2/Groups
@@ -531,7 +540,7 @@
 
 ### TC-SCIM-GROUP-052: Cross-tenant member addition
 - **Category**: Security
-- **Preconditions**: Group belongs to Tenant A; user belongs to Tenant B
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group belongs to Tenant A; user belongs to Tenant B
 - **Input**: PATCH to add Tenant B user as member of Tenant A group
 - **Expected Output**: Membership not created (user not found in tenant scope)
 
@@ -576,7 +585,7 @@
 ### TC-SCIM-GROUP-061: Members include $ref URI
 - **Category**: Compliance
 - **Standard**: RFC 7643 Section 4.2
-- **Preconditions**: Group has members
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Group has members
 - **Input**: `GET /scim/v2/Groups/<group-id>`
 - **Expected Output**: Each member has `"$ref": "https://<host>/scim/v2/Users/<user-id>"`
 

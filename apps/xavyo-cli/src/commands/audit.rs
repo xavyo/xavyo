@@ -1,19 +1,15 @@
 //! Audit log command implementations
 //!
-//! This module implements the `xavyo audit` command for viewing and
-//! streaming audit logs with filtering, pagination, and export support.
+//! This module implements the `xavyo audit` command for viewing login history.
 
 use crate::api::ApiClient;
 use crate::config::{Config, ConfigPaths};
 use crate::error::{CliError, CliResult};
-use crate::models::audit::{AuditEntry, AuditFilter, AuditListResponse};
+use crate::models::audit::{AuditFilter, AuditListResponse};
 use crate::verbose;
 use chrono::{DateTime, NaiveDate, Utc};
 use clap::{Args, Subcommand, ValueEnum};
 use csv::Writer as CsvWriter;
-use futures_util::StreamExt;
-use reqwest_eventsource::{Event, EventSource};
-use std::io::Write;
 use std::time::Instant;
 
 // ============================================================================
@@ -30,25 +26,15 @@ pub struct AuditArgs {
 /// Available audit subcommands
 #[derive(Subcommand, Debug)]
 pub enum AuditCommands {
-    /// List audit log entries with optional filtering
+    /// List login history entries with optional filtering
     ///
     /// Examples:
     ///   xavyo audit list
     ///   xavyo audit list --limit 100
     ///   xavyo audit list --user alice@example.com
     ///   xavyo audit list --since 2026-02-01 --until 2026-02-04
-    ///   xavyo audit list --action login
     ///   xavyo audit list --output json
     List(ListArgs),
-
-    /// Stream audit log events in real-time
-    ///
-    /// Press Ctrl+C to stop streaming.
-    ///
-    /// Examples:
-    ///   xavyo audit tail
-    ///   xavyo audit tail --action login
-    Tail(TailArgs),
 }
 
 /// Arguments for the list command
@@ -74,21 +60,9 @@ pub struct ListArgs {
     #[arg(long)]
     pub until: Option<String>,
 
-    /// Filter by action type (login, logout, create, read, update, delete, etc.)
-    #[arg(long, short = 'a')]
-    pub action: Option<String>,
-
     /// Output format: table (default), json, or csv
     #[arg(long, value_enum, default_value = "table")]
     pub output: OutputFormat,
-}
-
-/// Arguments for the tail command
-#[derive(Args, Debug)]
-pub struct TailArgs {
-    /// Filter by action type (login, logout, create, read, update, delete, etc.)
-    #[arg(long, short = 'a')]
-    pub action: Option<String>,
 }
 
 /// Output format options
@@ -111,7 +85,6 @@ pub enum OutputFormat {
 pub async fn execute(args: AuditArgs) -> CliResult<()> {
     match args.command {
         AuditCommands::List(list_args) => execute_list(list_args).await,
-        AuditCommands::Tail(tail_args) => execute_tail(tail_args).await,
     }
 }
 
@@ -153,132 +126,27 @@ async fn execute_list(args: ListArgs) -> CliResult<()> {
     if let Some(u) = until {
         filter = filter.with_until(u);
     }
-    if let Some(ref action) = args.action {
-        filter = filter.with_action(action.clone());
-    }
 
     verbose!("Authenticating with API...");
     let client = ApiClient::new(config, paths)?;
 
-    verbose!("Fetching audit logs...");
+    verbose!("Fetching login history...");
     let start = Instant::now();
     let response = client.list_audit_logs(&filter).await?;
     let elapsed = start.elapsed();
 
     verbose!(
         "Retrieved {} entries in {:.2}s",
-        response.entries.len(),
+        response.items.len(),
         elapsed.as_secs_f64()
     );
 
     // Output based on format
     match args.output {
-        OutputFormat::Table => format_table(&response, &args),
+        OutputFormat::Table => format_table(&response),
         OutputFormat::Json => format_json(&response)?,
         OutputFormat::Csv => format_csv(&response)?,
     }
-
-    Ok(())
-}
-
-/// Execute the tail command (real-time streaming)
-async fn execute_tail(args: TailArgs) -> CliResult<()> {
-    verbose!("Loading configuration...");
-    let paths = ConfigPaths::new()?;
-    let config = Config::load(&paths)?;
-
-    verbose!("Authenticating with API...");
-    let client = ApiClient::new(config, paths)?;
-
-    // Build the stream URL
-    let mut url = format!("{}/audit/stream", client.config().api_url);
-    if let Some(ref action) = args.action {
-        url = format!("{}?action={}", url, action);
-    }
-
-    verbose!("Connecting to audit stream...");
-    let token = client.get_access_token().await?;
-
-    // Create SSE event source
-    let req_client = reqwest::Client::new();
-    let request = req_client
-        .get(&url)
-        .header("Authorization", format!("Bearer {}", token))
-        .header("Accept", "text/event-stream");
-
-    let mut es = EventSource::new(request).map_err(|e| CliError::Network(e.to_string()))?;
-
-    println!("Streaming audit events (press Ctrl+C to stop)...");
-    if let Some(ref action) = args.action {
-        println!("Filter: action={}", action);
-    }
-    println!();
-
-    // Set up Ctrl+C handler
-    let (shutdown_tx, mut shutdown_rx) = tokio::sync::mpsc::channel::<()>(1);
-
-    // Spawn the signal handler
-    let shutdown_tx_clone = shutdown_tx.clone();
-    tokio::spawn(async move {
-        if tokio::signal::ctrl_c().await.is_ok() {
-            let _ = shutdown_tx_clone.send(()).await;
-        }
-    });
-
-    let start_time = Instant::now();
-    let mut event_count: u64 = 0;
-
-    // Main event loop
-    loop {
-        tokio::select! {
-            _ = shutdown_rx.recv() => {
-                // Ctrl+C received
-                break;
-            }
-            event = es.next() => {
-                match event {
-                    Some(Ok(Event::Open)) => {
-                        verbose!("Connected to stream");
-                    }
-                    Some(Ok(Event::Message(msg))) => {
-                        // Parse and display the audit entry
-                        match serde_json::from_str::<AuditEntry>(&msg.data) {
-                            Ok(entry) => {
-                                event_count += 1;
-                                print_stream_entry(&entry);
-                            }
-                            Err(e) => {
-                                verbose!("Failed to parse event: {}", e);
-                            }
-                        }
-                    }
-                    Some(Err(e)) => {
-                        // Handle stream errors
-                        let error_msg = format!("{}", e);
-                        if error_msg.contains("401") || error_msg.contains("403") {
-                            return Err(CliError::NotAuthenticated);
-                        }
-                        return Err(CliError::Network(error_msg));
-                    }
-                    None => {
-                        // Stream ended
-                        println!();
-                        println!("Stream ended.");
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    // Print summary
-    let elapsed = start_time.elapsed();
-    println!();
-    println!(
-        "Received {} events in {:.0} seconds. Exiting.",
-        event_count,
-        elapsed.as_secs_f64()
-    );
 
     Ok(())
 }
@@ -288,10 +156,6 @@ async fn execute_tail(args: TailArgs) -> CliResult<()> {
 // ============================================================================
 
 /// Parse a date string into a DateTime<Utc>
-///
-/// Supports:
-/// - YYYY-MM-DD (assumes start of day UTC)
-/// - Full ISO 8601 datetime
 fn parse_date(s: &str) -> CliResult<DateTime<Utc>> {
     // Try parsing as full ISO 8601 datetime
     if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
@@ -316,30 +180,31 @@ fn parse_date(s: &str) -> CliResult<DateTime<Utc>> {
 // Output Formatting
 // ============================================================================
 
-/// Format and print audit entries as a table
-fn format_table(response: &AuditListResponse, args: &ListArgs) {
-    if response.entries.is_empty() {
-        println!("No audit log entries found.");
+/// Format and print login history entries as a table
+fn format_table(response: &AuditListResponse) {
+    if response.items.is_empty() {
+        println!("No login history entries found.");
         return;
     }
 
     // Print header
     println!(
-        "{:<22} {:<26} {:<18} {:<20}",
-        "TIMESTAMP", "USER", "ACTION", "RESOURCE"
+        "{:<22} {:<28} {:<10} {:<12} {:<16}",
+        "TIMESTAMP", "EMAIL", "SUCCESS", "METHOD", "IP ADDRESS"
     );
     println!("{}", "-".repeat(90));
 
     // Print each entry
-    for entry in &response.entries {
-        let timestamp = entry.timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
-        let user = truncate_string(&entry.user.email, 24);
-        let action = entry.action.to_string();
-        let resource = format_resource(entry);
+    for entry in &response.items {
+        let timestamp = entry.created_at.format("%Y-%m-%d %H:%M:%S").to_string();
+        let email = truncate_string(entry.email.as_deref().unwrap_or("-"), 26);
+        let success = if entry.success { "yes" } else { "no" };
+        let method = entry.auth_method.as_deref().unwrap_or("-");
+        let ip = entry.ip_address.as_deref().unwrap_or("-");
 
         println!(
-            "{:<22} {:<26} {:<18} {:<20}",
-            timestamp, user, action, resource
+            "{:<22} {:<28} {:<10} {:<12} {:<16}",
+            timestamp, email, success, method, ip
         );
     }
 
@@ -347,24 +212,23 @@ fn format_table(response: &AuditListResponse, args: &ListArgs) {
     println!();
     println!(
         "Showing {} of {} total entries.",
-        response.entries.len(),
+        response.items.len(),
         response.total
     );
 
-    if response.has_more {
-        let next_offset = args.offset + args.limit;
-        println!("Use --offset {} to see more.", next_offset);
+    if response.next_cursor.is_some() {
+        println!("More entries available.");
     }
 }
 
-/// Format and print audit entries as JSON
+/// Format and print entries as JSON
 fn format_json(response: &AuditListResponse) -> CliResult<()> {
-    let json = serde_json::to_string_pretty(&response.entries)?;
+    let json = serde_json::to_string_pretty(&response.items)?;
     println!("{}", json);
     Ok(())
 }
 
-/// Format and print audit entries as CSV
+/// Format and print entries as CSV
 fn format_csv(response: &AuditListResponse) -> CliResult<()> {
     let mut wtr = CsvWriter::from_writer(std::io::stdout());
 
@@ -372,52 +236,32 @@ fn format_csv(response: &AuditListResponse) -> CliResult<()> {
     wtr.write_record([
         "id",
         "timestamp",
-        "user_email",
-        "action",
-        "resource_type",
-        "resource_id",
+        "email",
+        "success",
+        "auth_method",
         "ip_address",
+        "is_new_device",
+        "is_new_location",
     ])
     .map_err(|e| CliError::Io(e.to_string()))?;
 
     // Write data rows
-    for entry in &response.entries {
+    for entry in &response.items {
         wtr.write_record([
             &entry.id.to_string(),
-            &entry.timestamp.to_rfc3339(),
-            &entry.user.email,
-            &entry.action.to_string(),
-            &entry.resource_type,
-            &entry
-                .resource_id
-                .map(|id| id.to_string())
-                .unwrap_or_default(),
+            &entry.created_at.to_rfc3339(),
+            entry.email.as_deref().unwrap_or(""),
+            &entry.success.to_string(),
+            entry.auth_method.as_deref().unwrap_or(""),
             entry.ip_address.as_deref().unwrap_or(""),
+            &entry.is_new_device.to_string(),
+            &entry.is_new_location.to_string(),
         ])
         .map_err(|e| CliError::Io(e.to_string()))?;
     }
 
     wtr.flush().map_err(|e| CliError::Io(e.to_string()))?;
     Ok(())
-}
-
-/// Print a streaming entry in real-time
-fn print_stream_entry(entry: &AuditEntry) {
-    let timestamp = entry.timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
-    let user = truncate_string(&entry.user.email, 24);
-    let action = entry.action.to_string();
-    let resource = format_resource(entry);
-
-    println!("[{}] {} {} {}", timestamp, user, action, resource);
-    std::io::stdout().flush().ok();
-}
-
-/// Format resource information for display
-fn format_resource(entry: &AuditEntry) -> String {
-    match &entry.resource_id {
-        Some(id) => format!("{}/{}", entry.resource_type, truncate_uuid(id)),
-        None => entry.resource_type.clone(),
-    }
 }
 
 /// Truncate a string to fit in a column
@@ -427,11 +271,6 @@ fn truncate_string(s: &str, max_len: usize) -> String {
     } else {
         format!("{}...", &s[..max_len - 3])
     }
-}
-
-/// Truncate a UUID for display (first 8 chars)
-fn truncate_uuid(id: &uuid::Uuid) -> String {
-    id.to_string()[..8].to_string()
 }
 
 // ============================================================================
@@ -473,76 +312,8 @@ mod tests {
     }
 
     #[test]
-    fn test_truncate_uuid() {
-        let id = uuid::Uuid::parse_str("a1b2c3d4-e5f6-7890-abcd-ef1234567890").unwrap();
-        assert_eq!(truncate_uuid(&id), "a1b2c3d4");
-    }
-
-    #[test]
     fn test_output_format_default() {
         let format = OutputFormat::default();
         assert!(matches!(format, OutputFormat::Table));
-    }
-
-    #[test]
-    fn test_format_resource_with_id() {
-        let entry = AuditEntry {
-            id: uuid::Uuid::new_v4(),
-            timestamp: Utc::now(),
-            user: crate::models::audit::AuditUser {
-                id: uuid::Uuid::new_v4(),
-                email: "test@example.com".to_string(),
-                display_name: None,
-            },
-            action: crate::models::audit::AuditAction::Create,
-            resource_type: "agent".to_string(),
-            resource_id: Some(
-                uuid::Uuid::parse_str("a1b2c3d4-e5f6-7890-abcd-ef1234567890").unwrap(),
-            ),
-            resource_name: None,
-            ip_address: None,
-            user_agent: None,
-            metadata: None,
-        };
-
-        let result = format_resource(&entry);
-        assert!(result.starts_with("agent/a1b2c3d4"));
-    }
-
-    #[test]
-    fn test_format_resource_without_id() {
-        let entry = AuditEntry {
-            id: uuid::Uuid::new_v4(),
-            timestamp: Utc::now(),
-            user: crate::models::audit::AuditUser {
-                id: uuid::Uuid::new_v4(),
-                email: "test@example.com".to_string(),
-                display_name: None,
-            },
-            action: crate::models::audit::AuditAction::Login,
-            resource_type: "session".to_string(),
-            resource_id: None,
-            resource_name: None,
-            ip_address: None,
-            user_agent: None,
-            metadata: None,
-        };
-
-        let result = format_resource(&entry);
-        assert_eq!(result, "session");
-    }
-
-    #[test]
-    fn test_date_range_validation() {
-        // This is tested implicitly through execute_list
-        // but we can test the parse_date function
-        let since = parse_date("2026-02-01").unwrap();
-        let until = parse_date("2026-02-04").unwrap();
-        assert!(since < until);
-
-        // Reversed should fail in execute_list
-        let since2 = parse_date("2026-02-05").unwrap();
-        let until2 = parse_date("2026-02-01").unwrap();
-        assert!(since2 > until2); // This would trigger InvalidDateRange
     }
 }

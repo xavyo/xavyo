@@ -115,7 +115,12 @@ impl GovExcessivePrivilege {
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_excessive_privileges
+            SELECT id, tenant_id, job_id, user_id, peer_group_id,
+                deviation_percent::float8 as deviation_percent,
+                excess_entitlements,
+                peer_average::float8 as peer_average,
+                user_count, status, reviewed_at, reviewed_by, notes, created_at
+            FROM gov_excessive_privileges
             WHERE id = $1 AND tenant_id = $2
             ",
         )
@@ -136,7 +141,12 @@ impl GovExcessivePrivilege {
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
             r"
-            SELECT * FROM gov_excessive_privileges
+            SELECT id, tenant_id, job_id, user_id, peer_group_id,
+                deviation_percent::float8 as deviation_percent,
+                excess_entitlements,
+                peer_average::float8 as peer_average,
+                user_count, status, reviewed_at, reviewed_by, notes, created_at
+            FROM gov_excessive_privileges
             WHERE tenant_id = $1 AND job_id = $2
             ",
         );
@@ -233,7 +243,12 @@ impl GovExcessivePrivilege {
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_excessive_privileges
+            SELECT id, tenant_id, job_id, user_id, peer_group_id,
+                deviation_percent::float8 as deviation_percent,
+                excess_entitlements,
+                peer_average::float8 as peer_average,
+                user_count, status, reviewed_at, reviewed_by, notes, created_at
+            FROM gov_excessive_privileges
             WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at DESC
             LIMIT $3 OFFSET $4
@@ -260,7 +275,11 @@ impl GovExcessivePrivilege {
                 deviation_percent, excess_entitlements, peer_average, user_count
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING *
+            RETURNING id, tenant_id, job_id, user_id, peer_group_id,
+                deviation_percent::float8 as deviation_percent,
+                excess_entitlements,
+                peer_average::float8 as peer_average,
+                user_count, status, reviewed_at, reviewed_by, notes, created_at
             ",
         )
         .bind(tenant_id)
@@ -301,7 +320,11 @@ impl GovExcessivePrivilege {
             UPDATE gov_excessive_privileges
             SET status = $3, reviewed_at = NOW(), reviewed_by = $4, notes = $5
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
-            RETURNING *
+            RETURNING id, tenant_id, job_id, user_id, peer_group_id,
+                deviation_percent::float8 as deviation_percent,
+                excess_entitlements,
+                peer_average::float8 as peer_average,
+                user_count, status, reviewed_at, reviewed_by, notes, created_at
             ",
         )
         .bind(id)

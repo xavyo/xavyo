@@ -9,12 +9,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `SCIM_TOKEN`, `TEST_TENANT`, `ADMIN_JWT`
+- **Special Setup**: SCIM provisioning enabled for tenant
+
+---
+
 ## Nominal Cases
 
 ### TC-SCIM-SCHEMA-001: Get ServiceProviderConfig
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 4
-- **Preconditions**: Valid SCIM Bearer token for tenant
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Valid SCIM Bearer token for tenant
 - **Input**:
   ```
   GET /scim/v2/ServiceProviderConfig
@@ -65,6 +74,7 @@
 ### TC-SCIM-SCHEMA-002: Get Schemas endpoint
 - **Category**: Nominal
 - **Standard**: RFC 7643 Section 7
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Schemas
@@ -99,6 +109,7 @@
 ### TC-SCIM-SCHEMA-003: Get ResourceTypes endpoint
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 4
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/ResourceTypes
@@ -147,6 +158,7 @@
 ### TC-SCIM-SCHEMA-004: User schema contains required attributes
 - **Category**: Nominal
 - **Standard**: RFC 7643 Section 4.1
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Schemas
@@ -164,6 +176,7 @@
 ### TC-SCIM-SCHEMA-005: Group schema contains required attributes
 - **Category**: Nominal
 - **Standard**: RFC 7643 Section 4.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**:
   ```
   GET /scim/v2/Schemas
@@ -177,6 +190,7 @@
 ### TC-SCIM-SCHEMA-006: ServiceProviderConfig declares supported features
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 4
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: `GET /scim/v2/ServiceProviderConfig`
 - **Expected Output**: Response declares:
   - `patch.supported = true` (the server supports PATCH operations)
@@ -187,12 +201,14 @@
 ### TC-SCIM-SCHEMA-007: ServiceProviderConfig bulk limits
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 4
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: `GET /scim/v2/ServiceProviderConfig`
 - **Expected Output**: `bulk.maxOperations` is a positive integer (1000); `bulk.maxPayloadSize` is a positive integer (1048576 bytes = 1 MB)
 
 ### TC-SCIM-SCHEMA-008: ServiceProviderConfig authenticationSchemes
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 4
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: `GET /scim/v2/ServiceProviderConfig`
 - **Expected Output**: `authenticationSchemes` is a non-empty array containing at least one scheme with `type`, `name`, and `description` fields
 
@@ -203,6 +219,7 @@
 ### TC-SCIM-SCHEMA-020: ServiceProviderConfig response includes schemas array
 - **Category**: Edge Case
 - **Standard**: RFC 7643 Section 3
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: `GET /scim/v2/ServiceProviderConfig`
 - **Expected Output**: Response body contains:
   ```json
@@ -212,6 +229,7 @@
 ### TC-SCIM-SCHEMA-021: Schemas endpoint returns ListResponse format
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: `GET /scim/v2/Schemas`
 - **Expected Output**: Response uses ListResponse schema:
   ```json
@@ -222,17 +240,20 @@
 ### TC-SCIM-SCHEMA-022: ResourceTypes endpoint returns ListResponse format
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: `GET /scim/v2/ResourceTypes`
 - **Expected Output**: Response uses ListResponse schema with `totalResults` and `Resources`
 
 ### TC-SCIM-SCHEMA-023: Enterprise User extension schema present
 - **Category**: Edge Case
 - **Standard**: RFC 7643 Section 4.3
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: `GET /scim/v2/Schemas`
 - **Expected Output**: Schemas list includes `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User` with attributes: `department`, `costCenter`, `employeeNumber`, `organization`, `division`, `manager`
 
 ### TC-SCIM-SCHEMA-024: Xavyo Group extension schema present
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: `GET /scim/v2/Schemas`
 - **Expected Output**: Schemas list includes `urn:ietf:params:scim:schemas:extension:xavyo:2.0:Group` with attributes: `groupType`, `parentExternalId`
 
@@ -243,6 +264,7 @@
 ### TC-SCIM-SCHEMA-030: RFC 7643 required User schema URI
 - **Category**: Compliance
 - **Standard**: RFC 7643 Section 4.1
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: Create or retrieve any user resource
 - **Expected Output**: `schemas` array contains `"urn:ietf:params:scim:schemas:core:2.0:User"`
 - **Verification**: This is the canonical IETF-registered schema URI; any deviation breaks interop
@@ -250,12 +272,14 @@
 ### TC-SCIM-SCHEMA-031: RFC 7643 required Group schema URI
 - **Category**: Compliance
 - **Standard**: RFC 7643 Section 4.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: Create or retrieve any group resource
 - **Expected Output**: `schemas` array contains `"urn:ietf:params:scim:schemas:core:2.0:Group"`
 
 ### TC-SCIM-SCHEMA-032: RFC 7644 error schema URI
 - **Category**: Compliance
 - **Standard**: RFC 7644 Section 3.12
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: Any request that returns an error response
 - **Expected Output**: Error response contains:
   ```json
@@ -266,6 +290,7 @@
 ### TC-SCIM-SCHEMA-033: RFC 7644 ListResponse schema URI
 - **Category**: Compliance
 - **Standard**: RFC 7644 Section 3.4.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: Any list endpoint (GET /Users, GET /Groups, GET /Schemas, GET /ResourceTypes)
 - **Expected Output**: Response contains:
   ```json
@@ -275,6 +300,7 @@
 ### TC-SCIM-SCHEMA-034: RFC 7644 PatchOp schema URI
 - **Category**: Compliance
 - **Standard**: RFC 7644 Section 3.5.2
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: PATCH request body
 - **Expected Output**: Must include:
   ```json
@@ -285,6 +311,7 @@
 ### TC-SCIM-SCHEMA-035: RFC 7644 BulkRequest/BulkResponse schema URIs
 - **Category**: Compliance
 - **Standard**: RFC 7644 Section 3.7
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: Bulk request and response
 - **Expected Output**:
   - Request schema: `"urn:ietf:params:scim:api:messages:2.0:BulkRequest"`
@@ -293,6 +320,7 @@
 ### TC-SCIM-SCHEMA-036: Content-Type application/scim+json on all responses
 - **Category**: Compliance
 - **Standard**: RFC 7644 Section 3.1
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: Any SCIM endpoint call
 - **Expected Output**: `Content-Type: application/scim+json` in response headers
 - **Verification**: Implementation sets `application/scim+json` via `SCIM_CONTENT_TYPE` constant
@@ -300,6 +328,7 @@
 ### TC-SCIM-SCHEMA-037: SCIM error response fields (detail and status as string)
 - **Category**: Compliance
 - **Standard**: RFC 7644 Section 3.12
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: Any error-producing request
 - **Expected Output**: Error body contains:
   - `"detail"`: human-readable string
@@ -309,6 +338,7 @@
 ### TC-SCIM-SCHEMA-038: ServiceProviderConfig meta.resourceType
 - **Category**: Compliance
 - **Standard**: RFC 7644 Section 4
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: `GET /scim/v2/ServiceProviderConfig`
 - **Expected Output**: `meta.resourceType` is `"ServiceProviderConfig"`
 
@@ -319,6 +349,7 @@
 ### TC-SCIM-SCHEMA-040: Azure AD/Entra ID discovery compatibility
 - **Category**: Compliance
 - **Standard**: Microsoft SCIM implementation guide
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: Azure AD SCIM client performs discovery:
   1. `GET /scim/v2/ServiceProviderConfig`
   2. `GET /scim/v2/Schemas`
@@ -328,6 +359,7 @@
 ### TC-SCIM-SCHEMA-041: Okta SCIM discovery compatibility
 - **Category**: Compliance
 - **Standard**: Okta SCIM provisioning protocol
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: Okta SCIM client performs:
   1. `GET /scim/v2/Users?startIndex=1&count=1` (connectivity test)
   2. `GET /scim/v2/ServiceProviderConfig`
@@ -336,6 +368,7 @@
 ### TC-SCIM-SCHEMA-042: ServiceProviderConfig filter.maxResults
 - **Category**: Compliance
 - **Standard**: RFC 7644 Section 4
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: `GET /scim/v2/ServiceProviderConfig`
 - **Expected Output**: `filter.maxResults` matches the server's actual maximum count per page (100)
 - **Verification**: The value must be consistent with `ScimPagination::MAX_COUNT`
@@ -343,11 +376,13 @@
 ### TC-SCIM-SCHEMA-043: User schema userName uniqueness declaration
 - **Category**: Compliance
 - **Standard**: RFC 7643 Section 7
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: `GET /scim/v2/Schemas`
 - **Expected Output**: In the User schema, the `userName` attribute has `"uniqueness": "server"` indicating the server enforces uniqueness
 
 ### TC-SCIM-SCHEMA-044: User schema groups attribute is readOnly
 - **Category**: Compliance
 - **Standard**: RFC 7643 Section 4.1
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. SCIM token authenticated
 - **Input**: `GET /scim/v2/Schemas`
 - **Expected Output**: The `groups` attribute in User schema has `"mutability": "readOnly"` (groups are managed via Group endpoints, not User)

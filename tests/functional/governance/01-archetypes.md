@@ -7,12 +7,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: Some tests require existing archetype hierarchies (parent/child), lifecycle configs, or user assignments
+
+---
+
 ## Nominal Cases
 
 ### TC-GOV-ARCH-001: Create identity archetype with required fields
 - **Category**: Nominal
 - **Standard**: IGA Identity Classification
-- **Preconditions**: Authenticated as tenant admin
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated as tenant admin
 - **Input**:
   ```json
   POST /governance/archetypes
@@ -42,7 +51,7 @@
 ### TC-GOV-ARCH-002: Create archetype with parent inheritance
 - **Category**: Nominal
 - **Standard**: IGA Identity Hierarchy
-- **Preconditions**: Parent archetype "Employee" exists with known ID
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Parent archetype "Employee" exists with known ID
 - **Input**:
   ```json
   POST /governance/archetypes
@@ -62,7 +71,7 @@
 ### TC-GOV-ARCH-003: Create archetype with schema extensions
 - **Category**: Nominal
 - **Standard**: IGA Extensible Identity Schema
-- **Preconditions**: Authenticated as tenant admin
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated as tenant admin
 - **Input**:
   ```json
   POST /governance/archetypes
@@ -86,7 +95,7 @@
 ### TC-GOV-ARCH-004: Create archetype with lifecycle model reference
 - **Category**: Nominal
 - **Standard**: IGA Lifecycle Integration (F-059)
-- **Preconditions**: Lifecycle config exists with known ID
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Lifecycle config exists with known ID
 - **Input**:
   ```json
   POST /governance/archetypes
@@ -105,7 +114,7 @@
 ### TC-GOV-ARCH-005: List archetypes with pagination
 - **Category**: Nominal
 - **Standard**: IGA Best Practices
-- **Preconditions**: At least 5 archetypes exist in tenant
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. At least 5 archetypes exist in tenant
 - **Input**:
   ```
   GET /governance/archetypes?limit=2&offset=0
@@ -120,7 +129,7 @@
 ### TC-GOV-ARCH-006: List archetypes filtered by active status
 - **Category**: Nominal
 - **Standard**: IGA Best Practices
-- **Preconditions**: Mix of active and inactive archetypes exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Mix of active and inactive archetypes exist
 - **Input**:
   ```
   GET /governance/archetypes?active_only=true
@@ -133,7 +142,7 @@
 
 ### TC-GOV-ARCH-007: Get single archetype by ID
 - **Category**: Nominal
-- **Preconditions**: Archetype exists with known ID
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Archetype exists with known ID
 - **Input**:
   ```
   GET /governance/archetypes/<archetype-id>
@@ -146,7 +155,7 @@
 
 ### TC-GOV-ARCH-008: Update archetype name and description
 - **Category**: Nominal
-- **Preconditions**: Archetype exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Archetype exists
 - **Input**:
   ```json
   PUT /governance/archetypes/<archetype-id>
@@ -164,7 +173,7 @@
 ### TC-GOV-ARCH-009: Deactivate an archetype
 - **Category**: Nominal
 - **Standard**: IGA Lifecycle Management
-- **Preconditions**: Active archetype exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active archetype exists
 - **Input**:
   ```json
   PUT /governance/archetypes/<archetype-id>
@@ -178,7 +187,7 @@
 
 ### TC-GOV-ARCH-010: Delete archetype
 - **Category**: Nominal
-- **Preconditions**: Archetype exists with no user assignments
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Archetype exists with no user assignments
 - **Input**:
   ```
   DELETE /governance/archetypes/<archetype-id>
@@ -191,7 +200,7 @@
 ### TC-GOV-ARCH-011: Get archetype ancestry chain
 - **Category**: Nominal
 - **Standard**: IGA Inheritance Resolution
-- **Preconditions**: Archetype hierarchy exists (Grandparent -> Parent -> Child)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Archetype hierarchy exists (Grandparent -> Parent -> Child)
 - **Input**:
   ```
   GET /governance/archetypes/<child-id>/ancestry
@@ -205,7 +214,7 @@
 ### TC-GOV-ARCH-012: Bind policy to archetype
 - **Category**: Nominal
 - **Standard**: IGA Policy Governance
-- **Preconditions**: Archetype exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Archetype exists
 - **Input**:
   ```json
   POST /governance/archetypes/<archetype-id>/policies
@@ -222,7 +231,7 @@
 ### TC-GOV-ARCH-013: Get effective policies with inheritance
 - **Category**: Nominal
 - **Standard**: IGA Policy Resolution
-- **Preconditions**: Parent archetype has password policy; child archetype has MFA policy
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Parent archetype has password policy; child archetype has MFA policy
 - **Input**:
   ```
   GET /governance/archetypes/<child-id>/effective-policies
@@ -237,7 +246,7 @@
 ### TC-GOV-ARCH-014: Assign archetype to user
 - **Category**: Nominal
 - **Standard**: IGA Identity Classification
-- **Preconditions**: User and archetype exist in same tenant
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User and archetype exist in same tenant
 - **Input**:
   ```json
   PUT /governance/users/<user-id>/archetype
@@ -250,7 +259,7 @@
 
 ### TC-GOV-ARCH-015: Get user's assigned archetype
 - **Category**: Nominal
-- **Preconditions**: User has an archetype assigned
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User has an archetype assigned
 - **Input**:
   ```
   GET /governance/users/<user-id>/archetype
@@ -267,7 +276,7 @@
 
 ### TC-GOV-ARCH-020: Create archetype with duplicate name in same tenant
 - **Category**: Edge Case
-- **Preconditions**: Archetype named "Employee" already exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Archetype named "Employee" already exists
 - **Input**:
   ```json
   POST /governance/archetypes
@@ -281,6 +290,7 @@
 
 ### TC-GOV-ARCH-021: Create archetype with name exceeding 255 characters
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/archetypes
@@ -294,6 +304,7 @@
 
 ### TC-GOV-ARCH-022: Create archetype with empty name
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/archetypes
@@ -306,6 +317,7 @@
 
 ### TC-GOV-ARCH-023: Create archetype with non-existent parent
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/archetypes
@@ -323,7 +335,7 @@
 ### TC-GOV-ARCH-024: Delete archetype with assigned users
 - **Category**: Edge Case
 - **Standard**: IGA Referential Integrity
-- **Preconditions**: Archetype has at least one user assigned
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Archetype has at least one user assigned
 - **Input**:
   ```
   DELETE /governance/archetypes/<archetype-id>
@@ -336,7 +348,7 @@
 
 ### TC-GOV-ARCH-025: Delete archetype with child archetypes
 - **Category**: Edge Case
-- **Preconditions**: Archetype is parent of another archetype
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Archetype is parent of another archetype
 - **Input**:
   ```
   DELETE /governance/archetypes/<parent-id>
@@ -349,6 +361,7 @@
 
 ### TC-GOV-ARCH-026: Get non-existent archetype
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```
   GET /governance/archetypes/00000000-0000-0000-0000-000000000099
@@ -360,6 +373,7 @@
 
 ### TC-GOV-ARCH-027: Unbind non-existent policy type from archetype
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```
   DELETE /governance/archetypes/<id>/policies/nonexistent_type
@@ -372,7 +386,7 @@
 ### TC-GOV-ARCH-028: Assign archetype from different tenant to user
 - **Category**: Edge Case
 - **Standard**: Multi-tenancy isolation
-- **Preconditions**: Archetype belongs to tenant A; user belongs to tenant B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Archetype belongs to tenant A; user belongs to tenant B (second tenant required)
 - **Input**:
   ```json
   PUT /governance/users/<user-in-tenant-b>/archetype
@@ -390,7 +404,7 @@
 ### TC-GOV-ARCH-030: Create archetype without admin role
 - **Category**: Security
 - **Standard**: ISO 27001 A.9.2.3 (Privileged Access Management)
-- **Preconditions**: Authenticated as non-admin user
+- **Preconditions**: Fixtures: `TEST_TENANT`. Authenticated as non-admin user
 - **Input**:
   ```json
   POST /governance/archetypes
@@ -404,7 +418,7 @@
 ### TC-GOV-ARCH-031: Access archetype from different tenant
 - **Category**: Security
 - **Standard**: ISO 27001 A.9.4.1 (Tenant Isolation)
-- **Preconditions**: Archetype belongs to tenant A; JWT is for tenant B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Archetype belongs to tenant A; JWT is for tenant B (second tenant required)
 - **Input**:
   ```
   GET /governance/archetypes/<tenant-a-archetype-id>
@@ -418,6 +432,7 @@
 ### TC-GOV-ARCH-032: Create archetype without authentication
 - **Category**: Security
 - **Standard**: OWASP ASVS 4.1.1
+- **Preconditions**: Fixtures: `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/archetypes
@@ -432,7 +447,7 @@
 ### TC-GOV-ARCH-033: Modify archetype in different tenant
 - **Category**: Security
 - **Standard**: ISO 27001 A.9.4.1
-- **Preconditions**: Archetype exists in tenant A; JWT for tenant B with admin role
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Archetype exists in tenant A; JWT for tenant B with admin role (second tenant required)
 - **Input**:
   ```json
   PUT /governance/archetypes/<tenant-a-archetype-id>
@@ -450,7 +465,7 @@
 ### TC-GOV-ARCH-040: Archetype classification supports ISO 27001 identity types
 - **Category**: Compliance
 - **Standard**: ISO 27001 A.9.1.2 (Access to Networks and Network Services)
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Create archetype "Employee" with `lifecycle_model_id` referencing standard employee lifecycle
   2. Create archetype "Contractor" with `lifecycle_model_id` referencing contractor lifecycle
@@ -461,6 +476,7 @@
 ### TC-GOV-ARCH-041: Archetype policy binding enforces access control policy
 - **Category**: Compliance
 - **Standard**: ISO 27001 A.9.1.1 (Access Control Policy)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Create archetype "Privileged Admin"
   2. Bind MFA policy: `{ "policy_type": "mfa", "policy_config": { "required": true, "method": "webauthn" } }`
@@ -472,6 +488,7 @@
 ### TC-GOV-ARCH-042: Schema extensions support custom attributes for regulatory compliance
 - **Category**: Compliance
 - **Standard**: GDPR Article 6 (Lawful Basis), ISO 27001 A.18.1
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Create archetype with schema_extensions including `data_classification`, `consent_obtained`, `processing_purpose`
   2. Assign archetype to user
@@ -481,6 +498,7 @@
 ### TC-GOV-ARCH-043: Archetype deactivation does not remove existing user assignments
 - **Category**: Compliance
 - **Standard**: IGA Continuity
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Create archetype and assign to user
   2. Deactivate archetype (`is_active: false`)

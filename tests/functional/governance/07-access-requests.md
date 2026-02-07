@@ -7,12 +7,19 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`
+- **Special Setup**: Catalog categories and items must be created before self-service browse and cart tests. Approval workflows must be configured before approval tests.
+
 ## Nominal Cases
 
 ### TC-GOV-REQ-001: Create catalog category (admin)
 - **Category**: Nominal
 - **Standard**: ITIL Service Catalog Management
-- **Preconditions**: Authenticated as admin
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated as admin
 - **Input**:
   ```json
   POST /governance/admin/catalog/categories
@@ -32,7 +39,7 @@
 ### TC-GOV-REQ-002: Create nested catalog category
 - **Category**: Nominal
 - **Standard**: ITIL Service Catalog Hierarchy
-- **Preconditions**: Parent category "IT Applications" exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Parent category "IT Applications" exists
 - **Input**:
   ```json
   POST /governance/admin/catalog/categories
@@ -51,7 +58,7 @@
 ### TC-GOV-REQ-003: Create catalog item linked to entitlement
 - **Category**: Nominal
 - **Standard**: ITIL Service Request Management
-- **Preconditions**: Category and entitlement exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Category and entitlement exist
 - **Input**:
   ```json
   POST /governance/admin/catalog/items
@@ -77,7 +84,7 @@
 ### TC-GOV-REQ-004: Browse catalog categories (self-service)
 - **Category**: Nominal
 - **Standard**: ITIL Self-Service Portal
-- **Preconditions**: Categories and items exist
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Categories and items exist
 - **Input**:
   ```
   GET /governance/catalog/categories
@@ -90,6 +97,7 @@
 
 ### TC-GOV-REQ-005: Browse catalog items in category
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Categories with catalog items exist
 - **Input**:
   ```
   GET /governance/catalog/items?category_id=<category-id>
@@ -103,7 +111,7 @@
 ### TC-GOV-REQ-006: Add items to request cart
 - **Category**: Nominal
 - **Standard**: ITIL Request Fulfillment
-- **Preconditions**: Catalog items exist
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Catalog items exist
 - **Input**:
   ```json
   POST /governance/catalog/cart/items
@@ -120,7 +128,7 @@
 
 ### TC-GOV-REQ-007: Get current cart
 - **Category**: Nominal
-- **Preconditions**: User has items in cart
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. User has items in cart
 - **Input**:
   ```
   GET /governance/catalog/cart
@@ -134,7 +142,7 @@
 ### TC-GOV-REQ-008: Validate cart before submission
 - **Category**: Nominal
 - **Standard**: IGA Pre-validation
-- **Preconditions**: Cart has items
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Cart has items
 - **Input**:
   ```
   POST /governance/catalog/cart/validate
@@ -148,7 +156,7 @@
 ### TC-GOV-REQ-009: Submit cart (creates access requests)
 - **Category**: Nominal
 - **Standard**: ITIL Request Fulfillment
-- **Preconditions**: Cart is valid
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Cart is valid
 - **Input**:
   ```
   POST /governance/catalog/cart/submit
@@ -162,7 +170,7 @@
 
 ### TC-GOV-REQ-010: List my access requests
 - **Category**: Nominal
-- **Preconditions**: User has submitted requests
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. User has submitted requests
 - **Input**:
   ```
   GET /governance/access-requests?limit=50&offset=0
@@ -175,6 +183,7 @@
 
 ### TC-GOV-REQ-011: Get access request details
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Access request exists
 - **Input**:
   ```
   GET /governance/access-requests/<request-id>
@@ -187,7 +196,7 @@
 
 ### TC-GOV-REQ-012: Cancel pending access request
 - **Category**: Nominal
-- **Preconditions**: Request is pending
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Request is pending
 - **Input**:
   ```
   POST /governance/access-requests/<request-id>/cancel
@@ -201,7 +210,7 @@
 ### TC-GOV-REQ-013: Approve access request
 - **Category**: Nominal
 - **Standard**: ITIL Change Authorization
-- **Preconditions**: Request pending; authenticated as approver
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Request pending; authenticated as approver
 - **Input**:
   ```json
   POST /governance/access-requests/<request-id>/approve
@@ -216,7 +225,7 @@
 
 ### TC-GOV-REQ-014: Reject access request
 - **Category**: Nominal
-- **Preconditions**: Request pending; authenticated as approver
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Request pending; authenticated as approver
 - **Input**:
   ```json
   POST /governance/access-requests/<request-id>/reject
@@ -230,7 +239,7 @@
 
 ### TC-GOV-REQ-015: List pending approvals (approver view)
 - **Category**: Nominal
-- **Preconditions**: Authenticated user has pending approvals
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Authenticated user has pending approvals
 - **Input**:
   ```
   GET /governance/my-approvals
@@ -244,7 +253,7 @@
 ### TC-GOV-REQ-016: Create approval workflow
 - **Category**: Nominal
 - **Standard**: ITIL Change Management
-- **Preconditions**: Admin authenticated
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Admin authenticated
 - **Input**:
   ```json
   POST /governance/approval-workflows
@@ -263,6 +272,7 @@
 
 ### TC-GOV-REQ-017: Set default approval workflow
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Approval workflow exists
 - **Input**:
   ```
   POST /governance/approval-workflows/<workflow-id>/set-default
@@ -274,7 +284,7 @@
 
 ### TC-GOV-REQ-018: Enable/disable catalog item
 - **Category**: Nominal
-- **Preconditions**: Catalog item exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Catalog item exists
 - **Steps**:
   1. Disable: `POST /governance/admin/catalog/items/<id>/disable` -> 200 OK
   2. Enable: `POST /governance/admin/catalog/items/<id>/enable` -> 200 OK
@@ -282,7 +292,7 @@
 
 ### TC-GOV-REQ-019: Update cart item quantity/parameters
 - **Category**: Nominal
-- **Preconditions**: Item in cart
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Item in cart
 - **Input**:
   ```json
   PUT /governance/catalog/cart/items/<item-id>
@@ -295,6 +305,7 @@
 
 ### TC-GOV-REQ-020: Clear entire cart
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. User has items in cart
 - **Input**:
   ```
   DELETE /governance/catalog/cart
@@ -310,7 +321,7 @@
 
 ### TC-GOV-REQ-025: Submit empty cart
 - **Category**: Edge Case
-- **Preconditions**: Cart is empty
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Cart is empty
 - **Input**:
   ```
   POST /governance/catalog/cart/submit
@@ -324,7 +335,7 @@
 ### TC-GOV-REQ-026: Cart validation detects SoD conflict
 - **Category**: Edge Case
 - **Standard**: SOX Section 404
-- **Preconditions**: Cart contains item that conflicts with user's existing access per SoD rule
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Cart contains item that conflicts with user's existing access per SoD rule
 - **Input**:
   ```
   POST /governance/catalog/cart/validate
@@ -337,7 +348,7 @@
 
 ### TC-GOV-REQ-027: Cancel already-approved request
 - **Category**: Edge Case
-- **Preconditions**: Request is already approved
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Request is already approved
 - **Input**:
   ```
   POST /governance/access-requests/<request-id>/cancel
@@ -350,7 +361,7 @@
 
 ### TC-GOV-REQ-028: Request disabled catalog item
 - **Category**: Edge Case
-- **Preconditions**: Catalog item is disabled
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Catalog item is disabled
 - **Input**:
   ```json
   POST /governance/catalog/cart/items
@@ -368,6 +379,7 @@
 ### TC-GOV-REQ-030: Create catalog item without admin role
 - **Category**: Security
 - **Standard**: NIST SP 800-53 AC-6
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Authenticated with non-admin role
 - **Input**:
   ```json
   POST /governance/admin/catalog/items
@@ -381,7 +393,7 @@
 
 ### TC-GOV-REQ-031: Approve request as non-approver
 - **Category**: Security
-- **Preconditions**: User is not the designated approver
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. User is not the designated approver
 - **Input**:
   ```json
   POST /governance/access-requests/<request-id>/approve
@@ -395,6 +407,7 @@
 ### TC-GOV-REQ-032: Access another user's cart
 - **Category**: Security
 - **Standard**: Multi-tenancy / user isolation
+- **Preconditions**: Fixtures: `USER_JWT`, `TEST_TENANT`. Multiple users exist in same tenant
 - **Verification**: Cart endpoint returns only authenticated user's cart; no way to specify another user's cart
 
 ---
@@ -404,6 +417,7 @@
 ### TC-GOV-REQ-040: ITIL - Complete request fulfillment lifecycle
 - **Category**: Compliance
 - **Standard**: ITIL Service Request Management
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Catalog categories, items, and approval workflows configured
 - **Steps**:
   1. Admin creates catalog categories and items
   2. User browses catalog
@@ -416,6 +430,7 @@
 ### TC-GOV-REQ-041: ISO 27001 A.9.2.2 - Formal access request process
 - **Category**: Compliance
 - **Standard**: ISO 27001 A.9.2.2 (User Access Provisioning)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `USER_JWT`, `TEST_TENANT`. Catalog items with approval requirements configured
 - **Steps**:
   1. Verify justification is required for catalog items
   2. Verify approval is required before provisioning

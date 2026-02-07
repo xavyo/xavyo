@@ -13,12 +13,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: Admin endpoints require admin-role JWT; metadata endpoint requires tenant context via `X-Tenant-ID` header
+
+---
+
 ## Nominal Cases
 
 ### TC-SAML-META-001: Retrieve IdP metadata XML
 - **Category**: Nominal
 - **Standard**: SAML 2.0 Metadata 2.3 (IDPSSODescriptor)
-- **Preconditions**: Tenant `T1` exists with active IdP signing certificate
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Tenant `T1` exists with active IdP signing certificate
 - **Input**:
   ```
   GET /saml/metadata
@@ -60,7 +69,7 @@
 
 ### TC-SAML-META-002: IdP metadata without active certificate
 - **Category**: Nominal
-- **Preconditions**: Tenant `T1` exists but has no active certificate
+- **Preconditions**: Fixtures: `TEST_TENANT`. Tenant `T1` exists but has no active certificate
 - **Input**:
   ```
   GET /saml/metadata
@@ -72,6 +81,7 @@
 ### TC-SAML-META-003: IdP metadata includes both HTTP-Redirect and HTTP-POST SSO endpoints
 - **Category**: Nominal
 - **Standard**: SAML 2.0 Metadata 2.4.1
+- **Preconditions**: Fixtures: `TEST_TENANT`.
 - **Input**: `GET /saml/metadata`
 - **Expected Output**: Metadata contains two `<md:SingleSignOnService>` elements:
   - One with `Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"`
@@ -80,7 +90,7 @@
 
 ### TC-SAML-META-004: Create a new Service Provider
 - **Category**: Nominal
-- **Preconditions**: Admin user authenticated for tenant `T1`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Admin user authenticated for tenant `T1`
 - **Input**:
   ```json
   POST /admin/saml/service-providers
@@ -120,6 +130,7 @@
 
 ### TC-SAML-META-005: Create SP with minimal required fields
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**:
   ```json
   POST /admin/saml/service-providers
@@ -140,6 +151,7 @@
 
 ### TC-SAML-META-006: Create SP with custom attribute mapping
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**:
   ```json
   POST /admin/saml/service-providers
@@ -161,7 +173,7 @@
 
 ### TC-SAML-META-007: List service providers with pagination
 - **Category**: Nominal
-- **Preconditions**: 5 SPs registered for tenant `T1`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. 5 SPs registered for tenant `T1`
 - **Input**:
   ```
   GET /admin/saml/service-providers?limit=2&offset=0
@@ -180,7 +192,7 @@
 
 ### TC-SAML-META-008: List service providers filtered by enabled status
 - **Category**: Nominal
-- **Preconditions**: 3 enabled and 2 disabled SPs for tenant `T1`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. 3 enabled and 2 disabled SPs for tenant `T1`
 - **Input**:
   ```
   GET /admin/saml/service-providers?enabled=true
@@ -190,6 +202,7 @@
 
 ### TC-SAML-META-009: Get a specific service provider by ID
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**:
   ```
   GET /admin/saml/service-providers/<sp_uuid>
@@ -203,7 +216,7 @@
 
 ### TC-SAML-META-010: Update a service provider (partial update)
 - **Category**: Nominal
-- **Preconditions**: SP exists with `name="Old Name"`, `sign_assertions=true`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SP exists with `name="Old Name"`, `sign_assertions=true`
 - **Input**:
   ```json
   PUT /admin/saml/service-providers/<sp_uuid>
@@ -218,7 +231,7 @@
 
 ### TC-SAML-META-011: Delete a service provider
 - **Category**: Nominal
-- **Preconditions**: SP exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SP exists
 - **Input**:
   ```
   DELETE /admin/saml/service-providers/<sp_uuid>
@@ -233,6 +246,7 @@
 
 ### TC-SAML-META-012: Create SP with SP certificate for signature validation
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**:
   ```json
   POST /admin/saml/service-providers
@@ -248,6 +262,7 @@
 
 ### TC-SAML-META-013: Create SP with metadata_url
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**:
   ```json
   POST /admin/saml/service-providers
@@ -266,7 +281,7 @@
 
 ### TC-SAML-META-014: Create SP with duplicate entity_id
 - **Category**: Edge Case
-- **Preconditions**: SP already exists with entity_id `https://existing-sp.example.com`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SP already exists with entity_id `https://existing-sp.example.com`
 - **Input**:
   ```json
   POST /admin/saml/service-providers
@@ -287,6 +302,7 @@
 
 ### TC-SAML-META-015: Create SP with empty acs_urls
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**:
   ```json
   POST /admin/saml/service-providers
@@ -308,6 +324,7 @@
 
 ### TC-SAML-META-016: Get nonexistent SP
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**:
   ```
   GET /admin/saml/service-providers/00000000-0000-0000-0000-000000000099
@@ -324,6 +341,7 @@
 
 ### TC-SAML-META-017: Delete nonexistent SP
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**:
   ```
   DELETE /admin/saml/service-providers/00000000-0000-0000-0000-000000000099
@@ -337,7 +355,7 @@
 
 ### TC-SAML-META-018: Update SP - change entity_id not supported
 - **Category**: Edge Case
-- **Preconditions**: SP exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SP exists
 - **Input**:
   ```json
   PUT /admin/saml/service-providers/<sp_uuid>
@@ -348,6 +366,7 @@
 
 ### TC-SAML-META-019: Create SP with multiple ACS URLs
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**:
   ```json
   POST /admin/saml/service-providers
@@ -365,12 +384,13 @@
 
 ### TC-SAML-META-020: List SPs with default pagination
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**: `GET /admin/saml/service-providers` (no limit/offset query params)
 - **Expected Output**: Status 200, `limit=20` (default), `offset=0`
 
 ### TC-SAML-META-021: IdP metadata entityID includes tenant ID
 - **Category**: Edge Case
-- **Preconditions**: Tenant UUID is `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`
+- **Preconditions**: Fixtures: `TEST_TENANT`. Tenant UUID is `aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`
 - **Input**: `GET /saml/metadata` with tenant context
 - **Expected Output**: `entityID` in metadata contains the tenant UUID:
   ```
@@ -379,7 +399,7 @@
 
 ### TC-SAML-META-022: Update SP to disable it
 - **Category**: Edge Case
-- **Preconditions**: SP exists with `enabled=true`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SP exists with `enabled=true`
 - **Input**:
   ```json
   PUT /admin/saml/service-providers/<sp_uuid>
@@ -395,32 +415,34 @@
 ### TC-SAML-META-023: Admin endpoints require authentication
 - **Category**: Security
 - **Standard**: OWASP ASVS 4.1
+- **Preconditions**: Fixtures: `TEST_TENANT`.
 - **Input**: `GET /admin/saml/service-providers` without Authorization header
 - **Expected Output**: Status 401 Unauthorized
 
 ### TC-SAML-META-024: Admin endpoints require admin role
 - **Category**: Security
 - **Standard**: OWASP ASVS 4.2
+- **Preconditions**: Fixtures: `TEST_TENANT`.
 - **Input**: `POST /admin/saml/service-providers` with non-admin JWT
 - **Expected Output**: Status 403 Forbidden
 
 ### TC-SAML-META-025: Cross-tenant SP isolation on list
 - **Category**: Security
-- **Preconditions**: T1 has 3 SPs, T2 has 2 SPs
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. T1 has 3 SPs, T2 has 2 SPs
 - **Input**: `GET /admin/saml/service-providers` with T1 admin JWT
 - **Expected Output**: Only T1's 3 SPs are returned; T2's SPs are not visible
 - **Verification**: `total=3` and all returned items belong to T1
 
 ### TC-SAML-META-026: Cross-tenant SP isolation on get
 - **Category**: Security
-- **Preconditions**: SP `SP1` belongs to T1
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SP `SP1` belongs to T1
 - **Input**: `GET /admin/saml/service-providers/<SP1_uuid>` with T2 admin JWT
 - **Expected Output**: Status 404 (not found, not 403)
 - **Verification**: T2 cannot even determine if SP exists in T1
 
 ### TC-SAML-META-027: Cross-tenant SP isolation on delete
 - **Category**: Security
-- **Preconditions**: SP `SP1` belongs to T1
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SP `SP1` belongs to T1
 - **Input**: `DELETE /admin/saml/service-providers/<SP1_uuid>` with T2 admin JWT
 - **Expected Output**: Status 404 (not found, not affected)
 - **Verification**: SP1 still exists in T1 after the request
@@ -428,18 +450,21 @@
 ### TC-SAML-META-028: XSS in SP entity_id via metadata
 - **Category**: Security
 - **Standard**: OWASP ASVS 5.3.3
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**: Create SP with `entity_id` containing `<script>alert('xss')</script>`
 - **Expected Output**: If SP creation succeeds (no validation), the entity_id is XML-escaped in metadata output
 - **Verification**: No unescaped HTML/JS in metadata XML
 
 ### TC-SAML-META-029: Metadata Content-Type header prevents MIME sniffing
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`.
 - **Input**: `GET /saml/metadata`
 - **Expected Output**: Response includes `Content-Type: application/xml; charset=utf-8`
 - **Verification**: Browser treats response as XML, not HTML (prevents stored XSS via metadata)
 
 ### TC-SAML-META-030: SP certificate field does not expose private key material
 - **Category**: Security
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`.
 - **Input**: `GET /admin/saml/service-providers/<sp_uuid>` for SP with certificate
 - **Expected Output**: `certificate` field contains only the public certificate (PEM), never contains `-----BEGIN PRIVATE KEY-----` or `-----BEGIN RSA PRIVATE KEY-----`
 
@@ -450,18 +475,21 @@
 ### TC-SAML-META-031: Metadata uses correct namespace
 - **Category**: Compliance
 - **Standard**: SAML 2.0 Metadata
+- **Preconditions**: Fixtures: `TEST_TENANT`.
 - **Input**: `GET /saml/metadata`
 - **Expected Output**: Root element uses `xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"`
 
 ### TC-SAML-META-032: Metadata IDPSSODescriptor has correct protocol enumeration
 - **Category**: Compliance
 - **Standard**: SAML 2.0 Metadata 2.4.1
+- **Preconditions**: Fixtures: `TEST_TENANT`.
 - **Input**: `GET /saml/metadata`
 - **Expected Output**: `<md:IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">`
 
 ### TC-SAML-META-033: Metadata advertises all supported NameID formats
 - **Category**: Compliance
 - **Standard**: SAML 2.0 Metadata 2.4.1
+- **Preconditions**: Fixtures: `TEST_TENANT`.
 - **Input**: `GET /saml/metadata`
 - **Expected Output**: Three `<md:NameIDFormat>` elements:
   - `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress`
@@ -471,12 +499,13 @@
 ### TC-SAML-META-034: Metadata KeyDescriptor uses correct signing use
 - **Category**: Compliance
 - **Standard**: SAML 2.0 Metadata 2.4.1.1
-- **Preconditions**: Active certificate exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active certificate exists
 - **Input**: `GET /saml/metadata`
 - **Expected Output**: `<md:KeyDescriptor use="signing">` with `<ds:X509Certificate>` containing the DER-encoded certificate in base64
 
 ### TC-SAML-META-035: Metadata is well-formed XML
 - **Category**: Compliance
+- **Preconditions**: Fixtures: `TEST_TENANT`.
 - **Input**: `GET /saml/metadata`
 - **Expected Output**: Response body parses as valid well-formed XML
 - **Verification**: An XML parser can parse the document without errors; all tags are properly closed, attributes quoted, and special characters escaped

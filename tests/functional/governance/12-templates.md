@@ -7,12 +7,19 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: For scope-related tests, archetypes must exist. For parent template tests, at least one template must be created first. For simulation tests, an active template with rules is needed.
+
 ## Nominal Cases
 
 ### TC-GOV-TPL-001: Create object template
 - **Category**: Nominal
 - **Standard**: IGA Standardized Provisioning
-- **Preconditions**: Authenticated as admin
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated as admin
 - **Input**:
   ```json
   POST /governance/object-templates
@@ -54,6 +61,7 @@
 ### TC-GOV-TPL-002: Create template with scopes
 - **Category**: Nominal
 - **Standard**: IGA Conditional Templates
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Archetypes exist for scoping
 - **Input**:
   ```json
   POST /governance/object-templates
@@ -74,7 +82,7 @@
 ### TC-GOV-TPL-003: Create template with parent (inheritance)
 - **Category**: Nominal
 - **Standard**: IGA Template Hierarchy
-- **Preconditions**: Parent template exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Parent template exists
 - **Input**:
   ```json
   POST /governance/object-templates
@@ -93,6 +101,7 @@
 
 ### TC-GOV-TPL-004: List templates with filters
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Templates exist
 - **Input**:
   ```
   GET /governance/object-templates?object_type=user&limit=20&offset=0
@@ -105,6 +114,7 @@
 
 ### TC-GOV-TPL-005: Get template by ID
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template exists
 - **Input**:
   ```
   GET /governance/object-templates/<template-id>
@@ -117,6 +127,7 @@
 
 ### TC-GOV-TPL-006: Update template
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template exists
 - **Input**:
   ```json
   PUT /governance/object-templates/<template-id>
@@ -133,7 +144,7 @@
 
 ### TC-GOV-TPL-007: Delete template
 - **Category**: Nominal
-- **Preconditions**: Template in draft status
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template in draft status
 - **Input**:
   ```
   DELETE /governance/object-templates/<template-id>
@@ -145,7 +156,7 @@
 
 ### TC-GOV-TPL-008: Activate template
 - **Category**: Nominal
-- **Preconditions**: Template in draft status
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template in draft status
 - **Input**:
   ```
   POST /governance/object-templates/<template-id>/activate
@@ -158,7 +169,7 @@
 
 ### TC-GOV-TPL-009: Disable template
 - **Category**: Nominal
-- **Preconditions**: Template is active
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template is active
 - **Input**:
   ```
   POST /governance/object-templates/<template-id>/disable
@@ -172,6 +183,7 @@
 ### TC-GOV-TPL-010: Add rule to template
 - **Category**: Nominal
 - **Standard**: IGA Attribute Normalization
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template exists
 - **Input**:
   ```json
   POST /governance/object-templates/<template-id>/rules
@@ -190,6 +202,7 @@
 
 ### TC-GOV-TPL-011: List template rules
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template with rules exists
 - **Input**:
   ```
   GET /governance/object-templates/<template-id>/rules
@@ -202,6 +215,7 @@
 
 ### TC-GOV-TPL-012: Update template rule
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template with at least one rule exists
 - **Input**:
   ```json
   PUT /governance/object-templates/<template-id>/rules/<rule-id>
@@ -217,6 +231,7 @@
 
 ### TC-GOV-TPL-013: Delete template rule
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template with at least one rule exists
 - **Input**:
   ```
   DELETE /governance/object-templates/<template-id>/rules/<rule-id>
@@ -229,6 +244,7 @@
 ### TC-GOV-TPL-014: List template versions
 - **Category**: Nominal
 - **Standard**: IGA Change Management
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template with multiple versions exists
 - **Input**:
   ```
   GET /governance/object-templates/<template-id>/versions
@@ -241,6 +257,7 @@
 
 ### TC-GOV-TPL-015: Get specific template version
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template with versions exists
 - **Input**:
   ```
   GET /governance/object-templates/<template-id>/versions/<version-id>
@@ -252,6 +269,7 @@
 
 ### TC-GOV-TPL-016: List template events (audit)
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template with events exists
 - **Input**:
   ```
   GET /governance/object-templates/<template-id>/events
@@ -264,6 +282,7 @@
 
 ### TC-GOV-TPL-017: Add scope to template
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template and archetype exist
 - **Input**:
   ```json
   POST /governance/object-templates/<template-id>/scopes
@@ -276,6 +295,7 @@
 
 ### TC-GOV-TPL-018: Remove scope from template
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template with scope exists
 - **Input**:
   ```
   DELETE /governance/object-templates/<template-id>/scopes/<scope-id>
@@ -288,6 +308,7 @@
 ### TC-GOV-TPL-019: Simulate template application
 - **Category**: Nominal
 - **Standard**: IGA Impact Preview
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active template with rules exists
 - **Input**:
   ```json
   POST /governance/object-templates/<template-id>/simulate
@@ -316,6 +337,7 @@
 ### TC-GOV-TPL-020: Create merge policy for template
 - **Category**: Nominal
 - **Standard**: IGA Template Conflict Resolution
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template exists
 - **Input**:
   ```json
   POST /governance/object-templates/<template-id>/merge-policies
@@ -332,6 +354,7 @@
 
 ### TC-GOV-TPL-021: Create template exclusion
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template and user exist
 - **Input**:
   ```json
   POST /governance/object-templates/<template-id>/exclusions
@@ -344,6 +367,7 @@
 
 ### TC-GOV-TPL-022: List application events by template
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template with application events exists
 - **Input**:
   ```
   GET /governance/object-templates/<template-id>/application-events
@@ -356,6 +380,7 @@
 
 ### TC-GOV-TPL-023: List application events by object
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User with template application events exists
 - **Input**:
   ```
   GET /governance/object-templates/application-events/user/<user-id>
@@ -372,7 +397,7 @@
 
 ### TC-GOV-TPL-025: Create template with duplicate name
 - **Category**: Edge Case
-- **Preconditions**: Template "Standard Employee User Template" exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template "Standard Employee User Template" exists
 - **Input**:
   ```json
   POST /governance/object-templates
@@ -385,6 +410,7 @@
 
 ### TC-GOV-TPL-026: Create template with priority out of range
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/object-templates
@@ -398,7 +424,7 @@
 
 ### TC-GOV-TPL-027: Delete active template
 - **Category**: Edge Case
-- **Preconditions**: Template is active
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template is active
 - **Input**:
   ```
   DELETE /governance/object-templates/<active-template-id>
@@ -411,6 +437,7 @@
 
 ### TC-GOV-TPL-028: Name exceeding 255 characters
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/object-templates
@@ -423,6 +450,7 @@
 
 ### TC-GOV-TPL-029: Get non-existent template
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```
   GET /governance/object-templates/00000000-0000-0000-0000-000000000099
@@ -439,7 +467,7 @@
 ### TC-GOV-TPL-030: Create template without admin role
 - **Category**: Security
 - **Standard**: NIST SP 800-53 AC-6
-- **Preconditions**: JWT with user role only
+- **Preconditions**: Fixtures: `TEST_TENANT`. JWT with user role only
 - **Input**:
   ```json
   POST /governance/object-templates
@@ -453,7 +481,7 @@
 ### TC-GOV-TPL-031: Access template cross-tenant
 - **Category**: Security
 - **Standard**: Multi-tenancy isolation
-- **Preconditions**: Template in tenant A; JWT for tenant B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template in tenant A; JWT for tenant B (second tenant required)
 - **Input**:
   ```
   GET /governance/object-templates/<tenant-a-template-id>
@@ -465,7 +493,7 @@
 
 ### TC-GOV-TPL-032: Modify template cross-tenant
 - **Category**: Security
-- **Preconditions**: Template in tenant A; JWT for tenant B admin
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template in tenant A; JWT for tenant B admin (second tenant required)
 - **Input**:
   ```json
   PUT /governance/object-templates/<tenant-a-template-id>
@@ -483,6 +511,7 @@
 ### TC-GOV-TPL-040: Templates enforce standardized provisioning
 - **Category**: Compliance
 - **Standard**: ISO 27001 A.9.2.2 (User Access Provisioning)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template with default values and validation rules configured
 - **Steps**:
   1. Create template with default values for lifecycle_state, notification preferences
   2. Create validation rules for email domain, required fields
@@ -494,6 +523,7 @@
 ### TC-GOV-TPL-041: Template versioning supports change management
 - **Category**: Compliance
 - **Standard**: ISO 27001 A.12.1.2 (Change Management)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Create and activate template v1
   2. Modify template (creates v2)
@@ -504,6 +534,7 @@
 ### TC-GOV-TPL-042: Template simulation enables safe previews
 - **Category**: Compliance
 - **Standard**: IGA Change Risk Assessment
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Template with complex rules exists
 - **Steps**:
   1. Create template with complex rules
   2. Run simulation with sample object
@@ -514,6 +545,7 @@
 ### TC-GOV-TPL-043: Scoped templates apply to correct identity types
 - **Category**: Compliance
 - **Standard**: IGA Identity Classification
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Employee and contractor archetypes exist
 - **Steps**:
   1. Create template scoped to "Employee" archetype
   2. Create template scoped to "Contractor" archetype

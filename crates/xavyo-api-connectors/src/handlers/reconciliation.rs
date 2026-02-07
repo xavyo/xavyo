@@ -18,6 +18,7 @@ use xavyo_webhooks::{EventPublisher, WebhookEvent};
 
 use crate::error::{ApiError, ConnectorApiError};
 use crate::router::ReconciliationState;
+use crate::services::ReconciliationServiceError;
 
 // ============================================================================
 // Request/Response Types for Runs
@@ -419,6 +420,9 @@ pub async fn trigger_reconciliation(
     Path(connector_id): Path<Uuid>,
     Json(request): Json<TriggerReconciliationRequest>,
 ) -> Result<(StatusCode, Json<ReconciliationRunResponse>), ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let actor_id = Uuid::parse_str(&claims.sub).ok();
 
@@ -432,7 +436,7 @@ pub async fn trigger_reconciliation(
             request.dry_run,
         )
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     let stats: ReconciliationStatistics = run
         .statistics
@@ -501,7 +505,7 @@ pub async fn get_reconciliation_run(
         .reconciliation_service
         .get_run(tenant_id, connector_id, run_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?
+        .map_err(map_reconciliation_error)?
         .ok_or_else(|| ApiError::not_found("Reconciliation run not found"))?;
 
     let stats: ReconciliationStatistics =
@@ -555,7 +559,7 @@ pub async fn list_reconciliation_runs(
             query.offset.unwrap_or(0).max(0),
         )
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     let runs: Vec<ReconciliationRunResponse> = runs
         .into_iter()
@@ -607,7 +611,7 @@ pub async fn cancel_reconciliation_run(
         .reconciliation_service
         .cancel_run(tenant_id, connector_id, run_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -639,7 +643,7 @@ pub async fn resume_reconciliation_run(
         .reconciliation_service
         .resume_run(tenant_id, connector_id, run_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     let stats: ReconciliationStatistics =
         serde_json::from_value(run.statistics.clone()).unwrap_or_default();
@@ -699,7 +703,7 @@ pub async fn list_discrepancies(
             query.offset.unwrap_or(0).max(0),
         )
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     let discrepancies: Vec<DiscrepancyResponse> = discrepancies
         .into_iter()
@@ -752,7 +756,7 @@ pub async fn get_discrepancy(
         .reconciliation_service
         .get_discrepancy(tenant_id, connector_id, discrepancy_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?
+        .map_err(map_reconciliation_error)?
         .ok_or_else(|| ApiError::not_found("Discrepancy not found"))?;
 
     Ok(Json(DiscrepancyResponse {
@@ -794,6 +798,9 @@ pub async fn remediate_discrepancy(
     Path((connector_id, discrepancy_id)): Path<(Uuid, Uuid)>,
     Json(request): Json<RemediateRequest>,
 ) -> Result<Json<RemediationResponse>, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let user_id = Uuid::parse_str(&claims.sub).ok();
 
@@ -810,7 +817,7 @@ pub async fn remediate_discrepancy(
             request.dry_run,
         )
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     Ok(Json(result))
 }
@@ -837,6 +844,9 @@ pub async fn bulk_remediate_discrepancies(
     Path(connector_id): Path<Uuid>,
     Json(request): Json<BulkRemediateRequest>,
 ) -> Result<Json<BulkRemediationResponse>, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let user_id = Uuid::parse_str(&claims.sub).ok();
 
@@ -857,7 +867,7 @@ pub async fn bulk_remediate_discrepancies(
             request.dry_run,
         )
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     Ok(Json(result))
 }
@@ -883,6 +893,9 @@ pub async fn ignore_discrepancy(
     Extension(claims): Extension<JwtClaims>,
     Path((connector_id, discrepancy_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let user_id = Uuid::parse_str(&claims.sub).ok();
 
@@ -890,7 +903,7 @@ pub async fn ignore_discrepancy(
         .reconciliation_service
         .ignore_discrepancy(tenant_id, user_id, connector_id, discrepancy_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -922,7 +935,7 @@ pub async fn preview_remediation(
         .reconciliation_service
         .preview(tenant_id, connector_id, request.discrepancy_ids)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     Ok(Json(result))
 }
@@ -957,7 +970,7 @@ pub async fn get_schedule(
         .reconciliation_service
         .get_schedule(tenant_id, connector_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?
+        .map_err(map_reconciliation_error)?
         .ok_or_else(|| ApiError::not_found("Schedule not found"))?;
 
     Ok(Json(ScheduleResponse {
@@ -996,6 +1009,9 @@ pub async fn update_schedule(
     Path(connector_id): Path<Uuid>,
     Json(request): Json<ScheduleRequest>,
 ) -> Result<Json<ScheduleResponse>, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     let schedule = state
@@ -1011,7 +1027,7 @@ pub async fn update_schedule(
             request.enabled,
         )
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     Ok(Json(ScheduleResponse {
         id: schedule.id,
@@ -1048,13 +1064,16 @@ pub async fn delete_schedule(
     Extension(claims): Extension<JwtClaims>,
     Path(connector_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     state
         .reconciliation_service
         .delete_schedule(tenant_id, connector_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1085,7 +1104,7 @@ pub async fn enable_schedule(
         .reconciliation_service
         .enable_schedule(tenant_id, connector_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1116,7 +1135,7 @@ pub async fn disable_schedule(
         .reconciliation_service
         .disable_schedule(tenant_id, connector_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1142,7 +1161,7 @@ pub async fn list_schedules(
         .reconciliation_service
         .list_schedules(tenant_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     let schedules: Vec<ScheduleResponse> = schedules
         .into_iter()
@@ -1195,7 +1214,7 @@ pub async fn get_report(
         .reconciliation_service
         .get_report(tenant_id, connector_id, run_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     Ok(Json(report))
 }
@@ -1223,7 +1242,7 @@ pub async fn get_trend(
         .reconciliation_service
         .get_trend(tenant_id, query.connector_id, query.from, query.to)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     Ok(Json(trend))
 }
@@ -1268,7 +1287,7 @@ pub async fn list_actions(
             query.offset.unwrap_or(0).max(0),
         )
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(map_reconciliation_error)?;
 
     let actions: Vec<ActionResponse> = actions
         .into_iter()
@@ -1301,6 +1320,20 @@ fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiError> {
         .ok_or(ConnectorApiError::Unauthorized {
             message: "Missing tenant ID in token".to_string(),
         })
+}
+
+/// Map reconciliation service errors to API errors with proper status codes.
+fn map_reconciliation_error(err: ReconciliationServiceError) -> ApiError {
+    match err {
+        ReconciliationServiceError::NotFound(msg) => ApiError::not_found(msg),
+        ReconciliationServiceError::InvalidParameter(msg) => ApiError::bad_request(msg),
+        ReconciliationServiceError::Conflict(msg) => ApiError::conflict(msg),
+        ReconciliationServiceError::Database(e) => {
+            tracing::error!("Reconciliation database error: {e}");
+            ApiError::internal("Database error")
+        }
+        ReconciliationServiceError::Reconciliation(msg) => ApiError::internal(msg),
+    }
 }
 
 /// Get suggested actions for a discrepancy type.

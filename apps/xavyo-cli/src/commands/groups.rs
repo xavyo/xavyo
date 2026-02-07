@@ -53,12 +53,12 @@ async fn execute_list(args: ListArgs) -> CliResult<()> {
         println!("No groups found.");
     } else {
         print_group_table(&response.groups);
-        println!();
-        println!(
-            "Showing {} of {} groups",
-            response.groups.len(),
-            response.total
-        );
+        let total = response
+            .pagination
+            .as_ref()
+            .and_then(|p| p.total_count)
+            .unwrap_or(response.groups.len() as i64);
+        println!("\nShowing {} of {} groups", response.groups.len(), total);
     }
 
     Ok(())

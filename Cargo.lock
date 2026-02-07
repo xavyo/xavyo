@@ -8399,6 +8399,7 @@ dependencies = [
  "tracing",
  "utoipa",
  "uuid",
+ "validator",
  "xavyo-api-agents",
  "xavyo-api-governance",
  "xavyo-auth",
@@ -8676,7 +8677,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "aes-gcm",
  "anyhow",

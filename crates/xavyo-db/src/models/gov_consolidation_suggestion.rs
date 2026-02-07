@@ -99,7 +99,11 @@ impl GovConsolidationSuggestion {
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_consolidation_suggestions
+            SELECT id, tenant_id, job_id, role_a_id, role_b_id,
+                overlap_percent::float8 as overlap_percent,
+                shared_entitlements, unique_to_a, unique_to_b,
+                status, dismissed_reason, created_at
+            FROM gov_consolidation_suggestions
             WHERE id = $1 AND tenant_id = $2
             ",
         )
@@ -120,7 +124,11 @@ impl GovConsolidationSuggestion {
     ) -> Result<Vec<Self>, sqlx::Error> {
         let mut query = String::from(
             r"
-            SELECT * FROM gov_consolidation_suggestions
+            SELECT id, tenant_id, job_id, role_a_id, role_b_id,
+                overlap_percent::float8 as overlap_percent,
+                shared_entitlements, unique_to_a, unique_to_b,
+                status, dismissed_reason, created_at
+            FROM gov_consolidation_suggestions
             WHERE tenant_id = $1 AND job_id = $2
             ",
         );
@@ -224,7 +232,10 @@ impl GovConsolidationSuggestion {
                 overlap_percent, shared_entitlements, unique_to_a, unique_to_b
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING *
+            RETURNING id, tenant_id, job_id, role_a_id, role_b_id,
+                overlap_percent::float8 as overlap_percent,
+                shared_entitlements, unique_to_a, unique_to_b,
+                status, dismissed_reason, created_at
             ",
         )
         .bind(tenant_id)
@@ -264,7 +275,10 @@ impl GovConsolidationSuggestion {
             UPDATE gov_consolidation_suggestions
             SET status = 'merged'
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
-            RETURNING *
+            RETURNING id, tenant_id, job_id, role_a_id, role_b_id,
+                overlap_percent::float8 as overlap_percent,
+                shared_entitlements, unique_to_a, unique_to_b,
+                status, dismissed_reason, created_at
             ",
         )
         .bind(id)
@@ -285,7 +299,10 @@ impl GovConsolidationSuggestion {
             UPDATE gov_consolidation_suggestions
             SET status = 'dismissed', dismissed_reason = $3
             WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
-            RETURNING *
+            RETURNING id, tenant_id, job_id, role_a_id, role_b_id,
+                overlap_percent::float8 as overlap_percent,
+                shared_entitlements, unique_to_a, unique_to_b,
+                status, dismissed_reason, created_at
             ",
         )
         .bind(id)

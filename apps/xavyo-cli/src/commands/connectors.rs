@@ -99,14 +99,14 @@ async fn execute_list(args: ListArgs) -> CliResult<()> {
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&response)?);
-    } else if response.connectors.is_empty() {
+    } else if response.items.is_empty() {
         println!("No connectors found.");
     } else {
-        print_connector_table(&response.connectors);
+        print_connector_table(&response.items);
         println!();
         println!(
             "Showing {} of {} connectors",
-            response.connectors.len(),
+            response.items.len(),
             response.total
         );
     }

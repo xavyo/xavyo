@@ -16,11 +16,20 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: Organization must exist for security policy tests
+
+---
+
 ## Nominal Cases
 
 ### TC-TENANT-SET-001: Get tenant settings
 - **Category**: Nominal
-- **Preconditions**: Authenticated system admin
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated system admin
 - **Input**: `GET /system/tenants/:id/settings`
 - **Expected Output**:
   ```
@@ -53,6 +62,7 @@
 ### TC-TENANT-SET-002: Update password policy settings
 - **Category**: Nominal
 - **Standard**: NIST SP 800-63B Section 5.1.1
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   PATCH /system/tenants/:id/settings
@@ -70,6 +80,7 @@
 ### TC-TENANT-SET-003: Update MFA policy to required
 - **Category**: Nominal
 - **Standard**: NIST SP 800-63B AAL2
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   PATCH /system/tenants/:id/settings
@@ -85,6 +96,7 @@
 
 ### TC-TENANT-SET-004: Update session timeout settings
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   PATCH /system/tenants/:id/settings
@@ -99,13 +111,14 @@
 
 ### TC-TENANT-SET-005: Get tenant user-facing settings
 - **Category**: Nominal
-- **Preconditions**: Tenant admin authenticated
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Tenant admin authenticated
 - **Input**: `GET /tenants/:tenant_id/settings`
 - **Expected Output**: Status 200, settings visible to tenant admin
 
 ### TC-TENANT-SET-006: Create organization security policy
 - **Category**: Nominal
 - **Standard**: ISO 27001 Annex A.9
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Organization exists
 - **Input**:
   ```json
   POST /organizations/:org_id/security-policies
@@ -124,11 +137,13 @@
 
 ### TC-TENANT-SET-007: Get specific security policy
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Security policy exists
 - **Input**: `GET /organizations/:org_id/security-policies/password`
 - **Expected Output**: Status 200, password policy configuration
 
 ### TC-TENANT-SET-008: Update security policy (upsert)
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Organization exists
 - **Input**:
   ```json
   PUT /organizations/:org_id/security-policies/mfa
@@ -143,16 +158,19 @@
 
 ### TC-TENANT-SET-009: List all security policies for organization
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Organization exists with policies
 - **Input**: `GET /organizations/:org_id/security-policies`
 - **Expected Output**: Status 200, list of all policy types and their configurations
 
 ### TC-TENANT-SET-010: Delete security policy
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Security policy exists
 - **Input**: `DELETE /organizations/:org_id/security-policies/password`
 - **Expected Output**: Status 200, policy deleted, tenant-level defaults apply
 
 ### TC-TENANT-SET-011: Validate security policy for conflicts
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Organization exists
 - **Input**:
   ```json
   POST /organizations/:org_id/security-policies/validate
@@ -172,31 +190,37 @@
 
 ### TC-TENANT-SET-012: Update settings with invalid password min_length
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "password_policy": { "min_length": 3 } }` (below NIST minimum)
 - **Expected Output**: Status 400 "Minimum password length must be at least 8"
 
 ### TC-TENANT-SET-013: Update settings with negative timeout
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "session_policy": { "idle_timeout_minutes": -1 } }`
 - **Expected Output**: Status 400 "Timeout must be positive"
 
 ### TC-TENANT-SET-014: Update settings with zero max sessions
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "session_policy": { "max_sessions": 0 } }`
 - **Expected Output**: Status 400 "Max sessions must be at least 1"
 
 ### TC-TENANT-SET-015: Delete non-existent security policy
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `DELETE /organizations/:org_id/security-policies/nonexistent`
 - **Expected Output**: Status 404
 
 ### TC-TENANT-SET-016: Create policy for non-existent organization
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `POST /organizations/00000000-0000-0000-0000-000000000099/security-policies`
 - **Expected Output**: Status 404 "Organization not found"
 
 ### TC-TENANT-SET-017: Partial settings update preserves other fields
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Settings with known initial values
 - **Steps**:
   1. Note current settings (password min_length=8, require_special=true)
   2. `PATCH` only `{ "password_policy": { "min_length": 12 } }`
@@ -209,15 +233,18 @@
 
 ### TC-TENANT-SET-018: Non-admin cannot modify settings
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`. Authenticated as regular (non-admin) user
 - **Input**: Regular user calls `PATCH /system/tenants/:id/settings`
 - **Expected Output**: Status 403 Forbidden
 
 ### TC-TENANT-SET-019: Cross-tenant settings isolation
 - **Category**: Security
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Two tenants exist
 - **Input**: Admin of tenant A tries to modify tenant B's settings
 - **Expected Output**: Status 403 Forbidden
 
 ### TC-TENANT-SET-020: Audit trail for settings changes
 - **Category**: Security
 - **Standard**: SOC 2 CC6.1, ISO 27001
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Settings changes performed
 - **Verification**: All settings changes logged with: who changed, what changed (before/after), when

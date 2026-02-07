@@ -9,12 +9,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `TEST_TENANT`
+- **Special Setup**: None -- discovery endpoints are public
+
+---
+
 ## Nominal Cases
 
 ### TC-OIDC-DISC-001: Successful retrieval of OpenID Configuration document
 - **Category**: Nominal
 - **Standard**: OpenID Connect Discovery 1.0, Section 4
-- **Preconditions**: Server is running with a configured issuer URL
+- **Preconditions**: Fixtures: `TEST_TENANT`. Server is running with a configured issuer URL
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -49,7 +58,7 @@
 ### TC-OIDC-DISC-002: Issuer matches the request origin
 - **Category**: Nominal
 - **Standard**: OpenID Connect Discovery 1.0, Section 4.3
-- **Preconditions**: Server configured with issuer `https://idp.xavyo.com`
+- **Preconditions**: Fixtures: `TEST_TENANT`. Server configured with issuer `https://idp.xavyo.com`
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -62,7 +71,7 @@
 ### TC-OIDC-DISC-003: JWKS endpoint returns valid JSON Web Key Set
 - **Category**: Nominal
 - **Standard**: RFC 7517, Section 5
-- **Preconditions**: Server has at least one configured RSA signing key
+- **Preconditions**: Fixtures: `TEST_TENANT`. Server has at least one configured RSA signing key
 - **Input**:
   ```
   GET /.well-known/jwks.json
@@ -89,7 +98,7 @@
 ### TC-OIDC-DISC-004: JWKS contains multiple keys during key rotation
 - **Category**: Nominal
 - **Standard**: RFC 7517, Section 5 (key rotation)
-- **Preconditions**: Server configured with multiple signing keys (active + rotated) via F069-S5
+- **Preconditions**: Fixtures: `TEST_TENANT`. Server configured with multiple signing keys (active + rotated) via F069-S5
 - **Input**:
   ```
   GET /.well-known/jwks.json
@@ -103,7 +112,7 @@
 ### TC-OIDC-DISC-005: Discovery document includes device_authorization_endpoint
 - **Category**: Nominal
 - **Standard**: RFC 8628, Section 4
-- **Preconditions**: Device code flow is enabled
+- **Preconditions**: Fixtures: `TEST_TENANT`. Device code flow is enabled
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -115,7 +124,7 @@
 ### TC-OIDC-DISC-006: Discovery document declares PKCE S256 support
 - **Category**: Nominal
 - **Standard**: RFC 7636, Section 4.2
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -127,7 +136,7 @@
 ### TC-OIDC-DISC-007: JWK modulus and exponent are valid base64url
 - **Category**: Nominal
 - **Standard**: RFC 7518, Section 6.3.1
-- **Preconditions**: At least one signing key configured
+- **Preconditions**: Fixtures: `TEST_TENANT`. At least one signing key configured
 - **Input**:
   ```
   GET /.well-known/jwks.json
@@ -140,7 +149,7 @@
 ### TC-OIDC-DISC-008: Discovery response is cacheable
 - **Category**: Nominal
 - **Standard**: OpenID Connect Discovery 1.0, Section 4
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -157,7 +166,7 @@
 ### TC-OIDC-DISC-010: Discovery with Accept header specifying XML
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Discovery 1.0, Section 4
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -171,7 +180,7 @@
 ### TC-OIDC-DISC-011: POST request to discovery endpoint
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Discovery 1.0, Section 4
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   POST /.well-known/openid-configuration
@@ -185,7 +194,7 @@
 ### TC-OIDC-DISC-012: POST request to JWKS endpoint
 - **Category**: Edge Case
 - **Standard**: RFC 7517, Section 5
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   POST /.well-known/jwks.json
@@ -198,7 +207,7 @@
 ### TC-OIDC-DISC-013: JWKS endpoint with no configured signing keys
 - **Category**: Edge Case
 - **Standard**: RFC 7517, Section 5
-- **Preconditions**: Server started with empty signing key configuration (signing_keys is empty and public_key PEM is invalid/empty)
+- **Preconditions**: Fixtures: `TEST_TENANT`. Server started with empty signing key configuration (signing_keys is empty and public_key PEM is invalid/empty)
 - **Input**:
   ```
   GET /.well-known/jwks.json
@@ -213,7 +222,7 @@
 ### TC-OIDC-DISC-014: Discovery with query parameters (ignored)
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Discovery 1.0, Section 4
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration?extra=param&foo=bar
@@ -226,7 +235,7 @@
 ### TC-OIDC-DISC-015: Large number of concurrent discovery requests
 - **Category**: Edge Case
 - **Standard**: Operational
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**: 100 concurrent `GET /.well-known/openid-configuration` requests
 - **Expected Output**:
   - All requests return 200 OK
@@ -236,7 +245,7 @@
 ### TC-OIDC-DISC-016: JWKS URI in discovery matches actual JWKS endpoint
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Discovery 1.0, Section 3
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   1. `GET /.well-known/openid-configuration` -- extract `jwks_uri`
   2. `GET {extracted_jwks_uri}`
@@ -247,7 +256,7 @@
 ### TC-OIDC-DISC-017: All endpoint URLs in discovery are absolute
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Discovery 1.0, Section 3
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -263,7 +272,7 @@
 ### TC-OIDC-DISC-018: Discovery document fields are non-empty arrays where required
 - **Category**: Edge Case
 - **Standard**: OpenID Connect Discovery 1.0, Section 3
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -278,7 +287,7 @@
 ### TC-OIDC-DISC-019: JWKS keys have unique kid values
 - **Category**: Edge Case
 - **Standard**: RFC 7517, Section 4.5
-- **Preconditions**: Multiple signing keys configured
+- **Preconditions**: Fixtures: `TEST_TENANT`. Multiple signing keys configured
 - **Input**:
   ```
   GET /.well-known/jwks.json
@@ -294,7 +303,7 @@
 ### TC-OIDC-DISC-020: Discovery endpoint does not leak internal server details
 - **Category**: Security
 - **Standard**: OWASP ASVS 14.3
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -308,7 +317,7 @@
 ### TC-OIDC-DISC-021: JWKS does not expose private key material
 - **Category**: Security
 - **Standard**: RFC 7517, Section 4 / OWASP Cryptographic Failures
-- **Preconditions**: Signing keys configured
+- **Preconditions**: Fixtures: `TEST_TENANT`. Signing keys configured
 - **Input**:
   ```
   GET /.well-known/jwks.json
@@ -322,7 +331,7 @@
 ### TC-OIDC-DISC-022: Discovery endpoint returns security headers
 - **Category**: Security
 - **Standard**: OWASP ASVS 14.4
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -335,7 +344,7 @@
 ### TC-OIDC-DISC-023: JWKS endpoint resistant to timing attacks
 - **Category**: Security
 - **Standard**: Cryptographic best practices
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**: Multiple rapid requests to `GET /.well-known/jwks.json`
 - **Expected Output**:
   - Response time is consistent regardless of key state
@@ -345,7 +354,7 @@
 ### TC-OIDC-DISC-024: Discovery endpoint does not support CORS wildcard
 - **Category**: Security
 - **Standard**: OWASP ASVS 14.5
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -362,7 +371,7 @@
 ### TC-OIDC-DISC-030: Required fields per OIDC Discovery 1.0 Section 3
 - **Category**: Compliance
 - **Standard**: OpenID Connect Discovery 1.0, Section 3
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -379,7 +388,7 @@
 ### TC-OIDC-DISC-031: Issuer URL uses HTTPS scheme
 - **Category**: Compliance
 - **Standard**: OpenID Connect Discovery 1.0, Section 3 / RFC 8414, Section 2
-- **Preconditions**: Production deployment
+- **Preconditions**: Fixtures: `TEST_TENANT`. Production deployment
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -392,7 +401,7 @@
 ### TC-OIDC-DISC-032: Issuer value contains no trailing slash
 - **Category**: Compliance
 - **Standard**: OpenID Connect Discovery 1.0, Section 3
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -404,7 +413,7 @@
 ### TC-OIDC-DISC-033: scopes_supported includes openid
 - **Category**: Compliance
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.2.1
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -416,7 +425,7 @@
 ### TC-OIDC-DISC-034: response_types_supported includes code
 - **Category**: Compliance
 - **Standard**: OpenID Connect Core 1.0, Section 3
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -428,7 +437,7 @@
 ### TC-OIDC-DISC-035: subject_types_supported includes public
 - **Category**: Compliance
 - **Standard**: OpenID Connect Core 1.0, Section 8
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -440,7 +449,7 @@
 ### TC-OIDC-DISC-036: id_token_signing_alg includes RS256
 - **Category**: Compliance
 - **Standard**: OpenID Connect Core 1.0, Section 3.1.3.7
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -452,7 +461,7 @@
 ### TC-OIDC-DISC-037: claims_supported includes mandatory OIDC claims
 - **Category**: Compliance
 - **Standard**: OpenID Connect Core 1.0, Section 5.1
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -466,7 +475,7 @@
 ### TC-OIDC-DISC-038: token_endpoint_auth_methods_supported values are valid
 - **Category**: Compliance
 - **Standard**: OpenID Connect Core 1.0, Section 9
-- **Preconditions**: None
+- **Preconditions**: Fixtures: `TEST_TENANT`. No specific setup required
 - **Input**:
   ```
   GET /.well-known/openid-configuration
@@ -479,7 +488,7 @@
 ### TC-OIDC-DISC-039: JWK Set conforms to RFC 7517 structure
 - **Category**: Compliance
 - **Standard**: RFC 7517, Sections 4 and 5
-- **Preconditions**: At least one signing key configured
+- **Preconditions**: Fixtures: `TEST_TENANT`. At least one signing key configured
 - **Input**:
   ```
   GET /.well-known/jwks.json

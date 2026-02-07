@@ -28,6 +28,9 @@ pub async fn list_import_errors(
     Query(params): Query<ListImportErrorsParams>,
 ) -> Result<Json<ImportErrorListResponse>, ImportError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ImportError::Forbidden);
+    }
 
     // Verify job exists and belongs to tenant
     let _ = ImportService::get_job(&pool, tenant_id, job_id).await?;
@@ -58,6 +61,9 @@ pub async fn download_import_errors(
     Path(job_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ImportError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ImportError::Forbidden);
+    }
 
     // Verify job exists and belongs to tenant
     let job = ImportService::get_job(&pool, tenant_id, job_id).await?;

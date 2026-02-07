@@ -12,6 +12,7 @@ use axum::{
     Extension, Json,
 };
 use uuid::Uuid;
+use validator::Validate;
 
 use xavyo_auth::JwtClaims;
 
@@ -137,6 +138,7 @@ pub async fn create_service_account(
     if !claims.has_role("admin") {
         return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
     }
+    request.validate()?;
     let actor_id = extract_actor_id(&claims)?;
     let nhi = state
         .nhi_service

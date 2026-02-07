@@ -392,9 +392,12 @@ impl EmailTemplateService {
     // ========================================================================
 
     /// Validate Handlebars template syntax.
+    ///
+    /// Uses sample data for validation so that known template variables
+    /// (e.g. `{{tenant_name}}`) pass strict-mode rendering.
     fn validate_template(&self, template: &str) -> Result<(), ApiAuthError> {
         self.handlebars
-            .render_template(template, &HashMap::<String, String>::new())
+            .render_template(template, &self.get_sample_data())
             .map(|_| ())
             .map_err(|e| ApiAuthError::InvalidTemplateSyntax(e.to_string()))
     }

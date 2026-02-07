@@ -206,7 +206,8 @@ impl IntoResponse for ApiGovernanceError {
                         | GovernanceError::NoRecipientsSpecified
                         | GovernanceError::InvalidRecipientEmail(_)
                         | GovernanceError::ReportGenerationFailed(_)
-                        | GovernanceError::PersonaExtensionExceedsMax { .. } => {
+                        | GovernanceError::PersonaExtensionExceedsMax { .. }
+                        | GovernanceError::InvalidMiningParameters(_) => {
                             (StatusCode::BAD_REQUEST, "validation_error", e.to_string())
                         }
                         GovernanceError::Database(ref db_err) => {

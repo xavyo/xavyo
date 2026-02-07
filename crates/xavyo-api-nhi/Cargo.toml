@@ -43,6 +43,9 @@ argon2 = "0.5"
 rand = "0.8"
 base64.workspace = true
 
+# Validation
+validator = { version = "0.20", features = ["derive"] }
+
 # OpenAPI documentation
 utoipa.workspace = true
 

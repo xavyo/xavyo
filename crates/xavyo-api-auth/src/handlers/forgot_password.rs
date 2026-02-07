@@ -15,6 +15,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use validator::Validate;
 use xavyo_core::TenantId;
+use xavyo_db::set_tenant_context;
 
 /// Handle forgot password request.
 ///
@@ -131,14 +132,6 @@ async fn process_forgot_password(
         return Ok(()); // Don't leak account status
     }
 
-    // Invalidate any existing unused tokens for this user
-    sqlx::query(
-        "UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL",
-    )
-    .bind(user_id)
-    .execute(pool)
-    .await?;
-
     // Generate new token
     let (token, token_hash) = generate_password_reset_token();
     let expires_at = Utc::now() + Duration::hours(PASSWORD_RESET_TOKEN_VALIDITY_HOURS);
@@ -148,6 +141,18 @@ async fn process_forgot_password(
         .get(axum::http::header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
         .map(String::from);
+
+    // Use a transaction with tenant context for RLS compliance
+    let mut tx = pool.begin().await?;
+    set_tenant_context(&mut *tx, tenant_id).await?;
+
+    // Invalidate any existing unused tokens for this user
+    sqlx::query(
+        "UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL",
+    )
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await?;
 
     // Store token hash in database
     sqlx::query(
@@ -162,8 +167,10 @@ async fn process_forgot_password(
     .bind(expires_at)
     .bind(ip.to_string())
     .bind(user_agent)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     // Send email
     email_sender

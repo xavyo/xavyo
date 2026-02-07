@@ -35,6 +35,9 @@ pub async fn resend_user_invitation(
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<InvitationResponse>, ImportError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ImportError::Forbidden);
+    }
 
     // Verify user exists and belongs to tenant (tenant-scoped lookup)
     let user = User::find_by_id_in_tenant(&pool, user_id, tenant_id)
@@ -66,6 +69,9 @@ pub async fn bulk_resend_invitations(
     Path(job_id): Path<Uuid>,
 ) -> Result<Json<BulkResendResponse>, ImportError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ImportError::Forbidden);
+    }
 
     // Verify job exists and belongs to tenant
     let _ = ImportService::get_job(&pool, tenant_id, job_id).await?;

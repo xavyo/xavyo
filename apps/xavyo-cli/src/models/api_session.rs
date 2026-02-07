@@ -71,8 +71,8 @@ pub struct ApiSession {
     #[serde(default)]
     pub os: Option<String>,
 
-    /// Client application (e.g., "xavyo-cli v0.1.0", "Chrome 120")
-    #[serde(default)]
+    /// Client application / browser (e.g., "xavyo-cli v0.1.0", "Chrome 120")
+    #[serde(default, alias = "browser")]
     pub client: Option<String>,
 
     /// IP address of the session
@@ -99,9 +99,11 @@ pub struct SessionListResponse {
     pub sessions: Vec<ApiSession>,
 
     /// Total number of sessions
+    #[serde(default)]
     pub total: u32,
 
     /// Whether more sessions exist (pagination)
+    #[serde(default)]
     pub has_more: bool,
 
     /// Cursor for next page

@@ -7,12 +7,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `SCIM_TOKEN`, `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: SCIM bearer token provisioned for the test tenant
+
+---
+
 ## Nominal Cases
 
 ### TC-SCIM-USER-001: Create user with minimal required attributes
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.3
-- **Preconditions**: Valid SCIM Bearer token for tenant; no user with email `alice@example.com`
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Valid SCIM Bearer token for tenant; no user with email `alice@example.com`
 - **Input**:
   ```json
   POST /scim/v2/Users
@@ -52,7 +61,7 @@
 ### TC-SCIM-USER-002: Create user with full attributes
 - **Category**: Nominal
 - **Standard**: RFC 7643 Section 4.1, RFC 7644 Section 3.3
-- **Preconditions**: Valid SCIM Bearer token for tenant
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Valid SCIM Bearer token for tenant
 - **Input**:
   ```json
   POST /scim/v2/Users
@@ -96,7 +105,7 @@
 ### TC-SCIM-USER-003: Create user with enterprise extension attributes
 - **Category**: Nominal
 - **Standard**: RFC 7643 Section 4.3 (Enterprise User)
-- **Preconditions**: Valid SCIM Bearer token for tenant
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Valid SCIM Bearer token for tenant
 - **Input**:
   ```json
   POST /scim/v2/Users
@@ -125,7 +134,7 @@
 ### TC-SCIM-USER-004: Get user by ID
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.1
-- **Preconditions**: User `<user-id>` exists in tenant
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User `<user-id>` exists in tenant
 - **Input**:
   ```
   GET /scim/v2/Users/<user-id>
@@ -153,7 +162,7 @@
 ### TC-SCIM-USER-005: List users with default pagination
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2
-- **Preconditions**: Multiple users exist in tenant
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Multiple users exist in tenant
 - **Input**:
   ```
   GET /scim/v2/Users
@@ -175,7 +184,7 @@
 ### TC-SCIM-USER-006: List users with custom pagination
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.4
-- **Preconditions**: 50+ users exist in tenant
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. 50+ users exist in tenant
 - **Input**:
   ```
   GET /scim/v2/Users?startIndex=26&count=10
@@ -195,7 +204,7 @@
 ### TC-SCIM-USER-007: Replace user (PUT) with full resource
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.5.1
-- **Preconditions**: User `<user-id>` exists in tenant
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User `<user-id>` exists in tenant
 - **Input**:
   ```json
   PUT /scim/v2/Users/<user-id>
@@ -218,7 +227,7 @@
 ### TC-SCIM-USER-008: Patch user - replace single attribute
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.5.2
-- **Preconditions**: User `<user-id>` exists in tenant with `active = true`
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User `<user-id>` exists in tenant with `active = true`
 - **Input**:
   ```json
   PATCH /scim/v2/Users/<user-id>
@@ -238,7 +247,7 @@
 ### TC-SCIM-USER-009: Patch user - replace displayName
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.5.2
-- **Preconditions**: User exists
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User exists
 - **Input**:
   ```json
   PATCH /scim/v2/Users/<user-id>
@@ -258,7 +267,7 @@
 ### TC-SCIM-USER-010: Patch user - multiple operations in one request
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.5.2
-- **Preconditions**: User exists
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User exists
 - **Input**:
   ```json
   PATCH /scim/v2/Users/<user-id>
@@ -281,7 +290,7 @@
 ### TC-SCIM-USER-011: Delete user (soft delete / deactivate)
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.6
-- **Preconditions**: User `<user-id>` exists in tenant with `active = true`
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User `<user-id>` exists in tenant with `active = true`
 - **Input**:
   ```
   DELETE /scim/v2/Users/<user-id>
@@ -297,7 +306,7 @@
 ### TC-SCIM-USER-012: List users with filter (userName eq)
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.2
-- **Preconditions**: User `alice@example.com` exists
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User `alice@example.com` exists
 - **Input**:
   ```
   GET /scim/v2/Users?filter=userName eq "alice@example.com"
@@ -311,7 +320,7 @@
 ### TC-SCIM-USER-013: List users sorted by userName ascending
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.4.2.3
-- **Preconditions**: Multiple users exist
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Multiple users exist
 - **Input**:
   ```
   GET /scim/v2/Users?sortBy=userName&sortOrder=ascending
@@ -325,7 +334,7 @@
 ### TC-SCIM-USER-014: Patch user - replace with no path (bulk value object)
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.5.2
-- **Preconditions**: User exists
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User exists
 - **Input**:
   ```json
   PATCH /scim/v2/Users/<user-id>
@@ -345,7 +354,7 @@
 ### TC-SCIM-USER-015: Get user includes group memberships
 - **Category**: Nominal
 - **Standard**: RFC 7643 Section 4.1 (groups attribute)
-- **Preconditions**: User belongs to group "Engineering"
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User belongs to group "Engineering"
 - **Input**:
   ```
   GET /scim/v2/Users/<user-id>
@@ -370,7 +379,7 @@
 ### TC-SCIM-USER-020: Create user with duplicate userName
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.3 (uniqueness)
-- **Preconditions**: User `alice@example.com` already exists in tenant
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User `alice@example.com` already exists in tenant
 - **Input**:
   ```json
   POST /scim/v2/Users
@@ -394,7 +403,7 @@
 ### TC-SCIM-USER-021: Get non-existent user
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.1
-- **Preconditions**: No user with ID `00000000-0000-0000-0000-000000000099`
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. No user with ID `00000000-0000-0000-0000-000000000099`
 - **Input**:
   ```
   GET /scim/v2/Users/00000000-0000-0000-0000-000000000099
@@ -487,7 +496,7 @@
 ### TC-SCIM-USER-027: Replace user causing userName conflict with another user
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.5.1
-- **Preconditions**: User A has email `a@example.com`, User B has email `b@example.com`
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User A has email `a@example.com`, User B has email `b@example.com`
 - **Input**:
   ```json
   PUT /scim/v2/Users/<user-A-id>
@@ -567,7 +576,7 @@
 ### TC-SCIM-USER-031: Patch user - remove optional attributes
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.5.2
-- **Preconditions**: User has displayName, externalId, name.givenName, name.familyName set
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User has displayName, externalId, name.givenName, name.familyName set
 - **Input**:
   ```json
   PATCH /scim/v2/Users/<user-id>
@@ -601,7 +610,7 @@
 
 ### TC-SCIM-USER-033: Delete already-deactivated user
 - **Category**: Edge Case
-- **Preconditions**: User was previously deleted (deactivated via SCIM)
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User was previously deleted (deactivated via SCIM)
 - **Input**:
   ```
   DELETE /scim/v2/Users/<deactivated-user-id>
@@ -615,7 +624,7 @@
 ### TC-SCIM-USER-034: List users with empty result set
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2
-- **Preconditions**: New tenant with no users
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. New tenant with no users
 - **Input**:
   ```
   GET /scim/v2/Users
@@ -635,7 +644,7 @@
 ### TC-SCIM-USER-035: Pagination startIndex beyond total results
 - **Category**: Edge Case
 - **Standard**: RFC 7644 Section 3.4.2.4
-- **Preconditions**: Only 5 users exist
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Only 5 users exist
 - **Input**:
   ```
   GET /scim/v2/Users?startIndex=100
@@ -744,7 +753,7 @@
 
 ### TC-SCIM-USER-052: Request with revoked SCIM token
 - **Category**: Security
-- **Preconditions**: SCIM token was created then revoked via `DELETE /admin/scim/tokens/:id`
+- **Preconditions**: Fixtures: `TEST_TENANT`. SCIM token was created then revoked via `DELETE /admin/scim/tokens/:id`
 - **Input**:
   ```
   GET /scim/v2/Users
@@ -770,7 +779,7 @@
 
 ### TC-SCIM-USER-054: Cross-tenant user access
 - **Category**: Security
-- **Preconditions**: User `<user-id>` belongs to Tenant A; Bearer token belongs to Tenant B
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User `<user-id>` belongs to Tenant A; Bearer token belongs to Tenant B
 - **Input**:
   ```
   GET /scim/v2/Users/<user-id>
@@ -784,7 +793,7 @@
 
 ### TC-SCIM-USER-055: Cross-tenant user listing
 - **Category**: Security
-- **Preconditions**: Tenant A has 10 users; Tenant B has 5 users; Bearer token for Tenant B
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Tenant A has 10 users; Tenant B has 5 users; Bearer token for Tenant B
 - **Input**:
   ```
   GET /scim/v2/Users

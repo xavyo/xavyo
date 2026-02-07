@@ -19,14 +19,14 @@ use std::{
 use xavyo_api_auth::middleware::{extract_client_ip, RateLimitConfig, RateLimiter};
 
 /// Maximum provisioning requests per IP per hour.
-pub const PROVISION_RATE_LIMIT_MAX: usize = 10;
+pub const PROVISION_RATE_LIMIT_MAX: usize = 100;
 
 /// Rate limit window in seconds (1 hour).
 pub const PROVISION_RATE_LIMIT_WINDOW_SECS: u64 = 3600;
 
 /// Create a rate limiter configured for tenant provisioning.
 ///
-/// Configuration: 10 requests per IP per hour.
+/// Configuration: 100 requests per IP per hour.
 #[must_use]
 pub fn provision_rate_limiter() -> RateLimiter {
     RateLimiter::new(RateLimitConfig {
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn test_rate_limit_constants() {
-        assert_eq!(PROVISION_RATE_LIMIT_MAX, 10);
+        assert_eq!(PROVISION_RATE_LIMIT_MAX, 100);
         assert_eq!(PROVISION_RATE_LIMIT_WINDOW_SECS, 3600);
     }
 

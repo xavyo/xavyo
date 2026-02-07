@@ -17,12 +17,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`
+- **Special Setup**: Agent and tool must exist in same tenant for permission grant tests
+
+---
+
 ## Nominal Cases
 
 ### TC-AGENT-TOOL-001: Register a new tool
 - **Category**: Nominal
 - **Standard**: Zero Trust tool authorization
-- **Preconditions**: Authenticated admin user
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated admin user
 - **Input**:
   ```json
   POST /nhi/tools
@@ -65,6 +74,7 @@
 
 ### TC-AGENT-TOOL-002: Register a high-risk tool requiring approval
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated admin user
 - **Input**:
   ```json
   POST /nhi/tools
@@ -82,7 +92,7 @@
 
 ### TC-AGENT-TOOL-003: List all tools with pagination
 - **Category**: Nominal
-- **Preconditions**: 10 tools registered
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. 10 tools registered
 - **Input**: `GET /nhi/tools?limit=5&offset=0`
 - **Expected Output**:
   ```json
@@ -97,21 +107,25 @@
 
 ### TC-AGENT-TOOL-004: List tools filtered by category
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Tools with various categories exist
 - **Input**: `GET /nhi/tools?category=communication`
 - **Expected Output**: Status 200, only tools with `category=communication`
 
 ### TC-AGENT-TOOL-005: List tools filtered by risk_level
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Tools with various risk levels exist
 - **Input**: `GET /nhi/tools?risk_level=critical`
 - **Expected Output**: Status 200, only critical-risk tools
 
 ### TC-AGENT-TOOL-006: Get tool by ID
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Tool exists in tenant
 - **Input**: `GET /nhi/tools/<tool-id>`
 - **Expected Output**: Status 200, full tool object
 
 ### TC-AGENT-TOOL-007: Update tool description and approval requirement
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Tool exists in tenant
 - **Input**:
   ```json
   PATCH /nhi/tools/<tool-id>
@@ -124,13 +138,14 @@
 
 ### TC-AGENT-TOOL-008: Delete a tool
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Tool exists in tenant
 - **Input**: `DELETE /nhi/tools/<tool-id>`
 - **Expected Output**: Status 204 No Content
 
 ### TC-AGENT-TOOL-009: Grant tool permission to agent
 - **Category**: Nominal
 - **Standard**: Zero Trust - explicit permission grant
-- **Preconditions**: Agent and tool exist in same tenant
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent and tool exist in same tenant
 - **Input**:
   ```json
   POST /nhi/agents/<agent-id>/permissions
@@ -159,6 +174,7 @@
 
 ### TC-AGENT-TOOL-010: Grant permission without parameter restrictions
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent and tool exist in same tenant
 - **Input**:
   ```json
   POST /nhi/agents/<agent-id>/permissions
@@ -168,7 +184,7 @@
 
 ### TC-AGENT-TOOL-011: List agent permissions
 - **Category**: Nominal
-- **Preconditions**: Agent has 3 tool permissions
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent has 3 tool permissions
 - **Input**: `GET /nhi/agents/<agent-id>/permissions`
 - **Expected Output**:
   ```json
@@ -183,6 +199,7 @@
 
 ### TC-AGENT-TOOL-012: Revoke tool permission from agent
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent has permission for the tool
 - **Input**: `DELETE /nhi/agents/<agent-id>/permissions/<tool-id>`
 - **Expected Output**: Status 204 No Content
 - **Verification**: Agent can no longer authorize against this tool
@@ -190,7 +207,7 @@
 ### TC-AGENT-TOOL-013: Authorize agent for permitted tool
 - **Category**: Nominal
 - **Standard**: Zero Trust real-time authorization
-- **Preconditions**: Agent has permission for "send_email" tool
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent has permission for "send_email" tool
 - **Input**:
   ```json
   POST /nhi/agents/authorize
@@ -219,7 +236,7 @@
 
 ### TC-AGENT-TOOL-014: Authorization returns require_approval for high-risk tools
 - **Category**: Nominal
-- **Preconditions**: Agent has permission for tool with `requires_approval=true`
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent has permission for tool with `requires_approval=true`
 - **Input**: Authorization request for the approval-required tool
 - **Expected Output**:
   ```json
@@ -236,33 +253,37 @@
 
 ### TC-AGENT-TOOL-020: Register tool with duplicate name in same tenant
 - **Category**: Edge Case
-- **Preconditions**: Tool "send_email" exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Tool "send_email" exists
 - **Input**: `POST /nhi/tools { "name": "send_email", ... }`
 - **Expected Output**: Status 409 Conflict
 
 ### TC-AGENT-TOOL-021: Get non-existent tool
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `GET /nhi/tools/<nonexistent-uuid>`
 - **Expected Output**: Status 404
 
 ### TC-AGENT-TOOL-022: Delete non-existent tool
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `DELETE /nhi/tools/<nonexistent-uuid>`
 - **Expected Output**: Status 404
 
 ### TC-AGENT-TOOL-023: Grant duplicate permission (same agent + tool)
 - **Category**: Edge Case
-- **Preconditions**: Permission already exists for agent+tool pair
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Permission already exists for agent+tool pair
 - **Input**: Grant same permission again
 - **Expected Output**: Status 409 Conflict
 
 ### TC-AGENT-TOOL-024: Revoke non-existent permission
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`
 - **Input**: `DELETE /nhi/agents/<agent-id>/permissions/<unrelated-tool-id>`
 - **Expected Output**: Status 404
 
 ### TC-AGENT-TOOL-025: Authorize agent for tool without permission
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent has no permission for the tool
 - **Input**: Agent does not have permission for "dangerous_tool"
 - **Expected Output**:
   ```json
@@ -272,27 +293,32 @@
 
 ### TC-AGENT-TOOL-026: Authorize suspended agent
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent is suspended
 - **Input**: Authorization request for a suspended agent
 - **Expected Output**: `{ "decision": "deny", "reason": "Agent is suspended", ... }`
 
 ### TC-AGENT-TOOL-027: List tools with name partial match
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Tools with various names exist
 - **Input**: `GET /nhi/tools?name=send`
 - **Expected Output**: Status 200, tools matching name prefix
 
 ### TC-AGENT-TOOL-028: Update tool to inactive status
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Tool exists and is active
 - **Input**: `PATCH /nhi/tools/<id> { "status": "inactive" }`
 - **Expected Output**: Status 200, tool status updated
 - **Verification**: Authorization requests against inactive tool are denied
 
 ### TC-AGENT-TOOL-029: Grant permission with past expiration
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent and tool exist
 - **Input**: `{ "tool_id": "<id>", "expires_at": "2020-01-01T00:00:00Z" }`
 - **Expected Output**: Status 400 (expiration in the past) OR Status 201 with immediately expired permission
 
 ### TC-AGENT-TOOL-030: Register tool with empty input_schema
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "name": "no-schema-tool", "input_schema": {}, "risk_level": "low" }`
 - **Expected Output**: Status 201 (empty schema is valid JSON)
 
@@ -303,42 +329,46 @@
 ### TC-AGENT-TOOL-040: Tool registration without admin role
 - **Category**: Security
 - **Standard**: NIST SP 800-53 AC-6
+- **Preconditions**: Fixtures: `TEST_TENANT`. Authenticated non-admin user
 - **Input**: Non-admin user attempts `POST /nhi/tools { ... }`
 - **Expected Output**: Status 403 Forbidden
 
 ### TC-AGENT-TOOL-041: Permission grant without admin role
 - **Category**: Security
+- **Preconditions**: Fixtures: `TEST_TENANT`, `TEST_AGENT`. Authenticated non-admin user
 - **Input**: Non-admin attempts `POST /nhi/agents/<id>/permissions { ... }`
 - **Expected Output**: Status 403 Forbidden
 
 ### TC-AGENT-TOOL-042: Cross-tenant tool access
 - **Category**: Security
 - **Standard**: SOC 2 CC6.1
-- **Preconditions**: Tool created in Tenant A
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Tool created in Tenant A; second tenant JWT available
 - **Input**: Tenant B attempts `GET /nhi/tools/<tenant-a-tool-id>`
 - **Expected Output**: Status 404
 
 ### TC-AGENT-TOOL-043: Cross-tenant permission grant
 - **Category**: Security
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Second tenant JWT available
 - **Input**: Tenant B attempts to grant permission using Tenant A's tool_id
 - **Expected Output**: Status 404 (tool not found in Tenant B's scope)
 
 ### TC-AGENT-TOOL-044: Authorization audit trail created
 - **Category**: Security
 - **Standard**: SOC 2 CC7.2
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`
 - **Input**: Any authorization request (allow or deny)
 - **Verification**: Audit event created with agent_id, tool_name, decision, decision_reason, timestamp, conversation_id
 
 ### TC-AGENT-TOOL-045: Expired permission denies authorization
 - **Category**: Security
-- **Preconditions**: Permission with `expires_at` in the past
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Permission with `expires_at` in the past
 - **Input**: Authorization request for tool with expired permission
 - **Expected Output**: `{ "decision": "deny", "reason": "Permission expired", ... }`
 
 ### TC-AGENT-TOOL-046: Authorization with anomaly detection warnings
 - **Category**: Security
 - **Standard**: NIST SP 800-207 (Continuous Monitoring)
-- **Preconditions**: Agent behavior deviates from baseline (F094)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`. Agent behavior deviates from baseline (F094)
 - **Input**: Authorization request triggering anomaly detection
 - **Expected Output**:
   ```json
@@ -358,15 +388,18 @@
 
 ### TC-AGENT-TOOL-047: SQL injection in tool name
 - **Category**: Security
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "name": "'; DROP TABLE tools; --", "input_schema": {}, "risk_level": "low" }`
 - **Expected Output**: Status 400 or 201 (parameterized queries prevent injection)
 
 ### TC-AGENT-TOOL-048: Tool input_schema XSS payload
 - **Category**: Security
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**: `{ "name": "xss-tool", "input_schema": { "description": "<script>alert('xss')</script>" }, "risk_level": "low" }`
 - **Expected Output**: Status 201 (stored as JSON, no execution), output-encoded when rendered
 
 ### TC-AGENT-TOOL-049: Pagination limit enforcement on permissions
 - **Category**: Security
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`, `TEST_AGENT`
 - **Input**: `GET /nhi/agents/<id>/permissions?limit=10000`
 - **Expected Output**: Status 200, at most 100 permissions returned (limit clamped)

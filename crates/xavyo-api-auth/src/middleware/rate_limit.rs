@@ -35,9 +35,11 @@ pub const EMAIL_RATE_LIMIT_WINDOW_SECS: u64 = 3600;
 pub const EMAIL_IP_RATE_LIMIT_MAX: usize = 10;
 
 /// Signup rate limit: max requests per IP per hour (F111).
+/// Override with env var `SIGNUP_RATE_LIMIT_MAX`.
 pub const SIGNUP_RATE_LIMIT_MAX: usize = 10;
 
 /// Signup rate limit window in seconds (1 hour).
+/// Override with env var `SIGNUP_RATE_LIMIT_WINDOW_SECS`.
 pub const SIGNUP_RATE_LIMIT_WINDOW_SECS: u64 = 3600;
 
 /// Key type for rate limiting.
@@ -438,12 +440,21 @@ fn rate_limit_exceeded_response_with_endpoint(remaining: usize, endpoint: &str) 
 
 /// Create a rate limiter for signup endpoint (F111).
 ///
-/// Configuration: 10 requests per IP per hour.
+/// Configuration: 10 requests per IP per hour (default).
+/// Reads `SIGNUP_RATE_LIMIT_MAX` and `SIGNUP_RATE_LIMIT_WINDOW_SECS` env vars.
 #[must_use]
 pub fn signup_rate_limiter() -> RateLimiter {
+    let max = std::env::var("SIGNUP_RATE_LIMIT_MAX")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(SIGNUP_RATE_LIMIT_MAX);
+    let window_secs = std::env::var("SIGNUP_RATE_LIMIT_WINDOW_SECS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(SIGNUP_RATE_LIMIT_WINDOW_SECS);
     RateLimiter::new(RateLimitConfig {
-        max_attempts: SIGNUP_RATE_LIMIT_MAX,
-        window: Duration::from_secs(SIGNUP_RATE_LIMIT_WINDOW_SECS),
+        max_attempts: max,
+        window: Duration::from_secs(window_secs),
     })
 }
 

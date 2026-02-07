@@ -485,7 +485,7 @@ impl ReconciliationDiscrepancy {
                     d.discrepancy_type as discrepancy_type,
                     COUNT(*) as count
                 FROM gov_reconciliation_discrepancies d
-                JOIN gov_reconciliation_runs r ON d.run_id = r.id
+                JOIN gov_connector_reconciliation_runs r ON d.run_id = r.id
                 WHERE d.tenant_id = $1
                   AND r.connector_id = $2
                   AND d.detected_at >= $3

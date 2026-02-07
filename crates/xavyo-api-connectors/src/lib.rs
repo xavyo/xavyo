@@ -91,3 +91,6 @@ pub use jobs::{
 
 // Re-export connector types
 pub use xavyo_connector::prelude::*;
+
+// Re-export provisioning types used in OperationState
+pub use xavyo_provisioning::ConflictService;

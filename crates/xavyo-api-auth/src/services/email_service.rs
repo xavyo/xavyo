@@ -51,6 +51,8 @@ pub struct EmailConfig {
     pub from_address: String,
     /// Display name for the sender.
     pub from_name: String,
+    /// Whether to require TLS for SMTP connections (disable for local dev tools like Mailpit).
+    pub smtp_tls: bool,
     /// Base URL for frontend links (e.g., `https://app.xavyo.com`).
     pub frontend_base_url: String,
     /// Path for password reset page (e.g., "/auth/reset-password").
@@ -74,6 +76,7 @@ impl EmailConfig {
     /// - `FRONTEND_BASE_URL`
     ///
     /// Optional environment variables (with defaults):
+    /// - `EMAIL_SMTP_TLS` (default: "true") — set to "false" for local dev (e.g., Mailpit)
     /// - `PASSWORD_RESET_PATH` (default: "/auth/reset-password")
     /// - `EMAIL_VERIFY_PATH` (default: "/auth/verify-email")
     pub fn from_env() -> Result<Self, EmailError> {
@@ -91,6 +94,10 @@ impl EmailConfig {
             from_address: std::env::var("EMAIL_FROM_ADDRESS")
                 .map_err(|_| EmailError::ConfigError("EMAIL_FROM_ADDRESS not set".to_string()))?,
             from_name: std::env::var("EMAIL_FROM_NAME").unwrap_or_else(|_| "xavyo".to_string()),
+            smtp_tls: std::env::var("EMAIL_SMTP_TLS")
+                .unwrap_or_else(|_| "true".to_string())
+                .parse()
+                .unwrap_or(true),
             frontend_base_url: std::env::var("FRONTEND_BASE_URL")
                 .map_err(|_| EmailError::ConfigError("FRONTEND_BASE_URL not set".to_string()))?,
             password_reset_path: std::env::var("PASSWORD_RESET_PATH")
@@ -215,21 +222,29 @@ impl SmtpEmailSender {
 
     /// Create the SMTP transport.
     fn create_transport(&self) -> Result<AsyncSmtpTransport<Tokio1Executor>, EmailError> {
-        let creds = Credentials::new(
-            self.config.smtp_username.clone(),
-            self.config.smtp_password.clone(),
-        );
+        if self.config.smtp_tls {
+            let creds = Credentials::new(
+                self.config.smtp_username.clone(),
+                self.config.smtp_password.clone(),
+            );
+            let tls_params = TlsParameters::new(self.config.smtp_host.clone())
+                .map_err(|e| EmailError::ConfigError(format!("TLS configuration error: {e}")))?;
 
-        let tls_params = TlsParameters::new(self.config.smtp_host.clone())
-            .map_err(|e| EmailError::ConfigError(format!("TLS configuration error: {e}")))?;
-
-        AsyncSmtpTransport::<Tokio1Executor>::relay(&self.config.smtp_host)
-            .map_err(|e| EmailError::ConfigError(format!("SMTP relay error: {e}")))?
-            .port(self.config.smtp_port)
-            .tls(Tls::Required(tls_params))
-            .credentials(creds)
-            .build()
-            .pipe(Ok)
+            AsyncSmtpTransport::<Tokio1Executor>::relay(&self.config.smtp_host)
+                .map_err(|e| EmailError::ConfigError(format!("SMTP relay error: {e}")))?
+                .port(self.config.smtp_port)
+                .tls(Tls::Required(tls_params))
+                .credentials(creds)
+                .build()
+                .pipe(Ok)
+        } else {
+            // No TLS, no auth — for local dev tools like Mailpit
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&self.config.smtp_host)
+                .port(self.config.smtp_port)
+                .tls(Tls::None)
+                .build()
+                .pipe(Ok)
+        }
     }
 
     /// Build the "From" header mailbox.

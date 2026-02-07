@@ -112,14 +112,14 @@ async fn execute_list(args: ListArgs) -> CliResult<()> {
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&response)?);
-    } else if response.webhooks.is_empty() {
+    } else if response.items.is_empty() {
         println!("No webhooks found.");
     } else {
-        print_webhook_table(&response.webhooks);
+        print_webhook_table(&response.items);
         println!();
         println!(
             "Showing {} of {} webhooks",
-            response.webhooks.len(),
+            response.items.len(),
             response.total
         );
     }

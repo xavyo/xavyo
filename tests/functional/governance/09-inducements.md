@@ -7,12 +7,19 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: At least two governance roles must exist before inducement tests. For transitive inducement tests, a three-level role hierarchy is needed.
+
 ## Nominal Cases
 
 ### TC-GOV-IND-001: Create role inducement
 - **Category**: Nominal
 - **Standard**: IGA Role Engineering - Automatic Entitlement Inheritance
-- **Preconditions**: Inducing role (parent) and induced role (child) exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Inducing role (parent) and induced role (child) exist
 - **Input**:
   ```json
   POST /governance/roles/<inducing-role-id>/inducements
@@ -37,7 +44,7 @@
 
 ### TC-GOV-IND-002: List role inducements
 - **Category**: Nominal
-- **Preconditions**: Role has multiple inducements
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Role has multiple inducements
 - **Input**:
   ```
   GET /governance/roles/<role-id>/inducements?limit=20&offset=0
@@ -50,6 +57,7 @@
 
 ### TC-GOV-IND-003: List inducements filtered by enabled status
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Role has both enabled and disabled inducements
 - **Input**:
   ```
   GET /governance/roles/<role-id>/inducements?enabled_only=true
@@ -62,6 +70,7 @@
 
 ### TC-GOV-IND-004: Get single inducement
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Inducement exists for the role
 - **Input**:
   ```
   GET /governance/roles/<role-id>/inducements/<inducement-id>
@@ -81,7 +90,7 @@
 
 ### TC-GOV-IND-005: Delete inducement
 - **Category**: Nominal
-- **Preconditions**: Inducement exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Inducement exists
 - **Input**:
   ```
   DELETE /governance/roles/<role-id>/inducements/<inducement-id>
@@ -93,7 +102,7 @@
 
 ### TC-GOV-IND-006: Enable inducement
 - **Category**: Nominal
-- **Preconditions**: Inducement is disabled
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Inducement is disabled
 - **Input**:
   ```
   POST /governance/roles/<role-id>/inducements/<inducement-id>/enable
@@ -106,7 +115,7 @@
 
 ### TC-GOV-IND-007: Disable inducement
 - **Category**: Nominal
-- **Preconditions**: Inducement is enabled
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Inducement is enabled
 - **Input**:
   ```
   POST /governance/roles/<role-id>/inducements/<inducement-id>/disable
@@ -120,7 +129,7 @@
 ### TC-GOV-IND-008: Get induced roles for a role
 - **Category**: Nominal
 - **Standard**: IGA Role Decomposition
-- **Preconditions**: Role has multiple inducements configured
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Role has multiple inducements configured
 - **Input**:
   ```
   GET /governance/roles/<role-id>/induced-roles
@@ -140,7 +149,7 @@
 ### TC-GOV-IND-009: Role assignment triggers inducement execution
 - **Category**: Nominal
 - **Standard**: IGA Automatic Provisioning
-- **Preconditions**: Role A induces Role B; Role B has constructions
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Role A induces Role B; Role B has constructions
 - **Steps**:
   1. Assign Role A to user
   2. Verify user gets Role A constructions
@@ -150,7 +159,7 @@
 ### TC-GOV-IND-010: Role revocation triggers induced role cleanup
 - **Category**: Nominal
 - **Standard**: IGA Automatic Deprovisioning
-- **Preconditions**: User has Role A which induces Role B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User has Role A which induces Role B
 - **Steps**:
   1. Revoke Role A from user
   2. Verify Role A constructions deprovisioned
@@ -159,7 +168,7 @@
 
 ### TC-GOV-IND-011: Multiple inducements on same role
 - **Category**: Nominal
-- **Preconditions**: Role "Department Manager" exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Role "Department Manager" exists
 - **Steps**:
   1. Create inducement: Department Manager -> Basic Access
   2. Create inducement: Department Manager -> Report Viewer
@@ -174,6 +183,7 @@
 
 ### TC-GOV-IND-020: Create inducement with self-reference
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Role exists
 - **Input**:
   ```json
   POST /governance/roles/<role-id>/inducements
@@ -187,7 +197,7 @@
 
 ### TC-GOV-IND-021: Create inducement causing circular dependency
 - **Category**: Edge Case
-- **Preconditions**: Role A induces Role B; attempting to make Role B induce Role A
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Role A induces Role B; attempting to make Role B induce Role A
 - **Input**:
   ```json
   POST /governance/roles/<role-b-id>/inducements
@@ -201,7 +211,7 @@
 
 ### TC-GOV-IND-022: Create duplicate inducement
 - **Category**: Edge Case
-- **Preconditions**: Inducement from Role A to Role B already exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Inducement from Role A to Role B already exists
 - **Input**:
   ```json
   POST /governance/roles/<role-a-id>/inducements
@@ -214,6 +224,7 @@
 
 ### TC-GOV-IND-023: Delete non-existent inducement
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Role exists
 - **Input**:
   ```
   DELETE /governance/roles/<role-id>/inducements/00000000-0000-0000-0000-000000000099
@@ -225,6 +236,7 @@
 
 ### TC-GOV-IND-024: Create inducement with non-existent induced role
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Inducing role exists
 - **Input**:
   ```json
   POST /governance/roles/<role-id>/inducements
@@ -237,7 +249,7 @@
 
 ### TC-GOV-IND-025: Disabled inducement does not trigger on assignment
 - **Category**: Edge Case
-- **Preconditions**: Role A has disabled inducement to Role B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Role A has disabled inducement to Role B
 - **Steps**:
   1. Assign Role A to user
   2. Verify Role B constructions NOT triggered
@@ -245,6 +257,7 @@
 
 ### TC-GOV-IND-026: Description exceeding max length
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Inducing and induced roles exist
 - **Input**:
   ```json
   POST /governance/roles/<role-id>/inducements
@@ -262,7 +275,7 @@
 ### TC-GOV-IND-030: Create inducement without admin role
 - **Category**: Security
 - **Standard**: NIST SP 800-53 AC-6
-- **Preconditions**: JWT with user role only
+- **Preconditions**: Fixtures: `TEST_TENANT`. JWT with user role only
 - **Input**:
   ```json
   POST /governance/roles/<role-id>/inducements
@@ -275,7 +288,7 @@
 
 ### TC-GOV-IND-031: Access inducements cross-tenant
 - **Category**: Security
-- **Preconditions**: Role in tenant A; JWT for tenant B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Role in tenant A; JWT for tenant B (second tenant required)
 - **Input**:
   ```
   GET /governance/roles/<tenant-a-role>/inducements
@@ -287,7 +300,7 @@
 
 ### TC-GOV-IND-032: Create cross-tenant inducement
 - **Category**: Security
-- **Preconditions**: Inducing role in tenant A; induced role in tenant B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Inducing role in tenant A; induced role in tenant B (second tenant required)
 - **Input**:
   ```json
   POST /governance/roles/<tenant-a-role>/inducements
@@ -305,6 +318,7 @@
 ### TC-GOV-IND-040: Inducement supports automated access provisioning
 - **Category**: Compliance
 - **Standard**: IGA Birthright Access / ISO 27001 A.9.2.2
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Roles, inducements, and constructions configured
 - **Steps**:
   1. Create "Employee" role with inducement to "Email Access" role
   2. "Email Access" role has AD group membership construction
@@ -315,6 +329,7 @@
 ### TC-GOV-IND-041: Inducement chain provides complete role decomposition
 - **Category**: Compliance
 - **Standard**: RBAC Engineering Best Practices
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Three-level role hierarchy with inducements and constructions
 - **Steps**:
   1. Create hierarchy: "VP Finance" induces "Finance Manager" induces "Finance Analyst"
   2. Assign "VP Finance" to user
@@ -324,6 +339,7 @@
 ### TC-GOV-IND-042: Inducement revocation cascades through chain
 - **Category**: Compliance
 - **Standard**: ISO 27001 A.9.2.6 (Removal of Access Rights)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. User has role with transitive inducements configured
 - **Steps**:
   1. User has "VP Finance" role with transitive inducements
   2. Revoke "VP Finance" from user

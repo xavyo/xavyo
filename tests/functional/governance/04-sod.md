@@ -7,12 +7,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: Some tests require existing entitlements, SoD rules, violations, exemptions, and user-entitlement assignments
+
+---
+
 ## Nominal Cases
 
 ### TC-GOV-SOD-001: Create SoD rule between two entitlements
 - **Category**: Nominal
 - **Standard**: SOX Section 404 (Internal Controls)
-- **Preconditions**: Two entitlements exist (e.g., "Create Purchase Order", "Approve Purchase Order")
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Two entitlements exist (e.g., "Create Purchase Order", "Approve Purchase Order")
 - **Input**:
   ```json
   POST /governance/sod-rules
@@ -42,7 +51,7 @@
 
 ### TC-GOV-SOD-002: List SoD rules with filters
 - **Category**: Nominal
-- **Preconditions**: Multiple SoD rules exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Multiple SoD rules exist
 - **Input**:
   ```
   GET /governance/sod-rules?severity=critical&status=active&limit=50&offset=0
@@ -55,7 +64,7 @@
 
 ### TC-GOV-SOD-003: Get SoD rule by ID
 - **Category**: Nominal
-- **Preconditions**: SoD rule exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SoD rule exists
 - **Input**:
   ```
   GET /governance/sod-rules/<rule-id>
@@ -68,7 +77,7 @@
 
 ### TC-GOV-SOD-004: Update SoD rule
 - **Category**: Nominal
-- **Preconditions**: SoD rule exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SoD rule exists
 - **Input**:
   ```json
   PUT /governance/sod-rules/<rule-id>
@@ -86,7 +95,7 @@
 
 ### TC-GOV-SOD-005: Enable SoD rule
 - **Category**: Nominal
-- **Preconditions**: Disabled SoD rule exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Disabled SoD rule exists
 - **Input**:
   ```
   POST /governance/sod-rules/<rule-id>/enable
@@ -99,7 +108,7 @@
 
 ### TC-GOV-SOD-006: Disable SoD rule
 - **Category**: Nominal
-- **Preconditions**: Active SoD rule exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active SoD rule exists
 - **Input**:
   ```
   POST /governance/sod-rules/<rule-id>/disable
@@ -112,7 +121,7 @@
 
 ### TC-GOV-SOD-007: Delete SoD rule
 - **Category**: Nominal
-- **Preconditions**: SoD rule exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SoD rule exists
 - **Input**:
   ```
   DELETE /governance/sod-rules/<rule-id>
@@ -125,7 +134,7 @@
 ### TC-GOV-SOD-008: Pre-flight SoD check (no conflict)
 - **Category**: Nominal
 - **Standard**: SOX Section 404 (Preventive Controls)
-- **Preconditions**: SoD rule exists between entitlements A and B; user has only entitlement A
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SoD rule exists between entitlements A and B; user has only entitlement A
 - **Input**:
   ```json
   POST /governance/sod-check
@@ -143,7 +152,7 @@
 ### TC-GOV-SOD-009: Pre-flight SoD check (conflict detected)
 - **Category**: Nominal
 - **Standard**: SOX Section 404 (Preventive Controls)
-- **Preconditions**: SoD rule between A and B; user has A; checking assignment of B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SoD rule between A and B; user has A; checking assignment of B
 - **Input**:
   ```json
   POST /governance/sod-check
@@ -170,7 +179,7 @@
 ### TC-GOV-SOD-010: Scan rule for existing violations
 - **Category**: Nominal
 - **Standard**: SOC 2 CC6.3 (Logical Access)
-- **Preconditions**: SoD rule exists; some users have both conflicting entitlements
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SoD rule exists; some users have both conflicting entitlements
 - **Input**:
   ```
   POST /governance/sod-rules/<rule-id>/scan
@@ -190,7 +199,7 @@
 
 ### TC-GOV-SOD-011: List SoD violations
 - **Category**: Nominal
-- **Preconditions**: Violations exist from prior scan
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Violations exist from prior scan
 - **Input**:
   ```
   GET /governance/sod-violations?limit=50&offset=0
@@ -203,7 +212,7 @@
 
 ### TC-GOV-SOD-012: Get violation details
 - **Category**: Nominal
-- **Preconditions**: Violation exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Violation exists
 - **Input**:
   ```
   GET /governance/sod-violations/<violation-id>
@@ -217,7 +226,7 @@
 ### TC-GOV-SOD-013: Remediate violation
 - **Category**: Nominal
 - **Standard**: ISACA COBIT DSS05
-- **Preconditions**: Violation exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Violation exists
 - **Input**:
   ```json
   POST /governance/sod-violations/<violation-id>/remediate
@@ -232,7 +241,7 @@
 ### TC-GOV-SOD-014: Create SoD exemption
 - **Category**: Nominal
 - **Standard**: SOX Section 404 (Compensating Controls)
-- **Preconditions**: SoD rule exists; user has a violation
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SoD rule exists; user has a violation
 - **Input**:
   ```json
   POST /governance/sod-exemptions
@@ -252,7 +261,7 @@
 
 ### TC-GOV-SOD-015: List SoD exemptions
 - **Category**: Nominal
-- **Preconditions**: Exemptions exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Exemptions exist
 - **Input**:
   ```
   GET /governance/sod-exemptions?limit=50&offset=0
@@ -265,6 +274,7 @@
 
 ### TC-GOV-SOD-016: Get exemption details
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Exemption exists
 - **Input**:
   ```
   GET /governance/sod-exemptions/<exemption-id>
@@ -277,7 +287,7 @@
 ### TC-GOV-SOD-017: Revoke exemption
 - **Category**: Nominal
 - **Standard**: SOX Section 404 (Periodic Review)
-- **Preconditions**: Active exemption exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active exemption exists
 - **Input**:
   ```
   POST /governance/sod-exemptions/<exemption-id>/revoke
@@ -290,7 +300,7 @@
 
 ### TC-GOV-SOD-018: Filter SoD rules by entitlement
 - **Category**: Nominal
-- **Preconditions**: Rules involving specific entitlement exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Rules involving specific entitlement exist
 - **Input**:
   ```
   GET /governance/sod-rules?entitlement_id=<ent-id>
@@ -307,6 +317,7 @@
 
 ### TC-GOV-SOD-020: Create SoD rule with same entitlement on both sides
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlement exists
 - **Input**:
   ```json
   POST /governance/sod-rules
@@ -325,7 +336,7 @@
 
 ### TC-GOV-SOD-021: Create duplicate SoD rule for same entitlement pair
 - **Category**: Edge Case
-- **Preconditions**: Rule between A and B already exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Rule between A and B already exists
 - **Input**:
   ```json
   POST /governance/sod-rules
@@ -338,7 +349,7 @@
 
 ### TC-GOV-SOD-022: Create SoD rule with reversed entitlement pair
 - **Category**: Edge Case
-- **Preconditions**: Rule between A and B already exists
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Rule between A and B already exists
 - **Input**:
   ```json
   POST /governance/sod-rules
@@ -352,6 +363,7 @@
 
 ### TC-GOV-SOD-023: SoD check with non-existent user
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/sod-check
@@ -364,6 +376,7 @@
 
 ### TC-GOV-SOD-024: Exemption with past expiry date
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SoD rule and user exist
 - **Input**:
   ```json
   POST /governance/sod-exemptions
@@ -382,6 +395,7 @@
 
 ### TC-GOV-SOD-025: Create rule with non-existent entitlement
 - **Category**: Edge Case
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Input**:
   ```json
   POST /governance/sod-rules
@@ -404,7 +418,7 @@
 ### TC-GOV-SOD-030: Create SoD rule without admin role
 - **Category**: Security
 - **Standard**: ISACA COBIT (Governance)
-- **Preconditions**: JWT with non-admin role
+- **Preconditions**: Fixtures: `TEST_TENANT`. JWT with non-admin role
 - **Input**:
   ```json
   POST /governance/sod-rules
@@ -418,7 +432,7 @@
 ### TC-GOV-SOD-031: Cross-tenant SoD rule access
 - **Category**: Security
 - **Standard**: Multi-tenancy isolation
-- **Preconditions**: SoD rule in tenant A; JWT for tenant B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. SoD rule in tenant A; JWT for tenant B (second tenant required)
 - **Input**:
   ```
   GET /governance/sod-rules/<tenant-a-rule-id>
@@ -430,7 +444,7 @@
 
 ### TC-GOV-SOD-032: Cross-tenant violation access
 - **Category**: Security
-- **Preconditions**: Violation in tenant A; JWT for tenant B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Violation in tenant A; JWT for tenant B (second tenant required)
 - **Input**:
   ```
   GET /governance/sod-violations/<tenant-a-violation-id>
@@ -442,7 +456,7 @@
 
 ### TC-GOV-SOD-033: Cross-tenant exemption creation
 - **Category**: Security
-- **Preconditions**: Rule in tenant A; JWT for tenant B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Rule in tenant A; JWT for tenant B (second tenant required)
 - **Input**:
   ```json
   POST /governance/sod-exemptions
@@ -460,6 +474,7 @@
 ### TC-GOV-SOD-040: SOX Section 404 - Financial transaction SoD enforcement
 - **Category**: Compliance
 - **Standard**: SOX Section 404
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Create entitlements: "Initiate Payment", "Approve Payment", "Record Payment"
   2. Create SoD rules for all pairwise conflicts with severity "critical"
@@ -472,6 +487,7 @@
 ### TC-GOV-SOD-041: SOC 2 CC6.3 - Periodic SoD scanning
 - **Category**: Compliance
 - **Standard**: SOC 2 CC6.3 (Role-Based Access)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Create SoD rules covering sensitive financial entitlements
   2. Run scan on each rule
@@ -482,6 +498,7 @@
 ### TC-GOV-SOD-042: SOX - Exemptions require documented compensating controls
 - **Category**: Compliance
 - **Standard**: SOX Section 404 (Compensating Controls)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Create exemption with business justification
   2. Verify justification stored and retrievable
@@ -492,6 +509,7 @@
 ### TC-GOV-SOD-043: ISACA COBIT - SoD rule business rationale
 - **Category**: Compliance
 - **Standard**: ISACA COBIT DSS05 (Manage Security Services)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Create SoD rule with `business_rationale` field populated
   2. Verify business rationale preserved and returned in API responses
@@ -501,6 +519,7 @@
 ### TC-GOV-SOD-044: SoD violation remediation creates audit trail
 - **Category**: Compliance
 - **Standard**: SOC 2 CC7.2 (System Monitoring)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Create SoD rule and trigger violation
   2. Remediate the violation

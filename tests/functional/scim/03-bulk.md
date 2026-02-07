@@ -7,12 +7,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `SCIM_TOKEN`, `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: SCIM bearer token provisioned for the test tenant; existing users and groups for PUT/PATCH/DELETE operations
+
+---
+
 ## Nominal Cases
 
 ### TC-SCIM-BULK-001: Create multiple users in a single bulk request
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.7
-- **Preconditions**: Valid SCIM Bearer token; no existing users with the given emails
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Valid SCIM Bearer token; no existing users with the given emails
 - **Input**:
   ```json
   POST /scim/v2/Bulk
@@ -82,7 +91,7 @@
 ### TC-SCIM-BULK-002: Mixed operation types (POST, PUT, PATCH, DELETE)
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.7
-- **Preconditions**: User `<existing-id>` exists; user `<patch-id>` exists; user `<delete-id>` exists
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User `<existing-id>` exists; user `<patch-id>` exists; user `<delete-id>` exists
 - **Input**:
   ```json
   POST /scim/v2/Bulk
@@ -160,7 +169,7 @@
 ### TC-SCIM-BULK-004: Bulk request with failOnErrors = 0 (continue all)
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.7
-- **Preconditions**: User `existing@example.com` already exists
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User `existing@example.com` already exists
 - **Input**:
   ```json
   POST /scim/v2/Bulk
@@ -201,7 +210,7 @@
 ### TC-SCIM-BULK-005: Bulk request with failOnErrors = 1 (stop after first error)
 - **Category**: Nominal
 - **Standard**: RFC 7644 Section 3.7
-- **Preconditions**: User `existing@example.com` already exists
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. User `existing@example.com` already exists
 - **Input**:
   ```json
   POST /scim/v2/Bulk
@@ -548,7 +557,7 @@
 
 ### TC-SCIM-BULK-051: Bulk operations respect tenant isolation
 - **Category**: Security
-- **Preconditions**: Bearer token for Tenant A
+- **Preconditions**: Fixtures: `SCIM_TOKEN`, `TEST_TENANT`. Bearer token for Tenant A
 - **Input**: Bulk operations referencing Tenant B user IDs in PUT/PATCH/DELETE paths
 - **Expected Output**: Operations targeting Tenant B resources return status "404" per operation
 

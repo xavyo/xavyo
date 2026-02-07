@@ -4,13 +4,12 @@
 //! that creates the Axum router for all import-related endpoints.
 
 use axum::{
-    middleware,
     routing::{get, post},
     Extension, Router,
 };
 use sqlx::PgPool;
 use std::sync::Arc;
-use xavyo_api_auth::{jwt_auth_middleware, EmailSender};
+use xavyo_api_auth::EmailSender;
 
 use crate::handlers;
 
@@ -30,9 +29,9 @@ impl ImportState {
     }
 }
 
-/// Create the import router with admin (JWT-protected) and public routes.
+/// Create the admin import router (JWT-protected).
 ///
-/// Admin routes (require JWT auth):
+/// Routes:
 /// - POST   /admin/users/import                              — Upload CSV
 /// - GET    /admin/users/imports                             — List jobs
 /// - GET    /`admin/users/imports/:job_id`                     — Get job
@@ -40,12 +39,8 @@ impl ImportState {
 /// - GET    /`admin/users/imports/:job_id/errors/download`     — Download error CSV
 /// - POST   /admin/users/imports/:job_id/resend-invitations  — Bulk resend
 /// - POST   /`admin/users/:user_id/invite`                    — Resend single invite
-///
-/// Public routes (no auth required):
-/// - GET    /invite/:token                                   — Validate token
-/// - POST   /invite/:token                                   — Accept invitation
-pub fn import_router(state: ImportState) -> Router {
-    let admin_routes = Router::new()
+pub fn import_admin_router(state: ImportState) -> Router {
+    Router::new()
         // CSV upload
         .route(
             "/admin/users/import",
@@ -78,18 +73,33 @@ pub fn import_router(state: ImportState) -> Router {
             "/admin/users/:user_id/invite",
             post(handlers::invitations::resend_user_invitation),
         )
-        // Apply JWT auth middleware to all admin routes
-        .layer(middleware::from_fn(jwt_auth_middleware));
-
-    let public_routes = Router::new().route(
-        "/invite/:token",
-        get(handlers::invitations::validate_invitation_token)
-            .post(handlers::invitations::accept_invitation),
-    );
-
-    Router::new()
-        .merge(admin_routes)
-        .merge(public_routes)
         .layer(Extension(state.pool.clone()))
         .layer(Extension(state.email_sender.clone()))
+}
+
+/// Create the public invitation router (no auth required).
+///
+/// Routes:
+/// - GET    /invite/:token — Validate token
+/// - POST   /invite/:token — Accept invitation
+pub fn import_public_router(state: ImportState) -> Router {
+    Router::new()
+        .route(
+            "/invite/:token",
+            get(handlers::invitations::validate_invitation_token)
+                .post(handlers::invitations::accept_invitation),
+        )
+        .layer(Extension(state.pool.clone()))
+        .layer(Extension(state.email_sender.clone()))
+}
+
+/// Create the combined import router (backward compat).
+///
+/// NOTE: This applies NO auth middleware. The caller must apply
+/// appropriate auth layers. For split admin/public usage, prefer
+/// `import_admin_router()` and `import_public_router()`.
+pub fn import_router(state: ImportState) -> Router {
+    Router::new()
+        .merge(import_admin_router(state.clone()))
+        .merge(import_public_router(state))
 }

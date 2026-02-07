@@ -290,6 +290,9 @@ pub async fn create_catalog_category(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let input = xavyo_db::models::CreateCatalogCategory {
         name: request.name,
@@ -336,6 +339,9 @@ pub async fn update_catalog_category(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let input = xavyo_db::models::UpdateCatalogCategory {
         name: request.name,
@@ -379,6 +385,9 @@ pub async fn delete_catalog_category(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     state.catalog_service.delete_category(tenant_id, id).await?;
 
@@ -461,6 +470,9 @@ pub async fn create_catalog_item(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let input = xavyo_db::models::CreateCatalogItem {
         category_id: request.category_id,
@@ -508,6 +520,9 @@ pub async fn update_catalog_item(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let input = xavyo_db::models::UpdateCatalogItem {
         category_id: request.category_id,
@@ -552,6 +567,9 @@ pub async fn disable_catalog_item(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let item = state.catalog_service.disable_item(tenant_id, id).await?;
 
@@ -583,6 +601,9 @@ pub async fn enable_catalog_item(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let item = state.catalog_service.enable_item(tenant_id, id).await?;
 
@@ -615,6 +636,9 @@ pub async fn delete_catalog_item(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     state.catalog_service.delete_item(tenant_id, id).await?;
 

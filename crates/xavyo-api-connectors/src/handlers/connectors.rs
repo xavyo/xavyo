@@ -248,6 +248,21 @@ pub async fn test_connector(
             error: Some(msg),
             tested_at: Utc::now(),
         },
+        Err(ConnectorApiError::DecryptionFailed(_)) => ConnectionTestResponse {
+            success: false,
+            error: Some("Failed to decrypt connector credentials".to_string()),
+            tested_at: Utc::now(),
+        },
+        Err(ConnectorApiError::InvalidConfiguration(msg)) => ConnectionTestResponse {
+            success: false,
+            error: Some(format!("Invalid configuration: {msg}")),
+            tested_at: Utc::now(),
+        },
+        Err(ConnectorApiError::Connector(_)) => ConnectionTestResponse {
+            success: false,
+            error: Some("Connector framework error".to_string()),
+            tested_at: Utc::now(),
+        },
         Err(e) => return Err(e),
     };
 
@@ -276,6 +291,9 @@ pub async fn activate_connector(
     publisher: Option<Extension<EventPublisher>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ConnectorResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let actor_id = Uuid::parse_str(&claims.sub).ok();
 
@@ -326,6 +344,9 @@ pub async fn deactivate_connector(
     publisher: Option<Extension<EventPublisher>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ConnectorResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let actor_id = Uuid::parse_str(&claims.sub).ok();
 

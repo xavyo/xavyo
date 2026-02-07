@@ -15,6 +15,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use validator::Validate;
 use xavyo_core::TenantId;
+use xavyo_db::set_tenant_context;
 
 /// Handle resend verification request.
 ///
@@ -140,17 +141,21 @@ async fn process_resend_verification(
         return Ok(()); // Don't send email if already verified
     }
 
+    // Generate new token
+    let (token, token_hash) = generate_email_verification_token();
+    let expires_at = Utc::now() + Duration::hours(EMAIL_VERIFICATION_TOKEN_VALIDITY_HOURS);
+
+    // Use a transaction with tenant context for RLS compliance
+    let mut tx = pool.begin().await?;
+    set_tenant_context(&mut *tx, tenant_id).await?;
+
     // Invalidate any existing unused tokens for this user
     sqlx::query(
         "UPDATE email_verification_tokens SET verified_at = NOW() WHERE user_id = $1 AND verified_at IS NULL"
     )
     .bind(user_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
-
-    // Generate new token
-    let (token, token_hash) = generate_email_verification_token();
-    let expires_at = Utc::now() + Duration::hours(EMAIL_VERIFICATION_TOKEN_VALIDITY_HOURS);
 
     // Store token hash in database
     sqlx::query(
@@ -164,8 +169,10 @@ async fn process_resend_verification(
     .bind(&token_hash)
     .bind(expires_at)
     .bind(ip.to_string())
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
+
+    tx.commit().await?;
 
     // Send email
     email_sender

@@ -123,14 +123,14 @@ async fn execute_list(args: ListArgs) -> CliResult<()> {
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&response)?);
-    } else if response.service_accounts.is_empty() {
+    } else if response.items.is_empty() {
         println!("No service accounts found.");
     } else {
-        print_sa_table(&response.service_accounts);
+        print_sa_table(&response.items);
         println!();
         println!(
             "Showing {} of {} service accounts",
-            response.service_accounts.len(),
+            response.items.len(),
             response.total
         );
     }
@@ -300,8 +300,7 @@ fn print_sa_details(sa: &ServiceAccountResponse) {
         "Created:     {}",
         sa.created_at.format("%Y-%m-%d %H:%M:%S UTC")
     );
-    println!(
-        "Updated:     {}",
-        sa.updated_at.format("%Y-%m-%d %H:%M:%S UTC")
-    );
+    if let Some(ref updated) = sa.updated_at {
+        println!("Updated:     {}", updated.format("%Y-%m-%d %H:%M:%S UTC"));
+    }
 }

@@ -94,6 +94,9 @@ pub async fn create_import_job(
     mut multipart: axum_extra::extract::Multipart,
 ) -> Result<(StatusCode, Json<ImportJobCreatedResponse>), ImportError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ImportError::Forbidden);
+    }
     let user_id = extract_user_id(&claims);
 
     let mut file_data: Option<Vec<u8>> = None;
@@ -197,6 +200,9 @@ pub async fn list_import_jobs(
     Query(params): Query<ListImportJobsParams>,
 ) -> Result<Json<ImportJobListResponse>, ImportError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ImportError::Forbidden);
+    }
 
     let limit = params.limit.clamp(1, 100);
     let offset = params.offset.max(0);
@@ -223,6 +229,9 @@ pub async fn get_import_job(
     Path(job_id): Path<Uuid>,
 ) -> Result<Json<ImportJobResponse>, ImportError> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ImportError::Forbidden);
+    }
 
     let job = ImportService::get_job(&pool, tenant_id, job_id).await?;
 

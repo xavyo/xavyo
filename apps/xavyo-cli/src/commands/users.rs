@@ -148,12 +148,12 @@ async fn execute_list(args: ListArgs) -> CliResult<()> {
         println!("No users found.");
     } else {
         print_user_table(&response.users);
-        println!();
-        println!(
-            "Showing {} of {} users",
-            response.users.len(),
-            response.total
-        );
+        let total = response
+            .pagination
+            .as_ref()
+            .and_then(|p| p.total_count)
+            .unwrap_or(response.users.len() as i64);
+        println!("\nShowing {} of {} users", response.users.len(), total);
     }
 
     Ok(())

@@ -12,6 +12,7 @@ use std::sync::Arc;
 use validator::Validate;
 use xavyo_auth::hash_password;
 use xavyo_core::TenantId;
+use xavyo_db::set_tenant_context;
 
 /// Password reset token row from database query.
 type PasswordResetTokenRow = (
@@ -176,34 +177,43 @@ pub async fn reset_password_handler(
             .await?;
     }
 
-    // Update user's password (include tenant_id for defense-in-depth)
+    // Use a transaction with tenant context for RLS compliance
+    let mut tx = pool.begin().await?;
+    set_tenant_context(&mut *tx, tenant_id).await?;
+
+    // Update user's password and clear lockout state (include tenant_id for defense-in-depth)
+    // Clearing lockout is correct: the user proved account ownership via email token
     sqlx::query(
-        "UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3",
+        "UPDATE users SET password_hash = $1, failed_login_count = 0, locked_at = NULL, locked_until = NULL, updated_at = NOW() WHERE id = $2 AND tenant_id = $3",
     )
     .bind(&new_password_hash)
     .bind(user_id)
     .bind(*tenant_id.as_uuid())
-    .execute(&pool)
+    .execute(&mut *tx)
     .await?;
 
-    // Update password timestamps
+    // Mark token as used (include tenant_id for defense-in-depth)
+    sqlx::query("UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1 AND tenant_id = $2")
+        .bind(token_id)
+        .bind(*tenant_id.as_uuid())
+        .execute(&mut *tx)
+        .await?;
+
+    // Revoke all refresh tokens for this user (include tenant_id for tenant isolation)
+    let revoked = sqlx::query(
+        "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
+    )
+    .bind(user_id)
+    .bind(*tenant_id.as_uuid())
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    // Update password timestamps (uses its own pool connection)
     password_policy_service
         .update_password_timestamps(user_id, *tenant_id.as_uuid(), policy.expiration_days)
         .await?;
-
-    // Mark token as used
-    sqlx::query("UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1")
-        .bind(token_id)
-        .execute(&pool)
-        .await?;
-
-    // Revoke all refresh tokens for this user (security measure)
-    let revoked = sqlx::query(
-        "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL",
-    )
-    .bind(user_id)
-    .execute(&pool)
-    .await?;
 
     tracing::info!(
         user_id = %user_id,

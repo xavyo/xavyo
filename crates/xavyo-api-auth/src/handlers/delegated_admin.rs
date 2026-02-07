@@ -467,8 +467,8 @@ pub async fn revoke_assignment(
     delegation_service
         .revoke_assignment(
             tenant_uuid,
-            assignment_id,
             revoked_by,
+            assignment_id,
             None, // ip_address
             None, // user_agent
         )

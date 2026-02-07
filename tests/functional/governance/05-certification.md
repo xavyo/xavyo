@@ -7,12 +7,21 @@
 
 ---
 
+## Prerequisites
+
+> All fixtures referenced below are defined in [PREREQUISITES.md](../PREREQUISITES.md).
+
+- **Fixtures Required**: `ADMIN_JWT`, `TEST_TENANT`
+- **Special Setup**: Some tests require existing entitlements, assignments, certification campaigns, and reviewer users
+
+---
+
 ## Nominal Cases
 
 ### TC-GOV-CERT-001: Create certification campaign
 - **Category**: Nominal
 - **Standard**: SOC 2 CC6.1 (Logical Access Controls)
-- **Preconditions**: Entitlements and assignments exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Entitlements and assignments exist
 - **Input**:
   ```json
   POST /governance/certification-campaigns
@@ -39,7 +48,7 @@
 
 ### TC-GOV-CERT-002: List certification campaigns
 - **Category**: Nominal
-- **Preconditions**: Multiple campaigns exist
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Multiple campaigns exist
 - **Input**:
   ```
   GET /governance/certification-campaigns?limit=10&offset=0
@@ -52,6 +61,7 @@
 
 ### TC-GOV-CERT-003: Get campaign by ID
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign exists with known ID
 - **Input**:
   ```
   GET /governance/certification-campaigns/<campaign-id>
@@ -64,7 +74,7 @@
 
 ### TC-GOV-CERT-004: Update campaign (draft status)
 - **Category**: Nominal
-- **Preconditions**: Campaign in "draft" status
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign in "draft" status
 - **Input**:
   ```json
   PUT /governance/certification-campaigns/<campaign-id>
@@ -82,7 +92,7 @@
 ### TC-GOV-CERT-005: Launch certification campaign
 - **Category**: Nominal
 - **Standard**: ISO 27001 A.9.2.5
-- **Preconditions**: Campaign in "draft" status with valid scope
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign in "draft" status with valid scope
 - **Input**:
   ```
   POST /governance/certification-campaigns/<campaign-id>/launch
@@ -97,7 +107,7 @@
 ### TC-GOV-CERT-006: Get campaign progress
 - **Category**: Nominal
 - **Standard**: SOC 2 CC6.1
-- **Preconditions**: Active campaign with some decisions made
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active campaign with some decisions made
 - **Input**:
   ```
   GET /governance/certification-campaigns/<campaign-id>/progress
@@ -117,7 +127,7 @@
 
 ### TC-GOV-CERT-007: List campaign certification items
 - **Category**: Nominal
-- **Preconditions**: Active campaign
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active campaign
 - **Input**:
   ```
   GET /governance/certification-campaigns/<campaign-id>/items?limit=50&offset=0
@@ -130,6 +140,7 @@
 
 ### TC-GOV-CERT-008: Get single certification item
 - **Category**: Nominal
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Certification item exists
 - **Input**:
   ```
   GET /governance/certification-items/<item-id>
@@ -143,7 +154,7 @@
 ### TC-GOV-CERT-009: Approve certification item (certify access)
 - **Category**: Nominal
 - **Standard**: ISO 27001 A.9.2.5 (Review of User Access Rights)
-- **Preconditions**: Reviewer is authenticated; item is pending
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Reviewer is authenticated; item is pending
 - **Input**:
   ```json
   POST /governance/certification-items/<item-id>/decide
@@ -161,7 +172,7 @@
 ### TC-GOV-CERT-010: Revoke certification item
 - **Category**: Nominal
 - **Standard**: ISO 27001 A.9.2.5
-- **Preconditions**: Reviewer is authenticated; item is pending
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Reviewer is authenticated; item is pending
 - **Input**:
   ```json
   POST /governance/certification-items/<item-id>/decide
@@ -180,7 +191,7 @@
 ### TC-GOV-CERT-011: Reassign certification item to different reviewer
 - **Category**: Nominal
 - **Standard**: IGA Workflow Delegation
-- **Preconditions**: Item is pending; new reviewer is valid user
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Item is pending; new reviewer is valid user
 - **Input**:
   ```json
   POST /governance/certification-items/<item-id>/reassign
@@ -195,7 +206,7 @@
 ### TC-GOV-CERT-012: Get my pending certifications (reviewer view)
 - **Category**: Nominal
 - **Standard**: SOC 2 CC6.1
-- **Preconditions**: Authenticated user is reviewer with pending items
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated user is reviewer with pending items
 - **Input**:
   ```
   GET /governance/my-certifications
@@ -208,7 +219,7 @@
 
 ### TC-GOV-CERT-013: Get my certifications summary
 - **Category**: Nominal
-- **Preconditions**: Reviewer has items across campaigns
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Reviewer has items across campaigns
 - **Input**:
   ```
   GET /governance/my-certifications/summary
@@ -221,7 +232,7 @@
 
 ### TC-GOV-CERT-014: Cancel certification campaign
 - **Category**: Nominal
-- **Preconditions**: Active campaign
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Active campaign
 - **Input**:
   ```
   POST /governance/certification-campaigns/<campaign-id>/cancel
@@ -234,7 +245,7 @@
 
 ### TC-GOV-CERT-015: Delete draft campaign
 - **Category**: Nominal
-- **Preconditions**: Campaign in draft status
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign in draft status
 - **Input**:
   ```
   DELETE /governance/certification-campaigns/<campaign-id>
@@ -250,7 +261,7 @@
 
 ### TC-GOV-CERT-020: Launch campaign with empty scope
 - **Category**: Edge Case
-- **Preconditions**: Campaign has scope that matches no users/entitlements
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign has scope that matches no users/entitlements
 - **Input**:
   ```
   POST /governance/certification-campaigns/<campaign-id>/launch
@@ -263,7 +274,7 @@
 
 ### TC-GOV-CERT-021: Update campaign after launch
 - **Category**: Edge Case
-- **Preconditions**: Campaign is "active" (already launched)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign is "active" (already launched)
 - **Input**:
   ```json
   PUT /governance/certification-campaigns/<campaign-id>
@@ -277,7 +288,7 @@
 
 ### TC-GOV-CERT-022: Decide on already-decided item
 - **Category**: Edge Case
-- **Preconditions**: Item already has a decision
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Item already has a decision
 - **Input**:
   ```json
   POST /governance/certification-items/<item-id>/decide
@@ -291,7 +302,7 @@
 
 ### TC-GOV-CERT-023: Non-reviewer attempts to decide item
 - **Category**: Edge Case
-- **Preconditions**: Authenticated user is NOT the assigned reviewer
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Authenticated user is NOT the assigned reviewer
 - **Input**:
   ```json
   POST /governance/certification-items/<item-id>/decide
@@ -304,7 +315,7 @@
 
 ### TC-GOV-CERT-024: Delete active campaign
 - **Category**: Edge Case
-- **Preconditions**: Campaign is active
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign is active
 - **Input**:
   ```
   DELETE /governance/certification-campaigns/<campaign-id>
@@ -317,7 +328,7 @@
 
 ### TC-GOV-CERT-025: Launch already-launched campaign
 - **Category**: Edge Case
-- **Preconditions**: Campaign is already active
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign is already active
 - **Input**:
   ```
   POST /governance/certification-campaigns/<campaign-id>/launch
@@ -334,7 +345,7 @@
 ### TC-GOV-CERT-030: Create campaign without admin role
 - **Category**: Security
 - **Standard**: NIST SP 800-53 AC-6
-- **Preconditions**: JWT with non-admin role
+- **Preconditions**: Fixtures: `TEST_TENANT`. JWT with non-admin role
 - **Input**:
   ```json
   POST /governance/certification-campaigns
@@ -348,7 +359,7 @@
 ### TC-GOV-CERT-031: Access campaign from different tenant
 - **Category**: Security
 - **Standard**: Multi-tenancy isolation
-- **Preconditions**: Campaign in tenant A; JWT for tenant B
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Campaign in tenant A; JWT for tenant B (second tenant required)
 - **Input**:
   ```
   GET /governance/certification-campaigns/<tenant-a-campaign-id>
@@ -360,7 +371,7 @@
 
 ### TC-GOV-CERT-032: Decide item from different tenant
 - **Category**: Security
-- **Preconditions**: Item in tenant A; JWT for tenant B admin
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Item in tenant A; JWT for tenant B admin (second tenant required)
 - **Input**:
   ```json
   POST /governance/certification-items/<tenant-a-item>/decide
@@ -378,6 +389,7 @@
 ### TC-GOV-CERT-040: SOC 2 CC6.1 - Periodic access review execution
 - **Category**: Compliance
 - **Standard**: SOC 2 CC6.1
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Existing users and entitlement assignments
 - **Steps**:
   1. Create quarterly certification campaign scoped to all applications
   2. Launch campaign
@@ -389,6 +401,7 @@
 ### TC-GOV-CERT-041: ISO 27001 A.9.2.5 - Manager-based review
 - **Category**: Compliance
 - **Standard**: ISO 27001 A.9.2.5 (Review of User Access Rights)
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Existing users with managers and entitlement assignments
 - **Steps**:
   1. Create campaign with `reviewer_strategy: "manager"`
   2. Launch campaign
@@ -399,6 +412,7 @@
 ### TC-GOV-CERT-042: SOX Section 404 - Campaign with remediation tracking
 - **Category**: Compliance
 - **Standard**: SOX Section 404
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Existing users with entitlement assignments
 - **Steps**:
   1. Launch certification campaign
   2. Reviewer revokes access for non-compliant users
@@ -409,6 +423,7 @@
 ### TC-GOV-CERT-043: Campaign progress reporting for auditors
 - **Category**: Compliance
 - **Standard**: SOC 2 CC7.2
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`
 - **Steps**:
   1. Launch campaign
   2. Partially complete reviews
@@ -419,7 +434,7 @@
 ### TC-GOV-CERT-044: Micro-certification triggered by high-risk event
 - **Category**: Compliance
 - **Standard**: SOC 2 CC6.1 (Continuous Monitoring)
-- **Preconditions**: Micro-certification trigger rule configured for "role_change" events
+- **Preconditions**: Fixtures: `ADMIN_JWT`, `TEST_TENANT`. Micro-certification trigger rule configured for "role_change" events
 - **Steps**:
   1. Create trigger rule for high-risk entitlement changes
   2. Assign high-risk entitlement to user

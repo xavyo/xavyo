@@ -117,6 +117,9 @@ pub async fn create_template(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let created_by = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     let input = CreateGovObjectTemplate {
@@ -210,6 +213,9 @@ pub async fn update_template(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     let input = UpdateGovObjectTemplate {
@@ -253,6 +259,9 @@ pub async fn delete_template(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     state
@@ -293,6 +302,9 @@ pub async fn activate_template(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     let result = state
@@ -329,6 +341,9 @@ pub async fn disable_template(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     let result = state
@@ -427,6 +442,9 @@ pub async fn add_rule(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     let input = CreateGovTemplateRule {
@@ -527,6 +545,9 @@ pub async fn update_rule(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     let input = UpdateGovTemplateRule {
@@ -576,6 +597,9 @@ pub async fn remove_rule(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
     state
@@ -758,6 +782,9 @@ pub async fn add_scope(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
@@ -859,6 +886,9 @@ pub async fn remove_scope(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
@@ -1051,6 +1081,9 @@ pub async fn create_merge_policy(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     // Verify template exists
     state
@@ -1151,6 +1184,9 @@ pub async fn update_merge_policy(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     // Verify template exists
     state
@@ -1198,6 +1234,9 @@ pub async fn delete_merge_policy(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     // Verify template exists
     state
@@ -1295,6 +1334,9 @@ pub async fn create_exclusion(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     // Verify template exists
     state
@@ -1340,6 +1382,9 @@ pub async fn delete_exclusion(
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
 
     // Verify template exists
     state

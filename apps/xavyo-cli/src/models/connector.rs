@@ -18,13 +18,15 @@ pub struct ConnectorResponse {
     #[serde(default)]
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    #[serde(default)]
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 /// Connector list response
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConnectorListResponse {
-    pub connectors: Vec<ConnectorResponse>,
+    pub items: Vec<ConnectorResponse>,
+    #[serde(default)]
     pub total: i64,
 }
 

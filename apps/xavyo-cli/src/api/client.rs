@@ -180,6 +180,19 @@ impl ApiClient {
         request.send().await.map_err(Into::into)
     }
 
+    /// Make an authenticated POST request with no body
+    pub async fn post_empty(&self, url: &str) -> CliResult<reqwest::Response> {
+        let credentials = self.get_valid_credentials().await?;
+        let mut request = self.client.post(url).bearer_auth(&credentials.access_token);
+
+        // Add tenant header if available
+        if let Some(tenant_id) = self.get_tenant_id() {
+            request = request.header("X-Tenant-ID", tenant_id.to_string());
+        }
+
+        request.send().await.map_err(Into::into)
+    }
+
     /// Get the current access token (refreshing if needed)
     pub async fn get_access_token(&self) -> CliResult<String> {
         let credentials = self.get_valid_credentials().await?;

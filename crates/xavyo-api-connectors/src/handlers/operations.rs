@@ -155,6 +155,9 @@ pub async fn trigger_operation(
     Json(request): Json<TriggerOperationRequest>,
 ) -> Result<(StatusCode, Json<OperationResponse>)> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
 
     let operation = state
         .operation_service
@@ -187,6 +190,9 @@ pub async fn retry_operation(
     Path(id): Path<Uuid>,
 ) -> Result<Json<OperationResponse>> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
 
     let operation = state
         .operation_service
@@ -219,6 +225,9 @@ pub async fn cancel_operation(
     Path(id): Path<Uuid>,
 ) -> Result<Json<OperationResponse>> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
 
     let operation = state
         .operation_service
@@ -379,6 +388,9 @@ pub async fn resolve_operation(
     Json(request): Json<ResolveOperationRequest>,
 ) -> Result<Json<OperationResponse>> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let user_id = Uuid::parse_str(&claims.sub).unwrap_or_else(|_| Uuid::new_v4());
 
     let operation = state
@@ -558,6 +570,9 @@ pub async fn resolve_conflict(
     Json(request): Json<ResolveConflictRequest>,
 ) -> Result<Json<ConflictResponse>> {
     let tenant_id = extract_tenant_id(&claims)?;
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let user_id = Uuid::parse_str(&claims.sub).unwrap_or_else(|_| Uuid::new_v4());
 
     // Ensure conflict service is configured
