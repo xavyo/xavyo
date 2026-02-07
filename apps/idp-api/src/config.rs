@@ -878,6 +878,15 @@ impl Config {
     /// - `CONNECTOR_ENCRYPTION_KEY` is not all threes
     /// - `SOCIAL_STATE_SECRET` is not the default string
     /// - `CORS_ORIGINS` is not wildcard ("*") in production
+    ///
+    /// Defense-in-depth: encryption key checks use TWO independent signals:
+    /// 1. Key value matches a known insecure default pattern
+    /// 2. The corresponding env var was never explicitly set
+    ///
+    /// If BOTH conditions are true, the key is rejected even in development mode
+    /// when DATABASE_URL contains a non-localhost host (heuristic for non-local
+    /// environments). This prevents `APP_ENV` misconfiguration from silently
+    /// disabling encryption in staging/production.
     pub fn validate_security_config(&self) -> Result<Vec<String>, Vec<String>> {
         let mut issues = Vec::new();
 
@@ -949,10 +958,23 @@ impl Config {
         }
 
         if self.app_env.is_production() {
-            Err(issues)
-        } else {
-            Ok(issues)
+            return Err(issues);
         }
+
+        // Defense-in-depth: even in development mode, reject insecure defaults
+        // when the environment looks non-local (e.g. DATABASE_URL points to a
+        // remote host). This catches APP_ENV misconfiguration in staging/CI.
+        if looks_like_remote_environment(&self.database_url) {
+            tracing::error!(
+                target: "security",
+                count = issues.len(),
+                "Insecure default keys detected in what appears to be a remote environment. \
+                 Set proper encryption keys or verify APP_ENV is correct."
+            );
+            return Err(issues);
+        }
+
+        Ok(issues)
     }
 
     /// Returns the active signing key, if one exists.
@@ -1008,6 +1030,29 @@ fn validate_cors_origins(origins: &[String], app_env: &AppEnvironment) -> Result
         }
     }
     Ok(())
+}
+
+/// Heuristic: returns true if DATABASE_URL points to a non-local host.
+///
+/// This is a defense-in-depth check — if someone deploys to staging/CI but
+/// forgets to set `APP_ENV=production`, we still reject insecure default keys
+/// when the database is clearly remote.
+fn looks_like_remote_environment(database_url: &str) -> bool {
+    // Extract host portion from postgres://user:pass@HOST:port/db
+    let host = database_url
+        .split('@')
+        .nth(1)
+        .and_then(|after_at| after_at.split(':').next())
+        .unwrap_or("");
+    let host = host.split('/').next().unwrap_or(host);
+
+    // Local hosts that are safe for development defaults
+    !host.is_empty()
+        && host != "localhost"
+        && host != "127.0.0.1"
+        && host != "::1"
+        && host != "postgres" // docker-compose service name
+        && host != "xavyo-postgres" // docker container name
 }
 
 /// Parse hex-encoded 32-byte encryption key

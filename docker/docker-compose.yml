@@ -86,9 +86,9 @@ services:
     container_name: xavyo-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: xavyo_test
-      POSTGRES_USER: xavyo
-      POSTGRES_PASSWORD: xavyo_test_password
+      POSTGRES_DB: ${POSTGRES_DB:-xavyo_test}
+      POSTGRES_USER: ${POSTGRES_USER:-xavyo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-xavyo_test_password}
       # Performance tuning for development
       POSTGRES_INITDB_ARGS: '--encoding=UTF8'
     ports:
@@ -100,7 +100,7 @@ services:
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./postgres/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U xavyo -d xavyo_test']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-xavyo} -d ${POSTGRES_DB:-xavyo_test}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -123,11 +123,11 @@ services:
       LDAP_ORGANISATION: Xavyo Dev
       LDAP_DOMAIN: xavyo.dev
       LDAP_BASE_DN: dc=xavyo,dc=dev
-      LDAP_ADMIN_PASSWORD: admin_password
-      LDAP_CONFIG_PASSWORD: config_password
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:-admin_password}
+      LDAP_CONFIG_PASSWORD: ${LDAP_CONFIG_PASSWORD:-config_password}
       LDAP_READONLY_USER: 'true'
-      LDAP_READONLY_USER_USERNAME: readonly
-      LDAP_READONLY_USER_PASSWORD: readonly_password
+      LDAP_READONLY_USER_USERNAME: ${LDAP_READONLY_USER:-readonly}
+      LDAP_READONLY_USER_PASSWORD: ${LDAP_READONLY_USER_PASSWORD:-readonly_password}
     ports:
       - '${LDAP_PORT:-1389}:389'
       - '${LDAPS_PORT:-1636}:636'
@@ -135,7 +135,7 @@ services:
       - openldap_data:/var/lib/ldap
       - openldap_config:/etc/ldap/slapd.d
     healthcheck:
-      test: ['CMD', 'ldapsearch', '-x', '-H', 'ldap://localhost', '-b', 'dc=xavyo,dc=dev', '-D', 'cn=admin,dc=xavyo,dc=dev', '-w', 'admin_password']
+      test: ['CMD-SHELL', 'ldapsearch -x -H ldap://localhost -b dc=xavyo,dc=dev -D cn=admin,dc=xavyo,dc=dev -w $${LDAP_ADMIN_PASSWORD:-admin_password}']
       interval: 10s
       timeout: 5s
       retries: 10

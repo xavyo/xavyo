@@ -33,6 +33,7 @@ use axum::{
 use sqlx::PgPool;
 use std::sync::Arc;
 use xavyo_api_auth::RevocationCache;
+use xavyo_db::SYSTEM_TENANT_ID;
 
 /// A JWT signing key for multi-key rotation support (F069-S5).
 #[derive(Debug, Clone)]
@@ -166,7 +167,7 @@ impl OAuthState {
             csrf_secret,
             device_confirmation_service: None,
             device_risk_service: None,
-            system_tenant_id: uuid::Uuid::nil(), // Default to nil, set via with_system_tenant_id
+            system_tenant_id: SYSTEM_TENANT_ID, // Safe default; overridable via with_system_tenant_id
         }
     }
 

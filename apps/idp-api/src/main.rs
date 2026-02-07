@@ -60,6 +60,7 @@ use xavyo_api_tenants::{
     api_keys_router, oauth_clients_router, suspension_check_middleware, system_admin_router,
     tenant_router,
 };
+use xavyo_db::SYSTEM_TENANT_ID;
 use xavyo_api_users::{
     attribute_definitions_router, bulk_operations_router, groups_router, users_router, UsersState,
 };
@@ -615,7 +616,9 @@ async fn main() {
         config.csrf_secret.to_vec(),
     )
     // F084: Share RevocationCache with OAuth2 revocation/introspection handlers
-    .with_revocation_cache(revocation_cache.clone());
+    .with_revocation_cache(revocation_cache.clone())
+    // F117: Set system tenant ID for device code email confirmations
+    .with_system_tenant_id(SYSTEM_TENANT_ID);
 
     // OAuth routes (token endpoint, authorize, userinfo)
     // F082-US7: Rate limit token endpoint
