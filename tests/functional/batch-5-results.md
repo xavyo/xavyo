@@ -1,6 +1,6 @@
 # Batch 5: OIDC · SAML · Social — Functional Test Results
 
-**Date**: 2026-02-07T17:50:59+00:00
+**Date**: 2026-02-07T20:57:46+00:00
 **Server**: http://localhost:8080
 
 ## Summary
@@ -60,8 +60,8 @@ PASS=102 FAIL=0 SKIP=7 TOTAL=109
 | TC-OIDC-IDT-040 | PASS | JWT alg=RS256 |
 | TC-OIDC-IDT-050 | PASS | JWT has 3 parts |
 | TC-OIDC-IDT-051 | PASS | Header has alg=RS256, typ=JWT |
-| TC-OIDC-IDT-052 | PASS | sub=8effb017-cad1-4fa9-86c8-1fd05e0b0bd1 (UUID) |
-| TC-OIDC-IDT-054 | PASS | exp=1770487562, iat=1770486662 (numeric) |
+| TC-OIDC-IDT-052 | PASS | sub=f2b099ba-88a2-4d37-89bd-67aab3337506 (UUID) |
+| TC-OIDC-IDT-054 | PASS | exp=1770498768, iat=1770497868 (numeric) |
 | TC-OIDC-IDT-055 | SKIP | No OAuth client |
 | TC-OIDC-IDT-056 | SKIP | No OAuth client |
 | TC-OIDC-IDT-057 | SKIP | No OAuth client |
@@ -76,10 +76,10 @@ PASS=102 FAIL=0 SKIP=7 TOTAL=109
 | TC-OIDC-FED-023 | PASS | 400, no code or error |
 | TC-SAML-META-001 | PASS | 200, EntityDescriptor present |
 | TC-SAML-META-003 | PASS | Both HTTP-Redirect and HTTP-POST bindings present |
-| TC-SAML-META-004 | PASS | 201, sp_id=a4ec58df-aea3-4401-85af-0565dd65676e |
+| TC-SAML-META-004 | PASS | 201, sp_id=b5181c2a-ea36-4044-99c7-8f53b8df38c4 |
 | TC-SAML-META-005 | PASS | 201, minimal SP created |
-| TC-SAML-META-007 | PASS | 200, total=7 |
-| TC-SAML-META-009 | PASS | 200, name=Batch5 SP 1770486659 |
+| TC-SAML-META-007 | PASS | 200, total=8 |
+| TC-SAML-META-009 | PASS | 200, name=Batch5 SP 1770497866 |
 | TC-SAML-META-010 | PASS | 200, SP updated |
 | TC-SAML-META-014 | PASS | 409, duplicate entity_id rejected |
 | TC-SAML-META-015 | PASS | 400, empty acs_urls rejected |

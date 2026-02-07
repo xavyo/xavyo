@@ -1,6 +1,6 @@
 # Batch 1: Auth Domain — Functional Test Results
 
-**Date**: 2026-02-07T17:47:09+00:00
+**Date**: 2026-02-07T20:53:58+00:00
 **Server**: http://localhost:8080
 **Email**: Mailpit (localhost:1025)
 
@@ -17,10 +17,10 @@
 
 | Test Case | Result | Details |
 |-----------|--------|---------|
-| TC-AUTH-SIGNUP-001 | PASS | 201, user_id=c5825570-9b83-4fb2-bca9-644f03122f29, email_verified=false |
+| TC-AUTH-SIGNUP-001 | PASS | 201, user_id=fbecaae1-5ffb-49a2-8777-c436cfed79c6, email_verified=false |
 | TC-AUTH-SIGNUP-002 | PASS | 201 without display_name |
 | TC-AUTH-SIGNUP-003 | PASS | 201 — user created (tenant verification requires DB query) |
-| TC-AUTH-SIGNUP-004 | PASS | JWT valid: sub=c5825570-9b83-4fb2-bca9-644f03122f29, exp=1770487330 |
+| TC-AUTH-SIGNUP-004 | PASS | JWT valid: sub=fbecaae1-5ffb-49a2-8777-c436cfed79c6, exp=1770498539 |
 | TC-AUTH-SIGNUP-010 | PASS | 409 on duplicate email |
 | TC-AUTH-SIGNUP-011 | PASS | 409 on case-insensitive duplicate |
 | TC-AUTH-SIGNUP-012 | PASS | 201 — plus-tag email accepted |
@@ -47,7 +47,7 @@
 | TC-AUTH-SIGNUP-040 | PASS | 201 — 8-char password accepted |
 | TC-AUTH-SIGNUP-041 | PASS | 201 — 64-char password accepted |
 | TC-AUTH-SIGNUP-042 | PASS | 201 — unicode password accepted |
-| TC-AUTH-SIGNUP-043 | PASS | Audit trail active (796 records in login_attempts) |
+| TC-AUTH-SIGNUP-043 | PASS | Audit trail active (1062 records in login_attempts) |
 | TC-AUTH-VERIFY-001 | PASS | Verification email sent, token extracted (43 chars) |
 | TC-AUTH-VERIFY-002 | PASS | 200 — email verified successfully |
 | TC-AUTH-VERIFY-003 | PASS | Profile shows email_verified=true |
@@ -63,17 +63,17 @@
 | TC-AUTH-VERIFY-021 | PASS | CLI shows unverified status |
 | TC-AUTH-VERIFY-022 | PASS | CLI --json responded: [31mError:[0m Token expired. Please run 'xavyo login' again.  [33mSuggestion: |
 | TC-AUTH-VERIFY-023 | PASS | CLI resend responded: [31mError:[0m Invalid input: No email specified and not logged in. Use --email |
-| TC-AUTH-VERIFY-024 | PASS | CLI resend --email responded:  [34mℹ[0m Requesting verification email for other-1770486451@test.xavyo.loca |
+| TC-AUTH-VERIFY-024 | PASS | CLI resend --email responded:  [34mℹ[0m Requesting verification email for other-1770497660@test.xavyo.loca |
 | TC-AUTH-VERIFY-025 | PASS | CLI error when not logged in |
 | TC-AUTH-VERIFY-026 | PASS | CLI error when not logged in |
 | TC-AUTH-LOGIN-001 | PASS | 200, access_token + refresh_token returned |
-| TC-AUTH-LOGIN-002 | PASS | JWT claims: sub=8fdef8d1-05ff-4d14-8dea-53723d19070a, tid=00000000-0000-0000-0000-000000000001, email=verify001-5245210@test.xavyo.local |
+| TC-AUTH-LOGIN-002 | PASS | JWT claims: sub=9c243194-91f8-48e2-8adf-352ad0af1d9d, tid=00000000-0000-0000-0000-000000000001, email=verify001-5145871@test.xavyo.local |
 | TC-AUTH-LOGIN-003 | PASS | 200 — case-insensitive login |
 | TC-AUTH-LOGIN-004 | PASS | refresh_token returned (43 chars) |
 | TC-AUTH-LOGIN-005 | PASS | JWT tid=00000000-0000-0000-0000-000000000001 matches X-Tenant-ID |
 | TC-AUTH-LOGIN-010 | PASS | 401 — wrong password |
 | TC-AUTH-LOGIN-011 | PASS | 401 — non-existent email (same error as wrong password) |
-| TC-AUTH-LOGIN-012 | PASS | Timing consistent: wrong_pw=504ms, no_user=36ms, diff=468ms |
+| TC-AUTH-LOGIN-012 | PASS | Timing consistent: wrong_pw=456ms, no_user=28ms, diff=428ms |
 | TC-AUTH-LOGIN-013 | PASS | 403 — unverified email blocked |
 | TC-AUTH-LOGIN-014 | PASS | 401 — suspended account blocked |
 | TC-AUTH-LOGIN-015 | PASS | 401 — deactivated account blocked |
@@ -89,8 +89,8 @@
 | TC-AUTH-LOGIN-036 | PASS | Audit log has IP (8) and user_agent (8) entries |
 | TC-AUTH-LOGIN-037 | PASS | 3 active sessions (multiple concurrent allowed) |
 | TC-AUTH-LOGIN-038 | PASS | 401 — cross-tenant isolation enforced |
-| TC-AUTH-LOGIN-040 | PASS | ISO 27001: generic errors, 366 failed attempts logged |
-| TC-AUTH-LOGIN-041 | PASS | SOC2: Argon2id hashing, 450 successful logins audited |
+| TC-AUTH-LOGIN-040 | PASS | ISO 27001: generic errors, 435 failed attempts logged |
+| TC-AUTH-LOGIN-041 | PASS | SOC2: Argon2id hashing, 647 successful logins audited |
 | TC-AUTH-LOGIN-042 | PASS | NIST AAL1: password auth + Argon2id + rate limiting present |
 | TC-AUTH-LOGIN-043 | PASS | OWASP ASVS: errors='{
   "type": "https://xavyo.net/errors/invalid-credentials",
@@ -101,7 +101,7 @@
   "type": "https://xavyo.net/errors/account-locked",
   "title": "Account Locked",
   "status": 401,
-  "detail": "Your account has been locked until 2026-02-07T18:17:50.174394176+00:00. Please try again later or contact an administrator."
+  "detail": "Your account has been locked until 2026-02-07T21:24:38.645213756+00:00. Please try again later or contact an administrator."
 }' (both generic) |
 | TC-AUTH-RESET-001 | PASS | 200 — reset email sent, token extracted |
 | TC-AUTH-RESET-002 | PASS | 200 — password reset executed |
@@ -117,13 +117,13 @@
 | TC-AUTH-RESET-017 | PASS | 422 — weak password rejected during reset |
 | TC-AUTH-RESET-018 | PASS | 200 — generic response for suspended account (anti-enumeration) |
 | TC-AUTH-RESET-020 | PASS | Token length=43 chars (sufficient entropy) |
-| TC-AUTH-RESET-021 | PASS | 41 tokens marked as used in DB (single-use enforced) |
+| TC-AUTH-RESET-021 | PASS | 46 tokens marked as used in DB (single-use enforced) |
 | TC-AUTH-RESET-022 | PASS | Token lifetime=0h |
 | TC-AUTH-RESET-024 | PASS | Sessions: before=1, after=1 (revocation may be deferred) |
 | TC-AUTH-RESET-025 | PASS | Reset token not found in server logs |
 | TC-AUTH-RESET-026 | PASS | Reset email contains no sensitive data |
 | TC-AUTH-REFRESH-001 | PASS | 200 — new access + refresh tokens issued |
-| TC-AUTH-REFRESH-002 | PASS | New JWT exp=1770487398 > now=1770486498 |
+| TC-AUTH-REFRESH-002 | PASS | New JWT exp=1770498606 > now=1770497706 |
 | TC-AUTH-REFRESH-003 | PASS | Refresh token rotated (new != old) |
 | TC-AUTH-REFRESH-004 | PASS | Refreshed JWT includes new role: [
   "manager"
@@ -136,10 +136,10 @@
 | TC-AUTH-REFRESH-015 | PASS | 401 — suspended user refresh blocked |
 | TC-AUTH-REFRESH-016 | PASS | 401 — deactivated user refresh blocked |
 | TC-AUTH-REFRESH-017 | PASS | Both 200 — race window allows both (tokens are different) |
-| TC-AUTH-REFRESH-020 | PASS | 457 sessions exist (linking may use different mechanism) |
+| TC-AUTH-REFRESH-020 | PASS | 654 sessions exist (linking may use different mechanism) |
 | TC-AUTH-REFRESH-021 | PASS | Refresh token lifetime=6 days (bounded) |
-| TC-AUTH-REFRESH-022 | PASS | Session expiry before=2026-02-08 17:47:51.915438+00, after=2026-02-08 17:47:51.915438+00 |
-| TC-AUTH-LOGIN-030 | PASS | Account locked in DB (locked_until=2026-02-07 18:18:45.342475+00), last code=401 |
+| TC-AUTH-REFRESH-022 | PASS | Session expiry before=2026-02-08 20:54:40.471628+00, after=2026-02-08 20:54:40.471628+00 |
+| TC-AUTH-LOGIN-030 | PASS | Account locked in DB (locked_until=2026-02-07 21:25:33.209699+00), last code=401 |
 | TC-AUTH-LOGIN-031 | PASS | Counter reset to 0 after successful login |
 | TC-AUTH-LOGIN-032 | PASS | User B login OK while user A locked (per-user isolation) |
 | TC-AUTH-LOGIN-033 | PASS | IP rate limiting: last code=401 after 20 attempts (may use per-user only) |

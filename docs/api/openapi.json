@@ -4297,7 +4297,7 @@
         "tags": [
           "SCIM Targets"
         ],
-        "summary": "GET /admin/scim-targets — List SCIM targets.",
+        "summary": "GET /admin/scim-targets \u2014 List SCIM targets.",
         "operationId": "list_scim_targets",
         "parameters": [
           {
@@ -4353,7 +4353,7 @@
         "tags": [
           "SCIM Targets"
         ],
-        "summary": "POST /admin/scim-targets — Create a new SCIM target.",
+        "summary": "POST /admin/scim-targets \u2014 Create a new SCIM target.",
         "operationId": "create_scim_target",
         "requestBody": {
           "content": {
@@ -4395,7 +4395,7 @@
         "tags": [
           "SCIM Targets"
         ],
-        "summary": "GET /admin/scim-targets/:id — Get a SCIM target by ID.",
+        "summary": "GET /admin/scim-targets/:id \u2014 Get a SCIM target by ID.",
         "operationId": "get_scim_target",
         "parameters": [
           {
@@ -4437,7 +4437,7 @@
         "tags": [
           "SCIM Targets"
         ],
-        "summary": "PUT /admin/scim-targets/:id — Update a SCIM target.",
+        "summary": "PUT /admin/scim-targets/:id \u2014 Update a SCIM target.",
         "operationId": "update_scim_target",
         "parameters": [
           {
@@ -4492,7 +4492,7 @@
         "tags": [
           "SCIM Targets"
         ],
-        "summary": "DELETE /admin/scim-targets/:id — Delete a SCIM target.",
+        "summary": "DELETE /admin/scim-targets/:id \u2014 Delete a SCIM target.",
         "operationId": "delete_scim_target",
         "parameters": [
           {
@@ -4529,7 +4529,7 @@
         "tags": [
           "SCIM Targets"
         ],
-        "summary": "POST /admin/scim-targets/:id/health-check — Perform a health check.",
+        "summary": "POST /admin/scim-targets/:id/health-check \u2014 Perform a health check.",
         "operationId": "health_check_scim_target",
         "parameters": [
           {
@@ -4573,7 +4573,7 @@
         "tags": [
           "SCIM Target Logs"
         ],
-        "summary": "GET /admin/scim-targets/:id/log — List provisioning log entries.",
+        "summary": "GET /admin/scim-targets/:id/log \u2014 List provisioning log entries.",
         "operationId": "list_provisioning_log",
         "parameters": [
           {
@@ -4653,7 +4653,7 @@
         "tags": [
           "SCIM Target Logs"
         ],
-        "summary": "GET /admin/scim-targets/:id/log/:log_id — Get a single log entry with full details.",
+        "summary": "GET /admin/scim-targets/:id/log/:log_id \u2014 Get a single log entry with full details.",
         "operationId": "get_log_detail",
         "parameters": [
           {
@@ -4707,7 +4707,7 @@
         "tags": [
           "SCIM Target Mappings"
         ],
-        "summary": "GET /admin/scim-targets/:id/mappings — List attribute mappings for a target.",
+        "summary": "GET /admin/scim-targets/:id/mappings \u2014 List attribute mappings for a target.",
         "operationId": "list_mappings",
         "parameters": [
           {
@@ -4758,7 +4758,7 @@
         "tags": [
           "SCIM Target Mappings"
         ],
-        "summary": "PUT /admin/scim-targets/:id/mappings — Replace all attribute mappings for a target.",
+        "summary": "PUT /admin/scim-targets/:id/mappings \u2014 Replace all attribute mappings for a target.",
         "operationId": "replace_mappings",
         "parameters": [
           {
@@ -4815,7 +4815,7 @@
         "tags": [
           "SCIM Target Mappings"
         ],
-        "summary": "POST /admin/scim-targets/:id/mappings/defaults — Reset mappings to defaults.",
+        "summary": "POST /admin/scim-targets/:id/mappings/defaults \u2014 Reset mappings to defaults.",
         "operationId": "reset_mapping_defaults",
         "parameters": [
           {
@@ -4859,7 +4859,7 @@
         "tags": [
           "SCIM Target Provisioning"
         ],
-        "summary": "GET /admin/scim-targets/:id/provisioning-state — List provisioning state entries.",
+        "summary": "GET /admin/scim-targets/:id/provisioning-state \u2014 List provisioning state entries.",
         "operationId": "list_provisioning_state",
         "parameters": [
           {
@@ -4939,7 +4939,7 @@
         "tags": [
           "SCIM Target Provisioning"
         ],
-        "summary": "POST /admin/scim-targets/:id/provisioning-state/:state_id/retry — Retry a failed operation.",
+        "summary": "POST /admin/scim-targets/:id/provisioning-state/:state_id/retry \u2014 Retry a failed operation.",
         "operationId": "retry_provisioning",
         "parameters": [
           {
@@ -4996,7 +4996,7 @@
         "tags": [
           "SCIM Target Sync"
         ],
-        "summary": "POST /admin/scim-targets/:id/reconcile — Trigger a reconciliation.",
+        "summary": "POST /admin/scim-targets/:id/reconcile \u2014 Trigger a reconciliation.",
         "description": "Returns 202 Accepted with `sync_run_id`, or 409 if a sync is already running.",
         "operationId": "trigger_reconciliation",
         "parameters": [
@@ -5044,7 +5044,7 @@
         "tags": [
           "SCIM Target Sync"
         ],
-        "summary": "POST /admin/scim-targets/:id/sync — Trigger a full sync.",
+        "summary": "POST /admin/scim-targets/:id/sync \u2014 Trigger a full sync.",
         "description": "Returns 202 Accepted with `sync_run_id`, or 409 if a sync is already running.",
         "operationId": "trigger_sync",
         "parameters": [
@@ -5092,7 +5092,7 @@
         "tags": [
           "SCIM Target Sync"
         ],
-        "summary": "GET /admin/scim-targets/:id/sync-runs — List sync runs for a target.",
+        "summary": "GET /admin/scim-targets/:id/sync-runs \u2014 List sync runs for a target.",
         "operationId": "list_sync_runs",
         "parameters": [
           {
@@ -5163,7 +5163,7 @@
         "tags": [
           "SCIM Target Sync"
         ],
-        "summary": "GET /admin/scim-targets/:id/sync-runs/:run_id — Get a specific sync run.",
+        "summary": "GET /admin/scim-targets/:id/sync-runs/:run_id \u2014 Get a specific sync run.",
         "operationId": "get_sync_run",
         "parameters": [
           {
@@ -44156,7 +44156,7 @@
           "Observability"
         ],
         "summary": "Healthz handler (`GET /healthz`).",
-        "description": "Kubernetes naming convention compatibility — delegates to `readyz_handler`\nfor a full dependency check.",
+        "description": "Kubernetes naming convention compatibility \u2014 delegates to `readyz_handler`\nfor a full dependency check.",
         "operationId": "healthz_handler",
         "responses": {
           "200": {
@@ -44188,7 +44188,7 @@
           "Observability"
         ],
         "summary": "Liveness probe handler (`GET /livez`).",
-        "description": "Returns 200 immediately — no dependency checks. A failing liveness probe\ncauses Kubernetes to restart the pod, so this only confirms the process\nis responsive (FR-001).",
+        "description": "Returns 200 immediately \u2014 no dependency checks. A failing liveness probe\ncauses Kubernetes to restart the pod, so this only confirms the process\nis responsive (FR-001).",
         "operationId": "livez_handler",
         "responses": {
           "200": {
@@ -50810,7 +50810,7 @@
           "Users"
         ],
         "summary": "Lists users belonging to the authenticated admin's tenant.",
-        "description": "Supports filtering by custom attributes using `custom_attr.{name}` query parameters:\n- `custom_attr.department=Engineering` — equality filter\n- `custom_attr.hire_date.lt=2024-01-01` — less-than filter\n- `custom_attr.age.gte=18` — greater-than-or-equal filter\n\nMultiple custom attribute filters are combined with AND logic.",
+        "description": "Supports filtering by custom attributes using `custom_attr.{name}` query parameters:\n- `custom_attr.department=Engineering` \u2014 equality filter\n- `custom_attr.hire_date.lt=2024-01-01` \u2014 less-than filter\n- `custom_attr.age.gte=18` \u2014 greater-than-or-equal filter\n\nMultiple custom attribute filters are combined with AND logic.",
         "operationId": "list_users_handler",
         "parameters": [
           {
@@ -60368,7 +60368,7 @@
           "endpoint_port": {
             "type": "integer",
             "format": "int32",
-            "description": "Port (optional — defaults per type).",
+            "description": "Port (optional \u2014 defaults per type).",
             "nullable": true
           },
           "event_type_filter": {
@@ -66779,7 +66779,7 @@
       },
       "LivenessResponse": {
         "type": "object",
-        "description": "Liveness probe response.\n\nIndicates the process is alive and not deadlocked. Does not check\ndependencies — a failing liveness probe restarts the pod.",
+        "description": "Liveness probe response.\n\nIndicates the process is alive and not deadlocked. Does not check\ndependencies \u2014 a failing liveness probe restarts the pod.",
         "required": [
           "status"
         ],
@@ -69060,7 +69060,7 @@
         ],
         "properties": {
           "pagination": {
-            "$ref": "#/components/schemas/super.responses.PaginationMeta"
+            "$ref": "#/components/schemas/PaginationMeta"
           },
           "total_missing_count": {
             "type": "integer",
@@ -73473,12 +73473,12 @@
           "uptime_seconds": {
             "type": "integer",
             "format": "int64",
-            "description": "Seconds since service start (F074 — FR-004).",
+            "description": "Seconds since service start (F074 \u2014 FR-004).",
             "minimum": 0
           },
           "version": {
             "type": "string",
-            "description": "Application version from Cargo.toml (F074 — FR-004)."
+            "description": "Application version from Cargo.toml (F074 \u2014 FR-004)."
           }
         }
       },
@@ -78696,7 +78696,7 @@
       },
       "StartupResponse": {
         "type": "object",
-        "description": "Startup probe response (F074 — FR-003).\n\nReturns 503 during initialization, 200 once startup is complete.\nThis is a one-time gate — once it returns 200, it never reverts.",
+        "description": "Startup probe response (F074 \u2014 FR-003).\n\nReturns 503 during initialization, 200 once startup is complete.\nThis is a one-time gate \u2014 once it returns 200, it never reverts.",
         "required": [
           "status"
         ],
@@ -83922,6 +83922,678 @@
             "type": "string"
           }
         }
+      },
+      "AccessItem": {
+        "type": "object",
+        "description": "Schema for AccessItem."
+      },
+      "AccessSnapshotSummary": {
+        "type": "object",
+        "description": "Schema for AccessSnapshotSummary."
+      },
+      "AddInheritanceBlockRequest": {
+        "type": "object",
+        "description": "Schema for AddInheritanceBlockRequest."
+      },
+      "AddRoleEntitlementRequest": {
+        "type": "object",
+        "description": "Schema for AddRoleEntitlementRequest."
+      },
+      "AffectedUser": {
+        "type": "object",
+        "description": "Schema for AffectedUser."
+      },
+      "AlertSeverity": {
+        "type": "object",
+        "description": "Schema for AlertSeverity."
+      },
+      "AnomalyType": {
+        "type": "object",
+        "description": "Schema for AnomalyType."
+      },
+      "AnomalyWarning": {
+        "type": "object",
+        "description": "Schema for AnomalyWarning."
+      },
+      "AttributeListResponse": {
+        "type": "object",
+        "description": "Schema for AttributeListResponse."
+      },
+      "AuditActionType": {
+        "type": "object",
+        "description": "Schema for AuditActionType."
+      },
+      "AuditTrailResponse": {
+        "type": "object",
+        "description": "Schema for AuditTrailResponse."
+      },
+      "AuthorizationDecisionResponse": {
+        "type": "object",
+        "description": "Schema for AuthorizationDecisionResponse."
+      },
+      "BaselineStatus": {
+        "type": "object",
+        "description": "Schema for BaselineStatus."
+      },
+      "BaselineType": {
+        "type": "object",
+        "description": "Schema for BaselineType."
+      },
+      "BatchImpactSummary": {
+        "type": "object",
+        "description": "Schema for BatchImpactSummary."
+      },
+      "BulkCheckRequest": {
+        "type": "object",
+        "description": "Schema for BulkCheckRequest."
+      },
+      "BulkCheckResponse": {
+        "type": "object",
+        "description": "Schema for BulkCheckResponse."
+      },
+      "BulkFailureResponse": {
+        "type": "object",
+        "description": "Schema for BulkFailureResponse."
+      },
+      "BulkOperationDetailResponse": {
+        "type": "object",
+        "description": "Schema for BulkOperationDetailResponse."
+      },
+      "BulkOperationListResponse": {
+        "type": "object",
+        "description": "Schema for BulkOperationListResponse."
+      },
+      "BulkOperationResponse": {
+        "type": "object",
+        "description": "Schema for BulkOperationResponse."
+      },
+      "BulkOperationStatus": {
+        "type": "object",
+        "description": "Schema for BulkOperationStatus."
+      },
+      "BulkRemediationError": {
+        "type": "object",
+        "description": "Schema for BulkRemediationError."
+      },
+      "CampaignSummary": {
+        "type": "object",
+        "description": "Schema for CampaignSummary."
+      },
+      "Category": {
+        "type": "object",
+        "description": "Schema for Category."
+      },
+      "ChangeSpec": {
+        "type": "object",
+        "description": "Schema for ChangeSpec."
+      },
+      "CheckName": {
+        "type": "object",
+        "description": "Schema for CheckName."
+      },
+      "ComplianceReport": {
+        "type": "object",
+        "description": "Schema for ComplianceReport."
+      },
+      "ComplianceReportRequest": {
+        "type": "object",
+        "description": "Schema for ComplianceReportRequest."
+      },
+      "ConditionEvaluationResult": {
+        "type": "object",
+        "description": "Schema for ConditionEvaluationResult."
+      },
+      "ConditionOperator": {
+        "type": "object",
+        "description": "Schema for ConditionOperator."
+      },
+      "ConnectorHealthResponse": {
+        "type": "object",
+        "description": "Schema for ConnectorHealthResponse."
+      },
+      "CorrelationCaseListResponse": {
+        "type": "object",
+        "description": "Schema for CorrelationCaseListResponse."
+      },
+      "CreateBulkOperationRequest": {
+        "type": "object",
+        "description": "Schema for CreateBulkOperationRequest."
+      },
+      "CreateDelegationScopeRequest": {
+        "type": "object",
+        "description": "Schema for CreateDelegationScopeRequest."
+      },
+      "CreateLifecycleConfigRequest": {
+        "type": "object",
+        "description": "Schema for CreateLifecycleConfigRequest."
+      },
+      "CreateLifecycleStateRequest": {
+        "type": "object",
+        "description": "Schema for CreateLifecycleStateRequest."
+      },
+      "CreateLifecycleTransitionRequest": {
+        "type": "object",
+        "description": "Schema for CreateLifecycleTransitionRequest."
+      },
+      "CreateMappingRequest": {
+        "type": "object",
+        "description": "Schema for CreateMappingRequest."
+      },
+      "CreatePolicyRequest": {
+        "type": "object",
+        "description": "Schema for CreatePolicyRequest."
+      },
+      "CreateRoleRequest": {
+        "type": "object",
+        "description": "Schema for CreateRoleRequest."
+      },
+      "CreateSodExemptionRequest": {
+        "type": "object",
+        "description": "Schema for CreateSodExemptionRequest."
+      },
+      "DataProtectionClassification": {
+        "type": "object",
+        "description": "Schema for DataProtectionClassification."
+      },
+      "Decimal": {
+        "type": "object",
+        "description": "Schema for Decimal."
+      },
+      "DelegationStatus": {
+        "type": "object",
+        "description": "Schema for DelegationStatus."
+      },
+      "DepartmentImpact": {
+        "type": "object",
+        "description": "Schema for DepartmentImpact."
+      },
+      "DetectionReason": {
+        "type": "object",
+        "description": "Schema for DetectionReason."
+      },
+      "DiscoverSchemaRequest": {
+        "type": "object",
+        "description": "Schema for DiscoverSchemaRequest."
+      },
+      "DiscoveryStatusResponse": {
+        "type": "object",
+        "description": "Schema for DiscoveryStatusResponse."
+      },
+      "EffectiveEntitlementsResponse": {
+        "type": "object",
+        "description": "Schema for EffectiveEntitlementsResponse."
+      },
+      "EntitlementImpact": {
+        "type": "object",
+        "description": "Schema for EntitlementImpact."
+      },
+      "EntitlementSummary": {
+        "type": "object",
+        "description": "Schema for EntitlementSummary."
+      },
+      "ExecuteTransitionRequest": {
+        "type": "object",
+        "description": "Schema for ExecuteTransitionRequest."
+      },
+      "FactorBreakdown": {
+        "type": "object",
+        "description": "Schema for FactorBreakdown."
+      },
+      "FilterCriteria": {
+        "type": "object",
+        "description": "Schema for FilterCriteria."
+      },
+      "GdprLegalBasis": {
+        "type": "object",
+        "description": "Schema for GdprLegalBasis."
+      },
+      "GovExemptionStatus": {
+        "type": "object",
+        "description": "Schema for GovExemptionStatus."
+      },
+      "GovScheduleStatus": {
+        "type": "object",
+        "description": "Schema for GovScheduleStatus."
+      },
+      "GovViolationStatus": {
+        "type": "object",
+        "description": "Schema for GovViolationStatus."
+      },
+      "HighRiskOrphan": {
+        "type": "object",
+        "description": "Schema for HighRiskOrphan."
+      },
+      "ImpactSummary": {
+        "type": "object",
+        "description": "Schema for ImpactSummary."
+      },
+      "InheritanceBlockDetailsResponse": {
+        "type": "object",
+        "description": "Schema for InheritanceBlockDetailsResponse."
+      },
+      "InheritanceBlockResponse": {
+        "type": "object",
+        "description": "Schema for InheritanceBlockResponse."
+      },
+      "KeyErrorResponse": {
+        "type": "object",
+        "description": "Schema for KeyErrorResponse."
+      },
+      "LevelCount": {
+        "type": "object",
+        "description": "Schema for LevelCount."
+      },
+      "LicenseIncompatibilityListResponse": {
+        "type": "object",
+        "description": "Schema for LicenseIncompatibilityListResponse."
+      },
+      "LifecycleConfigDetailResponse": {
+        "type": "object",
+        "description": "Schema for LifecycleConfigDetailResponse."
+      },
+      "LifecycleConfigListResponse": {
+        "type": "object",
+        "description": "Schema for LifecycleConfigListResponse."
+      },
+      "LifecycleConfigResponse": {
+        "type": "object",
+        "description": "Schema for LifecycleConfigResponse."
+      },
+      "LifecycleObjectType": {
+        "type": "object",
+        "description": "Schema for LifecycleObjectType."
+      },
+      "LifecycleStateInfo": {
+        "type": "object",
+        "description": "Schema for LifecycleStateInfo."
+      },
+      "LifecycleStateResponse": {
+        "type": "object",
+        "description": "Schema for LifecycleStateResponse."
+      },
+      "LifecycleTransitionResponse": {
+        "type": "object",
+        "description": "Schema for LifecycleTransitionResponse."
+      },
+      "ListKeysResponse": {
+        "type": "object",
+        "description": "Schema for ListKeysResponse."
+      },
+      "LocationImpact": {
+        "type": "object",
+        "description": "Schema for LocationImpact."
+      },
+      "ManualTaskListResponse": {
+        "type": "object",
+        "description": "Schema for ManualTaskListResponse."
+      },
+      "ManualTaskResponse": {
+        "type": "object",
+        "description": "Schema for ManualTaskResponse."
+      },
+      "MappingResponse": {
+        "type": "object",
+        "description": "Schema for MappingResponse."
+      },
+      "MatchingPolicyResult": {
+        "type": "object",
+        "description": "Schema for MatchingPolicyResult."
+      },
+      "McpErrorCode": {
+        "type": "object",
+        "description": "Schema for McpErrorCode."
+      },
+      "MergePaginatedResponse": {
+        "type": "object",
+        "description": "Schema for MergePaginatedResponse."
+      },
+      "MetricsTrendDirection": {
+        "type": "object",
+        "description": "Schema for MetricsTrendDirection."
+      },
+      "MoveRoleRequest": {
+        "type": "object",
+        "description": "Schema for MoveRoleRequest."
+      },
+      "NhiRequestApprovalResponse": {
+        "type": "object",
+        "description": "Schema for NhiRequestApprovalResponse."
+      },
+      "NhiRequestSummary": {
+        "type": "object",
+        "description": "Schema for NhiRequestSummary."
+      },
+      "NhiTypeCountsResponse": {
+        "type": "object",
+        "description": "Schema for NhiTypeCountsResponse."
+      },
+      "NhiUsageOutcome": {
+        "type": "object",
+        "description": "Schema for NhiUsageOutcome."
+      },
+      "ObjectClassListResponse": {
+        "type": "object",
+        "description": "Schema for ObjectClassListResponse."
+      },
+      "ObjectClassResponse": {
+        "type": "object",
+        "description": "Schema for ObjectClassResponse."
+      },
+      "ObjectLifecycleStatusResponse": {
+        "type": "object",
+        "description": "Schema for ObjectLifecycleStatusResponse."
+      },
+      "OperationType": {
+        "type": "object",
+        "description": "Schema for OperationType."
+      },
+      "PaginatedResponse": {
+        "type": "object",
+        "description": "Schema for PaginatedResponse."
+      },
+      "PeerComparisonData": {
+        "type": "object",
+        "description": "Schema for PeerComparisonData."
+      },
+      "PeerGroupComparison": {
+        "type": "object",
+        "description": "Schema for PeerGroupComparison."
+      },
+      "PeerGroupScore": {
+        "type": "object",
+        "description": "Schema for PeerGroupScore."
+      },
+      "PeerGroupType": {
+        "type": "object",
+        "description": "Schema for PeerGroupType."
+      },
+      "PolicyListResponse": {
+        "type": "object",
+        "description": "Schema for PolicyListResponse."
+      },
+      "PolicyResponse": {
+        "type": "object",
+        "description": "Schema for PolicyResponse."
+      },
+      "PreviewMappingRequest": {
+        "type": "object",
+        "description": "Schema for PreviewMappingRequest."
+      },
+      "PreviewMappingResponse": {
+        "type": "object",
+        "description": "Schema for PreviewMappingResponse."
+      },
+      "Priority": {
+        "type": "object",
+        "description": "Schema for Priority."
+      },
+      "ProcessingSummary": {
+        "type": "object",
+        "description": "Schema for ProcessingSummary."
+      },
+      "RawDryRunRequest": {
+        "type": "object",
+        "description": "Schema for RawDryRunRequest."
+      },
+      "ReasonBreakdown": {
+        "type": "object",
+        "description": "Schema for ReasonBreakdown."
+      },
+      "RecomputeResponse": {
+        "type": "object",
+        "description": "Schema for RecomputeResponse."
+      },
+      "RefreshScheduleRequest": {
+        "type": "object",
+        "description": "Schema for RefreshScheduleRequest."
+      },
+      "RefreshScheduleResponse": {
+        "type": "object",
+        "description": "Schema for RefreshScheduleResponse."
+      },
+      "RemediateViolationRequest": {
+        "type": "object",
+        "description": "Schema for RemediateViolationRequest."
+      },
+      "RemediationAction": {
+        "type": "object",
+        "description": "Schema for RemediationAction."
+      },
+      "ReviewerProgressResponse": {
+        "type": "object",
+        "description": "Schema for ReviewerProgressResponse."
+      },
+      "RiskAlertSortOption": {
+        "type": "object",
+        "description": "Schema for RiskAlertSortOption."
+      },
+      "RiskScoreHistoryEntry": {
+        "type": "object",
+        "description": "Schema for RiskScoreHistoryEntry."
+      },
+      "RoleListResponse": {
+        "type": "object",
+        "description": "Schema for RoleListResponse."
+      },
+      "RoleMoveResponse": {
+        "type": "object",
+        "description": "Schema for RoleMoveResponse."
+      },
+      "RoleResponse": {
+        "type": "object",
+        "description": "Schema for RoleResponse."
+      },
+      "RoleTreeResponse": {
+        "type": "object",
+        "description": "Schema for RoleTreeResponse."
+      },
+      "RotateKeyResponse": {
+        "type": "object",
+        "description": "Schema for RotateKeyResponse."
+      },
+      "ScanRuleResponse": {
+        "type": "object",
+        "description": "Schema for ScanRuleResponse."
+      },
+      "ScheduledTransitionResponse": {
+        "type": "object",
+        "description": "Schema for ScheduledTransitionResponse."
+      },
+      "SchemaDiffResponse": {
+        "type": "object",
+        "description": "Schema for SchemaDiffResponse."
+      },
+      "SchemaResponse": {
+        "type": "object",
+        "description": "Schema for SchemaResponse."
+      },
+      "SchemaVersionListResponse": {
+        "type": "object",
+        "description": "Schema for SchemaVersionListResponse."
+      },
+      "ScimCredentials": {
+        "type": "object",
+        "description": "Schema for ScimCredentials."
+      },
+      "ScimProvisioningLog": {
+        "type": "object",
+        "description": "Schema for ScimProvisioningLog."
+      },
+      "ScimProvisioningState": {
+        "type": "object",
+        "description": "Schema for ScimProvisioningState."
+      },
+      "ScimSyncRun": {
+        "type": "object",
+        "description": "Schema for ScimSyncRun."
+      },
+      "ScimTargetAttributeMapping": {
+        "type": "object",
+        "description": "Schema for ScimTargetAttributeMapping."
+      },
+      "ScoringWeights": {
+        "type": "object",
+        "description": "Schema for ScoringWeights."
+      },
+      "ServiceAccountStatus": {
+        "type": "object",
+        "description": "Schema for ServiceAccountStatus."
+      },
+      "ServiceProviderConfig": {
+        "type": "object",
+        "description": "Schema for ServiceProviderConfig."
+      },
+      "SetLinkEnabledRequest": {
+        "type": "object",
+        "description": "Schema for SetLinkEnabledRequest."
+      },
+      "Severity": {
+        "type": "object",
+        "description": "Schema for Severity."
+      },
+      "SeverityCount": {
+        "type": "object",
+        "description": "Schema for SeverityCount."
+      },
+      "SingleTicketSyncResponse": {
+        "type": "object",
+        "description": "Schema for SingleTicketSyncResponse."
+      },
+      "SnapshotContentResponse": {
+        "type": "object",
+        "description": "Schema for SnapshotContentResponse."
+      },
+      "SodCheckRequest": {
+        "type": "object",
+        "description": "Schema for SodCheckRequest."
+      },
+      "SodCheckResponse": {
+        "type": "object",
+        "description": "Schema for SodCheckResponse."
+      },
+      "SodExemptionListResponse": {
+        "type": "object",
+        "description": "Schema for SodExemptionListResponse."
+      },
+      "SodExemptionResponse": {
+        "type": "object",
+        "description": "Schema for SodExemptionResponse."
+      },
+      "SodViolationListResponse": {
+        "type": "object",
+        "description": "Schema for SodViolationListResponse."
+      },
+      "SodViolationResponse": {
+        "type": "object",
+        "description": "Schema for SodViolationResponse."
+      },
+      "SodWarningSummary": {
+        "type": "object",
+        "description": "Schema for SodWarningSummary."
+      },
+      "StateAffectedEntitlements": {
+        "type": "object",
+        "description": "Schema for StateAffectedEntitlements."
+      },
+      "Status": {
+        "type": "object",
+        "description": "Schema for Status."
+      },
+      "ThresholdSource": {
+        "type": "object",
+        "description": "Schema for ThresholdSource."
+      },
+      "TicketSyncResponse": {
+        "type": "object",
+        "description": "Schema for TicketSyncResponse."
+      },
+      "TransitionAuditListResponse": {
+        "type": "object",
+        "description": "Schema for TransitionAuditListResponse."
+      },
+      "TransitionAuditResponse": {
+        "type": "object",
+        "description": "Schema for TransitionAuditResponse."
+      },
+      "TransitionRequestListResponse": {
+        "type": "object",
+        "description": "Schema for TransitionRequestListResponse."
+      },
+      "TransitionRequestResponse": {
+        "type": "object",
+        "description": "Schema for TransitionRequestResponse."
+      },
+      "TransitionRequestStatus": {
+        "type": "object",
+        "description": "Schema for TransitionRequestStatus."
+      },
+      "TriggerTypeStats": {
+        "type": "object",
+        "description": "Schema for TriggerTypeStats."
+      },
+      "UpdateLifecycleConfigRequest": {
+        "type": "object",
+        "description": "Schema for UpdateLifecycleConfigRequest."
+      },
+      "UpdateLifecycleStateRequest": {
+        "type": "object",
+        "description": "Schema for UpdateLifecycleStateRequest."
+      },
+      "UpdateMappingRequest": {
+        "type": "object",
+        "description": "Schema for UpdateMappingRequest."
+      },
+      "UpdateNotesRequest": {
+        "type": "object",
+        "description": "Schema for UpdateNotesRequest."
+      },
+      "UpdatePolicyRequest": {
+        "type": "object",
+        "description": "Schema for UpdatePolicyRequest."
+      },
+      "UpdateRoleRequest": {
+        "type": "object",
+        "description": "Schema for UpdateRoleRequest."
+      },
+      "UserContext": {
+        "type": "object",
+        "description": "Schema for UserContext."
+      },
+      "UserSummary": {
+        "type": "object",
+        "description": "Schema for UserSummary."
+      },
+      "ValidateCredentialRequest": {
+        "type": "object",
+        "description": "Schema for ValidateCredentialRequest."
+      },
+      "ValidateCredentialResponse": {
+        "type": "object",
+        "description": "Schema for ValidateCredentialResponse."
+      },
+      "WebhookCallbackRequest": {
+        "type": "object",
+        "description": "Schema for WebhookCallbackRequest."
+      },
+      "WebhookCallbackResponse": {
+        "type": "object",
+        "description": "Schema for WebhookCallbackResponse."
+      },
+      "crate.error.ErrorResponse": {
+        "type": "object",
+        "description": "Schema for crate.error.ErrorResponse."
+      },
+      "crate.models.CreateParametricAssignmentRequest": {
+        "type": "object",
+        "description": "Schema for crate.models.CreateParametricAssignmentRequest."
+      },
+      "crate.models.ParametricAssignmentListResponse": {
+        "type": "object",
+        "description": "Schema for crate.models.ParametricAssignmentListResponse."
+      },
+      "crate.models.ParametricAssignmentResponse": {
+        "type": "object",
+        "description": "Schema for crate.models.ParametricAssignmentResponse."
       }
     },
     "securitySchemes": {
