@@ -2,7 +2,7 @@
 # =============================================================================
 # Run All Functional Test Batches — Comprehensive Test Suite
 # =============================================================================
-# Executes all 7 test batches sequentially and produces a combined report.
+# Executes all 12 test batches sequentially and produces a combined report.
 #
 # Prerequisites:
 #   - API server running on localhost:8080
@@ -18,6 +18,10 @@
 #   Batch 6: governance, agents (NHI), operations, gdpr
 #   Batch 7: import-export, invitations
 #   Batch 8: deep NHI creds/tools/certs, governance SoD/certs/access-requests, SCIM deep
+#   Batch 9: governance deep (role mining, merge, personas, risk)
+#   Batch 10: infrastructure & self-service (/me, devices, audit, alerts, authz, system)
+#   Batch 11: admin features (IP, branding, delegation, keys, invitations, org policies, license, escalation)
+#   Batch 12: connectors deep (SCIM outbound, reconciliation, DLQ, circuit breakers, jobs, health, sync)
 # =============================================================================
 
 set -uo pipefail
@@ -58,6 +62,10 @@ BATCHES=(
   "run-batch-6-governance-nhi-ops.sh|Governance+NHI+Ops+GDPR"
   "run-batch-7-import-export.sh|Import+Export+Invitations"
   "run-batch-8-deep-nhi-gov-scim.sh|Deep NHI+Governance+SCIM"
+  "run-batch-9-governance-deep.sh|Governance Deep (Mining+Merge+Personas+Risk)"
+  "run-batch-10-infra-selfservice.sh|Infra+Self-Service"
+  "run-batch-11-admin-governance-deep.sh|Admin+Gov Deep (IP+Branding+Delegation+Keys+Escalation)"
+  "run-batch-12-connectors-webhooks-deep.sh|Connectors Deep+Webhooks Deep"
 )
 
 for i in "${!BATCHES[@]}"; do
