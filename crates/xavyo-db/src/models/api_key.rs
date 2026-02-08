@@ -48,6 +48,10 @@ pub struct ApiKey {
 
     /// When the API key was created.
     pub created_at: DateTime<Utc>,
+
+    /// Optional per-key rate limit (requests per hour).
+    /// NULL or 0 = no per-key rate limit.
+    pub rate_limit_per_hour: Option<i32>,
 }
 
 /// Data required to create a new API key.
@@ -311,6 +315,7 @@ mod tests {
             last_used_at: None,
             expires_at: None,
             created_at: Utc::now(),
+            rate_limit_per_hour: None,
         };
 
         assert!(key.is_valid());
@@ -330,6 +335,7 @@ mod tests {
             last_used_at: None,
             expires_at: None,
             created_at: Utc::now(),
+            rate_limit_per_hour: None,
         };
 
         assert!(!key.is_valid());
@@ -349,6 +355,7 @@ mod tests {
             last_used_at: None,
             expires_at: Some(Utc::now() - chrono::Duration::hours(1)),
             created_at: Utc::now(),
+            rate_limit_per_hour: None,
         };
 
         assert!(!key.is_valid());

@@ -31,20 +31,22 @@
 //!     .layer(middleware::from_fn(jwt_auth_middleware));
 //! ```
 
+use super::rate_limit::ApiKeyRateLimiter;
 use axum::{
     body::Body,
     extract::Request,
-    http::StatusCode,
+    http::{Method, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
 };
 use chrono::Utc;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
+use std::sync::Arc;
 use uuid::Uuid;
 use xavyo_auth::JwtClaims;
 use xavyo_core::{TenantId, UserId};
-use xavyo_db::models::ApiKey;
+use xavyo_db::models::{ApiKey, UserRole};
 
 /// API key prefix for xavyo API keys.
 const API_KEY_PREFIX: &str = "xavyo_sk_";
@@ -91,10 +93,42 @@ pub enum ApiKeyError {
     TenantMismatch,
     /// Database or infrastructure error.
     InternalError,
+    /// F202-US2: API key scope does not permit this operation.
+    ScopeRestricted,
+    /// F202-US3: API key rate limit exceeded.
+    RateLimited,
 }
 
 impl IntoResponse for ApiKeyError {
     fn into_response(self) -> Response {
+        match self {
+            ApiKeyError::RateLimited => {
+                // Return problem+json for rate limit exceeded
+                let body = serde_json::json!({
+                    "type": "https://xavyo.net/errors/rate-limit-exceeded",
+                    "title": "Too Many Requests",
+                    "status": 429,
+                    "detail": "API key rate limit exceeded. Please wait before trying again.",
+                    "instance": "/api-key-rate-limit",
+                    "remaining_attempts": 0
+                });
+                return (
+                    StatusCode::TOO_MANY_REQUESTS,
+                    [(axum::http::header::CONTENT_TYPE, "application/problem+json")],
+                    body.to_string(),
+                )
+                    .into_response();
+            }
+            ApiKeyError::ScopeRestricted => {
+                let body = serde_json::json!({
+                    "error": "forbidden",
+                    "message": "API key scope does not permit this operation"
+                });
+                return (StatusCode::FORBIDDEN, axum::Json(body)).into_response();
+            }
+            _ => {}
+        }
+
         let (status, message) = match self {
             ApiKeyError::MissingAuthHeader => {
                 (StatusCode::UNAUTHORIZED, "Missing Authorization header")
@@ -112,6 +146,8 @@ impl IntoResponse for ApiKeyError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Authentication service unavailable",
             ),
+            // Already handled above
+            ApiKeyError::ScopeRestricted | ApiKeyError::RateLimited => unreachable!(),
         };
 
         let body = serde_json::json!({
@@ -142,6 +178,108 @@ fn compute_key_hash(api_key: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(api_key.as_bytes());
     hex::encode(hasher.finalize())
+}
+
+/// F202-US2: Map a scope prefix to its URL path prefix.
+fn scope_prefix_to_path(prefix: &str) -> Option<&'static str> {
+    match prefix {
+        "nhi" => Some("/nhi"),
+        "agents" => Some("/agents"),
+        "users" => Some("/users"),
+        "groups" => Some("/groups"),
+        "audit" => Some("/audit"),
+        _ => None,
+    }
+}
+
+/// F202-US2: Map a scope action to allowed HTTP methods.
+fn scope_action_to_methods(action: &str) -> Option<&'static [Method]> {
+    // Use const arrays to avoid allocations
+    const READ_METHODS: &[Method] = &[Method::GET, Method::HEAD];
+    const CREATE_METHODS: &[Method] = &[Method::POST];
+    const UPDATE_METHODS: &[Method] = &[Method::PUT, Method::PATCH];
+    const DELETE_METHODS: &[Method] = &[Method::DELETE];
+    const ALL_METHODS: &[Method] = &[
+        Method::GET,
+        Method::HEAD,
+        Method::POST,
+        Method::PUT,
+        Method::PATCH,
+        Method::DELETE,
+    ];
+
+    match action {
+        "read" => Some(READ_METHODS),
+        "create" | "rotate" => Some(CREATE_METHODS),
+        "update" => Some(UPDATE_METHODS),
+        "delete" => Some(DELETE_METHODS),
+        "*" => Some(ALL_METHODS),
+        _ => None,
+    }
+}
+
+/// F202-US2: Check if API key scopes allow access to the given method and path.
+///
+/// Returns `true` if:
+/// - Scopes are empty (full access)
+/// - At least one scope matches the request (OR logic)
+///
+/// Scope format: `prefix:action` or `prefix:resource:action`
+/// - `prefix` maps to a URL path prefix (e.g., `nhi` → `/nhi`)
+/// - `resource` (optional) further restricts the path (e.g., `agents` → `/nhi/agents`)
+/// - `action` maps to HTTP methods (e.g., `read` → GET/HEAD)
+/// - `*` wildcard allows all methods
+fn check_scope_access(scopes: &[String], method: &Method, path: &str) -> bool {
+    // Empty scopes = full access
+    if scopes.is_empty() {
+        return true;
+    }
+
+    for scope in scopes {
+        let parts: Vec<&str> = scope.split(':').collect();
+        match parts.len() {
+            // 2-part: prefix:action (e.g., "users:read")
+            2 => {
+                let prefix = parts[0];
+                let action = parts[1];
+
+                let Some(path_prefix) = scope_prefix_to_path(prefix) else {
+                    continue; // Unknown prefix, skip
+                };
+
+                let Some(allowed_methods) = scope_action_to_methods(action) else {
+                    continue; // Unknown action, skip
+                };
+
+                if path.starts_with(path_prefix) && allowed_methods.contains(method) {
+                    return true;
+                }
+            }
+            // 3-part: prefix:resource:action (e.g., "nhi:agents:read")
+            3 => {
+                let prefix = parts[0];
+                let resource = parts[1];
+                let action = parts[2];
+
+                let Some(base_path) = scope_prefix_to_path(prefix) else {
+                    continue;
+                };
+
+                let Some(allowed_methods) = scope_action_to_methods(action) else {
+                    continue;
+                };
+
+                // Build full path prefix: e.g., /nhi/agents
+                let full_path = format!("{base_path}/{resource}");
+                if path.starts_with(&full_path) && allowed_methods.contains(method) {
+                    return true;
+                }
+            }
+            _ => continue, // Invalid scope format, skip
+        }
+    }
+
+    false
 }
 
 /// Extract tenant ID from X-Tenant-ID header if present.
@@ -297,6 +435,19 @@ pub async fn api_key_auth_middleware(
     // F113: Create synthetic JwtClaims for handler compatibility
     // Many handlers extract tenant_id/user_id from JwtClaims extension
     // This allows API key authentication to work with existing handlers
+
+    // F202-US1: Load user's actual roles instead of hardcoded ["api_key"]
+    let roles = UserRole::get_user_roles(&pool, api_key.user_id)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!(
+                user_id = %api_key.user_id,
+                error = %e,
+                "Failed to load roles for API key user, falling back to [\"api_key\"]"
+            );
+            vec!["api_key".to_string()]
+        });
+
     let now = Utc::now().timestamp();
     let synthetic_claims = JwtClaims {
         sub: api_key.user_id.to_string(),
@@ -306,7 +457,7 @@ pub async fn api_key_auth_middleware(
         iat: now,
         jti: format!("api-key-{}", api_key.id),
         tid: Some(api_key.tenant_id),
-        roles: vec!["api_key".to_string()], // Special role to indicate API key auth
+        roles,
         purpose: None,
         email: None,
         // F-061 Power of Attorney: API keys don't support identity assumption
@@ -322,6 +473,38 @@ pub async fn api_key_auth_middleware(
     // Raw Uuid extensions were causing ambiguity (second insert overwrites first)
     request.extensions_mut().insert(api_key_context);
     request.extensions_mut().insert(api_key.clone()); // Full ApiKey for advanced use cases
+
+    // F202-US2: Enforce API key scopes
+    if !api_key.scopes.is_empty() {
+        let method = request.method().clone();
+        let path = request.uri().path().to_string();
+        if !check_scope_access(&api_key.scopes, &method, &path) {
+            tracing::warn!(
+                key_id = %api_key.id,
+                scopes = ?api_key.scopes,
+                method = %method,
+                path = %path,
+                "API key scope does not permit this operation"
+            );
+            return Err(ApiKeyError::ScopeRestricted.into_response());
+        }
+    }
+
+    // F202-US3: Per-API-key rate limiting
+    if let Some(limit) = api_key.rate_limit_per_hour {
+        if limit > 0 {
+            if let Some(limiter) = request.extensions().get::<Arc<ApiKeyRateLimiter>>() {
+                if !limiter.record_attempt(api_key.id, limit as usize) {
+                    tracing::warn!(
+                        key_id = %api_key.id,
+                        rate_limit = limit,
+                        "API key rate limit exceeded"
+                    );
+                    return Err(ApiKeyError::RateLimited.into_response());
+                }
+            }
+        }
+    }
 
     // Update last_used_at asynchronously with debouncing
     // F113: Only update if enough time has passed since last update to reduce DB writes
@@ -440,6 +623,13 @@ mod tests {
 
         let internal = ApiKeyError::InternalError.into_response();
         assert_eq!(internal.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        // F202: New error variants
+        let scope_restricted = ApiKeyError::ScopeRestricted.into_response();
+        assert_eq!(scope_restricted.status(), StatusCode::FORBIDDEN);
+
+        let rate_limited = ApiKeyError::RateLimited.into_response();
+        assert_eq!(rate_limited.status(), StatusCode::TOO_MANY_REQUESTS);
     }
 
     #[test]
@@ -454,5 +644,111 @@ mod tests {
         assert_eq!(ctx.key_id, cloned.key_id);
         assert_eq!(ctx.key_name, cloned.key_name);
         assert_eq!(ctx.scopes, cloned.scopes);
+    }
+
+    // ====== F202-US2: Scope enforcement tests ======
+
+    #[test]
+    fn test_check_scope_access_empty_scopes_allows_all() {
+        let scopes: Vec<String> = vec![];
+        assert!(check_scope_access(&scopes, &Method::GET, "/users"));
+        assert!(check_scope_access(&scopes, &Method::POST, "/nhi/agents"));
+        assert!(check_scope_access(&scopes, &Method::DELETE, "/groups/123"));
+    }
+
+    #[test]
+    fn test_check_scope_access_matching_read_scope() {
+        let scopes = vec!["users:read".to_string()];
+        assert!(check_scope_access(&scopes, &Method::GET, "/users"));
+        assert!(check_scope_access(&scopes, &Method::GET, "/users/123"));
+        assert!(check_scope_access(&scopes, &Method::HEAD, "/users"));
+    }
+
+    #[test]
+    fn test_check_scope_access_blocks_wrong_method() {
+        let scopes = vec!["users:read".to_string()];
+        assert!(!check_scope_access(&scopes, &Method::POST, "/users"));
+        assert!(!check_scope_access(&scopes, &Method::PUT, "/users/123"));
+        assert!(!check_scope_access(&scopes, &Method::DELETE, "/users/123"));
+    }
+
+    #[test]
+    fn test_check_scope_access_wildcard() {
+        let scopes = vec!["nhi:*".to_string()];
+        assert!(check_scope_access(&scopes, &Method::GET, "/nhi"));
+        assert!(check_scope_access(&scopes, &Method::POST, "/nhi/agents"));
+        assert!(check_scope_access(
+            &scopes,
+            &Method::DELETE,
+            "/nhi/agents/123"
+        ));
+        assert!(check_scope_access(&scopes, &Method::PUT, "/nhi/tools/456"));
+        // Does NOT match other prefixes
+        assert!(!check_scope_access(&scopes, &Method::GET, "/users"));
+    }
+
+    #[test]
+    fn test_check_scope_access_resource_wildcard() {
+        let scopes = vec!["nhi:agents:*".to_string()];
+        assert!(check_scope_access(&scopes, &Method::GET, "/nhi/agents"));
+        assert!(check_scope_access(&scopes, &Method::POST, "/nhi/agents"));
+        assert!(check_scope_access(
+            &scopes,
+            &Method::DELETE,
+            "/nhi/agents/123"
+        ));
+        // Does NOT match other NHI resources
+        assert!(!check_scope_access(&scopes, &Method::GET, "/nhi/tools"));
+        assert!(!check_scope_access(&scopes, &Method::GET, "/nhi"));
+    }
+
+    #[test]
+    fn test_check_scope_access_or_logic() {
+        let scopes = vec!["users:read".to_string(), "groups:create".to_string()];
+        // First scope matches
+        assert!(check_scope_access(&scopes, &Method::GET, "/users"));
+        // Second scope matches
+        assert!(check_scope_access(&scopes, &Method::POST, "/groups"));
+        // Neither matches
+        assert!(!check_scope_access(&scopes, &Method::DELETE, "/users/123"));
+        assert!(!check_scope_access(&scopes, &Method::GET, "/groups"));
+    }
+
+    #[test]
+    fn test_check_scope_access_unrecognized_scope() {
+        let scopes = vec!["unknown:read".to_string()];
+        assert!(!check_scope_access(&scopes, &Method::GET, "/unknown"));
+        assert!(!check_scope_access(&scopes, &Method::GET, "/users"));
+    }
+
+    #[test]
+    fn test_check_scope_access_create_scope() {
+        let scopes = vec!["users:create".to_string()];
+        assert!(check_scope_access(&scopes, &Method::POST, "/users"));
+        assert!(!check_scope_access(&scopes, &Method::GET, "/users"));
+    }
+
+    #[test]
+    fn test_check_scope_access_update_scope() {
+        let scopes = vec!["users:update".to_string()];
+        assert!(check_scope_access(&scopes, &Method::PUT, "/users/123"));
+        assert!(check_scope_access(&scopes, &Method::PATCH, "/users/123"));
+        assert!(!check_scope_access(&scopes, &Method::POST, "/users"));
+    }
+
+    #[test]
+    fn test_check_scope_access_delete_scope() {
+        let scopes = vec!["users:delete".to_string()];
+        assert!(check_scope_access(&scopes, &Method::DELETE, "/users/123"));
+        assert!(!check_scope_access(&scopes, &Method::GET, "/users/123"));
+    }
+
+    #[test]
+    fn test_check_scope_access_three_part_read() {
+        let scopes = vec!["nhi:agents:read".to_string()];
+        assert!(check_scope_access(&scopes, &Method::GET, "/nhi/agents"));
+        assert!(check_scope_access(&scopes, &Method::GET, "/nhi/agents/123"));
+        assert!(!check_scope_access(&scopes, &Method::POST, "/nhi/agents"));
+        assert!(!check_scope_access(&scopes, &Method::GET, "/nhi/tools"));
     }
 }

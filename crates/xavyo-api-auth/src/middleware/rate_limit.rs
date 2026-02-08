@@ -18,6 +18,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use uuid::Uuid;
 
 /// Default maximum attempts per window.
 pub const DEFAULT_MAX_ATTEMPTS: usize = 5;
@@ -489,6 +490,117 @@ pub async fn signup_rate_limit_middleware(
     next.run(request).await
 }
 
+/// F202-US3: Per-API-key rate limiter using sliding window algorithm.
+///
+/// Keyed by API key UUID. Each key can have its own rate limit
+/// (from `api_keys.rate_limit_per_hour`). The window is always 1 hour.
+#[derive(Debug, Clone)]
+pub struct ApiKeyRateLimiter {
+    /// Entries keyed by API key UUID.
+    entries: Arc<Mutex<HashMap<Uuid, ApiKeyAttemptEntry>>>,
+}
+
+/// Entry tracking attempts for a single API key.
+#[derive(Debug, Clone)]
+struct ApiKeyAttemptEntry {
+    /// Timestamps of attempts within the window.
+    timestamps: Vec<Instant>,
+}
+
+/// The sliding window duration for API key rate limiting (1 hour).
+const API_KEY_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(3600);
+
+impl ApiKeyAttemptEntry {
+    fn new() -> Self {
+        Self {
+            timestamps: Vec::new(),
+        }
+    }
+
+    /// Clean up old attempts and add a new one.
+    fn record_attempt(&mut self, now: Instant) {
+        self.timestamps
+            .retain(|&t| now.duration_since(t) < API_KEY_RATE_LIMIT_WINDOW);
+        self.timestamps.push(now);
+    }
+
+    /// Count attempts within the window.
+    fn count(&self, now: Instant) -> usize {
+        self.timestamps
+            .iter()
+            .filter(|&&t| now.duration_since(t) < API_KEY_RATE_LIMIT_WINDOW)
+            .count()
+    }
+}
+
+impl ApiKeyRateLimiter {
+    /// Create a new API key rate limiter.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            entries: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Record an attempt for the given API key.
+    ///
+    /// Returns `true` if the attempt is allowed, `false` if rate limited.
+    /// `max_per_hour` is the per-key limit from the database.
+    pub fn record_attempt(&self, key_id: Uuid, max_per_hour: usize) -> bool {
+        let now = Instant::now();
+        let mut entries = self.entries.lock();
+
+        let entry = entries
+            .entry(key_id)
+            .or_insert_with(ApiKeyAttemptEntry::new);
+
+        // Check if already exceeded BEFORE recording
+        if entry.count(now) >= max_per_hour {
+            return false;
+        }
+
+        entry.record_attempt(now);
+        true
+    }
+
+    /// Check if the given API key is rate limited.
+    #[must_use]
+    pub fn is_limited(&self, key_id: Uuid, max_per_hour: usize) -> bool {
+        let now = Instant::now();
+        let entries = self.entries.lock();
+
+        entries
+            .get(&key_id)
+            .is_some_and(|entry| entry.count(now) >= max_per_hour)
+    }
+
+    /// Get the number of remaining attempts for an API key.
+    #[must_use]
+    pub fn remaining_attempts(&self, key_id: Uuid, max_per_hour: usize) -> usize {
+        let now = Instant::now();
+        let entries = self.entries.lock();
+
+        let count = entries.get(&key_id).map_or(0, |entry| entry.count(now));
+
+        max_per_hour.saturating_sub(count)
+    }
+
+    /// Clean up stale entries.
+    ///
+    /// Should be called periodically to prevent memory growth.
+    pub fn cleanup(&self) {
+        let now = Instant::now();
+        let mut entries = self.entries.lock();
+        entries.retain(|_, entry| entry.count(now) > 0);
+    }
+}
+
+impl Default for ApiKeyRateLimiter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -703,5 +815,86 @@ mod tests {
 
         // Should be limited because both emails are treated as the same
         assert!(!limiter.record_attempt("TEST@EXAMPLE.COM", ip));
+    }
+
+    // ====== F202-US3: API key rate limiter tests ======
+
+    #[test]
+    fn test_api_key_rate_limiter_allows_within_limit() {
+        let limiter = ApiKeyRateLimiter::new();
+        let key_id = Uuid::new_v4();
+
+        // First 5 attempts should succeed with limit of 5
+        for _ in 0..5 {
+            assert!(limiter.record_attempt(key_id, 5));
+        }
+    }
+
+    #[test]
+    fn test_api_key_rate_limiter_blocks_over_limit() {
+        let limiter = ApiKeyRateLimiter::new();
+        let key_id = Uuid::new_v4();
+
+        // Exhaust limit
+        for _ in 0..3 {
+            assert!(limiter.record_attempt(key_id, 3));
+        }
+
+        // 4th attempt should be blocked
+        assert!(!limiter.record_attempt(key_id, 3));
+        assert!(limiter.is_limited(key_id, 3));
+    }
+
+    #[test]
+    fn test_api_key_rate_limiter_independent_keys() {
+        let limiter = ApiKeyRateLimiter::new();
+        let key1 = Uuid::new_v4();
+        let key2 = Uuid::new_v4();
+
+        // Exhaust key1's limit
+        for _ in 0..2 {
+            limiter.record_attempt(key1, 2);
+        }
+        assert!(limiter.is_limited(key1, 2));
+
+        // key2 should still be allowed
+        assert!(limiter.record_attempt(key2, 2));
+        assert!(!limiter.is_limited(key2, 2));
+    }
+
+    #[test]
+    fn test_api_key_rate_limiter_remaining_attempts() {
+        let limiter = ApiKeyRateLimiter::new();
+        let key_id = Uuid::new_v4();
+
+        assert_eq!(limiter.remaining_attempts(key_id, 5), 5);
+
+        limiter.record_attempt(key_id, 5);
+        assert_eq!(limiter.remaining_attempts(key_id, 4), 3);
+
+        limiter.record_attempt(key_id, 5);
+        limiter.record_attempt(key_id, 5);
+        assert_eq!(limiter.remaining_attempts(key_id, 5), 2);
+    }
+
+    #[test]
+    fn test_api_key_rate_limiter_cleanup() {
+        let limiter = ApiKeyRateLimiter::new();
+        let key_id = Uuid::new_v4();
+
+        limiter.record_attempt(key_id, 10);
+
+        // Entry exists
+        {
+            let entries = limiter.entries.lock();
+            assert!(entries.contains_key(&key_id));
+        }
+
+        // Cleanup should keep entries within window (1 hour)
+        limiter.cleanup();
+        {
+            let entries = limiter.entries.lock();
+            assert!(entries.contains_key(&key_id));
+        }
     }
 }

@@ -193,11 +193,13 @@ pub async fn reset_password_handler(
     .await?;
 
     // Mark token as used (include tenant_id for defense-in-depth)
-    sqlx::query("UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1 AND tenant_id = $2")
-        .bind(token_id)
-        .bind(*tenant_id.as_uuid())
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(
+        "UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1 AND tenant_id = $2",
+    )
+    .bind(token_id)
+    .bind(*tenant_id.as_uuid())
+    .execute(&mut *tx)
+    .await?;
 
     // Revoke all refresh tokens for this user (include tenant_id for tenant isolation)
     let revoked = sqlx::query(

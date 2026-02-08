@@ -34,7 +34,8 @@ pub use error::{ApiAuthError, ProblemDetails};
 pub use handlers::revocation_router;
 pub use middleware::{
     api_key_auth_middleware, jwt_auth_middleware, session_activity_middleware, ApiKeyContext,
-    ApiKeyError, EmailRateLimiter, JwtPublicKey, JwtPublicKeys, RateLimitConfig, RateLimiter,
+    ApiKeyError, ApiKeyRateLimiter, EmailRateLimiter, JwtPublicKey, JwtPublicKeys, RateLimitConfig,
+    RateLimiter,
 };
 pub use models::{
     ForgotPasswordRequest, ForgotPasswordResponse, LoginRequest, LogoutRequest, RefreshRequest,
