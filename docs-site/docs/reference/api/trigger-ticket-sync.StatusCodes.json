@@ -1,1 +1,1 @@
-{"responses":{"200":{"description":"Sync completed","content":{"application/json":{"schema":{"type":"object","description":"Schema for TicketSyncResponse.","title":"TicketSyncResponse"}}}},"401":{"description":"Unauthorized"},"500":{"description":"Internal server error"}}}
+{"responses":{"200":{"description":"Sync completed","content":{"application/json":{"schema":{"type":"object","description":"Schema for TicketSyncResponse","title":"TicketSyncResponse"}}}},"401":{"description":"Unauthorized"},"500":{"description":"Internal server error"}}}

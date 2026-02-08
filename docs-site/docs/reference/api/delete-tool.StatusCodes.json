@@ -1,1 +1,1 @@
-{"responses":{"204":{"description":"Tool deleted"},"401":{"description":"Unauthorized"},"404":{"description":"Tool not found"},"500":{"description":"Internal server error"}}}
+{"responses":{"204":{"description":"Tool deleted"},"401":{"description":"Authentication required"},"404":{"description":"Tool not found"}}}

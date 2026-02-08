@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Tool updated successfully","content":{"application/json":{"schema":{"type":"object","description":"Schema for NhiToolWithIdentity","title":"NhiToolWithIdentity"}}}},"400":{"description":"Invalid request"},"401":{"description":"Authentication required"},"403":{"description":"Forbidden"},"404":{"description":"Tool not found"}}}

@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Tool deleted"},"401":{"description":"Authentication required"},"403":{"description":"Forbidden"},"404":{"description":"Tool not found"}}}

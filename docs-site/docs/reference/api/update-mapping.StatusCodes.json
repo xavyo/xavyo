@@ -1,1 +1,1 @@
-{"responses":{"200":{"description":"Mapping updated","content":{"application/json":{"schema":{"type":"object","description":"Schema for MappingResponse.","title":"MappingResponse"}}}},"400":{"description":"Invalid request"},"404":{"description":"Mapping not found"}}}
+{"responses":{"200":{"description":"Mapping updated","content":{"application/json":{"schema":{"type":"object","description":"Schema for MappingResponse","title":"MappingResponse"}}}},"400":{"description":"Invalid request"},"404":{"description":"Mapping not found"}}}

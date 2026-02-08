@@ -1,1 +1,0 @@
-{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to transfer NHI ownership.","required":["new_owner_id","reason"],"properties":{"new_owner_id":{"type":"string","format":"uuid","description":"New owner ID."},"reason":{"type":"string","description":"Reason for transfer."}},"title":"TransferOwnershipRequest"}}},"required":true}}

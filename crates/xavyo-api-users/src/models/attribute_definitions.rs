@@ -233,6 +233,7 @@ pub struct MissingAttributeAuditResponse {
     pub users: Vec<UserMissingAttributes>,
 
     /// Pagination metadata.
+    #[schema(value_type = PaginationMeta)]
     pub pagination: super::responses::PaginationMeta,
 
     /// Total number of users missing required attributes.

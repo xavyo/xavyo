@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request body for initiating a grace period.","required":["grace_days"],"properties":{"grace_days":{"type":"integer","format":"int32"}},"title":"GracePeriodRequest"}}},"required":true}}

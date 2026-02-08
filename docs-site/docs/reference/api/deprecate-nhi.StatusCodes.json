@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"NHI deprecated successfully","content":{"application/json":{"schema":{"type":"object","description":"Schema for NhiIdentity","title":"NhiIdentity"}}}},"401":{"description":"Authentication required"},"403":{"description":"Forbidden"},"404":{"description":"NHI identity not found"},"409":{"description":"Invalid lifecycle transition"}}}

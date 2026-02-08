@@ -1,1 +1,1 @@
-{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Schema for CreateMappingRequest.","title":"CreateMappingRequest"}}},"required":true}}
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Schema for CreateMappingRequest","title":"CreateMappingRequest"}}},"required":true}}

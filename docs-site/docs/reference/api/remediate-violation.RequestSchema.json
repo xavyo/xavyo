@@ -1,1 +1,1 @@
-{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Schema for RemediateViolationRequest.","title":"RemediateViolationRequest"}}},"required":true}}
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Schema for RemediateViolationRequest","title":"RemediateViolationRequest"}}},"required":true}}

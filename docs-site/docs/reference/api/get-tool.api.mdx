@@ -1,11 +1,11 @@
 ---
 id: get-tool
-title: "Get a tool by ID."
-description: "Get a tool by ID."
-sidebar_label: "Get a tool by ID."
+title: "GET /tools/{id} - Get tool by ID."
+description: "GET /tools/{id} - Get tool by ID."
+sidebar_label: "GET /tools/{id} - Get tool by ID."
 hide_title: true
 hide_table_of_contents: true
-api: eJylVt9v2zYQ/leIe9oAxXK6Dij0li1Z56JLgyRFHwzDoKWzxYYiGfLkxTP0vw9HSbE9aa2HvdiSePfdd7+5B5KbANkcbn+fiQvxaK0OsEjAOvSSlDWzAjLYIC3JWg0JOOllhYSetfZgZIWQgSogAWUgAyephAQKDLlXjhEgA4YVs2tIwONzrTwWkJGvMYGQl1hJyPZAO8dIgbwyG0hgbX0lCTKoa1VA0yxYOThrAgaWfzOd8t+IoQJJKh0ggdwaQkMsJ53TKo8upV8DC++Hxu3qK+Y0Tr83Lq4fP01OPJm37sdQcBRcTcsOOgGvwtNS4xb1QScspXPebmUMqLdbVaBfbtGrtUKGCiSpjg54lITFUjKp2hX9yyLqOfSk2mjkknBj/W4skiPO9OLsiKm1liuNbUqaE6PfyguTuSAVnR4zwSjKGsEigWTlJtD8Q/IsrkefRumq4vvlMwpcG/Vco1AFGuLI+0jwJH+DAvvw8OlWPMRDsbZecFeIqCIOnRFxKvmyzKXWYenQL0tb+yOayhBu0B/zVIZ+ejMg+od8UVVdiYgkHHrBSKNxaFvxrJCyaCRpa/ov3uKLw5ywEK3eKI2+ns+k0ot/E+vQGwfQlbUapRmgfimRSvSvwEIF0atHn4dNeD5ol+6tbSeJ6LFEj9VaOPT8d4Nwr8KTiLKZ0PbPRFRYqLpKRKk2ZSJyr0jlHW43Fs4LbCucCZmT2mIilOmfCnQeeQK08TgaK/+j3bUMJFqok45vEiBFnNMod99NUWgaPno7vRxW3WcjayqtV39hAVHo7b9MemNJrG1totjPYwthZgi9kVoE9Fv0Ar23PrIKmNde0S6usRVKj37JdiGbL3jZnOK8RxKyTf9qJ2bXXK4VUmm79Rg3IytDakqVsmBI96poeJpH0+2+rL2GDEoil6WptrnUpQ2UvZu+mw7ies1VYV2Fhjr60CTHECFLU1W4yYvc7uzE4HBz3Xlb1Hks1R5hcXA9dna7P9oAXEX/X4uAbUC3o2N3RCFIuoff+tL48OUxhlSZtY3qXcIjL3F1NxvwmsWZSztx13fp1d0sjpio061umceS7O4YLdojyoqzrVWOXEeH818ePl5cTi55UZ5EaKOorFeT3FZphOh+V9qu0koGQp9+nP16c/tww7icqZbjdHI5mfInZwNV0hyZGquG8cVG+EKp01KZ2Go+ToS2UuZgSgUJxFqBBDJV8F7neuDD/X4lA372umn483ONvN3niwS20qt2TM73UKjAzwVka6kDDni8XoHgh/vuxvKjONzHRml2H6XZAVvTNb9BAk+4a+96zaJJoEQZx/x83x1c5Tk6OlIZ3Lm4+F675v0NV83fO++gMg==
+api: eJylVk1v2zgQ/SvEnLaAYjndHgrdvJts4KLbBokXPRiGQUtji41EMuTIG0PQfy+GkmK70rYu9mJL1MybN9+sgeTOQ7KE2VzMdqhJLIwpPKwiMBadJGX0PIMEdkj8BSKw0skSCR3r1aBliZCAyiACpSEBKymHCDL0qVOWASAB1hXzG4jA4XOlHGaQkKswAp/mWEpIaqCDZSRPTukdRLA1rpQECVSVyqBpVqzsrdEePcu/nU75b8RQhiRV4SGC1GhCTSwnrS1UGjyKv3oWrofGzeYrpjROvzcubhafJ2eeLFv3Qyg4CraidQcdgVP+aV3gHoujjl9La53ZyxBQZ/YqQ7feo1NbhQzlSVIVHHAoCbO1ZFKVzfqXVdCz6Ei10Ugl4c64w1gkR5zpxdkRXRWF3BTYpqQ5M/qjvDCZK1LB6TETjKKMFiziSZZ2As13khdxPTkapauyn5fPKHCl1XOFQmWoiSPvAsGz/A0K7MPj50/iMXwUW+MEMVBQEcfOCDilfFmnsij82qJb56ZyJzSVJtyhO+WpNP3+dkD0b/miyqoUAUlYdIKRRuPQtuJFIWXRQNJU9Cve4ovFlDATrd4ojb6eL6TSi/8Q69gbR9CNMQVKPUD9kiPl6F6BhfKiVw8+D5vwctAu3XvTThLRY4keq7Vw7PmfBuFB+ScRZBNRmH8jUWKmqjISudrlkUidIpV2uN1YuCywrXAiZEpqj5FQun/K0DrkCdDG42Ss/I92L6Qn0UKddXwTASninAa5h26KQtPwp3fT62HVzSrKuSXPY5xBkH/3H0NfGxJbU+ksmPSYVk7RIeyoDUqHjlEhWa54kZzr390uRMyZ9XGtskZciTukNtWbg5jfcGmWSLnpNmHYggwGJ1o8tdHt+71YuQISyIlsEseFSWWRG0/J++n76SB+N5x9Y0vevy0GNNEphE/iWGV28iL3BzPRONxQ985kVRrC1SOsjlEIHdzuidNYvCabbUC3i0MXBCGIuoe/+hL48GURoqv01gT1LrGBl5jdzwe85mG20kHc9904u5+HURJ0uhUt01B63V2iRVugLDnjhUqR6+X4/Y/Hj1fXk2teiGcR2inKq80kNWUcILrfTWE2cSk9oYs/zv+8/fR4y7icqZbjdHI9mfKRNZ5KqU9MXVIZ4wuN8IViW0ilQ4u5MAnaqllCQIQIEpXxJufK4OO63kiP/7iiafj4uULe58tVBHvpVDsYlzVkyvNzBslWFh4HDF4vPfDbQ9c6b8TxBjZKsDuU+gBsraj4DSJ4wkN7u2tWTQQ5yjDYl3X3YZamaOlEZXDL4jJ87Z272wVEIM+L77tiC+ijdOq6lViYJ9RN88qO+J0JNs03+BC7DQ==
 sidebar_class_name: "get api-method"
 info_path: docs/reference/api/xavyo-api
 custom_edit_url: null
@@ -23,13 +23,13 @@ import Translate from "@docusaurus/Translate";
 <Heading
   as={"h1"}
   className={"openapi__heading"}
-  children={"Get a tool by ID."}
+  children={"GET /tools/{id} - Get tool by ID."}
 >
 </Heading>
 
 <MethodEndpoint
   method={"get"}
-  path={"/nhi/tools/{id}"}
+  path={"/tools/{id}"}
   context={"endpoint"}
 >
   
@@ -37,7 +37,7 @@ import Translate from "@docusaurus/Translate";
 
 
 
-Get a tool by ID.
+GET /tools/\{id\} - Get tool by ID.
 
 <Heading
   id={"request"}

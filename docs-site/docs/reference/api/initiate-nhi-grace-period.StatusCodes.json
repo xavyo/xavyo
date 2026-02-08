@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Grace period initiated"},"400":{"description":"Invalid request"},"401":{"description":"Authentication required"},"403":{"description":"Forbidden"},"404":{"description":"NHI identity not found"},"409":{"description":"Grace period already active"}}}

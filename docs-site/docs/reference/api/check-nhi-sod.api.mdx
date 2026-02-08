@@ -1,0 +1,70 @@
+---
+id: check-nhi-sod
+title: "POST /sod/check — Check if granting a tool permission would violate SoD rules."
+description: "Queries the agent's existing tool permissions and checks against all SoD rules"
+sidebar_label: "POST /sod/check — Check if granting a tool permission would violate SoD rules."
+hide_title: true
+hide_table_of_contents: true
+api: eJzVVk1v4zYQ/SvEXHqRJefLm+qWzaZoikWajdP2kBoBTY0kbihSS1J2DENAf0R/YX9JMZQcKXbQ3QK99JLI4vDxzZs3Q23B88JB+gA3P16zufkAiwgydMLK2kujIYVPDVqJjvkSGS9Q++8cw2fpvNQF88YoVqOtpHPSaMe4zpgoUTw5xgsutfOMK0XIzDYK3e/aG5ahR+GZMDpXUngXszv0jdXdIUo6z0zOVtIo7l9Q1yX6Em0IKSzXnklH2GaNWQwRmBptCL/OIIXA4aaUc5NBBBa/NOj8e5NtIN2CMNqj9vTI61pJEfYlnx0lvAUnSqw4PflNjZCCWX5G4WFfmbsOlXnTpRyyHFjH/cHSYkYKB/EeJfEh2ehpEUFtibiX6AKdXcxwuPNW6gIiyI2tuIcUmkZm0A4oX4+lYOkVhcxNdklke/LQ0uJA09sGwwtXG+06UsfTKf17nTzl2mVt0TWK1PnPZCU8cgBnL6fsiznIDBFI99gb4VDR0dpw8tIYhVyTiCOgYZ1byzcE7LFyX2d8wZzUhcLXBmC5aXTGsoZqwvjbeVBTdJ7YdYPUxeOushGgzo0VWJGuB7m9teVbjPOK/WG8bpTiS3JL74YxiTfiX4txNQQzhStULDe2LyVlG4esmoqyry2uCDSCNbeaEhzZdAREpHdK/Vu3/7qrR2f1wz4I7m3D4un06NDpF40vUfvezuylerTBoWis9BtIH7awRG7RUjikD4t2EUGFvjQ0jmrjKMua0xokupSJM1kSLAEEY1doXUBprIIUSu/rNEmUEVyVxvn0fHo+PdD6A+lr6qB1hwFtNIZwaZLIrI6f+WpjYo2H3r21JmtEyGyHsBjymlPPdmYbZ/dSAjqD+IcwaqwQBFH/8MOuMD/9dh/0ollwNwzjq2de1VSO8eSDk5yfn+Wz08nZu6N3k9Oz2fFkeZKLybH4fnaSz2Y857PREP3GDW0EUucmkO89EFRhF7fXB6pcZ1Rxv2G31qxkhpaigpHDnn7YcRH6QfNqQLtHXtFZSgrUDkfr7+cfJ0fxEUR79SmkL5tlLEyVBIj+71KZZVJx59EmH68vr27mV2FeoXUdx2l8FE/pFZmr4np01O3P83s2OIz99cefLLidyby7PLuRtHd9s7VpVNZPMBwu7Xhfn9EV+r/5Pugd6/HZJ7XiMkz/UIlt35cPoEtJbg7fDF1vLiKg9qPF7XbJHf5iVdvS6y8NWur7RQQrbmU3MB8WbQQl8gxtaOYn3EAKl51Yk3uiQOGqCbfM/iVJvdvtuBACa/+PsePxQvWmpuu/byqT0R7L13Tb8DWkED6QXq658G4Liuui4QXFdpjUovx1h+91dMhqd0vqzYjhdttF3Jsn1G0LUZ+Kp9/QLtq2/RsZAZmR
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"POST /sod/check — Check if granting a tool permission would violate SoD rules."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/nhi/sod/check"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Queries the agent's existing tool permissions and checks against all SoD rules
+to detect conflicts. Returns the list of violations and whether the grant is allowed.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./check-nhi-sod.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./check-nhi-sod.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

@@ -1,1 +1,1 @@
-{"title":"Body","body":{"description":"Optional filters for the compliance report","content":{"application/json":{"schema":{"allOf":[{"type":"object","description":"Schema for ComplianceReportRequest.","title":"ComplianceReportRequest"}],"nullable":true}}},"required":false}}
+{"title":"Body","body":{"description":"Optional filters for the compliance report","content":{"application/json":{"schema":{"allOf":[{"type":"object","description":"Schema for ComplianceReportRequest","title":"ComplianceReportRequest"}],"nullable":true}}},"required":false}}

@@ -1,1 +1,1 @@
-{"responses":{"200":{"description":"Correlation cases retrieved","content":{"application/json":{"schema":{"type":"object","description":"Schema for CorrelationCaseListResponse.","title":"CorrelationCaseListResponse"}}}},"401":{"description":"Unauthorized"}}}
+{"responses":{"200":{"description":"Correlation cases retrieved","content":{"application/json":{"schema":{"type":"object","description":"Schema for CorrelationCaseListResponse","title":"CorrelationCaseListResponse"}}}},"401":{"description":"Unauthorized"}}}

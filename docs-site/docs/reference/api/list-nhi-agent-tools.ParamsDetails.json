@@ -1,0 +1,1 @@
+{"parameters":[{"name":"agent_id","in":"path","description":"Agent NHI ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"limit","in":"query","required":false,"schema":{"type":"integer","format":"int64","nullable":true}},{"name":"offset","in":"query","required":false,"schema":{"type":"integer","format":"int64","nullable":true}}]}

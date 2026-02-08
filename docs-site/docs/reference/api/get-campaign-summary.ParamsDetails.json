@@ -1,1 +1,0 @@
-{"parameters":[{"name":"campaign_id","in":"path","description":"Campaign UUID","required":true,"schema":{"type":"string","format":"uuid"}}]}

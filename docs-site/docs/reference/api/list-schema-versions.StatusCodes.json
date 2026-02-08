@@ -1,1 +1,1 @@
-{"responses":{"200":{"description":"List of schema versions","content":{"application/json":{"schema":{"type":"object","description":"Schema for SchemaVersionListResponse.","title":"SchemaVersionListResponse"}}}},"404":{"description":"Connector not found"}}}
+{"responses":{"200":{"description":"List of schema versions","content":{"application/json":{"schema":{"type":"object","description":"Schema for SchemaVersionListResponse","title":"SchemaVersionListResponse"}}}},"404":{"description":"Connector not found"}}}

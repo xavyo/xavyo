@@ -1,1 +1,1 @@
-{"responses":{"200":{"description":"Object class details","content":{"application/json":{"schema":{"type":"object","description":"Schema for ObjectClassResponse.","title":"ObjectClassResponse"}}}},"404":{"description":"Object class not found"}}}
+{"responses":{"200":{"description":"Object class details","content":{"application/json":{"schema":{"type":"object","description":"Schema for ObjectClassResponse","title":"ObjectClassResponse"}}}},"404":{"description":"Object class not found"}}}

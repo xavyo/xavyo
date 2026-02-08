@@ -1,1 +1,0 @@
-{"parameters":[{"name":"id","in":"path","description":"Service account ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"period_days","in":"query","description":"Period in days (default: 30).","required":false,"schema":{"type":"integer","format":"int32","nullable":true}}]}
