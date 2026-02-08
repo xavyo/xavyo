@@ -13,6 +13,7 @@ path = "src/main.rs"
 [features]
 default = []
 kafka = ["xavyo-events", "xavyo-api-governance/kafka", "xavyo-api-users/kafka", "xavyo-scim-client/kafka"]
+aws-ses = ["xavyo-api-auth/aws-ses"]
 
 [dependencies]
 # Web framework

@@ -29,11 +29,11 @@ WORKDIR /app
 # Cook dependencies first (cached unless Cargo.toml/lock changes)
 COPY --from=planner /app/recipe.json recipe.json
 ENV SQLX_OFFLINE=true
-RUN cargo chef cook --release --recipe-path recipe.json -p idp-api
+RUN cargo chef cook --release --recipe-path recipe.json -p idp-api --features aws-ses
 
 # Copy source and build
 COPY . .
-RUN cargo build --release -p idp-api && strip target/release/idp-api
+RUN cargo build --release -p idp-api --features aws-ses && strip target/release/idp-api
 
 # ---------------------------------------------------------------------------
 # Stage 3: Minimal runtime image

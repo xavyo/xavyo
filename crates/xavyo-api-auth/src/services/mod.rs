@@ -48,6 +48,9 @@ pub use delegated_admin_service::DelegatedAdminService;
 pub use device_policy_service::{DevicePolicy, DevicePolicyService, DEFAULT_TRUST_DURATION_DAYS};
 pub use device_service::DeviceService;
 pub use email_change_service::{EmailChangeService, EMAIL_CHANGE_TOKEN_VALIDITY_HOURS};
+#[cfg(feature = "aws-ses")]
+pub mod ses_email_service;
+
 pub use email_service::{EmailConfig, EmailError, EmailSender, MockEmailSender, SmtpEmailSender};
 pub use email_template_service::EmailTemplateService;
 pub use ip_restriction_service::{
@@ -70,6 +73,8 @@ pub use risk_enforcement_service::{
     EnforcementAction, EnforcementDecision, LoginRiskContext, RiskEnforcementError,
     RiskEnforcementService,
 };
+#[cfg(feature = "aws-ses")]
+pub use ses_email_service::{SesEmailConfig, SesEmailSender};
 pub use session_service::SessionService;
 pub use token_service::{
     generate_email_verification_token, generate_password_reset_token, generate_secure_token,

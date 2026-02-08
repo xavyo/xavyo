@@ -238,24 +238,48 @@ async fn main() {
     let email_rate_limiter =
         EmailRateLimiter::with_config(email_rate_max, email_ip_rate_max, email_rate_window);
 
-    // Use SmtpEmailSender when SMTP env vars are configured, otherwise fall back to mock
-    let email_sender: Arc<dyn xavyo_api_auth::EmailSender> = match EmailConfig::from_env() {
-        Ok(email_config) => {
-            info!(
-                smtp_host = %email_config.smtp_host,
-                from_address = %email_config.from_address,
-                "SMTP email sender configured"
-            );
-            Arc::new(SmtpEmailSender::new(email_config))
+    // Email sender auto-detection: SES > SMTP > Mock
+    let email_sender: Arc<dyn xavyo_api_auth::EmailSender> = {
+        let mut sender: Option<Arc<dyn xavyo_api_auth::EmailSender>> = None;
+
+        // Priority 1: AWS SES (if EMAIL_SES_REGION is set and feature enabled)
+        #[cfg(feature = "aws-ses")]
+        if sender.is_none() && std::env::var("EMAIL_SES_REGION").is_ok() {
+            match xavyo_api_auth::SesEmailConfig::from_env() {
+                Ok(ses_config) => {
+                    let region = ses_config.region.clone();
+                    sender = Some(Arc::new(
+                        xavyo_api_auth::SesEmailSender::new(ses_config).await,
+                    ));
+                    info!(region = %region, "AWS SES email sender configured");
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "SES configuration error — falling through to SMTP");
+                }
+            }
         }
-        Err(_) => {
+
+        // Priority 2: SMTP (if EMAIL_SMTP_HOST is set)
+        if sender.is_none() {
+            if let Ok(email_config) = EmailConfig::from_env() {
+                info!(
+                    smtp_host = %email_config.smtp_host,
+                    from_address = %email_config.from_address,
+                    "SMTP email sender configured"
+                );
+                sender = Some(Arc::new(SmtpEmailSender::new(email_config)));
+            }
+        }
+
+        // Priority 3: Mock (fallback)
+        sender.unwrap_or_else(|| {
             tracing::warn!(
                 target: "security",
-                "SMTP not configured — using mock email sender. Set EMAIL_SMTP_HOST, \
-                 EMAIL_SMTP_USERNAME, EMAIL_SMTP_PASSWORD, EMAIL_FROM_ADDRESS to enable real emails."
+                "No email provider configured — using mock email sender. \
+                 Set EMAIL_SES_REGION for AWS SES, or EMAIL_SMTP_HOST for SMTP."
             );
             Arc::new(MockEmailSender::new())
-        }
+        })
     };
 
     // Create MFA service for TOTP authentication

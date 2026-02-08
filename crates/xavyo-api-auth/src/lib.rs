@@ -95,3 +95,6 @@ pub use services::{
     WEBAUTHN_LOCKOUT_MINUTES,
     WEBAUTHN_MAX_FAILED_ATTEMPTS,
 };
+
+#[cfg(feature = "aws-ses")]
+pub use services::{SesEmailConfig, SesEmailSender};

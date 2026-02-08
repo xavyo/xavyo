@@ -85,6 +85,10 @@ pkcs8 = { version = "0.10", features = ["pem"] }
 # Async trait support
 async-trait = "0.1"
 
+# AWS SES (optional)
+aws-config = { version = "1", optional = true }
+aws-sdk-sesv2 = { version = "1", optional = true }
+
 # MFA TOTP dependencies
 totp-rs = { version = "5.6", features = ["gen_secret", "qr"] }
 
@@ -117,3 +121,4 @@ proptest = "1.4"
 [features]
 default = []
 integration = []
+aws-ses = ["aws-config", "aws-sdk-sesv2"]

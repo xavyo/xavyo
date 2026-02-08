@@ -135,6 +135,83 @@ impl EmailConfig {
             self.frontend_base_url, self.magic_link_path, token
         )
     }
+
+    /// Build the password reset email body.
+    #[must_use]
+    pub fn password_reset_body(&self, token: &str) -> String {
+        let url = self.password_reset_url(token);
+        format!(
+            r"Hi,
+
+We received a request to reset your password for your Xavyo account.
+
+Click the link below to reset your password:
+{url}
+
+This link will expire in 1 hour.
+
+If you didn't request this, you can safely ignore this email.
+
+- The xavyo Team"
+        )
+    }
+
+    /// Build the magic link email body.
+    #[must_use]
+    pub fn magic_link_body(&self, token: &str) -> String {
+        let url = self.magic_link_url(token);
+        format!(
+            r"Hi,
+
+You requested to sign in to your Xavyo account using a magic link.
+
+Click the link below to sign in:
+{url}
+
+This link will expire in 15 minutes and can only be used once.
+
+If you didn't request this, you can safely ignore this email.
+
+- The xavyo Team"
+        )
+    }
+
+    /// Build the email OTP email body.
+    #[must_use]
+    pub fn email_otp_body(&self, code: &str) -> String {
+        format!(
+            r"Hi,
+
+You requested to sign in to your Xavyo account using a one-time code.
+
+Your verification code is: {code}
+
+This code will expire in 10 minutes. You have 5 attempts to enter it correctly.
+
+If you didn't request this, you can safely ignore this email.
+
+- The xavyo Team"
+        )
+    }
+
+    /// Build the email verification email body.
+    #[must_use]
+    pub fn verification_body(&self, token: &str) -> String {
+        let url = self.email_verify_url(token);
+        format!(
+            r"Hi,
+
+Welcome to Xavyo! Please verify your email address by clicking the link below:
+
+{url}
+
+This link will expire in 24 hours.
+
+If you didn't create an account, you can safely ignore this email.
+
+- The xavyo Team"
+        )
+    }
 }
 
 /// Trait for sending emails.
@@ -253,79 +330,6 @@ impl SmtpEmailSender {
             .parse()
             .map_err(|e| EmailError::InvalidAddress(format!("Invalid from address: {e}")))
     }
-
-    /// Build the password reset email body.
-    fn password_reset_body(&self, token: &str) -> String {
-        let url = self.config.password_reset_url(token);
-        format!(
-            r"Hi,
-
-We received a request to reset your password for your Xavyo account.
-
-Click the link below to reset your password:
-{url}
-
-This link will expire in 1 hour.
-
-If you didn't request this, you can safely ignore this email.
-
-- The xavyo Team"
-        )
-    }
-
-    /// Build the magic link email body.
-    fn magic_link_body(&self, token: &str) -> String {
-        let url = self.config.magic_link_url(token);
-        format!(
-            r"Hi,
-
-You requested to sign in to your Xavyo account using a magic link.
-
-Click the link below to sign in:
-{url}
-
-This link will expire in 15 minutes and can only be used once.
-
-If you didn't request this, you can safely ignore this email.
-
-- The xavyo Team"
-        )
-    }
-
-    /// Build the email OTP email body.
-    fn email_otp_body(&self, code: &str) -> String {
-        format!(
-            r"Hi,
-
-You requested to sign in to your Xavyo account using a one-time code.
-
-Your verification code is: {code}
-
-This code will expire in 10 minutes. You have 5 attempts to enter it correctly.
-
-If you didn't request this, you can safely ignore this email.
-
-- The xavyo Team"
-        )
-    }
-
-    /// Build the email verification email body.
-    fn verification_body(&self, token: &str) -> String {
-        let url = self.config.email_verify_url(token);
-        format!(
-            r"Hi,
-
-Welcome to Xavyo! Please verify your email address by clicking the link below:
-
-{url}
-
-This link will expire in 24 hours.
-
-If you didn't create an account, you can safely ignore this email.
-
-- The xavyo Team"
-        )
-    }
 }
 
 /// Extension trait to make method chaining easier.
@@ -350,7 +354,7 @@ impl EmailSender for SmtpEmailSender {
             .parse()
             .map_err(|e| EmailError::InvalidAddress(format!("Invalid recipient: {e}")))?;
 
-        let body = self.password_reset_body(token);
+        let body = self.config.password_reset_body(token);
 
         let email = Message::builder()
             .from(from)
@@ -387,7 +391,7 @@ impl EmailSender for SmtpEmailSender {
             .parse()
             .map_err(|e| EmailError::InvalidAddress(format!("Invalid recipient: {e}")))?;
 
-        let body = self.verification_body(token);
+        let body = self.config.verification_body(token);
 
         let email = Message::builder()
             .from(from)
@@ -424,7 +428,7 @@ impl EmailSender for SmtpEmailSender {
             .parse()
             .map_err(|e| EmailError::InvalidAddress(format!("Invalid recipient: {e}")))?;
 
-        let body = self.magic_link_body(token);
+        let body = self.config.magic_link_body(token);
 
         let email = Message::builder()
             .from(from)
@@ -461,7 +465,7 @@ impl EmailSender for SmtpEmailSender {
             .parse()
             .map_err(|e| EmailError::InvalidAddress(format!("Invalid recipient: {e}")))?;
 
-        let body = self.email_otp_body(code);
+        let body = self.config.email_otp_body(code);
 
         let email = Message::builder()
             .from(from)
@@ -763,6 +767,7 @@ mod tests {
             smtp_port: 587,
             smtp_username: "user".to_string(),
             smtp_password: "pass".to_string(),
+            smtp_tls: true,
             from_address: "noreply@example.com".to_string(),
             from_name: "Test".to_string(),
             frontend_base_url: "https://app.xavyo.com".to_string(),
