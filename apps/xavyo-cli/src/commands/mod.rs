@@ -15,6 +15,7 @@ pub mod groups;
 pub mod init;
 pub mod login;
 pub mod logout;
+pub mod nhi;
 pub mod operations;
 pub mod policies;
 pub mod service_accounts;

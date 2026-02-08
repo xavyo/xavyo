@@ -10,6 +10,7 @@ mod connectors;
 mod governance;
 mod groups;
 mod health;
+mod nhi;
 mod operations;
 mod policies;
 mod profile;

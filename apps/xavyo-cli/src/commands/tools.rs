@@ -3,6 +3,7 @@
 use crate::api::ApiClient;
 use crate::config::{Config, ConfigPaths};
 use crate::error::{CliError, CliResult};
+use crate::models::nhi::UpdateToolRequest;
 use crate::models::tool::{CreateToolRequest, ToolResponse};
 use clap::{Args, Subcommand};
 use dialoguer::{Confirm, Select};
@@ -23,6 +24,8 @@ pub enum ToolsCommands {
     Create(CreateArgs),
     /// Get details of a specific tool
     Get(GetArgs),
+    /// Update a tool
+    Update(UpdateArgs),
     /// Delete a tool
     Delete(DeleteArgs),
 }
@@ -85,6 +88,33 @@ pub struct GetArgs {
     pub json: bool,
 }
 
+/// Arguments for the update command
+#[derive(Args, Debug)]
+pub struct UpdateArgs {
+    /// Tool ID (UUID)
+    pub id: String,
+
+    /// New tool name
+    #[arg(long)]
+    pub name: Option<String>,
+
+    /// New description
+    #[arg(long, short = 'd')]
+    pub description: Option<String>,
+
+    /// New category
+    #[arg(long, short = 'c')]
+    pub category: Option<String>,
+
+    /// Set requires-approval flag
+    #[arg(long)]
+    pub requires_approval: bool,
+
+    /// Output as JSON
+    #[arg(long)]
+    pub json: bool,
+}
+
 /// Arguments for the delete command
 #[derive(Args, Debug)]
 pub struct DeleteArgs {
@@ -102,6 +132,7 @@ pub async fn execute(args: ToolsArgs) -> CliResult<()> {
         ToolsCommands::List(list_args) => execute_list(list_args).await,
         ToolsCommands::Create(create_args) => execute_create(create_args).await,
         ToolsCommands::Get(get_args) => execute_get(get_args).await,
+        ToolsCommands::Update(update_args) => execute_update(update_args).await,
         ToolsCommands::Delete(delete_args) => execute_delete(delete_args).await,
     }
 }
@@ -199,6 +230,49 @@ async fn execute_get(args: GetArgs) -> CliResult<()> {
     if args.json {
         println!("{}", serde_json::to_string_pretty(&tool)?);
     } else {
+        print_tool_details(&tool);
+    }
+
+    Ok(())
+}
+
+/// Execute update command
+async fn execute_update(args: UpdateArgs) -> CliResult<()> {
+    let id = parse_tool_id(&args.id)?;
+
+    let request = UpdateToolRequest {
+        name: args.name.clone(),
+        description: args.description.clone(),
+        category: args.category.clone(),
+        requires_approval: if args.requires_approval {
+            Some(true)
+        } else {
+            None
+        },
+    };
+
+    if !request.has_changes() {
+        return Err(CliError::Validation(
+            "No changes specified. Use --name, --description, --category, or --requires-approval."
+                .to_string(),
+        ));
+    }
+
+    if let Some(ref name) = args.name {
+        validate_tool_name(name)?;
+    }
+
+    let paths = ConfigPaths::new()?;
+    let config = Config::load(&paths)?;
+    let client = ApiClient::new(config, paths)?;
+
+    let tool = client.update_tool(id, request).await?;
+
+    if args.json {
+        println!("{}", serde_json::to_string_pretty(&tool)?);
+    } else {
+        println!("Tool updated successfully!");
+        println!();
         print_tool_details(&tool);
     }
 

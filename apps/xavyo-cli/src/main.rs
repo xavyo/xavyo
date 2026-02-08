@@ -110,6 +110,9 @@ enum Commands {
     /// Manage service accounts (NHI)
     ServiceAccounts(commands::service_accounts::ServiceAccountsArgs),
 
+    /// Unified NHI management (lifecycle, credentials, permissions, risk, certifications, SoD)
+    Nhi(commands::nhi::NhiArgs),
+
     /// Governance: roles, entitlements, access requests
     Governance(commands::governance::GovernanceArgs),
 
@@ -173,6 +176,7 @@ async fn run(cli: Cli) -> CliResult<()> {
         Commands::Groups(args) => commands::groups::execute(args).await,
         Commands::Sessions(args) => commands::sessions::execute(args).await,
         Commands::ServiceAccounts(args) => commands::service_accounts::execute(args).await,
+        Commands::Nhi(args) => commands::nhi::execute(args).await,
         Commands::Governance(args) => commands::governance::execute(args).await,
         Commands::Connectors(args) => commands::connectors::execute(args).await,
         Commands::Webhooks(args) => commands::webhooks::execute(args).await,

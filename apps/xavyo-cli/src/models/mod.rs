@@ -13,6 +13,7 @@ pub mod doctor;
 pub mod governance;
 pub mod group;
 mod health;
+pub mod nhi;
 pub mod operation;
 pub mod platform;
 pub mod policy;
