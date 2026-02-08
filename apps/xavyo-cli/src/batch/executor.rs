@@ -185,16 +185,7 @@ impl BatchExecutor {
                     continue;
                 }
             };
-            let risk_level = match entry.risk_level.clone() {
-                Some(r) => r,
-                None => {
-                    result.add_failure(i, entry.name_or_id(), "Missing required field 'risk_level'".to_string());
-                    if let Some(ref pb) = progress { pb.inc(); }
-                    continue;
-                }
-            };
             let request = CreateAgentRequest::new(name, agent_type)
-                .with_risk_level(risk_level)
                 .with_model(entry.model_provider.clone(), entry.model_name.clone())
                 .with_description(entry.description.clone());
 
@@ -241,9 +232,9 @@ impl BatchExecutor {
 
         // Filter matching agents
         let matching: Vec<&AgentResponse> = agents
-            .agents
+            .data
             .iter()
-            .filter(|a| filter.matches_agent(&a.name, &a.agent_type, &a.status, &a.risk_level))
+            .filter(|a| filter.matches_agent(&a.name, &a.agent_type, &a.lifecycle_state, a.risk_score))
             .collect();
 
         if matching.is_empty() {
@@ -360,7 +351,7 @@ impl BatchExecutor {
 
         // List all agents
         let agents = self.client.list_agents(1000, 0, None, None).await?;
-        let count = agents.agents.len();
+        let count = agents.data.len();
 
         if count == 0 {
             println!("No agents to delete.");
@@ -416,7 +407,7 @@ impl BatchExecutor {
         };
 
         // Execute deletes
-        for (i, agent) in agents.agents.iter().enumerate() {
+        for (i, agent) in agents.data.iter().enumerate() {
             if self.is_interrupted() {
                 result.set_interrupted();
                 if let Some(ref pb) = progress {
@@ -540,12 +531,6 @@ impl BatchExecutor {
                             .agent_type
                             .clone()
                             .unwrap_or(existing.agent_type.clone()),
-                    )
-                    .with_risk_level(
-                        entry
-                            .risk_level
-                            .clone()
-                            .unwrap_or(existing.risk_level.clone()),
                     )
                     .with_model(
                         entry
@@ -687,15 +672,7 @@ impl BatchExecutor {
                     continue;
                 }
             };
-            let risk_level = match entry.risk_level.clone() {
-                Some(r) => r,
-                None => {
-                    result.add_failure(i, entry.name_or_id(), "Missing required field 'risk_level'".to_string());
-                    if let Some(ref pb) = progress { pb.inc(); }
-                    continue;
-                }
-            };
-            let mut request = CreateToolRequest::new(name, schema, risk_level);
+            let mut request = CreateToolRequest::new(name, schema);
 
             if let Some(ref desc) = entry.description {
                 request = request.with_description(Some(desc.clone()));
@@ -750,9 +727,9 @@ impl BatchExecutor {
 
         // Filter matching tools
         let matching: Vec<&ToolResponse> = tools
-            .tools
+            .data
             .iter()
-            .filter(|t| filter.matches_tool(&t.name, &t.status, &t.risk_level))
+            .filter(|t| filter.matches_tool(&t.name, &t.lifecycle_state, t.risk_score))
             .collect();
 
         if matching.is_empty() {
@@ -869,7 +846,7 @@ impl BatchExecutor {
 
         // List all tools
         let tools = self.client.list_tools(1000, 0).await?;
-        let count = tools.tools.len();
+        let count = tools.data.len();
 
         if count == 0 {
             println!("No tools to delete.");
@@ -921,7 +898,7 @@ impl BatchExecutor {
         };
 
         // Execute deletes
-        for (i, tool) in tools.tools.iter().enumerate() {
+        for (i, tool) in tools.data.iter().enumerate() {
             if self.is_interrupted() {
                 result.set_interrupted();
                 if let Some(ref pb) = progress {
@@ -1043,10 +1020,6 @@ impl BatchExecutor {
                     let mut request = CreateToolRequest::new(
                         existing.name.clone(),
                         schema,
-                        entry
-                            .risk_level
-                            .clone()
-                            .unwrap_or(existing.risk_level.clone()),
                     );
 
                     if let Some(ref desc) = entry.description {

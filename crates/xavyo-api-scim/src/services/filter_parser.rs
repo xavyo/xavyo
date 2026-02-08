@@ -488,8 +488,12 @@ impl SqlFilter {
 
                 let param_num = start_param + params.len();
                 let is_boolean = mapper.is_boolean(column);
-                let (sql, param) =
-                    op.to_sql(column, value.as_deref().unwrap_or(""), param_num, is_boolean);
+                let (sql, param) = op.to_sql(
+                    column,
+                    value.as_deref().unwrap_or(""),
+                    param_num,
+                    is_boolean,
+                );
 
                 if let Some(p) = param {
                     params.push(p);

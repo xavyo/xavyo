@@ -1159,54 +1159,6 @@ impl Modify for SecurityAddon {
         // SCIM Outbound Logs (F087)
         xavyo_api_connectors::handlers::scim_log::list_provisioning_log,
         xavyo_api_connectors::handlers::scim_log::get_log_detail,
-        // Human-in-the-Loop Approvals (F092)
-        xavyo_api_agents::handlers::approvals::list_approvals,
-        xavyo_api_agents::handlers::approvals::get_approval,
-        xavyo_api_agents::handlers::approvals::check_approval_status,
-        xavyo_api_agents::handlers::approvals::approve_request,
-        xavyo_api_agents::handlers::approvals::deny_request,
-        // AI Agent Registry (F089)
-        xavyo_api_agents::handlers::agents::create_agent,
-        xavyo_api_agents::handlers::agents::list_agents,
-        xavyo_api_agents::handlers::agents::get_agent,
-        xavyo_api_agents::handlers::agents::update_agent,
-        xavyo_api_agents::handlers::agents::delete_agent,
-        xavyo_api_agents::handlers::agents::suspend_agent,
-        xavyo_api_agents::handlers::agents::reactivate_agent,
-        // AI Agent Tools (F089)
-        xavyo_api_agents::handlers::tools::create_tool,
-        xavyo_api_agents::handlers::tools::list_tools,
-        xavyo_api_agents::handlers::tools::get_tool,
-        xavyo_api_agents::handlers::tools::update_tool,
-        xavyo_api_agents::handlers::tools::delete_tool,
-        // AI Agent Permissions (F090)
-        xavyo_api_agents::handlers::permissions::grant_permission,
-        xavyo_api_agents::handlers::permissions::list_permissions,
-        xavyo_api_agents::handlers::permissions::revoke_permission,
-        // AI Agent Authorization (F090)
-        xavyo_api_agents::handlers::authorize::authorize,
-        // AI Agent Audit (F090)
-        xavyo_api_agents::handlers::audit::query_audit,
-        // AI Agent Discovery (F091 - A2A)
-        xavyo_api_agents::handlers::discovery::get_agent_card,
-        // MCP Tools (F091)
-        xavyo_api_agents::handlers::mcp::list_tools,
-        xavyo_api_agents::handlers::mcp::call_tool,
-        // A2A Tasks (F091)
-        xavyo_api_agents::handlers::a2a::create_task,
-        xavyo_api_agents::handlers::a2a::list_tasks,
-        xavyo_api_agents::handlers::a2a::get_task,
-        xavyo_api_agents::handlers::a2a::cancel_task,
-        // Security Assessment (F093)
-        xavyo_api_agents::handlers::assessment::get_agent_security_assessment,
-        // Behavioral Anomaly Detection (F094)
-        xavyo_api_agents::handlers::anomaly::list_agent_anomalies,
-        xavyo_api_agents::handlers::anomaly::get_agent_baseline,
-        xavyo_api_agents::handlers::anomaly::get_agent_thresholds,
-        xavyo_api_agents::handlers::anomaly::set_agent_thresholds,
-        xavyo_api_agents::handlers::anomaly::reset_agent_thresholds,
-        xavyo_api_agents::handlers::anomaly::get_tenant_thresholds,
-        xavyo_api_agents::handlers::anomaly::set_tenant_thresholds,
         // Tenant Provisioning (F097)
         xavyo_api_tenants::handlers::provision::provision_handler,
         // Unified NHI (201-tool-nhi-promotion)
@@ -2303,68 +2255,24 @@ impl Modify for SecurityAddon {
         xavyo_api_connectors::handlers::scim_provisioning::RetryResponse,
         // SCIM Outbound Logs (F087)
         xavyo_api_connectors::handlers::scim_log::ProvisioningLogListResponse,
-        // Human-in-the-Loop Approvals (F092)
-        xavyo_api_agents::models::ApprovalListResponse,
-        xavyo_api_agents::models::ApprovalResponse,
-        xavyo_api_agents::models::ApprovalStatusResponse,
-        xavyo_api_agents::models::ApprovalSummary,
-        xavyo_api_agents::models::ApproveRequest,
-        xavyo_api_agents::models::DenyRequest,
-        // AI Agent Registry (F089)
-        xavyo_api_agents::models::CreateAgentRequest,
-        xavyo_api_agents::models::UpdateAgentRequest,
-        xavyo_api_agents::models::AgentResponse,
-        xavyo_api_agents::models::AgentListResponse,
-        // AI Agent Tools (F089)
-        xavyo_api_agents::models::CreateToolRequest,
-        xavyo_api_agents::models::UpdateToolRequest,
-        xavyo_api_agents::models::ToolResponse,
-        xavyo_api_agents::models::ToolListResponse,
-        // AI Agent Permissions (F090)
-        xavyo_api_agents::models::GrantPermissionRequest,
-        xavyo_api_agents::models::PermissionResponse,
-        xavyo_api_agents::models::PermissionListResponse,
-        // AI Agent Authorization (F090)
-        xavyo_api_agents::models::AuthorizeRequest,
-        xavyo_api_agents::models::AuthorizationContext,
-        xavyo_api_agents::models::AuthorizeResponse,
-        // AI Agent Audit (F090)
-        xavyo_api_agents::models::AuditEventResponse,
-        xavyo_api_agents::models::AuditListResponse,
-        // AI Agent Discovery (F091 - A2A)
-        xavyo_api_agents::models::AgentCard,
-        xavyo_api_agents::models::AgentCapabilities,
-        xavyo_api_agents::models::AgentAuthentication,
-        xavyo_api_agents::models::AgentSkill,
-        // MCP Tools (F091)
-        xavyo_api_agents::models::McpTool,
-        xavyo_api_agents::models::McpToolsResponse,
-        xavyo_api_agents::models::McpCallRequest,
-        xavyo_api_agents::models::McpCallResponse,
-        xavyo_api_agents::models::McpContext,
-        xavyo_api_agents::models::McpErrorResponse,
-        // A2A Tasks (F091)
-        xavyo_api_agents::models::CreateA2aTaskRequest,
-        xavyo_api_agents::models::CreateA2aTaskResponse,
-        xavyo_api_agents::models::A2aTaskResponse,
-        xavyo_api_agents::models::A2aTaskListResponse,
-        xavyo_api_agents::models::CancelA2aTaskResponse,
-        xavyo_api_agents::models::A2aErrorResponse,
-        // Security Assessment (F093)
-        xavyo_api_agents::models::SecurityAssessment,
-        xavyo_api_agents::models::VulnerabilityCheck,
-        xavyo_api_agents::models::Recommendation,
-        xavyo_api_agents::models::ComplianceStatus,
-        xavyo_api_agents::models::OwaspAgenticCompliance,
-        // Behavioral Anomaly Detection (F094)
-        xavyo_api_agents::models::DetectedAnomaly,
-        xavyo_api_agents::models::AnomalyListResponse,
-        xavyo_api_agents::models::Baseline,
-        xavyo_api_agents::models::BaselineResponse,
-        xavyo_api_agents::models::Threshold,
-        xavyo_api_agents::models::ThresholdsResponse,
-        xavyo_api_agents::models::SetThresholdsRequest,
-        xavyo_api_agents::models::AnomalyThresholdInput,
+        // NHI Protocol types (A2A/MCP)
+        xavyo_api_nhi::models::AgentCard,
+        xavyo_api_nhi::models::AgentCapabilities,
+        xavyo_api_nhi::models::AgentAuthentication,
+        xavyo_api_nhi::models::AgentSkill,
+        xavyo_api_nhi::models::McpTool,
+        xavyo_api_nhi::models::McpToolsResponse,
+        xavyo_api_nhi::models::McpCallRequest,
+        xavyo_api_nhi::models::McpCallResponse,
+        xavyo_api_nhi::models::McpContext,
+        xavyo_api_nhi::models::McpErrorResponse,
+        xavyo_api_nhi::models::McpErrorCode,
+        xavyo_api_nhi::models::CreateA2aTaskRequest,
+        xavyo_api_nhi::models::CreateA2aTaskResponse,
+        xavyo_api_nhi::models::A2aTaskResponse,
+        xavyo_api_nhi::models::A2aTaskListResponse,
+        xavyo_api_nhi::models::CancelA2aTaskResponse,
+        xavyo_api_nhi::models::A2aErrorResponse,
         // Tenant Provisioning models (F097)
         xavyo_api_tenants::models::ProvisionTenantRequest,
         xavyo_api_tenants::models::ProvisionTenantResponse,
@@ -2563,19 +2471,6 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::services::license_report_service::ComplianceReport,
         xavyo_api_governance::services::nhi_request_service::NhiRequestSummary,
         xavyo_api_governance::services::state_access_rule_service::StateAffectedEntitlements,
-
-        // --- xavyo-api-agents types ---
-        xavyo_api_agents::models::AnomalyType,
-        xavyo_api_agents::models::AnomalyWarning,
-        xavyo_api_agents::models::BaselineStatus,
-        xavyo_api_agents::models::BaselineType,
-        xavyo_api_agents::models::Category,
-        xavyo_api_agents::models::CheckName,
-        xavyo_api_agents::models::McpErrorCode,
-        xavyo_api_agents::models::Priority,
-        xavyo_api_agents::models::Status,
-        xavyo_api_agents::models::ThresholdSource,
-        xavyo_api_agents::models::UserContext,
 
         // --- xavyo-api-authorization types ---
         xavyo_api_authorization::models::AuthorizationDecisionResponse,

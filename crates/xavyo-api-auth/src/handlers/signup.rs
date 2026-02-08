@@ -18,10 +18,10 @@ use sqlx::PgPool;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::{info, warn};
-use xavyo_db::set_tenant_context;
 use uuid::Uuid;
 use validator::Validate;
 use xavyo_core::TenantId;
+use xavyo_db::set_tenant_context;
 use xavyo_db::SYSTEM_TENANT_ID;
 
 /// Handle self-service signup.

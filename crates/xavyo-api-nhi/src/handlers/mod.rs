@@ -12,15 +12,23 @@
 //! - `certification` — Certification campaign management
 //! - `sod` — Separation of Duties validation
 //! - `inactivity` — Inactivity detection and orphan management
+//! - `mcp` — MCP (Model Context Protocol) tool discovery and invocation
+//! - `a2a` — A2A (Agent-to-Agent) asynchronous task management
+//! - `discovery` — A2A AgentCard discovery
 
+pub mod a2a;
 pub mod agents;
 pub mod certification;
 pub mod credentials;
+pub mod discovery;
 pub mod inactivity;
 pub mod lifecycle;
+pub mod mcp;
+pub mod nhi_permissions;
 pub mod permissions;
 pub mod risk;
 pub mod service_accounts;
 pub mod sod;
 pub mod tools;
 pub mod unified;
+pub mod user_permissions;

@@ -181,6 +181,48 @@ impl ProvisioningService {
                     TenantError::Database(e.to_string())
                 })?;
 
+        // 2a. Copy password hash from system-tenant user so admin can login with same password
+        let password_copied: bool = sqlx::query_scalar(
+            r"
+            UPDATE users SET password_hash = src.password_hash
+            FROM (SELECT password_hash FROM users WHERE email = $1 AND tenant_id = $2 AND password_hash != '') src
+            WHERE users.id = $3
+            RETURNING true
+            ",
+        )
+        .bind(email)
+        .bind(context.system_tenant_id)
+        .bind(admin_user.id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to copy password hash: {e}");
+            TenantError::Database(e.to_string())
+        })?
+        .unwrap_or(false);
+
+        if !password_copied {
+            tracing::info!(
+                "No password to copy for {email}; admin must set password via reset flow"
+            );
+        }
+
+        // 2b. Assign super_admin role to the new admin user
+        sqlx::query(
+            r"
+            INSERT INTO user_roles (user_id, role_name, created_at)
+            VALUES ($1, 'super_admin', NOW())
+            ON CONFLICT (user_id, role_name) DO NOTHING
+            ",
+        )
+        .bind(admin_user.id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to assign admin role: {e}");
+            TenantError::Database(e.to_string())
+        })?;
+
         // Audit: user.created
         self.log_audit(
             &mut tx,

@@ -314,28 +314,28 @@ fn test_tools_list_cache_format() {
     struct ToolResponse {
         id: String,
         name: String,
-        risk_level: String,
-        status: String,
+        risk_score: Option<i32>,
+        lifecycle_state: String,
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct ToolListResponse {
-        tools: Vec<ToolResponse>,
+        data: Vec<ToolResponse>,
         total: i64,
     }
 
     let response = ToolListResponse {
-        tools: vec![ToolResponse {
+        data: vec![ToolResponse {
             id: "550e8400-e29b-41d4-a716-446655440001".to_string(),
             name: "send-email".to_string(),
-            risk_level: "medium".to_string(),
-            status: "active".to_string(),
+            risk_score: Some(50),
+            lifecycle_state: "active".to_string(),
         }],
         total: 1,
     };
 
     let json = serde_json::to_string_pretty(&response).unwrap();
-    assert!(json.contains("\"tools\""));
+    assert!(json.contains("\"data\""));
     assert!(json.contains("send-email"));
 }
 

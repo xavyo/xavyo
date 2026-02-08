@@ -75,11 +75,6 @@ pub use models::{
     AdminResourceType,
     AdminRoleTemplate,
     AdminRoleTemplatePermission,
-    // AI Agent models (F089, F110)
-    AiAgent,
-    AiAgentFilter,
-    AiAgentStatus,
-    AiAgentType,
     // Risk Scoring models (F039)
     AlertSeverity,
     AlertType,
@@ -169,7 +164,6 @@ pub use models::{
     CorrelationRuleFilter,
     CreateAccessPattern,
     CreateAccessSnapshot,
-    CreateAiAgent,
     CreateAlert,
     CreateApprovalGroup,
     CreateAssignment,
@@ -676,7 +670,6 @@ pub use models::{
     TransitionRequestFilter,
     TransitionRequestStatus,
     TrendDirection,
-    UpdateAiAgent,
     UpdateApprovalGroup,
     UpdateBirthrightPolicy,
     UpdateCartItem,

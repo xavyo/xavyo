@@ -164,7 +164,10 @@ pub async fn create_archetype(
         .log_archetype_created(tenant_id, actor_id, archetype.id, &archetype.name)
         .await?;
 
-    Ok((StatusCode::CREATED, Json(ArchetypeResponse::from(archetype))))
+    Ok((
+        StatusCode::CREATED,
+        Json(ArchetypeResponse::from(archetype)),
+    ))
 }
 
 /// Get a persona archetype by ID.

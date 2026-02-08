@@ -6,6 +6,7 @@ members = [
   "apps/xavyo-cli",
   "crates/*"
 ]
+exclude = []
 
 [workspace.package]
 version = "0.1.0"

@@ -7,7 +7,7 @@ use crate::error::{CliError, CliResult};
 /// Filter for selecting resources to delete
 #[derive(Debug, Clone)]
 pub struct Filter {
-    /// Field to match (name, type, status, risk_level)
+    /// Field to match (name, type, lifecycle_state, risk_score)
     pub field: String,
     /// Pattern to match (supports glob: *, ?)
     pub pattern: String,
@@ -30,10 +30,10 @@ impl Filter {
 
         // Validate field name
         match field.as_str() {
-            "name" | "type" | "status" | "risk_level" => {}
+            "name" | "type" | "status" | "lifecycle_state" | "risk_level" | "risk_score" => {}
             _ => {
                 return Err(CliError::Validation(format!(
-                    "Unknown filter field '{}'. Valid fields: name, type, status, risk_level",
+                    "Unknown filter field '{}'. Valid fields: name, type, lifecycle_state, risk_score",
                     field
                 )));
             }
@@ -59,29 +59,41 @@ impl Filter {
         &self,
         name: &str,
         agent_type: &str,
-        status: &str,
-        risk_level: &str,
+        lifecycle_state: &str,
+        risk_score: Option<i32>,
     ) -> bool {
-        let value = match self.field.as_str() {
-            "name" => name,
-            "type" => agent_type,
-            "status" => status,
-            "risk_level" => risk_level,
-            _ => return false,
-        };
-        self.matches(value)
+        match self.field.as_str() {
+            "name" => self.matches(name),
+            "type" => self.matches(agent_type),
+            "status" | "state" | "lifecycle_state" => self.matches(lifecycle_state),
+            "risk_score" => match risk_score {
+                Some(score) => self.matches(&score.to_string()),
+                None => false,
+            },
+            "risk_level" => {
+                let level = crate::commands::export::risk_score_to_level(risk_score);
+                self.matches(&level)
+            }
+            _ => false,
+        }
     }
 
     /// Check if a tool matches this filter
-    pub fn matches_tool(&self, name: &str, status: &str, risk_level: &str) -> bool {
-        let value = match self.field.as_str() {
-            "name" => name,
-            "status" => status,
-            "risk_level" => risk_level,
-            "type" => return false, // Tools don't have a type field
-            _ => return false,
-        };
-        self.matches(value)
+    pub fn matches_tool(&self, name: &str, lifecycle_state: &str, risk_score: Option<i32>) -> bool {
+        match self.field.as_str() {
+            "name" => self.matches(name),
+            "status" | "lifecycle_state" => self.matches(lifecycle_state),
+            "risk_score" => match risk_score {
+                Some(score) => self.matches(&score.to_string()),
+                None => false,
+            },
+            "risk_level" => {
+                let level = crate::commands::export::risk_score_to_level(risk_score);
+                self.matches(&level)
+            }
+            "type" => false, // Tools don't have a type field
+            _ => false,
+        }
     }
 }
 
@@ -152,13 +164,20 @@ mod tests {
         assert_eq!(filter2.field, "type");
         assert_eq!(filter2.pattern, "copilot");
 
-        let filter3 = Filter::parse("risk_level=high").unwrap();
-        assert_eq!(filter3.field, "risk_level");
-        assert_eq!(filter3.pattern, "high");
+        let filter3 = Filter::parse("risk_score=75").unwrap();
+        assert_eq!(filter3.field, "risk_score");
+        assert_eq!(filter3.pattern, "75");
 
-        let filter4 = Filter::parse("status=active").unwrap();
-        assert_eq!(filter4.field, "status");
+        let filter4 = Filter::parse("lifecycle_state=active").unwrap();
+        assert_eq!(filter4.field, "lifecycle_state");
         assert_eq!(filter4.pattern, "active");
+
+        // Backward-compat: old field names still accepted
+        let filter5 = Filter::parse("risk_level=high").unwrap();
+        assert_eq!(filter5.field, "risk_level");
+
+        let filter6 = Filter::parse("status=active").unwrap();
+        assert_eq!(filter6.field, "status");
     }
 
     #[test]
@@ -247,30 +266,31 @@ mod tests {
     #[test]
     fn test_filter_matches_agent() {
         let filter = Filter::parse("name=test-*").unwrap();
-        assert!(filter.matches_agent("test-agent", "copilot", "active", "low"));
-        assert!(!filter.matches_agent("prod-agent", "copilot", "active", "low"));
+        assert!(filter.matches_agent("test-agent", "copilot", "active", Some(25)));
+        assert!(!filter.matches_agent("prod-agent", "copilot", "active", Some(25)));
 
         let type_filter = Filter::parse("type=copilot").unwrap();
-        assert!(type_filter.matches_agent("any", "copilot", "active", "low"));
-        assert!(!type_filter.matches_agent("any", "autonomous", "active", "low"));
+        assert!(type_filter.matches_agent("any", "copilot", "active", Some(25)));
+        assert!(!type_filter.matches_agent("any", "autonomous", "active", Some(25)));
 
-        let risk_filter = Filter::parse("risk_level=high").unwrap();
-        assert!(risk_filter.matches_agent("any", "any", "active", "high"));
-        assert!(!risk_filter.matches_agent("any", "any", "active", "low"));
+        let risk_filter = Filter::parse("risk_score=75").unwrap();
+        assert!(risk_filter.matches_agent("any", "any", "active", Some(75)));
+        assert!(!risk_filter.matches_agent("any", "any", "active", Some(25)));
+        assert!(!risk_filter.matches_agent("any", "any", "active", None));
     }
 
     #[test]
     fn test_filter_matches_tool() {
         let filter = Filter::parse("name=send-*").unwrap();
-        assert!(filter.matches_tool("send-email", "active", "low"));
-        assert!(!filter.matches_tool("receive-data", "active", "low"));
+        assert!(filter.matches_tool("send-email", "active", Some(25)));
+        assert!(!filter.matches_tool("receive-data", "active", Some(25)));
 
-        let status_filter = Filter::parse("status=active").unwrap();
-        assert!(status_filter.matches_tool("any", "active", "low"));
-        assert!(!status_filter.matches_tool("any", "inactive", "low"));
+        let status_filter = Filter::parse("lifecycle_state=active").unwrap();
+        assert!(status_filter.matches_tool("any", "active", Some(25)));
+        assert!(!status_filter.matches_tool("any", "inactive", Some(25)));
 
         // Type filter should not match tools
         let type_filter = Filter::parse("type=copilot").unwrap();
-        assert!(!type_filter.matches_tool("any", "active", "low"));
+        assert!(!type_filter.matches_tool("any", "active", Some(25)));
     }
 }

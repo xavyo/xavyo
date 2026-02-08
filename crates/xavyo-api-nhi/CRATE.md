@@ -33,8 +33,10 @@ Production-ready with comprehensive test coverage (55 unit tests + 22 integratio
 ### Routers
 
 ```rust
-pub fn nhi_router() -> Router<NhiState>;
-pub fn service_accounts_router() -> Router<NhiState>;
+pub fn nhi_router() -> Router<NhiState>;       // Unified NHI CRUD, lifecycle, credentials, permissions, risk, certs
+pub fn mcp_router(state: NhiState) -> Router;   // MCP protocol (tool listing + invocation)
+pub fn a2a_router(state: NhiState) -> Router;   // A2A protocol (agent-to-agent task management)
+pub fn discovery_router(state: NhiState) -> Router; // Agent discovery (/.well-known/agents/:id)
 ```
 
 ### Key Endpoints
@@ -45,24 +47,31 @@ pub fn service_accounts_router() -> Router<NhiState>;
 | GET | `/nhi/:id` | Get NHI by ID |
 | GET | `/nhi/:id/risk` | Get risk score |
 | POST | `/nhi/:id/certify` | Certify NHI |
-| GET | `/service-accounts` | List service accounts |
-| POST | `/service-accounts` | Create service account |
-| PATCH | `/service-accounts/:id` | Update account |
-| DELETE | `/service-accounts/:id` | Delete account |
-| POST | `/service-accounts/:id/rotate` | Rotate credentials |
-| POST | `/service-accounts/:id/suspend` | Suspend account |
+| GET | `/nhi/agents` | List agents |
+| GET | `/nhi/tools` | List tools |
+| GET | `/nhi/service-accounts` | List service accounts |
+| GET | `/mcp/tools` | List permitted MCP tools for calling agent |
+| POST | `/mcp/tools/:name/call` | Invoke an MCP tool |
+| POST | `/a2a/tasks` | Create A2A task (with NHI-to-NHI permission check) |
+| GET | `/a2a/tasks` | List A2A tasks |
+| GET | `/a2a/tasks/:id` | Get A2A task |
+| POST | `/a2a/tasks/:id/cancel` | Cancel A2A task |
+| GET | `/.well-known/agents/:id` | Get agent discovery card |
 
 ## Usage Example
 
 ```rust
-use xavyo_api_nhi::{nhi_router, NhiState};
+use xavyo_api_nhi::{nhi_router, mcp_router, a2a_router, discovery_router, NhiState};
 use axum::Router;
 
 let state = NhiState::new(pool.clone());
 
 let app = Router::new()
     .nest("/nhi", nhi_router())
-    .with_state(state);
+    .nest("/mcp", mcp_router(state.clone()))
+    .nest("/a2a", a2a_router(state.clone()))
+    .merge(discovery_router(state))
+    ;
 ```
 
 ## Integration Points
@@ -127,5 +136,4 @@ The crate implements comprehensive risk scoring for NHIs:
 ## Related Crates
 
 - `xavyo-nhi` - NHI types
-- `xavyo-api-agents` - AI agent specifics
 - `xavyo-governance` - NHI certification

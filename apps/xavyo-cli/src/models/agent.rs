@@ -16,8 +16,9 @@ pub struct AgentResponse {
     pub model_provider: Option<String>,
     #[serde(default)]
     pub model_name: Option<String>,
-    pub status: String,
-    pub risk_level: String,
+    pub lifecycle_state: String,
+    #[serde(default)]
+    pub risk_score: Option<i32>,
     #[serde(default)]
     pub requires_human_approval: bool,
     pub created_at: DateTime<Utc>,
@@ -27,10 +28,10 @@ pub struct AgentResponse {
 /// Paginated list response for agents
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentListResponse {
-    pub agents: Vec<AgentResponse>,
+    pub data: Vec<AgentResponse>,
     pub total: i64,
-    pub limit: i32,
-    pub offset: i32,
+    pub limit: i64,
+    pub offset: i64,
 }
 
 /// Request to create a new agent
@@ -44,8 +45,6 @@ pub struct CreateAgentRequest {
     pub model_provider: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub risk_level: Option<String>,
 }
 
 impl CreateAgentRequest {
@@ -56,18 +55,12 @@ impl CreateAgentRequest {
             description: None,
             model_provider: None,
             model_name: None,
-            risk_level: None,
         }
     }
 
     pub fn with_model(mut self, provider: Option<String>, name: Option<String>) -> Self {
         self.model_provider = provider;
         self.model_name = name;
-        self
-    }
-
-    pub fn with_risk_level(mut self, risk_level: String) -> Self {
-        self.risk_level = Some(risk_level);
         self
     }
 
@@ -269,8 +262,7 @@ mod tests {
             "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
             "name": "my-bot",
             "agent_type": "copilot",
-            "status": "active",
-            "risk_level": "low",
+            "lifecycle_state": "active",
             "requires_human_approval": false,
             "created_at": "2026-01-29T10:30:00Z",
             "updated_at": "2026-01-29T10:30:00Z"
@@ -279,8 +271,8 @@ mod tests {
         let agent: AgentResponse = serde_json::from_str(json).unwrap();
         assert_eq!(agent.name, "my-bot");
         assert_eq!(agent.agent_type, "copilot");
-        assert_eq!(agent.status, "active");
-        assert_eq!(agent.risk_level, "low");
+        assert_eq!(agent.lifecycle_state, "active");
+        assert!(agent.risk_score.is_none());
         assert!(!agent.requires_human_approval);
         assert!(agent.description.is_none());
         assert!(agent.model_provider.is_none());
@@ -295,8 +287,8 @@ mod tests {
             "agent_type": "autonomous",
             "model_provider": "anthropic",
             "model_name": "claude-sonnet-4",
-            "status": "active",
-            "risk_level": "high",
+            "lifecycle_state": "active",
+            "risk_score": 85,
             "requires_human_approval": true,
             "created_at": "2026-01-29T10:30:00Z",
             "updated_at": "2026-01-29T10:30:00Z"
@@ -310,19 +302,19 @@ mod tests {
         );
         assert_eq!(agent.model_provider.as_deref(), Some("anthropic"));
         assert_eq!(agent.model_name.as_deref(), Some("claude-sonnet-4"));
+        assert_eq!(agent.risk_score, Some(85));
         assert!(agent.requires_human_approval);
     }
 
     #[test]
     fn test_agent_list_response_deserialization() {
         let json = r#"{
-            "agents": [
+            "data": [
                 {
                     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
                     "name": "bot-1",
                     "agent_type": "copilot",
-                    "status": "active",
-                    "risk_level": "low",
+                    "lifecycle_state": "active",
                     "created_at": "2026-01-29T10:30:00Z",
                     "updated_at": "2026-01-29T10:30:00Z"
                 }
@@ -333,7 +325,7 @@ mod tests {
         }"#;
 
         let list: AgentListResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(list.agents.len(), 1);
+        assert_eq!(list.data.len(), 1);
         assert_eq!(list.total, 1);
         assert_eq!(list.limit, 50);
         assert_eq!(list.offset, 0);
@@ -345,15 +337,13 @@ mod tests {
             .with_model(
                 Some("anthropic".to_string()),
                 Some("claude-sonnet-4".to_string()),
-            )
-            .with_risk_level("medium".to_string());
+            );
 
         let json = serde_json::to_value(&request).unwrap();
         assert_eq!(json["name"], "my-bot");
         assert_eq!(json["agent_type"], "copilot");
         assert_eq!(json["model_provider"], "anthropic");
         assert_eq!(json["model_name"], "claude-sonnet-4");
-        assert_eq!(json["risk_level"], "medium");
         assert!(json.get("description").is_none());
     }
 
@@ -366,7 +356,6 @@ mod tests {
         assert_eq!(json["agent_type"], "workflow");
         // Optional fields should not be present when None
         assert!(json.get("model_provider").is_none());
-        assert!(json.get("risk_level").is_none());
     }
 
     // F-051: Update agent request tests

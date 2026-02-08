@@ -29,6 +29,7 @@ use xavyo_db::models::{
 use xavyo_nhi::{NhiLifecycleState, NhiType};
 
 use crate::error::NhiApiError;
+use crate::services::nhi_user_permission_service::NhiUserPermissionService;
 use crate::state::NhiState;
 
 // ---------------------------------------------------------------------------
@@ -196,6 +197,7 @@ pub async fn create_service_account(
 pub async fn list_service_accounts(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Query(query): Query<ListServiceAccountsQuery>,
 ) -> Result<Json<PaginatedResponse<NhiServiceAccountWithIdentity>>, NhiApiError> {
     let tenant_uuid = *tenant_id.as_uuid();
@@ -208,15 +210,57 @@ pub async fn list_service_accounts(
         owner_id: query.owner_id,
     };
 
-    let data = NhiServiceAccount::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
-    let total = count_service_accounts(&state.pool, tenant_uuid, &filter).await?;
+    // Admin/super_admin see all service accounts; non-admin users only see permitted ones
+    if claims.has_role("admin") || claims.has_role("super_admin") {
+        let data =
+            NhiServiceAccount::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
+        let total = count_service_accounts(&state.pool, tenant_uuid, &filter).await?;
+        Ok(Json(PaginatedResponse {
+            data,
+            total,
+            limit,
+            offset,
+        }))
+    } else {
+        use xavyo_db::models::nhi_user_permission::NhiUserPermission;
+        let user_id = Uuid::parse_str(&claims.sub)
+            .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
+        let user_perms =
+            NhiUserPermission::list_by_user(&state.pool, tenant_uuid, user_id, 10000, 0).await?;
+        let mut permitted_nhi_ids: Vec<Uuid> = user_perms.iter().map(|p| p.nhi_id).collect();
+        permitted_nhi_ids.sort();
+        permitted_nhi_ids.dedup();
 
-    Ok(Json(PaginatedResponse {
-        data,
-        total,
-        limit,
-        offset,
-    }))
+        if permitted_nhi_ids.is_empty() {
+            return Ok(Json(PaginatedResponse {
+                data: vec![],
+                total: 0,
+                limit,
+                offset,
+            }));
+        }
+
+        let fetch_limit = (limit + offset) * 10;
+        let all_data =
+            NhiServiceAccount::list(&state.pool, tenant_uuid, &filter, fetch_limit.min(10000), 0)
+                .await?;
+        let filtered: Vec<NhiServiceAccountWithIdentity> = all_data
+            .into_iter()
+            .filter(|sa| permitted_nhi_ids.binary_search(&sa.id).is_ok())
+            .collect();
+        let total = filtered.len() as i64;
+        let data: Vec<NhiServiceAccountWithIdentity> = filtered
+            .into_iter()
+            .skip(offset as usize)
+            .take(limit as usize)
+            .collect();
+        Ok(Json(PaginatedResponse {
+            data,
+            total,
+            limit,
+            offset,
+        }))
+    }
 }
 
 /// Count service accounts matching a filter.
@@ -281,9 +325,13 @@ async fn count_service_accounts(
 pub async fn get_service_account(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<NhiServiceAccountWithIdentity>, NhiApiError> {
     let tenant_uuid = *tenant_id.as_uuid();
+
+    // Enforce user→NHI permission (admin/super_admin bypass)
+    NhiUserPermissionService::enforce_access(&state.pool, tenant_uuid, &claims, id, "use").await?;
 
     let sa = NhiServiceAccount::find_by_nhi_id(&state.pool, tenant_uuid, id)
         .await?

@@ -26,6 +26,7 @@ use xavyo_db::models::{
 use xavyo_nhi::{NhiLifecycleState, NhiType};
 
 use crate::error::NhiApiError;
+use crate::services::nhi_user_permission_service::NhiUserPermissionService;
 use crate::state::NhiState;
 
 // ---------------------------------------------------------------------------
@@ -226,6 +227,7 @@ pub async fn create_agent(
 pub async fn list_agents(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Query(query): Query<ListAgentsQuery>,
 ) -> Result<Json<PaginatedResponse<NhiAgentWithIdentity>>, NhiApiError> {
     let tenant_uuid = *tenant_id.as_uuid();
@@ -240,15 +242,55 @@ pub async fn list_agents(
         team_id: query.team_id,
     };
 
-    let data = NhiAgent::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
-    let total = count_agents(&state.pool, tenant_uuid, &filter).await?;
+    // Admin/super_admin see all agents; non-admin users only see permitted ones
+    if claims.has_role("admin") || claims.has_role("super_admin") {
+        let data = NhiAgent::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
+        let total = count_agents(&state.pool, tenant_uuid, &filter).await?;
+        Ok(Json(PaginatedResponse {
+            data,
+            total,
+            limit,
+            offset,
+        }))
+    } else {
+        use xavyo_db::models::nhi_user_permission::NhiUserPermission;
+        let user_id = Uuid::parse_str(&claims.sub)
+            .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
+        let user_perms =
+            NhiUserPermission::list_by_user(&state.pool, tenant_uuid, user_id, 10000, 0).await?;
+        let mut permitted_nhi_ids: Vec<Uuid> = user_perms.iter().map(|p| p.nhi_id).collect();
+        permitted_nhi_ids.sort();
+        permitted_nhi_ids.dedup();
 
-    Ok(Json(PaginatedResponse {
-        data,
-        total,
-        limit,
-        offset,
-    }))
+        if permitted_nhi_ids.is_empty() {
+            return Ok(Json(PaginatedResponse {
+                data: vec![],
+                total: 0,
+                limit,
+                offset,
+            }));
+        }
+
+        let fetch_limit = (limit + offset) * 10;
+        let all_data =
+            NhiAgent::list(&state.pool, tenant_uuid, &filter, fetch_limit.min(10000), 0).await?;
+        let filtered: Vec<NhiAgentWithIdentity> = all_data
+            .into_iter()
+            .filter(|a| permitted_nhi_ids.binary_search(&a.id).is_ok())
+            .collect();
+        let total = filtered.len() as i64;
+        let data: Vec<NhiAgentWithIdentity> = filtered
+            .into_iter()
+            .skip(offset as usize)
+            .take(limit as usize)
+            .collect();
+        Ok(Json(PaginatedResponse {
+            data,
+            total,
+            limit,
+            offset,
+        }))
+    }
 }
 
 /// Count agents matching a filter.
@@ -329,9 +371,13 @@ async fn count_agents(
 pub async fn get_agent(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<NhiAgentWithIdentity>, NhiApiError> {
     let tenant_uuid = *tenant_id.as_uuid();
+
+    // Enforce user→NHI permission (admin/super_admin bypass)
+    NhiUserPermissionService::enforce_access(&state.pool, tenant_uuid, &claims, id, "use").await?;
 
     let agent = NhiAgent::find_by_nhi_id(&state.pool, tenant_uuid, id)
         .await?

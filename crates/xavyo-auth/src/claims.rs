@@ -112,9 +112,12 @@ impl JwtClaims {
     }
 
     /// Check if the claims contain a specific role.
+    ///
+    /// Role hierarchy: `super_admin` implies `admin`.
     #[must_use]
     pub fn has_role(&self, role: &str) -> bool {
         self.roles.iter().any(|r| r == role)
+            || (role == "admin" && self.roles.iter().any(|r| r == "super_admin"))
     }
 
     /// Check if the claims contain any of the specified roles.
@@ -371,6 +374,18 @@ mod tests {
         assert!(claims.has_role("admin"));
         assert!(claims.has_role("user"));
         assert!(!claims.has_role("superadmin"));
+    }
+
+    #[test]
+    fn test_super_admin_implies_admin() {
+        let claims = JwtClaims::builder()
+            .subject("user-123")
+            .roles(vec!["super_admin"])
+            .build();
+
+        assert!(claims.has_role("super_admin"));
+        assert!(claims.has_role("admin")); // super_admin implies admin
+        assert!(!claims.has_role("member"));
     }
 
     #[test]

@@ -54,13 +54,27 @@ async fn fetch_all_resources(
 )> {
     // Fetch all agents (using large limit to get all)
     let agents_response = client.list_agents(1000, 0, None, None).await?;
-    let agents = agents_response.agents;
+    let agents = agents_response.data;
 
     // Fetch all tools
     let tools_response = client.list_tools(1000, 0).await?;
-    let tools = tools_response.tools;
+    let tools = tools_response.data;
 
     Ok((agents, tools))
+}
+
+/// Convert a numeric risk_score (0-100) to a semantic risk_level label.
+///
+/// Maps: 0-33 → "low", 34-66 → "medium", 67-89 → "high", 90-100 → "critical".
+/// Returns "low" for None (no risk score computed).
+pub fn risk_score_to_level(score: Option<i32>) -> String {
+    match score {
+        Some(s) if s >= 90 => "critical".to_string(),
+        Some(s) if s >= 67 => "high".to_string(),
+        Some(s) if s >= 34 => "medium".to_string(),
+        Some(_) => "low".to_string(),
+        None => "low".to_string(),
+    }
 }
 
 /// Convert API responses to config format
@@ -75,7 +89,7 @@ fn build_config(
             agent_type: a.agent_type,
             model_provider: a.model_provider.unwrap_or_default(),
             model_name: a.model_name.unwrap_or_default(),
-            risk_level: a.risk_level,
+            risk_level: risk_score_to_level(a.risk_score),
             description: a.description,
             tools: vec![], // Tool assignments not tracked in agent response
         })
@@ -86,7 +100,7 @@ fn build_config(
         .map(|t| ToolConfig {
             name: t.name,
             description: t.description.unwrap_or_default(),
-            risk_level: t.risk_level,
+            risk_level: risk_score_to_level(t.risk_score),
             input_schema: t.input_schema,
         })
         .collect();
@@ -152,8 +166,8 @@ mod tests {
             agent_type: "copilot".to_string(),
             model_provider: Some("anthropic".to_string()),
             model_name: Some("claude-sonnet-4".to_string()),
-            status: "active".to_string(),
-            risk_level: "medium".to_string(),
+            lifecycle_state: "active".to_string(),
+            risk_score: Some(50),
             requires_human_approval: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -166,7 +180,7 @@ mod tests {
         assert_eq!(config.agents[0].agent_type, "copilot");
         assert_eq!(config.agents[0].model_provider, "anthropic");
         assert_eq!(config.agents[0].model_name, "claude-sonnet-4");
-        assert_eq!(config.agents[0].risk_level, "medium");
+        assert_eq!(config.agents[0].risk_level, "medium"); // 50 maps to "medium"
         assert_eq!(
             config.agents[0].description,
             Some("Test description".to_string())
@@ -182,12 +196,12 @@ mod tests {
             category: Some("data".to_string()),
             input_schema: serde_json::json!({"type": "object"}),
             output_schema: None,
-            risk_level: "low".to_string(),
+            risk_score: Some(25),
             requires_approval: false,
             max_calls_per_hour: None,
             provider: None,
             provider_verified: false,
-            status: "active".to_string(),
+            lifecycle_state: "active".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }];
@@ -197,7 +211,7 @@ mod tests {
         assert_eq!(config.tools.len(), 1);
         assert_eq!(config.tools[0].name, "test-tool");
         assert_eq!(config.tools[0].description, "Test tool description");
-        assert_eq!(config.tools[0].risk_level, "low");
+        assert_eq!(config.tools[0].risk_level, "low"); // 25 maps to "low"
     }
 
     #[test]
@@ -209,8 +223,8 @@ mod tests {
             agent_type: "workflow".to_string(),
             model_provider: None,
             model_name: None,
-            status: "active".to_string(),
-            risk_level: "low".to_string(),
+            lifecycle_state: "active".to_string(),
+            risk_score: None,
             requires_human_approval: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
