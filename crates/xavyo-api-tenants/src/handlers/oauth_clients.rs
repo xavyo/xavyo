@@ -42,10 +42,10 @@ use crate::router::TenantAppState;
     request_body = RotateOAuthSecretRequest,
     responses(
         (status = 200, description = "OAuth client secret rotated successfully", body = RotateOAuthSecretResponse),
-        (status = 400, description = "Validation error - cannot rotate public client", body = crate::error::ErrorResponse),
+        (status = 400, description = "Validation error - cannot rotate public client", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden", body = crate::error::ErrorResponse),
-        (status = 404, description = "OAuth client not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "OAuth client not found", body = ErrorResponse),
     ),
     tag = "OAuth Clients",
     security(
@@ -157,7 +157,7 @@ pub async fn rotate_oauth_secret_handler(
     responses(
         (status = 200, description = "List of OAuth clients", body = OAuthClientListResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
     ),
     tag = "OAuth Clients",
     security(
@@ -223,8 +223,8 @@ pub async fn list_oauth_clients_handler(
     responses(
         (status = 204, description = "OAuth client deactivated"),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden", body = crate::error::ErrorResponse),
-        (status = 404, description = "OAuth client not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "OAuth client not found", body = ErrorResponse),
     ),
     tag = "OAuth Clients",
     security(

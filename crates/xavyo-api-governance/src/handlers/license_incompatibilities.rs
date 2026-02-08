@@ -12,6 +12,8 @@ use uuid::Uuid;
 use validator::Validate;
 use xavyo_auth::JwtClaims;
 
+#[allow(unused_imports)]
+use crate::models::IncompatibilityListResponse;
 use crate::{
     error::{ApiGovernanceError, ApiResult},
     models::license::{
@@ -32,7 +34,7 @@ use crate::{
         ("offset" = Option<i64>, Query, description = "Results to skip for pagination")
     ),
     responses(
-        (status = 200, description = "Incompatibility rules retrieved", body = LicenseIncompatibilityListResponse),
+        (status = 200, description = "Incompatibility rules retrieved", body = IncompatibilityListResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),

@@ -101,6 +101,9 @@ pub struct PaginationQuery {
 /// Paginated response.
 #[derive(Debug, Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", aliases(
+    PaginatedSodRuleResponse = PaginatedResponse<SodRule>,
+))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
     pub limit: i64,
@@ -188,7 +191,7 @@ pub async fn create_sod_rule(
     operation_id = "listNhiSodRules",
     params(PaginationQuery),
     responses(
-        (status = 200, description = "List of SoD rules", body = PaginatedResponse<SodRule>),
+        (status = 200, description = "List of SoD rules", body = PaginatedSodRuleResponse),
         (status = 401, description = "Authentication required")
     ),
     security(("bearerAuth" = []))

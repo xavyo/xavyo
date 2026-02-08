@@ -80,18 +80,19 @@ xavyo-api-social = { path = "../../crates/xavyo-api-social" }
 xavyo-api-saml = { path = "../../crates/xavyo-api-saml" }
 xavyo-api-oidc-federation = { path = "../../crates/xavyo-api-oidc-federation" }
 xavyo-api-scim = { path = "../../crates/xavyo-api-scim" }
-xavyo-api-governance = { path = "../../crates/xavyo-api-governance" }
+xavyo-api-governance = { path = "../../crates/xavyo-api-governance", features = ["openapi"] }
 xavyo-api-connectors = { path = "../../crates/xavyo-api-connectors" }
-xavyo-connector = { path = "../../crates/xavyo-connector" }
+xavyo-connector = { path = "../../crates/xavyo-connector", features = ["openapi"] }
 xavyo-tenant = { path = "../../crates/xavyo-tenant" }
 xavyo-api-authorization = { path = "../../crates/xavyo-api-authorization" }
 xavyo-authorization = { path = "../../crates/xavyo-authorization" }
 xavyo-secrets = { path = "../../crates/xavyo-secrets", features = ["env-provider", "file-provider"] }
 xavyo-webhooks = { path = "../../crates/xavyo-webhooks" }
 xavyo-api-import = { path = "../../crates/xavyo-api-import" }
-xavyo-scim-client = { path = "../../crates/xavyo-scim-client" }
+xavyo-scim-client = { path = "../../crates/xavyo-scim-client", features = ["openapi"] }
 xavyo-api-agents = { path = "../../crates/xavyo-api-agents", features = ["openapi"] }
 xavyo-api-nhi = { path = "../../crates/xavyo-api-nhi", features = ["openapi"] }
+xavyo-nhi = { path = "../../crates/xavyo-nhi", features = ["openapi"] }
 xavyo-api-tenants = { path = "../../crates/xavyo-api-tenants" }
 xavyo-events = { path = "../../crates/xavyo-events", optional = true }
 

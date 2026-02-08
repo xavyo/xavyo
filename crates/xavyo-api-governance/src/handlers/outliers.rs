@@ -205,7 +205,7 @@ pub async fn disable_detection(
     tag = "Governance - Outlier Detection",
     params(ListAnalysesQuery),
     responses(
-        (status = 200, description = "Analysis list retrieved", body = PaginatedResponse<OutlierAnalysisResponse>),
+        (status = 200, description = "Analysis list retrieved", body = PaginatedOutlierAnalysisResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -398,7 +398,7 @@ pub async fn cancel_analysis(
     tag = "Governance - Outlier Detection",
     params(ListResultsQuery),
     responses(
-        (status = 200, description = "Results retrieved", body = PaginatedResponse<OutlierResultResponse>),
+        (status = 200, description = "Results retrieved", body = PaginatedOutlierResultResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -767,7 +767,7 @@ pub async fn update_disposition(
     tag = "Governance - Outlier Detection",
     params(ListDispositionsQuery),
     responses(
-        (status = 200, description = "Dispositions retrieved", body = PaginatedResponse<DispositionResponse>),
+        (status = 200, description = "Dispositions retrieved", body = PaginatedDispositionResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -864,7 +864,7 @@ pub async fn get_disposition_summary(
     tag = "Governance - Outlier Detection",
     params(ListAlertsQuery),
     responses(
-        (status = 200, description = "Alerts retrieved", body = PaginatedResponse<AlertResponse>),
+        (status = 200, description = "Alerts retrieved", body = PaginatedAlertResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),

@@ -43,6 +43,9 @@ pub struct PaginationQuery {
 
 #[derive(Debug, Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", aliases(
+    PaginatedNhiToolPermissionResponse = PaginatedResponse<NhiToolPermission>,
+))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
     pub limit: i64,
@@ -151,7 +154,7 @@ pub async fn revoke_permission(
         PaginationQuery
     ),
     responses(
-        (status = 200, description = "List of tool permissions", body = PaginatedResponse<NhiToolPermission>),
+        (status = 200, description = "List of tool permissions", body = PaginatedNhiToolPermissionResponse),
         (status = 401, description = "Authentication required")
     ),
     security(("bearerAuth" = []))
@@ -188,7 +191,7 @@ pub async fn list_agent_tools(
         PaginationQuery
     ),
     responses(
-        (status = 200, description = "List of agent permissions", body = PaginatedResponse<NhiToolPermission>),
+        (status = 200, description = "List of agent permissions", body = PaginatedNhiToolPermissionResponse),
         (status = 401, description = "Authentication required")
     ),
     security(("bearerAuth" = []))

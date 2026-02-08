@@ -61,7 +61,7 @@ pub async fn get_simulation_comparison(
     tag = "Governance - Enhanced Simulation",
     params(ListSimulationComparisonsQuery),
     responses(
-        (status = 200, description = "Comparisons listed", body = PaginatedResponse<SimulationComparisonResponse>),
+        (status = 200, description = "Comparisons listed", body = PaginatedSimulationComparisonResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),

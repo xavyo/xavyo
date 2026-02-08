@@ -62,7 +62,7 @@ pub async fn get_policy_simulation(
     tag = "Governance - Enhanced Simulation",
     params(ListPolicySimulationsQuery),
     responses(
-        (status = 200, description = "Simulations listed", body = PaginatedResponse<PolicySimulationResponse>),
+        (status = 200, description = "Simulations listed", body = PaginatedPolicySimulationResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -334,7 +334,7 @@ pub async fn update_policy_simulation_notes(
         ListPolicySimulationResultsQuery
     ),
     responses(
-        (status = 200, description = "Results retrieved", body = PaginatedResponse<PolicySimulationResultResponse>),
+        (status = 200, description = "Results retrieved", body = PaginatedPolicySimulationResultResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Simulation not found"),
         (status = 500, description = "Internal server error")

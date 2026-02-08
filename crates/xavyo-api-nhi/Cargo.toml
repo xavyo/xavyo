@@ -55,7 +55,7 @@ tokio-test.workspace = true
 [features]
 default = []
 kafka = ["xavyo-events"]
-openapi = ["utoipa"]
+openapi = ["utoipa", "xavyo-nhi/openapi"]
 
 [dependencies.xavyo-events]
 path = "../xavyo-events"

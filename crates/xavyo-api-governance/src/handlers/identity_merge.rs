@@ -32,7 +32,7 @@ use crate::services::DuplicateDetectionService;
     tag = "Governance - Identity Merge",
     params(ListDuplicatesQuery),
     responses(
-        (status = 200, description = "List of duplicate candidates", body = MergePaginatedResponse<DuplicateCandidateResponse>),
+        (status = 200, description = "List of duplicate candidates", body = MergePaginatedDuplicateCandidateResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -356,7 +356,7 @@ pub async fn get_merge_operation(
         ("offset" = Option<i64>, Query, description = "Skip results")
     ),
     responses(
-        (status = 200, description = "List of merge operations", body = MergePaginatedResponse<MergeOperationResponse>),
+        (status = 200, description = "List of merge operations", body = MergePaginatedMergeOperationResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -432,7 +432,7 @@ pub struct ListMergeOperationsQuery {
     tag = "Governance - Identity Merge",
     params(ListMergeAuditsQuery),
     responses(
-        (status = 200, description = "List of merge audit records", body = MergePaginatedResponse<MergeAuditSummaryResponse>),
+        (status = 200, description = "List of merge audit records", body = MergePaginatedMergeAuditSummaryResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),

@@ -109,6 +109,7 @@ pub struct CreateSchemaVersion {
 
 /// Summary of a schema version (for listing).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SchemaVersionSummary {
     /// Version number.
     pub version: i32,

@@ -9,6 +9,8 @@ use axum::{
 use uuid::Uuid;
 use xavyo_auth::JwtClaims;
 
+#[allow(unused_imports)]
+use crate::models::{ManualProvisioningTaskListResponse, ManualProvisioningTaskResponse};
 use crate::{
     error::{ApiGovernanceError, ApiResult},
     models::{
@@ -38,7 +40,7 @@ fn user_id_from_claims(claims: &JwtClaims) -> Result<Uuid, ApiGovernanceError> {
         ("offset" = Option<i64>, Query, description = "Results to skip")
     ),
     responses(
-        (status = 200, description = "Manual tasks retrieved", body = ManualTaskListResponse),
+        (status = 200, description = "Manual tasks retrieved", body = ManualProvisioningTaskListResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -71,7 +73,7 @@ pub async fn list_manual_tasks(
         ("id" = Uuid, Path, description = "Task ID")
     ),
     responses(
-        (status = 200, description = "Manual task retrieved", body = ManualTaskResponse),
+        (status = 200, description = "Manual task retrieved", body = ManualProvisioningTaskResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Task not found"),
         (status = 500, description = "Internal server error")
@@ -103,7 +105,7 @@ pub async fn get_manual_task(
     ),
     request_body = ConfirmManualTaskRequest,
     responses(
-        (status = 200, description = "Task confirmed", body = ManualTaskResponse),
+        (status = 200, description = "Task confirmed", body = ManualProvisioningTaskResponse),
         (status = 400, description = "Invalid request"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Task not found"),
@@ -142,7 +144,7 @@ pub async fn confirm_manual_task(
     ),
     request_body = RejectManualTaskRequest,
     responses(
-        (status = 200, description = "Task rejected", body = ManualTaskResponse),
+        (status = 200, description = "Task rejected", body = ManualProvisioningTaskResponse),
         (status = 400, description = "Invalid request"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Task not found"),
@@ -180,7 +182,7 @@ pub async fn reject_manual_task(
         ("id" = Uuid, Path, description = "Task ID")
     ),
     responses(
-        (status = 200, description = "Task cancelled", body = ManualTaskResponse),
+        (status = 200, description = "Task cancelled", body = ManualProvisioningTaskResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Task not found"),
         (status = 500, description = "Internal server error")
@@ -245,7 +247,7 @@ pub async fn get_manual_task_dashboard(
         ("id" = Uuid, Path, description = "Task ID")
     ),
     responses(
-        (status = 200, description = "Task claimed", body = ManualTaskResponse),
+        (status = 200, description = "Task claimed", body = ManualProvisioningTaskResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Task not found"),
         (status = 409, description = "Task already claimed"),
@@ -282,7 +284,7 @@ pub async fn claim_manual_task(
         ("id" = Uuid, Path, description = "Task ID")
     ),
     responses(
-        (status = 200, description = "Task started", body = ManualTaskResponse),
+        (status = 200, description = "Task started", body = ManualProvisioningTaskResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Task not found"),
         (status = 500, description = "Internal server error")

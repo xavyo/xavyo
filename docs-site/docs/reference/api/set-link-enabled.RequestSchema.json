@@ -1,1 +1,1 @@
-{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Schema for SetLinkEnabledRequest","title":"SetLinkEnabledRequest"}}},"required":true}}
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request body for enabling/disabling a link.","required":["enabled"],"properties":{"enabled":{"type":"boolean"}},"title":"SetLinkEnabledRequest"}}},"required":true}}

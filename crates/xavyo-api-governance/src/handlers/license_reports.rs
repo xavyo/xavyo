@@ -9,6 +9,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 use xavyo_auth::JwtClaims;
 
@@ -29,7 +30,7 @@ use crate::{
 ///
 /// All fields are optional. When omitted, the report covers all pools,
 /// all vendors, and the full available date range.
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Default, ToSchema)]
 pub struct ComplianceReportRequest {
     /// Restrict the report to specific license pool IDs.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -49,7 +50,7 @@ pub struct ComplianceReportRequest {
 }
 
 /// Paginated response for audit trail queries.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AuditTrailResponse {
     /// The audit trail entries for the current page.
     pub items: Vec<AuditTrailEntry>,

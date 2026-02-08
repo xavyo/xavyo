@@ -7,6 +7,7 @@
 
 use rust_decimal::Decimal;
 use sqlx::PgPool;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use xavyo_db::{
@@ -25,7 +26,7 @@ use crate::models::correlation::{
 // ============================================================================
 
 /// Paginated list of correlation case summaries.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, ToSchema)]
 pub struct CorrelationCaseListResponse {
     /// List of correlation case summaries.
     pub items: Vec<CorrelationCaseSummaryResponse>,

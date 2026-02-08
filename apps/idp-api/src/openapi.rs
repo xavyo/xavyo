@@ -1624,6 +1624,7 @@ impl Modify for SecurityAddon {
         xavyo_db::models::SimulationChanges,
         xavyo_db::models::EntitlementUsage,
         xavyo_db::models::MetricsTrendDirection,
+        xavyo_db::models::TrendDirection,
         // Lifecycle models (F037)
         xavyo_api_governance::models::CreateLifecycleEventRequest,
         xavyo_api_governance::models::LifecycleEventResponse,
@@ -1928,6 +1929,13 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::models::BatchSimulationResultResponse,
         xavyo_api_governance::models::BatchSimulationListResponse,
         xavyo_api_governance::models::BatchSimulationResultListResponse,
+        xavyo_api_governance::models::PolicySimulationResponse,
+        xavyo_api_governance::models::PolicySimulationResultResponse,
+        xavyo_api_governance::models::SimulationComparisonResponse,
+        xavyo_db::models::ComparisonSummary,
+        xavyo_db::models::DeltaEntry,
+        xavyo_db::models::DeltaResults,
+        xavyo_db::models::ModifiedEntry,
         // Enhanced Simulation DB types (F060)
         xavyo_db::models::PolicySimulationType,
         xavyo_db::models::BatchSimulationType,
@@ -2411,6 +2419,269 @@ impl Modify for SecurityAddon {
         // Tool handler types
         xavyo_api_nhi::handlers::tools::CreateToolRequest,
         xavyo_api_nhi::handlers::tools::UpdateToolRequest,
+
+        // ====================================================================
+        // Previously unregistered schemas (fixing 172 stub schemas)
+        // ====================================================================
+
+        // --- xavyo-db model types ---
+        xavyo_db::models::AccessItem,
+        xavyo_db::models::AlertSeverity,
+        xavyo_db::models::AuditActionType,
+        xavyo_db::models::BatchImpactSummary,
+        xavyo_db::models::BulkOperationStatus,
+        xavyo_db::models::ChangeSpec,
+        xavyo_db::models::ConditionOperator,
+        xavyo_db::models::DataProtectionClassification,
+        xavyo_db::models::DelegationStatus,
+        xavyo_db::models::DetectionReason,
+        xavyo_db::models::FilterCriteria,
+        xavyo_db::models::GdprLegalBasis,
+        xavyo_db::models::GovExemptionStatus,
+        xavyo_db::models::GovScheduleStatus,
+        xavyo_db::models::GovViolationStatus,
+        xavyo_db::models::LifecycleObjectType,
+        xavyo_db::models::NhiAgentWithIdentity,
+        xavyo_db::models::NhiCredential,
+        xavyo_db::models::NhiIdentity,
+        xavyo_db::models::NhiServiceAccountWithIdentity,
+        xavyo_db::models::NhiToolPermission,
+        xavyo_db::models::NhiToolWithIdentity,
+        xavyo_db::models::NhiUsageOutcome,
+        xavyo_db::models::OperationType,
+        xavyo_db::models::PeerGroupScore,
+        xavyo_db::models::PeerGroupType,
+        xavyo_db::models::RemediationAction,
+        // RiskAlertSortOption is in governance, not db
+        xavyo_db::models::ScoringWeights,
+        xavyo_db::models::ServiceAccountStatus,
+        xavyo_db::models::Severity,
+        xavyo_db::models::TransitionRequestStatus,
+        // SCIM-related DB models
+        xavyo_db::models::ScimProvisioningLog,
+        xavyo_db::models::ScimProvisioningState,
+        xavyo_db::models::ScimSyncRun,
+        xavyo_db::models::ScimTargetAttributeMapping,
+        // NHI certification campaign (DB model)
+        xavyo_db::models::NhiCertificationCampaign,
+
+        // --- xavyo-nhi foundation types ---
+        xavyo_nhi::types::NhiType,
+        xavyo_nhi::types::NhiLifecycleState,
+
+        // --- xavyo-api-governance handler types ---
+        xavyo_api_governance::handlers::license_reports::AuditTrailResponse,
+        xavyo_api_governance::handlers::license_reports::ComplianceReportRequest,
+        xavyo_api_governance::handlers::license_entitlement_links::SetLinkEnabledRequest,
+        xavyo_api_governance::handlers::nhis::NhiRequestApprovalResponse,
+        xavyo_api_governance::handlers::role_entitlements::AddRoleEntitlementRequest,
+        xavyo_api_governance::handlers::role_entitlements::EffectiveEntitlementsResponse,
+        xavyo_api_governance::handlers::role_entitlements::RecomputeResponse,
+        xavyo_api_governance::handlers::role_hierarchy::CreateRoleRequest,
+        xavyo_api_governance::handlers::role_hierarchy::MoveRoleRequest,
+        xavyo_api_governance::handlers::role_hierarchy::RoleListResponse,
+        xavyo_api_governance::handlers::role_hierarchy::RoleMoveResponse,
+        xavyo_api_governance::handlers::role_hierarchy::RoleResponse,
+        xavyo_api_governance::handlers::role_hierarchy::RoleTreeResponse,
+        xavyo_api_governance::handlers::role_hierarchy::UpdateRoleRequest,
+        xavyo_api_governance::handlers::role_inheritance_blocks::AddInheritanceBlockRequest,
+        xavyo_api_governance::handlers::role_inheritance_blocks::InheritanceBlockDetailsResponse,
+        xavyo_api_governance::handlers::role_inheritance_blocks::InheritanceBlockResponse,
+        xavyo_api_governance::handlers::script_testing::RawDryRunRequest,
+        xavyo_api_governance::handlers::ticketing_webhook::SingleTicketSyncResponse,
+        xavyo_api_governance::handlers::ticketing_webhook::TicketSyncResponse,
+        xavyo_api_governance::handlers::ticketing_webhook::WebhookCallbackRequest,
+        xavyo_api_governance::handlers::ticketing_webhook::WebhookCallbackResponse,
+
+        // --- xavyo-api-governance model types ---
+        xavyo_api_governance::models::AccessSnapshotSummary,
+        xavyo_api_governance::models::AffectedUser,
+        xavyo_api_governance::models::BulkOperationDetailResponse,
+        xavyo_api_governance::models::BulkOperationListResponse,
+        xavyo_api_governance::models::BulkOperationResponse,
+        xavyo_api_governance::models::BulkRemediationError,
+        xavyo_api_governance::models::CampaignSummary,
+        xavyo_api_governance::models::ConditionEvaluationResult,
+        xavyo_api_governance::models::CreateBulkOperationRequest,
+        xavyo_api_governance::models::CreateDelegationScopeRequest,
+        xavyo_api_governance::models::CreateLifecycleConfigRequest,
+        xavyo_api_governance::models::CreateLifecycleStateRequest,
+        xavyo_api_governance::models::CreateLifecycleTransitionRequest,
+        xavyo_api_governance::models::CreateParametricAssignmentRequest,
+        xavyo_api_governance::models::CreateSodExemptionRequest,
+        xavyo_api_governance::models::DepartmentImpact,
+        xavyo_api_governance::models::EntitlementImpact,
+        xavyo_api_governance::models::EntitlementSummary,
+        xavyo_api_governance::models::ExecuteTransitionRequest,
+        xavyo_api_governance::models::FactorBreakdown,
+        xavyo_api_governance::models::HighRiskOrphan,
+        xavyo_api_governance::models::ImpactSummary,
+        xavyo_api_governance::models::LevelCount,
+        xavyo_api_governance::models::LifecycleConfigDetailResponse,
+        xavyo_api_governance::models::LifecycleConfigListResponse,
+        xavyo_api_governance::models::LifecycleConfigResponse,
+        xavyo_api_governance::models::LifecycleStateResponse,
+        xavyo_api_governance::models::LifecycleTransitionResponse,
+        xavyo_api_governance::models::LocationImpact,
+        xavyo_api_governance::models::ManualProvisioningTaskResponse,
+        xavyo_api_governance::models::ManualProvisioningTaskListResponse,
+        xavyo_api_governance::models::MatchingPolicyResult,
+        xavyo_api_governance::models::ObjectLifecycleStatusResponse,
+        xavyo_api_governance::models::ParametricAssignmentListResponse,
+        xavyo_api_governance::models::ParametricAssignmentResponse,
+        xavyo_api_governance::models::PeerComparisonData,
+        xavyo_api_governance::models::PeerGroupComparison,
+        xavyo_api_governance::models::ProcessingSummary,
+        xavyo_api_governance::models::ReasonBreakdown,
+        xavyo_api_governance::models::ReviewerProgressResponse,
+        xavyo_api_governance::models::RiskAlertSortOption,
+        xavyo_api_governance::models::RiskScoreHistoryEntry,
+        xavyo_api_governance::models::ScanRuleResponse,
+        xavyo_api_governance::models::ScheduledTransitionResponse,
+        xavyo_api_governance::models::SeverityCount,
+        xavyo_api_governance::models::SnapshotContentResponse,
+        xavyo_api_governance::models::SodCheckResponse,
+        xavyo_api_governance::models::SodExemptionListResponse,
+        xavyo_api_governance::models::SodExemptionResponse,
+        xavyo_api_governance::models::SodViolationListResponse,
+        xavyo_api_governance::models::SodViolationResponse,
+        xavyo_api_governance::models::SodWarningSummary,
+        xavyo_api_governance::models::TransitionAuditListResponse,
+        xavyo_api_governance::models::TransitionAuditResponse,
+        xavyo_api_governance::models::TransitionRequestListResponse,
+        xavyo_api_governance::models::TransitionRequestResponse,
+        xavyo_api_governance::models::TriggerTypeStats,
+        xavyo_api_governance::models::UpdateLifecycleConfigRequest,
+        xavyo_api_governance::models::UpdateLifecycleStateRequest,
+        xavyo_api_governance::models::UpdateNotesRequest,
+        xavyo_api_governance::models::UserSummary,
+        // Governance - remediation violation
+        xavyo_api_governance::models::RemediateViolationRequest,
+
+        // --- xavyo-api-governance service types ---
+        xavyo_api_governance::services::correlation_case_service::CorrelationCaseListResponse,
+        xavyo_api_governance::services::license_report_service::ComplianceReport,
+        xavyo_api_governance::services::nhi_request_service::NhiRequestSummary,
+        xavyo_api_governance::services::state_access_rule_service::StateAffectedEntitlements,
+
+        // --- xavyo-api-agents types ---
+        xavyo_api_agents::models::AnomalyType,
+        xavyo_api_agents::models::AnomalyWarning,
+        xavyo_api_agents::models::BaselineStatus,
+        xavyo_api_agents::models::BaselineType,
+        xavyo_api_agents::models::Category,
+        xavyo_api_agents::models::CheckName,
+        xavyo_api_agents::models::McpErrorCode,
+        xavyo_api_agents::models::Priority,
+        xavyo_api_agents::models::Status,
+        xavyo_api_agents::models::ThresholdSource,
+        xavyo_api_agents::models::UserContext,
+
+        // --- xavyo-api-authorization types ---
+        xavyo_api_authorization::models::AuthorizationDecisionResponse,
+        xavyo_api_authorization::models::BulkCheckRequest,
+        xavyo_api_authorization::models::BulkCheckResponse,
+        xavyo_api_authorization::models::CreateMappingRequest,
+        xavyo_api_authorization::models::CreatePolicyRequest,
+        xavyo_api_authorization::models::MappingResponse,
+        xavyo_api_authorization::models::PolicyListResponse,
+        xavyo_api_authorization::models::PolicyResponse,
+        xavyo_api_authorization::models::UpdatePolicyRequest,
+
+        // --- xavyo-api-connectors types ---
+        xavyo_api_connectors::handlers::schemas::AttributeListResponse,
+        xavyo_api_connectors::handlers::schemas::DiscoverSchemaRequest,
+        xavyo_api_connectors::handlers::schemas::DiscoveryStatusResponse,
+        xavyo_api_connectors::handlers::schemas::ObjectClassListResponse,
+        xavyo_api_connectors::handlers::schemas::RefreshScheduleRequest,
+        xavyo_api_connectors::handlers::schemas::RefreshScheduleResponse,
+        xavyo_api_connectors::handlers::schemas::SchemaDiffResponse,
+        xavyo_api_connectors::handlers::schemas::SchemaVersionListResponse,
+        xavyo_api_connectors::models::ConnectorHealthResponse,
+        xavyo_api_connectors::services::mapping_service::PreviewMappingRequest,
+        xavyo_api_connectors::services::mapping_service::PreviewMappingResponse,
+        xavyo_api_connectors::services::mapping_service::UpdateMappingRequest,
+        xavyo_api_connectors::services::schema_service::ObjectClassResponse,
+        xavyo_api_connectors::services::schema_service::SchemaResponse,
+
+        // --- xavyo-api-auth types ---
+        xavyo_api_auth::handlers::key_management::KeyErrorResponse,
+        xavyo_api_auth::handlers::key_management::ListKeysResponse,
+        xavyo_api_auth::handlers::key_management::RotateKeyResponse,
+
+        // --- xavyo-api-users types ---
+        xavyo_api_users::models::LifecycleStateInfo,
+
+        // --- xavyo-scim-client types ---
+        xavyo_scim_client::auth::ScimCredentials,
+        xavyo_scim_client::client::ServiceProviderConfig,
+
+        // --- xavyo-api-tenants types ---
+        xavyo_api_tenants::error::ErrorResponse,
+
+        // ====================================================================
+        // Nested types (fields of the above types that also need registration)
+        // ====================================================================
+
+        // --- xavyo-db nested types ---
+        xavyo_db::models::EntitlementAction,
+        xavyo_db::models::OutlierSeverity,
+        xavyo_db::models::ScheduleType,
+        xavyo_db::models::SchemaVersionSummary,
+
+        // --- xavyo-connector nested types ---
+        xavyo_connector::schema::DiffSummary,
+        xavyo_connector::schema::ObjectClassChanges,
+        xavyo_connector::schema::AttributeChanges,
+        xavyo_connector::schema::AttributeAddition,
+        xavyo_connector::schema::AttributeModification,
+        xavyo_connector::schema::PropertyChange,
+        xavyo_connector::schema::AttributeDataType,
+
+        // --- xavyo-api-governance nested types ---
+        xavyo_api_governance::services::state_access_rule_service::AffectedEntitlement,
+        xavyo_api_governance::services::license_report_service::AuditTrailEntry,
+        xavyo_api_governance::services::license_report_service::ComplianceReportFilters,
+        xavyo_api_governance::services::license_report_service::PoolComplianceSummary,
+        xavyo_api_governance::handlers::role_hierarchy::RoleTreeNodeResponse,
+        xavyo_api_governance::handlers::ticketing_webhook::TicketSyncErrorResponse,
+        xavyo_api_governance::models::RollbackInfo,
+        xavyo_api_governance::models::SnapshotAssignmentResponse,
+        xavyo_api_governance::models::SodCheckViolation,
+        xavyo_api_governance::models::EntitlementSourceInfo,
+        xavyo_api_governance::models::TransitionStateInfo,
+        xavyo_api_governance::models::UserImpactType,
+
+        // --- xavyo-api-authorization nested types ---
+        xavyo_api_authorization::models::CheckItem,
+        xavyo_api_authorization::models::ConditionResponse,
+        xavyo_api_authorization::models::CreateConditionRequest,
+
+        // --- xavyo-api-connectors nested types ---
+        xavyo_api_connectors::handlers::schemas::AttributeWithSource,
+        xavyo_api_connectors::handlers::schemas::ObjectClassSummary,
+        xavyo_api_connectors::services::schema_service::AttributeResponse,
+        xavyo_api_connectors::services::mapping_service::TransformError,
+
+        // --- xavyo-api-auth nested types ---
+        xavyo_api_auth::handlers::key_management::KeyInfo,
+
+        // --- xavyo-scim-client nested types ---
+        xavyo_scim_client::client::BulkSupport,
+        xavyo_scim_client::client::FeatureSupport,
+        xavyo_scim_client::client::FilterSupport,
+
+        // --- Generic paginated response aliases (governance) ---
+        xavyo_api_governance::models::outlier::PaginatedOutlierAnalysisResponse,
+        xavyo_api_governance::models::identity_merge::MergePaginatedDuplicateCandidateResponse,
+
+        // --- Generic paginated response aliases (NHI) ---
+        xavyo_api_nhi::handlers::unified::PaginatedNhiIdentityResponse,
+        xavyo_api_nhi::handlers::agents::PaginatedNhiAgentWithIdentityResponse,
+        xavyo_api_nhi::handlers::tools::PaginatedNhiToolWithIdentityResponse,
+        xavyo_api_nhi::handlers::service_accounts::PaginatedNhiServiceAccountWithIdentityResponse,
+        xavyo_api_nhi::handlers::permissions::PaginatedNhiToolPermissionResponse,
+        xavyo_api_nhi::handlers::sod::PaginatedSodRuleResponse,
     ))
 )]
 pub struct ApiDoc;

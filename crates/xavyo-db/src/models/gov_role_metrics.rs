@@ -10,6 +10,7 @@ use uuid::Uuid;
 /// Trend direction for metrics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(as = MetricsTrendDirection))]
 #[sqlx(type_name = "trend_direction", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum TrendDirection {

@@ -49,6 +49,7 @@ pub struct CreateLicensePoolRequest {
 
     /// Cost per license unit.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
     pub cost_per_license: Option<Decimal>,
 
     /// ISO 4217 currency code (default: USD).
@@ -117,6 +118,7 @@ pub struct UpdateLicensePoolRequest {
 
     /// Updated cost per license.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
     pub cost_per_license: Option<Decimal>,
 
     /// Updated currency.
@@ -155,6 +157,7 @@ pub struct LicensePoolResponse {
     pub available_count: i32,
     pub utilization_percent: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
     pub cost_per_license: Option<Decimal>,
     pub currency: String,
     pub billing_period: LicenseBillingPeriod,
@@ -689,6 +692,7 @@ pub struct LicenseSummary {
     pub total_allocated: i64,
     pub total_available: i64,
     pub overall_utilization: f64,
+    #[schema(value_type = f64)]
     pub total_monthly_cost: Decimal,
     pub expiring_soon_count: i64,
 }
@@ -703,6 +707,7 @@ pub struct LicensePoolStats {
     pub allocated_count: i32,
     pub utilization_percent: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<f64>)]
     pub monthly_cost: Option<Decimal>,
     pub status: LicensePoolStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -716,6 +721,7 @@ pub struct VendorCost {
     pub pool_count: i64,
     pub total_capacity: i64,
     pub allocated_count: i64,
+    #[schema(value_type = f64)]
     pub monthly_cost: Decimal,
     pub currency: String,
 }
@@ -727,6 +733,7 @@ pub struct LicenseRecommendation {
     pub pool_id: Uuid,
     pub pool_name: String,
     pub description: String,
+    #[schema(value_type = Option<f64>)]
     pub potential_savings: Option<Decimal>,
     pub currency: Option<String>,
 }

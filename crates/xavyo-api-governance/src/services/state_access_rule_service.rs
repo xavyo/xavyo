@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use xavyo_db::{
@@ -417,7 +418,7 @@ impl StateAccessRuleService {
 }
 
 /// Summary of entitlements affected by a state transition.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct StateAffectedEntitlements {
     /// The action that will be taken (none, pause, revoke).
     pub action: String,
@@ -428,7 +429,7 @@ pub struct StateAffectedEntitlements {
 }
 
 /// Details of a single affected entitlement.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AffectedEntitlement {
     /// Assignment ID.
     pub assignment_id: Uuid,

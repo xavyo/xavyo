@@ -8,6 +8,7 @@ use axum::{
     Extension, Json,
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 use xavyo_auth::JwtClaims;
 
@@ -20,7 +21,7 @@ use crate::{
 };
 
 /// Webhook callback request body.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct WebhookCallbackRequest {
     /// External ticket ID/reference.
     pub ticket_id: String,
@@ -35,7 +36,7 @@ pub struct WebhookCallbackRequest {
 }
 
 /// Response to webhook callback.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct WebhookCallbackResponse {
     /// Whether the webhook was processed successfully.
     pub processed: bool,
@@ -193,7 +194,7 @@ pub async fn trigger_ticket_sync(
 }
 
 /// Response from ticket sync operation.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct TicketSyncResponse {
     /// Total number of tickets checked.
     pub total_tickets: usize,
@@ -206,7 +207,7 @@ pub struct TicketSyncResponse {
 }
 
 /// Error from ticket sync.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct TicketSyncErrorResponse {
     pub ticket_id: Uuid,
     pub error: String,
@@ -257,7 +258,7 @@ pub async fn sync_single_ticket(
 }
 
 /// Response from single ticket sync.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct SingleTicketSyncResponse {
     pub ticket_id: Uuid,
     pub was_updated: bool,

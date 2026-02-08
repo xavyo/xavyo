@@ -30,8 +30,8 @@ use crate::router::TenantAppState;
     responses(
         (status = 200, description = "Current usage metrics", body = UsageResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "System Administration",
     security(
@@ -96,10 +96,10 @@ pub async fn get_tenant_usage_handler(
     ),
     responses(
         (status = 200, description = "Historical usage metrics", body = UsageHistoryResponse),
-        (status = 400, description = "Invalid query parameters", body = crate::error::ErrorResponse),
+        (status = 400, description = "Invalid query parameters", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "System Administration",
     security(

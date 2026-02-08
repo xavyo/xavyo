@@ -9,6 +9,7 @@ use axum::{
     Extension, Json,
 };
 use serde::Deserialize;
+use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 use xavyo_auth::JwtClaims;
@@ -23,7 +24,7 @@ use crate::{
 };
 
 /// Request body for enabling/disabling a link.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct SetLinkEnabledRequest {
     pub enabled: bool,
 }

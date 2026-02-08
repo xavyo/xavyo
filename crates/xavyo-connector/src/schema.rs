@@ -675,6 +675,7 @@ impl SchemaAttribute {
 
 /// Data type for schema attributes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum AttributeDataType {
     /// String/text value.
@@ -1120,6 +1121,7 @@ impl SchemaDiff {
 
 /// Summary of changes between schema versions.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct DiffSummary {
     /// Number of object classes added.
     pub object_classes_added: i32,
@@ -1137,6 +1139,7 @@ pub struct DiffSummary {
 
 /// Changes to object classes.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ObjectClassChanges {
     /// Names of added object classes.
     pub added: Vec<String>,
@@ -1146,6 +1149,7 @@ pub struct ObjectClassChanges {
 
 /// Changes to attributes within an object class.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AttributeChanges {
     /// Attributes that were added.
     pub added: Vec<AttributeAddition>,
@@ -1157,6 +1161,7 @@ pub struct AttributeChanges {
 
 /// An attribute that was added.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AttributeAddition {
     /// Attribute name.
     pub name: String,
@@ -1168,6 +1173,7 @@ pub struct AttributeAddition {
 
 /// A modification to an existing attribute.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AttributeModification {
     /// Attribute name.
     pub name: String,
@@ -1177,6 +1183,7 @@ pub struct AttributeModification {
 
 /// A change to a specific property of an attribute.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PropertyChange {
     /// Property name (e.g., "required", "`multi_valued`").
     pub property: String,

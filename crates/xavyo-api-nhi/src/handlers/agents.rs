@@ -99,6 +99,9 @@ pub struct ListAgentsQuery {
 
 #[derive(Debug, Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", aliases(
+    PaginatedNhiAgentWithIdentityResponse = PaginatedResponse<NhiAgentWithIdentity>,
+))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
     pub total: i64,
@@ -215,7 +218,7 @@ pub async fn create_agent(
     operation_id = "listNhiAgents",
     params(ListAgentsQuery),
     responses(
-        (status = 200, description = "Paginated list of agents", body = PaginatedResponse<NhiAgentWithIdentity>),
+        (status = 200, description = "Paginated list of agents", body = PaginatedNhiAgentWithIdentityResponse),
         (status = 401, description = "Authentication required")
     ),
     security(("bearerAuth" = []))

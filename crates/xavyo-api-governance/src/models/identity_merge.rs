@@ -391,6 +391,11 @@ pub struct RunDetectionScanRequest {
 
 /// Paginated response wrapper for identity merge.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[aliases(
+    MergePaginatedDuplicateCandidateResponse = MergePaginatedResponse<DuplicateCandidateResponse>,
+    MergePaginatedMergeOperationResponse = MergePaginatedResponse<MergeOperationResponse>,
+    MergePaginatedMergeAuditSummaryResponse = MergePaginatedResponse<MergeAuditSummaryResponse>,
+)]
 pub struct MergePaginatedResponse<T> {
     pub items: Vec<T>,
     pub total: i64,

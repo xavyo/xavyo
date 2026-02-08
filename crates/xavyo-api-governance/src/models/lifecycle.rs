@@ -791,6 +791,7 @@ pub struct BulkOperationDetailResponse {
     pub operation: BulkOperationResponse,
 
     /// Per-object results.
+    #[schema(value_type = Option<Object>)]
     pub results: Option<JsonValue>,
 }
 
@@ -890,15 +891,19 @@ pub struct TransitionAuditResponse {
     pub action_type: AuditActionType,
 
     /// Approval details (if applicable).
+    #[schema(value_type = Option<Object>)]
     pub approval_details: Option<JsonValue>,
 
     /// Entitlements before transition.
+    #[schema(value_type = Object)]
     pub entitlements_before: JsonValue,
 
     /// Entitlements after transition.
+    #[schema(value_type = Object)]
     pub entitlements_after: JsonValue,
 
     /// Additional metadata.
+    #[schema(value_type = Option<Object>)]
     pub metadata: Option<JsonValue>,
 
     /// When the audit was created.
@@ -987,6 +992,7 @@ pub struct TransitionCondition {
     /// Configuration for the condition (depends on type).
     /// For CustomAttributeEquals: {"attribute": "department", "value": "Sales"}
     #[serde(default)]
+    #[schema(value_type = Object)]
     pub config: JsonValue,
 
     /// Optional human-readable description.
@@ -1094,6 +1100,7 @@ pub struct LifecycleAction {
     /// For Webhook: {"url": "https://...", "method": "POST", "headers": {}}
     /// For SendNotification: {"template": "...", "recipients": [...]}
     #[serde(default)]
+    #[schema(value_type = Object)]
     pub config: JsonValue,
 
     /// Optional human-readable description.
@@ -1258,6 +1265,7 @@ pub struct ActionExecutionResponse {
     pub action_type: String,
 
     /// Action configuration.
+    #[schema(value_type = Object)]
     pub action_config: JsonValue,
 
     /// Whether this was an entry or exit action.

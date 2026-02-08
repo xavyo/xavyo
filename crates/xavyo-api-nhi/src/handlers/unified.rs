@@ -39,6 +39,9 @@ pub struct ListNhiQuery {
 
 #[derive(Debug, Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", aliases(
+    PaginatedNhiIdentityResponse = PaginatedResponse<NhiIdentity>,
+))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
     pub total: i64,
@@ -105,7 +108,7 @@ pub struct ServiceAccountExtension {
     operation_id = "listNhis",
     params(ListNhiQuery),
     responses(
-        (status = 200, description = "Paginated list of NHI identities", body = PaginatedResponse<NhiIdentity>),
+        (status = 200, description = "Paginated list of NHI identities", body = PaginatedNhiIdentityResponse),
         (status = 401, description = "Authentication required")
     ),
     security(("bearerAuth" = []))

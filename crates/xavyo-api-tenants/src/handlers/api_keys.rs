@@ -55,9 +55,9 @@ use crate::services::ApiKeyService;
     request_body = CreateApiKeyRequest,
     responses(
         (status = 201, description = "API key created successfully", body = CreateApiKeyResponse),
-        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - user cannot create keys for this tenant", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - user cannot create keys for this tenant", body = ErrorResponse),
     ),
     tag = "API Keys",
     security(
@@ -177,10 +177,10 @@ pub async fn create_api_key_handler(
     request_body = RotateApiKeyRequest,
     responses(
         (status = 200, description = "API key rotated successfully", body = RotateApiKeyResponse),
-        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden", body = crate::error::ErrorResponse),
-        (status = 404, description = "API key not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "API key not found", body = ErrorResponse),
     ),
     tag = "API Keys",
     security(
@@ -325,7 +325,7 @@ pub async fn rotate_api_key_handler(
     responses(
         (status = 200, description = "List of API keys", body = ApiKeyListResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
     ),
     tag = "API Keys",
     security(
@@ -383,8 +383,8 @@ pub async fn list_api_keys_handler(
     responses(
         (status = 204, description = "API key deactivated"),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden", body = crate::error::ErrorResponse),
-        (status = 404, description = "API key not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "API key not found", body = ErrorResponse),
     ),
     tag = "API Keys",
     security(
@@ -482,10 +482,10 @@ pub async fn deactivate_api_key_handler(
     ),
     responses(
         (status = 200, description = "Usage statistics retrieved", body = ApiKeyUsageResponse),
-        (status = 400, description = "Invalid query parameters", body = crate::error::ErrorResponse),
+        (status = 400, description = "Invalid query parameters", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Access denied", body = crate::error::ErrorResponse),
-        (status = 404, description = "API key not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Access denied", body = ErrorResponse),
+        (status = 404, description = "API key not found", body = ErrorResponse),
     ),
     tag = "API Keys",
     security(
@@ -658,7 +658,7 @@ pub async fn get_api_key_usage_handler(
     path = "/api-keys/introspect",
     responses(
         (status = 200, description = "API key introspection successful", body = IntrospectApiKeyResponse),
-        (status = 401, description = "Unauthorized - invalid, expired, or revoked API key", body = crate::error::ErrorResponse),
+        (status = 401, description = "Unauthorized - invalid, expired, or revoked API key", body = ErrorResponse),
     ),
     tag = "API Keys",
     security(

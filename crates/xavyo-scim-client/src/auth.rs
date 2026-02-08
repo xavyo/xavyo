@@ -12,6 +12,7 @@ use tracing::debug;
 /// The [`Debug`] impl redacts sensitive fields (tokens and secrets) to prevent
 /// accidental credential exposure in log output.
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "type")]
 pub enum ScimCredentials {
     /// Bearer token authentication.

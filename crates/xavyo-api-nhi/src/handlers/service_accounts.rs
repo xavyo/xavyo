@@ -80,6 +80,9 @@ pub struct ListServiceAccountsQuery {
 
 #[derive(Debug, Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", aliases(
+    PaginatedNhiServiceAccountWithIdentityResponse = PaginatedResponse<NhiServiceAccountWithIdentity>,
+))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
     pub total: i64,
@@ -185,7 +188,7 @@ pub async fn create_service_account(
     operation_id = "listNhiServiceAccounts",
     params(ListServiceAccountsQuery),
     responses(
-        (status = 200, description = "Paginated list of service accounts", body = PaginatedResponse<NhiServiceAccountWithIdentity>),
+        (status = 200, description = "Paginated list of service accounts", body = PaginatedNhiServiceAccountWithIdentityResponse),
         (status = 401, description = "Authentication required")
     ),
     security(("bearerAuth" = []))

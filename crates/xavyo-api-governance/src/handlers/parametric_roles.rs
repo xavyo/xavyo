@@ -21,10 +21,12 @@ use xavyo_db::{
 
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
-    AssignmentParameterResponse, CreateRoleParameterRequest, ListParameterAuditQuery,
-    ListRoleParametersQuery, ParameterAuditEventResponse, ParameterAuditListResponse,
-    RoleParameterListResponse, RoleParameterResponse, UpdateRoleParameterRequest,
-    ValidateParametersRequest, ValidateParametersResponse,
+    AssignmentParameterResponse, CreateParametricAssignmentRequest, CreateRoleParameterRequest,
+    ListParameterAuditQuery, ListParametricAssignmentsQuery, ListRoleParametersQuery,
+    ParameterAuditEventResponse, ParameterAuditListResponse, ParameterValidationResult,
+    ParametricAssignmentListResponse, ParametricAssignmentResponse, RoleParameterListResponse,
+    RoleParameterResponse, UpdateRoleParameterRequest, ValidateParametersRequest,
+    ValidateParametersResponse,
 };
 use crate::router::GovernanceState;
 use crate::services::ValidationResult;
@@ -363,9 +365,9 @@ pub async fn validate_parameters(
     params(
         ("role_id" = Uuid, Path, description = "Role (entitlement) ID")
     ),
-    request_body = crate::models::CreateParametricAssignmentRequest,
+    request_body = CreateParametricAssignmentRequest,
     responses(
-        (status = 201, description = "Parametric assignment created", body = crate::models::ParametricAssignmentResponse),
+        (status = 201, description = "Parametric assignment created", body = ParametricAssignmentResponse),
         (status = 400, description = "Invalid request or validation failed"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Role not found or not parametric"),
@@ -378,10 +380,10 @@ pub async fn create_parametric_assignment(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(role_id): Path<Uuid>,
-    Json(request): Json<crate::models::CreateParametricAssignmentRequest>,
+    Json(request): Json<CreateParametricAssignmentRequest>,
 ) -> ApiResult<(
     StatusCode,
-    Json<crate::models::ParametricAssignmentResponse>,
+    Json<ParametricAssignmentResponse>,
 )> {
     request.validate()?;
 
@@ -574,12 +576,12 @@ pub async fn create_parametric_assignment(
     let is_temporally_active = assignment.valid_from.is_none_or(|vf| vf <= now)
         && assignment.valid_to.is_none_or(|vt| vt > now);
 
-    let params_response: Vec<crate::models::AssignmentParameterResponse> = assignment_params
+    let params_response: Vec<AssignmentParameterResponse> = assignment_params
         .into_iter()
-        .map(crate::models::AssignmentParameterResponse::from)
+        .map(AssignmentParameterResponse::from)
         .collect();
 
-    let response = crate::models::ParametricAssignmentResponse {
+    let response = ParametricAssignmentResponse {
         id: assignment.id,
         tenant_id: assignment.tenant_id,
         role_id: assignment.entitlement_id,
@@ -610,7 +612,7 @@ pub async fn create_parametric_assignment(
         ("assignment_id" = Uuid, Path, description = "Assignment ID")
     ),
     responses(
-        (status = 200, description = "Parametric assignment details", body = crate::models::ParametricAssignmentResponse),
+        (status = 200, description = "Parametric assignment details", body = ParametricAssignmentResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Assignment not found"),
         (status = 500, description = "Internal server error")
@@ -621,7 +623,7 @@ pub async fn get_parametric_assignment(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(assignment_id): Path<Uuid>,
-) -> ApiResult<Json<crate::models::ParametricAssignmentResponse>> {
+) -> ApiResult<Json<ParametricAssignmentResponse>> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -643,12 +645,12 @@ pub async fn get_parametric_assignment(
     let is_temporally_active = assignment.valid_from.is_none_or(|vf| vf <= now)
         && assignment.valid_to.is_none_or(|vt| vt > now);
 
-    let params_response: Vec<crate::models::AssignmentParameterResponse> = params
+    let params_response: Vec<AssignmentParameterResponse> = params
         .into_iter()
-        .map(crate::models::AssignmentParameterResponse::from)
+        .map(AssignmentParameterResponse::from)
         .collect();
 
-    let response = crate::models::ParametricAssignmentResponse {
+    let response = ParametricAssignmentResponse {
         id: assignment.id,
         tenant_id: assignment.tenant_id,
         role_id: assignment.entitlement_id,
@@ -677,10 +679,10 @@ pub async fn get_parametric_assignment(
     tag = "Governance - Parametric Roles",
     params(
         ("user_id" = Uuid, Path, description = "User ID"),
-        crate::models::ListParametricAssignmentsQuery
+        ListParametricAssignmentsQuery
     ),
     responses(
-        (status = 200, description = "List of parametric assignments", body = crate::models::ParametricAssignmentListResponse),
+        (status = 200, description = "List of parametric assignments", body = ParametricAssignmentListResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -690,8 +692,8 @@ pub async fn list_user_parametric_assignments(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Path(user_id): Path<Uuid>,
-    Query(query): Query<crate::models::ListParametricAssignmentsQuery>,
-) -> ApiResult<Json<crate::models::ParametricAssignmentListResponse>> {
+    Query(query): Query<ListParametricAssignmentsQuery>,
+) -> ApiResult<Json<ParametricAssignmentListResponse>> {
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -733,12 +735,12 @@ pub async fn list_user_parametric_assignments(
             .await
             .unwrap_or_default();
 
-        let params_response: Vec<crate::models::AssignmentParameterResponse> = params
+        let params_response: Vec<AssignmentParameterResponse> = params
             .into_iter()
-            .map(crate::models::AssignmentParameterResponse::from)
+            .map(AssignmentParameterResponse::from)
             .collect();
 
-        items.push(crate::models::ParametricAssignmentResponse {
+        items.push(ParametricAssignmentResponse {
             id: assignment.id,
             tenant_id: assignment.tenant_id,
             role_id: assignment.entitlement_id,
@@ -767,7 +769,7 @@ pub async fn list_user_parametric_assignments(
         .take(limit.max(0) as usize)
         .collect();
 
-    Ok(Json(crate::models::ParametricAssignmentListResponse {
+    Ok(Json(ParametricAssignmentListResponse {
         items: paginated_items,
         total,
         limit,
@@ -981,7 +983,7 @@ fn convert_validation_result(result: ValidationResult) -> ValidateParametersResp
         results: result
             .results
             .into_iter()
-            .map(|r| crate::models::ParameterValidationResult {
+            .map(|r| ParameterValidationResult {
                 parameter_id: r.parameter_id,
                 parameter_name: r.parameter_name,
                 is_valid: r.is_valid,

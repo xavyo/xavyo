@@ -28,5 +28,5 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [features]
 integration = []  # Feature flag for integration tests requiring real PostgreSQL
-openapi = ["utoipa"]  # Enable OpenAPI schema generation for models
+openapi = ["utoipa", "xavyo-nhi/openapi"]  # Enable OpenAPI schema generation for models
 argon2 = ["dep:argon2"]  # Enable Argon2 password hashing for credential verification

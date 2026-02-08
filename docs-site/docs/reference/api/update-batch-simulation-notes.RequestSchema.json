@@ -1,1 +1,1 @@
-{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Schema for UpdateNotesRequest","title":"UpdateNotesRequest"}}},"required":true}}
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to update notes on a simulation.","properties":{"notes":{"type":"string","description":"Notes/comments on the simulation (null to clear).","nullable":true}},"title":"UpdateNotesRequest"}}},"required":true}}

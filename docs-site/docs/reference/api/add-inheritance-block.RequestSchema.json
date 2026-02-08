@@ -1,1 +1,1 @@
-{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Schema for AddInheritanceBlockRequest","title":"AddInheritanceBlockRequest"}}},"required":true}}
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to add an inheritance block.","required":["entitlement_id"],"properties":{"entitlement_id":{"type":"string","format":"uuid","description":"The entitlement ID to block from inheritance."}},"title":"AddInheritanceBlockRequest"}}},"required":true}}

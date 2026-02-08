@@ -42,8 +42,8 @@ use crate::router::TenantAppState;
     responses(
         (status = 200, description = "Tenant settings", body = GetSettingsResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - not authorized for this tenant", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - not authorized for this tenant", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "Tenant Settings",
     security(
@@ -111,10 +111,10 @@ pub async fn get_tenant_user_settings_handler(
     request_body = TenantUserUpdateSettingsRequest,
     responses(
         (status = 200, description = "Settings updated successfully", body = UpdateSettingsResponse),
-        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - not authorized for this tenant", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - not authorized for this tenant", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "Tenant Settings",
     security(
@@ -219,10 +219,10 @@ pub async fn update_tenant_user_settings_handler(
     request_body = UpdateSettingsRequest,
     responses(
         (status = 200, description = "Settings updated successfully", body = UpdateSettingsResponse),
-        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "System Administration",
     security(
@@ -319,8 +319,8 @@ pub async fn update_settings_handler(
     responses(
         (status = 200, description = "Tenant settings", body = GetSettingsResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "System Administration",
     security(

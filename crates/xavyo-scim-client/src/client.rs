@@ -15,6 +15,7 @@ use xavyo_api_scim::models::{
 
 /// SCIM `ServiceProviderConfig` response (subset of RFC 7643 Section 5).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceProviderConfig {
     /// SCIM schema URIs.
@@ -52,12 +53,14 @@ pub struct ServiceProviderConfig {
 
 /// Simple feature support flag.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct FeatureSupport {
     pub supported: bool,
 }
 
 /// Bulk operation support details.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct BulkSupport {
     pub supported: bool,
@@ -69,6 +72,7 @@ pub struct BulkSupport {
 
 /// Filter support details.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct FilterSupport {
     pub supported: bool,

@@ -1,1 +1,1 @@
-{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Schema for AddRoleEntitlementRequest","title":"AddRoleEntitlementRequest"}}},"required":true}}
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to add an entitlement to a role.","required":["entitlement_id"],"properties":{"entitlement_id":{"type":"string","format":"uuid","description":"The entitlement ID to add."}},"title":"AddRoleEntitlementRequest"}}},"required":true}}

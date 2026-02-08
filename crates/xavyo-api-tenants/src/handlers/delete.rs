@@ -43,11 +43,11 @@ const IMMEDIATE_GRACE_PERIOD_DAYS: i64 = 1;
     request_body = DeleteTenantRequest,
     responses(
         (status = 200, description = "Tenant marked for deletion", body = DeleteTenantResponse),
-        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
-        (status = 409, description = "Tenant already deleted", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
+        (status = 409, description = "Tenant already deleted", body = ErrorResponse),
     ),
     tag = "System Administration",
     security(
@@ -171,9 +171,9 @@ pub async fn delete_tenant_handler(
     responses(
         (status = 200, description = "Tenant restored successfully", body = RestoreTenantResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
-        (status = 409, description = "Tenant not deleted or purge already started", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
+        (status = 409, description = "Tenant not deleted or purge already started", body = ErrorResponse),
     ),
     tag = "System Administration",
     security(
@@ -282,7 +282,7 @@ pub async fn restore_tenant_handler(
     responses(
         (status = 200, description = "List of deleted tenants", body = DeletedTenantListResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
     ),
     tag = "System Administration",
     security(

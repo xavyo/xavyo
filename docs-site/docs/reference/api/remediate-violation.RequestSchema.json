@@ -1,1 +1,1 @@
-{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Schema for RemediateViolationRequest","title":"RemediateViolationRequest"}}},"required":true}}
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","description":"Request to remediate a violation.","properties":{"notes":{"type":"string","description":"Notes about the remediation action.","nullable":true}},"title":"RemediateViolationRequest"}}},"required":true}}

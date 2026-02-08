@@ -76,6 +76,7 @@ impl EvaluationMode {
 
 /// Condition operator for policy evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ConditionOperator {
     /// Exact match.

@@ -62,7 +62,7 @@ pub async fn get_batch_simulation(
     tag = "Governance - Enhanced Simulation",
     params(ListBatchSimulationsQuery),
     responses(
-        (status = 200, description = "Simulations listed", body = PaginatedResponse<BatchSimulationResponse>),
+        (status = 200, description = "Simulations listed", body = PaginatedBatchSimulationResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -387,7 +387,7 @@ pub async fn update_batch_simulation_notes(
         ListBatchSimulationResultsQuery
     ),
     responses(
-        (status = 200, description = "Results retrieved", body = PaginatedResponse<BatchSimulationResultResponse>),
+        (status = 200, description = "Results retrieved", body = PaginatedBatchSimulationResultResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Simulation not found"),
         (status = 500, description = "Internal server error")

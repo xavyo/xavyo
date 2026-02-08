@@ -6,6 +6,10 @@ use uuid::Uuid;
 
 use utoipa::{IntoParams, ToSchema};
 
+use super::batch_simulation::{BatchSimulationResponse, BatchSimulationResultResponse};
+use super::policy_simulation::{PolicySimulationResponse, PolicySimulationResultResponse};
+use super::simulation_comparison::SimulationComparisonResponse;
+
 use xavyo_db::{
     FactorBreakdown, FactorScore, OutlierAlertSeverity, OutlierAlertType, OutlierAnalysisStatus,
     OutlierClassification, OutlierDispositionStatus, OutlierTriggerType, PeerGroupScore,
@@ -360,6 +364,17 @@ pub struct UserOutlierHistoryResponse {
 
 /// Generic paginated response.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[aliases(
+    PaginatedOutlierAnalysisResponse = PaginatedResponse<OutlierAnalysisResponse>,
+    PaginatedOutlierResultResponse = PaginatedResponse<OutlierResultResponse>,
+    PaginatedDispositionResponse = PaginatedResponse<DispositionResponse>,
+    PaginatedAlertResponse = PaginatedResponse<AlertResponse>,
+    PaginatedBatchSimulationResponse = PaginatedResponse<BatchSimulationResponse>,
+    PaginatedBatchSimulationResultResponse = PaginatedResponse<BatchSimulationResultResponse>,
+    PaginatedPolicySimulationResponse = PaginatedResponse<PolicySimulationResponse>,
+    PaginatedPolicySimulationResultResponse = PaginatedResponse<PolicySimulationResultResponse>,
+    PaginatedSimulationComparisonResponse = PaginatedResponse<SimulationComparisonResponse>,
+)]
 pub struct PaginatedResponse<T> {
     pub items: Vec<T>,
     pub total: i64,

@@ -44,10 +44,10 @@ fn default_limit() -> i32 {
     request_body = UpgradePlanRequest,
     responses(
         (status = 200, description = "Plan upgraded successfully", body = PlanChangeResponse),
-        (status = 400, description = "Validation error (same tier, lower tier, invalid plan)", body = crate::error::ErrorResponse),
+        (status = 400, description = "Validation error (same tier, lower tier, invalid plan)", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "Plan Management",
     security(
@@ -105,10 +105,10 @@ pub async fn upgrade_plan_handler(
     request_body = DowngradePlanRequest,
     responses(
         (status = 200, description = "Downgrade scheduled successfully", body = PlanChangeResponse),
-        (status = 400, description = "Validation error (same tier, higher tier, invalid plan, pending exists)", body = crate::error::ErrorResponse),
+        (status = 400, description = "Validation error (same tier, higher tier, invalid plan, pending exists)", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "Plan Management",
     security(
@@ -165,10 +165,10 @@ pub async fn downgrade_plan_handler(
     ),
     responses(
         (status = 200, description = "Pending downgrade cancelled", body = PlanChangeResponse),
-        (status = 400, description = "No pending downgrade to cancel", body = crate::error::ErrorResponse),
+        (status = 400, description = "No pending downgrade to cancel", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "Plan Management",
     security(
@@ -226,8 +226,8 @@ pub async fn cancel_downgrade_handler(
     responses(
         (status = 200, description = "Plan history", body = PlanHistoryResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "Plan Management",
     security(
@@ -273,7 +273,7 @@ pub async fn get_plan_history_handler(
     responses(
         (status = 200, description = "List of available plans", body = PlansListResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
     ),
     tag = "Plan Management",
     security(

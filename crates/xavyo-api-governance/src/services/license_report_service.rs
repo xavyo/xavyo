@@ -8,6 +8,7 @@ use std::fmt::Write;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::PgPool;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use xavyo_db::models::{
@@ -54,7 +55,7 @@ pub struct AuditTrailParams {
 // ============================================================================
 
 /// Full compliance report for license auditing.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ComplianceReport {
     /// When the report was generated.
     pub generated_at: DateTime<Utc>,
@@ -75,7 +76,7 @@ pub struct ComplianceReport {
 }
 
 /// Filters applied when generating the report.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ComplianceReportFilters {
     pub pool_ids: Option<Vec<Uuid>>,
     pub vendor: Option<String>,
@@ -84,7 +85,7 @@ pub struct ComplianceReportFilters {
 }
 
 /// Compliance summary for a single license pool.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PoolComplianceSummary {
     pub pool_id: Uuid,
     pub pool_name: String,
@@ -102,7 +103,7 @@ pub struct PoolComplianceSummary {
 }
 
 /// A single entry in the audit trail.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct AuditTrailEntry {
     pub id: Uuid,
     pub timestamp: DateTime<Utc>,

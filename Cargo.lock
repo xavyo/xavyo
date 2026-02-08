@@ -3059,6 +3059,7 @@ dependencies = [
  "xavyo-core",
  "xavyo-db",
  "xavyo-events",
+ "xavyo-nhi",
  "xavyo-scim-client",
  "xavyo-secrets",
  "xavyo-tenant",
@@ -8734,6 +8735,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing",
+ "utoipa",
  "uuid",
 ]
 
@@ -8942,6 +8944,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing",
+ "utoipa",
  "uuid",
  "wiremock",
  "xavyo-api-scim",

@@ -34,10 +34,10 @@ use crate::router::TenantAppState;
     request_body = SuspendTenantRequest,
     responses(
         (status = 200, description = "Tenant suspended successfully", body = SuspendTenantResponse),
-        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "System Administration",
     security(
@@ -154,8 +154,8 @@ pub async fn suspend_tenant_handler(
     responses(
         (status = 200, description = "Tenant reactivated successfully", body = ReactivateTenantResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "System Administration",
     security(
@@ -258,8 +258,8 @@ pub async fn reactivate_tenant_handler(
     responses(
         (status = 200, description = "Tenant details", body = TenantStatusResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must be system tenant admin", body = crate::error::ErrorResponse),
-        (status = 404, description = "Tenant not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must be system tenant admin", body = ErrorResponse),
+        (status = 404, description = "Tenant not found", body = ErrorResponse),
     ),
     tag = "System Administration",
     security(

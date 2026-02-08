@@ -92,6 +92,9 @@ pub struct ListToolsQuery {
 
 #[derive(Debug, Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", aliases(
+    PaginatedNhiToolWithIdentityResponse = PaginatedResponse<NhiToolWithIdentity>,
+))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
     pub total: i64,
@@ -213,7 +216,7 @@ struct RawNhiTool {
     operation_id = "listNhiTools",
     params(ListToolsQuery),
     responses(
-        (status = 200, description = "Paginated list of tools", body = PaginatedResponse<NhiToolWithIdentity>),
+        (status = 200, description = "Paginated list of tools", body = PaginatedNhiToolWithIdentityResponse),
         (status = 401, description = "Authentication required")
     ),
     security(("bearerAuth" = []))

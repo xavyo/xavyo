@@ -44,10 +44,10 @@ use crate::services::TenantInvitationService;
     request_body = CreateInvitationRequest,
     responses(
         (status = 201, description = "Invitation created successfully", body = InvitationResponse),
-        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - not a tenant admin", body = crate::error::ErrorResponse),
-        (status = 409, description = "Conflict - user exists or pending invitation", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - not a tenant admin", body = ErrorResponse),
+        (status = 409, description = "Conflict - user exists or pending invitation", body = ErrorResponse),
     ),
     tag = "Tenant Invitations",
     security(
@@ -147,7 +147,7 @@ pub async fn create_invitation_handler(
     responses(
         (status = 200, description = "List of invitations", body = InvitationListResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
     ),
     tag = "Tenant Invitations",
     security(
@@ -228,10 +228,10 @@ pub async fn list_invitations_handler(
     ),
     responses(
         (status = 200, description = "Invitation cancelled", body = InvitationResponse),
-        (status = 400, description = "Cannot cancel - already accepted", body = crate::error::ErrorResponse),
+        (status = 400, description = "Cannot cancel - already accepted", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden", body = crate::error::ErrorResponse),
-        (status = 404, description = "Invitation not found", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden", body = ErrorResponse),
+        (status = 404, description = "Invitation not found", body = ErrorResponse),
     ),
     tag = "Tenant Invitations",
     security(
@@ -314,8 +314,8 @@ pub async fn cancel_invitation_handler(
     request_body = AcceptInvitationRequest,
     responses(
         (status = 200, description = "Invitation accepted", body = AcceptInvitationResponse),
-        (status = 400, description = "Invalid request", body = crate::error::ErrorResponse),
-        (status = 410, description = "Gone - invitation expired, cancelled, or already used", body = crate::error::ErrorResponse),
+        (status = 400, description = "Invalid request", body = ErrorResponse),
+        (status = 410, description = "Gone - invitation expired, cancelled, or already used", body = ErrorResponse),
     ),
     tag = "Tenant Invitations"
 )]

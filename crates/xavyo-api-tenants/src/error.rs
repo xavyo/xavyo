@@ -68,7 +68,7 @@ pub enum TenantError {
 }
 
 /// Error response format for API errors.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct ErrorResponse {
     pub error: String,
     pub message: String,

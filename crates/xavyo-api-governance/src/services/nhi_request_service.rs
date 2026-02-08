@@ -5,6 +5,7 @@
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
 use std::sync::Arc;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 #[cfg(feature = "kafka")]
@@ -398,7 +399,7 @@ impl NhiRequestService {
 }
 
 /// Summary of NHI requests.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ToSchema)]
 pub struct NhiRequestSummary {
     pub pending: i64,
     pub approved: i64,

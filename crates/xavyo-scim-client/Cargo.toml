@@ -10,6 +10,7 @@ description = "SCIM 2.0 outbound provisioning client for xavyo"
 default = []
 kafka = ["xavyo-events/kafka"]
 integration = []
+openapi = ["utoipa"]
 
 [dependencies]
 # Core crates
@@ -36,6 +37,7 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+utoipa = { workspace = true, optional = true }
 
 # Database (for PgPool type)
 sqlx = { workspace = true }

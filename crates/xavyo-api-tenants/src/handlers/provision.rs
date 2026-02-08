@@ -39,9 +39,9 @@ use crate::router::TenantAppState;
     request_body = ProvisionTenantRequest,
     responses(
         (status = 201, description = "Tenant provisioned successfully", body = ProvisionTenantResponse),
-        (status = 400, description = "Validation error", body = crate::error::ErrorResponse),
+        (status = 400, description = "Validation error", body = ErrorResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Forbidden - must authenticate against system tenant", body = crate::error::ErrorResponse),
+        (status = 403, description = "Forbidden - must authenticate against system tenant", body = ErrorResponse),
     ),
     tag = "Tenant Provisioning",
     security(
