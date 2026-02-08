@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id,\n                tenant_id,\n                license_pool_id,\n                trigger_type as \"trigger_type: LicenseReclamationTrigger\",\n                threshold_days,\n                lifecycle_state,\n                notification_days_before,\n                enabled,\n                created_at,\n                updated_at,\n                created_by\n            FROM gov_license_reclamation_rules\n            WHERE tenant_id = $1 AND enabled = true\n            ORDER BY license_pool_id, trigger_type\n            ",
+  "query": "\n            SELECT\n                id,\n                tenant_id,\n                license_pool_id,\n                trigger_type as \"trigger_type: LicenseReclamationTrigger\",\n                threshold_days,\n                lifecycle_state,\n                notification_days_before,\n                enabled,\n                created_at,\n                updated_at,\n                created_by\n            FROM gov_license_reclamation_rules\n            WHERE tenant_id = $1\n              AND enabled = true\n              AND trigger_type = 'inactivity'\n            ORDER BY license_pool_id\n            LIMIT 1000\n            ",
   "describe": {
     "columns": [
       {
@@ -88,5 +88,5 @@
       false
     ]
   },
-  "hash": "4a49a6f011352013e5277e13b251e89c7c2cd3aa2feedd2b7aa4c5465272223f"
+  "hash": "2eefe899b61edd8f496e8f73732cbf6d063c360fd4ae0ae72c29d956c1fa74ca"
 }

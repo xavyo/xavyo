@@ -143,6 +143,48 @@ services:
     networks:
       - xavyo-network
 
+  # ===========================================================================
+  # xavyo IDP API Server
+  # ===========================================================================
+  idp-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: xavyo-idp-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c", "export JWT_PRIVATE_KEY=\"$(cat /app/keys/jwt_private.pem)\" JWT_PUBLIC_KEY=\"$(cat /app/keys/jwt_public.pem)\" && exec /app/idp-api"]
+    environment:
+      DATABASE_URL: postgres://xavyo:${POSTGRES_PASSWORD:-xavyo_test_password}@postgres:5432/${POSTGRES_DB:-xavyo_test}
+      ISSUER_URL: ${ISSUER_URL:-http://localhost:8080}
+      HOST: 0.0.0.0
+      PORT: 8080
+      RUST_LOG: ${RUST_LOG:-info}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      EMAIL_SMTP_HOST: mailpit
+      EMAIL_SMTP_PORT: 1025
+      EMAIL_SMTP_TLS: 'false'
+      EMAIL_SMTP_USERNAME: dev
+      EMAIL_SMTP_PASSWORD: dev
+      EMAIL_FROM_ADDRESS: noreply@xavyo.local
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3000}
+    ports:
+      - '${API_PORT:-8080}:8080'
+    volumes:
+      - ./keys:/app/keys:ro
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/readyz']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - xavyo-network
+
 # =============================================================================
 # Networks
 # =============================================================================

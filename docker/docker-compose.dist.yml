@@ -1,0 +1,64 @@
+# =============================================================================
+# xavyo IDP — Quick Start (standalone, no source code needed)
+# =============================================================================
+# Usage:
+#   1. Generate JWT keys:
+#        mkdir -p keys
+#        openssl genpkey -algorithm RSA -out keys/jwt_private.pem -pkeyopt rsa_keygen_bits:2048
+#        openssl rsa -pubout -in keys/jwt_private.pem -out keys/jwt_public.pem
+#   2. Start:  docker compose -f docker-compose.dist.yml up -d
+#   3. Health: curl http://localhost:8080/readyz
+#   4. Docs:   http://localhost:8080/docs
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: xavyo
+      POSTGRES_USER: xavyo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U xavyo -d xavyo']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - xavyo-network
+
+  idp-api:
+    image: ghcr.io/xavyo/xavyo-idp:${VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "export JWT_PRIVATE_KEY=\"$(cat /app/keys/jwt_private.pem)\" JWT_PUBLIC_KEY=\"$(cat /app/keys/jwt_public.pem)\" && exec /app/idp-api"]
+    environment:
+      DATABASE_URL: postgres://xavyo:${POSTGRES_PASSWORD:-changeme}@postgres:5432/xavyo
+      ISSUER_URL: ${ISSUER_URL:-http://localhost:8080}
+      HOST: 0.0.0.0
+      PORT: 8080
+      RUST_LOG: ${RUST_LOG:-info}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3000}
+    ports:
+      - '${API_PORT:-8080}:8080'
+    volumes:
+      - ./keys:/app/keys:ro
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/readyz']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - xavyo-network
+
+networks:
+  xavyo-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

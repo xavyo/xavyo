@@ -1,0 +1,54 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                i.id as rule_id,\n                CASE\n                    WHEN i.pool_a_id = $3 THEN i.pool_b_id\n                    ELSE i.pool_a_id\n                END as \"existing_pool_id!: Uuid\",\n                CASE\n                    WHEN i.pool_a_id = $3 THEN pb.name\n                    ELSE pa.name\n                END as \"existing_pool_name!\",\n                $3 as \"requested_pool_id!: Uuid\",\n                rp.name as \"requested_pool_name!\",\n                i.reason\n            FROM gov_license_incompatibilities i\n            JOIN gov_license_pools pa ON pa.id = i.pool_a_id AND pa.tenant_id = i.tenant_id\n            JOIN gov_license_pools pb ON pb.id = i.pool_b_id AND pb.tenant_id = i.tenant_id\n            JOIN gov_license_pools rp ON rp.id = $3 AND rp.tenant_id = i.tenant_id\n            WHERE i.tenant_id = $1\n              AND (i.pool_a_id = $3 OR i.pool_b_id = $3)\n              AND EXISTS (\n                  SELECT 1 FROM gov_license_assignments a\n                  WHERE a.tenant_id = $1\n                    AND a.user_id = $2\n                    AND a.status = 'active'\n                    AND a.license_pool_id = CASE\n                        WHEN i.pool_a_id = $3 THEN i.pool_b_id\n                        ELSE i.pool_a_id\n                    END\n              )\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "rule_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "existing_pool_id!: Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "existing_pool_name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "requested_pool_id!: Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "requested_pool_name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "reason",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "9681b9ad6fc6e5207fda62cf3ea7cc6eae5ff7d383cd59ba15a5d33e07d0555a"
+}

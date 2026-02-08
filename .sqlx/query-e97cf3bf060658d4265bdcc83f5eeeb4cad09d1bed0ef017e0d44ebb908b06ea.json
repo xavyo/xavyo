@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT EXISTS(\n                SELECT 1 FROM identity_provider_configs\n                WHERE tenant_id = $1 AND LOWER(name) = LOWER($2)\n                AND ($3::uuid IS NULL OR id != $3)\n            ) as \"exists!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e97cf3bf060658d4265bdcc83f5eeeb4cad09d1bed0ef017e0d44ebb908b06ea"
+}

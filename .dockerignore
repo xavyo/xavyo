@@ -1,0 +1,10 @@
+target/
+.git/
+docs-site/node_modules/
+docs-site/build/
+docs-site/.docusaurus/
+docs/
+tests/
+specs/
+*.md
+!crates/*/CRATE.md

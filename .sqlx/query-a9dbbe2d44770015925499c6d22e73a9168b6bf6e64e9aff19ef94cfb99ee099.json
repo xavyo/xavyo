@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                i.id,\n                i.tenant_id,\n                i.pool_a_id,\n                i.pool_b_id,\n                i.reason,\n                i.created_at,\n                i.created_by,\n                pa.name as pool_a_name,\n                pa.vendor as pool_a_vendor,\n                pb.name as pool_b_name,\n                pb.vendor as pool_b_vendor\n            FROM gov_license_incompatibilities i\n            LEFT JOIN gov_license_pools pa ON pa.id = i.pool_a_id\n            LEFT JOIN gov_license_pools pb ON pb.id = i.pool_b_id\n            WHERE i.tenant_id = $1\n              AND ($2::uuid IS NULL OR i.pool_a_id = $2 OR i.pool_b_id = $2)\n            ORDER BY i.created_at DESC\n            LIMIT $3 OFFSET $4\n            ",
+  "query": "\n            SELECT\n                i.id,\n                i.tenant_id,\n                i.pool_a_id,\n                i.pool_b_id,\n                i.reason,\n                i.created_at,\n                i.created_by,\n                pa.name as pool_a_name,\n                pa.vendor as pool_a_vendor,\n                pb.name as pool_b_name,\n                pb.vendor as pool_b_vendor\n            FROM gov_license_incompatibilities i\n            LEFT JOIN gov_license_pools pa ON pa.id = i.pool_a_id AND pa.tenant_id = i.tenant_id\n            LEFT JOIN gov_license_pools pb ON pb.id = i.pool_b_id AND pb.tenant_id = i.tenant_id\n            WHERE i.tenant_id = $1\n              AND ($2::uuid IS NULL OR i.pool_a_id = $2 OR i.pool_b_id = $2)\n            ORDER BY i.created_at DESC\n            LIMIT $3 OFFSET $4\n            ",
   "describe": {
     "columns": [
       {
@@ -81,5 +81,5 @@
       false
     ]
   },
-  "hash": "b0d4c3f035c63584fda5413425e05d8d1c3b8efddb3585523786da258f960e5f"
+  "hash": "a9dbbe2d44770015925499c6d22e73a9168b6bf6e64e9aff19ef94cfb99ee099"
 }
