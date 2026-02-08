@@ -29,17 +29,20 @@ use crate::state::NhiState;
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct GrantPermissionRequest {
     pub expires_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
 pub struct PaginationQuery {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
     pub limit: i64,
@@ -47,6 +50,7 @@ pub struct PaginatedResponse<T: Serialize> {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RevokeResponse {
     pub revoked: bool,
 }
@@ -56,7 +60,25 @@ pub struct RevokeResponse {
 // ---------------------------------------------------------------------------
 
 /// POST /agents/{agent_id}/tools/{tool_id}/grant — Grant an agent permission to use a tool.
-async fn grant_permission(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/agents/{agent_id}/tools/{tool_id}/grant",
+    tag = "NHI Permissions",
+    operation_id = "grantNhiToolPermission",
+    params(
+        ("agent_id" = Uuid, Path, description = "Agent NHI ID"),
+        ("tool_id" = Uuid, Path, description = "Tool NHI ID")
+    ),
+    request_body = GrantPermissionRequest,
+    responses(
+        (status = 201, description = "Permission granted", body = NhiToolPermission),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Agent or tool not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn grant_permission(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -85,7 +107,23 @@ async fn grant_permission(
 }
 
 /// POST /agents/{agent_id}/tools/{tool_id}/revoke — Revoke an agent's permission to use a tool.
-async fn revoke_permission(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/agents/{agent_id}/tools/{tool_id}/revoke",
+    tag = "NHI Permissions",
+    operation_id = "revokeNhiToolPermission",
+    params(
+        ("agent_id" = Uuid, Path, description = "Agent NHI ID"),
+        ("tool_id" = Uuid, Path, description = "Tool NHI ID")
+    ),
+    responses(
+        (status = 200, description = "Permission revoked", body = RevokeResponse),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn revoke_permission(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -103,7 +141,22 @@ async fn revoke_permission(
 }
 
 /// GET /agents/{agent_id}/tools — List tools an agent has permission to use.
-async fn list_agent_tools(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/agents/{agent_id}/tools",
+    tag = "NHI Permissions",
+    operation_id = "listNhiAgentTools",
+    params(
+        ("agent_id" = Uuid, Path, description = "Agent NHI ID"),
+        PaginationQuery
+    ),
+    responses(
+        (status = 200, description = "List of tool permissions", body = PaginatedResponse<NhiToolPermission>),
+        (status = 401, description = "Authentication required")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn list_agent_tools(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Path(agent_id): Path<Uuid>,
@@ -125,7 +178,22 @@ async fn list_agent_tools(
 }
 
 /// GET /tools/{tool_id}/agents — List agents with permission to use a tool.
-async fn list_tool_agents(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/tools/{tool_id}/agents",
+    tag = "NHI Permissions",
+    operation_id = "listNhiToolAgents",
+    params(
+        ("tool_id" = Uuid, Path, description = "Tool NHI ID"),
+        PaginationQuery
+    ),
+    responses(
+        (status = 200, description = "List of agent permissions", body = PaginatedResponse<NhiToolPermission>),
+        (status = 401, description = "Authentication required")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn list_tool_agents(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Path(tool_id): Path<Uuid>,

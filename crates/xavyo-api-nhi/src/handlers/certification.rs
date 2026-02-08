@@ -30,6 +30,7 @@ use crate::state::NhiState;
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CreateCampaignRequest {
     pub name: String,
     pub description: Option<String>,
@@ -40,6 +41,7 @@ pub struct CreateCampaignRequest {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CertifyResponse {
     pub nhi_id: Uuid,
     pub certified_by: Uuid,
@@ -48,6 +50,7 @@ pub struct CertifyResponse {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RevokeResponse {
     pub nhi_id: Uuid,
     pub revoked: bool,
@@ -55,6 +58,7 @@ pub struct RevokeResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
 pub struct ListCampaignsQuery {
     pub status: Option<String>,
     pub limit: Option<i64>,
@@ -66,7 +70,21 @@ pub struct ListCampaignsQuery {
 // ---------------------------------------------------------------------------
 
 /// POST /certifications — Create a certification campaign.
-async fn create_campaign(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/certifications",
+    tag = "NHI Certifications",
+    operation_id = "createNhiCertificationCampaign",
+    request_body = CreateCampaignRequest,
+    responses(
+        (status = 201, description = "Campaign created", body = NhiCertificationCampaign),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn create_campaign(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -128,7 +146,19 @@ async fn create_campaign(
 }
 
 /// GET /certifications — List certification campaigns for tenant.
-async fn list_campaigns(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/certifications",
+    tag = "NHI Certifications",
+    operation_id = "listNhiCertificationCampaigns",
+    params(ListCampaignsQuery),
+    responses(
+        (status = 200, description = "List of campaigns", body = Vec<NhiCertificationCampaign>),
+        (status = 401, description = "Authentication required")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn list_campaigns(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Query(query): Query<ListCampaignsQuery>,
@@ -151,7 +181,25 @@ async fn list_campaigns(
 }
 
 /// POST /certifications/:campaign_id/certify/:nhi_id — Certify an NHI entity.
-async fn certify_nhi(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/certifications/{campaign_id}/certify/{nhi_id}",
+    tag = "NHI Certifications",
+    operation_id = "certifyNhi",
+    params(
+        ("campaign_id" = Uuid, Path, description = "Certification campaign ID"),
+        ("nhi_id" = Uuid, Path, description = "NHI identity ID to certify")
+    ),
+    responses(
+        (status = 200, description = "NHI certified", body = CertifyResponse),
+        (status = 400, description = "Invalid request or campaign state"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Campaign or NHI not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn certify_nhi(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -240,7 +288,25 @@ async fn certify_nhi(
 
 /// POST /certifications/:campaign_id/revoke/:nhi_id — Revoke certification,
 /// transitioning the NHI to Deprecated state.
-async fn revoke_certification(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/certifications/{campaign_id}/revoke/{nhi_id}",
+    tag = "NHI Certifications",
+    operation_id = "revokeNhiCertification",
+    params(
+        ("campaign_id" = Uuid, Path, description = "Certification campaign ID"),
+        ("nhi_id" = Uuid, Path, description = "NHI identity ID to revoke")
+    ),
+    responses(
+        (status = 200, description = "Certification revoked", body = RevokeResponse),
+        (status = 400, description = "Invalid campaign state"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Campaign or NHI not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn revoke_certification(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,

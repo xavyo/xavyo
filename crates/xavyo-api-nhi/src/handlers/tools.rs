@@ -33,6 +33,7 @@ use crate::state::NhiState;
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize, Validate)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CreateToolRequest {
     #[validate(length(min = 1, max = 255))]
     pub name: String,
@@ -56,6 +57,7 @@ pub struct CreateToolRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UpdateToolRequest {
     // Base fields
     pub name: Option<String>,
@@ -77,6 +79,7 @@ pub struct UpdateToolRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
 pub struct ListToolsQuery {
     pub category: Option<String>,
     pub lifecycle_state: Option<NhiLifecycleState>,
@@ -88,6 +91,7 @@ pub struct ListToolsQuery {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
     pub total: i64,
@@ -100,7 +104,21 @@ pub struct PaginatedResponse<T: Serialize> {
 // ---------------------------------------------------------------------------
 
 /// POST /nhi/tools — Create a new tool.
-async fn create_tool(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/tools",
+    tag = "NHI Tools",
+    operation_id = "createNhiTool",
+    request_body = CreateToolRequest,
+    responses(
+        (status = 201, description = "Tool created successfully", body = NhiToolWithIdentity),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn create_tool(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -188,7 +206,19 @@ struct RawNhiTool {
 }
 
 /// GET /nhi/tools — List tools with filters.
-async fn list_tools(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/tools",
+    tag = "NHI Tools",
+    operation_id = "listNhiTools",
+    params(ListToolsQuery),
+    responses(
+        (status = 200, description = "Paginated list of tools", body = PaginatedResponse<NhiToolWithIdentity>),
+        (status = 401, description = "Authentication required")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn list_tools(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Query(query): Query<ListToolsQuery>,
@@ -276,7 +306,22 @@ async fn count_tools(
 }
 
 /// GET /nhi/tools/{id} — Get a specific tool.
-async fn get_tool(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/tools/{id}",
+    tag = "NHI Tools",
+    operation_id = "getNhiTool",
+    params(
+        ("id" = Uuid, Path, description = "NHI tool ID")
+    ),
+    responses(
+        (status = 200, description = "Tool details", body = NhiToolWithIdentity),
+        (status = 401, description = "Authentication required"),
+        (status = 404, description = "Tool not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn get_tool(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Path(id): Path<Uuid>,
@@ -291,7 +336,25 @@ async fn get_tool(
 }
 
 /// PATCH /nhi/tools/{id} — Update a tool.
-async fn update_tool(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    patch,
+    path = "/nhi/tools/{id}",
+    tag = "NHI Tools",
+    operation_id = "updateNhiTool",
+    params(
+        ("id" = Uuid, Path, description = "NHI tool ID")
+    ),
+    request_body = UpdateToolRequest,
+    responses(
+        (status = 200, description = "Tool updated successfully", body = NhiToolWithIdentity),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Tool not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn update_tool(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -399,7 +462,23 @@ async fn update_tool(
 }
 
 /// DELETE /nhi/tools/{id} — Delete a tool.
-async fn delete_tool(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    delete,
+    path = "/nhi/tools/{id}",
+    tag = "NHI Tools",
+    operation_id = "deleteNhiTool",
+    params(
+        ("id" = Uuid, Path, description = "NHI tool ID")
+    ),
+    responses(
+        (status = 204, description = "Tool deleted"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Tool not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn delete_tool(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,

@@ -28,6 +28,7 @@ use crate::state::NhiState;
 
 /// Request body for initiating a grace period.
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct GracePeriodRequest {
     pub grace_days: i32,
 }
@@ -40,7 +41,19 @@ pub struct GracePeriodRequest {
 ///
 /// Returns entities that have exceeded their configured inactivity threshold
 /// but do not yet have a grace period set.
-async fn detect_inactive(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/inactivity/detect",
+    tag = "NHI Inactivity",
+    operation_id = "detectInactiveNhis",
+    responses(
+        (status = 200, description = "List of inactive NHI entities", body = Vec<InactiveEntity>),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn detect_inactive(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -58,7 +71,26 @@ async fn detect_inactive(
 /// POST /inactivity/grace-period/{id} — Initiate a grace period for an entity.
 ///
 /// Sets a deadline after which the entity will be auto-suspended if still inactive.
-async fn initiate_grace_period(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/inactivity/grace-period/{id}",
+    tag = "NHI Inactivity",
+    operation_id = "initiateNhiGracePeriod",
+    params(
+        ("id" = Uuid, Path, description = "NHI identity ID")
+    ),
+    request_body = GracePeriodRequest,
+    responses(
+        (status = 204, description = "Grace period initiated"),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "NHI identity not found"),
+        (status = 409, description = "Grace period already active")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn initiate_grace_period(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -81,7 +113,19 @@ async fn initiate_grace_period(
 ///
 /// Admin-only endpoint that finds all entities with expired grace periods
 /// and transitions them to suspended state.
-async fn auto_suspend(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/inactivity/auto-suspend",
+    tag = "NHI Inactivity",
+    operation_id = "autoSuspendNhis",
+    responses(
+        (status = 200, description = "Auto-suspend results", body = AutoSuspendResult),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn auto_suspend(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -100,7 +144,19 @@ async fn auto_suspend(
 ///
 /// Returns active entities whose owner is missing, deleted, or inactive,
 /// and that have no backup owner configured.
-async fn detect_orphans(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/orphans/detect",
+    tag = "NHI Inactivity",
+    operation_id = "detectOrphanNhis",
+    responses(
+        (status = 200, description = "List of orphaned NHI entities", body = Vec<OrphanEntity>),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn detect_orphans(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,

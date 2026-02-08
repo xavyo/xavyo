@@ -15,6 +15,7 @@ use crate::error::NhiApiError;
 
 /// Individual risk factor with score and weight.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RiskFactor {
     pub name: String,
     pub score: f64,
@@ -24,6 +25,7 @@ pub struct RiskFactor {
 
 /// Complete risk breakdown for an NHI entity.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RiskBreakdown {
     pub nhi_id: Uuid,
     pub total_score: i32,
@@ -34,6 +36,7 @@ pub struct RiskBreakdown {
 
 /// Risk summary aggregation.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RiskSummary {
     pub total_entities: i64,
     pub by_type: Vec<TypeRiskSummary>,
@@ -41,6 +44,7 @@ pub struct RiskSummary {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TypeRiskSummary {
     pub nhi_type: String,
     pub count: i64,
@@ -48,6 +52,7 @@ pub struct TypeRiskSummary {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct LevelRiskSummary {
     pub level: String,
     pub count: i64,

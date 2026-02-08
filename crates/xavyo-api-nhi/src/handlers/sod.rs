@@ -32,6 +32,7 @@ use crate::state::NhiState;
 /// Enforcement level for a SoD rule.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum SodEnforcement {
     /// Block the permission grant entirely.
     Prevent,
@@ -41,6 +42,7 @@ pub enum SodEnforcement {
 
 /// A Separation of Duties rule.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SodRule {
     pub id: Uuid,
     pub tenant_id: Uuid,
@@ -54,6 +56,7 @@ pub struct SodRule {
 
 /// Request to create a SoD rule.
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CreateSodRuleRequest {
     pub tool_id_a: Uuid,
     pub tool_id_b: Uuid,
@@ -63,6 +66,7 @@ pub struct CreateSodRuleRequest {
 
 /// Request to check SoD violations.
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SodCheckRequest {
     pub agent_id: Uuid,
     pub tool_id: Uuid,
@@ -70,6 +74,7 @@ pub struct SodCheckRequest {
 
 /// A single SoD violation found during a check.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SodViolation {
     pub rule_id: Uuid,
     pub conflicting_tool_id: Uuid,
@@ -79,6 +84,7 @@ pub struct SodViolation {
 
 /// Result of a SoD check.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SodCheckResult {
     pub violations: Vec<SodViolation>,
     pub is_allowed: bool,
@@ -86,6 +92,7 @@ pub struct SodCheckResult {
 
 /// Pagination query parameters.
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
 pub struct PaginationQuery {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
@@ -93,6 +100,7 @@ pub struct PaginationQuery {
 
 /// Paginated response.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
     pub limit: i64,
@@ -104,7 +112,21 @@ pub struct PaginatedResponse<T: Serialize> {
 // ---------------------------------------------------------------------------
 
 /// POST /sod/rules — Create a SoD rule.
-async fn create_sod_rule(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/sod/rules",
+    tag = "NHI SoD",
+    operation_id = "createNhiSodRule",
+    request_body = CreateSodRuleRequest,
+    responses(
+        (status = 201, description = "SoD rule created", body = SodRule),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn create_sod_rule(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -159,7 +181,19 @@ async fn create_sod_rule(
 }
 
 /// GET /sod/rules — List SoD rules for the tenant.
-async fn list_sod_rules(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/sod/rules",
+    tag = "NHI SoD",
+    operation_id = "listNhiSodRules",
+    params(PaginationQuery),
+    responses(
+        (status = 200, description = "List of SoD rules", body = PaginatedResponse<SodRule>),
+        (status = 401, description = "Authentication required")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn list_sod_rules(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Query(query): Query<PaginationQuery>,
@@ -191,7 +225,23 @@ async fn list_sod_rules(
 }
 
 /// DELETE /sod/rules/{id} — Delete a SoD rule.
-async fn delete_sod_rule(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    delete,
+    path = "/nhi/sod/rules/{id}",
+    tag = "NHI SoD",
+    operation_id = "deleteNhiSodRule",
+    params(
+        ("id" = Uuid, Path, description = "SoD rule ID")
+    ),
+    responses(
+        (status = 204, description = "SoD rule deleted"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "SoD rule not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn delete_sod_rule(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -221,7 +271,19 @@ async fn delete_sod_rule(
 ///
 /// Queries the agent's existing tool permissions and checks against all SoD rules
 /// to detect conflicts. Returns the list of violations and whether the grant is allowed.
-async fn check_sod(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/sod/check",
+    tag = "NHI SoD",
+    operation_id = "checkNhiSod",
+    request_body = SodCheckRequest,
+    responses(
+        (status = 200, description = "SoD check result", body = SodCheckResult),
+        (status = 401, description = "Authentication required")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn check_sod(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Json(request): Json<SodCheckRequest>,

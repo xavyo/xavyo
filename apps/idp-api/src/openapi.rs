@@ -197,7 +197,19 @@ impl Modify for SecurityAddon {
         (name = "NHI - Service Accounts", description = "Service account lifecycle, credentials, usage, risk, and self-service requests"),
         (name = "NHI - Agents", description = "AI agent management, permissions, authorization, audit, and anomaly detection"),
         (name = "NHI - Tools", description = "Tool registry for AI agent capabilities"),
-        (name = "NHI - Approvals", description = "Human-in-the-loop approval workflow for agent tool invocations")
+        (name = "NHI - Approvals", description = "Human-in-the-loop approval workflow for agent tool invocations"),
+        // Unified NHI Data Model (201-tool-nhi-promotion)
+        (name = "NHI", description = "Unified Non-Human Identity list and detail endpoints"),
+        (name = "NHI Lifecycle", description = "NHI lifecycle state transitions (suspend, reactivate, deprecate, archive, deactivate, activate)"),
+        (name = "NHI Credentials", description = "NHI credential issuance, rotation, and revocation"),
+        (name = "NHI Certifications", description = "NHI certification campaign management"),
+        (name = "NHI Permissions", description = "Agent-to-tool permission grants and queries"),
+        (name = "NHI Risk", description = "NHI risk scoring and summary"),
+        (name = "NHI SoD", description = "NHI Separation of Duties rule management and validation"),
+        (name = "NHI Inactivity", description = "NHI inactivity detection, auto-suspend, and orphan management"),
+        (name = "NHI Agents", description = "NHI AI agent type-specific CRUD"),
+        (name = "NHI Service Accounts", description = "NHI service account type-specific CRUD"),
+        (name = "NHI Tools", description = "NHI tool type-specific CRUD")
     ),
     paths(
         // Health
@@ -1197,8 +1209,62 @@ impl Modify for SecurityAddon {
         xavyo_api_agents::handlers::anomaly::set_tenant_thresholds,
         // Tenant Provisioning (F097)
         xavyo_api_tenants::handlers::provision::provision_handler,
-        // Unified NHI endpoints (201-tool-nhi-promotion — handlers added in later phases)
-        // Phase 3+: list, get, CRUD, lifecycle, credentials, permissions, risk, certification
+        // Unified NHI (201-tool-nhi-promotion)
+        xavyo_api_nhi::handlers::unified::list_nhis,
+        xavyo_api_nhi::handlers::unified::get_nhi,
+        // NHI Lifecycle
+        xavyo_api_nhi::handlers::lifecycle::suspend,
+        xavyo_api_nhi::handlers::lifecycle::reactivate,
+        xavyo_api_nhi::handlers::lifecycle::deprecate,
+        xavyo_api_nhi::handlers::lifecycle::archive,
+        xavyo_api_nhi::handlers::lifecycle::deactivate,
+        xavyo_api_nhi::handlers::lifecycle::activate,
+        // NHI Credentials
+        xavyo_api_nhi::handlers::credentials::issue_credential,
+        xavyo_api_nhi::handlers::credentials::list_credentials,
+        xavyo_api_nhi::handlers::credentials::rotate_credential,
+        xavyo_api_nhi::handlers::credentials::revoke_credential,
+        // NHI Certifications
+        xavyo_api_nhi::handlers::certification::create_campaign,
+        xavyo_api_nhi::handlers::certification::list_campaigns,
+        xavyo_api_nhi::handlers::certification::certify_nhi,
+        xavyo_api_nhi::handlers::certification::revoke_certification,
+        // NHI Permissions
+        xavyo_api_nhi::handlers::permissions::grant_permission,
+        xavyo_api_nhi::handlers::permissions::revoke_permission,
+        xavyo_api_nhi::handlers::permissions::list_agent_tools,
+        xavyo_api_nhi::handlers::permissions::list_tool_agents,
+        // NHI Risk
+        xavyo_api_nhi::handlers::risk::get_risk,
+        xavyo_api_nhi::handlers::risk::get_risk_summary,
+        // NHI SoD
+        xavyo_api_nhi::handlers::sod::create_sod_rule,
+        xavyo_api_nhi::handlers::sod::list_sod_rules,
+        xavyo_api_nhi::handlers::sod::delete_sod_rule,
+        xavyo_api_nhi::handlers::sod::check_sod,
+        // NHI Inactivity
+        xavyo_api_nhi::handlers::inactivity::detect_inactive,
+        xavyo_api_nhi::handlers::inactivity::initiate_grace_period,
+        xavyo_api_nhi::handlers::inactivity::auto_suspend,
+        xavyo_api_nhi::handlers::inactivity::detect_orphans,
+        // NHI Agents
+        xavyo_api_nhi::handlers::agents::create_agent,
+        xavyo_api_nhi::handlers::agents::list_agents,
+        xavyo_api_nhi::handlers::agents::get_agent,
+        xavyo_api_nhi::handlers::agents::update_agent,
+        xavyo_api_nhi::handlers::agents::delete_agent,
+        // NHI Service Accounts
+        xavyo_api_nhi::handlers::service_accounts::create_service_account,
+        xavyo_api_nhi::handlers::service_accounts::list_service_accounts,
+        xavyo_api_nhi::handlers::service_accounts::get_service_account,
+        xavyo_api_nhi::handlers::service_accounts::update_service_account,
+        xavyo_api_nhi::handlers::service_accounts::delete_service_account,
+        // NHI Tools
+        xavyo_api_nhi::handlers::tools::create_tool,
+        xavyo_api_nhi::handlers::tools::list_tools,
+        xavyo_api_nhi::handlers::tools::get_tool,
+        xavyo_api_nhi::handlers::tools::update_tool,
+        xavyo_api_nhi::handlers::tools::delete_tool,
         // NOTE: The following handlers need #[utoipa::path] annotations to be included in OpenAPI:
         // - Bulk Import (F086): import.rs, errors.rs, invitations.rs handlers (9 endpoints)
         // - Prometheus Metrics (F072): metrics.rs handler (1 endpoint)
@@ -2298,7 +2364,53 @@ impl Modify for SecurityAddon {
         xavyo_api_tenants::models::AdminInfo,
         xavyo_api_tenants::models::OAuthClientInfo,
         xavyo_api_tenants::models::EndpointInfo,
-        // Unified NHI models (201-tool-nhi-promotion — schemas added in later phases)
+        // Unified NHI models (201-tool-nhi-promotion)
+        // Unified handler types
+        xavyo_api_nhi::handlers::unified::NhiIdentityDetail,
+        xavyo_api_nhi::handlers::unified::ToolExtension,
+        xavyo_api_nhi::handlers::unified::AgentExtension,
+        xavyo_api_nhi::handlers::unified::ServiceAccountExtension,
+        // Lifecycle handler types
+        xavyo_api_nhi::handlers::lifecycle::SuspendRequest,
+        // Credential handler types
+        xavyo_api_nhi::handlers::credentials::IssueCredentialRequest,
+        xavyo_api_nhi::handlers::credentials::RotateCredentialRequest,
+        xavyo_api_nhi::handlers::credentials::CredentialIssuedResponse,
+        // Certification handler types
+        xavyo_api_nhi::handlers::certification::CreateCampaignRequest,
+        xavyo_api_nhi::handlers::certification::CertifyResponse,
+        xavyo_api_nhi::handlers::certification::RevokeResponse,
+        // Permission handler types
+        xavyo_api_nhi::handlers::permissions::GrantPermissionRequest,
+        // Risk service types
+        xavyo_api_nhi::services::nhi_risk_service::RiskBreakdown,
+        xavyo_api_nhi::services::nhi_risk_service::RiskSummary,
+        xavyo_api_nhi::services::nhi_risk_service::RiskFactor,
+        xavyo_api_nhi::services::nhi_risk_service::TypeRiskSummary,
+        xavyo_api_nhi::services::nhi_risk_service::LevelRiskSummary,
+        // SoD handler types
+        xavyo_api_nhi::handlers::sod::SodEnforcement,
+        xavyo_api_nhi::handlers::sod::SodRule,
+        xavyo_api_nhi::handlers::sod::CreateSodRuleRequest,
+        xavyo_api_nhi::handlers::sod::SodCheckRequest,
+        xavyo_api_nhi::handlers::sod::SodViolation,
+        xavyo_api_nhi::handlers::sod::SodCheckResult,
+        // Inactivity service types
+        xavyo_api_nhi::services::nhi_inactivity_service::InactiveEntity,
+        xavyo_api_nhi::services::nhi_inactivity_service::OrphanEntity,
+        xavyo_api_nhi::services::nhi_inactivity_service::AutoSuspendResult,
+        xavyo_api_nhi::services::nhi_inactivity_service::AutoSuspendFailure,
+        // Inactivity handler types
+        xavyo_api_nhi::handlers::inactivity::GracePeriodRequest,
+        // Agent handler types
+        xavyo_api_nhi::handlers::agents::CreateAgentRequest,
+        xavyo_api_nhi::handlers::agents::UpdateAgentRequest,
+        // Service Account handler types
+        xavyo_api_nhi::handlers::service_accounts::CreateServiceAccountRequest,
+        xavyo_api_nhi::handlers::service_accounts::UpdateServiceAccountRequest,
+        // Tool handler types
+        xavyo_api_nhi::handlers::tools::CreateToolRequest,
+        xavyo_api_nhi::handlers::tools::UpdateToolRequest,
     ))
 )]
 pub struct ApiDoc;

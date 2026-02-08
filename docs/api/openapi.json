@@ -44338,6 +44338,2411 @@
         ]
       }
     },
+    "/nhi": {
+      "get": {
+        "tags": [
+          "NHI"
+        ],
+        "summary": "GET /nhi — List all NHIs with optional type/state/owner filters.",
+        "operationId": "listNhis",
+        "parameters": [
+          {
+            "name": "nhi_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NhiType"
+                }
+              ],
+              "nullable": true
+            }
+          },
+          {
+            "name": "lifecycle_state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NhiLifecycleState"
+                }
+              ],
+              "nullable": true
+            }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of NHI identities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/agents": {
+      "get": {
+        "tags": [
+          "NHI Agents"
+        ],
+        "summary": "GET /nhi/agents — List agents with filters.",
+        "operationId": "listNhiAgents",
+        "parameters": [
+          {
+            "name": "agent_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "lifecycle_state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NhiLifecycleState"
+                }
+              ],
+              "nullable": true
+            }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "requires_human_approval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "team_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of agents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "NHI Agents"
+        ],
+        "summary": "POST /nhi/agents — Create a new agent.",
+        "operationId": "createNhiAgent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Agent created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiAgentWithIdentity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/agents/{agent_id}/tools": {
+      "get": {
+        "tags": [
+          "NHI Permissions"
+        ],
+        "summary": "GET /agents/{agent_id}/tools — List tools an agent has permission to use.",
+        "operationId": "listNhiAgentTools",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "description": "Agent NHI ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of tool permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/agents/{agent_id}/tools/{tool_id}/grant": {
+      "post": {
+        "tags": [
+          "NHI Permissions"
+        ],
+        "summary": "POST /agents/{agent_id}/tools/{tool_id}/grant — Grant an agent permission to use a tool.",
+        "operationId": "grantNhiToolPermission",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "description": "Agent NHI ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "tool_id",
+            "in": "path",
+            "description": "Tool NHI ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantPermissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Permission granted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiToolPermission"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Agent or tool not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/agents/{agent_id}/tools/{tool_id}/revoke": {
+      "post": {
+        "tags": [
+          "NHI Permissions"
+        ],
+        "summary": "POST /agents/{agent_id}/tools/{tool_id}/revoke — Revoke an agent's permission to use a tool.",
+        "operationId": "revokeNhiToolPermission",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "description": "Agent NHI ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "tool_id",
+            "in": "path",
+            "description": "Tool NHI ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Permission revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/agents/{id}": {
+      "get": {
+        "tags": [
+          "NHI Agents"
+        ],
+        "summary": "GET /nhi/agents/{id} — Get a specific agent.",
+        "operationId": "getNhiAgent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI agent ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiAgentWithIdentity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Agent not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "NHI Agents"
+        ],
+        "summary": "DELETE /nhi/agents/{id} — Delete an agent.",
+        "operationId": "deleteNhiAgent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI agent ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Agent deleted"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Agent not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "NHI Agents"
+        ],
+        "summary": "PATCH /nhi/agents/{id} — Update an agent.",
+        "operationId": "updateNhiAgent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI agent ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Agent updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiAgentWithIdentity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Agent not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/certifications": {
+      "get": {
+        "tags": [
+          "NHI Certifications"
+        ],
+        "summary": "GET /certifications — List certification campaigns for tenant.",
+        "operationId": "listNhiCertificationCampaigns",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of campaigns",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NhiCertificationCampaign"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "NHI Certifications"
+        ],
+        "summary": "POST /certifications — Create a certification campaign.",
+        "operationId": "createNhiCertificationCampaign",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCampaignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Campaign created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiCertificationCampaign"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/certifications/{campaign_id}/certify/{nhi_id}": {
+      "post": {
+        "tags": [
+          "NHI Certifications"
+        ],
+        "summary": "POST /certifications/:campaign_id/certify/:nhi_id — Certify an NHI entity.",
+        "operationId": "certifyNhi",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "description": "Certification campaign ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "nhi_id",
+            "in": "path",
+            "description": "NHI identity ID to certify",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NHI certified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertifyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or campaign state"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Campaign or NHI not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/certifications/{campaign_id}/revoke/{nhi_id}": {
+      "post": {
+        "tags": [
+          "NHI Certifications"
+        ],
+        "summary": "POST /certifications/:campaign_id/revoke/:nhi_id — Revoke certification,",
+        "description": "transitioning the NHI to Deprecated state.",
+        "operationId": "revokeNhiCertification",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "description": "Certification campaign ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "nhi_id",
+            "in": "path",
+            "description": "NHI identity ID to revoke",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Certification revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid campaign state"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Campaign or NHI not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/inactivity/auto-suspend": {
+      "post": {
+        "tags": [
+          "NHI Inactivity"
+        ],
+        "summary": "POST /inactivity/auto-suspend — Auto-suspend entities with expired grace periods.",
+        "description": "Admin-only endpoint that finds all entities with expired grace periods\nand transitions them to suspended state.",
+        "operationId": "autoSuspendNhis",
+        "responses": {
+          "200": {
+            "description": "Auto-suspend results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoSuspendResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/inactivity/detect": {
+      "get": {
+        "tags": [
+          "NHI Inactivity"
+        ],
+        "summary": "GET /inactivity/detect — Detect inactive NHI entities.",
+        "description": "Returns entities that have exceeded their configured inactivity threshold\nbut do not yet have a grace period set.",
+        "operationId": "detectInactiveNhis",
+        "responses": {
+          "200": {
+            "description": "List of inactive NHI entities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InactiveEntity"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/inactivity/grace-period/{id}": {
+      "post": {
+        "tags": [
+          "NHI Inactivity"
+        ],
+        "summary": "POST /inactivity/grace-period/{id} — Initiate a grace period for an entity.",
+        "description": "Sets a deadline after which the entity will be auto-suspended if still inactive.",
+        "operationId": "initiateNhiGracePeriod",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GracePeriodRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Grace period initiated"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "NHI identity not found"
+          },
+          "409": {
+            "description": "Grace period already active"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/orphans/detect": {
+      "get": {
+        "tags": [
+          "NHI Inactivity"
+        ],
+        "summary": "GET /orphans/detect — Detect orphaned NHI entities.",
+        "description": "Returns active entities whose owner is missing, deleted, or inactive,\nand that have no backup owner configured.",
+        "operationId": "detectOrphanNhis",
+        "responses": {
+          "200": {
+            "description": "List of orphaned NHI entities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrphanEntity"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/risk-summary": {
+      "get": {
+        "tags": [
+          "NHI Risk"
+        ],
+        "summary": "GET /risk-summary — Aggregate risk summary for tenant.",
+        "operationId": "getNhiRiskSummary",
+        "responses": {
+          "200": {
+            "description": "Aggregate risk summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/service-accounts": {
+      "get": {
+        "tags": [
+          "NHI Service Accounts"
+        ],
+        "summary": "GET /nhi/service-accounts — List service accounts with filters.",
+        "operationId": "listNhiServiceAccounts",
+        "parameters": [
+          {
+            "name": "environment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "lifecycle_state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NhiLifecycleState"
+                }
+              ],
+              "nullable": true
+            }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of service accounts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "NHI Service Accounts"
+        ],
+        "summary": "POST /nhi/service-accounts — Create a new service account.",
+        "operationId": "createNhiServiceAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateServiceAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Service account created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiServiceAccountWithIdentity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/service-accounts/{id}": {
+      "get": {
+        "tags": [
+          "NHI Service Accounts"
+        ],
+        "summary": "GET /nhi/service-accounts/{id} — Get a specific service account.",
+        "operationId": "getNhiServiceAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI service account ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Service account details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiServiceAccountWithIdentity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Service account not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "NHI Service Accounts"
+        ],
+        "summary": "DELETE /nhi/service-accounts/{id} — Delete a service account.",
+        "operationId": "deleteNhiServiceAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI service account ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Service account deleted"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Service account not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "NHI Service Accounts"
+        ],
+        "summary": "PATCH /nhi/service-accounts/{id} — Update a service account.",
+        "operationId": "updateNhiServiceAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI service account ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateServiceAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Service account updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiServiceAccountWithIdentity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Service account not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/sod/check": {
+      "post": {
+        "tags": [
+          "NHI SoD"
+        ],
+        "summary": "POST /sod/check — Check if granting a tool permission would violate SoD rules.",
+        "description": "Queries the agent's existing tool permissions and checks against all SoD rules\nto detect conflicts. Returns the list of violations and whether the grant is allowed.",
+        "operationId": "checkNhiSod",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SodCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "SoD check result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SodCheckResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/sod/rules": {
+      "get": {
+        "tags": [
+          "NHI SoD"
+        ],
+        "summary": "GET /sod/rules — List SoD rules for the tenant.",
+        "operationId": "listNhiSodRules",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of SoD rules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "NHI SoD"
+        ],
+        "summary": "POST /sod/rules — Create a SoD rule.",
+        "operationId": "createNhiSodRule",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSodRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "SoD rule created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SodRule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/sod/rules/{id}": {
+      "delete": {
+        "tags": [
+          "NHI SoD"
+        ],
+        "summary": "DELETE /sod/rules/{id} — Delete a SoD rule.",
+        "operationId": "deleteNhiSodRule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "SoD rule ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "SoD rule deleted"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "SoD rule not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/tools": {
+      "get": {
+        "tags": [
+          "NHI Tools"
+        ],
+        "summary": "GET /nhi/tools — List tools with filters.",
+        "operationId": "listNhiTools",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "lifecycle_state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NhiLifecycleState"
+                }
+              ],
+              "nullable": true
+            }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "requires_approval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "provider_verified",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of tools",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "NHI Tools"
+        ],
+        "summary": "POST /nhi/tools — Create a new tool.",
+        "operationId": "createNhiTool",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateToolRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Tool created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiToolWithIdentity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/tools/{id}": {
+      "get": {
+        "tags": [
+          "NHI Tools"
+        ],
+        "summary": "GET /nhi/tools/{id} — Get a specific tool.",
+        "operationId": "getNhiTool",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI tool ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tool details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiToolWithIdentity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Tool not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "NHI Tools"
+        ],
+        "summary": "DELETE /nhi/tools/{id} — Delete a tool.",
+        "operationId": "deleteNhiTool",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI tool ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Tool deleted"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Tool not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "NHI Tools"
+        ],
+        "summary": "PATCH /nhi/tools/{id} — Update a tool.",
+        "operationId": "updateNhiTool",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI tool ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateToolRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Tool updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiToolWithIdentity"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Tool not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/tools/{tool_id}/agents": {
+      "get": {
+        "tags": [
+          "NHI Permissions"
+        ],
+        "summary": "GET /tools/{tool_id}/agents — List agents with permission to use a tool.",
+        "operationId": "listNhiToolAgents",
+        "parameters": [
+          {
+            "name": "tool_id",
+            "in": "path",
+            "description": "Tool NHI ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of agent permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/{id}": {
+      "get": {
+        "tags": [
+          "NHI"
+        ],
+        "summary": "GET /nhi/{id} — Get a specific NHI by ID with type-specific extension data.",
+        "operationId": "getNhi",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NHI identity detail with type-specific extension",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiIdentityDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "NHI identity not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/{id}/activate": {
+      "post": {
+        "tags": [
+          "NHI Lifecycle"
+        ],
+        "summary": "POST /nhi/{id}/activate — Activate an inactive NHI identity.",
+        "operationId": "activateNhi",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NHI activated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiIdentity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "NHI identity not found"
+          },
+          "409": {
+            "description": "Invalid lifecycle transition"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/{id}/archive": {
+      "post": {
+        "tags": [
+          "NHI Lifecycle"
+        ],
+        "summary": "POST /nhi/{id}/archive — Archive a deprecated NHI identity (terminal).",
+        "description": "This cascade-revokes all tool permissions and deactivates all credentials.",
+        "operationId": "archiveNhi",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NHI archived successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiIdentity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "NHI identity not found"
+          },
+          "409": {
+            "description": "Invalid lifecycle transition"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/{id}/deactivate": {
+      "post": {
+        "tags": [
+          "NHI Lifecycle"
+        ],
+        "summary": "POST /nhi/{id}/deactivate — Deactivate an active NHI identity.",
+        "operationId": "deactivateNhi",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NHI deactivated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiIdentity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "NHI identity not found"
+          },
+          "409": {
+            "description": "Invalid lifecycle transition"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/{id}/deprecate": {
+      "post": {
+        "tags": [
+          "NHI Lifecycle"
+        ],
+        "summary": "POST /nhi/{id}/deprecate — Mark an NHI identity as deprecated.",
+        "operationId": "deprecateNhi",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NHI deprecated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiIdentity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "NHI identity not found"
+          },
+          "409": {
+            "description": "Invalid lifecycle transition"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/{id}/reactivate": {
+      "post": {
+        "tags": [
+          "NHI Lifecycle"
+        ],
+        "summary": "POST /nhi/{id}/reactivate — Reactivate a suspended NHI identity.",
+        "operationId": "reactivateNhi",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "NHI reactivated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiIdentity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "NHI identity not found"
+          },
+          "409": {
+            "description": "Invalid lifecycle transition"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/{id}/risk": {
+      "get": {
+        "tags": [
+          "NHI Risk"
+        ],
+        "summary": "GET /{id}/risk — Compute and return risk breakdown for a specific NHI.",
+        "operationId": "getNhiRisk",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Risk breakdown computed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskBreakdown"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "NHI identity not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/{id}/suspend": {
+      "post": {
+        "tags": [
+          "NHI Lifecycle"
+        ],
+        "summary": "POST /nhi/{id}/suspend — Suspend an NHI identity.",
+        "operationId": "suspendNhi",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuspendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "NHI suspended successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NhiIdentity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "NHI identity not found"
+          },
+          "409": {
+            "description": "Invalid lifecycle transition"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/{nhi_id}/credentials": {
+      "get": {
+        "tags": [
+          "NHI Credentials"
+        ],
+        "summary": "`GET /nhi/{id}/credentials` — List credentials for an NHI.",
+        "description": "Requires admin role. The `credential_hash` field is excluded from the response\nvia `#[serde(skip_serializing)]` on the model.",
+        "operationId": "listNhiCredentials",
+        "parameters": [
+          {
+            "name": "nhi_id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NhiCredential"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "NHI Credentials"
+        ],
+        "summary": "`POST /nhi/{id}/credentials` — Issue a new credential for an NHI.",
+        "description": "Requires admin role. Returns the credential record and the plaintext secret\n(returned exactly once).",
+        "operationId": "issueNhiCredential",
+        "parameters": [
+          {
+            "name": "nhi_id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueCredentialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Credential issued successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialIssuedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "NHI identity not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/{nhi_id}/credentials/{credential_id}": {
+      "delete": {
+        "tags": [
+          "NHI Credentials"
+        ],
+        "summary": "`DELETE /nhi/{id}/credentials/{credential_id}` — Revoke a credential.",
+        "description": "Requires admin role. Sets the credential's `is_active` flag to false.",
+        "operationId": "revokeNhiCredential",
+        "parameters": [
+          {
+            "name": "nhi_id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "credential_id",
+            "in": "path",
+            "description": "Credential ID to revoke",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Credential revoked successfully"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Credential not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/nhi/{nhi_id}/credentials/{credential_id}/rotate": {
+      "post": {
+        "tags": [
+          "NHI Credentials"
+        ],
+        "summary": "`POST /nhi/{id}/credentials/{credential_id}/rotate` — Rotate a credential.",
+        "description": "Requires admin role. Issues a new credential and sets the old one to expire\nafter the specified grace period. Returns the new credential with its plaintext.",
+        "operationId": "rotateNhiCredential",
+        "parameters": [
+          {
+            "name": "nhi_id",
+            "in": "path",
+            "description": "NHI identity ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "credential_id",
+            "in": "path",
+            "description": "Credential ID to rotate",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RotateCredentialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Credential rotated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialIssuedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Credential not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/oauth/authorize": {
       "get": {
         "tags": [
@@ -47744,6 +50149,46 @@
           }
         }
       },
+      "AgentExtension": {
+        "type": "object",
+        "required": [
+          "agent_type",
+          "max_token_lifetime_secs",
+          "requires_human_approval"
+        ],
+        "properties": {
+          "agent_card_signature": {
+            "type": "string",
+            "nullable": true
+          },
+          "agent_card_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "agent_type": {
+            "type": "string"
+          },
+          "max_token_lifetime_secs": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "model_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "model_provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "model_version": {
+            "type": "string",
+            "nullable": true
+          },
+          "requires_human_approval": {
+            "type": "boolean"
+          }
+        }
+      },
       "AgentListResponse": {
         "type": "object",
         "description": "List response for agents with pagination.",
@@ -49927,6 +52372,46 @@
           }
         }
       },
+      "AutoSuspendFailure": {
+        "type": "object",
+        "description": "A failed auto-suspend attempt.",
+        "required": [
+          "id",
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "AutoSuspendResult": {
+        "type": "object",
+        "description": "Result of an auto-suspend operation.",
+        "required": [
+          "suspended",
+          "failed"
+        ],
+        "properties": {
+          "failed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutoSuspendFailure"
+            }
+          },
+          "suspended": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "AvailableMethodsResponse": {
         "type": "object",
         "description": "Response showing available passwordless methods for the tenant.",
@@ -51797,6 +54282,33 @@
           }
         }
       },
+      "CertifyResponse": {
+        "type": "object",
+        "required": [
+          "nhi_id",
+          "certified_by",
+          "certified_at"
+        ],
+        "properties": {
+          "certified_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "certified_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "next_certification_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "nhi_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "CheckPermissionRequest": {
         "type": "object",
         "description": "Check permission request body.",
@@ -53579,87 +56091,76 @@
       },
       "CreateAgentRequest": {
         "type": "object",
-        "description": "Request to create a new AI agent.",
         "required": [
           "name",
           "agent_type"
         ],
         "properties": {
-          "agent_type": {
+          "agent_card_signature": {
             "type": "string",
-            "description": "Agent type: autonomous, copilot, workflow, orchestrator."
+            "nullable": true
+          },
+          "agent_card_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "agent_type": {
+            "type": "string"
           },
           "backup_owner_id": {
             "type": "string",
             "format": "uuid",
-            "description": "Backup owner ID for governance continuity (F108).",
             "nullable": true
           },
           "description": {
             "type": "string",
-            "description": "Agent description.",
             "nullable": true
           },
           "expires_at": {
             "type": "string",
             "format": "date-time",
-            "description": "Optional expiration date.",
             "nullable": true
           },
           "inactivity_threshold_days": {
             "type": "integer",
             "format": "int32",
-            "description": "Days of inactivity before agent enters grace period (F108).",
             "nullable": true
           },
           "max_token_lifetime_secs": {
             "type": "integer",
-            "format": "int32",
-            "description": "Maximum OAuth token lifetime in seconds. Default: 900 (15 min)."
+            "format": "int32"
           },
           "model_name": {
             "type": "string",
-            "description": "Model name (e.g., claude-sonnet-4, gpt-4).",
             "nullable": true
           },
           "model_provider": {
             "type": "string",
-            "description": "Model provider (e.g., anthropic, openai, google).",
             "nullable": true
           },
           "model_version": {
             "type": "string",
-            "description": "Model version.",
             "nullable": true
           },
           "name": {
-            "type": "string",
-            "description": "Agent display name (unique per tenant)."
+            "type": "string"
           },
           "owner_id": {
             "type": "string",
             "format": "uuid",
-            "description": "User ID of the agent owner.",
             "nullable": true
           },
           "requires_human_approval": {
-            "type": "boolean",
-            "description": "Require human approval for sensitive operations."
-          },
-          "risk_level": {
-            "type": "string",
-            "description": "Risk level: low, medium, high, critical. Default: medium."
+            "type": "boolean"
           },
           "rotation_interval_days": {
             "type": "integer",
             "format": "int32",
-            "description": "Days between required credential rotations (F108).",
             "nullable": true
           },
           "team_id": {
             "type": "string",
             "format": "uuid",
-            "description": "Team/group ID associated with this agent.",
             "nullable": true
           }
         }
@@ -54076,49 +56577,36 @@
       },
       "CreateCampaignRequest": {
         "type": "object",
-        "description": "Request to create a new certification campaign.",
         "required": [
-          "name",
-          "scope_type",
-          "reviewer_type",
-          "deadline"
+          "name"
         ],
         "properties": {
-          "deadline": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Campaign deadline (must be in the future)."
-          },
           "description": {
             "type": "string",
-            "description": "Campaign description.",
+            "nullable": true
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date-time",
             "nullable": true
           },
           "name": {
+            "type": "string"
+          },
+          "nhi_type_filter": {
             "type": "string",
-            "description": "Campaign display name (1-255 characters)."
-          },
-          "reviewer_type": {
-            "$ref": "#/components/schemas/CertReviewerType"
-          },
-          "scope_config": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ScopeConfig"
-              }
-            ],
             "nullable": true
           },
-          "scope_type": {
-            "$ref": "#/components/schemas/CertScopeType"
+          "scope": {
+            "type": "string",
+            "nullable": true
           },
-          "specific_reviewers": {
+          "specific_nhi_ids": {
             "type": "array",
             "items": {
               "type": "string",
               "format": "uuid"
             },
-            "description": "Specific reviewer user IDs (required when `reviewer_type` is `specific_users`).",
             "nullable": true
           }
         }
@@ -55668,6 +58156,54 @@
           }
         }
       },
+      "CreateServiceAccountRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "purpose"
+        ],
+        "properties": {
+          "backup_owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "environment": {
+            "type": "string",
+            "nullable": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "inactivity_threshold_days": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "rotation_interval_days": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
       "CreateServiceProviderRequest": {
         "type": "object",
         "description": "Request to create a new Service Provider",
@@ -55877,40 +58413,27 @@
       },
       "CreateSodRuleRequest": {
         "type": "object",
-        "description": "Request to create a new `SoD` rule.",
+        "description": "Request to create a SoD rule.",
         "required": [
-          "name",
-          "first_entitlement_id",
-          "second_entitlement_id",
-          "severity"
+          "tool_id_a",
+          "tool_id_b",
+          "enforcement"
         ],
         "properties": {
-          "business_rationale": {
-            "type": "string",
-            "description": "Business rationale for the rule.",
-            "nullable": true
-          },
           "description": {
             "type": "string",
-            "description": "Optional description.",
             "nullable": true
           },
-          "first_entitlement_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "First conflicting entitlement ID."
+          "enforcement": {
+            "$ref": "#/components/schemas/SodEnforcement"
           },
-          "name": {
+          "tool_id_a": {
             "type": "string",
-            "description": "Display name for the rule."
+            "format": "uuid"
           },
-          "second_entitlement_id": {
+          "tool_id_b": {
             "type": "string",
-            "format": "uuid",
-            "description": "Second conflicting entitlement ID."
-          },
-          "severity": {
-            "$ref": "#/components/schemas/GovSodSeverity"
+            "format": "uuid"
           }
         }
       },
@@ -56004,52 +58527,69 @@
       },
       "CreateToolRequest": {
         "type": "object",
-        "description": "Request to create a new tool.",
         "required": [
           "name",
-          "input_schema",
-          "risk_level"
+          "input_schema"
         ],
         "properties": {
+          "backup_owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
           "category": {
             "type": "string",
-            "description": "Tool category (e.g., communication, data, system).",
+            "nullable": true
+          },
+          "checksum": {
+            "type": "string",
             "nullable": true
           },
           "description": {
             "type": "string",
-            "description": "Tool description.",
             "nullable": true
           },
-          "input_schema": {
-            "description": "JSON Schema for tool input parameters."
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
+          "inactivity_threshold_days": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "input_schema": {},
           "max_calls_per_hour": {
             "type": "integer",
             "format": "int32",
-            "description": "Maximum calls per hour (rate limiting).",
             "nullable": true
           },
           "name": {
-            "type": "string",
-            "description": "Tool name (unique per tenant)."
+            "type": "string"
           },
           "output_schema": {
-            "description": "JSON Schema for expected output (optional).",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
             "nullable": true
           },
           "provider": {
             "type": "string",
-            "description": "Tool provider (e.g., internal, mcp:service).",
             "nullable": true
           },
-          "requires_approval": {
-            "type": "boolean",
-            "description": "Whether tool invocation requires approval."
+          "provider_verified": {
+            "type": "boolean"
           },
-          "risk_level": {
-            "type": "string",
-            "description": "Risk level: low, medium, high, critical."
+          "requires_approval": {
+            "type": "boolean"
+          },
+          "rotation_interval_days": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
@@ -56251,6 +58791,22 @@
               "type": "string"
             },
             "nullable": true
+          }
+        }
+      },
+      "CredentialIssuedResponse": {
+        "type": "object",
+        "description": "Response returned when a credential is issued or rotated.\n\nThe `secret` field contains the plaintext credential, which is returned\nexactly once and never stored.",
+        "required": [
+          "credential",
+          "secret"
+        ],
+        "properties": {
+          "credential": {
+            "$ref": "#/components/schemas/NhiCredential"
+          },
+          "secret": {
+            "type": "string"
           }
         }
       },
@@ -59986,38 +62542,26 @@
           "critical"
         ]
       },
-      "GrantPermissionRequest": {
+      "GracePeriodRequest": {
         "type": "object",
-        "description": "Request to grant a tool permission to an agent.",
+        "description": "Request body for initiating a grace period.",
         "required": [
-          "tool_id"
+          "grace_days"
         ],
         "properties": {
-          "allowed_parameters": {
-            "description": "Parameter restrictions (JSON object).",
-            "nullable": true
-          },
+          "grace_days": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "GrantPermissionRequest": {
+        "type": "object",
+        "properties": {
           "expires_at": {
             "type": "string",
             "format": "date-time",
-            "description": "Permission expiration date.",
             "nullable": true
-          },
-          "max_calls_per_hour": {
-            "type": "integer",
-            "format": "int32",
-            "description": "Override tool's max calls per hour.",
-            "nullable": true
-          },
-          "requires_approval": {
-            "type": "boolean",
-            "description": "Override tool's approval requirement.",
-            "nullable": true
-          },
-          "tool_id": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Tool ID to grant permission for."
           }
         }
       },
@@ -60417,6 +62961,47 @@
           "warning"
         ]
       },
+      "InactiveEntity": {
+        "type": "object",
+        "description": "An NHI entity that has exceeded its inactivity threshold.",
+        "required": [
+          "id",
+          "name",
+          "nhi_type",
+          "days_inactive",
+          "threshold_days"
+        ],
+        "properties": {
+          "days_inactive": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "grace_period_ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_activity_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "nhi_type": {
+            "type": "string"
+          },
+          "threshold_days": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "InboundChangeResponse": {
         "type": "object",
         "description": "Response for an inbound change.",
@@ -60804,6 +63389,25 @@
           }
         }
       },
+      "IssueCredentialRequest": {
+        "type": "object",
+        "description": "Request body for issuing a new credential.",
+        "required": [
+          "credential_type"
+        ],
+        "properties": {
+          "credential_type": {
+            "type": "string",
+            "description": "Type of credential: \"api_key\", \"secret\", or \"certificate\"."
+          },
+          "valid_days": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Validity period in days. Defaults to 90.",
+            "nullable": true
+          }
+        }
+      },
       "ItemListResponse": {
         "type": "object",
         "description": "Paginated list of items.",
@@ -61029,6 +63633,22 @@
               "$ref": "#/components/schemas/Jwk"
             },
             "description": "Array of JWKs."
+          }
+        }
+      },
+      "LevelRiskSummary": {
+        "type": "object",
+        "required": [
+          "level",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "level": {
+            "type": "string"
           }
         }
       },
@@ -65032,6 +67652,43 @@
           "certificate"
         ]
       },
+      "NhiIdentityDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NhiIdentity"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "agent": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/AgentExtension"
+                  }
+                ],
+                "nullable": true
+              },
+              "service_account": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/ServiceAccountExtension"
+                  }
+                ],
+                "nullable": true
+              },
+              "tool": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/ToolExtension"
+                  }
+                ],
+                "nullable": true
+              }
+            }
+          }
+        ],
+        "description": "Polymorphic NHI detail — base identity + optional type-specific extension."
+      },
       "NhiListResponse": {
         "type": "object",
         "description": "Paginated list of NHIs.",
@@ -66322,6 +68979,36 @@
             "type": "string",
             "format": "uuid",
             "description": "The user identified as orphan."
+          }
+        }
+      },
+      "OrphanEntity": {
+        "type": "object",
+        "description": "An NHI entity whose owner is missing or inactive.",
+        "required": [
+          "id",
+          "name",
+          "nhi_type",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nhi_type": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string"
           }
         }
       },
@@ -70113,6 +72800,26 @@
           }
         }
       },
+      "RevokeResponse": {
+        "type": "object",
+        "required": [
+          "nhi_id",
+          "revoked",
+          "new_state"
+        ],
+        "properties": {
+          "new_state": {
+            "type": "string"
+          },
+          "nhi_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revoked": {
+            "type": "boolean"
+          }
+        }
+      },
       "RevokeTokenRequest": {
         "type": "object",
         "required": [
@@ -70241,6 +72948,42 @@
           }
         }
       },
+      "RiskBreakdown": {
+        "type": "object",
+        "description": "Complete risk breakdown for an NHI entity.",
+        "required": [
+          "nhi_id",
+          "total_score",
+          "risk_level",
+          "common_factors",
+          "type_specific_factors"
+        ],
+        "properties": {
+          "common_factors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RiskFactor"
+            }
+          },
+          "nhi_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "risk_level": {
+            "type": "string"
+          },
+          "total_score": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "type_specific_factors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RiskFactor"
+            }
+          }
+        }
+      },
       "RiskEnforcementResponse": {
         "type": "object",
         "description": "Risk enforcement check response.",
@@ -70277,6 +73020,32 @@
             "type": "string",
             "format": "uuid",
             "description": "User ID."
+          }
+        }
+      },
+      "RiskFactor": {
+        "type": "object",
+        "description": "Individual risk factor with score and weight.",
+        "required": [
+          "name",
+          "score",
+          "weight",
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number",
+            "format": "double"
+          },
+          "weight": {
+            "type": "number",
+            "format": "double"
           }
         }
       },
@@ -70603,6 +73372,33 @@
             "type": "integer",
             "format": "int64",
             "description": "Total users with scores."
+          }
+        }
+      },
+      "RiskSummary": {
+        "type": "object",
+        "description": "Risk summary aggregation.",
+        "required": [
+          "total_entities",
+          "by_type",
+          "by_level"
+        ],
+        "properties": {
+          "by_level": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LevelRiskSummary"
+            }
+          },
+          "by_type": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TypeRiskSummary"
+            }
+          },
+          "total_entities": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -71160,6 +73956,18 @@
             "type": "integer",
             "format": "int32",
             "description": "The version number to rollback to."
+          }
+        }
+      },
+      "RotateCredentialRequest": {
+        "type": "object",
+        "description": "Request body for rotating a credential.",
+        "properties": {
+          "grace_period_hours": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grace period in hours for the old credential. Defaults to 24.",
+            "nullable": true
           }
         }
       },
@@ -72555,6 +75363,21 @@
           }
         }
       },
+      "ServiceAccountExtension": {
+        "type": "object",
+        "required": [
+          "purpose"
+        ],
+        "properties": {
+          "environment": {
+            "type": "string",
+            "nullable": true
+          },
+          "purpose": {
+            "type": "string"
+          }
+        }
+      },
       "ServiceProviderListResponse": {
         "type": "object",
         "description": "Service Provider list response",
@@ -73602,6 +76425,97 @@
           }
         }
       },
+      "SodCheckRequest": {
+        "type": "object",
+        "description": "Request to check SoD violations.",
+        "required": [
+          "agent_id",
+          "tool_id"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tool_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SodCheckResult": {
+        "type": "object",
+        "description": "Result of a SoD check.",
+        "required": [
+          "violations",
+          "is_allowed"
+        ],
+        "properties": {
+          "is_allowed": {
+            "type": "boolean"
+          },
+          "violations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SodViolation"
+            }
+          }
+        }
+      },
+      "SodEnforcement": {
+        "type": "string",
+        "description": "Enforcement level for a SoD rule.",
+        "enum": [
+          "prevent",
+          "warn"
+        ]
+      },
+      "SodRule": {
+        "type": "object",
+        "description": "A Separation of Duties rule.",
+        "required": [
+          "id",
+          "tenant_id",
+          "tool_id_a",
+          "tool_id_b",
+          "enforcement",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "enforcement": {
+            "$ref": "#/components/schemas/SodEnforcement"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tool_id_a": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tool_id_b": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "SodRuleListResponse": {
         "type": "object",
         "description": "Paginated list of `SoD` rules.",
@@ -73700,6 +76614,32 @@
             "type": "string",
             "format": "date-time",
             "description": "Last update timestamp."
+          }
+        }
+      },
+      "SodViolation": {
+        "type": "object",
+        "description": "A single SoD violation found during a check.",
+        "required": [
+          "rule_id",
+          "conflicting_tool_id",
+          "enforcement"
+        ],
+        "properties": {
+          "conflicting_tool_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "enforcement": {
+            "$ref": "#/components/schemas/SodEnforcement"
+          },
+          "rule_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -74114,6 +77054,16 @@
           },
           "reason": {
             "$ref": "#/components/schemas/NhiSuspensionReason"
+          }
+        }
+      },
+      "SuspendRequest": {
+        "type": "object",
+        "description": "Request body for the suspend endpoint.",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -75259,6 +78209,43 @@
           }
         }
       },
+      "ToolExtension": {
+        "type": "object",
+        "required": [
+          "input_schema",
+          "requires_approval",
+          "provider_verified"
+        ],
+        "properties": {
+          "category": {
+            "type": "string",
+            "nullable": true
+          },
+          "checksum": {
+            "type": "string",
+            "nullable": true
+          },
+          "input_schema": {},
+          "max_calls_per_hour": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "output_schema": {
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "provider_verified": {
+            "type": "boolean"
+          },
+          "requires_approval": {
+            "type": "boolean"
+          }
+        }
+      },
       "ToolListResponse": {
         "type": "object",
         "description": "List response for tools with pagination.",
@@ -75785,68 +78772,99 @@
           }
         }
       },
+      "TypeRiskSummary": {
+        "type": "object",
+        "required": [
+          "nhi_type",
+          "count",
+          "avg_score"
+        ],
+        "properties": {
+          "avg_score": {
+            "type": "number",
+            "format": "double"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nhi_type": {
+            "type": "string"
+          }
+        }
+      },
       "UpdateAgentRequest": {
         "type": "object",
-        "description": "Request to update an AI agent.",
         "properties": {
+          "agent_card_signature": {
+            "type": "string",
+            "nullable": true
+          },
+          "agent_card_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "agent_type": {
+            "type": "string",
+            "nullable": true
+          },
           "backup_owner_id": {
             "type": "string",
             "format": "uuid",
-            "description": "Updated backup owner ID (F108).",
             "nullable": true
           },
           "description": {
             "type": "string",
-            "description": "Updated description.",
             "nullable": true
           },
           "expires_at": {
             "type": "string",
             "format": "date-time",
-            "description": "Updated expiration date.",
             "nullable": true
           },
           "inactivity_threshold_days": {
             "type": "integer",
             "format": "int32",
-            "description": "Updated inactivity threshold in days (F108).",
             "nullable": true
           },
           "max_token_lifetime_secs": {
             "type": "integer",
             "format": "int32",
-            "description": "Updated max token lifetime.",
             "nullable": true
           },
           "model_name": {
             "type": "string",
-            "description": "Updated model name.",
             "nullable": true
           },
           "model_provider": {
             "type": "string",
-            "description": "Updated model provider.",
             "nullable": true
           },
           "model_version": {
             "type": "string",
-            "description": "Updated model version.",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
             "nullable": true
           },
           "requires_human_approval": {
             "type": "boolean",
-            "description": "Updated human approval requirement.",
-            "nullable": true
-          },
-          "risk_level": {
-            "type": "string",
-            "description": "Updated risk level.",
             "nullable": true
           },
           "rotation_interval_days": {
             "type": "integer",
             "format": "int32",
-            "description": "Updated rotation interval in days (F108).",
+            "nullable": true
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
             "nullable": true
           }
         }
@@ -77379,6 +80397,52 @@
           }
         }
       },
+      "UpdateServiceAccountRequest": {
+        "type": "object",
+        "properties": {
+          "backup_owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "environment": {
+            "type": "string",
+            "nullable": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "inactivity_threshold_days": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "purpose": {
+            "type": "string",
+            "nullable": true
+          },
+          "rotation_interval_days": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
       "UpdateServiceProviderRequest": {
         "type": "object",
         "description": "Request to update a Service Provider",
@@ -77699,50 +80763,69 @@
       },
       "UpdateToolRequest": {
         "type": "object",
-        "description": "Request to update an existing tool.",
         "properties": {
+          "backup_owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
           "category": {
             "type": "string",
-            "description": "Updated category.",
+            "nullable": true
+          },
+          "checksum": {
+            "type": "string",
             "nullable": true
           },
           "description": {
             "type": "string",
-            "description": "Updated description.",
+            "nullable": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "inactivity_threshold_days": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           },
           "input_schema": {
-            "description": "Updated input schema.",
             "nullable": true
           },
           "max_calls_per_hour": {
             "type": "integer",
             "format": "int32",
-            "description": "Updated max calls per hour.",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
             "nullable": true
           },
           "output_schema": {
-            "description": "Updated output schema.",
+            "nullable": true
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
             "nullable": true
           },
           "provider": {
             "type": "string",
-            "description": "Updated provider.",
+            "nullable": true
+          },
+          "provider_verified": {
+            "type": "boolean",
             "nullable": true
           },
           "requires_approval": {
             "type": "boolean",
-            "description": "Updated approval requirement.",
             "nullable": true
           },
-          "risk_level": {
-            "type": "string",
-            "description": "Updated risk level.",
-            "nullable": true
-          },
-          "status": {
-            "type": "string",
-            "description": "Updated status.",
+          "rotation_interval_days": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           }
         }
@@ -79566,6 +82649,50 @@
     {
       "name": "NHI - Approvals",
       "description": "Human-in-the-loop approval workflow for agent tool invocations"
+    },
+    {
+      "name": "NHI",
+      "description": "Unified Non-Human Identity list and detail endpoints"
+    },
+    {
+      "name": "NHI Lifecycle",
+      "description": "NHI lifecycle state transitions (suspend, reactivate, deprecate, archive, deactivate, activate)"
+    },
+    {
+      "name": "NHI Credentials",
+      "description": "NHI credential issuance, rotation, and revocation"
+    },
+    {
+      "name": "NHI Certifications",
+      "description": "NHI certification campaign management"
+    },
+    {
+      "name": "NHI Permissions",
+      "description": "Agent-to-tool permission grants and queries"
+    },
+    {
+      "name": "NHI Risk",
+      "description": "NHI risk scoring and summary"
+    },
+    {
+      "name": "NHI SoD",
+      "description": "NHI Separation of Duties rule management and validation"
+    },
+    {
+      "name": "NHI Inactivity",
+      "description": "NHI inactivity detection, auto-suspend, and orphan management"
+    },
+    {
+      "name": "NHI Agents",
+      "description": "NHI AI agent type-specific CRUD"
+    },
+    {
+      "name": "NHI Service Accounts",
+      "description": "NHI service account type-specific CRUD"
+    },
+    {
+      "name": "NHI Tools",
+      "description": "NHI tool type-specific CRUD"
     }
   ]
 }

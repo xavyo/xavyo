@@ -28,6 +28,7 @@ use crate::state::NhiState;
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
 pub struct ListNhiQuery {
     pub nhi_type: Option<NhiType>,
     pub lifecycle_state: Option<NhiLifecycleState>,
@@ -37,6 +38,7 @@ pub struct ListNhiQuery {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
     pub total: i64,
@@ -46,6 +48,7 @@ pub struct PaginatedResponse<T: Serialize> {
 
 /// Polymorphic NHI detail — base identity + optional type-specific extension.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct NhiIdentityDetail {
     #[serde(flatten)]
     pub identity: NhiIdentity,
@@ -58,6 +61,7 @@ pub struct NhiIdentityDetail {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ToolExtension {
     pub category: Option<String>,
     pub input_schema: serde_json::Value,
@@ -70,6 +74,7 @@ pub struct ToolExtension {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AgentExtension {
     pub agent_type: String,
     pub model_provider: Option<String>,
@@ -82,6 +87,7 @@ pub struct AgentExtension {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ServiceAccountExtension {
     pub purpose: String,
     pub environment: Option<String>,
@@ -92,7 +98,19 @@ pub struct ServiceAccountExtension {
 // ---------------------------------------------------------------------------
 
 /// GET /nhi — List all NHIs with optional type/state/owner filters.
-async fn list_nhis(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi",
+    tag = "NHI",
+    operation_id = "listNhis",
+    params(ListNhiQuery),
+    responses(
+        (status = 200, description = "Paginated list of NHI identities", body = PaginatedResponse<NhiIdentity>),
+        (status = 401, description = "Authentication required")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn list_nhis(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Query(query): Query<ListNhiQuery>,
@@ -119,7 +137,22 @@ async fn list_nhis(
 }
 
 /// GET /nhi/{id} — Get a specific NHI by ID with type-specific extension data.
-async fn get_nhi(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/{id}",
+    tag = "NHI",
+    operation_id = "getNhi",
+    params(
+        ("id" = Uuid, Path, description = "NHI identity ID")
+    ),
+    responses(
+        (status = 200, description = "NHI identity detail with type-specific extension", body = NhiIdentityDetail),
+        (status = 401, description = "Authentication required"),
+        (status = 404, description = "NHI identity not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn get_nhi(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Path(id): Path<Uuid>,

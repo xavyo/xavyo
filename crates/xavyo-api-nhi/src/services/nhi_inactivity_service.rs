@@ -17,6 +17,7 @@ use xavyo_nhi::NhiLifecycleState;
 
 /// An NHI entity that has exceeded its inactivity threshold.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct InactiveEntity {
     pub id: Uuid,
     pub name: String,
@@ -29,6 +30,7 @@ pub struct InactiveEntity {
 
 /// An NHI entity whose owner is missing or inactive.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct OrphanEntity {
     pub id: Uuid,
     pub name: String,
@@ -39,6 +41,7 @@ pub struct OrphanEntity {
 
 /// Result of an auto-suspend operation.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AutoSuspendResult {
     pub suspended: Vec<Uuid>,
     pub failed: Vec<AutoSuspendFailure>,
@@ -46,6 +49,7 @@ pub struct AutoSuspendResult {
 
 /// A failed auto-suspend attempt.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AutoSuspendFailure {
     pub id: Uuid,
     pub error: String,

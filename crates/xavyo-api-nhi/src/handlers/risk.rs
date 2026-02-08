@@ -18,7 +18,22 @@ use crate::services::nhi_risk_service::NhiRiskService;
 use crate::state::NhiState;
 
 /// GET /{id}/risk — Compute and return risk breakdown for a specific NHI.
-async fn get_risk(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/{id}/risk",
+    tag = "NHI Risk",
+    operation_id = "getNhiRisk",
+    params(
+        ("id" = Uuid, Path, description = "NHI identity ID")
+    ),
+    responses(
+        (status = 200, description = "Risk breakdown computed", body = RiskBreakdown),
+        (status = 401, description = "Authentication required"),
+        (status = 404, description = "NHI identity not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn get_risk(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Path(id): Path<Uuid>,
@@ -29,7 +44,18 @@ async fn get_risk(
 }
 
 /// GET /risk-summary — Aggregate risk summary for tenant.
-async fn get_risk_summary(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/risk-summary",
+    tag = "NHI Risk",
+    operation_id = "getNhiRiskSummary",
+    responses(
+        (status = 200, description = "Aggregate risk summary", body = RiskSummary),
+        (status = 401, description = "Authentication required")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn get_risk_summary(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
 ) -> Result<impl IntoResponse, NhiApiError> {

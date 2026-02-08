@@ -36,6 +36,7 @@ use crate::state::NhiState;
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize, Validate)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CreateServiceAccountRequest {
     #[validate(length(min = 1, max = 255))]
     pub name: String,
@@ -52,6 +53,7 @@ pub struct CreateServiceAccountRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UpdateServiceAccountRequest {
     // Base fields
     pub name: Option<String>,
@@ -67,6 +69,7 @@ pub struct UpdateServiceAccountRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
 pub struct ListServiceAccountsQuery {
     pub environment: Option<String>,
     pub lifecycle_state: Option<NhiLifecycleState>,
@@ -76,6 +79,7 @@ pub struct ListServiceAccountsQuery {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
     pub total: i64,
@@ -88,7 +92,21 @@ pub struct PaginatedResponse<T: Serialize> {
 // ---------------------------------------------------------------------------
 
 /// POST /nhi/service-accounts — Create a new service account.
-async fn create_service_account(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/service-accounts",
+    tag = "NHI Service Accounts",
+    operation_id = "createNhiServiceAccount",
+    request_body = CreateServiceAccountRequest,
+    responses(
+        (status = 201, description = "Service account created successfully", body = NhiServiceAccountWithIdentity),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn create_service_account(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -160,7 +178,19 @@ async fn create_service_account(
 }
 
 /// GET /nhi/service-accounts — List service accounts with filters.
-async fn list_service_accounts(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/service-accounts",
+    tag = "NHI Service Accounts",
+    operation_id = "listNhiServiceAccounts",
+    params(ListServiceAccountsQuery),
+    responses(
+        (status = 200, description = "Paginated list of service accounts", body = PaginatedResponse<NhiServiceAccountWithIdentity>),
+        (status = 401, description = "Authentication required")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn list_service_accounts(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Query(query): Query<ListServiceAccountsQuery>,
@@ -230,7 +260,22 @@ async fn count_service_accounts(
 }
 
 /// GET /nhi/service-accounts/{id} — Get a specific service account.
-async fn get_service_account(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/service-accounts/{id}",
+    tag = "NHI Service Accounts",
+    operation_id = "getNhiServiceAccount",
+    params(
+        ("id" = Uuid, Path, description = "NHI service account ID")
+    ),
+    responses(
+        (status = 200, description = "Service account details", body = NhiServiceAccountWithIdentity),
+        (status = 401, description = "Authentication required"),
+        (status = 404, description = "Service account not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn get_service_account(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Path(id): Path<Uuid>,
@@ -245,7 +290,25 @@ async fn get_service_account(
 }
 
 /// PATCH /nhi/service-accounts/{id} — Update a service account.
-async fn update_service_account(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    patch,
+    path = "/nhi/service-accounts/{id}",
+    tag = "NHI Service Accounts",
+    operation_id = "updateNhiServiceAccount",
+    params(
+        ("id" = Uuid, Path, description = "NHI service account ID")
+    ),
+    request_body = UpdateServiceAccountRequest,
+    responses(
+        (status = 200, description = "Service account updated successfully", body = NhiServiceAccountWithIdentity),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Service account not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn update_service_account(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -326,7 +389,23 @@ async fn update_service_account(
 }
 
 /// DELETE /nhi/service-accounts/{id} — Delete a service account.
-async fn delete_service_account(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    delete,
+    path = "/nhi/service-accounts/{id}",
+    tag = "NHI Service Accounts",
+    operation_id = "deleteNhiServiceAccount",
+    params(
+        ("id" = Uuid, Path, description = "NHI service account ID")
+    ),
+    responses(
+        (status = 204, description = "Service account deleted"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Service account not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn delete_service_account(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,

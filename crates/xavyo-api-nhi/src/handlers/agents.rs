@@ -33,6 +33,7 @@ use crate::state::NhiState;
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize, Validate)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CreateAgentRequest {
     #[validate(length(min = 1, max = 255))]
     pub name: String,
@@ -62,6 +63,7 @@ fn default_max_token_lifetime() -> i32 {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UpdateAgentRequest {
     // Base fields
     pub name: Option<String>,
@@ -84,6 +86,7 @@ pub struct UpdateAgentRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::IntoParams))]
 pub struct ListAgentsQuery {
     pub agent_type: Option<String>,
     pub lifecycle_state: Option<NhiLifecycleState>,
@@ -95,6 +98,7 @@ pub struct ListAgentsQuery {
 }
 
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct PaginatedResponse<T: Serialize> {
     pub data: Vec<T>,
     pub total: i64,
@@ -107,7 +111,21 @@ pub struct PaginatedResponse<T: Serialize> {
 // ---------------------------------------------------------------------------
 
 /// POST /nhi/agents — Create a new agent.
-async fn create_agent(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/agents",
+    tag = "NHI Agents",
+    operation_id = "createNhiAgent",
+    request_body = CreateAgentRequest,
+    responses(
+        (status = 201, description = "Agent created successfully", body = NhiAgentWithIdentity),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn create_agent(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -190,7 +208,19 @@ async fn create_agent(
 }
 
 /// GET /nhi/agents — List agents with filters.
-async fn list_agents(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/agents",
+    tag = "NHI Agents",
+    operation_id = "listNhiAgents",
+    params(ListAgentsQuery),
+    responses(
+        (status = 200, description = "Paginated list of agents", body = PaginatedResponse<NhiAgentWithIdentity>),
+        (status = 401, description = "Authentication required")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn list_agents(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Query(query): Query<ListAgentsQuery>,
@@ -278,7 +308,22 @@ async fn count_agents(
 }
 
 /// GET /nhi/agents/{id} — Get a specific agent.
-async fn get_agent(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/agents/{id}",
+    tag = "NHI Agents",
+    operation_id = "getNhiAgent",
+    params(
+        ("id" = Uuid, Path, description = "NHI agent ID")
+    ),
+    responses(
+        (status = 200, description = "Agent details", body = NhiAgentWithIdentity),
+        (status = 401, description = "Authentication required"),
+        (status = 404, description = "Agent not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn get_agent(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Path(id): Path<Uuid>,
@@ -293,7 +338,25 @@ async fn get_agent(
 }
 
 /// PATCH /nhi/agents/{id} — Update an agent.
-async fn update_agent(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    patch,
+    path = "/nhi/agents/{id}",
+    tag = "NHI Agents",
+    operation_id = "updateNhiAgent",
+    params(
+        ("id" = Uuid, Path, description = "NHI agent ID")
+    ),
+    request_body = UpdateAgentRequest,
+    responses(
+        (status = 200, description = "Agent updated successfully", body = NhiAgentWithIdentity),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Agent not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn update_agent(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
@@ -403,7 +466,23 @@ async fn update_agent(
 }
 
 /// DELETE /nhi/agents/{id} — Delete an agent.
-async fn delete_agent(
+#[cfg_attr(feature = "openapi", utoipa::path(
+    delete,
+    path = "/nhi/agents/{id}",
+    tag = "NHI Agents",
+    operation_id = "deleteNhiAgent",
+    params(
+        ("id" = Uuid, Path, description = "NHI agent ID")
+    ),
+    responses(
+        (status = 204, description = "Agent deleted"),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Agent not found")
+    ),
+    security(("bearerAuth" = []))
+))]
+pub async fn delete_agent(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,

@@ -27,11 +27,30 @@ use crate::state::NhiState;
 
 /// Request body for the suspend endpoint.
 #[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct SuspendRequest {
     pub reason: Option<String>,
 }
 
 /// POST /nhi/{id}/suspend — Suspend an NHI identity.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/{id}/suspend",
+    tag = "NHI Lifecycle",
+    operation_id = "suspendNhi",
+    params(
+        ("id" = Uuid, Path, description = "NHI identity ID")
+    ),
+    request_body = SuspendRequest,
+    responses(
+        (status = 200, description = "NHI suspended successfully", body = NhiIdentity),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "NHI identity not found"),
+        (status = 409, description = "Invalid lifecycle transition")
+    ),
+    security(("bearerAuth" = []))
+))]
 pub async fn suspend(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -58,6 +77,23 @@ pub async fn suspend(
 }
 
 /// POST /nhi/{id}/reactivate — Reactivate a suspended NHI identity.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/{id}/reactivate",
+    tag = "NHI Lifecycle",
+    operation_id = "reactivateNhi",
+    params(
+        ("id" = Uuid, Path, description = "NHI identity ID")
+    ),
+    responses(
+        (status = 200, description = "NHI reactivated successfully", body = NhiIdentity),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "NHI identity not found"),
+        (status = 409, description = "Invalid lifecycle transition")
+    ),
+    security(("bearerAuth" = []))
+))]
 pub async fn reactivate(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -82,6 +118,23 @@ pub async fn reactivate(
 }
 
 /// POST /nhi/{id}/deprecate — Mark an NHI identity as deprecated.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/{id}/deprecate",
+    tag = "NHI Lifecycle",
+    operation_id = "deprecateNhi",
+    params(
+        ("id" = Uuid, Path, description = "NHI identity ID")
+    ),
+    responses(
+        (status = 200, description = "NHI deprecated successfully", body = NhiIdentity),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "NHI identity not found"),
+        (status = 409, description = "Invalid lifecycle transition")
+    ),
+    security(("bearerAuth" = []))
+))]
 pub async fn deprecate(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -108,6 +161,23 @@ pub async fn deprecate(
 /// POST /nhi/{id}/archive — Archive a deprecated NHI identity (terminal).
 ///
 /// This cascade-revokes all tool permissions and deactivates all credentials.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/{id}/archive",
+    tag = "NHI Lifecycle",
+    operation_id = "archiveNhi",
+    params(
+        ("id" = Uuid, Path, description = "NHI identity ID")
+    ),
+    responses(
+        (status = 200, description = "NHI archived successfully", body = NhiIdentity),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "NHI identity not found"),
+        (status = 409, description = "Invalid lifecycle transition")
+    ),
+    security(("bearerAuth" = []))
+))]
 pub async fn archive(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -132,6 +202,23 @@ pub async fn archive(
 }
 
 /// POST /nhi/{id}/deactivate — Deactivate an active NHI identity.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/{id}/deactivate",
+    tag = "NHI Lifecycle",
+    operation_id = "deactivateNhi",
+    params(
+        ("id" = Uuid, Path, description = "NHI identity ID")
+    ),
+    responses(
+        (status = 200, description = "NHI deactivated successfully", body = NhiIdentity),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "NHI identity not found"),
+        (status = 409, description = "Invalid lifecycle transition")
+    ),
+    security(("bearerAuth" = []))
+))]
 pub async fn deactivate(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -156,6 +243,23 @@ pub async fn deactivate(
 }
 
 /// POST /nhi/{id}/activate — Activate an inactive NHI identity.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/{id}/activate",
+    tag = "NHI Lifecycle",
+    operation_id = "activateNhi",
+    params(
+        ("id" = Uuid, Path, description = "NHI identity ID")
+    ),
+    responses(
+        (status = 200, description = "NHI activated successfully", body = NhiIdentity),
+        (status = 401, description = "Authentication required"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "NHI identity not found"),
+        (status = 409, description = "Invalid lifecycle transition")
+    ),
+    security(("bearerAuth" = []))
+))]
 pub async fn activate(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
