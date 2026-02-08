@@ -482,8 +482,7 @@ impl GroupService {
 
         // Check for displayName conflicts if it was changed
         if group.display_name != original_name {
-            let existing =
-                Group::find_by_name(&self.pool, tenant_id, &group.display_name).await?;
+            let existing = Group::find_by_name(&self.pool, tenant_id, &group.display_name).await?;
             if let Some(ex) = existing {
                 if ex.id != group_id {
                     return Err(ScimError::Conflict {

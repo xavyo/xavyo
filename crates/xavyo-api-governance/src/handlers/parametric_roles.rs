@@ -381,10 +381,7 @@ pub async fn create_parametric_assignment(
     Extension(claims): Extension<JwtClaims>,
     Path(role_id): Path<Uuid>,
     Json(request): Json<CreateParametricAssignmentRequest>,
-) -> ApiResult<(
-    StatusCode,
-    Json<ParametricAssignmentResponse>,
-)> {
+) -> ApiResult<(StatusCode, Json<ParametricAssignmentResponse>)> {
     request.validate()?;
 
     let tenant_id = *claims

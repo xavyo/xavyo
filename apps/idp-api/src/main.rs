@@ -35,10 +35,10 @@ use xavyo_api_auth::{
     delegation_router, devices_router, jwt_auth_middleware, key_management_router, me_router,
     mfa_router, org_security_policy_router, passwordless_admin_router, passwordless_router,
     public_auth_router, public_router, revocation_router, users_router as auth_users_router,
-    AuditService, AuthService, AuthState, EmailConfig, EmailRateLimiter, JwtPublicKey,
-    JwtPublicKeys, KeyService, LockoutService, MfaService, MockEmailSender, RateLimitConfig,
-    RateLimiter, RevocationCache, SessionService, SmtpEmailSender, TokenConfig, TokenService,
-    TotpEncryption,
+    ApiKeyRateLimiter, AuditService, AuthService, AuthState, EmailConfig, EmailRateLimiter,
+    JwtPublicKey, JwtPublicKeys, KeyService, LockoutService, MfaService, MockEmailSender,
+    RateLimitConfig, RateLimiter, RevocationCache, SessionService, SmtpEmailSender, TokenConfig,
+    TokenService, TotpEncryption,
 };
 use xavyo_api_authorization::authorization_router;
 use xavyo_api_connectors::{
@@ -238,6 +238,9 @@ async fn main() {
         .unwrap_or(3600);
     let email_rate_limiter =
         EmailRateLimiter::with_config(email_rate_max, email_ip_rate_max, email_rate_window);
+
+    // F202-US3: Per-API-key rate limiter (shared across all routes with API key auth)
+    let api_key_rate_limiter = Arc::new(ApiKeyRateLimiter::new());
 
     // Email sender auto-detection: SES > SMTP > Mock
     let email_sender: Arc<dyn xavyo_api_auth::EmailSender> = {
@@ -1219,6 +1222,8 @@ async fn main() {
         ))
         // JWT public keys for kid-based key rotation (F069-S5)
         .layer(axum::Extension(jwt_public_keys))
+        // F202-US3: Per-API-key rate limiter (shared across all routes with API key auth)
+        .layer(axum::Extension(api_key_rate_limiter.clone()))
         // F082-US4: Revocation cache for fast JTI lookups
         .layer(axum::Extension(revocation_cache))
         // F085: Webhook event publisher for identity lifecycle events

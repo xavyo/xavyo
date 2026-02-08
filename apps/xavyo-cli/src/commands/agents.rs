@@ -5,7 +5,7 @@ use crate::config::{Config, ConfigPaths};
 use crate::error::{CliError, CliResult};
 use crate::interactive::{
     prompt_confirm, prompt_select, prompt_text, prompt_text_optional, require_interactive,
-    AGENT_TYPE_OPTIONS, RISK_LEVEL_OPTIONS,
+    AGENT_TYPE_OPTIONS,
 };
 use crate::models::agent::{
     AgentResponse, CreateAgentRequest, NhiCredentialResponse, RevokeCredentialRequest,
@@ -93,10 +93,6 @@ pub struct CreateArgs {
     /// AI model name (e.g., claude-sonnet-4, gpt-4)
     #[arg(long)]
     pub model_name: Option<String>,
-
-    /// Risk level: low, medium, high, critical
-    #[arg(long, short = 'r')]
-    pub risk_level: Option<String>,
 
     /// Agent description
     #[arg(long, short = 'd')]
@@ -292,7 +288,7 @@ async fn execute_list(args: ListArgs) -> CliResult<()> {
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&response)?);
-    } else if response.agents.is_empty() {
+    } else if response.data.is_empty() {
         if filter_context.is_some() {
             println!("No agents found matching criteria.");
             println!();
@@ -303,7 +299,7 @@ async fn execute_list(args: ListArgs) -> CliResult<()> {
             println!("Create your first agent with: xavyo agents create <name>");
         }
     } else {
-        print_agent_table(&response.agents);
+        print_agent_table(&response.data);
         println!();
 
         // Show pagination info
@@ -324,14 +320,14 @@ async fn execute_list(args: ListArgs) -> CliResult<()> {
         } else if let Some(ref ctx) = filter_context {
             println!(
                 "Showing {} of {} agents ({})",
-                response.agents.len(),
+                response.data.len(),
                 response.total,
                 ctx
             );
         } else {
             println!(
                 "Showing {} of {} agents",
-                response.agents.len(),
+                response.data.len(),
                 response.total
             );
         }
@@ -416,15 +412,6 @@ async fn execute_create(args: CreateArgs) -> CliResult<()> {
         None => prompt_agent_type_legacy()?,
     };
 
-    // Get risk level (interactive or from flag)
-    let risk_level = match args.risk_level {
-        Some(r) => {
-            validate_risk_level(&r)?;
-            r
-        }
-        None => prompt_risk_level_legacy()?,
-    };
-
     // Get model provider and name (optional, interactive if TTY)
     let (model_provider, model_name) = if args.model_provider.is_some() || args.model_name.is_some()
     {
@@ -438,7 +425,6 @@ async fn execute_create(args: CreateArgs) -> CliResult<()> {
     // Build the request
     let request = CreateAgentRequest::new(name.clone(), agent_type)
         .with_model(model_provider, model_name)
-        .with_risk_level(risk_level)
         .with_description(args.description);
 
     // Create the agent
@@ -483,15 +469,6 @@ async fn execute_create_interactive(args: CreateArgs) -> CliResult<()> {
         None => prompt_agent_type_interactive()?,
     };
 
-    // Get risk level (prompt if not provided)
-    let risk_level = match args.risk_level {
-        Some(r) => {
-            validate_risk_level(&r)?;
-            r
-        }
-        None => prompt_risk_level_interactive()?,
-    };
-
     // Get description (optional)
     let description = match args.description {
         Some(d) => Some(d),
@@ -505,7 +482,6 @@ async fn execute_create_interactive(args: CreateArgs) -> CliResult<()> {
     // Build the request
     let request = CreateAgentRequest::new(name.clone(), agent_type)
         .with_model(args.model_provider, args.model_name)
-        .with_risk_level(risk_level)
         .with_description(description);
 
     // Create the agent
@@ -553,18 +529,6 @@ fn prompt_agent_type_interactive() -> CliResult<String> {
 
     let selection = prompt_select("Agent type", &options, 0)?;
     Ok(AGENT_TYPE_OPTIONS[selection].value.to_string())
-}
-
-/// Prompt for risk level using new interactive module (F-053)
-fn prompt_risk_level_interactive() -> CliResult<String> {
-    let options: Vec<String> = RISK_LEVEL_OPTIONS
-        .iter()
-        .map(|o| format!("{}", o))
-        .collect();
-
-    // Default to medium (index 1)
-    let selection = prompt_select("Risk level", &options, 1)?;
-    Ok(RISK_LEVEL_OPTIONS[selection].value.to_string())
 }
 
 /// Prompt for optional description (F-053)
@@ -972,22 +936,12 @@ fn validate_agent_type(agent_type: &str) -> CliResult<()> {
     }
 }
 
-/// Validate risk level
-fn validate_risk_level(risk_level: &str) -> CliResult<()> {
-    match risk_level {
-        "low" | "medium" | "high" | "critical" => Ok(()),
-        _ => Err(CliError::Validation(format!(
-            "Invalid risk level '{risk_level}'. Must be one of: low, medium, high, critical"
-        ))),
-    }
-}
-
-/// Validate agent status (F-051)
+/// Validate agent lifecycle state
 fn validate_agent_status(status: &str) -> CliResult<()> {
     match status {
-        "active" | "inactive" | "pending" => Ok(()),
+        "active" | "inactive" | "suspended" | "deprecated" | "archived" => Ok(()),
         _ => Err(CliError::Validation(format!(
-            "Invalid agent status '{status}'. Must be one of: active, inactive, pending"
+            "Invalid lifecycle state '{status}'. Must be one of: active, inactive, suspended, deprecated, archived"
         ))),
     }
 }
@@ -1028,20 +982,6 @@ fn prompt_agent_type_legacy() -> CliResult<String> {
     Ok(agent_type.to_string())
 }
 
-/// Interactive prompt for risk level (legacy, for non-interactive mode fallback)
-fn prompt_risk_level_legacy() -> CliResult<String> {
-    let levels = vec!["low", "medium", "high", "critical"];
-
-    let selection = Select::new()
-        .with_prompt("Select risk level")
-        .items(&levels)
-        .default(1) // Default to "medium"
-        .interact()
-        .map_err(|e| CliError::Io(e.to_string()))?;
-
-    Ok(levels[selection].to_string())
-}
-
 /// Interactive prompt for model provider and name
 fn prompt_model_info() -> CliResult<(Option<String>, Option<String>)> {
     let provider: String = Input::new()
@@ -1075,8 +1015,8 @@ fn prompt_model_info() -> CliResult<(Option<String>, Option<String>)> {
 fn print_agent_table(agents: &[AgentResponse]) {
     // Print header
     println!(
-        "{:<38} {:<20} {:<12} {:<10} {:<8}",
-        "ID", "NAME", "TYPE", "STATUS", "RISK"
+        "{:<38} {:<20} {:<12} {:<12} {:<6}",
+        "ID", "NAME", "TYPE", "STATE", "RISK"
     );
     println!("{}", "-".repeat(90));
 
@@ -1088,9 +1028,14 @@ fn print_agent_table(agents: &[AgentResponse]) {
             agent.name.clone()
         };
 
+        let risk = agent
+            .risk_score
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "-".to_string());
+
         println!(
-            "{:<38} {:<20} {:<12} {:<10} {:<8}",
-            agent.id, truncated_name, agent.agent_type, agent.status, agent.risk_level
+            "{:<38} {:<20} {:<12} {:<12} {:<6}",
+            agent.id, truncated_name, agent.agent_type, agent.lifecycle_state, risk
         );
     }
 }
@@ -1101,8 +1046,10 @@ fn print_agent_details(agent: &AgentResponse) {
     println!("{}", "━".repeat(45));
     println!("ID:          {}", agent.id);
     println!("Type:        {}", agent.agent_type);
-    println!("Status:      {}", agent.status);
-    println!("Risk Level:  {}", agent.risk_level);
+    println!("State:       {}", agent.lifecycle_state);
+    if let Some(score) = agent.risk_score {
+        println!("Risk Score:  {score}");
+    }
 
     if let Some(ref desc) = agent.description {
         println!("Description: {desc}");
@@ -1172,16 +1119,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_risk_level() {
-        assert!(validate_risk_level("low").is_ok());
-        assert!(validate_risk_level("medium").is_ok());
-        assert!(validate_risk_level("high").is_ok());
-        assert!(validate_risk_level("critical").is_ok());
-        assert!(validate_risk_level("invalid").is_err());
-        assert!(validate_risk_level("LOW").is_err()); // Case sensitive
-    }
-
-    #[test]
     fn test_parse_agent_id() {
         let valid_uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
         assert!(parse_agent_id(valid_uuid).is_ok());
@@ -1219,7 +1156,10 @@ mod tests {
     fn test_validate_agent_status() {
         assert!(validate_agent_status("active").is_ok());
         assert!(validate_agent_status("inactive").is_ok());
-        assert!(validate_agent_status("pending").is_ok());
+        assert!(validate_agent_status("suspended").is_ok());
+        assert!(validate_agent_status("deprecated").is_ok());
+        assert!(validate_agent_status("archived").is_ok());
+        assert!(validate_agent_status("pending").is_err());
         assert!(validate_agent_status("invalid").is_err());
         assert!(validate_agent_status("ACTIVE").is_err()); // Case sensitive
     }
@@ -1402,7 +1342,6 @@ mod tests {
             r#type: None,
             model_provider: None,
             model_name: None,
-            risk_level: None,
             description: None,
             json: false,
         };
@@ -1419,7 +1358,6 @@ mod tests {
             r#type: Some("copilot".to_string()),
             model_provider: None,
             model_name: None,
-            risk_level: Some("low".to_string()),
             description: None,
             json: false,
         };
@@ -1437,14 +1375,12 @@ mod tests {
             r#type: Some("autonomous".to_string()),
             model_provider: Some("anthropic".to_string()),
             model_name: Some("claude-4".to_string()),
-            risk_level: Some("medium".to_string()),
             description: Some("Test agent".to_string()),
             json: true,
         };
         assert_eq!(args.name, Some("my-agent".to_string()));
         assert!(args.interactive);
         assert_eq!(args.r#type, Some("autonomous".to_string()));
-        assert_eq!(args.risk_level, Some("medium".to_string()));
     }
 
     #[test]

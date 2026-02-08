@@ -556,22 +556,19 @@ impl IdentityMergeService {
         user_id: Uuid,
     ) -> Result<IdentitySummary> {
         // Fetch user from database
-        let row: Option<(
-            Option<String>,
-            Option<String>,
-            Option<serde_json::Value>,
-        )> = sqlx::query_as(
-            r"
+        let row: Option<(Option<String>, Option<String>, Option<serde_json::Value>)> =
+            sqlx::query_as(
+                r"
             SELECT email, display_name, custom_attributes
             FROM users
             WHERE id = $1 AND tenant_id = $2
             ",
-        )
-        .bind(user_id)
-        .bind(tenant_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(GovernanceError::Database)?;
+            )
+            .bind(user_id)
+            .bind(tenant_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(GovernanceError::Database)?;
 
         match row {
             Some((email, display_name, attributes)) => Ok(IdentitySummary {

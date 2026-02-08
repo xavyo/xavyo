@@ -1,7 +1,7 @@
 //! Verify command - Check email verification status and resend verification emails
 
 use crate::api::{get_profile, resend_verification, ApiClient};
-use crate::config::{Config, ConfigPaths};
+use crate::config::{Config, ConfigPaths, SYSTEM_TENANT_ID};
 use crate::credentials::get_credential_store;
 use crate::error::{CliError, CliResult};
 use crate::models::Session;
@@ -10,9 +10,6 @@ use clap::{Args, Subcommand};
 use reqwest::Client;
 use serde::Serialize;
 use std::time::Duration;
-
-/// System tenant ID — used as fallback when no session tenant is available
-const SYSTEM_TENANT_ID: &str = "00000000-0000-0000-0000-000000000001";
 
 /// Arguments for the verify command
 #[derive(Args)]
