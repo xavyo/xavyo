@@ -8384,6 +8384,7 @@ name = "xavyo-api-nhi"
 version = "0.1.0"
 dependencies = [
  "argon2",
+ "async-trait",
  "axum",
  "axum-test",
  "base64 0.22.1",
@@ -8400,8 +8401,6 @@ dependencies = [
  "utoipa",
  "uuid",
  "validator",
- "xavyo-api-agents",
- "xavyo-api-governance",
  "xavyo-auth",
  "xavyo-core",
  "xavyo-db",
@@ -8898,6 +8897,7 @@ dependencies = [
  "sqlx",
  "thiserror 1.0.69",
  "tokio-test",
+ "utoipa",
  "uuid",
 ]
 

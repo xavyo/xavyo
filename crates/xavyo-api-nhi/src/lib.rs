@@ -1,52 +1,40 @@
-//! Unified Non-Human Identity API for service accounts and AI agents.
+//! Unified Non-Human Identity API for service accounts, AI agents, and tools.
 //!
-//! This crate provides REST API endpoints for unified NHI management:
-//! - `GET /nhi` - List all NHIs with filtering
-//! - `GET /nhi/{id}` - Get specific NHI
-//! - `GET /nhi/risk-summary` - Aggregated risk statistics
-//! - `GET /nhi/staleness-report` - Inactive NHI report
-//! - `POST /nhi/certifications/campaigns` - Unified certification campaigns
+//! This crate provides REST API endpoints for unified NHI management,
+//! operating on the `nhi_identities` base table with type-specific
+//! extension tables (`nhi_agents`, `nhi_tools`, `nhi_service_accounts`).
 //!
-//! ## Consolidated Endpoints (F109)
+//! # Endpoint Groups
 //!
-//! - `/nhi/service-accounts/*` - Service account CRUD and lifecycle
-//! - `/nhi/agents/*` - AI agent CRUD and authorization
-//! - `/nhi/tools/*` - Tool registry management
-//! - `/nhi/approvals/*` - HITL approval workflow
+//! ## Unified (polymorphic)
+//! - `GET /nhi` — List all NHIs with type/state filtering
+//! - `GET /nhi/{id}` — Get a specific NHI by ID
+//!
+//! ## Type-Specific CRUD
+//! - `/nhi/tools/*` — Tool registry management
+//! - `/nhi/agents/*` — AI agent management
+//! - `/nhi/service-accounts/*` — Service account management
+//!
+//! ## Lifecycle
+//! - `POST /nhi/{id}/{suspend,reactivate,deprecate,archive,deactivate,activate}`
+//!
+//! ## Credentials
+//! - `/nhi/{id}/credentials/*` — Credential create, rotate, revoke
+//!
+//! ## Permissions
+//! - `/nhi/agents/{id}/permissions/*` — Tool permission grants
+//!
+//! ## Risk & Certification
+//! - `/nhi/{id}/risk` — Risk scoring
+//! - `/nhi/certifications/*` — Certification campaigns
 
 pub mod error;
 pub mod handlers;
-pub mod middleware;
 pub mod router;
 pub mod services;
 pub mod state;
 
-// Re-export router function for easy integration
-pub use router::{router, NhiAppState};
-
-// Re-export error types
-pub use error::{ApiNhiError, ApiResult, ErrorResponse};
-
-// Re-export state types for custom router building
-pub use state::{
-    AgentsState, ApprovalsState, ConsolidatedNhiState, ServiceAccountsState, ToolsState,
-};
-
-// Re-export handlers for custom router building
-pub use handlers::{
-    get_nhi, get_risk_summary, list_nhi, CountByRiskLevel, CountByType, NhiItem, NhiListQuery,
-    NhiListResponse, NhiState, RiskState, RiskSummaryResponse,
-};
-
-// Re-export certification types
-pub use handlers::certification::{
-    CampaignFilterRequest, CampaignListResponse, CampaignResponse, CertificationItemResponse,
-    CreateCampaignRequest, DecisionRequest, ErrorResponse as CertErrorResponse, ItemCountsResponse,
-    ItemListResponse, ListCampaignsQuery, ListItemsQuery,
-};
-
-// Re-export services
-pub use services::{UnifiedListService, UnifiedRiskService};
-
-// Re-export middleware (F110)
-pub use middleware::{nhi_auth_middleware, NhiAuthContext, NhiCredentialService};
+// Re-export main entry points
+pub use error::{ApiResult, ErrorResponse, NhiApiError};
+pub use router::nhi_router;
+pub use state::NhiState;

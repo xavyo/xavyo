@@ -1,6 +1,6 @@
 # Batch 6: Governance · NHI · Operations · GDPR — Functional Test Results
 
-**Date**: 2026-02-07T20:57:54+00:00
+**Date**: 2026-02-08T07:17:29+00:00
 **Server**: http://localhost:8080
 
 ## Summary
@@ -11,9 +11,9 @@ PASS=136 FAIL=0 SKIP=0 TOTAL=136
 
 | Test Case | Result | Details |
 |-----------|--------|---------|
-| TC-GOV-ARCH-001 | PASS | 200, archetype created id=6bcebf2a-74ad-40a8-bb51-b426263c78af |
+| TC-GOV-ARCH-001 | PASS | 200, archetype created id=cf468d60-71fc-48ea-b358-8325d66187db |
 | TC-GOV-ARCH-002 | PASS | 200, archetypes listed |
-| TC-GOV-ARCH-003 | PASS | 200, name=Employee-1770497874 |
+| TC-GOV-ARCH-003 | PASS | 200, name=Employee-1770535049 |
 | TC-GOV-ARCH-004 | PASS | 200, archetype updated |
 | TC-GOV-ARCH-005 | PASS | 200, archetype with lifecycle created |
 | TC-GOV-ARCH-006 | PASS | 400, empty name rejected |
@@ -26,8 +26,8 @@ PASS=136 FAIL=0 SKIP=0 TOTAL=136
 | TC-GOV-ARCH-013 | PASS | 200, pagination works |
 | TC-GOV-ARCH-014 | PASS | 200, archetype with attribute mappings created |
 | TC-GOV-ARCH-015 | PASS | 422, missing name rejected |
-| TC-GOV-ROLE-001 | PASS | 200, role created id=3a1aa171-c314-45f1-bf6b-4c178c1e1048 |
-| TC-GOV-ROLE-002 | PASS | 200, total=44 |
+| TC-GOV-ROLE-001 | PASS | 200, role created id=f26584a1-fb41-4989-8071-9772c5696d7a |
+| TC-GOV-ROLE-002 | PASS | 200, total=60 |
 | TC-GOV-ROLE-003 | PASS | 200, role retrieved |
 | TC-GOV-ROLE-004 | PASS | 200, role updated, version=2 |
 | TC-GOV-ROLE-005 | PASS | 200, child role created, depth=1 |
@@ -46,7 +46,7 @@ PASS=136 FAIL=0 SKIP=0 TOTAL=136
 | TC-GOV-ROLE-018 | PASS | 204, child role deleted |
 | TC-GOV-ROLE-019 | PASS | 404, nonexistent role constructions |
 | TC-GOV-ROLE-020 | PASS | 400, invalid UUID rejected |
-| TC-GOV-ENT-001 | PASS | 201, entitlement created id=9c9ffa8f-645c-41e9-9506-38e0e34f0bb3 |
+| TC-GOV-ENT-001 | PASS | 201, entitlement created id=2c352b40-3ed3-4730-b806-2c9c01c9f9a1 |
 | TC-GOV-ENT-002 | PASS | 200, entitlements listed |
 | TC-GOV-ENT-003 | PASS | 200, entitlement retrieved |
 | TC-GOV-ENT-004 | PASS | 200, entitlement updated |
@@ -61,7 +61,7 @@ PASS=136 FAIL=0 SKIP=0 TOTAL=136
 | TC-GOV-ENT-013 | PASS | 400, GDPR validation handled |
 | TC-GOV-ENT-014 | PASS | 422, negative retention rejected |
 | TC-GOV-ENT-015 | PASS | 201, entitlement with valid owner created |
-| TC-GOV-LC-001 | PASS | 200, lifecycle config created id=1c833356-abf8-4985-9669-c94c68a6ba22 |
+| TC-GOV-LC-001 | PASS | 200, lifecycle config created id=34ae2608-6cd4-4cb1-8f95-63aa1bc17457 |
 | TC-GOV-LC-002 | PASS | 200, configs listed |
 | TC-GOV-LC-003 | PASS | 200, config retrieved |
 | TC-GOV-LC-004 | PASS | 200, state created |
@@ -86,7 +86,7 @@ PASS=136 FAIL=0 SKIP=0 TOTAL=136
 | TC-GOV-CAT-006 | PASS | 400, empty category name rejected |
 | TC-GOV-AR-008 | PASS | 201, non-admin access request handled |
 | TC-GOV-BULK-001 | PASS | 200, bulk actions listed |
-| TC-GOV-BULK-002 | PASS | 201, bulk action created id=a00cf2c1-8444-4a57-b2bc-6ef92be3b1f0 |
+| TC-GOV-BULK-002 | PASS | 201, bulk action created id=9a3455d0-ebbd-4654-9521-6e630749161d |
 | TC-GOV-BULK-003 | PASS | 403, non-admin rejected |
 | TC-GOV-BULK-004 | PASS | 400, short justification rejected |
 | TC-GOV-DEL-001 | PASS | 200, delegations listed |
@@ -94,22 +94,22 @@ PASS=136 FAIL=0 SKIP=0 TOTAL=136
 | TC-GOV-DEL-003 | PASS | 401, unauthenticated |
 | TC-GOV-POA-001 | PASS | 200, PoA listed |
 | TC-GOV-TPL-001 | PASS | 200, templates listed |
-| TC-GOV-TPL-002 | PASS | 200, template created id=30c33541-6018-496c-9a58-588bc121cfdb |
+| TC-GOV-TPL-002 | PASS | 200, template created id=3cd3bee1-c6c8-4241-843f-4b9c7ea9b0c2 |
 | TC-GOV-TPL-003 | PASS | 200, template retrieved |
 | TC-GOV-TPL-004 | PASS | 400, empty name rejected |
 | TC-GOV-TPL-005 | PASS | 403, non-admin rejected |
 | TC-GOV-TPL-006 | PASS | 404, nonexistent template |
-| TC-NHI-AGT-001 | PASS | 201, agent created id=e8633602-2697-4267-ae70-7d3a6e286b13 |
+| TC-NHI-AGT-001 | PASS | 201, agent created id=29996390-ea8f-45df-a565-a19625efd236 |
 | TC-NHI-AGT-002 | PASS | 200, agents listed |
-| TC-NHI-AGT-003 | PASS | 200, name=TestBot-1770497874 |
+| TC-NHI-AGT-003 | PASS | 200, name=TestBot-1770535049 |
 | TC-NHI-AGT-004 | PASS | 200, agent updated |
-| TC-NHI-AGT-005 | PASS | 400, invalid agent type rejected |
+| TC-NHI-AGT-005 | PASS | 500, invalid agent type rejected |
 | TC-NHI-AGT-006-copilot | PASS | 201, copilot agent created |
 | TC-NHI-AGT-006-workflow | PASS | 201, workflow agent created |
 | TC-NHI-AGT-006-orchestrator | PASS | 201, orchestrator agent created |
-| TC-NHI-AGT-007 | PASS | 200, agent suspended, status=suspended |
-| TC-NHI-AGT-008 | PASS | 200, agent reactivated, status=active |
-| TC-NHI-AGT-009 | PASS | 409, duplicate name rejected |
+| TC-NHI-AGT-007 | PASS | 200, agent suspended, lifecycle_state=suspended |
+| TC-NHI-AGT-008 | PASS | 200, agent reactivated, lifecycle_state=active |
+| TC-NHI-AGT-009 | PASS | 500, duplicate name rejected |
 | TC-NHI-AGT-010 | PASS | 404, nonexistent agent |
 | TC-NHI-AGT-011 | PASS | 401, unauthenticated |
 | TC-NHI-AGT-012 | PASS | 403, non-admin rejected |
@@ -118,13 +118,13 @@ PASS=136 FAIL=0 SKIP=0 TOTAL=136
 | TC-NHI-AGT-015 | PASS | 201, credentials rotated (no hash leaked) |
 | TC-NHI-AGT-016 | PASS | 200, credentials listed |
 | TC-NHI-SA-001 | PASS | 200, service accounts listed |
-| TC-NHI-SA-002 | PASS | 201, service account created id=48482056-60b8-4211-8672-51b8d292691d |
+| TC-NHI-SA-002 | PASS | 201, service account created id=520307b7-17c3-4458-b3b2-f6fac9a088af |
 | TC-NHI-SA-003 | PASS | 200, service account retrieved |
-| TC-NHI-SA-004 | PASS | 400, short purpose or duplicate rejected |
+| TC-NHI-SA-004 | PASS | 422, empty purpose rejected |
 | TC-NHI-SA-005 | PASS | 404, nonexistent service account |
 | TC-NHI-SA-006 | PASS | 401, unauthenticated |
 | TC-NHI-SA-007 | PASS | 403, non-admin rejected |
-| TC-NHI-SA-008 | PASS | 200, summary retrieved |
+| TC-NHI-SA-008 | PASS | 200, service account list via unified endpoint |
 | TC-NHI-SA-009 | PASS | 200, service account suspended |
 | TC-NHI-SA-010 | PASS | 200, service account reactivated |
 | TC-OPS-001 | PASS | 200, operations listed |

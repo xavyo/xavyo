@@ -23,9 +23,13 @@ async-trait.workspace = true
 # Database (for sqlx derives)
 sqlx = { workspace = true, optional = true }
 
+# OpenAPI (for utoipa derives)
+utoipa = { workspace = true, optional = true }
+
 [dev-dependencies]
 tokio-test.workspace = true
 
 [features]
 default = []
 sqlx = ["dep:sqlx"]
+openapi = ["dep:utoipa"]

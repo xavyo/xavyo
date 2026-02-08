@@ -1,985 +1,511 @@
-//! AI agent handlers for /nhi/agents/* endpoints.
+//! Agent-specific CRUD handlers.
 //!
-//! These handlers delegate to xavyo-api-agents services.
-//! F109 - NHI API Consolidation
+//! Provides endpoints for AI agent management:
+//! - `POST /nhi/agents` — Create a new agent
+//! - `GET /nhi/agents` — List agents
+//! - `GET /nhi/agents/{id}` — Get a specific agent
+//! - `PATCH /nhi/agents/{id}` — Update an agent
+//! - `DELETE /nhi/agents/{id}` — Delete an agent
 
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    Extension, Json,
+    response::IntoResponse,
+    routing::{get, post},
+    Extension, Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
+use validator::Validate;
 use xavyo_auth::JwtClaims;
-
-use crate::error::{ApiNhiError, ApiResult};
-
-// Re-use AgentsState directly from agents crate
-pub use xavyo_api_agents::AgentsState;
-
-// Re-export types from agents crate
-pub use xavyo_api_agents::models::{
-    AgentListResponse, AgentResponse, CreateAgentRequest, ListAgentsQuery, UpdateAgentRequest,
+use xavyo_core::TenantId;
+use xavyo_db::models::{
+    nhi_agent::{NhiAgent, NhiAgentFilter, NhiAgentWithIdentity, UpdateNhiAgent},
+    nhi_identity::{NhiIdentity, UpdateNhiIdentity},
 };
+use xavyo_nhi::{NhiLifecycleState, NhiType};
 
-// Re-export authorization types
-pub use xavyo_api_agents::models::{AuthorizeRequest, AuthorizeResponse};
+use crate::error::NhiApiError;
+use crate::state::NhiState;
 
-// Re-export permission types
-pub use xavyo_api_agents::models::{
-    GrantPermissionRequest, ListPermissionsQuery, PermissionListResponse, PermissionResponse,
-};
+// ---------------------------------------------------------------------------
+// Request / Response types
+// ---------------------------------------------------------------------------
 
-// Re-export audit types
-pub use xavyo_api_agents::models::{AuditFilter, AuditListResponse};
-
-// Re-export security assessment types (F093)
-pub use xavyo_api_agents::models::SecurityAssessment;
-
-// Re-export anomaly detection types (F094)
-pub use xavyo_api_agents::models::{
-    AnomalyListResponse, BaselineResponse, ListAnomaliesQuery, SetThresholdsRequest,
-    ThresholdsResponse,
-};
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiNhiError> {
-    claims
-        .tenant_id()
-        .map(|t| *t.as_uuid())
-        .ok_or(ApiNhiError::Unauthorized)
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreateAgentRequest {
+    #[validate(length(min = 1, max = 255))]
+    pub name: String,
+    pub description: Option<String>,
+    pub owner_id: Option<Uuid>,
+    pub backup_owner_id: Option<Uuid>,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub inactivity_threshold_days: Option<i32>,
+    pub rotation_interval_days: Option<i32>,
+    // Agent-specific fields
+    #[validate(length(min = 1, max = 100))]
+    pub agent_type: String,
+    pub model_provider: Option<String>,
+    pub model_name: Option<String>,
+    pub model_version: Option<String>,
+    pub agent_card_url: Option<String>,
+    pub agent_card_signature: Option<String>,
+    #[serde(default = "default_max_token_lifetime")]
+    pub max_token_lifetime_secs: i32,
+    #[serde(default)]
+    pub requires_human_approval: bool,
+    pub team_id: Option<Uuid>,
 }
 
-fn extract_actor_id(claims: &JwtClaims) -> Result<Uuid, ApiNhiError> {
-    Uuid::parse_str(&claims.sub).map_err(|_| ApiNhiError::Unauthorized)
+fn default_max_token_lifetime() -> i32 {
+    900
 }
 
-// ============================================================================
-// Agent CRUD Handlers
-// ============================================================================
-
-/// List AI agents.
-#[utoipa::path(
-    get,
-    path = "/nhi/agents",
-    tag = "NHI - Agents",
-    params(ListAgentsQuery),
-    responses(
-        (status = 200, description = "List of AI agents", body = AgentListResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn list_agents(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Query(query): Query<ListAgentsQuery>,
-) -> ApiResult<Json<AgentListResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let response = state.agent_service.list(tenant_id, query).await?;
-    Ok(Json(response))
+#[derive(Debug, Deserialize)]
+pub struct UpdateAgentRequest {
+    // Base fields
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub owner_id: Option<Option<Uuid>>,
+    pub backup_owner_id: Option<Option<Uuid>>,
+    pub expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
+    pub inactivity_threshold_days: Option<Option<i32>>,
+    pub rotation_interval_days: Option<Option<i32>>,
+    // Agent-specific fields
+    pub agent_type: Option<String>,
+    pub model_provider: Option<String>,
+    pub model_name: Option<String>,
+    pub model_version: Option<String>,
+    pub agent_card_url: Option<String>,
+    pub agent_card_signature: Option<String>,
+    pub max_token_lifetime_secs: Option<i32>,
+    pub requires_human_approval: Option<bool>,
+    pub team_id: Option<Uuid>,
 }
 
-/// Create a new AI agent.
-#[utoipa::path(
-    post,
-    path = "/nhi/agents",
-    tag = "NHI - Agents",
-    request_body = CreateAgentRequest,
-    responses(
-        (status = 201, description = "Agent created", body = AgentResponse),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 409, description = "Agent name already exists"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn create_agent(
-    State(state): State<AgentsState>,
+#[derive(Debug, Deserialize)]
+pub struct ListAgentsQuery {
+    pub agent_type: Option<String>,
+    pub lifecycle_state: Option<NhiLifecycleState>,
+    pub owner_id: Option<Uuid>,
+    pub requires_human_approval: Option<bool>,
+    pub team_id: Option<Uuid>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PaginatedResponse<T: Serialize> {
+    pub data: Vec<T>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Handlers
+// ---------------------------------------------------------------------------
+
+/// POST /nhi/agents — Create a new agent.
+async fn create_agent(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateAgentRequest>,
-) -> ApiResult<(StatusCode, Json<AgentResponse>)> {
-    let tenant_id = extract_tenant_id(&claims)?;
+) -> Result<impl IntoResponse, NhiApiError> {
     if !claims.has_role("admin") {
-        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
+        return Err(NhiApiError::Forbidden);
     }
-    let user_id = extract_actor_id(&claims)?;
-    let agent = state
-        .agent_service
-        .create(tenant_id, user_id, request)
-        .await?;
-    Ok((StatusCode::CREATED, Json(agent)))
-}
+    request.validate()?;
 
-/// Get an AI agent by ID.
-#[utoipa::path(
-    get,
-    path = "/nhi/agents/{id}",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    responses(
-        (status = 200, description = "Agent details", body = AgentResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_agent(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<AgentResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let agent = state.agent_service.get(tenant_id, id).await?;
-    Ok(Json(agent))
-}
+    let tenant_uuid = *tenant_id.as_uuid();
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
 
-/// Update an AI agent.
-#[utoipa::path(
-    patch,
-    path = "/nhi/agents/{id}",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    request_body = UpdateAgentRequest,
-    responses(
-        (status = 200, description = "Agent updated", body = AgentResponse),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn update_agent(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Json(request): Json<UpdateAgentRequest>,
-) -> ApiResult<Json<AgentResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    if !claims.has_role("admin") {
-        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
-    }
-    let agent = state.agent_service.update(tenant_id, id, request).await?;
-    Ok(Json(agent))
-}
+    let mut tx = state.pool.begin().await.map_err(|e| {
+        tracing::error!("Failed to begin transaction: {e}");
+        NhiApiError::Internal("Failed to begin transaction".into())
+    })?;
 
-/// Delete an AI agent.
-#[utoipa::path(
-    delete,
-    path = "/nhi/agents/{id}",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    responses(
-        (status = 204, description = "Agent deleted"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn delete_agent(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<StatusCode> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    if !claims.has_role("admin") {
-        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
-    }
-    state.agent_service.delete(tenant_id, id).await?;
-    Ok(StatusCode::NO_CONTENT)
-}
+    // 1. Insert base identity
+    let identity: NhiIdentity = sqlx::query_as(
+        r"
+        INSERT INTO nhi_identities (
+            tenant_id, nhi_type, name, description, owner_id, backup_owner_id,
+            expires_at, inactivity_threshold_days, rotation_interval_days, created_by
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+        ",
+    )
+    .bind(tenant_uuid)
+    .bind(NhiType::Agent)
+    .bind(&request.name)
+    .bind(&request.description)
+    .bind(request.owner_id)
+    .bind(request.backup_owner_id)
+    .bind(request.expires_at)
+    .bind(request.inactivity_threshold_days)
+    .bind(request.rotation_interval_days)
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await?;
 
-// ============================================================================
-// Lifecycle Handlers
-// ============================================================================
+    // 2. Insert agent extension
+    sqlx::query(
+        r"
+        INSERT INTO nhi_agents (
+            nhi_id, agent_type, model_provider, model_name, model_version,
+            agent_card_url, agent_card_signature,
+            max_token_lifetime_secs, requires_human_approval, team_id
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        ",
+    )
+    .bind(identity.id)
+    .bind(&request.agent_type)
+    .bind(&request.model_provider)
+    .bind(&request.model_name)
+    .bind(&request.model_version)
+    .bind(&request.agent_card_url)
+    .bind(&request.agent_card_signature)
+    .bind(request.max_token_lifetime_secs)
+    .bind(request.requires_human_approval)
+    .bind(request.team_id)
+    .execute(&mut *tx)
+    .await?;
 
-/// Suspend an AI agent.
-#[utoipa::path(
-    post,
-    path = "/nhi/agents/{id}/suspend",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    responses(
-        (status = 200, description = "Agent suspended", body = AgentResponse),
-        (status = 400, description = "Already suspended"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn suspend_agent(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<AgentResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    if !claims.has_role("admin") {
-        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
-    }
-    let agent = state.agent_service.suspend(tenant_id, id).await?;
-    Ok(Json(agent))
-}
+    tx.commit().await.map_err(|e| {
+        tracing::error!("Failed to commit transaction: {e}");
+        NhiApiError::Internal("Failed to commit transaction".into())
+    })?;
 
-/// Reactivate a suspended AI agent.
-#[utoipa::path(
-    post,
-    path = "/nhi/agents/{id}/reactivate",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    responses(
-        (status = 200, description = "Agent reactivated", body = AgentResponse),
-        (status = 400, description = "Not suspended"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn reactivate_agent(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<AgentResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    if !claims.has_role("admin") {
-        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
-    }
-    let agent = state.agent_service.reactivate(tenant_id, id).await?;
-    Ok(Json(agent))
-}
+    let result = NhiAgent::find_by_nhi_id(&state.pool, tenant_uuid, identity.id)
+        .await?
+        .ok_or(NhiApiError::Internal(
+            "Failed to fetch created agent".into(),
+        ))?;
 
-// ============================================================================
-// Authorization Handler
-// ============================================================================
-
-/// Real-time authorization decision (<100ms).
-#[utoipa::path(
-    post,
-    path = "/nhi/agents/authorize",
-    tag = "NHI - Agents",
-    request_body = AuthorizeRequest,
-    responses(
-        (status = 200, description = "Authorization decision", body = AuthorizeResponse),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn authorize_agent(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Json(request): Json<AuthorizeRequest>,
-) -> ApiResult<Json<AuthorizeResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let response = state
-        .authorization_service
-        .authorize_request(tenant_id, request, None)
-        .await?;
-    Ok(Json(response))
-}
-
-// ============================================================================
-// Permission Handlers
-// ============================================================================
-
-/// Grant tool permission to an agent.
-#[utoipa::path(
-    post,
-    path = "/nhi/agents/{id}/permissions",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    request_body = GrantPermissionRequest,
-    responses(
-        (status = 201, description = "Permission granted", body = PermissionResponse),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent or tool not found"),
-        (status = 409, description = "Permission already exists"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn grant_agent_permission(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Json(request): Json<GrantPermissionRequest>,
-) -> ApiResult<(StatusCode, Json<PermissionResponse>)> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let actor_id = extract_actor_id(&claims)?;
-    let permission = state
-        .permission_service
-        .grant(tenant_id, id, request, Some(actor_id))
-        .await?;
-    Ok((StatusCode::CREATED, Json(permission)))
-}
-
-/// List permissions for an agent.
-#[utoipa::path(
-    get,
-    path = "/nhi/agents/{id}/permissions",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID"),
-        ListPermissionsQuery
-    ),
-    responses(
-        (status = 200, description = "List of permissions", body = PermissionListResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn list_agent_permissions(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Query(query): Query<ListPermissionsQuery>,
-) -> ApiResult<Json<PermissionListResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let response = state
-        .permission_service
-        .list_by_agent(tenant_id, id, query.limit, query.offset)
-        .await?;
-    Ok(Json(response))
-}
-
-/// Revoke tool permission from an agent.
-#[utoipa::path(
-    delete,
-    path = "/nhi/agents/{agent_id}/permissions/{tool_id}",
-    tag = "NHI - Agents",
-    params(
-        ("agent_id" = Uuid, Path, description = "Agent ID"),
-        ("tool_id" = Uuid, Path, description = "Tool ID")
-    ),
-    responses(
-        (status = 204, description = "Permission revoked"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Permission not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn revoke_agent_permission(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path((agent_id, tool_id)): Path<(Uuid, Uuid)>,
-) -> ApiResult<StatusCode> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    state
-        .permission_service
-        .revoke(tenant_id, agent_id, tool_id)
-        .await?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-// ============================================================================
-// Audit Handler
-// ============================================================================
-
-/// Query audit trail for an agent.
-#[utoipa::path(
-    get,
-    path = "/nhi/agents/{id}/audit",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID"),
-        AuditFilter
-    ),
-    responses(
-        (status = 200, description = "Audit trail", body = AuditListResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn query_agent_audit(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Query(query): Query<AuditFilter>,
-) -> ApiResult<Json<AuditListResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let response = state
-        .audit_service
-        .query_by_agent(tenant_id, id, query)
-        .await?;
-    Ok(Json(response))
-}
-
-// ============================================================================
-// Security Assessment Handler (F093)
-// ============================================================================
-
-/// Get security assessment for an agent.
-#[utoipa::path(
-    get,
-    path = "/nhi/agents/{id}/security-assessment",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    responses(
-        (status = 200, description = "Security assessment", body = SecurityAssessment),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_security_assessment(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<SecurityAssessment>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let assessment = state.assessment_service.assess_agent(tenant_id, id).await?;
-    Ok(Json(assessment))
-}
-
-// ============================================================================
-// Anomaly Detection Handlers (F094)
-// ============================================================================
-
-/// List detected anomalies for an agent.
-#[utoipa::path(
-    get,
-    path = "/nhi/agents/{id}/anomalies",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID"),
-        ("since" = Option<chrono::DateTime<chrono::Utc>>, Query, description = "Filter anomalies since this time"),
-        ("anomaly_type" = Option<String>, Query, description = "Filter by anomaly type"),
-        ("severity" = Option<String>, Query, description = "Filter by severity"),
-        ("limit" = Option<i64>, Query, description = "Maximum number of results"),
-        ("offset" = Option<i64>, Query, description = "Offset for pagination")
-    ),
-    responses(
-        (status = 200, description = "List of anomalies", body = AnomalyListResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn list_anomalies(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Query(query): Query<ListAnomaliesQuery>,
-) -> ApiResult<Json<AnomalyListResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let anomalies = state
-        .anomaly_service
-        .list_anomalies(tenant_id, id, &query)
-        .await?;
-    Ok(Json(anomalies))
-}
-
-/// Get baseline for an agent.
-#[utoipa::path(
-    get,
-    path = "/nhi/agents/{id}/baseline",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    responses(
-        (status = 200, description = "Agent baseline", body = BaselineResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent or baseline not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_baseline(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<BaselineResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let baseline = state.baseline_service.get_baseline(tenant_id, id).await?;
-    Ok(Json(baseline))
-}
-
-/// Get thresholds for an agent.
-#[utoipa::path(
-    get,
-    path = "/nhi/agents/{id}/thresholds",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    responses(
-        (status = 200, description = "Agent thresholds", body = ThresholdsResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_thresholds(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<ThresholdsResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let thresholds = state
-        .anomaly_service
-        .get_agent_thresholds(tenant_id, id)
-        .await?;
-    Ok(Json(thresholds))
-}
-
-/// Update thresholds for an agent.
-#[utoipa::path(
-    put,
-    path = "/nhi/agents/{id}/thresholds",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    request_body = SetThresholdsRequest,
-    responses(
-        (status = 200, description = "Thresholds updated", body = ThresholdsResponse),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn update_thresholds(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Json(request): Json<SetThresholdsRequest>,
-) -> ApiResult<Json<ThresholdsResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let thresholds = state
-        .anomaly_service
-        .set_agent_thresholds(tenant_id, id, request)
-        .await?;
-    Ok(Json(thresholds))
-}
-
-/// Reset thresholds for an agent to defaults.
-#[utoipa::path(
-    delete,
-    path = "/nhi/agents/{id}/thresholds",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    responses(
-        (status = 200, description = "Thresholds reset to tenant defaults", body = ThresholdsResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn reset_thresholds(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<ThresholdsResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let thresholds = state
-        .anomaly_service
-        .reset_agent_thresholds(tenant_id, id)
-        .await?;
-    Ok(Json(thresholds))
-}
-
-// ============================================================================
-// Tenant-Wide Threshold Handlers
-// ============================================================================
-
-/// Get tenant-wide default thresholds.
-#[utoipa::path(
-    get,
-    path = "/nhi/agents/thresholds",
-    tag = "NHI - Agents",
-    responses(
-        (status = 200, description = "Tenant default thresholds", body = ThresholdsResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_tenant_thresholds(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-) -> ApiResult<Json<ThresholdsResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let thresholds = state
-        .anomaly_service
-        .get_tenant_thresholds(tenant_id)
-        .await?;
-    Ok(Json(thresholds))
-}
-
-/// Set tenant-wide default thresholds.
-#[utoipa::path(
-    put,
-    path = "/nhi/agents/thresholds",
-    tag = "NHI - Agents",
-    request_body = SetThresholdsRequest,
-    responses(
-        (status = 200, description = "Tenant thresholds updated", body = ThresholdsResponse),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn set_tenant_thresholds(
-    State(state): State<AgentsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Json(request): Json<SetThresholdsRequest>,
-) -> ApiResult<Json<ThresholdsResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let thresholds = state
-        .anomaly_service
-        .set_tenant_thresholds(tenant_id, request)
-        .await?;
-    Ok(Json(thresholds))
-}
-
-// ============================================================================
-// Credential Handlers (F110)
-// ============================================================================
-
-// Re-export credential types for agents
-pub use xavyo_api_governance::models::{
-    NhiCredentialCreatedResponse, NhiCredentialListResponse, NhiCredentialResponse,
-    RevokeCredentialRequest, RotateCredentialsRequest,
-};
-
-/// Query parameters for listing agent credentials.
-#[derive(Debug, Clone, serde::Deserialize, utoipa::IntoParams)]
-pub struct ListAgentCredentialsQuery {
-    /// Only return active credentials.
-    pub active_only: Option<bool>,
-}
-
-/// List credentials for an AI agent.
-#[utoipa::path(
-    get,
-    path = "/nhi/agents/{id}/credentials",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID"),
-        ListAgentCredentialsQuery
-    ),
-    responses(
-        (status = 200, description = "List of credentials", body = NhiCredentialListResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn list_agent_credentials(
-    State(state): State<AgentCredentialState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Query(query): Query<ListAgentCredentialsQuery>,
-) -> ApiResult<Json<NhiCredentialListResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let result = state
-        .credential_service
-        .list(tenant_id, id, query.active_only.unwrap_or(false))
-        .await?;
-    Ok(Json(result))
-}
-
-/// Get a specific credential for an AI agent.
-#[utoipa::path(
-    get,
-    path = "/nhi/agents/{agent_id}/credentials/{credential_id}",
-    tag = "NHI - Agents",
-    params(
-        ("agent_id" = Uuid, Path, description = "Agent ID"),
-        ("credential_id" = Uuid, Path, description = "Credential ID")
-    ),
-    responses(
-        (status = 200, description = "Credential details", body = NhiCredentialResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent or credential not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_agent_credential(
-    State(state): State<AgentCredentialState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path((agent_id, credential_id)): Path<(Uuid, Uuid)>,
-) -> ApiResult<Json<NhiCredentialResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let credential = state
-        .credential_service
-        .get(tenant_id, agent_id, credential_id)
-        .await?;
-    Ok(Json(credential))
-}
-
-/// Rotate credentials for an AI agent.
-#[utoipa::path(
-    post,
-    path = "/nhi/agents/{id}/credentials/rotate",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    request_body = RotateCredentialsRequest,
-    responses(
-        (status = 201, description = "Credentials rotated - secret only shown once", body = NhiCredentialCreatedResponse),
-        (status = 400, description = "Invalid request or agent suspended"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn rotate_agent_credentials(
-    State(state): State<AgentCredentialState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Json(request): Json<RotateCredentialsRequest>,
-) -> ApiResult<(StatusCode, Json<NhiCredentialCreatedResponse>)> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let actor_id = extract_actor_id(&claims)?;
-    let result = state
-        .credential_service
-        .rotate(tenant_id, id, Some(actor_id), request)
-        .await?;
     Ok((StatusCode::CREATED, Json(result)))
 }
 
-/// Revoke a credential for an AI agent.
-#[utoipa::path(
-    post,
-    path = "/nhi/agents/{agent_id}/credentials/{credential_id}/revoke",
-    tag = "NHI - Agents",
-    params(
-        ("agent_id" = Uuid, Path, description = "Agent ID"),
-        ("credential_id" = Uuid, Path, description = "Credential ID")
-    ),
-    request_body = RevokeCredentialRequest,
-    responses(
-        (status = 200, description = "Credential revoked", body = NhiCredentialResponse),
-        (status = 400, description = "Invalid request or credential already revoked"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Agent or credential not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn revoke_agent_credential(
-    State(state): State<AgentCredentialState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path((agent_id, credential_id)): Path<(Uuid, Uuid)>,
-    Json(request): Json<RevokeCredentialRequest>,
-) -> ApiResult<Json<NhiCredentialResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let actor_id = extract_actor_id(&claims)?;
-    let credential = state
-        .credential_service
-        .revoke(
-            tenant_id,
-            agent_id,
-            credential_id,
-            actor_id,
-            request.reason,
-            request.immediate,
-        )
-        .await?;
-    Ok(Json(credential))
+/// GET /nhi/agents — List agents with filters.
+async fn list_agents(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
+    Query(query): Query<ListAgentsQuery>,
+) -> Result<Json<PaginatedResponse<NhiAgentWithIdentity>>, NhiApiError> {
+    let tenant_uuid = *tenant_id.as_uuid();
+    let limit = query.limit.unwrap_or(20).clamp(1, 100);
+    let offset = query.offset.unwrap_or(0).max(0);
+
+    let filter = NhiAgentFilter {
+        agent_type: query.agent_type,
+        lifecycle_state: query.lifecycle_state,
+        owner_id: query.owner_id,
+        requires_human_approval: query.requires_human_approval,
+        team_id: query.team_id,
+    };
+
+    let data = NhiAgent::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
+    let total = count_agents(&state.pool, tenant_uuid, &filter).await?;
+
+    Ok(Json(PaginatedResponse {
+        data,
+        total,
+        limit,
+        offset,
+    }))
 }
 
-/// Validate a credential for an AI agent.
-///
-/// This endpoint allows an agent to verify that its credential is valid
-/// without performing any other operation. Returns 200 if valid, 401 if invalid.
-#[utoipa::path(
-    post,
-    path = "/nhi/agents/{id}/credentials/validate",
-    tag = "NHI - Agents",
-    params(
-        ("id" = Uuid, Path, description = "Agent ID")
-    ),
-    request_body = ValidateCredentialRequest,
-    responses(
-        (status = 200, description = "Credential is valid", body = ValidateCredentialResponse),
-        (status = 401, description = "Invalid or expired credential"),
-        (status = 404, description = "Agent not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn validate_agent_credential(
-    State(state): State<AgentCredentialState>,
+/// Count agents matching a filter.
+async fn count_agents(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    filter: &NhiAgentFilter,
+) -> Result<i64, sqlx::Error> {
+    let mut query = String::from(
+        r"
+        SELECT COUNT(*)
+        FROM nhi_identities i
+        INNER JOIN nhi_agents a ON a.nhi_id = i.id
+        WHERE i.tenant_id = $1
+        ",
+    );
+    let mut param_idx = 2;
+
+    if filter.agent_type.is_some() {
+        query.push_str(&format!(" AND a.agent_type = ${param_idx}"));
+        param_idx += 1;
+    }
+    if filter.lifecycle_state.is_some() {
+        query.push_str(&format!(" AND i.lifecycle_state = ${param_idx}"));
+        param_idx += 1;
+    }
+    if filter.owner_id.is_some() {
+        query.push_str(&format!(" AND i.owner_id = ${param_idx}"));
+        param_idx += 1;
+    }
+    if filter.requires_human_approval.is_some() {
+        query.push_str(&format!(" AND a.requires_human_approval = ${param_idx}"));
+        param_idx += 1;
+    }
+    if filter.team_id.is_some() {
+        query.push_str(&format!(" AND a.team_id = ${param_idx}"));
+        param_idx += 1;
+    }
+    let _ = param_idx; // suppress unused warning
+
+    let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
+
+    if let Some(ref agent_type) = filter.agent_type {
+        q = q.bind(agent_type);
+    }
+    if let Some(lifecycle_state) = filter.lifecycle_state {
+        q = q.bind(lifecycle_state);
+    }
+    if let Some(owner_id) = filter.owner_id {
+        q = q.bind(owner_id);
+    }
+    if let Some(requires_human_approval) = filter.requires_human_approval {
+        q = q.bind(requires_human_approval);
+    }
+    if let Some(team_id) = filter.team_id {
+        q = q.bind(team_id);
+    }
+
+    q.fetch_one(pool).await
+}
+
+/// GET /nhi/agents/{id} — Get a specific agent.
+async fn get_agent(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
     Path(id): Path<Uuid>,
-    Json(request): Json<ValidateCredentialRequest>,
-) -> ApiResult<Json<ValidateCredentialResponse>> {
-    let result = state.credential_service.validate(&request.credential).await;
+) -> Result<Json<NhiAgentWithIdentity>, NhiApiError> {
+    let tenant_uuid = *tenant_id.as_uuid();
 
-    match result {
-        Ok((tenant_id, nhi_id, nhi_type)) => {
-            // Verify the credential belongs to the requested agent
-            if nhi_id != id {
-                return Err(crate::error::ApiNhiError::BadRequest(
-                    "Credential does not belong to this agent".to_string(),
-                ));
-            }
+    let agent = NhiAgent::find_by_nhi_id(&state.pool, tenant_uuid, id)
+        .await?
+        .ok_or(NhiApiError::NotFound)?;
 
-            Ok(Json(ValidateCredentialResponse {
-                valid: true,
-                agent_id: nhi_id,
-                tenant_id,
-                nhi_type: nhi_type.to_string(),
-                message: "Credential is valid".to_string(),
-            }))
-        }
-        Err(_) => Err(crate::error::ApiNhiError::InvalidCredential),
-    }
+    Ok(Json(agent))
 }
 
-/// Request to validate a credential.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct ValidateCredentialRequest {
-    /// The credential to validate (e.g., xnhi_...)
-    pub credential: String,
+/// PATCH /nhi/agents/{id} — Update an agent.
+async fn update_agent(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+    Json(request): Json<UpdateAgentRequest>,
+) -> Result<Json<NhiAgentWithIdentity>, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
+    let tenant_uuid = *tenant_id.as_uuid();
+
+    NhiIdentity::find_by_id(&state.pool, tenant_uuid, id)
+        .await?
+        .ok_or(NhiApiError::NotFound)?;
+
+    let mut tx = state.pool.begin().await.map_err(|e| {
+        tracing::error!("Failed to begin transaction: {e}");
+        NhiApiError::Internal("Failed to begin transaction".into())
+    })?;
+
+    // Update base identity fields if any are set
+    let has_base_update = request.name.is_some()
+        || request.description.is_some()
+        || request.owner_id.is_some()
+        || request.backup_owner_id.is_some()
+        || request.expires_at.is_some()
+        || request.inactivity_threshold_days.is_some()
+        || request.rotation_interval_days.is_some();
+
+    if has_base_update {
+        let base_update = UpdateNhiIdentity {
+            name: request.name,
+            description: request.description,
+            owner_id: request.owner_id,
+            backup_owner_id: request.backup_owner_id,
+            expires_at: request.expires_at,
+            inactivity_threshold_days: request.inactivity_threshold_days,
+            rotation_interval_days: request.rotation_interval_days,
+        };
+        update_identity_in_tx(&mut tx, tenant_uuid, id, base_update).await?;
+    }
+
+    // Update agent extension fields if any are set
+    let has_agent_update = request.agent_type.is_some()
+        || request.model_provider.is_some()
+        || request.model_name.is_some()
+        || request.model_version.is_some()
+        || request.agent_card_url.is_some()
+        || request.agent_card_signature.is_some()
+        || request.max_token_lifetime_secs.is_some()
+        || request.requires_human_approval.is_some()
+        || request.team_id.is_some();
+
+    if has_agent_update {
+        let agent_update = UpdateNhiAgent {
+            agent_type: request.agent_type,
+            model_provider: request.model_provider,
+            model_name: request.model_name,
+            model_version: request.model_version,
+            agent_card_url: request.agent_card_url,
+            agent_card_signature: request.agent_card_signature,
+            max_token_lifetime_secs: request.max_token_lifetime_secs,
+            requires_human_approval: request.requires_human_approval,
+            team_id: request.team_id,
+        };
+        sqlx::query(
+            r"
+            UPDATE nhi_agents
+            SET agent_type = COALESCE($3, agent_type),
+                model_provider = COALESCE($4, model_provider),
+                model_name = COALESCE($5, model_name),
+                model_version = COALESCE($6, model_version),
+                agent_card_url = COALESCE($7, agent_card_url),
+                agent_card_signature = COALESCE($8, agent_card_signature),
+                max_token_lifetime_secs = COALESCE($9, max_token_lifetime_secs),
+                requires_human_approval = COALESCE($10, requires_human_approval),
+                team_id = COALESCE($11, team_id)
+            WHERE nhi_id = $2
+              AND EXISTS (SELECT 1 FROM nhi_identities WHERE id = $2 AND tenant_id = $1)
+            ",
+        )
+        .bind(tenant_uuid)
+        .bind(id)
+        .bind(&agent_update.agent_type)
+        .bind(&agent_update.model_provider)
+        .bind(&agent_update.model_name)
+        .bind(&agent_update.model_version)
+        .bind(&agent_update.agent_card_url)
+        .bind(&agent_update.agent_card_signature)
+        .bind(agent_update.max_token_lifetime_secs)
+        .bind(agent_update.requires_human_approval)
+        .bind(agent_update.team_id)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await.map_err(|e| {
+        tracing::error!("Failed to commit transaction: {e}");
+        NhiApiError::Internal("Failed to commit transaction".into())
+    })?;
+
+    let result = NhiAgent::find_by_nhi_id(&state.pool, tenant_uuid, id)
+        .await?
+        .ok_or(NhiApiError::NotFound)?;
+
+    Ok(Json(result))
 }
 
-/// Response for credential validation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-pub struct ValidateCredentialResponse {
-    /// Whether the credential is valid.
-    pub valid: bool,
-    /// The agent ID the credential belongs to.
-    pub agent_id: Uuid,
-    /// The tenant ID.
-    pub tenant_id: Uuid,
-    /// The NHI type (agent or `service_account`).
-    pub nhi_type: String,
-    /// A human-readable message.
-    pub message: String,
+/// DELETE /nhi/agents/{id} — Delete an agent.
+async fn delete_agent(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
+    let tenant_uuid = *tenant_id.as_uuid();
+
+    let deleted = NhiIdentity::delete(&state.pool, tenant_uuid, id).await?;
+    if !deleted {
+        return Err(NhiApiError::NotFound);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
-/// State for agent credential handlers.
-#[derive(Clone)]
-pub struct AgentCredentialState {
-    pub credential_service: crate::services::AgentCredentialService,
+// ---------------------------------------------------------------------------
+// Helper: update identity within a transaction
+// ---------------------------------------------------------------------------
+
+async fn update_identity_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    tenant_id: Uuid,
+    id: Uuid,
+    input: UpdateNhiIdentity,
+) -> Result<(), NhiApiError> {
+    let mut updates = vec!["updated_at = NOW()".to_string()];
+    let mut param_idx: u32 = 3;
+
+    if input.name.is_some() {
+        updates.push(format!("name = ${param_idx}"));
+        param_idx += 1;
+    }
+    if input.description.is_some() {
+        updates.push(format!("description = ${param_idx}"));
+        param_idx += 1;
+    }
+    if input.owner_id.is_some() {
+        updates.push(format!("owner_id = ${param_idx}"));
+        param_idx += 1;
+    }
+    if input.backup_owner_id.is_some() {
+        updates.push(format!("backup_owner_id = ${param_idx}"));
+        param_idx += 1;
+    }
+    if input.expires_at.is_some() {
+        updates.push(format!("expires_at = ${param_idx}"));
+        param_idx += 1;
+    }
+    if input.inactivity_threshold_days.is_some() {
+        updates.push(format!("inactivity_threshold_days = ${param_idx}"));
+        param_idx += 1;
+    }
+    if input.rotation_interval_days.is_some() {
+        updates.push(format!("rotation_interval_days = ${param_idx}"));
+    }
+
+    let query = format!(
+        "UPDATE nhi_identities SET {} WHERE tenant_id = $1 AND id = $2",
+        updates.join(", ")
+    );
+
+    let mut q = sqlx::query(&query).bind(tenant_id).bind(id);
+
+    if let Some(ref name) = input.name {
+        q = q.bind(name);
+    }
+    if let Some(ref description) = input.description {
+        q = q.bind(description);
+    }
+    if let Some(ref owner_opt) = input.owner_id {
+        q = q.bind(*owner_opt);
+    }
+    if let Some(ref backup_opt) = input.backup_owner_id {
+        q = q.bind(*backup_opt);
+    }
+    if let Some(ref expires_opt) = input.expires_at {
+        q = q.bind(*expires_opt);
+    }
+    if let Some(ref inactivity_opt) = input.inactivity_threshold_days {
+        q = q.bind(*inactivity_opt);
+    }
+    if let Some(ref rotation_opt) = input.rotation_interval_days {
+        q = q.bind(*rotation_opt);
+    }
+
+    q.execute(&mut **tx).await?;
+    Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// ---------------------------------------------------------------------------
+// Router
+// ---------------------------------------------------------------------------
 
-    #[test]
-    fn test_agents_handlers_compile() {
-        assert!(true);
-    }
-
-    // F110: Test agent credential query types
-    #[test]
-    fn test_list_agent_credentials_query() {
-        let query = ListAgentCredentialsQuery { active_only: None };
-        assert!(query.active_only.is_none());
-
-        let query_active = ListAgentCredentialsQuery {
-            active_only: Some(true),
-        };
-        assert_eq!(query_active.active_only, Some(true));
-    }
-
-    // T032: Test agents list handler types
-    #[test]
-    fn test_list_agents_query_types() {
-        // Verify ListAgentsQuery can be constructed with defaults
-        let query = ListAgentsQuery {
-            status: None,
-            agent_type: None,
-            owner_id: None,
-            risk_level: None,
-            name: None,
-            limit: 100,
-            offset: 0,
-        };
-        assert!(query.status.is_none());
-        assert!(query.name.is_none());
-
-        let query_with_filter = ListAgentsQuery {
-            status: Some("active".to_string()),
-            agent_type: Some("assistant".to_string()),
-            owner_id: None,
-            risk_level: Some("low".to_string()),
-            name: Some("test".to_string()),
-            limit: 20,
-            offset: 0,
-        };
-        assert_eq!(query_with_filter.status, Some("active".to_string()));
-        assert_eq!(query_with_filter.limit, 20);
-    }
-
-    // T033: Test agents authorize handler types
-    #[test]
-    fn test_authorize_agent_request_types() {
-        // Verify AuthorizeRequest can be constructed
-        let request = AuthorizeRequest {
-            agent_id: uuid::Uuid::new_v4(),
-            tool: "test-tool".to_string(),
-            parameters: None,
-            context: None,
-        };
-        assert!(request.context.is_none());
-        assert!(request.parameters.is_none());
-
-        let request_with_params = AuthorizeRequest {
-            agent_id: uuid::Uuid::new_v4(),
-            tool: "another-tool".to_string(),
-            parameters: Some(serde_json::json!({"key": "value"})),
-            context: None,
-        };
-        assert!(request_with_params.parameters.is_some());
-    }
-
-    #[test]
-    fn test_extract_tenant_id_error_type() {
-        // Test that extract_tenant_id returns appropriate error type
-        fn _verify_error_type() -> Result<uuid::Uuid, ApiNhiError> {
-            Err(ApiNhiError::Unauthorized)
-        }
-    }
+pub fn agent_routes(state: NhiState) -> Router {
+    Router::new()
+        .route("/agents", post(create_agent).get(list_agents))
+        .route(
+            "/agents/:id",
+            get(get_agent).patch(update_agent).delete(delete_agent),
+        )
+        .with_state(state)
 }

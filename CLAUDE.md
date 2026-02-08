@@ -192,6 +192,7 @@ docs/             # Documentation
 - Rust 1.75+ (per constitution) + Axum + Tower (REST API), SQLx (database), tokio (async runtime), serde (serialization) (197-bulk-action-engine)
 - Rust 1.75+ (per constitution) + xavyo-db (SQLx), xavyo-api-auth, xavyo-api-tenants, xavyo-core (TenantId, UserId), async-trait, chrono, uuid, serde (199-org-security-policies)
 - Rust 1.75+ + Axum + Tower (HTTP), SQLx (database), serde (serialization), utoipa (OpenAPI) (200-gdpr-data-protection)
+- Rust 1.75+ (per constitution) + Axum + Tower (HTTP), SQLx (database, compile-time checked), serde/serde_json, chrono, uuid, async-trait, utoipa (OpenAPI), validator (input validation) (201-tool-nhi-promotion)
 
 ## Recent Changes
 - 132-sod-validation: Added Rust 1.75+ (per constitution) + xavyo-governance (F-004 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror

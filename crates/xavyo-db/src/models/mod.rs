@@ -1139,16 +1139,30 @@ pub use api_key_usage::{
     ResponseCategory, UsageFilter,
 };
 
-// Unified NHI View models (F108)
-pub mod nhi_view;
+// Unified NHI Models (201-tool-nhi-promotion)
+pub mod nhi_agent;
+pub mod nhi_certification_campaign;
+pub mod nhi_credential;
+pub mod nhi_identity;
+pub mod nhi_service_account;
+pub mod nhi_tool;
+pub mod nhi_tool_permission;
 
-// Unified NHI trait implementations (F108)
-pub mod nhi_impl;
+// Old NHI view/impl models (F108) — deleted, superseded by 201-tool-nhi-promotion unified models
 
-// Unified NHI View exports (F108)
-pub use nhi_view::{
-    NhiCountByRiskLevel, NhiCountByType, NhiRiskSummary, NhiViewFilter, NonHumanIdentityView,
+// Unified NHI Model exports (201-tool-nhi-promotion)
+pub use nhi_agent::{
+    CreateNhiAgent, NhiAgent, NhiAgentFilter, NhiAgentWithIdentity, UpdateNhiAgent,
 };
+pub use nhi_certification_campaign::{CreateNhiCertificationCampaign, NhiCertificationCampaign};
+pub use nhi_credential::{CreateNhiCredential, NhiCredential};
+pub use nhi_identity::{CreateNhiIdentity, NhiIdentity, NhiIdentityFilter, UpdateNhiIdentity};
+pub use nhi_service_account::{
+    CreateNhiServiceAccount, NhiServiceAccount, NhiServiceAccountFilter,
+    NhiServiceAccountWithIdentity, UpdateNhiServiceAccount,
+};
+pub use nhi_tool::{CreateNhiTool, NhiTool, NhiToolFilter, NhiToolWithIdentity, UpdateNhiTool};
+pub use nhi_tool_permission::{CreateNhiToolPermission, NhiToolPermission};
 
 // Tenant Usage Tracking models (F-USAGE-TRACK)
 pub mod usage;

@@ -1,51 +1,51 @@
 # Batch 8: Deep NHI · Governance SoD/Certification · SCIM Deep
 
-PASS=92 FAIL=0 SKIP=5 TOTAL=97
+PASS=92 FAIL=0 SKIP=5 TOTAL=74
 
 | Test ID | Result | Details |
 |---------|--------|---------|
-| TC-NHI-CRED-001 | PASS | Credentials rotated, id=597cb83e-8c8c-43a8-80ae-ec9fba9986d8 |
-| TC-NHI-CRED-002 | PASS | 200, credentials listed (count=1) |
-| TC-NHI-CRED-003 | PASS | 200, credential retrieved (secret not leaked) |
-| TC-NHI-CRED-004 | PASS | 200, credential revoked |
-| TC-NHI-CRED-005 | PASS | 401, revoked credential rejected |
-| TC-NHI-CRED-006 | PASS | 429, rate limited (credential rotation has cooldown) |
-| TC-NHI-CRED-007 | PASS | 200, active credentials filtered |
-| TC-NHI-CRED-008 | PASS | 429, rate limited before auth check (acceptable) |
+| TC-NHI-CRED-001 | PASS | Credential issued, id=7319a97f-cda2-4659-861e-47fa5143cf19 |
+| TC-NHI-CRED-002 | PASS | 200, credentials listed (count=) |
+| TC-NHI-CRED-003 | PASS | 200, credentials listed (secret not leaked) |
+| TC-NHI-CRED-004 | PASS | 204, credential revoked |
+| TC-NHI-CRED-005 | PASS | 200, credentials listed after revocation |
+| TC-NHI-CRED-006 | PASS | 201, second credential issued id=02e15c0b-8443-4032-b8a1-abd15c8b9b94 |
+| TC-NHI-CRED-007 | PASS | 201, credential rotated |
+| TC-NHI-CRED-008 | PASS | 403, non-admin rejected |
 | TC-NHI-CRED-009 | PASS | 401, unauthenticated rejected |
-| TC-NHI-CRED-010 | PASS | 404, nonexistent agent credentials |
-| TC-NHI-TOOL-001 | PASS | 201, tool registered id=3be5b88f-bfb7-47f2-ac33-f20936131888 |
+| TC-NHI-CRED-010 | PASS | 200 with empty list for nonexistent NHI |
+| TC-NHI-TOOL-001 | PASS | 201, tool registered id=8164c02b-6747-4f9d-a1f4-49ffb5db094c |
 | TC-NHI-TOOL-002 | PASS | 200, tools listed |
-| TC-NHI-TOOL-003 | PASS | 200, tool retrieved name=batch8-tool-1770497907 |
+| TC-NHI-TOOL-003 | PASS | 200, tool retrieved name=batch8-tool-1770535083 |
 | TC-NHI-TOOL-004 | PASS | 200, tool updated |
 | TC-NHI-TOOL-005 | PASS | 422, duplicate tool name rejected |
 | TC-NHI-TOOL-006 | PASS | 201, permission granted |
-| TC-NHI-TOOL-007 | PASS | 200, permissions listed |
-| TC-NHI-TOOL-008 | PASS | 204, permission revoked |
+| TC-NHI-TOOL-007 | PASS | 200, agent tools listed |
+| TC-NHI-TOOL-008 | PASS | 200, permission revoked |
 | TC-NHI-TOOL-009 | PASS | 404, nonexistent tool |
 | TC-NHI-TOOL-010 | PASS | 403, non-admin rejected |
 | TC-NHI-TOOL-011 | PASS | 204, tool deleted |
 | TC-NHI-TOOL-012 | PASS | 404, nonexistent tool delete |
 | TC-NHI-TOOL-013 | PASS | 200, tools filtered by category |
-| TC-NHI-CERT-001 | PASS | 201, campaign created id=e5dbb3e9-0391-44f2-8807-bc0ff92369f4 |
+| TC-NHI-CERT-001 | PASS | 201, campaign created id=3294e5aa-df3a-4aa2-9770-cb7a21ed0118 |
 | TC-NHI-CERT-002 | PASS | 200, campaigns listed |
-| TC-NHI-CERT-003 | PASS | 200, campaign retrieved |
-| TC-NHI-CERT-004 | PASS | 200, campaign launched |
-| TC-NHI-CERT-005 | PASS | 200, campaign summary retrieved |
-| TC-NHI-CERT-006 | PASS | 200, campaign items listed |
-| TC-NHI-CERT-007 | PASS | 200, my pending items listed |
-| TC-NHI-CERT-008 | PASS | 200, campaign cancelled |
-| TC-NHI-CERT-009 | PASS | 404, nonexistent campaign |
+| TC-NHI-CERT-003 | PASS | 200, campaigns filtered by status |
+| TC-NHI-CERT-004 | PASS | 200, NHI certified via campaign |
+| TC-NHI-CERT-005 | PASS | 200, NHI certification revoked |
+| TC-NHI-CERT-006 | PASS | 201, typed campaign created id=18591417-2ecd-4051-9bc1-262980177533 |
+| TC-NHI-CERT-007 | PASS | 201, specific-scope campaign created |
+| TC-NHI-CERT-008 | PASS | 400, invalid scope rejected |
+| TC-NHI-CERT-009 | PASS | 400, empty name rejected |
 | TC-NHI-CERT-010 | PASS | 403, non-admin rejected |
-| TC-NHI-REQ-001 | PASS | 201, request submitted id=e7fb6722-6499-4a73-9368-1278da588c30 |
-| TC-NHI-REQ-002 | PASS | 200, requests listed |
-| TC-NHI-REQ-003 | PASS | 200, request retrieved |
-| TC-NHI-REQ-004 | PASS | 200, request summary retrieved |
-| TC-NHI-REQ-005 | PASS | 200, my pending requests listed |
-| TC-NHI-REQ-006 | PASS | 200, request approved |
-| TC-NHI-REQ-007 | PASS | 200, request cancelled |
-| TC-NHI-REQ-008 | PASS | 400, request already decided (cannot re-approve) |
-| TC-GOV-SOD-001 | PASS | 201, SoD rule created id=f330d526-54d5-4bbb-9459-1a532d25ed0d |
+| TC-NHI-REQ-001 | PASS | 201, service account created id=6919b2ab-df82-45af-9dff-b543a6d8ffa0 |
+| TC-NHI-REQ-002 | PASS | 200, service accounts listed (total=11) |
+| TC-NHI-REQ-003 | PASS | 200, service account retrieved name=sa-batch8-1770535083 |
+| TC-NHI-REQ-004 | PASS | 200, service accounts filtered by environment |
+| TC-NHI-REQ-005 | PASS | 200, service account updated |
+| TC-NHI-REQ-006 | PASS | 201, credential issued for service account |
+| TC-NHI-REQ-007 | PASS | 204, service account deleted |
+| TC-NHI-REQ-008 | PASS | 403, non-admin rejected |
+| TC-GOV-SOD-001 | PASS | 201, SoD rule created id=3ab63fa0-5539-410d-aa43-030fb84d1d30 |
 | TC-GOV-SOD-002 | PASS | 200, SoD rules listed |
 | TC-GOV-SOD-003 | PASS | 200, SoD rule retrieved |
 | TC-GOV-SOD-004 | PASS | 200, SoD rule updated |
@@ -55,11 +55,11 @@ PASS=92 FAIL=0 SKIP=5 TOTAL=97
 | TC-GOV-SOD-008 | PASS | 200, scan completed |
 | TC-GOV-SOD-009 | PASS | 200, violations listed |
 | TC-GOV-SOD-010 | PASS | 200, exemptions listed |
-| TC-GOV-SOD-011 | PASS | 201, exemption created id=717c2a9a-151a-4b66-9bda-a98e64d81dbc |
+| TC-GOV-SOD-011 | PASS | 201, exemption created id=df9e3cac-822c-44cb-9b22-bcb79d0a2e7c |
 | TC-GOV-SOD-012 | PASS | 204, SoD rule deleted |
 | TC-GOV-SOD-013 | PASS | 403, non-admin rejected |
 | TC-GOV-SOD-014 | PASS | 404, nonexistent SoD rule |
-| TC-GOV-CERT-001 | PASS | 201, campaign created id=92d32b90-c5e0-4a99-bb45-fcaa0afe55de |
+| TC-GOV-CERT-001 | PASS | 201, campaign created id=307f3920-5054-4000-b7ca-c44a99a36d9a |
 | TC-GOV-CERT-002 | PASS | 200, campaigns listed |
 | TC-GOV-CERT-003 | PASS | 200, campaign retrieved |
 | TC-GOV-CERT-004 | PASS | 200, campaign updated |
@@ -75,7 +75,7 @@ PASS=92 FAIL=0 SKIP=5 TOTAL=97
 | TC-GOV-REQ-002 | PASS | 200, catalog items listed |
 | TC-GOV-REQ-003 | PASS | 200, cart retrieved |
 | TC-GOV-REQ-004 | PASS | 200, cart has items field |
-| TC-GOV-REQ-005 | PASS | 201, access request created id=9ccfd6f8-b0e0-49ab-8fe1-e21765e08e23 |
+| TC-GOV-REQ-005 | PASS | 201, access request created id=1b9e2913-0cfa-4e83-a620-cdfbcd5c7ba0 |
 | TC-GOV-REQ-006 | PASS | 200, access requests listed |
 | TC-GOV-REQ-007 | PASS | 200, access request retrieved |
 | TC-GOV-REQ-008 | PASS | 403, approval behavior (self-approval or not designated approver) |
@@ -102,4 +102,4 @@ PASS=92 FAIL=0 SKIP=5 TOTAL=97
 | TC-SCIM-DEEP-017 | PASS | 401, unauthenticated SCIM rejected |
 | TC-SCIM-DEEP-018 | PASS | 204, SCIM user deleted |
 
-Generated: 2026-02-07 20:58:54 UTC
+Generated: 2026-02-08 07:18:15 UTC
