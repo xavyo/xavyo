@@ -43,6 +43,8 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:3000}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@xavyo.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@1234}
     ports:
       - '${API_PORT:-8080}:8080'
     volumes:
