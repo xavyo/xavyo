@@ -798,6 +798,18 @@ echo "════════════════════════�
 echo "  Part 5: Admin Invitations (TC-AI-001 … TC-AI-012)"
 echo "═══════════════════════════════════════════════════════════════════"
 
+# Cleanup: delete all pending invitations from previous runs
+RAW=$(admin_call GET "/admin/invitations?limit=100")
+parse_response "$RAW"
+if [[ "$CODE" == "200" ]]; then
+  EXISTING_IDS=$(echo "$BODY" | jq -r '.invitations[]?.id // empty' 2>/dev/null)
+  for inv_id in $EXISTING_IDS; do
+    if [[ -n "$inv_id" && "$inv_id" != "null" ]]; then
+      admin_call DELETE "/admin/invitations/$inv_id" > /dev/null 2>&1
+    fi
+  done
+fi
+
 # TC-AI-001: List invitations (empty)
 RAW=$(admin_call GET /admin/invitations)
 parse_response "$RAW"

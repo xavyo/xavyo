@@ -1,6 +1,6 @@
 # Batch 7: Import · Export · Invitations — Functional Test Results
 
-**Date**: 2026-02-08T07:17:43+00:00
+**Date**: 2026-02-08T08:20:07+00:00
 **Server**: http://localhost:8080
 
 ## Summary
@@ -11,14 +11,14 @@ PASS=36 FAIL=0 SKIP=0 TOTAL=36
 
 | Test Case | Result | Details |
 |-----------|--------|---------|
-| TC-IMPORT-001 | PASS | 202, import job created id=18e7a29c-c504-4e52-9763-99e9b93f85c1 |
+| TC-IMPORT-001 | PASS | 202, import job created id=f9d926d9-c5e5-471a-bbcd-1a43c6d46db8 |
 | TC-IMPORT-002 | PASS | 200, job status=pending |
 | TC-IMPORT-003 | PASS | 200, import jobs listed |
 | TC-IMPORT-004 | PASS | 202, minimal CSV imported |
 | TC-IMPORT-005 | PASS | 200, tenant isolation verified |
 | TC-IMPORT-006 | PASS | 200, errors listed (for successful job) |
 | TC-IMPORT-007 | PASS | 200, error CSV downloaded |
-| TC-IMPORT-008 | PASS | 202, partial CSV imported, job=a3555064-16ec-47bb-88cd-e29d2ce7b686 |
+| TC-IMPORT-008 | PASS | 202, partial CSV imported, job=26421f6e-db90-4928-ada6-c7f6677c4324 |
 | TC-IMPORT-009 | PASS | 200, job status=pending (processing may still be running) |
 | TC-IMPORT-010 | PASS | 400, empty CSV handled |
 | TC-IMPORT-011 | PASS | 202, duplicate emails handled |

@@ -4,20 +4,20 @@ PASS=68 FAIL=0 SKIP=0 TOTAL=68
 
 | Test ID | Result | Details |
 |---------|--------|---------|
-| TC-201-UNI-001 | PASS | 200, unified list returned (total=58) |
-| TC-201-UNI-002 | PASS | 200, count increased from 58 to 61 (created 3) |
+| TC-201-UNI-001 | PASS | 200, unified list returned (total=90) |
+| TC-201-UNI-002 | PASS | 200, count increased from 90 to 93 (created 3) |
 | TC-201-UNI-003 | PASS | 200, agent via unified endpoint (type=agent, has_agent_ext=yes) |
 | TC-201-UNI-004 | PASS | 200, tool via unified endpoint (type=tool) |
 | TC-201-UNI-005 | PASS | 200, service account via unified endpoint (type=service_account) |
 | TC-201-UNI-006 | PASS | 404, nonexistent NHI |
 | TC-201-UNI-007 | PASS | 401, unauthenticated rejected |
 | TC-201-UNI-008 | PASS | 200, pagination works (limit=2, data_count=2) |
-| TC-201-AGT-001 | PASS | 201, agent created without team (id=c4502056-2c35-4b9e-8c6d-7a64e591563d) |
-| TC-201-AGT-002 | PASS | 200, agent retrieved (name=agt-no-team-1770535346, type=copilot) |
+| TC-201-AGT-001 | PASS | 201, agent created without team (id=6047a95c-8e57-4b6c-8dec-0271a9b8cd3e) |
+| TC-201-AGT-002 | PASS | 200, agent retrieved (name=agt-no-team-1770539152, type=copilot) |
 | TC-201-AGT-003 | PASS | 200, agent updated (model=claude-opus-4-6) |
-| TC-201-AGT-004 | PASS | 200, agents listed (total=39) |
-| TC-201-AGT-005 | PASS | 201, autonomous agent created (id=b3764931-4d55-448a-bfbd-a648036a9514) |
-| TC-201-AGT-006 | PASS | 201, orchestrator agent created (id=d8265b84-6649-4bda-86af-81d0d3ce0309) |
+| TC-201-AGT-004 | PASS | 200, agents listed (total=59) |
+| TC-201-AGT-005 | PASS | 201, autonomous agent created (id=48d7d7a7-5153-461d-9252-55c6fc426623) |
+| TC-201-AGT-006 | PASS | 201, orchestrator agent created (id=c69a2535-4a81-42b0-8c3f-c6af56379cc9) |
 | TC-201-AGT-007 | PASS | 403, non-admin create rejected |
 | TC-201-AGT-008 | PASS | 401, unauthenticated rejected |
 | TC-201-AGT-009 | PASS | 404, nonexistent agent |
@@ -35,14 +35,14 @@ PASS=68 FAIL=0 SKIP=0 TOTAL=68
 | TC-201-LC-011 | PASS | 404, nonexistent NHI lifecycle transition |
 | TC-201-LC-012 | PASS | 403, non-admin lifecycle transition rejected |
 | TC-201-LC-013 | PASS | 401, unauthenticated lifecycle transition rejected |
-| TC-201-CERT-001 | PASS | 201, campaign created with scope=all (id=b90e3843-376b-4123-a401-8d923c786e87) |
-| TC-201-CERT-002 | PASS | 201, campaign created with scope=by_type (id=1f9dc63a-a03d-4974-8675-8e6ad34443c5) |
-| TC-201-CERT-003 | PASS | 201, campaign created with scope=specific (id=e0cef1a2-64ec-4651-9c7f-6b503b178970) |
+| TC-201-CERT-001 | PASS | 201, campaign created with scope=all (id=06a94544-da1c-4440-8785-332803934ca9) |
+| TC-201-CERT-002 | PASS | 201, campaign created with scope=by_type (id=d77c8ce8-507a-4932-ad72-2edffb8313af) |
+| TC-201-CERT-003 | PASS | 201, campaign created with scope=specific (id=68528a01-7b9b-4617-8851-4ea1e93367d8) |
 | TC-201-CERT-004 | PASS | 400, by_type without nhi_type_filter rejected |
 | TC-201-CERT-005 | PASS | 400, specific without specific_nhi_ids rejected |
 | TC-201-CERT-006 | PASS | 400, invalid scope 'foobar' rejected |
 | TC-201-CERT-007 | PASS | 400, empty name rejected |
-| TC-201-CERT-008 | PASS | 200, NHI certified in all-scope campaign (at=2026-02-08T07:22:33.843500201Z) |
+| TC-201-CERT-008 | PASS | 200, NHI certified in all-scope campaign (at=2026-02-08T08:25:59.039554528Z) |
 | TC-201-CERT-009 | PASS | 200, campaigns listed |
 | TC-201-CERT-010 | PASS | 403, non-admin create campaign rejected |
 | TC-201-CERT-011 | PASS | 404, certify nonexistent NHI |
@@ -55,7 +55,7 @@ PASS=68 FAIL=0 SKIP=0 TOTAL=68
 | TC-201-PERM-006 | PASS | 201, permission re-granted (upsert) |
 | TC-201-PERM-007 | PASS | 403, non-admin grant rejected |
 | TC-201-PERM-008 | PASS | 404, grant to nonexistent agent rejected |
-| TC-201-RISK-001 | PASS | 200, risk summary retrieved (total_entities=67) |
+| TC-201-RISK-001 | PASS | 200, risk summary retrieved (total_entities=99) |
 | TC-201-RISK-002 | PASS | 200, agent risk score=19 level=low |
 | TC-201-RISK-003 | PASS | 200, risk has total_score=19, risk_level=low, common_factors=3 |
 | TC-201-RISK-004 | PASS | 404, nonexistent NHI risk |
@@ -66,11 +66,11 @@ PASS=68 FAIL=0 SKIP=0 TOTAL=68
 | TC-201-INACT-004 | PASS | 200, auto-suspend executed (suspended=0) |
 | TC-201-INACT-005 | PASS | 403, non-admin detect inactive rejected |
 | TC-201-INACT-006 | PASS | 404, grace period for nonexistent NHI |
-| TC-201-SOD-001 | PASS | 201, SoD rule created id=8c9955ab-4446-4784-9fce-35687df0e114 |
+| TC-201-SOD-001 | PASS | 201, SoD rule created id=f2452455-b8d2-4bcd-9bd7-85ddf1d26919 |
 | TC-201-SOD-002 | PASS | 200, SoD rules listed (count=1) |
 | TC-201-SOD-003 | PASS | 200, SoD check done (is_allowed=false, violations=1) |
 | TC-201-SOD-004 | PASS | 204, SoD rule deleted |
 | TC-201-SOD-005 | PASS | 403, non-admin SoD rule creation rejected |
 | TC-201-SOD-006 | PASS | 404, nonexistent SoD rule delete |
 
-Generated: 2026-02-08 07:22:35 UTC
+Generated: 2026-02-08 08:26:00 UTC
