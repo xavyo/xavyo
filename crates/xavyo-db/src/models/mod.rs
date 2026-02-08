@@ -1050,38 +1050,11 @@ pub use role_inducement::{
     RoleInducementWithNames,
 };
 
-// AI Agent Security models (F089)
-pub mod ai_agent;
-pub mod ai_agent_audit_event;
-pub mod ai_agent_tool_permission;
-pub mod ai_tool;
-
-// AI Agent Security exports (F089)
-pub use ai_agent::{
-    AiAgent, AiAgentFilter, AiAgentStatus, AiAgentType, CreateAiAgent, UpdateAiAgent,
-};
-pub use ai_agent_audit_event::{
-    AiAgentAuditEvent, AiAgentAuditEventFilter, AiAuditDecision, AiAuditEventType, AiAuditOutcome,
-    LogAuditEvent,
-};
-pub use ai_agent_tool_permission::{
-    AiAgentToolPermission, AiAgentToolPermissionDetails, GrantToolPermission, UpdateToolPermission,
-};
-pub use ai_tool::{AiRiskLevel, AiTool, AiToolFilter, AiToolStatus, CreateAiTool, UpdateAiTool};
-
 // A2A Protocol models (F091)
 pub mod a2a_task;
 
 // A2A Protocol exports (F091)
 pub use a2a_task::{A2aTask, A2aTaskFilter, A2aTaskState, CallbackStatus, CreateA2aTask};
-
-// Human-in-the-Loop Approval models (F092)
-pub mod ai_agent_approval_request;
-
-// Human-in-the-Loop Approval exports (F092)
-pub use ai_agent_approval_request::{
-    AiAgentApprovalRequest, ApprovalRequestFilter, ApprovalStatus, CreateApprovalRequest,
-};
 
 // Behavioral Anomaly Detection models (F094)
 pub mod anomaly_baseline;
@@ -1144,9 +1117,11 @@ pub mod nhi_agent;
 pub mod nhi_certification_campaign;
 pub mod nhi_credential;
 pub mod nhi_identity;
+pub mod nhi_nhi_permission;
 pub mod nhi_service_account;
 pub mod nhi_tool;
 pub mod nhi_tool_permission;
+pub mod nhi_user_permission;
 
 // Old NHI view/impl models (F108) — deleted, superseded by 201-tool-nhi-promotion unified models
 
@@ -1157,12 +1132,14 @@ pub use nhi_agent::{
 pub use nhi_certification_campaign::{CreateNhiCertificationCampaign, NhiCertificationCampaign};
 pub use nhi_credential::{CreateNhiCredential, NhiCredential};
 pub use nhi_identity::{CreateNhiIdentity, NhiIdentity, NhiIdentityFilter, UpdateNhiIdentity};
+pub use nhi_nhi_permission::{CreateNhiNhiPermission, NhiNhiPermission};
 pub use nhi_service_account::{
     CreateNhiServiceAccount, NhiServiceAccount, NhiServiceAccountFilter,
     NhiServiceAccountWithIdentity, UpdateNhiServiceAccount,
 };
 pub use nhi_tool::{CreateNhiTool, NhiTool, NhiToolFilter, NhiToolWithIdentity, UpdateNhiTool};
 pub use nhi_tool_permission::{CreateNhiToolPermission, NhiToolPermission};
+pub use nhi_user_permission::{CreateNhiUserPermission, NhiUserPermission};
 
 // Tenant Usage Tracking models (F-USAGE-TRACK)
 pub mod usage;

@@ -63,6 +63,20 @@ async fn fetch_all_resources(
     Ok((agents, tools))
 }
 
+/// Convert a numeric risk_score (0-100) to a semantic risk_level label.
+///
+/// Maps: 0-33 → "low", 34-66 → "medium", 67-89 → "high", 90-100 → "critical".
+/// Returns "low" for None (no risk score computed).
+pub fn risk_score_to_level(score: Option<i32>) -> String {
+    match score {
+        Some(s) if s >= 90 => "critical".to_string(),
+        Some(s) if s >= 67 => "high".to_string(),
+        Some(s) if s >= 34 => "medium".to_string(),
+        Some(_) => "low".to_string(),
+        None => "low".to_string(),
+    }
+}
+
 /// Convert API responses to config format
 fn build_config(
     agents: Vec<crate::models::agent::AgentResponse>,
@@ -75,10 +89,7 @@ fn build_config(
             agent_type: a.agent_type,
             model_provider: a.model_provider.unwrap_or_default(),
             model_name: a.model_name.unwrap_or_default(),
-            risk_level: a
-                .risk_score
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "medium".to_string()),
+            risk_level: risk_score_to_level(a.risk_score),
             description: a.description,
             tools: vec![], // Tool assignments not tracked in agent response
         })
@@ -89,10 +100,7 @@ fn build_config(
         .map(|t| ToolConfig {
             name: t.name,
             description: t.description.unwrap_or_default(),
-            risk_level: t
-                .risk_score
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "N/A".to_string()),
+            risk_level: risk_score_to_level(t.risk_score),
             input_schema: t.input_schema,
         })
         .collect();
@@ -172,7 +180,7 @@ mod tests {
         assert_eq!(config.agents[0].agent_type, "copilot");
         assert_eq!(config.agents[0].model_provider, "anthropic");
         assert_eq!(config.agents[0].model_name, "claude-sonnet-4");
-        assert_eq!(config.agents[0].risk_level, "50");
+        assert_eq!(config.agents[0].risk_level, "medium"); // 50 maps to "medium"
         assert_eq!(
             config.agents[0].description,
             Some("Test description".to_string())
@@ -203,7 +211,7 @@ mod tests {
         assert_eq!(config.tools.len(), 1);
         assert_eq!(config.tools[0].name, "test-tool");
         assert_eq!(config.tools[0].description, "Test tool description");
-        assert_eq!(config.tools[0].risk_level, "25");
+        assert_eq!(config.tools[0].risk_level, "low"); // 25 maps to "low"
     }
 
     #[test]

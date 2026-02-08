@@ -45,6 +45,15 @@ base64.workspace = true
 # Validation
 validator = { version = "0.20", features = ["derive"] }
 
+# JSON Schema validation (MCP tool parameter validation)
+jsonschema = "0.18"
+
+# HTTP client (A2A webhook delivery)
+reqwest = { workspace = true }
+
+# URL parsing (A2A callback URL validation)
+url = "2"
+
 # OpenAPI documentation
 utoipa = { workspace = true, optional = true }
 

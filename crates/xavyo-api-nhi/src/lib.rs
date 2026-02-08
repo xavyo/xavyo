@@ -30,11 +30,12 @@
 
 pub mod error;
 pub mod handlers;
+pub mod models;
 pub mod router;
 pub mod services;
 pub mod state;
 
 // Re-export main entry points
 pub use error::{ApiResult, ErrorResponse, NhiApiError};
-pub use router::nhi_router;
+pub use router::{a2a_router, discovery_router, mcp_router, nhi_router};
 pub use state::NhiState;

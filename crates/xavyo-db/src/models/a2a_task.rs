@@ -85,8 +85,8 @@ impl CallbackStatus {
 pub struct A2aTask {
     pub id: Uuid,
     pub tenant_id: Uuid,
-    pub source_agent_id: Uuid,
-    pub target_agent_id: Uuid,
+    pub source_nhi_id: Option<Uuid>,
+    pub target_nhi_id: Option<Uuid>,
     pub task_type: String,
     pub input: serde_json::Value,
     pub state: String,
@@ -119,7 +119,7 @@ impl A2aTask {
 /// Request to create a new A2A task.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateA2aTask {
-    pub target_agent_id: Uuid,
+    pub target_nhi_id: Option<Uuid>,
     pub task_type: String,
     pub input: serde_json::Value,
     pub callback_url: Option<String>,
@@ -129,8 +129,8 @@ pub struct CreateA2aTask {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct A2aTaskFilter {
     pub state: Option<String>,
-    pub target_agent_id: Option<Uuid>,
-    pub source_agent_id: Option<Uuid>,
+    pub target_nhi_id: Option<Uuid>,
+    pub source_nhi_id: Option<Uuid>,
     pub limit: Option<i32>,
     pub offset: Option<i32>,
 }
@@ -140,21 +140,21 @@ impl A2aTask {
     pub async fn create(
         pool: &PgPool,
         tenant_id: Uuid,
-        source_agent_id: Uuid,
+        source_nhi_id: Option<Uuid>,
         req: CreateA2aTask,
     ) -> Result<Self, sqlx::Error> {
         let task = sqlx::query_as::<_, Self>(
             r"
             INSERT INTO a2a_tasks (
-                tenant_id, source_agent_id, target_agent_id, task_type, input, callback_url
+                tenant_id, source_nhi_id, target_nhi_id, task_type, input, callback_url
             )
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *
             ",
         )
         .bind(tenant_id)
-        .bind(source_agent_id)
-        .bind(req.target_agent_id)
+        .bind(source_nhi_id)
+        .bind(req.target_nhi_id)
         .bind(&req.task_type)
         .bind(&req.input)
         .bind(&req.callback_url)
@@ -188,7 +188,7 @@ impl A2aTask {
     pub async fn list(
         pool: &PgPool,
         tenant_id: Uuid,
-        source_agent_id: Uuid,
+        source_nhi_id: Option<Uuid>,
         filter: A2aTaskFilter,
     ) -> Result<Vec<Self>, sqlx::Error> {
         let limit = filter.limit.unwrap_or(100).min(1000);
@@ -198,17 +198,17 @@ impl A2aTask {
             r"
             SELECT * FROM a2a_tasks
             WHERE tenant_id = $1
-              AND source_agent_id = $2
+              AND ($2::uuid IS NULL OR source_nhi_id = $2)
               AND ($3::varchar IS NULL OR state = $3)
-              AND ($4::uuid IS NULL OR target_agent_id = $4)
+              AND ($4::uuid IS NULL OR target_nhi_id = $4)
             ORDER BY created_at DESC
             LIMIT $5 OFFSET $6
             ",
         )
         .bind(tenant_id)
-        .bind(source_agent_id)
+        .bind(source_nhi_id)
         .bind(&filter.state)
-        .bind(filter.target_agent_id)
+        .bind(filter.target_nhi_id)
         .bind(limit)
         .bind(offset)
         .fetch_all(pool)
@@ -221,22 +221,22 @@ impl A2aTask {
     pub async fn count(
         pool: &PgPool,
         tenant_id: Uuid,
-        source_agent_id: Uuid,
+        source_nhi_id: Option<Uuid>,
         filter: &A2aTaskFilter,
     ) -> Result<i64, sqlx::Error> {
         let row: (i64,) = sqlx::query_as(
             r"
             SELECT COUNT(*) FROM a2a_tasks
             WHERE tenant_id = $1
-              AND source_agent_id = $2
+              AND ($2::uuid IS NULL OR source_nhi_id = $2)
               AND ($3::varchar IS NULL OR state = $3)
-              AND ($4::uuid IS NULL OR target_agent_id = $4)
+              AND ($4::uuid IS NULL OR target_nhi_id = $4)
             ",
         )
         .bind(tenant_id)
-        .bind(source_agent_id)
+        .bind(source_nhi_id)
         .bind(&filter.state)
-        .bind(filter.target_agent_id)
+        .bind(filter.target_nhi_id)
         .fetch_one(pool)
         .await?;
 

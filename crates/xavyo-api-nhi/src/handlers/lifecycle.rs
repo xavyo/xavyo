@@ -23,6 +23,7 @@ use xavyo_nhi::NhiLifecycleState;
 
 use crate::error::NhiApiError;
 use crate::services::nhi_lifecycle_service::NhiLifecycleService;
+use crate::services::nhi_user_permission_service::NhiUserPermissionService;
 use crate::state::NhiState;
 
 /// Request body for the suspend endpoint.
@@ -58,10 +59,9 @@ pub async fn suspend(
     Path(id): Path<Uuid>,
     body: Option<Json<SuspendRequest>>,
 ) -> Result<impl IntoResponse, NhiApiError> {
-    if !claims.has_role("admin") {
-        return Err(NhiApiError::Forbidden);
-    }
     let tenant_uuid = *tenant_id.as_uuid();
+    NhiUserPermissionService::enforce_access(&state.pool, tenant_uuid, &claims, id, "manage")
+        .await?;
     let reason = body.and_then(|b| b.0.reason);
 
     let updated = NhiLifecycleService::transition(
@@ -100,10 +100,9 @@ pub async fn reactivate(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, NhiApiError> {
-    if !claims.has_role("admin") {
-        return Err(NhiApiError::Forbidden);
-    }
     let tenant_uuid = *tenant_id.as_uuid();
+    NhiUserPermissionService::enforce_access(&state.pool, tenant_uuid, &claims, id, "manage")
+        .await?;
 
     let updated = NhiLifecycleService::transition(
         &state.pool,
@@ -141,10 +140,9 @@ pub async fn deprecate(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, NhiApiError> {
-    if !claims.has_role("admin") {
-        return Err(NhiApiError::Forbidden);
-    }
     let tenant_uuid = *tenant_id.as_uuid();
+    NhiUserPermissionService::enforce_access(&state.pool, tenant_uuid, &claims, id, "manage")
+        .await?;
 
     let updated = NhiLifecycleService::transition(
         &state.pool,
@@ -184,10 +182,9 @@ pub async fn archive(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, NhiApiError> {
-    if !claims.has_role("admin") {
-        return Err(NhiApiError::Forbidden);
-    }
     let tenant_uuid = *tenant_id.as_uuid();
+    NhiUserPermissionService::enforce_access(&state.pool, tenant_uuid, &claims, id, "manage")
+        .await?;
 
     let updated = NhiLifecycleService::transition(
         &state.pool,
@@ -225,10 +222,9 @@ pub async fn deactivate(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, NhiApiError> {
-    if !claims.has_role("admin") {
-        return Err(NhiApiError::Forbidden);
-    }
     let tenant_uuid = *tenant_id.as_uuid();
+    NhiUserPermissionService::enforce_access(&state.pool, tenant_uuid, &claims, id, "manage")
+        .await?;
 
     let updated = NhiLifecycleService::transition(
         &state.pool,
@@ -266,10 +262,9 @@ pub async fn activate(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, NhiApiError> {
-    if !claims.has_role("admin") {
-        return Err(NhiApiError::Forbidden);
-    }
     let tenant_uuid = *tenant_id.as_uuid();
+    NhiUserPermissionService::enforce_access(&state.pool, tenant_uuid, &claims, id, "manage")
+        .await?;
 
     let updated = NhiLifecycleService::transition(
         &state.pool,

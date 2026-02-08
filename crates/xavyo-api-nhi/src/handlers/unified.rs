@@ -11,12 +11,14 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
 use xavyo_db::models::{
     nhi_agent::{NhiAgent, NhiAgentWithIdentity},
     nhi_identity::{NhiIdentity, NhiIdentityFilter},
     nhi_service_account::{NhiServiceAccount, NhiServiceAccountWithIdentity},
     nhi_tool::{NhiTool, NhiToolWithIdentity},
+    nhi_user_permission::NhiUserPermission,
 };
 use xavyo_nhi::{NhiLifecycleState, NhiType};
 
@@ -116,6 +118,7 @@ pub struct ServiceAccountExtension {
 pub async fn list_nhis(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Query(query): Query<ListNhiQuery>,
 ) -> Result<Json<PaginatedResponse<NhiIdentity>>, NhiApiError> {
     let tenant_uuid = *tenant_id.as_uuid();
@@ -128,15 +131,60 @@ pub async fn list_nhis(
         owner_id: query.owner_id,
     };
 
-    let data = NhiIdentity::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
-    let total = NhiIdentity::count(&state.pool, tenant_uuid, &filter).await?;
+    // Admin/super_admin see all NHIs; non-admin users only see permitted ones
+    if claims.has_role("admin") || claims.has_role("super_admin") {
+        let data = NhiIdentity::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
+        let total = NhiIdentity::count(&state.pool, tenant_uuid, &filter).await?;
+        Ok(Json(PaginatedResponse {
+            data,
+            total,
+            limit,
+            offset,
+        }))
+    } else {
+        let user_id = Uuid::parse_str(&claims.sub)
+            .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
 
-    Ok(Json(PaginatedResponse {
-        data,
-        total,
-        limit,
-        offset,
-    }))
+        // Get distinct NHI IDs this user has any non-expired permission for
+        let user_perms =
+            NhiUserPermission::list_by_user(&state.pool, tenant_uuid, user_id, 10000, 0).await?;
+        let mut permitted_nhi_ids: Vec<Uuid> = user_perms.iter().map(|p| p.nhi_id).collect();
+        permitted_nhi_ids.sort();
+        permitted_nhi_ids.dedup();
+
+        if permitted_nhi_ids.is_empty() {
+            return Ok(Json(PaginatedResponse {
+                data: vec![],
+                total: 0,
+                limit,
+                offset,
+            }));
+        }
+
+        // Fetch all matching NHIs then filter to permitted ones
+        // Use a generous fetch limit to account for filtering
+        let fetch_limit = (limit + offset) * 10; // Over-fetch to compensate for filtering
+        let all_data =
+            NhiIdentity::list(&state.pool, tenant_uuid, &filter, fetch_limit.min(10000), 0).await?;
+        let filtered: Vec<NhiIdentity> = all_data
+            .into_iter()
+            .filter(|nhi| permitted_nhi_ids.binary_search(&nhi.id).is_ok())
+            .collect();
+
+        let total = filtered.len() as i64;
+        let data: Vec<NhiIdentity> = filtered
+            .into_iter()
+            .skip(offset as usize)
+            .take(limit as usize)
+            .collect();
+
+        Ok(Json(PaginatedResponse {
+            data,
+            total,
+            limit,
+            offset,
+        }))
+    }
 }
 
 /// GET /nhi/{id} — Get a specific NHI by ID with type-specific extension data.
@@ -158,9 +206,20 @@ pub async fn list_nhis(
 pub async fn get_nhi(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<NhiIdentityDetail>, NhiApiError> {
     let tenant_uuid = *tenant_id.as_uuid();
+
+    // Enforce user→NHI permission (admin/super_admin bypass)
+    crate::services::nhi_user_permission_service::NhiUserPermissionService::enforce_access(
+        &state.pool,
+        tenant_uuid,
+        &claims,
+        id,
+        "use",
+    )
+    .await?;
 
     let identity = NhiIdentity::find_by_id(&state.pool, tenant_uuid, id)
         .await?

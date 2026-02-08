@@ -91,7 +91,6 @@ xavyo-secrets = { path = "../../crates/xavyo-secrets", features = ["env-provider
 xavyo-webhooks = { path = "../../crates/xavyo-webhooks" }
 xavyo-api-import = { path = "../../crates/xavyo-api-import" }
 xavyo-scim-client = { path = "../../crates/xavyo-scim-client", features = ["openapi"] }
-xavyo-api-agents = { path = "../../crates/xavyo-api-agents", features = ["openapi"] }
 xavyo-api-nhi = { path = "../../crates/xavyo-api-nhi", features = ["openapi"] }
 xavyo-nhi = { path = "../../crates/xavyo-nhi", features = ["openapi"] }
 xavyo-api-tenants = { path = "../../crates/xavyo-api-tenants" }

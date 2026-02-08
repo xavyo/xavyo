@@ -28,7 +28,6 @@ use std::time::Duration;
 use tokio::signal;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
-use xavyo_api_agents::{a2a_router, discovery_router, mcp_router, AgentsState};
 use xavyo_api_auth::{
     admin_invite_public_router, admin_invite_router, admin_router as auth_admin_router,
     alerts_router, api_key_auth_middleware, audit_router, auth_router, branding_router,
@@ -49,7 +48,9 @@ use xavyo_api_connectors::{
 };
 use xavyo_api_governance::governance_router;
 use xavyo_api_import::{import_admin_router, import_public_router, ImportState};
+use xavyo_api_nhi::{a2a_router, discovery_router, mcp_router};
 use xavyo_api_nhi::{nhi_router, NhiState};
+// NOTE: a2a_router, discovery_router, mcp_router are now imported from xavyo_api_nhi (Feature 205)
 use xavyo_api_oauth::router::{
     admin_oauth_router, device_router, oauth_router, well_known_router, OAuthState,
 };
@@ -942,20 +943,13 @@ async fn main() {
                 .build(),
         ));
 
-    // AI Agent state for MCP/A2A/Discovery routes
-    // NOTE: Agent CRUD routes (/agents/*, /tools/*, /approvals/*) are now under /nhi/*
-    // via F109 - NHI API Consolidation. The agents_state is still needed for protocol routes.
-    let agents_state = match AgentsState::new(pool.clone()) {
-        Ok(s) => s,
-        Err(e) => {
-            tracing::error!("Failed to create agents state: {e}");
-            std::process::exit(1);
-        }
-    };
+    // Protocol routes (Feature 205: Migrated from xavyo-api-agents to xavyo-api-nhi)
+    // MCP, A2A, and Discovery handlers now read from NHI tables (nhi_identities, nhi_agents, nhi_tools).
+    let protocol_nhi_state = NhiState::new(pool.clone());
 
-    // MCP routes (F091 - Model Context Protocol)
+    // MCP routes (F091 - Model Context Protocol, migrated to NHI in F205)
     // F113: Support both API key and JWT authentication for programmatic access
-    let mcp_routes = mcp_router(agents_state.clone())
+    let mcp_routes = mcp_router(protocol_nhi_state.clone())
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::middleware::from_fn(api_key_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
@@ -966,9 +960,9 @@ async fn main() {
                 .build(),
         ));
 
-    // A2A routes (F091 - Agent-to-Agent Protocol)
+    // A2A routes (F091 - Agent-to-Agent Protocol, migrated to NHI in F205)
     // F113: Support both API key and JWT authentication for programmatic access
-    let a2a_routes = a2a_router(agents_state.clone())
+    let a2a_routes = a2a_router(protocol_nhi_state.clone())
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::middleware::from_fn(api_key_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
@@ -980,7 +974,7 @@ async fn main() {
         ));
 
     // A2A AgentCard discovery routes (public, no auth required)
-    let agents_discovery_routes = discovery_router(agents_state);
+    let agents_discovery_routes = discovery_router(protocol_nhi_state);
 
     // Unified NHI routes (201-tool-nhi-promotion — unified data model)
     //
@@ -1318,35 +1312,6 @@ async fn main() {
                             target: "passwordless",
                             error = %e,
                             "Failed to clean up expired passwordless tokens"
-                        );
-                    }
-                }
-            }
-        });
-    }
-
-    // Spawn background cleanup task for expired approval requests (F092)
-    {
-        let cleanup_pool = pool.clone();
-        tokio::spawn(async move {
-            let interval = Duration::from_secs(30); // Check every 30 seconds
-            loop {
-                tokio::time::sleep(interval).await;
-                match xavyo_db::models::AiAgentApprovalRequest::expire_pending(&cleanup_pool).await
-                {
-                    Ok(count) if count > 0 => {
-                        tracing::info!(
-                            target: "agents",
-                            expired = count,
-                            "Expired pending approval requests"
-                        );
-                    }
-                    Ok(_) => {} // Nothing to expire
-                    Err(e) => {
-                        tracing::warn!(
-                            target: "agents",
-                            error = %e,
-                            "Failed to expire pending approval requests"
                         );
                     }
                 }

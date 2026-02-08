@@ -70,6 +70,10 @@ impl Filter {
                 Some(score) => self.matches(&score.to_string()),
                 None => false,
             },
+            "risk_level" => {
+                let level = crate::commands::export::risk_score_to_level(risk_score);
+                self.matches(&level)
+            }
             _ => false,
         }
     }
@@ -79,10 +83,14 @@ impl Filter {
         match self.field.as_str() {
             "name" => self.matches(name),
             "status" | "lifecycle_state" => self.matches(lifecycle_state),
-            "risk_level" | "risk_score" => match risk_score {
+            "risk_score" => match risk_score {
                 Some(score) => self.matches(&score.to_string()),
                 None => false,
             },
+            "risk_level" => {
+                let level = crate::commands::export::risk_score_to_level(risk_score);
+                self.matches(&level)
+            }
             "type" => false, // Tools don't have a type field
             _ => false,
         }

@@ -287,20 +287,18 @@ pub fn compute_changes(
             // Tool exists - check if update needed
             let existing_desc = existing.description.as_deref().unwrap_or("");
             let config_desc = tool_config.description.as_str();
-            let existing_risk_str = existing
-                .risk_score
-                .map(|s| s.to_string())
-                .unwrap_or_default();
+            let existing_risk_level =
+                crate::commands::export::risk_score_to_level(existing.risk_score);
             let needs_update = existing_desc != config_desc
-                || existing_risk_str != tool_config.risk_level
+                || existing_risk_level != tool_config.risk_level
                 || existing.input_schema != tool_config.input_schema;
 
             if needs_update {
                 let mut details = Vec::new();
-                if existing_risk_str != tool_config.risk_level {
+                if existing_risk_level != tool_config.risk_level {
                     details.push(format!(
                         "risk: {} → {}",
-                        existing_risk_str, tool_config.risk_level
+                        existing_risk_level, tool_config.risk_level
                     ));
                 }
                 if existing_desc != config_desc {
@@ -327,14 +325,23 @@ pub fn compute_changes(
     for agent_config in &config.agents {
         if let Some(existing) = agent_map.get(agent_config.name.as_str()) {
             // Agent exists - check if update needed
+            let existing_risk_level =
+                crate::commands::export::risk_score_to_level(existing.risk_score);
             let needs_update = existing.description.as_deref()
                 != agent_config.description.as_deref()
                 || existing.agent_type != agent_config.agent_type
                 || existing.model_provider.as_deref() != Some(agent_config.model_provider.as_str())
-                || existing.model_name.as_deref() != Some(agent_config.model_name.as_str());
+                || existing.model_name.as_deref() != Some(agent_config.model_name.as_str())
+                || existing_risk_level != agent_config.risk_level;
 
             if needs_update {
                 let mut details = Vec::new();
+                if existing_risk_level != agent_config.risk_level {
+                    details.push(format!(
+                        "risk: {} → {}",
+                        existing_risk_level, agent_config.risk_level
+                    ));
+                }
                 if existing.agent_type != agent_config.agent_type {
                     details.push(format!(
                         "agent_type: {} → {}",

@@ -251,7 +251,9 @@ fn check_scope_access(scopes: &[String], method: &Method, path: &str) -> bool {
                     continue; // Unknown action, skip
                 };
 
-                if path.starts_with(path_prefix) && allowed_methods.contains(method) {
+                if is_path_prefix_match(path, path_prefix)
+                    && allowed_methods.contains(method)
+                {
                     return true;
                 }
             }
@@ -271,7 +273,9 @@ fn check_scope_access(scopes: &[String], method: &Method, path: &str) -> bool {
 
                 // Build full path prefix: e.g., /nhi/agents
                 let full_path = format!("{base_path}/{resource}");
-                if path.starts_with(&full_path) && allowed_methods.contains(method) {
+                if is_path_prefix_match(path, &full_path)
+                    && allowed_methods.contains(method)
+                {
                     return true;
                 }
             }
@@ -280,6 +284,18 @@ fn check_scope_access(scopes: &[String], method: &Method, path: &str) -> bool {
     }
 
     false
+}
+
+/// Check if `path` matches `prefix` at a path segment boundary.
+///
+/// Returns true only if `path` starts with `prefix` AND the next character
+/// after the prefix is either '/' or end-of-string. This prevents
+/// `/audit` from matching `/audit-log`.
+fn is_path_prefix_match(path: &str, prefix: &str) -> bool {
+    if !path.starts_with(prefix) {
+        return false;
+    }
+    path.len() == prefix.len() || path.as_bytes()[prefix.len()] == b'/'
 }
 
 /// Extract tenant ID from X-Tenant-ID header if present.
@@ -494,7 +510,8 @@ pub async fn api_key_auth_middleware(
     if let Some(limit) = api_key.rate_limit_per_hour {
         if limit > 0 {
             if let Some(limiter) = request.extensions().get::<Arc<ApiKeyRateLimiter>>() {
-                if !limiter.record_attempt(api_key.id, limit as usize) {
+                let limit_usize = limit as usize; // Safe: limit > 0, so positive i32 fits usize
+                if !limiter.record_attempt(api_key.id, limit_usize) {
                     tracing::warn!(
                         key_id = %api_key.id,
                         rate_limit = limit,
@@ -502,6 +519,13 @@ pub async fn api_key_auth_middleware(
                     );
                     return Err(ApiKeyError::RateLimited.into_response());
                 }
+            } else {
+                tracing::error!(
+                    key_id = %api_key.id,
+                    rate_limit = limit,
+                    "ApiKeyRateLimiter extension not configured; denying request (fail closed)"
+                );
+                return Err(ApiKeyError::InternalError.into_response());
             }
         }
     }
@@ -750,5 +774,40 @@ mod tests {
         assert!(check_scope_access(&scopes, &Method::GET, "/nhi/agents/123"));
         assert!(!check_scope_access(&scopes, &Method::POST, "/nhi/agents"));
         assert!(!check_scope_access(&scopes, &Method::GET, "/nhi/tools"));
+    }
+
+    #[test]
+    fn test_check_scope_access_path_boundary() {
+        // Two-part scope: /audit should NOT match /audit-log
+        let scopes = vec!["audit:read".to_string()];
+        assert!(check_scope_access(&scopes, &Method::GET, "/audit"));
+        assert!(check_scope_access(&scopes, &Method::GET, "/audit/entries"));
+        assert!(
+            !check_scope_access(&scopes, &Method::GET, "/audit-log"),
+            "/audit scope must not match /audit-log"
+        );
+
+        // Three-part scope: /nhi/agents should NOT match /nhi/agents-proxy
+        let scopes = vec!["nhi:agents:read".to_string()];
+        assert!(check_scope_access(&scopes, &Method::GET, "/nhi/agents"));
+        assert!(check_scope_access(
+            &scopes,
+            &Method::GET,
+            "/nhi/agents/123"
+        ));
+        assert!(
+            !check_scope_access(&scopes, &Method::GET, "/nhi/agents-proxy"),
+            "/nhi/agents scope must not match /nhi/agents-proxy"
+        );
+    }
+
+    #[test]
+    fn test_is_path_prefix_match() {
+        assert!(is_path_prefix_match("/users", "/users"));
+        assert!(is_path_prefix_match("/users/123", "/users"));
+        assert!(!is_path_prefix_match("/users-admin", "/users"));
+        assert!(is_path_prefix_match("/nhi/agents/456", "/nhi/agents"));
+        assert!(!is_path_prefix_match("/nhi/agents-proxy", "/nhi/agents"));
+        assert!(!is_path_prefix_match("/use", "/users"));
     }
 }

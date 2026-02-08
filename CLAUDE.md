@@ -195,6 +195,8 @@ docs/             # Documentation
 - Rust 1.75+ (per constitution) + Axum + Tower (HTTP), SQLx (database, compile-time checked), serde/serde_json, chrono, uuid, async-trait, utoipa (OpenAPI), validator (input validation) (201-tool-nhi-promotion)
 - Rust 1.75+ + Axum + Tower (middleware), SQLx (compile-time checked), xavyo-auth (JwtClaims), xavyo-db (ApiKey, UserRole models) (202-api-key-identity-fix)
 - Rust 1.75+ (existing CLI crate) + clap 4, reqwest, serde, chrono, uuid (all existing) (203-cli-tool-model-fix)
+- Rust 1.75+ (per constitution) + Axum + Tower (HTTP), SQLx (compile-time checked queries), serde/serde_json, chrono, uuid, async-trait, utoipa (OpenAPI) (204-nhi-permission-model)
+- Rust 1.75+ (per constitution) + Axum + Tower (HTTP), SQLx (database), xavyo-api-nhi (existing NHI API crate), xavyo-db (models), xavyo-auth (JwtClaims), jsonschema (MCP parameter validation), reqwest (A2A webhooks) (205-protocol-migration)
 
 ## Recent Changes
 - 132-sod-validation: Added Rust 1.75+ (per constitution) + xavyo-governance (F-004 services), xavyo-core (TenantId, UserId), xavyo-db (PostgreSQL/SQLx), async-trait, chrono, uuid, serde/serde_json, thiserror
