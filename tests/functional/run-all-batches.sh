@@ -2,7 +2,7 @@
 # =============================================================================
 # Run All Functional Test Batches — Comprehensive Test Suite
 # =============================================================================
-# Executes all 12 test batches sequentially and produces a combined report.
+# Executes all 13 test batches sequentially and produces a combined report.
 #
 # Prerequisites:
 #   - API server running on localhost:8080
@@ -22,6 +22,7 @@
 #   Batch 10: infrastructure & self-service (/me, devices, audit, alerts, authz, system)
 #   Batch 11: admin features (IP, branding, delegation, keys, invitations, org policies, license, escalation)
 #   Batch 12: connectors deep (SCIM outbound, reconciliation, DLQ, circuit breakers, jobs, health, sync)
+#   Batch 13: NHI Feature 201 (unified model, lifecycle, certification, permissions, risk, inactivity, SoD)
 # =============================================================================
 
 set -uo pipefail
@@ -66,6 +67,7 @@ BATCHES=(
   "run-batch-10-infra-selfservice.sh|Infra+Self-Service"
   "run-batch-11-admin-governance-deep.sh|Admin+Gov Deep (IP+Branding+Delegation+Keys+Escalation)"
   "run-batch-12-connectors-webhooks-deep.sh|Connectors Deep+Webhooks Deep"
+  "run-batch-13-nhi-201-unified.sh|NHI Feature 201 (Unified+Lifecycle+Cert+Perms+Risk+SoD)"
 )
 
 for i in "${!BATCHES[@]}"; do

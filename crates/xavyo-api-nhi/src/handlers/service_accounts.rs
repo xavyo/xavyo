@@ -1,1013 +1,439 @@
-//! Service account handlers for /nhi/service-accounts/* endpoints.
+//! Service account-specific CRUD handlers.
 //!
-//! These handlers delegate to xavyo-api-governance NHI services.
-//! F109 - NHI API Consolidation
-//!
-//! NOTE: This is a minimal stub implementation. Full implementation will be added
-//! once the core handlers (agents, tools, approvals) are verified to compile.
+//! Provides endpoints for service account management:
+//! - `POST /nhi/service-accounts` — Create a new service account
+//! - `GET /nhi/service-accounts` — List service accounts
+//! - `GET /nhi/service-accounts/{id}` — Get a specific service account
+//! - `PATCH /nhi/service-accounts/{id}` — Update a service account
+//! - `DELETE /nhi/service-accounts/{id}` — Delete a service account
 
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    Extension, Json,
+    response::IntoResponse,
+    routing::{get, post},
+    Extension, Json, Router,
 };
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
-
 use xavyo_auth::JwtClaims;
-
-use crate::error::{ApiNhiError, ApiResult};
-use crate::state::ServiceAccountsState;
-
-// Re-export types from governance for the router
-pub use xavyo_api_governance::models::{
-    CertifyNhiResponse, CreateNhiRequest, ListNhisQuery, NhiListResponse, NhiResponse, NhiSummary,
-    ReactivateNhiRequest, SuspendNhiRequest, TransferOwnershipRequest, UpdateNhiRequest,
+use xavyo_core::TenantId;
+use xavyo_db::models::{
+    nhi_identity::{NhiIdentity, UpdateNhiIdentity},
+    nhi_service_account::{
+        NhiServiceAccount, NhiServiceAccountFilter, NhiServiceAccountWithIdentity,
+        UpdateNhiServiceAccount,
+    },
 };
+use xavyo_nhi::{NhiLifecycleState, NhiType};
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
+use crate::error::NhiApiError;
+use crate::state::NhiState;
 
-fn extract_tenant_id(claims: &JwtClaims) -> Result<Uuid, ApiNhiError> {
-    claims
-        .tenant_id()
-        .map(|t| *t.as_uuid())
-        .ok_or(ApiNhiError::Unauthorized)
+// ---------------------------------------------------------------------------
+// Request / Response types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct CreateServiceAccountRequest {
+    #[validate(length(min = 1, max = 255))]
+    pub name: String,
+    pub description: Option<String>,
+    pub owner_id: Option<Uuid>,
+    pub backup_owner_id: Option<Uuid>,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub inactivity_threshold_days: Option<i32>,
+    pub rotation_interval_days: Option<i32>,
+    // Service-account-specific fields
+    #[validate(length(min = 1, max = 500))]
+    pub purpose: String,
+    pub environment: Option<String>,
 }
 
-fn extract_actor_id(claims: &JwtClaims) -> Result<Uuid, ApiNhiError> {
-    Uuid::parse_str(&claims.sub).map_err(|_| ApiNhiError::Unauthorized)
+#[derive(Debug, Deserialize)]
+pub struct UpdateServiceAccountRequest {
+    // Base fields
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub owner_id: Option<Option<Uuid>>,
+    pub backup_owner_id: Option<Option<Uuid>>,
+    pub expires_at: Option<Option<chrono::DateTime<chrono::Utc>>>,
+    pub inactivity_threshold_days: Option<Option<i32>>,
+    pub rotation_interval_days: Option<Option<i32>>,
+    // Service-account-specific fields
+    pub purpose: Option<String>,
+    pub environment: Option<String>,
 }
 
-// ============================================================================
-// CRUD Handlers
-// ============================================================================
-
-/// List service accounts with optional filtering.
-#[utoipa::path(
-    get,
-    path = "/nhi/service-accounts",
-    tag = "NHI - Service Accounts",
-    params(ListNhisQuery),
-    responses(
-        (status = 200, description = "List of service accounts", body = NhiListResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn list_service_accounts(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Query(query): Query<ListNhisQuery>,
-) -> ApiResult<Json<NhiListResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let result = state.nhi_service.list(tenant_id, &query).await?;
-    Ok(Json(result))
-}
-
-/// Get service account summary statistics.
-#[utoipa::path(
-    get,
-    path = "/nhi/service-accounts/summary",
-    tag = "NHI - Service Accounts",
-    responses(
-        (status = 200, description = "Service account summary", body = NhiSummary),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_service_account_summary(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-) -> ApiResult<Json<NhiSummary>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let summary = state.nhi_service.get_summary(tenant_id).await?;
-    Ok(Json(summary))
-}
-
-/// Get a service account by ID.
-#[utoipa::path(
-    get,
-    path = "/nhi/service-accounts/{id}",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID")
-    ),
-    responses(
-        (status = 200, description = "Service account details", body = NhiResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_service_account(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<NhiResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let nhi = state.nhi_service.get(tenant_id, id).await?;
-    Ok(Json(nhi))
-}
-
-/// Create a new service account.
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts",
-    tag = "NHI - Service Accounts",
-    request_body = CreateNhiRequest,
-    responses(
-        (status = 201, description = "Service account created", body = NhiResponse),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 409, description = "Service account name already exists"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn create_service_account(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Json(request): Json<CreateNhiRequest>,
-) -> ApiResult<(StatusCode, Json<NhiResponse>)> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    if !claims.has_role("admin") {
-        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
-    }
-    request.validate()?;
-    let actor_id = extract_actor_id(&claims)?;
-    let nhi = state
-        .nhi_service
-        .create(tenant_id, actor_id, request)
-        .await?;
-    Ok((StatusCode::CREATED, Json(nhi)))
-}
-
-/// Update a service account.
-#[utoipa::path(
-    put,
-    path = "/nhi/service-accounts/{id}",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID")
-    ),
-    request_body = UpdateNhiRequest,
-    responses(
-        (status = 200, description = "Service account updated", body = NhiResponse),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn update_service_account(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Json(request): Json<UpdateNhiRequest>,
-) -> ApiResult<Json<NhiResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    if !claims.has_role("admin") {
-        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
-    }
-    let actor_id = extract_actor_id(&claims)?;
-    let nhi = state
-        .nhi_service
-        .update(tenant_id, id, actor_id, request)
-        .await?;
-    Ok(Json(nhi))
-}
-
-/// Delete a service account.
-#[utoipa::path(
-    delete,
-    path = "/nhi/service-accounts/{id}",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID")
-    ),
-    responses(
-        (status = 204, description = "Service account deleted"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn delete_service_account(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<StatusCode> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    if !claims.has_role("admin") {
-        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
-    }
-    let actor_id = extract_actor_id(&claims)?;
-    state.nhi_service.delete(tenant_id, id, actor_id).await?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-// ============================================================================
-// Lifecycle Handlers
-// ============================================================================
-
-/// Suspend a service account.
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts/{id}/suspend",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID")
-    ),
-    request_body = SuspendNhiRequest,
-    responses(
-        (status = 200, description = "Service account suspended", body = NhiResponse),
-        (status = 400, description = "Already suspended"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn suspend_service_account(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Json(request): Json<SuspendNhiRequest>,
-) -> ApiResult<Json<NhiResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    if !claims.has_role("admin") {
-        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
-    }
-    let actor_id = extract_actor_id(&claims)?;
-    let nhi = state
-        .nhi_service
-        .suspend(tenant_id, id, actor_id, request.reason, request.details)
-        .await?;
-    Ok(Json(nhi))
-}
-
-/// Reactivate a suspended service account.
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts/{id}/reactivate",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID")
-    ),
-    request_body = ReactivateNhiRequest,
-    responses(
-        (status = 200, description = "Service account reactivated", body = NhiResponse),
-        (status = 400, description = "Not suspended"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn reactivate_service_account(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Json(request): Json<ReactivateNhiRequest>,
-) -> ApiResult<Json<NhiResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    if !claims.has_role("admin") {
-        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
-    }
-    let actor_id = extract_actor_id(&claims)?;
-    let nhi = state
-        .nhi_service
-        .reactivate(tenant_id, id, actor_id, Some(request.reason))
-        .await?;
-    Ok(Json(nhi))
-}
-
-/// Transfer ownership of a service account.
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts/{id}/transfer-ownership",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID")
-    ),
-    request_body = TransferOwnershipRequest,
-    responses(
-        (status = 200, description = "Ownership transferred", body = NhiResponse),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn transfer_ownership(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Json(request): Json<TransferOwnershipRequest>,
-) -> ApiResult<Json<NhiResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    if !claims.has_role("admin") {
-        return Err(ApiNhiError::Forbidden("Admin role required".to_string()));
-    }
-    let actor_id = extract_actor_id(&claims)?;
-    let nhi = state
-        .nhi_service
-        .transfer_ownership(
-            tenant_id,
-            id,
-            actor_id,
-            request.new_owner_id,
-            Some(request.reason),
-        )
-        .await?;
-    Ok(Json(nhi))
-}
-
-/// Certify a service account (confirm ownership and purpose are still valid).
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts/{id}/certify",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID")
-    ),
-    responses(
-        (status = 200, description = "Service account certified", body = CertifyNhiResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn certify_service_account(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<CertifyNhiResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let actor_id = extract_actor_id(&claims)?;
-    let nhi = state
-        .nhi_service
-        .certify(tenant_id, id, actor_id, None)
-        .await?;
-    Ok(Json(CertifyNhiResponse {
-        nhi,
-        message: "Service account ownership and purpose confirmed".to_string(),
-    }))
-}
-
-// ============================================================================
-// Credential Handlers (T026)
-// ============================================================================
-
-// Re-export credential types
-pub use xavyo_api_governance::models::{
-    NhiCredentialCreatedResponse, NhiCredentialListResponse, NhiCredentialResponse,
-    RevokeCredentialRequest, RotateCredentialsRequest,
-};
-
-/// Query parameters for listing credentials.
-#[derive(Debug, Clone, serde::Deserialize, utoipa::IntoParams)]
-pub struct ListCredentialsQuery {
-    /// Only return active credentials.
-    pub active_only: Option<bool>,
-}
-
-/// List credentials for a service account.
-#[utoipa::path(
-    get,
-    path = "/nhi/service-accounts/{id}/credentials",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID"),
-        ListCredentialsQuery
-    ),
-    responses(
-        (status = 200, description = "List of credentials", body = NhiCredentialListResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn list_credentials(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Query(query): Query<ListCredentialsQuery>,
-) -> ApiResult<Json<NhiCredentialListResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let result = state
-        .credential_service
-        .list(tenant_id, id, query.active_only.unwrap_or(false))
-        .await?;
-    Ok(Json(result))
-}
-
-/// Get a specific credential by ID.
-#[utoipa::path(
-    get,
-    path = "/nhi/service-accounts/{nhi_id}/credentials/{credential_id}",
-    tag = "NHI - Service Accounts",
-    params(
-        ("nhi_id" = Uuid, Path, description = "Service account ID"),
-        ("credential_id" = Uuid, Path, description = "Credential ID")
-    ),
-    responses(
-        (status = 200, description = "Credential details", body = NhiCredentialResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account or credential not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_credential(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path((nhi_id, credential_id)): Path<(Uuid, Uuid)>,
-) -> ApiResult<Json<NhiCredentialResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let credential = state
-        .credential_service
-        .get(tenant_id, nhi_id, credential_id)
-        .await?;
-    Ok(Json(credential))
-}
-
-/// Rotate credentials for a service account.
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts/{id}/credentials/rotate",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID")
-    ),
-    request_body = RotateCredentialsRequest,
-    responses(
-        (status = 201, description = "Credentials rotated", body = NhiCredentialCreatedResponse),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn rotate_credentials(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Json(request): Json<RotateCredentialsRequest>,
-) -> ApiResult<(StatusCode, Json<NhiCredentialCreatedResponse>)> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let actor_id = extract_actor_id(&claims)?;
-    let result = state
-        .credential_service
-        .rotate(tenant_id, id, Some(actor_id), request)
-        .await?;
-    Ok((StatusCode::CREATED, Json(result)))
-}
-
-/// Revoke a credential.
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts/{nhi_id}/credentials/{credential_id}/revoke",
-    tag = "NHI - Service Accounts",
-    params(
-        ("nhi_id" = Uuid, Path, description = "Service account ID"),
-        ("credential_id" = Uuid, Path, description = "Credential ID")
-    ),
-    request_body = RevokeCredentialRequest,
-    responses(
-        (status = 200, description = "Credential revoked", body = NhiCredentialResponse),
-        (status = 400, description = "Invalid request or credential already revoked"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account or credential not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn revoke_credential(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path((nhi_id, credential_id)): Path<(Uuid, Uuid)>,
-    Json(request): Json<RevokeCredentialRequest>,
-) -> ApiResult<Json<NhiCredentialResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let actor_id = extract_actor_id(&claims)?;
-    let credential = state
-        .credential_service
-        .revoke(
-            tenant_id,
-            nhi_id,
-            credential_id,
-            actor_id,
-            request.reason,
-            request.immediate,
-        )
-        .await?;
-    Ok(Json(credential))
-}
-
-// ============================================================================
-// Usage Handlers (T027)
-// ============================================================================
-
-// Re-export usage types
-pub use xavyo_api_governance::models::{
-    ListNhiUsageQuery, NhiUsageListResponse, NhiUsageSummaryExtendedResponse, RecordUsageRequest,
-};
-
-/// Record usage for a service account.
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts/{id}/usage",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID")
-    ),
-    request_body = RecordUsageRequest,
-    responses(
-        (status = 201, description = "Usage recorded"),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn record_usage(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Json(request): Json<RecordUsageRequest>,
-) -> ApiResult<StatusCode> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    state
-        .usage_service
-        .record_usage(tenant_id, id, request)
-        .await?;
-    Ok(StatusCode::CREATED)
-}
-
-/// List usage events for a service account.
-#[utoipa::path(
-    get,
-    path = "/nhi/service-accounts/{id}/usage",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID"),
-        ListNhiUsageQuery
-    ),
-    responses(
-        (status = 200, description = "List of usage events", body = NhiUsageListResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn list_usage(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Query(query): Query<ListNhiUsageQuery>,
-) -> ApiResult<Json<NhiUsageListResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let result = state.usage_service.list_usage(tenant_id, id, query).await?;
-    Ok(Json(result))
-}
-
-/// Query parameters for usage summary.
-#[derive(Debug, Clone, serde::Deserialize, utoipa::IntoParams)]
-pub struct UsageSummaryQuery {
-    /// Period in days (default: 30).
-    pub period_days: Option<i32>,
-}
-
-/// Get usage summary for a service account.
-#[utoipa::path(
-    get,
-    path = "/nhi/service-accounts/{id}/usage/summary",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID"),
-        UsageSummaryQuery
-    ),
-    responses(
-        (status = 200, description = "Usage summary", body = NhiUsageSummaryExtendedResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_usage_summary(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Query(query): Query<UsageSummaryQuery>,
-) -> ApiResult<Json<NhiUsageSummaryExtendedResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let summary = state
-        .usage_service
-        .get_summary(tenant_id, id, query.period_days)
-        .await?;
-    Ok(Json(summary))
-}
-
-// ============================================================================
-// Risk Handlers (T028)
-// ============================================================================
-
-// Re-export risk types
-pub use xavyo_api_governance::models::{NhiRiskScoreResponse, RiskLevelSummary};
-
-/// Get risk score for a service account.
-#[utoipa::path(
-    get,
-    path = "/nhi/service-accounts/{id}/risk",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID")
-    ),
-    responses(
-        (status = 200, description = "Risk score", body = NhiRiskScoreResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_risk_score(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<NhiRiskScoreResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let score = state
-        .risk_service
-        .get_or_calculate_score(tenant_id, id)
-        .await?;
-    Ok(Json(score))
-}
-
-/// Calculate/recalculate risk score for a service account.
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts/{id}/risk/calculate",
-    tag = "NHI - Service Accounts",
-    params(
-        ("id" = Uuid, Path, description = "Service account ID")
-    ),
-    responses(
-        (status = 200, description = "Risk score calculated", body = NhiRiskScoreResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Service account not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn calculate_risk_score(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<Json<NhiRiskScoreResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let score = state.risk_service.calculate_score(tenant_id, id).await?;
-    Ok(Json(score))
-}
-
-// ============================================================================
-// Request Handlers (T029)
-// ============================================================================
-
-// Re-export request types
-pub use xavyo_api_governance::models::{
-    ApproveNhiRequestRequest, ListNhiRequestsQuery, NhiRequestListResponse, NhiRequestResponse,
-    RejectNhiRequestRequest, SubmitNhiRequestRequest,
-};
-pub use xavyo_api_governance::services::NhiRequestSummary;
-
-/// Response when approving an NHI request.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
-pub struct NhiRequestApprovalResponse {
-    /// The updated request.
-    pub request: NhiRequestResponse,
-    /// The initial client secret (only shown once).
-    pub secret: String,
-    /// Warning to store the secret securely.
-    pub warning: String,
-}
-
-/// Submit a request for a new service account.
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts/requests",
-    tag = "NHI - Service Accounts",
-    request_body = SubmitNhiRequestRequest,
-    responses(
-        (status = 201, description = "Request submitted", body = NhiRequestResponse),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn submit_request(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Json(body): Json<SubmitNhiRequestRequest>,
-) -> ApiResult<(StatusCode, Json<NhiRequestResponse>)> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let user_id = extract_actor_id(&claims)?;
-    let result = state
-        .request_service
-        .submit_request(
-            tenant_id,
-            user_id,
-            body.name,
-            body.purpose,
-            body.requested_permissions,
-            body.requested_expiration,
-            body.requested_rotation_days,
-        )
-        .await?;
-    Ok((StatusCode::CREATED, Json(result)))
-}
-
-/// List service account requests.
-#[utoipa::path(
-    get,
-    path = "/nhi/service-accounts/requests",
-    tag = "NHI - Service Accounts",
-    params(ListNhiRequestsQuery),
-    responses(
-        (status = 200, description = "List of requests", body = NhiRequestListResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn list_requests(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Query(query): Query<ListNhiRequestsQuery>,
-) -> ApiResult<Json<NhiRequestListResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let filter = xavyo_db::NhiRequestFilter {
-        requester_id: query.requester_id,
-        status: query.status,
-        pending_only: query.pending_only,
-    };
-    let limit = query.limit.unwrap_or(50);
-    let offset = query.offset.unwrap_or(0).max(0);
-    let result = state
-        .request_service
-        .list_requests(tenant_id, filter, limit, offset)
-        .await?;
-    Ok(Json(result))
-}
-
-/// Get request summary statistics.
-#[utoipa::path(
-    get,
-    path = "/nhi/service-accounts/requests/summary",
-    tag = "NHI - Service Accounts",
-    responses(
-        (status = 200, description = "Request summary", body = NhiRequestSummary),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_request_summary(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-) -> ApiResult<Json<NhiRequestSummary>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let result = state.request_service.get_request_summary(tenant_id).await?;
-    Ok(Json(result))
-}
-
-/// Query parameters for pagination.
-#[derive(Debug, Clone, serde::Deserialize, utoipa::IntoParams)]
-pub struct PaginationQuery {
-    /// Maximum number of results.
+#[derive(Debug, Deserialize)]
+pub struct ListServiceAccountsQuery {
+    pub environment: Option<String>,
+    pub lifecycle_state: Option<NhiLifecycleState>,
+    pub owner_id: Option<Uuid>,
     pub limit: Option<i64>,
-    /// Number of results to skip.
     pub offset: Option<i64>,
 }
 
-/// Get my pending requests.
-#[utoipa::path(
-    get,
-    path = "/nhi/service-accounts/requests/my-pending",
-    tag = "NHI - Service Accounts",
-    params(PaginationQuery),
-    responses(
-        (status = 200, description = "My pending requests", body = NhiRequestListResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_my_pending_requests(
-    State(state): State<ServiceAccountsState>,
+#[derive(Debug, Serialize)]
+pub struct PaginatedResponse<T: Serialize> {
+    pub data: Vec<T>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Handlers
+// ---------------------------------------------------------------------------
+
+/// POST /nhi/service-accounts — Create a new service account.
+async fn create_service_account(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
-    Query(query): Query<PaginationQuery>,
-) -> ApiResult<Json<NhiRequestListResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let user_id = extract_actor_id(&claims)?;
-    let limit = query.limit.unwrap_or(50);
+    Json(request): Json<CreateServiceAccountRequest>,
+) -> Result<impl IntoResponse, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
+    request.validate()?;
+
+    let tenant_uuid = *tenant_id.as_uuid();
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
+
+    let mut tx = state.pool.begin().await.map_err(|e| {
+        tracing::error!("Failed to begin transaction: {e}");
+        NhiApiError::Internal("Failed to begin transaction".into())
+    })?;
+
+    // 1. Insert base identity
+    let identity: NhiIdentity = sqlx::query_as(
+        r"
+        INSERT INTO nhi_identities (
+            tenant_id, nhi_type, name, description, owner_id, backup_owner_id,
+            expires_at, inactivity_threshold_days, rotation_interval_days, created_by
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING *
+        ",
+    )
+    .bind(tenant_uuid)
+    .bind(NhiType::ServiceAccount)
+    .bind(&request.name)
+    .bind(&request.description)
+    .bind(request.owner_id)
+    .bind(request.backup_owner_id)
+    .bind(request.expires_at)
+    .bind(request.inactivity_threshold_days)
+    .bind(request.rotation_interval_days)
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    // 2. Insert service account extension
+    sqlx::query(
+        r"
+        INSERT INTO nhi_service_accounts (nhi_id, purpose, environment)
+        VALUES ($1, $2, $3)
+        ",
+    )
+    .bind(identity.id)
+    .bind(&request.purpose)
+    .bind(&request.environment)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await.map_err(|e| {
+        tracing::error!("Failed to commit transaction: {e}");
+        NhiApiError::Internal("Failed to commit transaction".into())
+    })?;
+
+    let result = NhiServiceAccount::find_by_nhi_id(&state.pool, tenant_uuid, identity.id)
+        .await?
+        .ok_or(NhiApiError::Internal(
+            "Failed to fetch created service account".into(),
+        ))?;
+
+    Ok((StatusCode::CREATED, Json(result)))
+}
+
+/// GET /nhi/service-accounts — List service accounts with filters.
+async fn list_service_accounts(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
+    Query(query): Query<ListServiceAccountsQuery>,
+) -> Result<Json<PaginatedResponse<NhiServiceAccountWithIdentity>>, NhiApiError> {
+    let tenant_uuid = *tenant_id.as_uuid();
+    let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
-    let result = state
-        .request_service
-        .get_my_pending_requests(tenant_id, user_id, limit, offset)
-        .await?;
-    Ok(Json(result))
-}
 
-/// Get a service account request by ID.
-#[utoipa::path(
-    get,
-    path = "/nhi/service-accounts/requests/{request_id}",
-    tag = "NHI - Service Accounts",
-    params(
-        ("request_id" = Uuid, Path, description = "Request ID")
-    ),
-    responses(
-        (status = 200, description = "Request details", body = NhiRequestResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Request not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_request(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(request_id): Path<Uuid>,
-) -> ApiResult<Json<NhiRequestResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let result = state
-        .request_service
-        .get_request(tenant_id, request_id)
-        .await?;
-    Ok(Json(result))
-}
+    let filter = NhiServiceAccountFilter {
+        environment: query.environment,
+        lifecycle_state: query.lifecycle_state,
+        owner_id: query.owner_id,
+    };
 
-/// Approve a service account request.
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts/requests/{request_id}/approve",
-    tag = "NHI - Service Accounts",
-    params(
-        ("request_id" = Uuid, Path, description = "Request ID")
-    ),
-    request_body = ApproveNhiRequestRequest,
-    responses(
-        (status = 200, description = "Request approved, service account created", body = NhiRequestApprovalResponse),
-        (status = 400, description = "Invalid request or already decided"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Request not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn approve_request(
-    State(state): State<ServiceAccountsState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(request_id): Path<Uuid>,
-    Json(body): Json<ApproveNhiRequestRequest>,
-) -> ApiResult<Json<NhiRequestApprovalResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let approver_id = extract_actor_id(&claims)?;
-    let (request, secret) = state
-        .request_service
-        .approve_request(tenant_id, request_id, approver_id, body.comments)
-        .await?;
-    Ok(Json(NhiRequestApprovalResponse {
-        request,
-        secret,
-        warning: "This is the only time the secret will be shown. Store it securely.".to_string(),
+    let data = NhiServiceAccount::list(&state.pool, tenant_uuid, &filter, limit, offset).await?;
+    let total = count_service_accounts(&state.pool, tenant_uuid, &filter).await?;
+
+    Ok(Json(PaginatedResponse {
+        data,
+        total,
+        limit,
+        offset,
     }))
 }
 
-/// Reject a service account request.
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts/requests/{request_id}/reject",
-    tag = "NHI - Service Accounts",
-    params(
-        ("request_id" = Uuid, Path, description = "Request ID")
-    ),
-    request_body = RejectNhiRequestRequest,
-    responses(
-        (status = 200, description = "Request rejected", body = NhiRequestResponse),
-        (status = 400, description = "Invalid request or already decided"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Request not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn reject_request(
-    State(state): State<ServiceAccountsState>,
+/// Count service accounts matching a filter.
+async fn count_service_accounts(
+    pool: &sqlx::PgPool,
+    tenant_id: Uuid,
+    filter: &NhiServiceAccountFilter,
+) -> Result<i64, sqlx::Error> {
+    let mut query = String::from(
+        r"
+        SELECT COUNT(*)
+        FROM nhi_identities i
+        INNER JOIN nhi_service_accounts s ON s.nhi_id = i.id
+        WHERE i.tenant_id = $1
+        ",
+    );
+    let mut param_idx = 2;
+
+    if filter.environment.is_some() {
+        query.push_str(&format!(" AND s.environment = ${param_idx}"));
+        param_idx += 1;
+    }
+    if filter.lifecycle_state.is_some() {
+        query.push_str(&format!(" AND i.lifecycle_state = ${param_idx}"));
+        param_idx += 1;
+    }
+    if filter.owner_id.is_some() {
+        query.push_str(&format!(" AND i.owner_id = ${param_idx}"));
+    }
+
+    let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
+
+    if let Some(ref environment) = filter.environment {
+        q = q.bind(environment);
+    }
+    if let Some(lifecycle_state) = filter.lifecycle_state {
+        q = q.bind(lifecycle_state);
+    }
+    if let Some(owner_id) = filter.owner_id {
+        q = q.bind(owner_id);
+    }
+
+    q.fetch_one(pool).await
+}
+
+/// GET /nhi/service-accounts/{id} — Get a specific service account.
+async fn get_service_account(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<NhiServiceAccountWithIdentity>, NhiApiError> {
+    let tenant_uuid = *tenant_id.as_uuid();
+
+    let sa = NhiServiceAccount::find_by_nhi_id(&state.pool, tenant_uuid, id)
+        .await?
+        .ok_or(NhiApiError::NotFound)?;
+
+    Ok(Json(sa))
+}
+
+/// PATCH /nhi/service-accounts/{id} — Update a service account.
+async fn update_service_account(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
-    Path(request_id): Path<Uuid>,
-    Json(body): Json<RejectNhiRequestRequest>,
-) -> ApiResult<Json<NhiRequestResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let approver_id = extract_actor_id(&claims)?;
-    let result = state
-        .request_service
-        .reject_request(tenant_id, request_id, approver_id, body.reason)
+    Path(id): Path<Uuid>,
+    Json(request): Json<UpdateServiceAccountRequest>,
+) -> Result<Json<NhiServiceAccountWithIdentity>, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
+    let tenant_uuid = *tenant_id.as_uuid();
+
+    NhiIdentity::find_by_id(&state.pool, tenant_uuid, id)
+        .await?
+        .ok_or(NhiApiError::NotFound)?;
+
+    let mut tx = state.pool.begin().await.map_err(|e| {
+        tracing::error!("Failed to begin transaction: {e}");
+        NhiApiError::Internal("Failed to begin transaction".into())
+    })?;
+
+    // Update base identity fields if any are set
+    let has_base_update = request.name.is_some()
+        || request.description.is_some()
+        || request.owner_id.is_some()
+        || request.backup_owner_id.is_some()
+        || request.expires_at.is_some()
+        || request.inactivity_threshold_days.is_some()
+        || request.rotation_interval_days.is_some();
+
+    if has_base_update {
+        let base_update = UpdateNhiIdentity {
+            name: request.name,
+            description: request.description,
+            owner_id: request.owner_id,
+            backup_owner_id: request.backup_owner_id,
+            expires_at: request.expires_at,
+            inactivity_threshold_days: request.inactivity_threshold_days,
+            rotation_interval_days: request.rotation_interval_days,
+        };
+        update_identity_in_tx(&mut tx, tenant_uuid, id, base_update).await?;
+    }
+
+    // Update service account extension fields if any are set
+    let has_sa_update = request.purpose.is_some() || request.environment.is_some();
+
+    if has_sa_update {
+        let sa_update = UpdateNhiServiceAccount {
+            purpose: request.purpose,
+            environment: request.environment,
+        };
+        sqlx::query(
+            r"
+            UPDATE nhi_service_accounts
+            SET purpose = COALESCE($3, purpose),
+                environment = COALESCE($4, environment)
+            WHERE nhi_id = $2
+              AND EXISTS (SELECT 1 FROM nhi_identities WHERE id = $2 AND tenant_id = $1)
+            ",
+        )
+        .bind(tenant_uuid)
+        .bind(id)
+        .bind(&sa_update.purpose)
+        .bind(&sa_update.environment)
+        .execute(&mut *tx)
         .await?;
+    }
+
+    tx.commit().await.map_err(|e| {
+        tracing::error!("Failed to commit transaction: {e}");
+        NhiApiError::Internal("Failed to commit transaction".into())
+    })?;
+
+    let result = NhiServiceAccount::find_by_nhi_id(&state.pool, tenant_uuid, id)
+        .await?
+        .ok_or(NhiApiError::NotFound)?;
+
     Ok(Json(result))
 }
 
-/// Cancel a service account request.
-#[utoipa::path(
-    post,
-    path = "/nhi/service-accounts/requests/{request_id}/cancel",
-    tag = "NHI - Service Accounts",
-    params(
-        ("request_id" = Uuid, Path, description = "Request ID")
-    ),
-    responses(
-        (status = 200, description = "Request cancelled", body = NhiRequestResponse),
-        (status = 400, description = "Invalid request or already decided"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Only requester can cancel"),
-        (status = 404, description = "Request not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn cancel_request(
-    State(state): State<ServiceAccountsState>,
+/// DELETE /nhi/service-accounts/{id} — Delete a service account.
+async fn delete_service_account(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
-    Path(request_id): Path<Uuid>,
-) -> ApiResult<Json<NhiRequestResponse>> {
-    let tenant_id = extract_tenant_id(&claims)?;
-    let user_id = extract_actor_id(&claims)?;
-    let result = state
-        .request_service
-        .cancel_request(tenant_id, request_id, user_id)
-        .await?;
-    Ok(Json(result))
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
+    let tenant_uuid = *tenant_id.as_uuid();
+
+    let deleted = NhiIdentity::delete(&state.pool, tenant_uuid, id).await?;
+    if !deleted {
+        return Err(NhiApiError::NotFound);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// ---------------------------------------------------------------------------
+// Helper: update identity within a transaction
+// ---------------------------------------------------------------------------
 
-    #[test]
-    fn test_service_accounts_handlers_compile() {
-        // Compile-time verification that handler signatures are correct.
-        assert!(true);
+async fn update_identity_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    tenant_id: Uuid,
+    id: Uuid,
+    input: UpdateNhiIdentity,
+) -> Result<(), NhiApiError> {
+    let mut updates = vec!["updated_at = NOW()".to_string()];
+    let mut param_idx: u32 = 3;
+
+    if input.name.is_some() {
+        updates.push(format!("name = ${param_idx}"));
+        param_idx += 1;
+    }
+    if input.description.is_some() {
+        updates.push(format!("description = ${param_idx}"));
+        param_idx += 1;
+    }
+    if input.owner_id.is_some() {
+        updates.push(format!("owner_id = ${param_idx}"));
+        param_idx += 1;
+    }
+    if input.backup_owner_id.is_some() {
+        updates.push(format!("backup_owner_id = ${param_idx}"));
+        param_idx += 1;
+    }
+    if input.expires_at.is_some() {
+        updates.push(format!("expires_at = ${param_idx}"));
+        param_idx += 1;
+    }
+    if input.inactivity_threshold_days.is_some() {
+        updates.push(format!("inactivity_threshold_days = ${param_idx}"));
+        param_idx += 1;
+    }
+    if input.rotation_interval_days.is_some() {
+        updates.push(format!("rotation_interval_days = ${param_idx}"));
     }
 
-    // T015: Test service_accounts list handler types
-    #[test]
-    fn test_list_service_accounts_query_params() {
-        // Verify ListServiceAccountsQuery can be constructed
-        // Note: The actual query type is from xavyo_api_governance
-        // This test verifies the handler signature compiles correctly
-        assert!(true);
+    let query = format!(
+        "UPDATE nhi_identities SET {} WHERE tenant_id = $1 AND id = $2",
+        updates.join(", ")
+    );
+
+    let mut q = sqlx::query(&query).bind(tenant_id).bind(id);
+
+    if let Some(ref name) = input.name {
+        q = q.bind(name);
+    }
+    if let Some(ref description) = input.description {
+        q = q.bind(description);
+    }
+    if let Some(ref owner_opt) = input.owner_id {
+        q = q.bind(*owner_opt);
+    }
+    if let Some(ref backup_opt) = input.backup_owner_id {
+        q = q.bind(*backup_opt);
+    }
+    if let Some(ref expires_opt) = input.expires_at {
+        q = q.bind(*expires_opt);
+    }
+    if let Some(ref inactivity_opt) = input.inactivity_threshold_days {
+        q = q.bind(*inactivity_opt);
+    }
+    if let Some(ref rotation_opt) = input.rotation_interval_days {
+        q = q.bind(*rotation_opt);
     }
 
-    // T016: Test service_accounts create handler types
-    #[test]
-    fn test_create_service_account_request_types() {
-        // Verify CreateNhiRequest can be constructed
-        // Note: The actual type is from xavyo_api_governance
-        // This test verifies the handler signature compiles correctly
-        assert!(true);
-    }
+    q.execute(&mut **tx).await?;
+    Ok(())
+}
 
-    #[test]
-    fn test_nhi_request_approval_response_structure() {
-        // Verify NhiRequestApprovalResponse struct fields exist and types are correct
-        // Note: We only check the wrapper struct since NhiRequestResponse
-        // is from xavyo_api_governance and has its own tests
+// ---------------------------------------------------------------------------
+// Router
+// ---------------------------------------------------------------------------
 
-        // Test that the struct has the expected public fields via a helper function
-        fn _verify_nhi_request_approval_response_fields(
-            response: &NhiRequestApprovalResponse,
-        ) -> (&NhiRequestResponse, &String, &String) {
-            (&response.request, &response.secret, &response.warning)
-        }
-
-        // Type check only - actual construction requires database types
-        assert!(true);
-    }
+pub fn service_account_routes(state: NhiState) -> Router {
+    Router::new()
+        .route(
+            "/service-accounts",
+            post(create_service_account).get(list_service_accounts),
+        )
+        .route(
+            "/service-accounts/:id",
+            get(get_service_account)
+                .patch(update_service_account)
+                .delete(delete_service_account),
+        )
+        .with_state(state)
 }

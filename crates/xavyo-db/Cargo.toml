@@ -9,7 +9,7 @@ license = "BSL-1.1"
 sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "uuid", "chrono", "rust_decimal", "json"] }
 tokio = { version = "1.35", features = ["full"] }
 xavyo-core = { path = "../xavyo-core" }
-xavyo-nhi = { path = "../xavyo-nhi" }
+xavyo-nhi = { path = "../xavyo-nhi", features = ["sqlx"] }
 thiserror = "1.0"
 tracing = "0.1"
 chrono = { version = "0.4", features = ["serde"] }

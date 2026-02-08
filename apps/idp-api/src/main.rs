@@ -48,7 +48,7 @@ use xavyo_api_connectors::{
 };
 use xavyo_api_governance::governance_router;
 use xavyo_api_import::{import_admin_router, import_public_router, ImportState};
-use xavyo_api_nhi::router as nhi_router;
+use xavyo_api_nhi::{nhi_router, NhiState};
 use xavyo_api_oauth::router::{
     admin_oauth_router, device_router, oauth_router, well_known_router, OAuthState,
 };
@@ -60,12 +60,12 @@ use xavyo_api_tenants::{
     api_keys_router, oauth_clients_router, suspension_check_middleware, system_admin_router,
     tenant_router,
 };
-use xavyo_db::SYSTEM_TENANT_ID;
 use xavyo_api_users::{
     attribute_definitions_router, bulk_operations_router, groups_router, users_router, UsersState,
 };
 use xavyo_connector::crypto::CredentialEncryption;
 use xavyo_connector::registry::ConnectorRegistry;
+use xavyo_db::SYSTEM_TENANT_ID;
 use xavyo_tenant::TenantLayer;
 use xavyo_webhooks::services::delivery_service::DeliveryService;
 use xavyo_webhooks::{webhooks_router, EventPublisher, WebhookWorker, WebhooksState};
@@ -235,11 +235,8 @@ async fn main() {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(3600);
-    let email_rate_limiter = EmailRateLimiter::with_config(
-        email_rate_max,
-        email_ip_rate_max,
-        email_rate_window,
-    );
+    let email_rate_limiter =
+        EmailRateLimiter::with_config(email_rate_max, email_ip_rate_max, email_rate_window);
 
     // Use SmtpEmailSender when SMTP env vars are configured, otherwise fall back to mock
     let email_sender: Arc<dyn xavyo_api_auth::EmailSender> = match EmailConfig::from_env() {
@@ -803,7 +800,8 @@ async fn main() {
     // Operation tracking routes (F160 - Job Tracking)
     let operation_service = Arc::new(OperationService::new(pool.clone()));
     let conflict_service = Arc::new(xavyo_api_connectors::ConflictService::new(pool.clone()));
-    let operation_state = OperationState::with_conflict_service(operation_service, conflict_service);
+    let operation_state =
+        OperationState::with_conflict_service(operation_service, conflict_service);
     let job_service = Arc::new(JobService::new(Arc::new(pool.clone())));
     let job_state = JobState::new(job_service);
 
@@ -952,8 +950,7 @@ async fn main() {
     // A2A AgentCard discovery routes (public, no auth required)
     let agents_discovery_routes = discovery_router(agents_state);
 
-    // Unified NHI routes (F108 - Unified Non-Human Identity Architecture)
-    // F113: Support both API key and JWT authentication for programmatic access
+    // Unified NHI routes (201-tool-nhi-promotion — unified data model)
     //
     // Layer order (outermost runs first on request):
     // 1. Extension(pool) - makes PgPool available for API key lookups
@@ -961,25 +958,20 @@ async fn main() {
     // 3. api_key_auth_middleware - validates API keys, sets TenantId/UserId/JwtClaims
     // 4. jwt_auth_middleware - validates JWTs if not API key
     // 5. TenantLayer - validates tenant context (checks extensions first, then header)
-    let nhi_routes = match nhi_router(pool.clone()) {
-        Ok(r) => r,
-        Err(e) => {
-            tracing::error!("Failed to create NHI router: {e}");
-            std::process::exit(1);
-        }
-    }
-    // F113: TenantLayer runs last - can see TenantId set by API key auth
-    .layer(TenantLayer::with_config(
-        xavyo_tenant::TenantConfig::builder()
-            .require_tenant(true)
-            .build(),
-    ))
-    .layer(axum::middleware::from_fn(jwt_auth_middleware))
-    // F113: API key middleware runs before JWT - if API key, validates; if not, passes through
-    .layer(axum::middleware::from_fn(api_key_auth_middleware))
-    .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
-    // F113: PgPool required for API key validation lookups
-    .layer(axum::Extension(pool.clone()));
+    let nhi_state = NhiState::new(pool.clone());
+    let nhi_routes = nhi_router(nhi_state)
+        // F113: TenantLayer runs last - can see TenantId set by API key auth
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(true)
+                .build(),
+        ))
+        .layer(axum::middleware::from_fn(jwt_auth_middleware))
+        // F113: API key middleware runs before JWT - if API key, validates; if not, passes through
+        .layer(axum::middleware::from_fn(api_key_auth_middleware))
+        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+        // F113: PgPool required for API key validation lookups
+        .layer(axum::Extension(pool.clone()));
 
     // Tenant provisioning routes (F097 - Self-service tenant creation)
     // Requires JWT authentication against the system tenant
