@@ -255,11 +255,11 @@ pub async fn fetch_current_state(
 )> {
     // Fetch all agents (using large limit to get all)
     let agents_response = client.list_agents(1000, 0, None, None).await?;
-    let agents = agents_response.agents;
+    let agents = agents_response.data;
 
     // Fetch all tools
     let tools_response = client.list_tools(1000, 0).await?;
-    let tools = tools_response.tools;
+    let tools = tools_response.data;
 
     Ok((agents, tools))
 }
@@ -287,16 +287,20 @@ pub fn compute_changes(
             // Tool exists - check if update needed
             let existing_desc = existing.description.as_deref().unwrap_or("");
             let config_desc = tool_config.description.as_str();
+            let existing_risk_str = existing
+                .risk_score
+                .map(|s| s.to_string())
+                .unwrap_or_default();
             let needs_update = existing_desc != config_desc
-                || existing.risk_level != tool_config.risk_level
+                || existing_risk_str != tool_config.risk_level
                 || existing.input_schema != tool_config.input_schema;
 
             if needs_update {
                 let mut details = Vec::new();
-                if existing.risk_level != tool_config.risk_level {
+                if existing_risk_str != tool_config.risk_level {
                     details.push(format!(
-                        "risk_level: {} → {}",
-                        existing.risk_level, tool_config.risk_level
+                        "risk: {} → {}",
+                        existing_risk_str, tool_config.risk_level
                     ));
                 }
                 if existing_desc != config_desc {
@@ -326,7 +330,6 @@ pub fn compute_changes(
             let needs_update = existing.description.as_deref()
                 != agent_config.description.as_deref()
                 || existing.agent_type != agent_config.agent_type
-                || existing.risk_level != agent_config.risk_level
                 || existing.model_provider.as_deref() != Some(agent_config.model_provider.as_str())
                 || existing.model_name.as_deref() != Some(agent_config.model_name.as_str());
 
@@ -336,12 +339,6 @@ pub fn compute_changes(
                     details.push(format!(
                         "agent_type: {} → {}",
                         existing.agent_type, agent_config.agent_type
-                    ));
-                }
-                if existing.risk_level != agent_config.risk_level {
-                    details.push(format!(
-                        "risk_level: {} → {}",
-                        existing.risk_level, agent_config.risk_level
                     ));
                 }
                 if existing.model_provider.as_deref() != Some(agent_config.model_provider.as_str())
@@ -405,7 +402,6 @@ pub async fn apply_changes(
                     let request = CreateToolRequest::new(
                         tool_config.name.clone(),
                         tool_config.input_schema.clone(),
-                        tool_config.risk_level.clone(),
                     )
                     .with_description(Some(tool_config.description.clone()));
 
@@ -445,7 +441,6 @@ pub async fn apply_changes(
                         Some(agent_config.model_provider.clone()),
                         Some(agent_config.model_name.clone()),
                     )
-                    .with_risk_level(agent_config.risk_level.clone())
                     .with_description(agent_config.description.clone());
 
                     match client.create_agent(request).await {
@@ -754,8 +749,8 @@ mod tests {
             agent_type: "copilot".to_string(),
             model_provider: Some("anthropic".to_string()),
             model_name: Some("claude".to_string()),
-            status: "active".to_string(),
-            risk_level: "low".to_string(),
+            lifecycle_state: "active".to_string(),
+            risk_score: None,
             requires_human_approval: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -792,8 +787,8 @@ mod tests {
             agent_type: "copilot".to_string(),
             model_provider: Some("anthropic".to_string()),
             model_name: Some("claude".to_string()),
-            status: "active".to_string(),
-            risk_level: "low".to_string(),
+            lifecycle_state: "active".to_string(),
+            risk_score: None,
             requires_human_approval: false,
             created_at: Utc::now(),
             updated_at: Utc::now(),
@@ -804,6 +799,5 @@ mod tests {
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].action, ApplyAction::Update);
         assert!(changes[0].details.as_ref().unwrap().contains("agent_type"));
-        assert!(changes[0].details.as_ref().unwrap().contains("risk_level"));
     }
 }

@@ -6,7 +6,7 @@ use crate::error::{CliError, CliResult};
 use crate::models::nhi::UpdateToolRequest;
 use crate::models::tool::{CreateToolRequest, ToolResponse};
 use clap::{Args, Subcommand};
-use dialoguer::{Confirm, Select};
+use dialoguer::Confirm;
 use uuid::Uuid;
 
 /// Tool management commands
@@ -51,10 +51,6 @@ pub struct ListArgs {
 pub struct CreateArgs {
     /// Tool name (alphanumeric, hyphens, underscores, 1-64 chars)
     pub name: String,
-
-    /// Risk level: low, medium, high, critical
-    #[arg(long, short = 'r')]
-    pub risk_level: Option<String>,
 
     /// JSON Schema for tool input parameters
     #[arg(long, short = 's')]
@@ -147,16 +143,16 @@ async fn execute_list(args: ListArgs) -> CliResult<()> {
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&response)?);
-    } else if response.tools.is_empty() {
+    } else if response.data.is_empty() {
         println!("No tools found.");
         println!();
-        println!("Create your first tool with: xavyo tools create <name> --risk-level <level> --schema '<json>'");
+        println!("Create your first tool with: xavyo tools create <name> --schema '<json>'");
     } else {
-        print_tool_table(&response.tools);
+        print_tool_table(&response.data);
         println!();
         println!(
             "Showing {} of {} tools",
-            response.tools.len(),
+            response.data.len(),
             response.total
         );
     }
@@ -173,15 +169,6 @@ async fn execute_create(args: CreateArgs) -> CliResult<()> {
     let config = Config::load(&paths)?;
     let client = ApiClient::new(config, paths)?;
 
-    // Get risk level (interactive or from flag)
-    let risk_level = match args.risk_level {
-        Some(r) => {
-            validate_risk_level(&r)?;
-            r
-        }
-        None => prompt_risk_level()?,
-    };
-
     // Get JSON schema (from flag or prompt for default)
     let input_schema = match args.schema {
         Some(ref s) => parse_json_schema(s)?,
@@ -189,7 +176,7 @@ async fn execute_create(args: CreateArgs) -> CliResult<()> {
     };
 
     // Build the request
-    let mut request = CreateToolRequest::new(args.name.clone(), input_schema, risk_level);
+    let mut request = CreateToolRequest::new(args.name.clone(), input_schema);
 
     if let Some(desc) = args.description {
         request = request.with_description(Some(desc));
@@ -351,16 +338,6 @@ fn validate_tool_name(name: &str) -> CliResult<()> {
     Ok(())
 }
 
-/// Validate risk level
-fn validate_risk_level(risk_level: &str) -> CliResult<()> {
-    match risk_level {
-        "low" | "medium" | "high" | "critical" => Ok(()),
-        _ => Err(CliError::Validation(format!(
-            "Invalid risk level '{risk_level}'. Must be one of: low, medium, high, critical"
-        ))),
-    }
-}
-
 /// Parse tool ID from string
 fn parse_tool_id(id_str: &str) -> CliResult<Uuid> {
     Uuid::parse_str(id_str).map_err(|_| {
@@ -372,26 +349,6 @@ fn parse_tool_id(id_str: &str) -> CliResult<Uuid> {
 fn parse_json_schema(schema_str: &str) -> CliResult<serde_json::Value> {
     serde_json::from_str(schema_str)
         .map_err(|e| CliError::Validation(format!("Invalid JSON schema: {e}")))
-}
-
-/// Interactive prompt for risk level
-fn prompt_risk_level() -> CliResult<String> {
-    if !atty::is(atty::Stream::Stdin) {
-        return Err(CliError::Validation(
-            "Risk level is required. Use --risk-level flag in non-interactive mode.".to_string(),
-        ));
-    }
-
-    let levels = vec!["low", "medium", "high", "critical"];
-
-    let selection = Select::new()
-        .with_prompt("Select risk level")
-        .items(&levels)
-        .default(1) // Default to "medium"
-        .interact()
-        .map_err(|e| CliError::Io(e.to_string()))?;
-
-    Ok(levels[selection].to_string())
 }
 
 /// Interactive prompt for JSON schema
@@ -437,7 +394,13 @@ fn print_tool_table(tools: &[ToolResponse]) {
 
         println!(
             "{:<38} {:<20} {:<15} {:<10} {:<8}",
-            tool.id, truncated_name, truncated_category, tool.risk_level, tool.status
+            tool.id,
+            truncated_name,
+            truncated_category,
+            tool.risk_score
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "N/A".to_string()),
+            tool.lifecycle_state
         );
     }
 }
@@ -452,12 +415,17 @@ fn print_tool_details(tool: &ToolResponse) {
         println!("Category:          {category}");
     }
 
-    println!("Risk Level:        {}", tool.risk_level);
+    println!(
+        "Risk Score:        {}",
+        tool.risk_score
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "N/A".to_string())
+    );
     println!(
         "Requires Approval: {}",
         if tool.requires_approval { "Yes" } else { "No" }
     );
-    println!("Status:            {}", tool.status);
+    println!("Lifecycle State:   {}", tool.lifecycle_state);
 
     if let Some(ref desc) = tool.description {
         println!("Description:       {desc}");
@@ -531,16 +499,6 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_risk_level() {
-        assert!(validate_risk_level("low").is_ok());
-        assert!(validate_risk_level("medium").is_ok());
-        assert!(validate_risk_level("high").is_ok());
-        assert!(validate_risk_level("critical").is_ok());
-        assert!(validate_risk_level("invalid").is_err());
-        assert!(validate_risk_level("LOW").is_err()); // Case sensitive
-    }
-
-    #[test]
     fn test_parse_tool_id() {
         let valid_uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
         assert!(parse_tool_id(valid_uuid).is_ok());
@@ -581,12 +539,12 @@ mod tests {
             category: Some("testing".to_string()),
             input_schema: serde_json::json!({"type": "object"}),
             output_schema: Some(serde_json::json!({"type": "string"})),
-            risk_level: "low".to_string(),
+            risk_score: Some(25),
             requires_approval: false,
             max_calls_per_hour: Some(100),
             provider: Some("test-provider".to_string()),
             provider_verified: true,
-            status: "active".to_string(),
+            lifecycle_state: "active".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -598,10 +556,10 @@ mod tests {
 
         // Verify the tool data is accessible for display
         assert_eq!(tool.name, "test-tool");
-        assert_eq!(tool.risk_level, "low");
+        assert_eq!(tool.risk_score, Some(25));
         assert!(!tool.requires_approval);
         assert_eq!(tool.category, Some("testing".to_string()));
-        assert_eq!(tool.status, "active");
+        assert_eq!(tool.lifecycle_state, "active");
         assert!(tool.provider.is_some());
         assert!(tool.provider_verified);
         assert_eq!(tool.max_calls_per_hour, Some(100));
@@ -621,12 +579,12 @@ mod tests {
             category: None,
             input_schema: serde_json::json!({}),
             output_schema: None,
-            risk_level: "critical".to_string(),
+            risk_score: None,
             requires_approval: true,
             max_calls_per_hour: None,
             provider: None,
             provider_verified: false,
-            status: "active".to_string(),
+            lifecycle_state: "active".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
