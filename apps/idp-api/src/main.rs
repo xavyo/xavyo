@@ -34,10 +34,11 @@ use xavyo_api_auth::{
     alerts_router, api_key_auth_middleware, audit_router, auth_router, branding_router,
     delegation_router, devices_router, jwt_auth_middleware, key_management_router, me_router,
     mfa_router, org_security_policy_router, passwordless_admin_router, passwordless_router,
-    public_router, revocation_router, users_router as auth_users_router, AuditService, AuthService,
-    AuthState, EmailConfig, EmailRateLimiter, JwtPublicKey, JwtPublicKeys, KeyService,
-    LockoutService, MfaService, MockEmailSender, RateLimitConfig, RateLimiter, RevocationCache,
-    SessionService, SmtpEmailSender, TokenConfig, TokenService, TotpEncryption,
+    public_auth_router, public_router, revocation_router, users_router as auth_users_router,
+    AuditService, AuthService, AuthState, EmailConfig, EmailRateLimiter, JwtPublicKey,
+    JwtPublicKeys, KeyService, LockoutService, MfaService, MockEmailSender, RateLimitConfig,
+    RateLimiter, RevocationCache, SessionService, SmtpEmailSender, TokenConfig, TokenService,
+    TotpEncryption,
 };
 use xavyo_api_authorization::authorization_router;
 use xavyo_api_connectors::{
@@ -389,20 +390,24 @@ async fn main() {
         JwtPublicKeys(keys_map)
     };
 
-    // Build auth routes with tenant middleware
-    // The auth_router returns Router<()> as it uses Extension for state
-    // Tenant is required for all auth operations (login, register, etc.)
-    let auth_routes = auth_router(auth_state.clone())
+    // Build auth routes: tenant-required routes (login, register, forgot-password, etc.)
+    let tenant_auth_routes = auth_router(auth_state.clone()).layer(TenantLayer::with_config(
+        xavyo_tenant::TenantConfig::builder()
+            .require_tenant(true)
+            .build(),
+    ));
+
+    // Public auth routes — no tenant header needed (signup, refresh, logout)
+    let public_auth_routes = public_auth_router(auth_state.clone());
+
+    // Merge and apply shared rate limiting on top
+    let auth_routes = tenant_auth_routes
+        .merge(public_auth_routes)
         // F082-US7: Rate limit login/register endpoints
         .layer(axum::middleware::from_fn(
             middleware::login_rate_limit_middleware,
         ))
-        .layer(axum::Extension(endpoint_rate_limiters.clone()))
-        .layer(TenantLayer::with_config(
-            xavyo_tenant::TenantConfig::builder()
-                .require_tenant(true) // Tenant header required for multi-tenant auth
-                .build(),
-        ));
+        .layer(axum::Extension(endpoint_rate_limiters.clone()));
 
     // Build MFA routes with JWT authentication (F022)
     let mfa_routes = mfa_router(auth_state.clone())

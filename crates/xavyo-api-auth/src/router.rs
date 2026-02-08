@@ -406,33 +406,19 @@ impl AuthState {
     }
 }
 
-/// Create the authentication router with all endpoints.
+/// Create the authentication router for tenant-required endpoints.
+///
+/// These routes require `TenantLayer` because handlers extract `Extension<TenantId>`.
 ///
 /// # Endpoints
 ///
-/// - `POST /auth/register` - User registration
 /// - `POST /auth/login` - User login (rate limited)
-/// - `POST /auth/refresh` - Token refresh
-/// - `POST /auth/logout` - User logout (requires authentication)
+/// - `POST /auth/register` - User registration
 /// - `POST /auth/forgot-password` - Initiate password reset (email rate limited)
+/// - `POST /auth/resend-verification` - Resend verification email (email rate limited)
 /// - `POST /auth/reset-password` - Complete password reset
 /// - `POST /auth/verify-email` - Verify email address
-/// - `POST /auth/resend-verification` - Resend verification email (email rate limited)
-/// - `POST /auth/mfa/totp/setup` - Initiate TOTP MFA setup
-/// - `POST /auth/mfa/totp/verify-setup` - Complete TOTP setup
-/// - `POST /auth/mfa/totp/verify` - Verify TOTP during login
-/// - `DELETE /auth/mfa/totp` - Disable TOTP MFA
-/// - `POST /auth/mfa/recovery/generate` - Regenerate recovery codes
-/// - `POST /auth/mfa/recovery/verify` - Verify recovery code during login
-/// - `GET /users/me/mfa/status` - Get MFA status
-///
-/// # Arguments
-///
-/// * `state` - The authentication state containing services and rate limiter
-///
-/// # Returns
-///
-/// A configured Axum router for the `/auth` prefix.
+/// - `PUT /auth/password` - Change password
 pub fn auth_router(state: AuthState) -> Router {
     // Login route with rate limiting
     let login_route = Router::new()
@@ -452,6 +438,45 @@ pub fn auth_router(state: AuthState) -> Router {
         .route("/register", post(register_handler))
         .layer(Extension(state.email_sender.clone()));
 
+    // Routes without rate limiting
+    let other_routes = Router::new()
+        .route("/reset-password", post(reset_password_handler))
+        .route("/verify-email", post(verify_email_handler))
+        .route("/password", put(password_change_handler));
+
+    Router::new()
+        .merge(login_route)
+        .merge(email_rate_limited_routes)
+        .merge(register_route)
+        .merge(other_routes)
+        .layer(Extension(state.pool))
+        .layer(Extension(state.auth_service))
+        .layer(Extension(state.token_service))
+        .layer(Extension(state.mfa_service))
+        .layer(Extension(state.webauthn_service))
+        .layer(Extension(state.session_service))
+        .layer(Extension(state.password_policy_service))
+        .layer(Extension(state.lockout_service))
+        .layer(Extension(state.audit_service))
+        .layer(Extension(state.alert_service))
+        .layer(Extension(state.device_service))
+        .layer(Extension(state.device_policy_service))
+        .layer(Extension(state.risk_enforcement_service))
+}
+
+/// Create the public authentication router for endpoints that don't require a tenant header.
+///
+/// These routes don't need `TenantLayer` because:
+/// - `signup_handler` hardcodes `SYSTEM_TENANT_ID`
+/// - `refresh_handler` extracts tenant from the refresh token
+/// - `logout_handler` extracts tenant from the refresh token
+///
+/// # Endpoints
+///
+/// - `POST /auth/signup` - Self-service signup (F111, rate limited)
+/// - `POST /auth/refresh` - Token refresh
+/// - `POST /auth/logout` - User logout
+pub fn public_auth_router(state: AuthState) -> Router {
     // Signup route for self-service system tenant signup (F111)
     // Rate limited to 10 requests per IP per hour
     let signup_route = Router::new()
@@ -460,22 +485,11 @@ pub fn auth_router(state: AuthState) -> Router {
         .layer(Extension(state.signup_rate_limiter.clone()))
         .layer(Extension(state.email_sender.clone()));
 
-    // Routes without rate limiting
     let other_routes = Router::new()
         .route("/refresh", post(refresh_handler))
-        .route("/logout", post(logout_handler))
-        .route("/reset-password", post(reset_password_handler))
-        .route("/verify-email", post(verify_email_handler))
-        .route("/password", put(password_change_handler));
+        .route("/logout", post(logout_handler));
 
-    // Note: MFA routes are now in a separate mfa_router() function
-    // They need JWT authentication and should be mounted separately in main.rs
-
-    // Merge all public routes under /auth
     Router::new()
-        .merge(login_route)
-        .merge(email_rate_limited_routes)
-        .merge(register_route)
         .merge(signup_route)
         .merge(other_routes)
         .layer(Extension(state.pool))
