@@ -31,6 +31,30 @@ curl http://localhost:8080/readyz
 
 The API is now running at `http://localhost:8080` with Swagger UI at `http://localhost:8080/docs/`.
 
+A default admin user is created automatically:
+
+| | Default |
+|---|---------|
+| **Email** | `admin@xavyo.local` |
+| **Password** | `Admin@1234` |
+| **Role** | `super_admin` |
+| **Tenant** | System (`00000000-0000-0000-0000-000000000001`) |
+
+```bash
+# Login
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-Id: 00000000-0000-0000-0000-000000000001" \
+  -d '{"email":"admin@xavyo.local","password":"Admin@1234"}'
+```
+
+Override with custom credentials via environment variables:
+
+```bash
+ADMIN_EMAIL=me@example.com ADMIN_PASSWORD='MyS3cure!Pass' \
+  docker compose -f docker/docker-compose.yml up -d
+```
+
 ### Standalone Distribution (no source code)
 
 For end users who just want to run xavyo without cloning the repository:
@@ -51,7 +75,17 @@ docker compose -f docker-compose.dist.yml up -d
 curl http://localhost:8080/readyz
 ```
 
-The pre-built image is published to `ghcr.io/xavyo/xavyo-idp` on every release.
+The pre-built image is published to `ghcr.io/xavyo/xavyo-idp` on every release. The default admin credentials (`admin@xavyo.local` / `Admin@1234`) are the same as above — override with `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
+
+### Bootstrap Admin User
+
+On first startup, if `ADMIN_EMAIL` and `ADMIN_PASSWORD` are set, a `super_admin` user is created under the system tenant with email pre-verified for immediate login. The operation is idempotent — on subsequent restarts the existing user is left unchanged.
+
+To disable automatic admin creation, unset both variables:
+
+```bash
+ADMIN_EMAIL= ADMIN_PASSWORD= docker compose -f docker/docker-compose.yml up -d
+```
 
 ### Docker Image Details
 
