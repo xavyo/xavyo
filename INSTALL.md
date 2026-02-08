@@ -1,8 +1,76 @@
-# xavyo Development Environment Setup
+# xavyo Installation Guide
 
-This guide walks you through setting up a local development environment for xavyo.
+This guide covers all ways to run xavyo: Docker (quickest), from source (for development), or standalone distribution.
 
-## Prerequisites
+## Docker Quick Start (recommended)
+
+The fastest way to get xavyo running. No Rust toolchain required.
+
+### Prerequisites
+
+| Tool | Version | Check Command |
+|------|---------|---------------|
+| Docker | 24.0+ | `docker --version` |
+| Docker Compose | 2.20+ | `docker compose version` |
+
+### Steps
+
+```bash
+# 1. Clone
+git clone https://github.com/xavyo/xavyo.git && cd xavyo
+
+# 2. Generate JWT keys
+bash docker/generate-keys.sh
+
+# 3. Start everything (PostgreSQL, Kafka, Mailpit, OpenLDAP, API)
+docker compose -f docker/docker-compose.yml up -d
+
+# 4. Verify
+curl http://localhost:8080/readyz
+```
+
+The API is now running at `http://localhost:8080` with Swagger UI at `http://localhost:8080/docs/`.
+
+### Standalone Distribution (no source code)
+
+For end users who just want to run xavyo without cloning the repository:
+
+```bash
+# 1. Download the compose file
+curl -O https://raw.githubusercontent.com/xavyo/xavyo/master/docker/docker-compose.dist.yml
+
+# 2. Generate JWT keys
+mkdir -p keys
+openssl genpkey -algorithm RSA -out keys/jwt_private.pem -pkeyopt rsa_keygen_bits:2048
+openssl rsa -pubout -in keys/jwt_private.pem -out keys/jwt_public.pem
+
+# 3. Start (pulls pre-built image from GHCR)
+docker compose -f docker-compose.dist.yml up -d
+
+# 4. Verify
+curl http://localhost:8080/readyz
+```
+
+The pre-built image is published to `ghcr.io/xavyo/xavyo-idp` on every release.
+
+### Docker Image Details
+
+| Property | Value |
+|----------|-------|
+| **Base image** | Debian bookworm-slim |
+| **Image size** | ~422 MB |
+| **Runtime user** | `xavyo` (UID 1000, non-root) |
+| **Exposed port** | 8080 |
+| **Healthcheck** | `GET /readyz` every 10s |
+| **Registry** | `ghcr.io/xavyo/xavyo-idp` |
+
+---
+
+## Development Setup (from source)
+
+For contributors and developers who need to build and modify xavyo.
+
+### Prerequisites
 
 | Tool | Version | Check Command |
 |------|---------|---------------|
@@ -13,8 +81,6 @@ This guide walks you through setting up a local development environment for xavy
 | Git | 2.30+ | `git --version` |
 | Node.js | 18+ | `node --version` (for documentation site only) |
 
-## Quick Start
-
 ### 1. Clone the Repository
 
 ```bash
@@ -24,13 +90,17 @@ cd xavyo
 
 ### 2. Generate JWT Signing Keys
 
-xavyo uses RSA keys for JWT signing:
+```bash
+bash docker/generate-keys.sh
+```
+
+Or manually:
 
 ```bash
-mkdir -p keys
-openssl genpkey -algorithm RSA -out keys/test-private.pem -pkeyopt rsa_keygen_bits:2048
-openssl rsa -pubout -in keys/test-private.pem -out keys/test-public.pem
-chmod 600 keys/test-private.pem
+mkdir -p docker/keys
+openssl genpkey -algorithm RSA -out docker/keys/jwt_private.pem -pkeyopt rsa_keygen_bits:2048
+openssl rsa -pubout -in docker/keys/jwt_private.pem -out docker/keys/jwt_public.pem
+chmod 600 docker/keys/jwt_private.pem
 ```
 
 ### 3. Generate Encryption Keys
@@ -69,8 +139,8 @@ DATABASE_URL=postgres://xavyo:xavyo_test_password@localhost:5434/xavyo_test
 APP_DATABASE_URL=postgres://xavyo_app:xavyo_app_password@localhost:5434/xavyo_test
 
 # JWT keys (paste the content of your key files)
-JWT_PRIVATE_KEY="$(cat keys/test-private.pem)"
-JWT_PUBLIC_KEY="$(cat keys/test-public.pem)"
+JWT_PRIVATE_KEY="$(cat docker/keys/jwt_private.pem)"
+JWT_PUBLIC_KEY="$(cat docker/keys/jwt_public.pem)"
 JWT_KEY_ID=dev-key-1
 
 # API server
@@ -90,10 +160,10 @@ FRONTEND_BASE_URL=http://localhost:3000
 
 ### 5. Start Infrastructure Services
 
-Start all development services:
+Start infrastructure services (without the API container — you'll run it from source):
 
 ```bash
-docker compose -f docker/docker-compose.yml up -d
+docker compose -f docker/docker-compose.yml up -d postgres mailpit kafka openldap
 ```
 
 Or start only what you need:
@@ -127,7 +197,7 @@ cargo run -p idp-api
 curl http://localhost:8080/health
 
 # OpenAPI documentation
-open http://localhost:8080/swagger-ui/
+open http://localhost:8080/docs/
 
 # Signup a test user
 curl -X POST http://localhost:8080/auth/signup \
@@ -143,6 +213,7 @@ The `docker/docker-compose.yml` provides the full development stack:
 
 | Service | Port(s) | Description | Required |
 |---------|---------|-------------|----------|
+| **idp-api** | 8080 | xavyo API server (built from source) | Yes |
 | **postgres** | 5434 → 5432 | PostgreSQL 15 with RLS | Yes |
 | **mailpit** | 1025 (SMTP), 8025 (Web UI) | Email testing (catches all outbound email) | For email features |
 | **kafka** | 9094 → 9094 | Apache Kafka 3.7 (KRaft mode, no Zookeeper) | For event streaming |
@@ -165,10 +236,27 @@ All ports are configurable via environment variables (e.g., `POSTGRES_PORT`, `MA
 
 | URL | Description |
 |-----|-------------|
+| http://localhost:8080/readyz | API readiness check |
 | http://localhost:8080/health | API health check |
-| http://localhost:8080/swagger-ui/ | Interactive API documentation |
+| http://localhost:8080/docs/ | Interactive API documentation (Swagger UI) |
 | http://localhost:8025 | Mailpit Web UI (email testing) |
 | http://localhost:4000 | Documentation site (if running) |
+
+## Building the Docker Image
+
+To build the production Docker image locally:
+
+```bash
+docker compose -f docker/docker-compose.yml build idp-api
+```
+
+Or directly:
+
+```bash
+docker build -f docker/Dockerfile -t xavyo-idp .
+```
+
+The multi-stage build uses `cargo-chef` for dependency caching. Rebuilds after source-only changes complete in under a minute.
 
 ## Documentation Site
 
@@ -300,7 +388,7 @@ cargo run -p idp-api  # Re-runs all migrations
 ## Next Steps
 
 - Browse the [Documentation Site](http://localhost:4000) for comprehensive guides
-- Read the [API Reference](http://localhost:8080/swagger-ui/) interactively
+- Read the [API Reference](http://localhost:8080/docs/) interactively
 - Review [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
 - Check [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for system architecture
 

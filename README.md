@@ -105,15 +105,34 @@ Traditional IAM solutions weren't built for this. They focus on humans, not mach
 
 ## 🚀 Quick Start
 
-Get running in **5 minutes**:
+### Docker (recommended)
+
+Get running in **2 minutes** — no Rust toolchain needed:
 
 ```bash
 # 1. Clone
 git clone https://github.com/xavyo/xavyo.git && cd xavyo
 
 # 2. Generate JWT keys
-openssl genpkey -algorithm RSA -out keys/test-private.pem -pkeyopt rsa_keygen_bits:2048
-openssl rsa -pubout -in keys/test-private.pem -out keys/test-public.pem
+bash docker/generate-keys.sh
+
+# 3. Start everything
+docker compose -f docker/docker-compose.yml up -d
+
+# 4. Verify
+curl http://localhost:8080/readyz
+```
+
+**That's it!** API running at `http://localhost:8080`
+
+### Without Docker (from source)
+
+```bash
+# 1. Clone
+git clone https://github.com/xavyo/xavyo.git && cd xavyo
+
+# 2. Generate JWT keys
+bash docker/generate-keys.sh
 
 # 3. Start PostgreSQL
 docker compose -f docker/docker-compose.yml up -d postgres
@@ -123,9 +142,7 @@ cp .env.example .env
 cargo run -p idp-api
 ```
 
-**That's it!** API running at `http://localhost:8080`
-
-📖 **Swagger UI**: `http://localhost:8080/swagger-ui/`
+📖 **Swagger UI**: `http://localhost:8080/docs/`
 
 ### Using the CLI
 
@@ -187,7 +204,7 @@ curl -X POST http://localhost:8080/auth/login \
 | **[Architecture](docs/ARCHITECTURE.md)** | System architecture overview |
 | **[Crate Index](docs/crates/index.md)** | All crates organized by layer |
 | **[Dependency Graph](docs/crates/dependency-graph.md)** | Visual dependency relationships |
-| **[API Reference](http://localhost:8080/swagger-ui/)** | Swagger UI (when running) |
+| **[API Reference](http://localhost:8080/docs/)** | Swagger UI (when running) |
 
 Each crate has a standardized `CRATE.md` file at its root (e.g., [`crates/xavyo-core/CRATE.md`](crates/xavyo-core/CRATE.md)).
 
@@ -215,7 +232,7 @@ xavyo/
 │   ├── xavyo-connector/   # Connector framework
 │   └── xavyo-governance/  # IGA engine
 │
-└── docker/                # Development environment
+└── docker/                # Docker & development environment
 ```
 
 **32 Rust crates** | **149 SQL migrations** | **1,400+ source files**
