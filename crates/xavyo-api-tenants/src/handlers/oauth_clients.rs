@@ -66,6 +66,13 @@ pub async fn rotate_oauth_secret_handler(
         ));
     }
 
+    // Only admin/super_admin can rotate OAuth client secrets
+    if !claims.has_role("admin") {
+        return Err(TenantError::Forbidden(
+            "Only administrators can manage OAuth clients".to_string(),
+        ));
+    }
+
     let admin_user_id = claims
         .sub
         .parse::<Uuid>()
@@ -176,6 +183,13 @@ pub async fn list_oauth_clients_handler(
         ));
     }
 
+    // Only admin/super_admin can list OAuth clients
+    if !claims.has_role("admin") {
+        return Err(TenantError::Forbidden(
+            "Only administrators can manage OAuth clients".to_string(),
+        ));
+    }
+
     let oauth_service = xavyo_api_oauth::services::OAuth2ClientService::new(state.pool.clone());
 
     let clients = oauth_service
@@ -240,6 +254,13 @@ pub async fn deactivate_oauth_client_handler(
     if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to this tenant's OAuth clients".to_string(),
+        ));
+    }
+
+    // Only admin/super_admin can deactivate OAuth clients
+    if !claims.has_role("admin") {
+        return Err(TenantError::Forbidden(
+            "Only administrators can manage OAuth clients".to_string(),
         ));
     }
 

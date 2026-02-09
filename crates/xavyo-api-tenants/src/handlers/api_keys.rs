@@ -41,7 +41,7 @@ use crate::services::ApiKeyService;
 /// retrieved later. The key is stored as a SHA-256 hash.
 ///
 /// ## Authorization
-/// - Tenant users can create keys for their own tenant only
+/// - Any tenant user can create keys for themselves
 #[utoipa::path(
     post,
     path = "/tenants/{tenant_id}/api-keys",
@@ -210,6 +210,13 @@ pub async fn rotate_api_key_handler(
         .map_err(|e| TenantError::Database(e.to_string()))?
         .ok_or_else(|| TenantError::NotFoundWithMessage(format!("API key {key_id} not found")))?;
 
+    // Only admin or key owner can rotate
+    if !claims.has_role("admin") && old_key.user_id != admin_user_id {
+        return Err(TenantError::Forbidden(
+            "You can only manage your own API keys".to_string(),
+        ));
+    }
+
     if !old_key.is_active {
         return Err(TenantError::Validation(
             "Cannot rotate an inactive API key".to_string(),
@@ -342,9 +349,20 @@ pub async fn list_api_keys_handler(
         ));
     }
 
-    let keys = ApiKey::list_by_tenant(&state.pool, tenant_id)
-        .await
-        .map_err(|e| TenantError::Database(e.to_string()))?;
+    // Admin sees all tenant keys; regular users see only their own
+    let keys = if claims.has_role("admin") {
+        ApiKey::list_by_tenant(&state.pool, tenant_id)
+            .await
+            .map_err(|e| TenantError::Database(e.to_string()))?
+    } else {
+        let caller_user_id = claims
+            .sub
+            .parse::<Uuid>()
+            .map_err(|_| TenantError::Unauthorized("Invalid user ID in claims".to_string()))?;
+        ApiKey::list_by_user(&state.pool, tenant_id, caller_user_id)
+            .await
+            .map_err(|e| TenantError::Database(e.to_string()))?
+    };
 
     let api_keys: Vec<ApiKeyInfo> = keys
         .into_iter()
@@ -412,6 +430,13 @@ pub async fn deactivate_api_key_handler(
         .map_err(|e| TenantError::Database(e.to_string()))?
         .ok_or_else(|| TenantError::NotFoundWithMessage(format!("API key {key_id} not found")))?;
 
+    // Only admin or key owner can deactivate
+    if !claims.has_role("admin") && old_key.user_id != admin_user_id {
+        return Err(TenantError::Forbidden(
+            "You can only manage your own API keys".to_string(),
+        ));
+    }
+
     // Deactivate the key
     ApiKey::deactivate(&state.pool, tenant_id, key_id)
         .await
@@ -462,7 +487,7 @@ pub async fn deactivate_api_key_handler(
 /// based on the granularity parameter.
 ///
 /// ## Authorization
-/// - Tenant users can view usage for API keys in their own tenant only
+/// - Admins can view usage for any tenant API key; regular users only their own
 #[utoipa::path(
     get,
     path = "/tenants/{tenant_id}/api-keys/{key_id}/usage",
@@ -513,6 +538,17 @@ pub async fn get_api_key_usage_handler(
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?
         .ok_or_else(|| TenantError::NotFoundWithMessage("API key not found".to_string()))?;
+
+    // Only admin or key owner can view usage
+    let caller_user_id = claims
+        .sub
+        .parse::<Uuid>()
+        .map_err(|_| TenantError::Unauthorized("Invalid user ID in claims".to_string()))?;
+    if !claims.has_role("admin") && api_key.user_id != caller_user_id {
+        return Err(TenantError::Forbidden(
+            "You can only view usage for your own API keys".to_string(),
+        ));
+    }
 
     // Get usage statistics
     let usage = ApiKeyUsage::get_by_key_id(&state.pool, key_id, tenant_id)

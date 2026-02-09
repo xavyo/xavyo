@@ -152,8 +152,8 @@ pub fn system_admin_router(pool: PgPool) -> Router {
 /// ## Authorization
 ///
 /// Endpoints are accessible by:
-/// - System tenant administrators (can access any tenant)
-/// - Tenant's own users (can only access their tenant's keys/settings)
+/// - Tenant admins (can manage all keys/invitations within their tenant)
+/// - Tenant's own users (can only manage their own keys)
 /// - /api-keys/introspect requires a valid API key (introspects itself)
 pub fn api_keys_router(pool: PgPool) -> Router {
     let slug_service = Arc::new(SlugService::new(pool.clone()));
@@ -223,7 +223,7 @@ pub fn api_keys_router(pool: PgPool) -> Router {
 /// ## Authorization
 ///
 /// Endpoints are accessible by:
-/// - System tenant administrators (can access any tenant)
+/// - Tenant admins (can manage all OAuth clients within their tenant)
 /// - Tenant's own users (can only access their tenant's clients)
 pub fn oauth_clients_router(pool: PgPool) -> Router {
     let slug_service = Arc::new(SlugService::new(pool.clone()));
