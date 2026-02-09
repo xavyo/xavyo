@@ -55,7 +55,7 @@ jobs:
           sudo swapon /swapfile
       - run: cargo test --workspace
         env:
-          CARGO_BUILD_JOBS: 2
+          CARGO_BUILD_JOBS: 1
 
   deny:
     name: Dependency audit
