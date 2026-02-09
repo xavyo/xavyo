@@ -162,9 +162,13 @@ pub async fn revoke_permission(
 pub async fn list_agent_tools(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Path(agent_id): Path<Uuid>,
     Query(query): Query<PaginationQuery>,
 ) -> Result<Json<PaginatedResponse<NhiToolPermission>>, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
     let tenant_uuid = *tenant_id.as_uuid();
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
@@ -199,9 +203,13 @@ pub async fn list_agent_tools(
 pub async fn list_tool_agents(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Path(tool_id): Path<Uuid>,
     Query(query): Query<PaginationQuery>,
 ) -> Result<Json<PaginatedResponse<NhiToolPermission>>, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
     let tenant_uuid = *tenant_id.as_uuid();
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);

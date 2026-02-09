@@ -85,6 +85,9 @@ pub async fn list_mappings(
     Path(target_id): Path<Uuid>,
     Query(query): Query<ListMappingsQuery>,
 ) -> Result<Json<MappingListResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let pool = state.scim_target_service.pool();
 

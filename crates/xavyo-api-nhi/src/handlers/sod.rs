@@ -199,8 +199,12 @@ pub async fn create_sod_rule(
 pub async fn list_sod_rules(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Query(query): Query<PaginationQuery>,
 ) -> Result<Json<PaginatedResponse<SodRule>>, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
     let tenant_uuid = *tenant_id.as_uuid();
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);
@@ -289,8 +293,12 @@ pub async fn delete_sod_rule(
 pub async fn check_sod(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Json(request): Json<SodCheckRequest>,
 ) -> Result<Json<SodCheckResult>, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
     let tenant_uuid = *tenant_id.as_uuid();
 
     // Get the agent's current tool permissions (non-expired)

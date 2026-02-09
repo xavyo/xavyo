@@ -15,6 +15,7 @@ use axum::{
     Extension, Json,
 };
 use uuid::Uuid;
+use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
 
 /// Lists all `OAuth2` clients for the current tenant.
@@ -32,7 +33,11 @@ use xavyo_core::TenantId;
 pub async fn list_clients_handler(
     State(state): State<OAuthState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
 ) -> Result<Json<ClientListResponse>, OAuthError> {
+    if !claims.has_role("admin") {
+        return Err(OAuthError::AccessDenied("Admin role required".into()));
+    }
     let tid = *tenant_id.as_uuid();
 
     let clients = state.client_service.list_clients(tid).await?;
@@ -60,8 +65,12 @@ pub async fn list_clients_handler(
 pub async fn get_client_handler(
     State(state): State<OAuthState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ClientResponse>, OAuthError> {
+    if !claims.has_role("admin") {
+        return Err(OAuthError::AccessDenied("Admin role required".into()));
+    }
     let tid = *tenant_id.as_uuid();
 
     let client = state.client_service.get_client_by_id(tid, id).await?;
@@ -86,8 +95,12 @@ pub async fn get_client_handler(
 pub async fn create_client_handler(
     State(state): State<OAuthState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateClientRequest>,
 ) -> Result<Json<CreateClientResponse>, OAuthError> {
+    if !claims.has_role("admin") {
+        return Err(OAuthError::AccessDenied("Admin role required".into()));
+    }
     let tid = *tenant_id.as_uuid();
 
     // Validate the request
@@ -152,9 +165,13 @@ pub async fn create_client_handler(
 pub async fn update_client_handler(
     State(state): State<OAuthState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateClientRequest>,
 ) -> Result<Json<ClientResponse>, OAuthError> {
+    if !claims.has_role("admin") {
+        return Err(OAuthError::AccessDenied("Admin role required".into()));
+    }
     let tid = *tenant_id.as_uuid();
 
     // Validate grant types if provided
@@ -193,8 +210,12 @@ pub async fn update_client_handler(
 pub async fn delete_client_handler(
     State(state): State<OAuthState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, OAuthError> {
+    if !claims.has_role("admin") {
+        return Err(OAuthError::AccessDenied("Admin role required".into()));
+    }
     let tid = *tenant_id.as_uuid();
 
     state.client_service.deactivate_client(tid, id).await?;
@@ -222,8 +243,12 @@ pub async fn delete_client_handler(
 pub async fn regenerate_secret_handler(
     State(state): State<OAuthState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<RegenerateSecretResponse>, OAuthError> {
+    if !claims.has_role("admin") {
+        return Err(OAuthError::AccessDenied("Admin role required".into()));
+    }
     let tid = *tenant_id.as_uuid();
 
     let new_secret = state

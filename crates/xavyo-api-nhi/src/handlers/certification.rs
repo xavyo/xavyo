@@ -161,8 +161,12 @@ pub async fn create_campaign(
 pub async fn list_campaigns(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Query(query): Query<ListCampaignsQuery>,
 ) -> Result<impl IntoResponse, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
     let tenant_uuid = *tenant_id.as_uuid();
     let limit = query.limit.unwrap_or(20).clamp(1, 100);
     let offset = query.offset.unwrap_or(0).max(0);

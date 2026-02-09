@@ -4,6 +4,7 @@ use axum::{extract::Path, http::StatusCode, Extension, Json};
 use std::sync::Arc;
 use uuid::Uuid;
 use validator::Validate;
+use xavyo_auth::JwtClaims;
 use xavyo_db::UpsertSessionPolicy;
 
 use crate::{
@@ -16,9 +17,25 @@ use crate::{
 ///
 /// Get session policy for a tenant (admin only).
 pub async fn get_session_policy(
+    Extension(claims): Extension<JwtClaims>,
     Extension(session_service): Extension<Arc<SessionService>>,
     Path(tenant_id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<SessionPolicyResponse>), ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
+    let caller_tenant_id = claims
+        .tenant_id()
+        .map(|t| *t.as_uuid())
+        .ok_or_else(|| ApiAuthError::PermissionDenied("Missing tenant_id in claims".to_string()))?;
+    if caller_tenant_id != tenant_id {
+        return Err(ApiAuthError::PermissionDenied(
+            "Cannot access other tenant's session policy".to_string(),
+        ));
+    }
+
     let policy = session_service.get_tenant_policy(tenant_id).await?;
 
     Ok((StatusCode::OK, Json(policy.into())))
@@ -28,10 +45,26 @@ pub async fn get_session_policy(
 ///
 /// Update session policy for a tenant (admin only).
 pub async fn update_session_policy(
+    Extension(claims): Extension<JwtClaims>,
     Extension(session_service): Extension<Arc<SessionService>>,
     Path(tenant_id): Path<Uuid>,
     Json(request): Json<UpdateSessionPolicyRequest>,
 ) -> Result<(StatusCode, Json<SessionPolicyResponse>), ApiAuthError> {
+    if !claims.has_role("admin") {
+        return Err(ApiAuthError::PermissionDenied(
+            "Admin role required".to_string(),
+        ));
+    }
+    let caller_tenant_id = claims
+        .tenant_id()
+        .map(|t| *t.as_uuid())
+        .ok_or_else(|| ApiAuthError::PermissionDenied("Missing tenant_id in claims".to_string()))?;
+    if caller_tenant_id != tenant_id {
+        return Err(ApiAuthError::PermissionDenied(
+            "Cannot access other tenant's session policy".to_string(),
+        ));
+    }
+
     // Validate request
     request
         .validate()

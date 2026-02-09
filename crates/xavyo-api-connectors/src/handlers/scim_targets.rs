@@ -94,6 +94,9 @@ pub async fn list_scim_targets(
     Extension(claims): Extension<JwtClaims>,
     Query(query): Query<ListScimTargetsQuery>,
 ) -> Result<Json<ScimTargetListResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let limit = query.limit.clamp(1, 100);
     let offset = query.offset.max(0);
@@ -122,6 +125,9 @@ pub async fn get_scim_target(
     Extension(claims): Extension<JwtClaims>,
     Path(target_id): Path<Uuid>,
 ) -> Result<Json<ScimTargetResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let target = state
         .scim_target_service

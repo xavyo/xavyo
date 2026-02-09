@@ -54,7 +54,7 @@ use xavyo_api_nhi::{nhi_router, NhiState};
 use xavyo_api_oauth::router::{
     admin_oauth_router, device_router, oauth_router, well_known_router, OAuthState,
 };
-use xavyo_api_oidc_federation::{create_federation_router, FederationConfig};
+use xavyo_api_oidc_federation::{admin_routes as federation_admin_routes_fn, auth_routes as federation_auth_routes_fn, FederationConfig, FederationState};
 use xavyo_api_saml::{create_saml_state, saml_admin_router, saml_public_router};
 use xavyo_api_scim::{scim_admin_router, scim_resource_router, ScimConfig};
 use xavyo_api_social::{admin_social_router, public_social_router, SocialConfig, SocialState};
@@ -63,7 +63,8 @@ use xavyo_api_tenants::{
     tenant_router,
 };
 use xavyo_api_users::{
-    attribute_definitions_router, bulk_operations_router, groups_router, users_router, UsersState,
+    attribute_definitions_router, bulk_operations_router, groups_router,
+    middleware::admin_guard, users_router, UsersState,
 };
 use xavyo_connector::crypto::CredentialEncryption;
 use xavyo_connector::registry::ConnectorRegistry;
@@ -718,6 +719,7 @@ async fn main() {
     // Social login admin routes (requires admin role and tenant)
     let social_admin_routes = admin_social_router()
         .with_state(social_state)
+        .layer(axum::middleware::from_fn(admin_guard))
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
         .layer(TenantLayer::with_config(
@@ -742,8 +744,9 @@ async fn main() {
                 .require_tenant(true)
                 .build(),
         ));
-    // SAML admin routes (SP/cert management) - require tenant and JWT auth
+    // SAML admin routes (SP/cert management) - require tenant, JWT auth, and admin role
     let saml_admin_routes = saml_admin_router(saml_state)
+        .layer(axum::middleware::from_fn(admin_guard))
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
         .layer(TenantLayer::with_config(
@@ -759,8 +762,24 @@ async fn main() {
         master_key: config.federation_encryption_key,
         callback_base_url: config.issuer_url.clone(),
     };
-    let federation_routes =
-        create_federation_router(federation_config).layer(TenantLayer::with_config(
+    let federation_state = FederationState::new(&federation_config);
+    // Federation public routes (discover, authorize, callback, logout) - no auth required
+    let federation_public_routes = Router::new()
+        .nest("/auth/federation", federation_auth_routes_fn())
+        .with_state(federation_state.clone())
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(true)
+                .build(),
+        ));
+    // Federation admin routes (IdP CRUD, domains) - require tenant, JWT auth, and admin role
+    let federation_admin_routes = Router::new()
+        .nest("/admin/federation", federation_admin_routes_fn())
+        .with_state(federation_state)
+        .layer(axum::middleware::from_fn(admin_guard))
+        .layer(axum::middleware::from_fn(jwt_auth_middleware))
+        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+        .layer(TenantLayer::with_config(
             xavyo_tenant::TenantConfig::builder()
                 .require_tenant(true)
                 .build(),
@@ -782,6 +801,7 @@ async fn main() {
     // Governance routes (F033 - IGA Entitlement Management)
     // F113: Support both API key and JWT authentication for programmatic access
     let governance_routes = governance_router(pool.clone())
+        .layer(axum::middleware::from_fn(admin_guard))
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::middleware::from_fn(api_key_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
@@ -1096,8 +1116,10 @@ async fn main() {
         .merge(saml_public_routes)
         // SAML admin routes (SP/cert management)
         .nest("/admin/saml", saml_admin_routes)
-        // OIDC Federation routes (external IdP integration)
-        .merge(federation_routes)
+        // OIDC Federation public routes (discover, authorize, callback, logout)
+        .merge(federation_public_routes)
+        // OIDC Federation admin routes (IdP CRUD, domains - requires admin role)
+        .merge(federation_admin_routes)
         // SCIM 2.0 resource provisioning routes (SCIM Bearer token auth)
         .nest("/scim/v2", scim_resource_routes)
         // SCIM admin routes (JWT + admin role)

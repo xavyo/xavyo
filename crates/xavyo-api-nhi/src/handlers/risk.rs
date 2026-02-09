@@ -11,6 +11,7 @@ use axum::{
     Extension, Json, Router,
 };
 use uuid::Uuid;
+use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
 
 use crate::error::NhiApiError;
@@ -36,8 +37,12 @@ use crate::state::NhiState;
 pub async fn get_risk(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
     let tenant_uuid = *tenant_id.as_uuid();
     let breakdown = NhiRiskService::compute(&state.pool, tenant_uuid, id).await?;
     Ok(Json(breakdown))
@@ -58,7 +63,11 @@ pub async fn get_risk(
 pub async fn get_risk_summary(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
 ) -> Result<impl IntoResponse, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
     let tenant_uuid = *tenant_id.as_uuid();
     let summary = NhiRiskService::summary(&state.pool, tenant_uuid).await?;
     Ok(Json(summary))

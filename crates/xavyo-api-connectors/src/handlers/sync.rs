@@ -363,6 +363,9 @@ pub async fn get_sync_token(
     Extension(claims): Extension<JwtClaims>,
     Path(connector_id): Path<Uuid>,
 ) -> Result<Json<SyncTokenResponse>, ApiError> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let _tenant_id = extract_tenant_id(&claims)?;
 
     let token = state

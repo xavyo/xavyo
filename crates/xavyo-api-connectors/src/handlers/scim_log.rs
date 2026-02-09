@@ -72,6 +72,9 @@ pub async fn list_provisioning_log(
     Path(target_id): Path<Uuid>,
     Query(query): Query<ListProvisioningLogQuery>,
 ) -> Result<Json<ProvisioningLogListResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let pool = state.scim_target_service.pool();
 
@@ -127,6 +130,9 @@ pub async fn get_log_detail(
     Extension(claims): Extension<JwtClaims>,
     Path((target_id, log_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<ScimProvisioningLog>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let pool = state.scim_target_service.pool();
 

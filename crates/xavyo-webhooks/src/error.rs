@@ -32,6 +32,9 @@ pub enum WebhookError {
     #[error("Unauthorized")]
     Unauthorized,
 
+    #[error("Forbidden: admin role required")]
+    Forbidden,
+
     #[error("Invalid request: {0}")]
     Validation(String),
 
@@ -83,6 +86,7 @@ impl IntoResponse for WebhookError {
                 (StatusCode::INTERNAL_SERVER_ERROR, "encryption_error")
             }
             WebhookError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
+            WebhookError::Forbidden => (StatusCode::FORBIDDEN, "forbidden"),
             WebhookError::Validation(_) => (StatusCode::BAD_REQUEST, "validation_error"),
             WebhookError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal_error"),
             // Circuit breaker errors
