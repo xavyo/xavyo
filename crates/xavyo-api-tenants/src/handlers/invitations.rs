@@ -72,6 +72,13 @@ pub async fn create_invitation_handler(
         ));
     }
 
+    // Only admin/super_admin can create invitations
+    if !claims.has_role("admin") {
+        return Err(TenantError::Forbidden(
+            "Only administrators can manage invitations".to_string(),
+        ));
+    }
+
     // Get the user ID from claims
     let user_id = claims
         .sub
@@ -170,6 +177,13 @@ pub async fn list_invitations_handler(
         ));
     }
 
+    // Only admin/super_admin can list invitations
+    if !claims.has_role("admin") {
+        return Err(TenantError::Forbidden(
+            "Only administrators can manage invitations".to_string(),
+        ));
+    }
+
     // List invitations
     let service = TenantInvitationService::new(state.pool.clone());
     let (invitations, total) = service
@@ -244,6 +258,13 @@ pub async fn cancel_invitation_handler(
     if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to this tenant's invitations".to_string(),
+        ));
+    }
+
+    // Only admin/super_admin can cancel invitations
+    if !claims.has_role("admin") {
+        return Err(TenantError::Forbidden(
+            "Only administrators can manage invitations".to_string(),
         ));
     }
 

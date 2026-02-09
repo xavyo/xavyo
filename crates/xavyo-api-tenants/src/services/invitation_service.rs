@@ -11,7 +11,9 @@ use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use xavyo_core::TenantId;
 use xavyo_db::models::{CreateAdminInvitation, User, UserInvitation};
+use xavyo_db::set_tenant_context;
 
 use crate::error::TenantError;
 
@@ -247,10 +249,24 @@ impl TenantInvitationService {
             .as_ref()
             .ok_or_else(|| TenantError::Internal("Invitation missing email".to_string()))?;
 
-        // Check if user already exists in this tenant
-        let existing_user = User::find_by_email(&self.pool, invitation.tenant_id, email)
+        // Use a transaction with tenant context for RLS-protected tables
+        let mut tx = self
+            .pool
+            .begin()
             .await
             .map_err(|e| TenantError::Database(e.to_string()))?;
+        set_tenant_context(&mut *tx, TenantId::from_uuid(invitation.tenant_id))
+            .await
+            .map_err(|e| TenantError::Database(e.to_string()))?;
+
+        // Check if user already exists in this tenant
+        let existing_user: Option<User> =
+            sqlx::query_as("SELECT * FROM users WHERE tenant_id = $1 AND email = $2 LIMIT 1")
+                .bind(invitation.tenant_id)
+                .bind(email)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(|e| TenantError::Database(e.to_string()))?;
 
         let user_id = if let Some(user) = existing_user {
             // User already exists - just add to tenant membership
@@ -281,19 +297,38 @@ impl TenantInvitationService {
             .bind(email)
             .bind(&password_hash)
             .bind(now)
-            .fetch_one(&self.pool)
+            .fetch_one(&mut *tx)
             .await
             .map_err(|e| TenantError::Database(e.to_string()))?;
 
             new_user_id
         };
 
-        // Update invitation with user_id
+        // Get role from invitation (default to member)
+        // Note: In a full implementation, we'd look up the role_template_id
+        let role = "member".to_string();
+
+        // Assign the role to the user in user_roles table
+        sqlx::query(
+            "INSERT INTO user_roles (user_id, role_name, created_at) VALUES ($1, $2, NOW()) ON CONFLICT DO NOTHING",
+        )
+        .bind(user_id)
+        .bind(&role)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| TenantError::Database(e.to_string()))?;
+
+        // Commit user + role creation before updating invitation status
+        tx.commit()
+            .await
+            .map_err(|e| TenantError::Database(e.to_string()))?;
+
+        // Update invitation with user_id (user_invitations has permissive RLS)
         UserInvitation::set_user_id(&self.pool, invitation.tenant_id, invitation.id, user_id)
             .await
             .map_err(|e| TenantError::Database(e.to_string()))?;
 
-        // Mark as accepted
+        // Mark as accepted (user_invitations has permissive RLS)
         UserInvitation::mark_accepted(
             &self.pool,
             invitation.tenant_id,
@@ -303,10 +338,6 @@ impl TenantInvitationService {
         )
         .await
         .map_err(|e| TenantError::Database(e.to_string()))?;
-
-        // Get role from invitation (default to member)
-        // Note: In a full implementation, we'd look up the role_template_id
-        let role = "member".to_string();
 
         tracing::info!(
             tenant_id = %invitation.tenant_id,
