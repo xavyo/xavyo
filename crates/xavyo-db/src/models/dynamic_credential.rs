@@ -99,6 +99,7 @@ pub struct DynamicCredential {
     pub secret_type: String,
 
     /// Encrypted credential value (AES-256-GCM).
+    #[serde(skip_serializing)]
     pub credential_value: String,
 
     /// When the credential was issued.

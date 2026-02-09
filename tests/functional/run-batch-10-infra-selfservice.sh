@@ -1293,7 +1293,7 @@ fi
 
 # TC-SYS-002: Suspend tenant
 if [[ "$SYS_TESTS_DEGRADED" == "false" ]]; then
-  RAW=$(sys_call POST "/system/tenants/$MANAGED_TENANT_ID/suspend")
+  RAW=$(sys_call POST "/system/tenants/$MANAGED_TENANT_ID/suspend" -d '{"reason":"Functional test suspension"}')
   parse_response "$RAW"
   if [[ "$CODE" == "200" ]]; then
     pass "TC-SYS-002" "Suspend tenant — 200"
@@ -1421,7 +1421,7 @@ if [[ "$SYS_TESTS_DEGRADED" == "false" ]]; then
   fi
 
   if [[ -n "$DEL_TENANT_ID" && "$DEL_TENANT_ID" != "null" ]]; then
-    RAW=$(sys_call POST "/system/tenants/$DEL_TENANT_ID/delete")
+    RAW=$(sys_call POST "/system/tenants/$DEL_TENANT_ID/delete" -d '{"reason":"Functional test deletion"}')
     parse_response "$RAW"
     if [[ "$CODE" == "200" ]]; then
       pass "TC-SYS-013" "Soft delete tenant — 200"
@@ -1467,7 +1467,7 @@ else
 fi
 
 # TC-SYS-017: Suspend non-existent tenant
-RAW=$(sys_call POST "/system/tenants/00000000-0000-0000-0000-000000000099/suspend")
+RAW=$(sys_call POST "/system/tenants/00000000-0000-0000-0000-000000000099/suspend" -d '{"reason":"Test non-existent"}')
 parse_response "$RAW"
 if [[ "$CODE" == "404" || "$CODE" == "400" ]]; then
   pass "TC-SYS-017" "Suspend non-existent — $CODE"
@@ -1498,7 +1498,7 @@ else
 fi
 
 # TC-SYS-020: Suspend system tenant (should be blocked)
-RAW=$(sys_call POST "/system/tenants/$SYSTEM_TENANT_ID/suspend")
+RAW=$(sys_call POST "/system/tenants/$SYSTEM_TENANT_ID/suspend" -d '{"reason":"Test suspend system tenant"}')
 parse_response "$RAW"
 if [[ "$CODE" == "400" || "$CODE" == "403" || "$CODE" == "409" ]]; then
   pass "TC-SYS-020" "Cannot suspend system tenant — $CODE"
@@ -1507,7 +1507,7 @@ else
 fi
 
 # TC-SYS-021: Delete system tenant (should be blocked)
-RAW=$(sys_call POST "/system/tenants/$SYSTEM_TENANT_ID/delete")
+RAW=$(sys_call POST "/system/tenants/$SYSTEM_TENANT_ID/delete" -d '{"reason":"Test delete system tenant"}')
 parse_response "$RAW"
 if [[ "$CODE" == "400" || "$CODE" == "403" || "$CODE" == "409" ]]; then
   pass "TC-SYS-021" "Cannot delete system tenant — $CODE"
@@ -1517,8 +1517,8 @@ fi
 
 # TC-SYS-022: Suspend already suspended tenant
 if [[ "$SYS_TESTS_DEGRADED" == "false" ]]; then
-  sys_call POST "/system/tenants/$MANAGED_TENANT_ID/suspend" > /dev/null 2>&1
-  RAW=$(sys_call POST "/system/tenants/$MANAGED_TENANT_ID/suspend")
+  sys_call POST "/system/tenants/$MANAGED_TENANT_ID/suspend" -d '{"reason":"Pre-suspend"}' > /dev/null 2>&1
+  RAW=$(sys_call POST "/system/tenants/$MANAGED_TENANT_ID/suspend" -d '{"reason":"Double suspend test"}')
   parse_response "$RAW"
   if [[ "$CODE" == "409" || "$CODE" == "400" || "$CODE" == "200" ]]; then
     pass "TC-SYS-022" "Double suspend — $CODE"

@@ -61,6 +61,7 @@ pub struct SecretProviderConfig {
     pub name: String,
 
     /// Encrypted connection settings (JSON).
+    #[serde(skip_serializing)]
     pub connection_settings: String,
 
     /// Provider status.
@@ -106,12 +107,14 @@ pub struct OpenBaoSettings {
     pub auth_method: String,
 
     /// Token (if `auth_method` is "token").
+    #[serde(skip_serializing)]
     pub token: Option<String>,
 
     /// `AppRole` role ID (if `auth_method` is "approle").
     pub role_id: Option<String>,
 
     /// `AppRole` secret ID (if `auth_method` is "approle").
+    #[serde(skip_serializing)]
     pub secret_id: Option<String>,
 
     /// Namespace (optional).
@@ -126,6 +129,7 @@ pub struct InfisicalSettings {
     pub base_url: String,
 
     /// Service token for authentication.
+    #[serde(skip_serializing)]
     pub service_token: String,
 
     /// Workspace ID.
@@ -146,6 +150,7 @@ pub struct AwsSettings {
     pub access_key_id: Option<String>,
 
     /// Secret access key (optional, uses IAM role if not set).
+    #[serde(skip_serializing)]
     pub secret_access_key: Option<String>,
 
     /// IAM role ARN to assume (optional).
@@ -601,7 +606,7 @@ mod tests {
         let settings = OpenBaoSettings {
             addr: "https://openbao.example.com:8200".to_string(),
             auth_method: "approle".to_string(),
-            token: None,
+            token: Some("secret-token".to_string()),
             role_id: Some("role-123".to_string()),
             secret_id: Some("secret-456".to_string()),
             namespace: Some("xavyo".to_string()),
@@ -610,10 +615,9 @@ mod tests {
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.contains("openbao.example.com"));
         assert!(json.contains("approle"));
-
-        let deserialized: OpenBaoSettings = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.addr, settings.addr);
-        assert_eq!(deserialized.auth_method, "approle");
+        // Secrets should be stripped from serialized output
+        assert!(!json.contains("secret-token"));
+        assert!(!json.contains("secret-456"));
     }
 
     #[test]
@@ -626,22 +630,23 @@ mod tests {
         };
 
         let json = serde_json::to_string(&settings).unwrap();
-        let deserialized: InfisicalSettings = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.workspace_id, "ws-123");
+        // service_token should be stripped from serialized output
+        assert!(!json.contains("st.xxx.yyy"));
+        assert!(json.contains("ws-123"));
     }
 
     #[test]
     fn test_aws_settings_serialization() {
         let settings = AwsSettings {
             region: "eu-west-1".to_string(),
-            access_key_id: None,
-            secret_access_key: None,
+            access_key_id: Some("AKIA12345".to_string()),
+            secret_access_key: Some("super-secret-key".to_string()),
             role_arn: Some("arn:aws:iam::123:role/secrets".to_string()),
         };
 
         let json = serde_json::to_string(&settings).unwrap();
-        let deserialized: AwsSettings = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.region, "eu-west-1");
-        assert!(deserialized.role_arn.is_some());
+        assert!(json.contains("eu-west-1"));
+        // Secret access key should be stripped from serialized output
+        assert!(!json.contains("super-secret-key"));
     }
 }

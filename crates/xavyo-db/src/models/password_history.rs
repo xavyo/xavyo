@@ -22,6 +22,7 @@ pub struct PasswordHistory {
     pub tenant_id: Uuid,
 
     /// The Argon2id hash of the previous password.
+    #[serde(skip_serializing)]
     pub password_hash: String,
 
     /// When this password was set.
