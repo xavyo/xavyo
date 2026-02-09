@@ -10,10 +10,7 @@ use axum::{
 use chrono::Utc;
 use uuid::Uuid;
 use xavyo_auth::JwtClaims;
-use xavyo_db::{
-    bootstrap::SYSTEM_TENANT_ID,
-    models::{AdminAction, AdminAuditLog, AdminResourceType, CreateAuditLogEntry},
-};
+use xavyo_db::models::{AdminAction, AdminAuditLog, AdminResourceType, CreateAuditLogEntry};
 
 use crate::error::TenantError;
 use crate::models::{
@@ -63,8 +60,7 @@ pub async fn rotate_oauth_secret_handler(
         .tid
         .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
 
-    // Allow system tenant admins or the tenant's own users
-    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+    if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to this tenant's OAuth clients".to_string(),
         ));
@@ -174,7 +170,7 @@ pub async fn list_oauth_clients_handler(
         .tid
         .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
 
-    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+    if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to this tenant's OAuth clients".to_string(),
         ));
@@ -241,7 +237,7 @@ pub async fn deactivate_oauth_client_handler(
         .tid
         .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
 
-    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+    if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to this tenant's OAuth clients".to_string(),
         ));

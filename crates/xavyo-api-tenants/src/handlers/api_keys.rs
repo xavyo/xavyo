@@ -12,12 +12,9 @@ use axum::{
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 use xavyo_auth::JwtClaims;
-use xavyo_db::{
-    bootstrap::SYSTEM_TENANT_ID,
-    models::{
-        AdminAction, AdminAuditLog, AdminResourceType, ApiKey, ApiKeyUsage, ApiKeyUsageDaily,
-        ApiKeyUsageHourly, CreateApiKey, CreateAuditLogEntry,
-    },
+use xavyo_db::models::{
+    AdminAction, AdminAuditLog, AdminResourceType, ApiKey, ApiKeyUsage, ApiKeyUsageDaily,
+    ApiKeyUsageHourly, CreateApiKey, CreateAuditLogEntry,
 };
 
 // Note: AdminAction::Read doesn't exist, so we skip audit logging for read-only usage queries.
@@ -44,7 +41,6 @@ use crate::services::ApiKeyService;
 /// retrieved later. The key is stored as a SHA-256 hash.
 ///
 /// ## Authorization
-/// - System administrators can create keys for any tenant
 /// - Tenant users can create keys for their own tenant only
 #[utoipa::path(
     post,
@@ -80,8 +76,7 @@ pub async fn create_api_key_handler(
         .tid
         .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
 
-    // Allow system tenant admins or the tenant's own users
-    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+    if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to create API keys for this tenant".to_string(),
         ));
@@ -198,8 +193,7 @@ pub async fn rotate_api_key_handler(
         .tid
         .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
 
-    // Allow system tenant admins or the tenant's own users
-    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+    if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to this tenant's API keys".to_string(),
         ));
@@ -342,7 +336,7 @@ pub async fn list_api_keys_handler(
         .tid
         .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
 
-    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+    if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to this tenant's API keys".to_string(),
         ));
@@ -401,7 +395,7 @@ pub async fn deactivate_api_key_handler(
         .tid
         .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
 
-    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+    if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to this tenant's API keys".to_string(),
         ));
@@ -468,7 +462,6 @@ pub async fn deactivate_api_key_handler(
 /// based on the granularity parameter.
 ///
 /// ## Authorization
-/// - System administrators can view usage for any API key in any tenant
 /// - Tenant users can view usage for API keys in their own tenant only
 #[utoipa::path(
     get,
@@ -509,8 +502,7 @@ pub async fn get_api_key_usage_handler(
         .tid
         .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
 
-    // Allow system tenant admins or the tenant's own users
-    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+    if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "Access denied to this tenant's resources".to_string(),
         ));

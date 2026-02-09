@@ -32,7 +32,6 @@ use crate::router::TenantAppState;
 ///
 /// Authorization:
 /// - Tenant users can only view settings for their own tenant
-/// - System administrators can view settings for any tenant
 #[utoipa::path(
     get,
     path = "/tenants/{tenant_id}/settings",
@@ -60,9 +59,8 @@ pub async fn get_tenant_user_settings_handler(
         .tid
         .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
 
-    // Authorization check: must be own tenant OR system admin
-    let is_system_admin = caller_tenant_id == SYSTEM_TENANT_ID;
-    if !is_system_admin && caller_tenant_id != tenant_id {
+    // Authorization check: must be own tenant
+    if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to this tenant's settings".to_string(),
         ));
@@ -77,7 +75,6 @@ pub async fn get_tenant_user_settings_handler(
     tracing::debug!(
         tenant_id = %tenant_id,
         caller_tenant_id = %caller_tenant_id,
-        is_system_admin = %is_system_admin,
         "Tenant user retrieved settings"
     );
 

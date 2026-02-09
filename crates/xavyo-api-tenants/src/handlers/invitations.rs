@@ -10,10 +10,7 @@ use axum::{
 };
 use uuid::Uuid;
 use xavyo_auth::JwtClaims;
-use xavyo_db::{
-    bootstrap::SYSTEM_TENANT_ID,
-    models::{AdminAction, AdminAuditLog, AdminResourceType, CreateAuditLogEntry},
-};
+use xavyo_db::models::{AdminAction, AdminAuditLog, AdminResourceType, CreateAuditLogEntry};
 
 use crate::error::TenantError;
 use crate::models::{
@@ -32,7 +29,6 @@ use crate::services::TenantInvitationService;
 /// Create a new invitation for a user to join the tenant.
 ///
 /// ## Authorization
-/// - System administrators can create invitations for any tenant
 /// - Tenant administrators can create invitations for their own tenant only
 /// - Non-admin tenant users receive 403 Forbidden
 #[utoipa::path(
@@ -70,8 +66,7 @@ pub async fn create_invitation_handler(
         .tid
         .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
 
-    // Allow system tenant admins or the tenant's own users
-    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+    if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to create invitations for this tenant".to_string(),
         ));
@@ -133,7 +128,6 @@ pub async fn create_invitation_handler(
 /// List all invitations for a tenant with optional status filter.
 ///
 /// ## Authorization
-/// - System administrators can list invitations for any tenant
 /// - Tenant administrators can list invitations for their own tenant only
 #[utoipa::path(
     get,
@@ -170,7 +164,7 @@ pub async fn list_invitations_handler(
         .tid
         .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
 
-    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+    if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to this tenant's invitations".to_string(),
         ));
@@ -217,7 +211,6 @@ pub async fn list_invitations_handler(
 /// Cancel a pending invitation. Cannot cancel accepted invitations.
 ///
 /// ## Authorization
-/// - System administrators can cancel invitations for any tenant
 /// - Tenant administrators can cancel invitations for their own tenant only
 #[utoipa::path(
     delete,
@@ -248,7 +241,7 @@ pub async fn cancel_invitation_handler(
         .tid
         .ok_or_else(|| TenantError::Unauthorized("JWT claims missing tenant_id".to_string()))?;
 
-    if caller_tenant_id != SYSTEM_TENANT_ID && caller_tenant_id != tenant_id {
+    if caller_tenant_id != tenant_id {
         return Err(TenantError::Forbidden(
             "You don't have access to this tenant's invitations".to_string(),
         ));
