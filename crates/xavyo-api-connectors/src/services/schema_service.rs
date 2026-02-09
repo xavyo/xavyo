@@ -867,6 +867,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(non_snake_case)]
     fn test_attribute_with_IGA_edge_cases() {
         // Test primary identifier
         let attr = AttributeResponse {

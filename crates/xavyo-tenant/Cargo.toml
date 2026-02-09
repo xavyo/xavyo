@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Tower/Axum middleware for multi-tenant context extraction and validation"
 license = "BSL-1.1"
+publish = false
 
 [dependencies]
 axum = { version = "0.7", features = ["macros"] }

@@ -190,7 +190,7 @@ mod alert_type_tests {
     #[test]
     fn test_alert_types_complete() {
         // Verify we have all expected alert types
-        let alert_types = vec![
+        let alert_types = [
             AlertType::NewDevice,
             AlertType::NewLocation,
             AlertType::FailedAttempts,
@@ -203,7 +203,7 @@ mod alert_type_tests {
     #[test]
     fn test_severity_levels_complete() {
         // Verify we have all expected severity levels
-        let severities = vec![Severity::Info, Severity::Warning, Severity::Critical];
+        let severities = [Severity::Info, Severity::Warning, Severity::Critical];
         assert_eq!(severities.len(), 3);
     }
 }

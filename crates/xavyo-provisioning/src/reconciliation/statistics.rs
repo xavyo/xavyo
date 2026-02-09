@@ -225,6 +225,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_run_statistics_progress() {
         let mut stats = RunStatistics::default();
         stats.accounts_total = 100;
@@ -285,6 +286,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_run_statistics_merge() {
         let mut stats1 = RunStatistics::default();
         stats1.accounts_processed = 50;

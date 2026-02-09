@@ -258,6 +258,7 @@ fn test_user_lifecycle_status_route() {
 
 /// Test lifecycle model sources
 mod lifecycle_model_source_tests {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]

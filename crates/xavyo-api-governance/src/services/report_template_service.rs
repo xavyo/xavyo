@@ -219,6 +219,31 @@ impl ReportTemplateService {
     }
 }
 
+/// Validate template definition.
+fn validate_definition(definition: &TemplateDefinition) -> Result<()> {
+    // Validate columns
+    if definition.columns.is_empty() {
+        return Err(GovernanceError::Validation(
+            "Template must have at least one column".to_string(),
+        ));
+    }
+
+    for col in &definition.columns {
+        if col.field.trim().is_empty() {
+            return Err(GovernanceError::Validation(
+                "Column field cannot be empty".to_string(),
+            ));
+        }
+        if col.label.trim().is_empty() {
+            return Err(GovernanceError::Validation(
+                "Column label cannot be empty".to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -273,29 +298,4 @@ mod tests {
         let result = validate_definition(&definition);
         assert!(result.is_ok());
     }
-}
-
-/// Validate template definition.
-fn validate_definition(definition: &TemplateDefinition) -> Result<()> {
-    // Validate columns
-    if definition.columns.is_empty() {
-        return Err(GovernanceError::Validation(
-            "Template must have at least one column".to_string(),
-        ));
-    }
-
-    for col in &definition.columns {
-        if col.field.trim().is_empty() {
-            return Err(GovernanceError::Validation(
-                "Column field cannot be empty".to_string(),
-            ));
-        }
-        if col.label.trim().is_empty() {
-            return Err(GovernanceError::Validation(
-                "Column label cannot be empty".to_string(),
-            ));
-        }
-    }
-
-    Ok(())
 }

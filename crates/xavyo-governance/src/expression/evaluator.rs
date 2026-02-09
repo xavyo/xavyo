@@ -534,7 +534,7 @@ mod tests {
 
     #[test]
     fn test_float_comparison() {
-        let ctx = EvalContext::new().with_attribute("risk_score", 3.14);
+        let ctx = EvalContext::new().with_attribute("risk_score", 3.15);
         assert!(eval("risk_score > 3.0", &ctx).unwrap());
         assert!(eval("risk_score < 4.0", &ctx).unwrap());
     }

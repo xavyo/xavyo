@@ -8,6 +8,7 @@ use xavyo_db::{MicroCertDecision, MicroCertStatus};
 
 /// Simulated certification for testing expiration logic
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct TestCertification {
     id: Uuid,
     tenant_id: Uuid,

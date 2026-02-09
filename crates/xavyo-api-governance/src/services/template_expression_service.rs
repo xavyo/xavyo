@@ -1059,8 +1059,8 @@ mod tests {
         let expr = svc.parse("42").unwrap();
         assert_eq!(expr.token, Token::Number(42.0));
 
-        let expr = svc.parse("-3.14").unwrap();
-        assert_eq!(expr.token, Token::Number(-3.14));
+        let expr = svc.parse("-3.15").unwrap();
+        assert_eq!(expr.token, Token::Number(-3.15));
     }
 
     #[test]

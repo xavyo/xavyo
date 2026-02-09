@@ -13,6 +13,7 @@ pub mod onelogin_client;
 
 pub use azure_ad_client::AzureAdClient;
 pub use base_client::*;
+#[allow(unused_imports)]
 pub use fixtures::{TestGroup, TestUser};
 pub use okta_client::OktaClient;
 pub use onelogin_client::OneLoginClient;

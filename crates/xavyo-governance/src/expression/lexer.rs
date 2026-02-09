@@ -507,14 +507,14 @@ mod tests {
 
     #[test]
     fn test_float_literal() {
-        let lexer = Lexer::new("risk_score > 3.14");
+        let lexer = Lexer::new("risk_score > 3.15");
         let tokens = lexer.tokenize().unwrap();
         assert_eq!(
             tokens,
             vec![
                 Token::Identifier("risk_score".into()),
                 Token::GreaterThan,
-                Token::FloatLiteral(3.14),
+                Token::FloatLiteral(3.15),
                 Token::Eof,
             ]
         );

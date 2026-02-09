@@ -75,6 +75,7 @@ mod tests {
     use super::*;
 
     // Test struct for TenantAware implementation
+    #[allow(dead_code)]
     struct TestEntity {
         tenant_id: TenantId,
         name: String,
@@ -87,6 +88,7 @@ mod tests {
     }
 
     // Another test struct to verify trait works with different types
+    #[allow(dead_code)]
     struct AnotherEntity {
         id: u64,
         tenant: TenantId,

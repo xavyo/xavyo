@@ -159,18 +159,14 @@ mod tests {
     #[test]
     fn test_auth_layer_creation() {
         let _layer = ScimAuthLayer::new();
-        assert!(true); // Layer created successfully
+        // Layer created successfully
     }
 
     #[test]
     fn test_extract_bearer_token() {
         // Test the token extraction logic
         let auth_header = "Bearer xscim_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk";
-        let token = if auth_header.starts_with("Bearer ") {
-            Some(&auth_header[7..])
-        } else {
-            None
-        };
+        let token = auth_header.strip_prefix("Bearer ");
 
         assert_eq!(token, Some("xscim_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk"));
     }

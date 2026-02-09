@@ -5,6 +5,7 @@ edition = "2021"
 description = "SAML 2.0 Identity Provider library for xavyo"
 authors = ["xavyo Team"]
 license = "BSL-1.1"
+publish = false
 
 [dependencies]
 # SAML 2.0 library

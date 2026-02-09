@@ -1377,10 +1377,9 @@ mod tests {
             Some("This simulation tests Q4 policy changes".to_string());
         let notes_absent: Option<String> = None;
 
-        assert!(notes_present.is_some());
         assert_eq!(
-            notes_present.unwrap(),
-            "This simulation tests Q4 policy changes"
+            notes_present.as_deref(),
+            Some("This simulation tests Q4 policy changes")
         );
         assert!(notes_absent.is_none());
     }
@@ -1448,7 +1447,7 @@ mod tests {
 
     #[test]
     fn test_archive_flag_toggling() {
-        let mut is_archived = false;
+        let mut is_archived;
 
         // Archive
         is_archived = true;
@@ -1472,7 +1471,7 @@ mod tests {
         assert!(!filter.include_archived);
 
         // Simulate filtering - archived should be excluded
-        let simulations = vec![("active1", false), ("archived1", true), ("active2", false)];
+        let simulations = [("active1", false), ("archived1", true), ("active2", false)];
 
         let visible_count = simulations
             .iter()
@@ -1503,7 +1502,7 @@ mod tests {
         let retain_until = Some(Utc::now() + Duration::days(30));
 
         // Cannot delete if retention is in the future
-        let can_delete = retain_until.map_or(true, |rt| rt <= Utc::now());
+        let can_delete = retain_until.is_none_or(|rt| rt <= Utc::now());
         assert!(!can_delete);
     }
 
@@ -1512,7 +1511,7 @@ mod tests {
         let retain_until: Option<chrono::DateTime<Utc>> = None;
 
         // No retention policy means can delete immediately
-        let can_delete = retain_until.map_or(true, |rt| rt <= Utc::now());
+        let can_delete = retain_until.is_none_or(|rt| rt <= Utc::now());
         assert!(can_delete);
     }
 
@@ -1521,7 +1520,7 @@ mod tests {
         let retain_until = Some(Utc::now() - Duration::days(1));
 
         // Past retention date allows delete
-        let can_delete = retain_until.map_or(true, |rt| rt <= Utc::now());
+        let can_delete = retain_until.is_none_or(|rt| rt <= Utc::now());
         assert!(can_delete);
     }
 
@@ -1542,8 +1541,8 @@ mod tests {
         let existing_entitlement_id = Uuid::new_v4();
 
         // Simulate a rule that references both existing and deleted entitlements
-        let rule_entitlements = vec![deleted_entitlement_id, existing_entitlement_id];
-        let available_entitlements = vec![existing_entitlement_id]; // deleted_entitlement_id is missing
+        let rule_entitlements = [deleted_entitlement_id, existing_entitlement_id];
+        let available_entitlements = [existing_entitlement_id]; // deleted_entitlement_id is missing
 
         // Filter to only available entitlements
         let valid_entitlements: Vec<_> = rule_entitlements
@@ -1593,12 +1592,13 @@ mod tests {
             Pending,
         }
 
+        #[allow(dead_code)]
         struct TestUser {
             id: Uuid,
             status: UserStatus,
         }
 
-        let users = vec![
+        let users = [
             TestUser {
                 id: Uuid::new_v4(),
                 status: UserStatus::Active,
@@ -1797,7 +1797,7 @@ mod tests {
             triggers_on: Option<Uuid>,
         }
 
-        let policies = vec![
+        let policies = [
             PolicyEffect {
                 triggers_on: None,
                 grants: ent_a,
@@ -1811,7 +1811,7 @@ mod tests {
         // Check no cascade - both are independent birthright policies
         let cascade_detected = policies.iter().any(|p| {
             p.triggers_on
-                .map_or(false, |t| policies.iter().any(|other| other.grants == t))
+                .is_some_and(|t| policies.iter().any(|other| other.grants == t))
         });
 
         assert!(!cascade_detected);
@@ -1836,6 +1836,7 @@ mod tests {
 
         // Simulate chunk processing results
         #[derive(Debug)]
+        #[allow(dead_code)]
         struct ChunkResult {
             chunk_index: usize,
             success: bool,
@@ -1878,7 +1879,7 @@ mod tests {
 
     #[test]
     fn test_all_chunks_successful() {
-        let chunks = vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8]];
+        let chunks = [vec![1, 2, 3], vec![4, 5, 6], vec![7, 8]];
 
         let all_success = chunks.iter().all(|_chunk| true); // Simulate all successful
         assert!(all_success);

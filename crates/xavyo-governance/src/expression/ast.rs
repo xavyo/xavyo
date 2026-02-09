@@ -213,7 +213,7 @@ mod tests {
     fn test_value_display() {
         assert_eq!(Value::String("test".into()).to_string(), "'test'");
         assert_eq!(Value::Integer(42).to_string(), "42");
-        assert_eq!(Value::Float(3.14).to_string(), "3.14");
+        assert_eq!(Value::Float(3.15).to_string(), "3.15");
         assert_eq!(Value::Boolean(true).to_string(), "true");
         assert_eq!(Value::Null.to_string(), "NULL");
         assert_eq!(

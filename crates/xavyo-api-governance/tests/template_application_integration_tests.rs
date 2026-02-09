@@ -769,11 +769,9 @@ fn apply_rules_on_create(rules: &[TestRule], input: &serde_json::Value) -> serde
                     // Strong always applies
                     let value = evaluate_expression_simple(&rule.expression, input);
                     result[&rule.target_attribute] = value;
-                } else {
-                    if result.get(&rule.target_attribute).is_none() {
-                        let value = evaluate_expression_simple(&rule.expression, input);
-                        result[&rule.target_attribute] = value;
-                    }
+                } else if result.get(&rule.target_attribute).is_none() {
+                    let value = evaluate_expression_simple(&rule.expression, input);
+                    result[&rule.target_attribute] = value;
                 }
             }
             TemplateRuleType::Computed => {

@@ -865,8 +865,8 @@ mod tests {
         let mapped = map_ad_user(&entry).unwrap();
         assert!(!mapped.external_id.is_empty());
         assert!(mapped.is_active); // Default
-        assert!(mapped.attributes.get("username").is_none());
-        assert!(mapped.attributes.get("email").is_none());
+        assert!(!mapped.attributes.contains_key("username"));
+        assert!(!mapped.attributes.contains_key("email"));
     }
 
     // --- T010: Tests for uSNChanged incremental sync ---
@@ -1185,9 +1185,9 @@ mod tests {
         );
 
         // manager_external_id should NOT be set
-        assert!(users[0].attributes.get("manager_external_id").is_none());
+        assert!(!users[0].attributes.contains_key("manager_external_id"));
         // manager_dn should still be there
-        assert!(users[0].attributes.get("manager_dn").is_some());
+        assert!(users[0].attributes.contains_key("manager_dn"));
     }
 
     #[test]

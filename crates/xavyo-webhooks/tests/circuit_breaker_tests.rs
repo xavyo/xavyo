@@ -7,8 +7,7 @@ use std::time::Duration;
 
 use uuid::Uuid;
 use xavyo_webhooks::{
-    CircuitBreaker, CircuitBreakerConfig, CircuitBreakerRegistry, CircuitBreakerStatus,
-    CircuitState, FailureRecord,
+    CircuitBreaker, CircuitBreakerConfig, CircuitBreakerStatus, CircuitState, FailureRecord,
 };
 
 // Helper to create a test circuit breaker

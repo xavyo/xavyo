@@ -332,6 +332,5 @@ mod tests {
     #[test]
     fn test_service_construction() {
         // Basic test to ensure module compiles
-        assert!(true);
     }
 }

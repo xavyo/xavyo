@@ -1539,6 +1539,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_batch_impact_aggregation() {
         let mut total_summary = BatchImpactSummary::default();
         total_summary.total_users = 100;

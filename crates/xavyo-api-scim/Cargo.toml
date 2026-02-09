@@ -5,6 +5,7 @@ edition = "2021"
 description = "SCIM 2.0 API for xavyo user and group provisioning"
 authors = ["xavyo Team"]
 license = "BSL-1.1"
+publish = false
 repository = "https://github.com/xavyo/xavyo"
 
 [dependencies]

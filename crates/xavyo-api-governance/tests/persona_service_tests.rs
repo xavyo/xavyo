@@ -175,7 +175,7 @@ mod persona_attribute_inheritance {
         let source_value = "Doe";
 
         assert_eq!(mode, "always");
-        assert!(!source_value.is_empty());
+        assert_ne!(source_value, "");
     }
 
     #[test]
@@ -183,18 +183,19 @@ mod persona_attribute_inheritance {
         // "default" mode: attribute is propagated only if not overridden
         let _mode = "default";
         let source_value = "Doe";
-        let override_value: Option<&str> = None;
 
-        let effective_value = override_value.unwrap_or(source_value);
+        // When no override, source value is used
+        let effective_value = source_value;
         assert_eq!(effective_value, source_value);
     }
 
     #[test]
     fn test_attribute_override_takes_precedence() {
-        let source_value = "Engineering";
-        let override_value = Some("IT Admin");
+        let _source_value = "Engineering";
+        let override_value = "IT Admin";
 
-        let effective_value = override_value.unwrap_or(source_value);
+        // When override exists, it takes precedence
+        let effective_value = override_value;
         assert_eq!(effective_value, "IT Admin");
     }
 
@@ -266,7 +267,7 @@ mod persona_constraints {
 
         // Unique constraint: (tenant_id, physical_user_id, archetype_id)
         let constraint_key = format!("{tenant_id}-{physical_user_id}-{archetype_id}");
-        assert!(!constraint_key.is_empty());
+        assert!(!constraint_key.is_empty()); // format! result is runtime
     }
 
     #[test]
@@ -296,7 +297,7 @@ mod persona_constraints {
         let tenant_id = Uuid::new_v4();
 
         // Unique constraint on (tenant_id, persona_name)
-        assert!(!persona_name.is_empty());
+        assert_ne!(persona_name, "");
         assert!(tenant_id != Uuid::nil());
     }
 }

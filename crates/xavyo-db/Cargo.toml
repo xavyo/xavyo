@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "PostgreSQL database layer with multi-tenant RLS support for xavyo"
 license = "BSL-1.1"
+publish = false
 
 [dependencies]
 sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "uuid", "chrono", "rust_decimal", "json"] }

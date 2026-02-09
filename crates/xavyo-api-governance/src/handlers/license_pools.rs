@@ -246,11 +246,11 @@ pub async fn archive_license_pool(
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
     fn test_handler_module_exists() {
         // Placeholder test to verify the module compiles
-        assert!(true);
     }
 }

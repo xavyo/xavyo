@@ -69,6 +69,7 @@ mod persona_expiration_service_tests {
     #[test]
     fn test_expiration_status_transitions() {
         #[derive(Debug, PartialEq, Clone, Copy)]
+        #[allow(dead_code)]
         enum PersonaStatus {
             Active,
             Expiring,

@@ -492,13 +492,13 @@ mod tests {
 
     #[test]
     fn test_float_value() {
-        let expr = Parser::parse("risk_score > 3.14").unwrap();
+        let expr = Parser::parse("risk_score > 3.15").unwrap();
         assert_eq!(
             expr,
             Expression::Comparison(Comparison {
                 attribute: "risk_score".into(),
                 operator: ComparisonOp::GreaterThan,
-                value: Value::Float(3.14),
+                value: Value::Float(3.15),
             })
         );
     }

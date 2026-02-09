@@ -40,6 +40,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn test_default_poll_interval() {
         assert!(DEFAULT_POLL_INTERVAL_SECS > 0);
     }
@@ -52,7 +53,7 @@ mod tests {
             expires_in: 3600,
             device_token: None,
         };
-        matches!(result, SSOResult::Success { .. });
+        assert!(matches!(result, SSOResult::Success { .. }));
     }
 
     #[test]

@@ -837,7 +837,9 @@ mod tests {
         let utilization = pool.utilization_percent() / 100.0;
         assert!((utilization - UNDERUTILIZATION_THRESHOLD).abs() < f64::EPSILON);
         // Not strictly less than threshold
-        assert!(!(utilization < UNDERUTILIZATION_THRESHOLD));
+        assert!(
+            utilization.partial_cmp(&UNDERUTILIZATION_THRESHOLD) != Some(std::cmp::Ordering::Less)
+        );
     }
 
     #[test]
@@ -847,7 +849,10 @@ mod tests {
         let utilization = pool.utilization_percent() / 100.0;
         assert!((utilization - HIGH_UTILIZATION_THRESHOLD).abs() < f64::EPSILON);
         // Not strictly greater than threshold
-        assert!(!(utilization > HIGH_UTILIZATION_THRESHOLD));
+        assert!(
+            utilization.partial_cmp(&HIGH_UTILIZATION_THRESHOLD)
+                != Some(std::cmp::Ordering::Greater)
+        );
     }
 
     #[test]

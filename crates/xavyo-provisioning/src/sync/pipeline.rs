@@ -919,6 +919,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_dry_run_mode() {
         // Test that dry_run flag is properly set via builder
         use super::super::config::SyncConfig;

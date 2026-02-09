@@ -40,6 +40,7 @@ pub enum MockBehavior {
 }
 
 /// Mock connector that can be configured to succeed or fail.
+#[allow(dead_code)]
 pub struct TestConnector {
     name: String,
     create_behavior: AtomicUsize, // 0=Success, 1=ConnectionError

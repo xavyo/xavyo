@@ -690,7 +690,11 @@ mod tests {
         let scopes: Vec<String> = vec![];
         assert!(check_scope_access(&scopes, &Method::GET, "/users"));
         assert!(check_scope_access(&scopes, &Method::POST, "/nhi/agents"));
-        assert!(check_scope_access(&scopes, &Method::DELETE, "/admin/groups/123"));
+        assert!(check_scope_access(
+            &scopes,
+            &Method::DELETE,
+            "/admin/groups/123"
+        ));
     }
 
     #[test]
@@ -803,11 +807,7 @@ mod tests {
         // Three-part scope: /nhi/agents should NOT match /nhi/agents-proxy
         let scopes = vec!["nhi:agents:read".to_string()];
         assert!(check_scope_access(&scopes, &Method::GET, "/nhi/agents"));
-        assert!(check_scope_access(
-            &scopes,
-            &Method::GET,
-            "/nhi/agents/123"
-        ));
+        assert!(check_scope_access(&scopes, &Method::GET, "/nhi/agents/123"));
         assert!(
             !check_scope_access(&scopes, &Method::GET, "/nhi/agents-proxy"),
             "/nhi/agents scope must not match /nhi/agents-proxy"

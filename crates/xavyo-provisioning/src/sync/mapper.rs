@@ -420,7 +420,7 @@ mod tests {
         let result = mapper.map(&external).unwrap();
         // Currently passthrough - when transform is implemented, this should be lowercase and trimmed
         assert!(result.is_success());
-        assert!(result.attributes.get("email").is_some());
+        assert!(result.attributes.contains_key("email"));
         // Verify a warning is emitted about the skipped transform
         assert!(
             result

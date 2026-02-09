@@ -17,6 +17,7 @@ use xavyo_db::models::{
 
 /// Mock template for unit testing.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct TestTemplate {
     id: Uuid,
     tenant_id: Uuid,
@@ -62,6 +63,7 @@ impl TestTemplate {
 
 /// Mock rule for testing.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct TestRule {
     id: Uuid,
     template_id: Uuid,
@@ -311,7 +313,7 @@ fn test_name_validation_rules() {
     }
 
     // Invalid: empty name
-    let empty_name = "";
+    let empty_name: String = String::new();
     assert!(empty_name.is_empty());
 
     // Invalid: too long

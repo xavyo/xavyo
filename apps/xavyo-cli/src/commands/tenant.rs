@@ -116,8 +116,7 @@ mod tests {
 
         // Test current with JSON flag
         let args = TestCli::parse_from(["test", "current", "--json"]);
-        if let TenantCommands::Current(current_args) = args.command {
-            assert!(current_args.json);
-        }
+        let TenantCommands::Current(current_args) = args.command;
+        assert!(current_args.json);
     }
 }

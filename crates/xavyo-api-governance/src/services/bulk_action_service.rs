@@ -665,6 +665,7 @@ impl BulkActionService {
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
     use xavyo_governance::validate_expression;
 

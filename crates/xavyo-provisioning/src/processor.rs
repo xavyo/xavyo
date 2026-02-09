@@ -1180,7 +1180,7 @@ mod tests {
         assert_eq!(attrs.get("custom_attributes.level").unwrap(), "5");
 
         // Whole object also available as JSON string
-        assert!(attrs.get("custom_attributes").is_some());
+        assert!(attrs.contains_key("custom_attributes"));
         let ca_json: serde_json::Value =
             serde_json::from_str(attrs.get("custom_attributes").unwrap()).unwrap();
         assert_eq!(ca_json["department"], "Engineering");

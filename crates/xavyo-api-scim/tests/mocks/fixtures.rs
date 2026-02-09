@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 /// Test user fixture for interoperability tests.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TestUser {
     /// User email (userName in SCIM).
     pub email: String,
@@ -55,6 +56,7 @@ impl TestUser {
 
 /// Test group fixture for interoperability tests.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TestGroup {
     /// Group display name.
     pub display_name: String,
@@ -76,6 +78,7 @@ impl TestGroup {
     }
 
     /// Create a test group with specific name.
+    #[allow(dead_code)]
     pub fn with_name(name: impl Into<String>) -> Self {
         Self {
             display_name: name.into(),

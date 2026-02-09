@@ -46,7 +46,7 @@ mod tests {
     #[test]
     fn test_archive_exclude_from_listing() {
         // When include_archived is false, archived simulations should be excluded
-        let simulations = vec![
+        let simulations = [
             ("sim1", false), // active
             ("sim2", true),  // archived
             ("sim3", false), // active
@@ -90,7 +90,7 @@ mod tests {
     fn test_retain_until_none_allows_delete() {
         // If retain_until is None, simulation can be deleted immediately
         let retain_until: Option<chrono::DateTime<Utc>> = None;
-        let can_delete = retain_until.is_none() || retain_until.unwrap() <= Utc::now();
+        let can_delete = retain_until.is_none_or(|rt| rt <= Utc::now());
         assert!(can_delete);
     }
 
@@ -98,7 +98,7 @@ mod tests {
     fn test_retain_until_past_allows_delete() {
         // If retain_until is in the past, simulation can be deleted
         let retain_until = Some(Utc::now() - Duration::days(1));
-        let can_delete = retain_until.is_none() || retain_until.unwrap() <= Utc::now();
+        let can_delete = retain_until.is_none_or(|rt| rt <= Utc::now());
         assert!(can_delete);
     }
 
@@ -106,7 +106,7 @@ mod tests {
     fn test_retain_until_future_blocks_delete() {
         // If retain_until is in the future, simulation cannot be deleted
         let retain_until = Some(Utc::now() + Duration::days(30));
-        let can_delete = retain_until.is_none() || retain_until.unwrap() <= Utc::now();
+        let can_delete = retain_until.is_none_or(|rt| rt <= Utc::now());
         assert!(!can_delete);
     }
 
@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn test_expired_simulation_detection() {
         // Detect simulations that have passed their retention period
-        let simulations = vec![
+        let simulations = [
             (Uuid::new_v4(), Some(Utc::now() - Duration::days(10))), // expired
             (Uuid::new_v4(), Some(Utc::now() + Duration::days(10))), // retained
             (Uuid::new_v4(), None),                                  // no retention
@@ -185,10 +185,12 @@ mod tests {
 
         // Cancel flow: Draft → Cancelled or Executed → Cancelled
         let mut status = SimulationStatus::Draft;
+        let _ = status;
         status = SimulationStatus::Cancelled;
         assert_eq!(status, SimulationStatus::Cancelled);
 
         status = SimulationStatus::Executed;
+        let _ = status;
         status = SimulationStatus::Cancelled;
         assert_eq!(status, SimulationStatus::Cancelled);
     }
@@ -214,13 +216,14 @@ mod tests {
         use chrono::Utc;
 
         // Simulations to potentially clean up
+        #[allow(dead_code)]
         struct SimulationToClean {
             id: Uuid,
             is_archived: bool,
             retain_until: Option<chrono::DateTime<Utc>>,
         }
 
-        let simulations = vec![
+        let simulations = [
             SimulationToClean {
                 id: Uuid::new_v4(),
                 is_archived: true,
@@ -277,6 +280,7 @@ mod tests {
         // Archive only changes the is_archived flag, not the data
         use xavyo_db::SimulationStatus;
 
+        #[allow(dead_code)]
         struct SimulationData {
             id: Uuid,
             name: String,

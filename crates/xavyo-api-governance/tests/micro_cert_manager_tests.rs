@@ -177,7 +177,7 @@ mod bulk_approval {
         // A single comment can be applied to all certifications in the batch
         let comment = "Bulk approved during quarterly review";
 
-        assert!(!comment.is_empty());
+        assert_ne!(comment, "");
     }
 
     #[test]

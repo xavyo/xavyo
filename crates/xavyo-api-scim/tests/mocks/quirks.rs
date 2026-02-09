@@ -23,6 +23,7 @@ impl std::fmt::Display for Severity {
 
 /// Definition of an IdP-specific quirk (deviation from SCIM spec).
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct QuirkDefinition {
     /// Unique identifier (e.g., "OKTA-001").
     pub id: String,

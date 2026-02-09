@@ -19,6 +19,10 @@
 *.der
 *secret*
 *credential*
+# Allow source code and migration files with "credential" in their names
+!**/crates/**
+!**/apps/**
+!**/migrations/**
 *.token
 service-account*.json
 *-sa.json

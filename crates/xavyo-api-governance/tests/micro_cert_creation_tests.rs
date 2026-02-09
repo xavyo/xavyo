@@ -8,6 +8,7 @@ use xavyo_db::{MicroCertDecision, MicroCertStatus};
 
 /// Simulated certification creation input
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct CreateCertificationInput {
     trigger_rule_id: Uuid,
     assignment_id: Option<Uuid>,
@@ -23,6 +24,7 @@ struct CreateCertificationInput {
 
 /// Simulated certification output
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct Certification {
     id: Uuid,
     tenant_id: Uuid,

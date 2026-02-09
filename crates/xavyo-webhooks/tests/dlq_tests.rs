@@ -176,7 +176,7 @@ fn dlq_filter_include_replayed() {
 fn dlq_pagination_limit() {
     // Max limit is 100
     let requested_limit = 150;
-    let actual_limit = requested_limit.min(100).max(1);
+    let actual_limit = requested_limit.clamp(1, 100);
 
     assert_eq!(actual_limit, 100);
 }

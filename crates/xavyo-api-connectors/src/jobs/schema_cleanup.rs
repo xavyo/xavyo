@@ -129,6 +129,6 @@ mod tests {
     fn test_retention_count_minimum() {
         // Test that retention count is clamped to at least 1
         // We can't easily test the job without a database, but we can test the constants
-        assert!(DEFAULT_SCHEMA_RETENTION_COUNT >= 1);
+        const { assert!(DEFAULT_SCHEMA_RETENTION_COUNT >= 1) };
     }
 }

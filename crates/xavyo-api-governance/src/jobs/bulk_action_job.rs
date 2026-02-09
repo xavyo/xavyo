@@ -581,7 +581,7 @@ mod tests {
     #[test]
     fn test_with_batch_size() {
         // Can't create job without pool, but test builder pattern logic
-        assert!(DEFAULT_BATCH_SIZE > 0);
+        const { assert!(DEFAULT_BATCH_SIZE > 0) };
     }
 
     #[test]

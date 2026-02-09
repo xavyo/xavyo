@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Kafka event bus library for xavyo"
 license = "BSL-1.1"
+publish = false
 
 [dependencies]
 # Kafka client - use dynamic linking by default for easier development

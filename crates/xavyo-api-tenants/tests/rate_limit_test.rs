@@ -155,14 +155,18 @@ fn test_rate_limiter_thread_safety() {
 #[test]
 fn test_rate_limit_constants_are_reasonable() {
     // Max attempts should be between 1 and 100
-    assert!(
-        PROVISION_RATE_LIMIT_MAX >= 1 && PROVISION_RATE_LIMIT_MAX <= 100,
-        "Max attempts should be reasonable (1-100)"
-    );
+    const {
+        assert!(
+            PROVISION_RATE_LIMIT_MAX >= 1 && PROVISION_RATE_LIMIT_MAX <= 100,
+            // "Max attempts should be reasonable (1-100)"
+        )
+    };
 
     // Window should be at least 1 minute and at most 24 hours
-    assert!(
-        PROVISION_RATE_LIMIT_WINDOW_SECS >= 60 && PROVISION_RATE_LIMIT_WINDOW_SECS <= 86400,
-        "Window should be reasonable (1 min to 24 hours)"
-    );
+    const {
+        assert!(
+            PROVISION_RATE_LIMIT_WINDOW_SECS >= 60 && PROVISION_RATE_LIMIT_WINDOW_SECS <= 86400,
+            // "Window should be reasonable (1 min to 24 hours)"
+        )
+    };
 }

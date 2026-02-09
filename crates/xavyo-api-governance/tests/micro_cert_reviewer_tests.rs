@@ -8,6 +8,7 @@ use xavyo_db::MicroCertReviewerType;
 
 /// Simulated user data for testing reviewer resolution
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct TestUser {
     id: Uuid,
     manager_id: Option<Uuid>,
@@ -16,6 +17,7 @@ struct TestUser {
 
 /// Simulated entitlement with owner
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct TestEntitlement {
     id: Uuid,
     owner_id: Option<Uuid>,

@@ -678,7 +678,7 @@ impl SodValidationService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::sod::{CreateSodRuleInput, InMemorySodRuleStore, UpdateSodRuleInput};
+    use crate::services::sod::{CreateSodRuleInput, InMemorySodRuleStore};
     use crate::services::sod_exemption::InMemorySodExemptionStore;
     use crate::types::SodRuleStatus;
 

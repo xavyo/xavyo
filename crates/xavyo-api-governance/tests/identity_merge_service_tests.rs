@@ -14,6 +14,7 @@ use xavyo_db::models::{GovDuplicateStatus, GovEntitlementStrategy, GovMergeOpera
 
 /// Mock identity summary for testing merge preview.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct MockIdentity {
     id: Uuid,
     email: Option<String>,

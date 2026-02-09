@@ -397,6 +397,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_sync_config_validation() {
         let mut config = SyncConfig::default();
         config.tenant_id = Uuid::new_v4();
@@ -421,6 +422,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_polling_interval_duration() {
         let mut config = SyncConfig::default();
         config.polling_interval_secs = 120;

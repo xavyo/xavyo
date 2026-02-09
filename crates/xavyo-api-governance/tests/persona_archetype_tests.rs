@@ -209,7 +209,7 @@ mod archetype_constraints {
     fn test_archetype_name_uniqueness() {
         // In a real test, this would verify database constraint
         let name = "Admin Persona";
-        assert!(!name.is_empty());
+        assert_ne!(name, "");
     }
 
     #[test]

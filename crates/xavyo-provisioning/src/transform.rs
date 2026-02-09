@@ -929,6 +929,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn test_type_conversion() {
         let engine = TransformEngine::new();
 

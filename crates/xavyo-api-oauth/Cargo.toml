@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "OAuth2/OIDC Provider API endpoints for xavyo"
 license = "BSL-1.1"
+publish = false
 repository = "https://github.com/xavyo/xavyo"
 
 [dependencies]

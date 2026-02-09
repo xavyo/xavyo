@@ -489,6 +489,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_factor_breakdown_serialization() {
         let mut breakdown = FactorBreakdown::default();
         breakdown.role_frequency = Some(FactorScore {

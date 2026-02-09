@@ -171,6 +171,5 @@ mod tests {
     #[test]
     fn test_handler_module_exists() {
         // Placeholder test to verify the module compiles
-        assert!(true);
     }
 }

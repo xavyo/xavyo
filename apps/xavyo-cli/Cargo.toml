@@ -5,6 +5,7 @@ edition = "2021"
 description = "Command-line interface for the xavyo platform"
 authors = ["xavyo <dev@xavyo.io>"]
 license = "BSL-1.1"
+publish = false
 repository = "https://github.com/xavyo/xavyo"
 keywords = ["cli", "idp", "oauth", "identity"]
 categories = ["command-line-utilities", "authentication"]

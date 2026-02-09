@@ -13,7 +13,7 @@ mod common;
 use common::{create_agent_fixture, TestContext};
 use serde_json::json;
 use uuid::Uuid;
-use wiremock::matchers::{body_json, header, method, path, path_regex};
+use wiremock::matchers::{method, path, path_regex};
 use wiremock::{Mock, ResponseTemplate};
 
 // =========================================================================

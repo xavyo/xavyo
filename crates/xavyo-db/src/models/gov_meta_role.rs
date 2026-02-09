@@ -400,6 +400,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn test_priority_constants() {
         assert_eq!(DEFAULT_PRIORITY, 100);
         assert_eq!(MIN_PRIORITY, 1);

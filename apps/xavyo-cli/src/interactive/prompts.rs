@@ -246,7 +246,7 @@ mod tests {
         // In test environment, it's typically not a TTY, so we just verify the return type.
         let result = is_interactive_terminal();
         // Result should be false in test environment (not a real TTY)
-        assert!(!result || result); // Always passes, but verifies bool type
+        let _: bool = result; // Verifies bool type
     }
 
     #[test]

@@ -11,9 +11,11 @@ mod common;
 use common::*;
 use serde_json::json;
 use uuid::Uuid;
+#[allow(unused_imports)]
 use xavyo_api_governance::services::{
     CartValidationResult, CatalogService, RequestContext, RequestabilityResult,
 };
+#[allow(unused_imports)]
 use xavyo_db::models::{
     AddCartItem, CatalogCategory, CatalogCategoryFilter, CatalogItem, CatalogItemFilter,
     CatalogItemType, CreateCatalogCategory, CreateCatalogItem, RequestCart, RequestCartItem,

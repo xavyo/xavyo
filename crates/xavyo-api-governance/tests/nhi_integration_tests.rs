@@ -772,7 +772,7 @@ fn test_suspend_request_all_reasons() {
 
     for reason in reasons {
         let request = SuspendNhiRequest {
-            reason: reason,
+            reason,
             details: None,
         };
 

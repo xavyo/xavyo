@@ -11,7 +11,7 @@ mod common;
 
 use common::{
     create_credentials_json, create_expired_credentials_json, create_user_fixture,
-    credentials_exist, delete_credentials, write_test_config, write_test_credentials, TestContext,
+    credentials_exist, delete_credentials, write_test_credentials, TestContext,
 };
 use serde_json::json;
 

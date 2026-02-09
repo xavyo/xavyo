@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Microsoft Entra ID connector for xavyo"
 license = "BSL-1.1"
+publish = false
 repository = "https://github.com/xavyo/xavyo"
 
 [dependencies]

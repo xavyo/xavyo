@@ -109,6 +109,7 @@ mod tests {
 
     /// Test batch impact summary aggregation
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_batch_impact_summary_aggregation() {
         use xavyo_db::BatchImpactSummary;
 
@@ -217,7 +218,7 @@ mod tests {
         use xavyo_db::SCOPE_WARNING_THRESHOLD;
 
         // Verify the threshold is reasonable
-        assert!(SCOPE_WARNING_THRESHOLD > 0);
+        const { assert!(SCOPE_WARNING_THRESHOLD > 0) };
         assert_eq!(SCOPE_WARNING_THRESHOLD, 100);
     }
 

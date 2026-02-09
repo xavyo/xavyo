@@ -304,7 +304,7 @@ mod tests {
     fn test_enabled_filter() {
         let mut state = PluginState::new();
 
-        let mut enabled_plugin = InstalledPlugin::new(
+        let enabled_plugin = InstalledPlugin::new(
             "enabled".to_string(),
             "1.0.0".to_string(),
             PluginSource::Local {

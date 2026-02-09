@@ -23,6 +23,7 @@ use std::fs;
 use tempfile::TempDir;
 
 // Re-export common test utilities
+#[allow(unused_imports)]
 use common::TestContext;
 
 /// Helper to create a test cache directory structure
@@ -216,7 +217,7 @@ fn test_network_error_detection() {
 
 #[test]
 fn test_offline_flag_args_parsing() {
-    use clap::{Args, Parser};
+    use clap::Parser;
 
     #[derive(Parser)]
     struct TestCli {
@@ -239,7 +240,7 @@ fn test_offline_flag_args_parsing() {
 
 #[test]
 fn test_refresh_flag_args_parsing() {
-    use clap::{Args, Parser};
+    use clap::Parser;
 
     #[derive(Parser)]
     struct TestCli {
@@ -440,7 +441,7 @@ fn test_cache_clear_removes_files() {
                 .unwrap()
                 .path()
                 .extension()
-                .map_or(false, |ext| ext == "json")
+                .is_some_and(|ext| ext == "json")
         })
         .count();
     assert_eq!(count_before, 3);
@@ -449,7 +450,7 @@ fn test_cache_clear_removes_files() {
     let mut removed = 0;
     for entry in fs::read_dir(&cache_dir).unwrap() {
         let entry = entry.unwrap();
-        if entry.path().extension().map_or(false, |ext| ext == "json") {
+        if entry.path().extension().is_some_and(|ext| ext == "json") {
             fs::remove_file(entry.path()).unwrap();
             removed += 1;
         }
@@ -465,7 +466,7 @@ fn test_cache_clear_removes_files() {
                 .unwrap()
                 .path()
                 .extension()
-                .map_or(false, |ext| ext == "json")
+                .is_some_and(|ext| ext == "json")
         })
         .count();
     assert_eq!(count_after, 0);

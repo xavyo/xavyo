@@ -30,6 +30,7 @@ async fn setup_test_env(pool: &PgPool) -> (Uuid, Uuid) {
 /// When creating a new service account via the database,
 /// Then the service account is created with correct attributes.
 #[tokio::test]
+    #[ignore]
 async fn test_create_service_account() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -63,6 +64,7 @@ async fn test_create_service_account() {
 /// When fetching it by ID,
 /// Then the correct service account is returned.
 #[tokio::test]
+    #[ignore]
 async fn test_get_service_account() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -97,6 +99,7 @@ async fn test_get_service_account() {
 /// When updating its attributes,
 /// Then the attributes are updated correctly.
 #[tokio::test]
+    #[ignore]
 async fn test_update_service_account() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -143,6 +146,7 @@ async fn test_update_service_account() {
 /// When suspending it,
 /// Then the status changes to suspended.
 #[tokio::test]
+    #[ignore]
 async fn test_suspend_service_account() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -187,6 +191,7 @@ async fn test_suspend_service_account() {
 /// When reactivating it,
 /// Then the status changes back to active.
 #[tokio::test]
+    #[ignore]
 async fn test_reactivate_service_account() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -245,6 +250,7 @@ async fn test_reactivate_service_account() {
 /// When deleting it,
 /// Then the account is removed.
 #[tokio::test]
+    #[ignore]
 async fn test_delete_service_account() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;

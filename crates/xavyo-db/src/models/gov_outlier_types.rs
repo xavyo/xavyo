@@ -395,6 +395,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_scoring_weights_validation() {
         let mut weights = ScoringWeights::default();
         weights.role_frequency = 0.5;

@@ -72,8 +72,7 @@ pub async fn create_task(
         "Creating A2A task"
     );
 
-    let response =
-        a2a_service::create_task(&state.pool, tenant_id, source_nhi_id, request).await?;
+    let response = a2a_service::create_task(&state.pool, tenant_id, source_nhi_id, request).await?;
 
     Ok((StatusCode::CREATED, Json(response)))
 }

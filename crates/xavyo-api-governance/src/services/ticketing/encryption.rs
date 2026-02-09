@@ -190,7 +190,7 @@ mod tests {
         let _lock = ENV_MUTEX.lock().unwrap();
         setup_test_key();
 
-        let result = decrypt_credentials(&BASE64.encode(&[0u8; 5]));
+        let result = decrypt_credentials(&BASE64.encode([0u8; 5]));
         assert!(result.is_err());
     }
 

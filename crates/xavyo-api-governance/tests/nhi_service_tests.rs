@@ -760,7 +760,6 @@ fn test_high_volume_usage_aggregation() {
 
     // This is a documentation/design test - actual high volume handling
     // requires scheduled aggregation jobs
-    assert!(true);
 }
 
 #[test]

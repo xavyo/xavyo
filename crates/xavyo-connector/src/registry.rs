@@ -222,6 +222,7 @@ mod tests {
             }
         }
 
+        #[allow(dead_code)]
         fn is_disposed(&self) -> bool {
             self.disposed.load(Ordering::SeqCst)
         }

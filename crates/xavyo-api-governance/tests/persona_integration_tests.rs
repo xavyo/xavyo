@@ -201,7 +201,7 @@ mod persona_deactivation_integration {
         let initial_status = PersonaStatus::Active;
         let final_status = PersonaStatus::Suspended;
 
-        assert!(!reason.is_empty());
+        assert_ne!(reason, "");
         assert!(matches!(initial_status, PersonaStatus::Active));
         assert!(matches!(final_status, PersonaStatus::Suspended));
     }
@@ -250,7 +250,7 @@ mod persona_archive_integration {
         let reason = "User left the organization";
         let final_status = PersonaStatus::Archived;
 
-        assert!(!reason.is_empty());
+        assert_ne!(reason, "");
         assert!(final_status.is_terminal());
     }
 
@@ -318,7 +318,7 @@ mod duplicate_prevention_integration {
         let tenant_id = Uuid::new_v4();
 
         // Persona name must be unique within tenant
-        assert!(!persona_name.is_empty());
+        assert_ne!(persona_name, "");
         assert!(tenant_id != Uuid::nil());
     }
 }

@@ -401,6 +401,7 @@ mod error_type_tests {
     }
 }
 
+#[allow(non_snake_case)]
 mod IGA_edge_case_scenarios {
     use super::*;
 
@@ -476,7 +477,7 @@ mod IGA_edge_case_scenarios {
     #[test]
     fn test_approval_workflow_incompatibility() {
         // Archetype's default entitlements
-        let default_entitlements = vec![
+        let default_entitlements = [
             ("admin_access", true),   // requires approval
             ("basic_access", false),  // no approval needed
             ("sensitive_data", true), // requires approval

@@ -39,7 +39,7 @@ async fn test_sso_start_session() {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(&format!("{}/auth/sso/start", ctx.server.uri()))
+        .post(format!("{}/auth/sso/start", ctx.server.uri()))
         .json(&json!({
             "email": "user@acme.corp"
         }))
@@ -73,7 +73,7 @@ async fn test_sso_poll_pending() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!("{}/auth/sso/status/session-123", ctx.server.uri()))
+        .get(format!("{}/auth/sso/status/session-123", ctx.server.uri()))
         .send()
         .await
         .expect("Request failed");
@@ -102,7 +102,7 @@ async fn test_sso_poll_completed() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!("{}/auth/sso/status/session-123", ctx.server.uri()))
+        .get(format!("{}/auth/sso/status/session-123", ctx.server.uri()))
         .send()
         .await
         .expect("Request failed");
@@ -131,7 +131,7 @@ async fn test_sso_timeout() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!("{}/auth/sso/status/session-123", ctx.server.uri()))
+        .get(format!("{}/auth/sso/status/session-123", ctx.server.uri()))
         .send()
         .await
         .expect("Request failed");
@@ -157,7 +157,7 @@ async fn test_sso_cancelled() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!("{}/auth/sso/status/session-123", ctx.server.uri()))
+        .get(format!("{}/auth/sso/status/session-123", ctx.server.uri()))
         .send()
         .await
         .expect("Request failed");
@@ -191,7 +191,7 @@ async fn test_idp_discovery_success() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!(
+        .get(format!(
             "{}/auth/sso/discover?email={}",
             ctx.server.uri(),
             urlencoding::encode("user@acme.corp")
@@ -226,7 +226,7 @@ async fn test_idp_discovery_not_found() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!(
+        .get(format!(
             "{}/auth/sso/discover?email={}",
             ctx.server.uri(),
             urlencoding::encode("user@unknown.com")
@@ -272,7 +272,7 @@ async fn test_idp_discovery_multiple_idps() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!(
+        .get(format!(
             "{}/auth/sso/discover?email={}",
             ctx.server.uri(),
             urlencoding::encode("user@multi-idp.com")
@@ -312,7 +312,7 @@ async fn test_sso_explicit_idp_url() {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(&format!("{}/auth/sso/start", ctx.server.uri()))
+        .post(format!("{}/auth/sso/start", ctx.server.uri()))
         .json(&json!({
             "idp_url": "https://custom.idp.com/sso/saml"
         }))
@@ -342,7 +342,7 @@ async fn test_sso_invalid_idp_url() {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(&format!("{}/auth/sso/start", ctx.server.uri()))
+        .post(format!("{}/auth/sso/start", ctx.server.uri()))
         .json(&json!({
             "idp_url": "not-a-valid-url"
         }))
@@ -375,7 +375,7 @@ async fn test_sso_entity_id_resolution() {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(&format!("{}/auth/sso/resolve", ctx.server.uri()))
+        .post(format!("{}/auth/sso/resolve", ctx.server.uri()))
         .json(&json!({
             "entity_id": "urn:okta:example"
         }))
@@ -417,10 +417,7 @@ async fn test_sso_saml_success() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!(
-            "{}/auth/sso/status/saml-session",
-            ctx.server.uri()
-        ))
+        .get(format!("{}/auth/sso/status/saml-session", ctx.server.uri()))
         .send()
         .await
         .expect("Request failed");
@@ -449,10 +446,7 @@ async fn test_sso_saml_expired() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!(
-            "{}/auth/sso/status/saml-session",
-            ctx.server.uri()
-        ))
+        .get(format!("{}/auth/sso/status/saml-session", ctx.server.uri()))
         .send()
         .await
         .expect("Request failed");
@@ -481,10 +475,7 @@ async fn test_sso_saml_invalid_signature() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!(
-            "{}/auth/sso/status/saml-session",
-            ctx.server.uri()
-        ))
+        .get(format!("{}/auth/sso/status/saml-session", ctx.server.uri()))
         .send()
         .await
         .expect("Request failed");

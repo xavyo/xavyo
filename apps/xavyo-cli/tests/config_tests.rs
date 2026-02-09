@@ -14,7 +14,7 @@ mod common;
 
 use common::TestContext;
 use serde_json::json;
-use wiremock::matchers::{body_string_contains, header, method, path, query_param};
+use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, ResponseTemplate};
 
 // =========================================================================

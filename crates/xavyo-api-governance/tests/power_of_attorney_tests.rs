@@ -725,7 +725,7 @@ mod tests {
     fn test_revocation_reason_is_recorded() {
         let donor = Uuid::new_v4();
         let attorney = Uuid::new_v4();
-        let poa = make_test_poa(donor, attorney, PoaStatus::Active, 1, 24);
+        let _poa = make_test_poa(donor, attorney, PoaStatus::Active, 1, 24);
 
         // Revocation reason should be stored
         let reason = Some("Vacation cancelled".to_string());

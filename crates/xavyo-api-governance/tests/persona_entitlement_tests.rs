@@ -51,11 +51,10 @@ mod persona_entitlement_service_tests {
 
         // Simulate active persona session
         let has_active_persona = true;
-        let active_persona_id = Some(persona_id);
 
         // Effective identity is the persona when active
         let effective_id = if has_active_persona {
-            active_persona_id.unwrap()
+            persona_id
         } else {
             user_id
         };
@@ -70,11 +69,11 @@ mod persona_entitlement_service_tests {
 
         // No active persona session
         let has_active_persona = false;
-        let active_persona_id: Option<Uuid> = None;
 
         // Effective identity is the physical user
-        let effective_id = if has_active_persona && active_persona_id.is_some() {
-            active_persona_id.unwrap()
+        let effective_id = if has_active_persona {
+            // Would use persona_id if available
+            user_id
         } else {
             user_id
         };
@@ -253,7 +252,7 @@ mod persona_entitlement_service_tests {
         let application_id = Uuid::new_v4();
 
         // Entitlements can be filtered by application
-        let all_entitlements = vec![
+        let all_entitlements = [
             json!({
                 "id": Uuid::new_v4(),
                 "name": "ReadData",

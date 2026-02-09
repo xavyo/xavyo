@@ -13,6 +13,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["xavyo Team <pascal@heartbit.ai>"]
 license = "BSL-1.1"
+publish = false
 repository = "https://github.com/xavyo/xavyo"
 homepage = "https://xavyo.net"
 documentation = "https://github.com/xavyo/xavyo#readme"

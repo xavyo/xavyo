@@ -10,5 +10,6 @@ mod mocks;
 mod interop;
 
 // Re-export for test access
+#[allow(ambiguous_glob_reexports)]
 pub use common::*;
 pub use mocks::*;

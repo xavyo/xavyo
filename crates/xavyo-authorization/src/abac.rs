@@ -259,6 +259,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn test_value_to_f64() {
         assert_eq!(value_to_f64(&json!(42)), Some(42.0));
         assert_eq!(value_to_f64(&json!(3.14)), Some(3.14));

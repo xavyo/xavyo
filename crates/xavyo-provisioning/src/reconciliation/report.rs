@@ -265,6 +265,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_performance_metrics_calculation() {
         let mut stats = RunStatistics::default();
         stats.accounts_processed = 1000;
@@ -277,6 +278,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_performance_metrics_zero_duration() {
         let mut stats = RunStatistics::default();
         stats.accounts_processed = 1000;

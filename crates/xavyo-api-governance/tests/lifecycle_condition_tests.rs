@@ -101,7 +101,7 @@ mod condition_parsing {
 
     #[test]
     fn test_parse_multiple_conditions() {
-        let conditions = vec![
+        let conditions = [
             TestCondition::termination_date_set(),
             TestCondition::no_active_sessions(),
         ];
@@ -248,6 +248,7 @@ mod transition_flow {
     use super::*;
 
     /// Represents a simulated transition with conditions.
+    #[allow(dead_code)]
     struct SimulatedTransition {
         id: Uuid,
         name: String,
@@ -449,6 +450,7 @@ mod transition_flow {
 // ============================================================================
 
 mod error_messages {
+    #[allow(unused_imports)]
     use super::*;
 
     /// Format a condition failure error message.

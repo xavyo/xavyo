@@ -176,7 +176,7 @@ fn test_credential_age_factor_calculation() {
     // Max days: 365
     // Linear scaling: factor = days * 30 / 365
 
-    let max_points = 30;
+    let max_points: i32 = 30;
     let max_days = 365;
 
     let test_cases = [
@@ -194,7 +194,7 @@ fn test_credential_age_factor_calculation() {
             (days * max_points) / max_days
         };
         // Allow +/- 1 for rounding
-        let diff = (calculated as i32 - expected_points as i32).abs();
+        let diff = (calculated - expected_points).abs();
         assert!(
             diff <= 1,
             "Credential age factor mismatch for {} days: expected ~{}, got {}",

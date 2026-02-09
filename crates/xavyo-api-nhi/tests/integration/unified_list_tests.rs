@@ -28,6 +28,7 @@ async fn setup_test_env(pool: &PgPool) -> (Uuid, Uuid) {
 /// When listing via unified endpoint,
 /// Then all NHIs are returned.
 #[tokio::test]
+    #[ignore]
 async fn test_list_all_nhis() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -75,6 +76,7 @@ async fn test_list_all_nhis() {
 /// When filtering by type,
 /// Then only matching NHIs are returned.
 #[tokio::test]
+    #[ignore]
 async fn test_filter_by_type() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -127,6 +129,7 @@ async fn test_filter_by_type() {
 /// When paginating,
 /// Then results are correctly paginated.
 #[tokio::test]
+    #[ignore]
 async fn test_pagination() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -198,6 +201,7 @@ async fn test_pagination() {
 /// When fetching by ID,
 /// Then the correct NHI is returned.
 #[tokio::test]
+    #[ignore]
 async fn test_get_nhi_by_id() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;

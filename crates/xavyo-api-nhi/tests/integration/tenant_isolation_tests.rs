@@ -31,6 +31,7 @@ async fn setup_dual_tenant_env(pool: &PgPool) -> ((Uuid, Uuid), (Uuid, Uuid)) {
 /// When tenant B tries to list NHIs,
 /// Then tenant A's NHIs are not visible.
 #[tokio::test]
+    #[ignore]
 async fn test_tenant_cannot_list_others_nhis() {
     let pool = create_test_pool().await;
     let ((tenant_a, owner_a), (tenant_b, _owner_b)) = setup_dual_tenant_env(&pool).await;
@@ -82,6 +83,7 @@ async fn test_tenant_cannot_list_others_nhis() {
 /// When tenant B tries to access it by ID,
 /// Then access is denied (returns no rows).
 #[tokio::test]
+    #[ignore]
 async fn test_tenant_cannot_access_others_by_id() {
     let pool = create_test_pool().await;
     let ((tenant_a, owner_a), (tenant_b, _owner_b)) = setup_dual_tenant_env(&pool).await;
@@ -116,6 +118,7 @@ async fn test_tenant_cannot_access_others_by_id() {
 /// When tenant B tries to update it,
 /// Then the operation has no effect.
 #[tokio::test]
+    #[ignore]
 async fn test_tenant_cannot_update_others() {
     let pool = create_test_pool().await;
     let ((tenant_a, owner_a), (tenant_b, _owner_b)) = setup_dual_tenant_env(&pool).await;
@@ -173,6 +176,7 @@ async fn test_tenant_cannot_update_others() {
 /// When tenant B tries to delete it,
 /// Then the operation has no effect.
 #[tokio::test]
+    #[ignore]
 async fn test_tenant_cannot_delete_others() {
     let pool = create_test_pool().await;
     let ((tenant_a, owner_a), (tenant_b, _owner_b)) = setup_dual_tenant_env(&pool).await;

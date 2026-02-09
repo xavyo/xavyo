@@ -238,19 +238,16 @@ mod scope_tests {
     fn test_scope_all_matches_any_role() {
         // When scope is "all", it should apply to any user
         // This is a placeholder - actual scope logic is in the model
-        assert!(true);
     }
 
     #[test]
     fn test_scope_admin_matches_admin_role() {
         // When scope is "admin", it should only apply to admins
-        assert!(true);
     }
 
     #[test]
     fn test_scope_role_specific_matches_role() {
         // When scope is "role:some_role", it should only apply to that role
-        assert!(true);
     }
 }
 

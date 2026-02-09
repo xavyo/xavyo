@@ -197,6 +197,7 @@ mod tests {
     use super::*;
 
     // Test certificate (self-signed for testing)
+    #[allow(dead_code)]
     const TEST_CERT: &str = r#"-----BEGIN CERTIFICATE-----
 MIIBkTCB+wIJAKHBfNPqGLvIMA0GCSqGSIb3DQEBCwUAMBExDzANBgNVBAMMBnRl
 c3RDQTAPIBY2NTAxMDEwMDAwMDBaFw0zNTAxMDEwMDAwMDBaMBExDzANBgNVBAMM

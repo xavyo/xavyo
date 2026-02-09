@@ -576,7 +576,7 @@ mod tests {
             Some(&"john.doe@example.com".to_string())
         );
         assert_eq!(result.attributes.get("cn"), Some(&"John Doe".to_string()));
-        assert!(result.attributes.get("uid").is_none());
+        assert!(!result.attributes.contains_key("uid"));
     }
 
     #[test]

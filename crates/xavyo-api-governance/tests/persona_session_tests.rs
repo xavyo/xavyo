@@ -327,7 +327,7 @@ mod session_tracking_tests {
     fn test_session_captures_switch_reason() {
         let reason = "Starting privileged operations for incident response";
 
-        assert!(!reason.is_empty());
+        assert_ne!(reason, "");
         assert!(reason.len() >= 5, "Reason should be descriptive");
     }
 

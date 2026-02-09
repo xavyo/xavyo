@@ -9,11 +9,13 @@ pub fn unique_email() -> String {
 }
 
 /// Generate a unique external ID.
+#[allow(dead_code)]
 pub fn unique_external_id() -> String {
     Uuid::new_v4().to_string()
 }
 
 /// Generate a unique group name.
+#[allow(dead_code)]
 pub fn unique_group_name() -> String {
     format!("TestGroup-{}", &Uuid::new_v4().to_string()[..8])
 }
@@ -41,6 +43,7 @@ pub fn scim_user_payload(email: &str, external_id: &str) -> Value {
 }
 
 /// Create a SCIM user with enterprise extension.
+#[allow(dead_code)]
 pub fn scim_user_with_enterprise(
     email: &str,
     external_id: &str,
@@ -61,6 +64,7 @@ pub fn scim_user_with_enterprise(
 }
 
 /// Create a SCIM group creation payload.
+#[allow(dead_code)]
 pub fn scim_group_payload(display_name: &str, external_id: &str) -> Value {
     json!({
         "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
@@ -91,6 +95,7 @@ pub fn patch_op(op: &str, path: Option<&str>, value: Value) -> Value {
 }
 
 /// Create a SCIM list response wrapper.
+#[allow(dead_code)]
 pub fn scim_list_response(resources: Vec<Value>, total: i64, start_index: i64) -> Value {
     json!({
         "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],

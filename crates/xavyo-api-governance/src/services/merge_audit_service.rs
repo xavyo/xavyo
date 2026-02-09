@@ -86,12 +86,12 @@ impl MergeAuditService {
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
     fn test_merge_audit_service_creation() {
         // Test that we can create a MergeAuditService
         // Note: Actual database tests would require a test database
-        assert!(true);
     }
 }

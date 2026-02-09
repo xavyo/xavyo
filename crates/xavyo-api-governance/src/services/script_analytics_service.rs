@@ -540,7 +540,7 @@ mod tests {
         assert!(error_rate_percent > 10.0);
 
         // Threshold at 20% should not trigger
-        assert!(!(error_rate_percent > 20.0));
+        assert!(error_rate_percent.partial_cmp(&20.0) != Some(std::cmp::Ordering::Greater));
     }
 
     #[test]
@@ -549,8 +549,8 @@ mod tests {
         let error_rate_percent = error_rate * 100.0;
 
         // Any positive threshold should not trigger
-        assert!(!(error_rate_percent > 1.0));
-        assert!(!(error_rate_percent > 0.0));
+        assert!(error_rate_percent.partial_cmp(&1.0) != Some(std::cmp::Ordering::Greater));
+        assert!(error_rate_percent.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater));
     }
 
     #[test]

@@ -24,8 +24,6 @@ ignore = [
     #               validator 0.18.x pins idna 0.5.x. Low risk for our use case
     #               (server-side email/URL validation, not browser navigation).
     # Deadline: 2026-04-01
-    { id = "RUSTSEC-2024-0421", reason = "validator 0.18.x pins idna 0.5.x; low risk for server-side validation" },
-
     # RUSTSEC-2023-0071: rsa 0.9.10 — Marvin Attack timing sidechannel (CVSS 5.9 MEDIUM)
     # Affected crate: rsa (transitive via sqlx-mysql, openidconnect)
     # Why exempted: No fixed version available upstream. We use PostgreSQL (not MySQL),

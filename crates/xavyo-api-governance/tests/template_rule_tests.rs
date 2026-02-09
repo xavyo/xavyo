@@ -17,6 +17,7 @@ use xavyo_db::models::{
 
 /// Mock rule for unit testing.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct TestRule {
     id: Uuid,
     tenant_id: Uuid,

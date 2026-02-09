@@ -106,7 +106,7 @@ async fn rate_limiter_refills_proportionally() {
 
     // Should have refilled ~3 tokens
     let available = limiter.available_tokens();
-    assert!(available >= 2.0 && available <= 5.0);
+    assert!((2.0..=5.0).contains(&available));
 }
 
 #[tokio::test]
@@ -293,7 +293,7 @@ fn rate_limiter_available_tokens() {
 
     // Should have ~3 tokens left (might have refilled slightly)
     let available = limiter.available_tokens();
-    assert!(available >= 3.0 && available <= 5.0);
+    assert!((3.0..=5.0).contains(&available));
 }
 
 #[test]

@@ -79,8 +79,6 @@ csv-tool-2,Second CSV tool,high,"{""type"":""object"",""properties"":{""param"":
 #[test]
 fn test_export_json_basic() {
     // Verify JSON export produces valid JSON structure
-    use xavyo_cli::config::ConfigPaths;
-
     // This test verifies the JSON module works correctly
     // Full CLI integration requires a running API server
     let json_str = fixtures::sample_json_config();

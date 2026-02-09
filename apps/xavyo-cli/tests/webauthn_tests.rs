@@ -38,7 +38,7 @@ async fn test_passkey_challenge_success() {
     // Create client and make request
     let client = reqwest::Client::new();
     let response = client
-        .post(&format!("{}/auth/webauthn/challenge", ctx.server.uri()))
+        .post(format!("{}/auth/webauthn/challenge", ctx.server.uri()))
         .send()
         .await
         .expect("Request failed");
@@ -66,7 +66,7 @@ async fn test_passkey_challenge_not_configured() {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(&format!("{}/auth/webauthn/challenge", ctx.server.uri()))
+        .post(format!("{}/auth/webauthn/challenge", ctx.server.uri()))
         .send()
         .await
         .expect("Request failed");
@@ -92,7 +92,7 @@ async fn test_passkey_verify_success() {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(&format!("{}/auth/webauthn/verify", ctx.server.uri()))
+        .post(format!("{}/auth/webauthn/verify", ctx.server.uri()))
         .json(&json!({
             "challenge_id": "challenge-123",
             "credential_id": "Y3JlZGVudGlhbC1pZC0xMjM",
@@ -129,7 +129,7 @@ async fn test_passkey_verify_invalid_credential() {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(&format!("{}/auth/webauthn/verify", ctx.server.uri()))
+        .post(format!("{}/auth/webauthn/verify", ctx.server.uri()))
         .json(&json!({
             "challenge_id": "challenge-123",
             "credential_id": "invalid-cred",
@@ -164,7 +164,7 @@ async fn test_passkey_unavailable_returns_fallback() {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(&format!("{}/auth/webauthn/challenge", ctx.server.uri()))
+        .post(format!("{}/auth/webauthn/challenge", ctx.server.uri()))
         .send()
         .await
         .expect("Request failed");
@@ -189,7 +189,7 @@ async fn test_passkey_timeout_returns_fallback() {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(&format!("{}/auth/webauthn/verify", ctx.server.uri()))
+        .post(format!("{}/auth/webauthn/verify", ctx.server.uri()))
         .json(&json!({
             "challenge_id": "challenge-123",
             "credential_id": "test",
@@ -220,7 +220,7 @@ async fn test_passkey_cancelled_returns_fallback() {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(&format!("{}/auth/webauthn/verify", ctx.server.uri()))
+        .post(format!("{}/auth/webauthn/verify", ctx.server.uri()))
         .json(&json!({
             "challenge_id": "challenge-123",
             "credential_id": "test",
@@ -296,7 +296,7 @@ async fn test_whoami_passkeys_endpoint() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!("{}/users/me/passkeys", ctx.server.uri()))
+        .get(format!("{}/users/me/passkeys", ctx.server.uri()))
         .header("Authorization", "Bearer test-token")
         .send()
         .await
@@ -326,7 +326,7 @@ async fn test_whoami_no_passkeys() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!("{}/users/me/passkeys", ctx.server.uri()))
+        .get(format!("{}/users/me/passkeys", ctx.server.uri()))
         .header("Authorization", "Bearer test-token")
         .send()
         .await
@@ -361,7 +361,7 @@ async fn test_browser_handoff_create_session() {
 
     let client = reqwest::Client::new();
     let response = client
-        .post(&format!(
+        .post(format!(
             "{}/auth/webauthn/browser-handoff",
             ctx.server.uri()
         ))
@@ -398,7 +398,7 @@ async fn test_browser_handoff_poll_pending() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!(
+        .get(format!(
             "{}/auth/webauthn/browser-handoff/status/session-123",
             ctx.server.uri()
         ))
@@ -430,7 +430,7 @@ async fn test_browser_handoff_poll_completed() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!(
+        .get(format!(
             "{}/auth/webauthn/browser-handoff/status/session-123",
             ctx.server.uri()
         ))
@@ -459,7 +459,7 @@ async fn test_browser_handoff_poll_expired() {
 
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!(
+        .get(format!(
             "{}/auth/webauthn/browser-handoff/status/session-123",
             ctx.server.uri()
         ))

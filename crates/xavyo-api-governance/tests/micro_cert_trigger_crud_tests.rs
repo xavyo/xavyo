@@ -195,7 +195,7 @@ mod set_default {
 
         // Can only have one default rule for this combination
         assert!(tenant_id != Uuid::nil());
-        assert!(!trigger_type.is_empty());
+        assert_ne!(trigger_type, "");
     }
 
     #[test]

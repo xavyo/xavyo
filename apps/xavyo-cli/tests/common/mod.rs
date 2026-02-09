@@ -24,6 +24,7 @@ pub struct TestContext {
     pub config_dir: TempDir,
 }
 
+#[allow(dead_code)]
 impl TestContext {
     /// Create a new test context with fresh mock server and temp directories
     pub async fn new() -> Self {
@@ -91,7 +92,7 @@ impl TestContext {
 
     /// Mock successful token exchange
     pub async fn mock_token_success(&self) {
-        let expires_at = Utc::now() + Duration::hours(1);
+        let _expires_at = Utc::now() + Duration::hours(1);
         Mock::given(method("POST"))
             .and(path("/oauth/token"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({
@@ -411,6 +412,7 @@ pub fn create_user_fixture(email: &str) -> Value {
 }
 
 /// Generate test credentials JSON
+#[allow(dead_code)]
 pub fn create_credentials_json() -> Value {
     let expires_at = Utc::now() + Duration::hours(1);
     json!({
@@ -422,6 +424,7 @@ pub fn create_credentials_json() -> Value {
 }
 
 /// Generate expired credentials JSON
+#[allow(dead_code)]
 pub fn create_expired_credentials_json() -> Value {
     let expires_at = Utc::now() - Duration::hours(1);
     json!({
@@ -437,6 +440,7 @@ pub fn create_expired_credentials_json() -> Value {
 // =========================================================================
 
 /// Write credentials to a temporary file for testing
+#[allow(dead_code)]
 pub fn write_test_credentials(dir: &std::path::Path, credentials: &Value) -> PathBuf {
     let credentials_file = dir.join("credentials.json");
     std::fs::write(
@@ -448,6 +452,7 @@ pub fn write_test_credentials(dir: &std::path::Path, credentials: &Value) -> Pat
 }
 
 /// Write config to a temporary file for testing
+#[allow(dead_code)]
 pub fn write_test_config(dir: &std::path::Path, api_url: &str) -> PathBuf {
     let config_file = dir.join("config.yaml");
     let config_content = format!(
@@ -462,11 +467,13 @@ timeout_secs: 30
 }
 
 /// Check if credentials file exists
+#[allow(dead_code)]
 pub fn credentials_exist(dir: &std::path::Path) -> bool {
     dir.join("credentials.json").exists()
 }
 
 /// Delete credentials file if it exists
+#[allow(dead_code)]
 pub fn delete_credentials(dir: &std::path::Path) {
     let credentials_file = dir.join("credentials.json");
     if credentials_file.exists() {

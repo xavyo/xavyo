@@ -487,7 +487,7 @@ impl LicenseAssignmentService {
 mod tests {
     use super::*;
     use crate::models::license::{
-        AssignLicenseRequest, BulkAssignLicenseRequest, BulkOperationFailure, BulkOperationResult,
+        AssignLicenseRequest, BulkAssignLicenseRequest, BulkOperationFailure,
         BulkReclaimLicenseRequest, ListLicenseAssignmentsParams,
     };
     use xavyo_db::models::{LicenseAssignmentSource, LicenseAssignmentStatus};

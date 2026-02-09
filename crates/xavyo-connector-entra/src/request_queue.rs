@@ -307,7 +307,7 @@ mod tests {
 
         // We can't directly access IDs, but we can verify enqueue succeeds
         for _ in 0..5 {
-            let _ = queue.enqueue("test").await.unwrap();
+            queue.enqueue("test").await.unwrap();
         }
         assert_eq!(queue.depth(), 5);
     }

@@ -38,7 +38,7 @@ impl MockClientConfig {
 }
 
 /// Trait for mock SCIM clients that simulate `IdP` behavior.
-#[allow(async_fn_in_trait)]
+#[allow(async_fn_in_trait, dead_code)]
 pub trait MockScimClient {
     /// Get the `IdP` name (e.g., "Okta", "Azure AD", "`OneLogin`").
     fn idp_name(&self) -> &'static str;

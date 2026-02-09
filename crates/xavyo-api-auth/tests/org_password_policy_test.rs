@@ -3,7 +3,7 @@
 //! Tests that org-level password policies are properly resolved and enforced
 //! through the PasswordPolicyService.
 
-use xavyo_api_auth::models::{MfaPolicyConfig, PasswordPolicyConfig, SessionPolicyConfig};
+use xavyo_api_auth::models::PasswordPolicyConfig;
 use xavyo_api_auth::services::{PasswordPolicyError, PasswordPolicyService};
 use xavyo_db::TenantPasswordPolicy;
 

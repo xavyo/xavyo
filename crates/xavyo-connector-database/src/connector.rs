@@ -1131,8 +1131,8 @@ mod tests {
             "true"
         );
         assert_eq!(
-            DatabaseConnector::attribute_value_to_sql_string(&AttributeValue::Float(3.14)),
-            "3.14"
+            DatabaseConnector::attribute_value_to_sql_string(&AttributeValue::Float(3.15)),
+            "3.15"
         );
         assert_eq!(
             DatabaseConnector::attribute_value_to_sql_string(&AttributeValue::Null),

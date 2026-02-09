@@ -793,6 +793,7 @@ fn test_event_serialization() {
 // ============================================================================
 
 #[test]
+#[allow(non_snake_case)]
 fn test_IGA_parity_delta_tracking() {
     // IGA stores operation deltas - we do similar with before/after
     let event = CreateGovMetaRoleEvent {
@@ -819,6 +820,7 @@ fn test_IGA_parity_delta_tracking() {
 }
 
 #[test]
+#[allow(non_snake_case)]
 fn test_IGA_parity_cascade_tracking() {
     // IGA tracks task execution - we track cascade execution
     let started = CreateGovMetaRoleEvent {

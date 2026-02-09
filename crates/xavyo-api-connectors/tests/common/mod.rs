@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 /// Test context containing tenant and authentication info.
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct TestContext {
     pub tenant_id: Uuid,
     pub user_id: Uuid,
@@ -14,6 +15,7 @@ pub struct TestContext {
 
 impl TestContext {
     /// Create a new test context with a fresh tenant.
+    #[allow(dead_code)]
     pub fn new() -> Self {
         let tenant_id = Uuid::new_v4();
         let user_id = Uuid::new_v4();
@@ -34,6 +36,7 @@ impl Default for TestContext {
 }
 
 /// Generate a test JWT token for the given tenant and user.
+#[allow(dead_code)]
 fn generate_test_jwt(tenant_id: Uuid, user_id: Uuid) -> String {
     format!("test_token_{tenant_id}_{user_id}")
 }

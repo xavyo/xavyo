@@ -9,6 +9,7 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 /// Test application wrapper for making SCIM requests.
+#[allow(dead_code)]
 pub struct TestApp {
     router: Router,
     bearer_token: String,
@@ -16,6 +17,7 @@ pub struct TestApp {
 
 impl TestApp {
     /// Create a new test application with the given router and bearer token.
+    #[allow(dead_code)]
     pub fn new(router: Router, bearer_token: impl Into<String>) -> Self {
         Self {
             router,
@@ -24,31 +26,37 @@ impl TestApp {
     }
 
     /// Make a GET request to the given path.
+    #[allow(dead_code)]
     pub async fn get(&self, path: &str) -> TestResponse {
         self.request(Method::GET, path, None).await
     }
 
     /// Make a POST request with JSON body.
+    #[allow(dead_code)]
     pub async fn post(&self, path: &str, body: Value) -> TestResponse {
         self.request(Method::POST, path, Some(body)).await
     }
 
     /// Make a PUT request with JSON body.
+    #[allow(dead_code)]
     pub async fn put(&self, path: &str, body: Value) -> TestResponse {
         self.request(Method::PUT, path, Some(body)).await
     }
 
     /// Make a PATCH request with JSON body.
+    #[allow(dead_code)]
     pub async fn patch(&self, path: &str, body: Value) -> TestResponse {
         self.request(Method::PATCH, path, Some(body)).await
     }
 
     /// Make a DELETE request.
+    #[allow(dead_code)]
     pub async fn delete(&self, path: &str) -> TestResponse {
         self.request(Method::DELETE, path, None).await
     }
 
     /// Make a request with custom headers (for IdP-specific testing).
+    #[allow(dead_code)]
     pub async fn request_with_headers(
         &self,
         method: Method,
@@ -85,6 +93,7 @@ impl TestApp {
         TestResponse { status, body }
     }
 
+    #[allow(dead_code)]
     async fn request(&self, method: Method, path: &str, body: Option<Value>) -> TestResponse {
         self.request_with_headers(method, path, body, vec![]).await
     }
@@ -111,6 +120,7 @@ impl TestResponse {
     }
 
     /// Assert the response status is Created (201).
+    #[allow(dead_code)]
     pub fn assert_created(&self) -> &Self {
         assert_eq!(
             self.status,
@@ -123,6 +133,7 @@ impl TestResponse {
     }
 
     /// Assert the response status is No Content (204).
+    #[allow(dead_code)]
     pub fn assert_no_content(&self) -> &Self {
         assert_eq!(
             self.status,
@@ -135,6 +146,7 @@ impl TestResponse {
     }
 
     /// Assert the response status is Bad Request (400).
+    #[allow(dead_code)]
     pub fn assert_bad_request(&self) -> &Self {
         assert_eq!(
             self.status,
@@ -147,6 +159,7 @@ impl TestResponse {
     }
 
     /// Assert the response status is Not Found (404).
+    #[allow(dead_code)]
     pub fn assert_not_found(&self) -> &Self {
         assert_eq!(
             self.status,
@@ -159,6 +172,7 @@ impl TestResponse {
     }
 
     /// Assert the response status is Conflict (409).
+    #[allow(dead_code)]
     pub fn assert_conflict(&self) -> &Self {
         assert_eq!(
             self.status,
@@ -171,11 +185,13 @@ impl TestResponse {
     }
 
     /// Get the response body as a reference.
+    #[allow(dead_code)]
     pub fn json(&self) -> &Value {
         &self.body
     }
 
     /// Get a field from the response body.
+    #[allow(dead_code)]
     pub fn get(&self, field: &str) -> &Value {
         &self.body[field]
     }

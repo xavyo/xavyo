@@ -258,6 +258,7 @@ mod tests {
             task_type: "process_document".to_string(),
             input: serde_json::json!({ "url": "https://example.com/doc.pdf" }),
             callback_url: Some("https://myapp.example.com/webhooks/a2a".to_string()),
+            source_agent_id: None,
         };
 
         let json = serde_json::to_string(&req).unwrap();
