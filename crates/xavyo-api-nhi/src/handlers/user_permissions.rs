@@ -1,9 +1,9 @@
 //! User-to-NHI permission management handlers.
 //!
 //! Provides endpoints for user-to-NHI permission grants:
-//! - `POST /{nhi_id}/users/{user_id}/grant` — Grant user permission
-//! - `POST /{nhi_id}/users/{user_id}/revoke` — Revoke user permission
-//! - `GET /{nhi_id}/users` — List users with access to an NHI
+//! - `POST /{id}/users/{user_id}/grant` — Grant user permission
+//! - `POST /{id}/users/{user_id}/revoke` — Revoke user permission
+//! - `GET /{id}/users` — List users with access to an NHI
 //! - `GET /users/{user_id}/accessible` — List NHIs accessible by a user
 
 use axum::{
@@ -66,7 +66,7 @@ pub struct RevokeResponse {
 // Handlers
 // ---------------------------------------------------------------------------
 
-/// POST /{nhi_id}/users/{user_id}/grant — Grant a user permission to access an NHI.
+/// POST /{id}/users/{user_id}/grant — Grant a user permission to access an NHI.
 pub async fn grant_user_permission(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -96,7 +96,7 @@ pub async fn grant_user_permission(
     Ok((StatusCode::CREATED, Json(perm)))
 }
 
-/// POST /{nhi_id}/users/{user_id}/revoke — Revoke a user's permission on an NHI.
+/// POST /{id}/users/{user_id}/revoke — Revoke a user's permission on an NHI.
 pub async fn revoke_user_permission(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -122,7 +122,7 @@ pub async fn revoke_user_permission(
     Ok(Json(RevokeResponse { revoked }))
 }
 
-/// GET /{nhi_id}/users — List users with permissions on a specific NHI.
+/// GET /{id}/users — List users with permissions on a specific NHI.
 pub async fn list_nhi_users(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -187,13 +187,13 @@ pub async fn list_user_nhis(
 pub fn user_permission_routes(state: NhiState) -> Router {
     Router::new()
         // Grant/revoke: admin-only mutation endpoints
-        .route("/:nhi_id/users/:user_id/grant", post(grant_user_permission))
-        .route(
-            "/:nhi_id/users/:user_id/revoke",
-            post(revoke_user_permission),
-        )
+        // NOTE: Must use /:id (not /:nhi_id) to match the param name used by other
+        // merged NHI routers (unified, lifecycle, risk, etc.). Axum requires all
+        // routes sharing the same trie position to use the same parameter name.
+        .route("/:id/users/:user_id/grant", post(grant_user_permission))
+        .route("/:id/users/:user_id/revoke", post(revoke_user_permission))
         // List: admin-only or self
-        .route("/:nhi_id/users", get(list_nhi_users))
+        .route("/:id/users", get(list_nhi_users))
         .route("/users/:user_id/accessible", get(list_user_nhis))
         .with_state(state)
 }

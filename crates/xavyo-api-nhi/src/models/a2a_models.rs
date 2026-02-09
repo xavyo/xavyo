@@ -27,6 +27,12 @@ pub struct CreateA2aTaskRequest {
     /// Optional webhook URL for completion notification.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub callback_url: Option<String>,
+
+    /// Optional source agent ID. When an admin user creates a task on behalf
+    /// of an agent, they can specify which agent is the source. If omitted,
+    /// the JWT subject is used as the source NHI identity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_agent_id: Option<Uuid>,
 }
 
 /// Response for POST /a2a/tasks - task created.

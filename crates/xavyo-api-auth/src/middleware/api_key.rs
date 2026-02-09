@@ -34,7 +34,7 @@
 use super::rate_limit::ApiKeyRateLimiter;
 use axum::{
     body::Body,
-    extract::Request,
+    extract::{OriginalUri, Request},
     http::{Method, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
@@ -180,15 +180,18 @@ fn compute_key_hash(api_key: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
-/// F202-US2: Map a scope prefix to its URL path prefix.
-fn scope_prefix_to_path(prefix: &str) -> Option<&'static str> {
+/// F202-US2: Map a scope prefix to its URL path prefixes.
+///
+/// Returns all possible path prefixes for a scope. Some resources are served
+/// at multiple paths (e.g., users at both `/admin/users` and `/users/me`).
+fn scope_prefix_to_paths(prefix: &str) -> &'static [&'static str] {
     match prefix {
-        "nhi" => Some("/nhi"),
-        "agents" => Some("/agents"),
-        "users" => Some("/users"),
-        "groups" => Some("/groups"),
-        "audit" => Some("/audit"),
-        _ => None,
+        "nhi" => &["/nhi"],
+        "agents" => &["/agents"],
+        "users" => &["/admin/users", "/users"],
+        "groups" => &["/admin/groups"],
+        "audit" => &["/audit"],
+        _ => &[],
     }
 }
 
@@ -243,16 +246,19 @@ fn check_scope_access(scopes: &[String], method: &Method, path: &str) -> bool {
                 let prefix = parts[0];
                 let action = parts[1];
 
-                let Some(path_prefix) = scope_prefix_to_path(prefix) else {
+                let path_prefixes = scope_prefix_to_paths(prefix);
+                if path_prefixes.is_empty() {
                     continue; // Unknown prefix, skip
-                };
+                }
 
                 let Some(allowed_methods) = scope_action_to_methods(action) else {
                     continue; // Unknown action, skip
                 };
 
-                if is_path_prefix_match(path, path_prefix)
-                    && allowed_methods.contains(method)
+                if allowed_methods.contains(method)
+                    && path_prefixes
+                        .iter()
+                        .any(|pp| is_path_prefix_match(path, pp))
                 {
                     return true;
                 }
@@ -263,18 +269,20 @@ fn check_scope_access(scopes: &[String], method: &Method, path: &str) -> bool {
                 let resource = parts[1];
                 let action = parts[2];
 
-                let Some(base_path) = scope_prefix_to_path(prefix) else {
+                let base_paths = scope_prefix_to_paths(prefix);
+                if base_paths.is_empty() {
                     continue;
-                };
+                }
 
                 let Some(allowed_methods) = scope_action_to_methods(action) else {
                     continue;
                 };
 
-                // Build full path prefix: e.g., /nhi/agents
-                let full_path = format!("{base_path}/{resource}");
-                if is_path_prefix_match(path, &full_path)
-                    && allowed_methods.contains(method)
+                // Build full path prefixes: e.g., /nhi/agents
+                if allowed_methods.contains(method)
+                    && base_paths
+                        .iter()
+                        .any(|bp| is_path_prefix_match(path, &format!("{bp}/{resource}")))
                 {
                     return true;
                 }
@@ -493,7 +501,12 @@ pub async fn api_key_auth_middleware(
     // F202-US2: Enforce API key scopes
     if !api_key.scopes.is_empty() {
         let method = request.method().clone();
-        let path = request.uri().path().to_string();
+        // Use OriginalUri if available (preserves full path before Axum .nest() stripping)
+        let path = request
+            .extensions()
+            .get::<OriginalUri>()
+            .map(|ou| ou.0.path().to_string())
+            .unwrap_or_else(|| request.uri().path().to_string());
         if !check_scope_access(&api_key.scopes, &method, &path) {
             tracing::warn!(
                 key_id = %api_key.id,
@@ -677,7 +690,7 @@ mod tests {
         let scopes: Vec<String> = vec![];
         assert!(check_scope_access(&scopes, &Method::GET, "/users"));
         assert!(check_scope_access(&scopes, &Method::POST, "/nhi/agents"));
-        assert!(check_scope_access(&scopes, &Method::DELETE, "/groups/123"));
+        assert!(check_scope_access(&scopes, &Method::DELETE, "/admin/groups/123"));
     }
 
     #[test]
@@ -731,11 +744,11 @@ mod tests {
         let scopes = vec!["users:read".to_string(), "groups:create".to_string()];
         // First scope matches
         assert!(check_scope_access(&scopes, &Method::GET, "/users"));
-        // Second scope matches
-        assert!(check_scope_access(&scopes, &Method::POST, "/groups"));
+        // Second scope matches (groups routes are at /admin/groups)
+        assert!(check_scope_access(&scopes, &Method::POST, "/admin/groups"));
         // Neither matches
         assert!(!check_scope_access(&scopes, &Method::DELETE, "/users/123"));
-        assert!(!check_scope_access(&scopes, &Method::GET, "/groups"));
+        assert!(!check_scope_access(&scopes, &Method::GET, "/admin/groups"));
     }
 
     #[test]

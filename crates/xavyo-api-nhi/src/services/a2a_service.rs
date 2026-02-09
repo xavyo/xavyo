@@ -98,22 +98,26 @@ pub async fn create_task(
 
 /// Get a task by ID with tenant isolation and ownership check.
 ///
-/// The requester must be either the source or target agent of the task.
+/// The requester must be either the source or target agent of the task,
+/// or an admin/super_admin user.
 pub async fn get_task(
     pool: &PgPool,
     tenant_id: Uuid,
     requester_nhi_id: Uuid,
+    is_admin: bool,
     task_id: Uuid,
 ) -> Result<A2aTaskResponse, NhiApiError> {
     let task = A2aTask::get_by_id(pool, tenant_id, task_id)
         .await?
         .ok_or(NhiApiError::NotFound)?;
 
-    // Verify requester is a participant (source or target) of this task
-    let is_source = task.source_nhi_id == Some(requester_nhi_id);
-    let is_target = task.target_nhi_id == Some(requester_nhi_id);
-    if !is_source && !is_target {
-        return Err(NhiApiError::NotFound);
+    // Admins can view any task; non-admins must be a participant
+    if !is_admin {
+        let is_source = task.source_nhi_id == Some(requester_nhi_id);
+        let is_target = task.target_nhi_id == Some(requester_nhi_id);
+        if !is_source && !is_target {
+            return Err(NhiApiError::NotFound);
+        }
     }
 
     Ok(task_to_response(&task))
@@ -157,11 +161,13 @@ pub async fn list_tasks(
 ///
 /// Only tasks in `pending` or `running` state can be cancelled.
 /// Tasks in terminal states (`completed`, `failed`, `cancelled`) are rejected.
-/// The requester must be either the source or target agent of the task.
+/// The requester must be either the source or target agent of the task,
+/// or an admin/super_admin user.
 pub async fn cancel_task(
     pool: &PgPool,
     tenant_id: Uuid,
     requester_nhi_id: Uuid,
+    is_admin: bool,
     task_id: Uuid,
 ) -> Result<CancelA2aTaskResponse, NhiApiError> {
     // First fetch the task to check its current state
@@ -169,11 +175,13 @@ pub async fn cancel_task(
         .await?
         .ok_or(NhiApiError::NotFound)?;
 
-    // Verify requester is a participant (source or target) of this task
-    let is_source = existing.source_nhi_id == Some(requester_nhi_id);
-    let is_target = existing.target_nhi_id == Some(requester_nhi_id);
-    if !is_source && !is_target {
-        return Err(NhiApiError::NotFound);
+    // Admins can cancel any task; non-admins must be a participant
+    if !is_admin {
+        let is_source = existing.source_nhi_id == Some(requester_nhi_id);
+        let is_target = existing.target_nhi_id == Some(requester_nhi_id);
+        if !is_source && !is_target {
+            return Err(NhiApiError::NotFound);
+        }
     }
 
     // Validate the task is in a cancellable state

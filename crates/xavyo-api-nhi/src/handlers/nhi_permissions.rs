@@ -1,10 +1,10 @@
 //! NHI-to-NHI permission management handlers.
 //!
 //! Provides endpoints for NHI-to-NHI calling/delegation permission grants:
-//! - `POST /{source_id}/call/{target_id}/grant` — Grant calling permission
-//! - `POST /{source_id}/call/{target_id}/revoke` — Revoke calling permission
-//! - `GET /{nhi_id}/callers` — List NHIs with calling permission TO this NHI
-//! - `GET /{nhi_id}/callees` — List NHIs this NHI has calling permission FOR
+//! - `POST /{id}/call/{target_id}/grant` — Grant calling permission
+//! - `POST /{id}/call/{target_id}/revoke` — Revoke calling permission
+//! - `GET /{id}/callers` — List NHIs with calling permission TO this NHI
+//! - `GET /{id}/callees` — List NHIs this NHI has calling permission FOR
 
 use axum::{
     extract::{Path, Query, State},
@@ -68,7 +68,7 @@ pub struct RevokeResponse {
 // Handlers
 // ---------------------------------------------------------------------------
 
-/// POST /{source_id}/call/{target_id}/grant — Grant NHI calling permission.
+/// POST /{id}/call/{target_id}/grant — Grant NHI calling permission.
 pub async fn grant_nhi_permission(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -100,7 +100,7 @@ pub async fn grant_nhi_permission(
     Ok((StatusCode::CREATED, Json(perm)))
 }
 
-/// POST /{source_id}/call/{target_id}/revoke — Revoke NHI calling permission.
+/// POST /{id}/call/{target_id}/revoke — Revoke NHI calling permission.
 pub async fn revoke_nhi_permission(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -126,7 +126,7 @@ pub async fn revoke_nhi_permission(
     Ok(Json(RevokeResponse { revoked }))
 }
 
-/// GET /{nhi_id}/callers — List NHIs with calling permission TO this NHI.
+/// GET /{id}/callers — List NHIs with calling permission TO this NHI.
 pub async fn list_callers(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -153,7 +153,7 @@ pub async fn list_callers(
     }))
 }
 
-/// GET /{nhi_id}/callees — List NHIs this NHI has calling permission FOR.
+/// GET /{id}/callees — List NHIs this NHI has calling permission FOR.
 pub async fn list_callees(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -187,16 +187,13 @@ pub async fn list_callees(
 pub fn nhi_nhi_permission_routes(state: NhiState) -> Router {
     Router::new()
         // Grant/revoke: admin-only mutation endpoints
-        .route(
-            "/:source_id/call/:target_id/grant",
-            post(grant_nhi_permission),
-        )
-        .route(
-            "/:source_id/call/:target_id/revoke",
-            post(revoke_nhi_permission),
-        )
+        // NOTE: Must use /:id (not /:source_id) to match the param name used by other
+        // merged NHI routers (unified, lifecycle, risk, etc.). Axum requires all
+        // routes sharing the same trie position to use the same parameter name.
+        .route("/:id/call/:target_id/grant", post(grant_nhi_permission))
+        .route("/:id/call/:target_id/revoke", post(revoke_nhi_permission))
         // List: admin-only
-        .route("/:nhi_id/callers", get(list_callers))
-        .route("/:nhi_id/callees", get(list_callees))
+        .route("/:id/callers", get(list_callers))
+        .route("/:id/callees", get(list_callees))
         .with_state(state)
 }

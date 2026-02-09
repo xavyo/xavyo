@@ -23,6 +23,7 @@
 #   Batch 11: admin features (IP, branding, delegation, keys, invitations, org policies, license, escalation)
 #   Batch 12: connectors deep (SCIM outbound, reconciliation, DLQ, circuit breakers, jobs, health, sync)
 #   Batch 13: NHI Feature 201 (unified model, lifecycle, certification, permissions, risk, inactivity, SoD)
+#   Batch 14: Features 202-205 (API key identity, NHI permissions, protocol migration)
 # =============================================================================
 
 set -uo pipefail
@@ -68,6 +69,7 @@ BATCHES=(
   "run-batch-11-admin-governance-deep.sh|Admin+Gov Deep (IP+Branding+Delegation+Keys+Escalation)"
   "run-batch-12-connectors-webhooks-deep.sh|Connectors Deep+Webhooks Deep"
   "run-batch-13-nhi-201-unified.sh|NHI Feature 201 (Unified+Lifecycle+Cert+Perms+Risk+SoD)"
+  "run-batch-14-features-202-205.sh|Features 202-205 (APIKey+NHI Perms+Protocols)"
 )
 
 for i in "${!BATCHES[@]}"; do

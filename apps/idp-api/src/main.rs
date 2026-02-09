@@ -573,15 +573,18 @@ async fn main() {
 
     // Build users routes with tenant middleware
     // The users_router requires JWT authentication with admin role
+    // F202: Support both API key and JWT authentication for programmatic access
     let users_state = UsersState::new(pool.clone());
     let users_routes = users_router(users_state.clone())
-        .layer(axum::middleware::from_fn(jwt_auth_middleware))
-        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
         .layer(TenantLayer::with_config(
             xavyo_tenant::TenantConfig::builder()
                 .require_tenant(true) // Tenant is required for user management
                 .build(),
-        ));
+        ))
+        .layer(axum::middleware::from_fn(jwt_auth_middleware))
+        .layer(axum::middleware::from_fn(api_key_auth_middleware))
+        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+        .layer(axum::Extension(pool.clone()));
 
     // Build attribute definitions routes (F070 - Custom User Attributes)
     let attribute_def_routes = attribute_definitions_router(users_state.clone())
@@ -604,14 +607,17 @@ async fn main() {
         ));
 
     // Build group hierarchy routes (F071 - Organization Hierarchy)
+    // F202: Support both API key and JWT authentication for programmatic access
     let groups_routes = groups_router(users_state)
-        .layer(axum::middleware::from_fn(jwt_auth_middleware))
-        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
         .layer(TenantLayer::with_config(
             xavyo_tenant::TenantConfig::builder()
                 .require_tenant(true)
                 .build(),
-        ));
+        ))
+        .layer(axum::middleware::from_fn(jwt_auth_middleware))
+        .layer(axum::middleware::from_fn(api_key_auth_middleware))
+        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+        .layer(axum::Extension(pool.clone()));
 
     // Build OAuth2/OIDC routes (F069-S5: multi-key support)
     let oauth_signing_keys: Vec<xavyo_api_oauth::OAuthSigningKey> =

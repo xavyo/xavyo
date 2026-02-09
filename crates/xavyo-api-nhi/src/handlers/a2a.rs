@@ -40,23 +40,40 @@ fn extract_agent_id(claims: &JwtClaims) -> Result<Uuid, NhiApiError> {
 }
 
 /// POST /a2a/tasks - Create a new asynchronous task.
+///
+/// If the caller is an admin/super_admin user (not an NHI agent), they can
+/// specify `source_agent_id` in the request body to create tasks on behalf
+/// of an agent. If the JWT subject is an NHI identity, it is used as the source.
 pub async fn create_task(
     State(state): State<NhiState>,
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateA2aTaskRequest>,
 ) -> Result<(StatusCode, Json<CreateA2aTaskResponse>), NhiApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
-    let agent_id = extract_agent_id(&claims)?;
+    let caller_id = extract_agent_id(&claims)?;
+
+    // Determine the source NHI: either from the request body (admin acting on behalf)
+    // or from the JWT subject (direct agent-to-agent call)
+    let source_nhi_id = if let Some(explicit_source) = request.source_agent_id {
+        // Admin users can specify a source agent
+        if !claims.has_role("admin") && !claims.has_role("super_admin") {
+            return Err(NhiApiError::Forbidden);
+        }
+        explicit_source
+    } else {
+        caller_id
+    };
 
     debug!(
         tenant_id = %tenant_id,
-        agent_id = %agent_id,
+        source_nhi_id = %source_nhi_id,
         target_agent_id = %request.target_agent_id,
         task_type = %request.task_type,
         "Creating A2A task"
     );
 
-    let response = a2a_service::create_task(&state.pool, tenant_id, agent_id, request).await?;
+    let response =
+        a2a_service::create_task(&state.pool, tenant_id, source_nhi_id, request).await?;
 
     Ok((StatusCode::CREATED, Json(response)))
 }
@@ -90,6 +107,7 @@ pub async fn get_task(
 ) -> Result<Json<A2aTaskResponse>, NhiApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
     let agent_id = extract_agent_id(&claims)?;
+    let is_admin = claims.has_role("admin") || claims.has_role("super_admin");
 
     debug!(
         tenant_id = %tenant_id,
@@ -98,7 +116,8 @@ pub async fn get_task(
         "Getting A2A task status"
     );
 
-    let response = a2a_service::get_task(&state.pool, tenant_id, agent_id, task_id).await?;
+    let response =
+        a2a_service::get_task(&state.pool, tenant_id, agent_id, is_admin, task_id).await?;
 
     Ok(Json(response))
 }
@@ -111,6 +130,7 @@ pub async fn cancel_task(
 ) -> Result<Json<CancelA2aTaskResponse>, NhiApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
     let agent_id = extract_agent_id(&claims)?;
+    let is_admin = claims.has_role("admin") || claims.has_role("super_admin");
 
     debug!(
         tenant_id = %tenant_id,
@@ -119,7 +139,8 @@ pub async fn cancel_task(
         "Cancelling A2A task"
     );
 
-    let response = a2a_service::cancel_task(&state.pool, tenant_id, agent_id, task_id).await?;
+    let response =
+        a2a_service::cancel_task(&state.pool, tenant_id, agent_id, is_admin, task_id).await?;
 
     Ok(Json(response))
 }
