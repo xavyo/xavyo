@@ -63,7 +63,8 @@ use xavyo_api_tenants::{
     tenant_router,
 };
 use xavyo_api_users::{
-    attribute_definitions_router, bulk_operations_router, groups_router, users_router, UsersState,
+    attribute_definitions_router, bulk_operations_router, groups_router,
+    middleware::admin_guard, users_router, UsersState,
 };
 use xavyo_connector::crypto::CredentialEncryption;
 use xavyo_connector::registry::ConnectorRegistry;
@@ -782,6 +783,7 @@ async fn main() {
     // Governance routes (F033 - IGA Entitlement Management)
     // F113: Support both API key and JWT authentication for programmatic access
     let governance_routes = governance_router(pool.clone())
+        .layer(axum::middleware::from_fn(admin_guard))
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::middleware::from_fn(api_key_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))

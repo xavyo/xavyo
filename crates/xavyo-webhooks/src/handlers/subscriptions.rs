@@ -48,6 +48,9 @@ pub async fn create_subscription_handler(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateWebhookSubscriptionRequest>,
 ) -> ApiResult<(StatusCode, Json<WebhookSubscriptionResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(WebhookError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let actor_id = Uuid::parse_str(&claims.sub).ok();
 
@@ -143,6 +146,9 @@ pub async fn update_subscription_handler(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateWebhookSubscriptionRequest>,
 ) -> ApiResult<Json<WebhookSubscriptionResponse>> {
+    if !claims.has_role("admin") {
+        return Err(WebhookError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     request
@@ -177,6 +183,9 @@ pub async fn delete_subscription_handler(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(WebhookError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     state

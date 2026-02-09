@@ -80,6 +80,9 @@ pub async fn trigger_sync(
     Extension(claims): Extension<JwtClaims>,
     Path(target_id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<TriggerSyncResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let pool = state.scim_target_service.pool();
     let triggered_by = Uuid::parse_str(&claims.sub).ok();
@@ -148,6 +151,9 @@ pub async fn trigger_reconciliation(
     Extension(claims): Extension<JwtClaims>,
     Path(target_id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<TriggerSyncResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let pool = state.scim_target_service.pool();
     let triggered_by = Uuid::parse_str(&claims.sub).ok();
@@ -217,6 +223,9 @@ pub async fn list_sync_runs(
     Path(target_id): Path<Uuid>,
     Query(query): Query<ListSyncRunsQuery>,
 ) -> Result<Json<SyncRunListResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let pool = state.scim_target_service.pool();
 
@@ -271,6 +280,9 @@ pub async fn get_sync_run(
     Extension(claims): Extension<JwtClaims>,
     Path((target_id, run_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<ScimSyncRun>> {
+    if !claims.has_role("admin") {
+        return Err(ConnectorApiError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
     let pool = state.scim_target_service.pool();
 

@@ -137,6 +137,9 @@ pub async fn delete_dlq_entry_handler(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(WebhookError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     let deleted = state.dlq_service.delete_entry(tenant_id, id).await?;
@@ -173,6 +176,9 @@ pub async fn replay_single_handler(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<ReplayResponse>> {
+    if !claims.has_role("admin") {
+        return Err(WebhookError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     let response = state.dlq_service.replay_single(tenant_id, id).await?;
@@ -198,6 +204,9 @@ pub async fn replay_bulk_handler(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<BulkReplayRequest>,
 ) -> ApiResult<Json<BulkReplayResponse>> {
+    if !claims.has_role("admin") {
+        return Err(WebhookError::Forbidden);
+    }
     let tenant_id = extract_tenant_id(&claims)?;
 
     let response = state.dlq_service.replay_bulk(tenant_id, request).await?;
