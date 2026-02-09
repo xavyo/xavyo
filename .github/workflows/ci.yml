@@ -31,6 +31,12 @@ jobs:
           components: clippy
       - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev
       - uses: Swatinem/rust-cache@v2
+      - name: Create swap space
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
@@ -41,7 +47,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev
       - uses: Swatinem/rust-cache@v2
+      - name: Create swap space
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
       - run: cargo test --workspace
+        env:
+          CARGO_BUILD_JOBS: 2
 
   deny:
     name: Dependency audit
@@ -58,4 +72,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev
       - uses: Swatinem/rust-cache@v2
+      - name: Create swap space
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
       - run: cargo build --workspace --release
+        env:
+          CARGO_BUILD_JOBS: 2

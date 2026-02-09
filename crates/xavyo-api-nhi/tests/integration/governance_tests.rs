@@ -29,7 +29,7 @@ async fn setup_test_env(pool: &PgPool) -> (Uuid, Uuid) {
 /// When getting risk summary,
 /// Then aggregated statistics are returned.
 #[tokio::test]
-    #[ignore]
+#[ignore]
 async fn test_get_risk_summary() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -93,7 +93,7 @@ async fn test_get_risk_summary() {
 /// When certifying it,
 /// Then the NHI is marked as certified with timestamp.
 #[tokio::test]
-    #[ignore]
+#[ignore]
 async fn test_certify_service_account() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -152,7 +152,7 @@ async fn test_certify_service_account() {
 /// When getting its details,
 /// Then certification status is correctly reflected.
 #[tokio::test]
-    #[ignore]
+#[ignore]
 async fn test_certification_status_persisted() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -213,7 +213,7 @@ async fn test_certification_status_persisted() {
 /// When getting its risk score,
 /// Then a risk score is returned.
 #[tokio::test]
-    #[ignore]
+#[ignore]
 async fn test_risk_score_endpoint() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;

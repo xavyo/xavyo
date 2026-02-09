@@ -66,7 +66,7 @@ async fn create_test_credential(
 /// When listing its credentials,
 /// Then all credentials are returned.
 #[tokio::test]
-    #[ignore]
+#[ignore]
 async fn test_list_credentials() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -110,7 +110,7 @@ async fn test_list_credentials() {
 /// When rotating credentials,
 /// Then new credentials are generated.
 #[tokio::test]
-    #[ignore]
+#[ignore]
 async fn test_rotate_credentials() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -172,7 +172,7 @@ async fn test_rotate_credentials() {
 /// When revoking a specific credential,
 /// Then only that credential is marked inactive.
 #[tokio::test]
-    #[ignore]
+#[ignore]
 async fn test_revoke_credential() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
@@ -245,7 +245,7 @@ async fn test_revoke_credential() {
 /// When checking the old credential status,
 /// Then it shows as inactive/invalid.
 #[tokio::test]
-    #[ignore]
+#[ignore]
 async fn test_old_credential_invalid_after_rotation() {
     let pool = create_test_pool().await;
     let (tenant_id, owner_id) = setup_test_env(&pool).await;
