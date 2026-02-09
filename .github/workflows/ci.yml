@@ -56,6 +56,7 @@ jobs:
       - run: cargo test --workspace
         env:
           CARGO_BUILD_JOBS: 1
+          RUSTFLAGS: -Dwarnings -Clink-arg=-Wl,--threads=1
 
   deny:
     name: Dependency audit
