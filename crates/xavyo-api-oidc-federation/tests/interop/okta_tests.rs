@@ -75,7 +75,7 @@ async fn test_okta_valid_token_verification() {
     let token = create_test_token(&claims, kid);
 
     // Verify token
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -98,7 +98,7 @@ async fn test_okta_jwks_parsing() {
     mock.mount_jwks(okta_fixtures::jwks(kid)).await;
 
     // Fetch JWKS directly via cache
-    let cache = xavyo_api_oidc_federation::services::JwksCache::default();
+    let cache = mock.cache();
     let result = cache.get_keys(&mock.jwks_uri).await;
 
     assert!(result.is_ok(), "JWKS fetch failed: {:?}", result.err());
@@ -125,7 +125,7 @@ async fn test_okta_groups_claim_extraction() {
     );
     let token = create_test_token_with_custom_claims(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -149,7 +149,7 @@ async fn test_okta_invalid_signature_rejected() {
     let claims = TestClaims::new("user123", &issuer, vec!["api://default".to_string()]);
     let token = create_invalid_signature_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(result.is_err());
@@ -175,7 +175,7 @@ async fn test_okta_expired_token_rejected() {
         TestClaims::with_exp_offset("user123", &issuer, vec!["api://default".to_string()], -3600);
     let token = create_test_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(result.is_err());
@@ -198,7 +198,7 @@ async fn test_okta_key_rotation() {
     let claims = TestClaims::new("user123", &issuer, vec!["api://default".to_string()]);
     let token = create_test_token(&claims, "okta-key-2");
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(

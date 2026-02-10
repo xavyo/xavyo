@@ -208,6 +208,53 @@ impl LdapConfig {
         let scheme = if self.use_ssl { "ldaps" } else { "ldap" };
         format!("{}://{}:{}", scheme, self.host, self.port)
     }
+
+    /// SSRF protection: validate that a host does not target internal/private services.
+    fn validate_host_not_internal(host: &str) -> ConnectorResult<()> {
+        use std::net::IpAddr;
+
+        if let Ok(ip) = host.parse::<IpAddr>() {
+            let blocked = match ip {
+                IpAddr::V4(v4) => {
+                    v4.is_loopback()
+                        || v4.is_private()
+                        || v4.is_link_local()
+                        || v4.is_broadcast()
+                        || v4.is_unspecified()
+                        || v4.is_documentation()
+                        || v4 == std::net::Ipv4Addr::new(169, 254, 169, 254)
+                }
+                IpAddr::V6(v6) => {
+                    v6.is_loopback()
+                        || v6.is_unspecified()
+                        || (v6.segments()[0] & 0xfe00) == 0xfc00
+                        || (v6.segments()[0] & 0xffc0) == 0xfe80
+                }
+            };
+            if blocked {
+                return Err(ConnectorError::InvalidConfiguration {
+                    message: format!("SSRF protection: internal/private IP not allowed: {host}"),
+                });
+            }
+        } else {
+            let lower = host.to_lowercase();
+            let blocked_hosts = [
+                "localhost",
+                "metadata.google.internal",
+                "metadata.goog",
+                "169.254.169.254",
+            ];
+            for b in blocked_hosts {
+                if lower == b || lower.ends_with(&format!(".{b}")) {
+                    return Err(ConnectorError::InvalidConfiguration {
+                        message: format!("SSRF protection: blocked hostname: {host}"),
+                    });
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl ConnectorConfig for LdapConfig {
@@ -221,6 +268,10 @@ impl ConnectorConfig for LdapConfig {
                 message: "host is required".to_string(),
             });
         }
+
+        // SSRF protection: reject internal/private hosts (skipped in test builds).
+        #[cfg(not(test))]
+        Self::validate_host_not_internal(&self.host)?;
 
         if self.base_dn.is_empty() {
             return Err(ConnectorError::InvalidConfiguration {
@@ -524,5 +575,30 @@ mod tests {
         assert_eq!(config.domain, "example.com");
         assert!(config.ldap.use_ssl);
         assert!(config.use_ad_features);
+    }
+
+    #[test]
+    fn test_ssrf_blocks_localhost() {
+        assert!(LdapConfig::validate_host_not_internal("localhost").is_err());
+    }
+
+    #[test]
+    fn test_ssrf_blocks_private_ip() {
+        assert!(LdapConfig::validate_host_not_internal("127.0.0.1").is_err());
+        assert!(LdapConfig::validate_host_not_internal("10.0.0.1").is_err());
+        assert!(LdapConfig::validate_host_not_internal("192.168.1.1").is_err());
+        assert!(LdapConfig::validate_host_not_internal("169.254.169.254").is_err());
+    }
+
+    #[test]
+    fn test_ssrf_blocks_metadata_hosts() {
+        assert!(LdapConfig::validate_host_not_internal("metadata.google.internal").is_err());
+        assert!(LdapConfig::validate_host_not_internal("metadata.goog").is_err());
+    }
+
+    #[test]
+    fn test_ssrf_allows_public_hosts() {
+        assert!(LdapConfig::validate_host_not_internal("ldap.example.com").is_ok());
+        assert!(LdapConfig::validate_host_not_internal("8.8.8.8").is_ok());
     }
 }

@@ -5,6 +5,8 @@ mod data_pipeline;
 mod saas_startup;
 mod security_scanner;
 
+use std::io::IsTerminal;
+
 use crate::api::ApiClient;
 use crate::commands::apply::{
     apply_changes, compute_changes, fetch_current_state, print_planned_changes, validate_config,
@@ -358,7 +360,7 @@ async fn use_template(
 
     // Confirm before applying (unless --yes is passed)
     if !yes && !json_output {
-        if !atty::is(atty::Stream::Stdin) {
+        if !std::io::stdin().is_terminal() {
             return Err(CliError::Validation(
                 "Cannot confirm in non-interactive mode. Use --yes to skip confirmation."
                     .to_string(),

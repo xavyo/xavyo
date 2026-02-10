@@ -274,6 +274,7 @@ impl Default for TokenVerifierService {
 mod tests {
     use super::*;
     use chrono::Utc;
+    use std::time::Duration;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -324,6 +325,12 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
         .to_string()
     }
 
+    /// Create a verifier that allows local IPs (for wiremock tests).
+    fn test_verifier(config: VerificationConfig) -> TokenVerifierService {
+        let cache = JwksCache::new_allow_local(Duration::from_secs(600));
+        TokenVerifierService::with_cache(config, cache)
+    }
+
     fn create_test_token(exp_offset_secs: i64, issuer: &str) -> String {
         let claims = xavyo_auth::JwtClaims::builder()
             .subject("user-123")
@@ -347,7 +354,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
         let jwks_uri = format!("{}/.well-known/jwks.json", mock_server.uri());
         let token = create_test_token(3600, "https://idp.example.com");
 
-        let verifier = TokenVerifierService::new(VerificationConfig::default());
+        let verifier = test_verifier(VerificationConfig::default());
         let result = verifier.verify_token(&token, &jwks_uri).await;
 
         assert!(result.is_ok());
@@ -371,7 +378,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
         // Token expired 1 hour ago
         let token = create_test_token(-3600, "https://idp.example.com");
 
-        let verifier = TokenVerifierService::new(VerificationConfig::default());
+        let verifier = test_verifier(VerificationConfig::default());
         let result = verifier.verify_token(&token, &jwks_uri).await;
 
         assert!(result.is_err());
@@ -393,7 +400,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
         let token = create_test_token(-120, "https://idp.example.com");
 
         // With 5 minute tolerance, should still pass
-        let verifier = TokenVerifierService::new(VerificationConfig::with_clock_skew(300));
+        let verifier = test_verifier(VerificationConfig::with_clock_skew(300));
         let result = verifier.verify_token(&token, &jwks_uri).await;
 
         assert!(result.is_ok());
@@ -412,9 +419,8 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
         let jwks_uri = format!("{}/.well-known/jwks.json", mock_server.uri());
         let token = create_test_token(3600, "https://wrong-idp.example.com");
 
-        let verifier = TokenVerifierService::new(
-            VerificationConfig::default().issuer("https://expected-idp.example.com"),
-        );
+        let verifier =
+            test_verifier(VerificationConfig::default().issuer("https://expected-idp.example.com"));
         let result = verifier.verify_token(&token, &jwks_uri).await;
 
         assert!(result.is_err());
@@ -442,7 +448,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
         let jwks_uri = format!("{}/.well-known/jwks.json", mock_server.uri());
         let token = create_test_token(3600, "https://idp.example.com");
 
-        let verifier = TokenVerifierService::new(VerificationConfig::default());
+        let verifier = test_verifier(VerificationConfig::default());
         let result = verifier.verify_token(&token, &jwks_uri).await;
 
         assert!(result.is_err());
@@ -479,7 +485,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
         let jwks_uri = format!("{}/.well-known/jwks.json", mock_server.uri());
         let token = create_test_token(3600, "https://idp.example.com");
 
-        let verifier = TokenVerifierService::new(VerificationConfig::default());
+        let verifier = test_verifier(VerificationConfig::default());
         let result = verifier.verify_token(&token, &jwks_uri).await;
 
         assert!(result.is_err());

@@ -51,6 +51,33 @@ impl AssignRoleExecutor {
         Ok(count.0 > 0)
     }
 
+    /// Revoke all sessions for a user (force re-authentication after role change).
+    async fn revoke_user_sessions(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
+             WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .execute(pool)
+        .await?;
+
+        let count = result.rows_affected();
+        if count > 0 {
+            tracing::info!(
+                user_id = %user_id,
+                tenant_id = %tenant_id,
+                revoked_count = count,
+                "Revoked sessions after role assignment"
+            );
+        }
+        Ok(count)
+    }
+
     /// Assign the role to the user.
     async fn assign_role(pool: &PgPool, user_id: Uuid, role_name: &str) -> Result<(), sqlx::Error> {
         sqlx::query(
@@ -116,18 +143,30 @@ impl ActionExecutor for AssignRoleExecutor {
 
         // Assign the role
         match Self::assign_role(pool, target_user_id, &role_name).await {
-            Ok(()) => ExecutionResult::success(
-                serde_json::json!({
-                    "has_role": false,
-                    "role_id": role_id.to_string(),
-                    "role_name": role_name
-                }),
-                serde_json::json!({
-                    "has_role": true,
-                    "role_id": role_id.to_string(),
-                    "role_name": role_name
-                }),
-            ),
+            Ok(()) => {
+                // Invalidate all sessions for the user so they pick up new permissions
+                if let Err(e) =
+                    Self::revoke_user_sessions(pool, ctx.tenant_id, target_user_id).await
+                {
+                    tracing::warn!(
+                        user_id = %target_user_id,
+                        error = %e,
+                        "Failed to revoke sessions after role assignment"
+                    );
+                }
+                ExecutionResult::success(
+                    serde_json::json!({
+                        "has_role": false,
+                        "role_id": role_id.to_string(),
+                        "role_name": role_name
+                    }),
+                    serde_json::json!({
+                        "has_role": true,
+                        "role_id": role_id.to_string(),
+                        "role_name": role_name
+                    }),
+                )
+            }
             Err(e) => ExecutionResult::failure(format!("Failed to assign role: {e}")),
         }
     }

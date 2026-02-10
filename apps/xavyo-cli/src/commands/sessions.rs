@@ -1,5 +1,7 @@
 //! Session management CLI commands
 
+use std::io::IsTerminal;
+
 use crate::api::ApiClient;
 use crate::config::{Config, ConfigPaths};
 use crate::error::{CliError, CliResult};
@@ -165,7 +167,7 @@ async fn execute_revoke_single(
     if session.is_current {
         // Warn about revoking current session
         if !skip_confirm {
-            if !atty::is(atty::Stream::Stdin) {
+            if !std::io::stdin().is_terminal() {
                 return Err(CliError::Validation(
                     "Cannot revoke current session in non-interactive mode. Use 'xavyo logout' instead.".to_string(),
                 ));
@@ -188,7 +190,7 @@ async fn execute_revoke_single(
         }
     } else if !skip_confirm {
         // Confirm revocation for non-current session
-        if atty::is(atty::Stream::Stdin) {
+        if std::io::stdin().is_terminal() {
             let device_info = format!("{} ({})", session.device_name, session.device_type);
             let confirm = Confirm::new()
                 .with_prompt(format!("Revoke session '{}'?", device_info))
@@ -227,7 +229,7 @@ async fn execute_revoke_all(client: &ApiClient, skip_confirm: bool) -> CliResult
 
     // Confirm revocation
     if !skip_confirm {
-        if !atty::is(atty::Stream::Stdin) {
+        if !std::io::stdin().is_terminal() {
             return Err(CliError::Validation(
                 "Cannot confirm revocation in non-interactive mode. Use --yes to skip confirmation.".to_string(),
             ));

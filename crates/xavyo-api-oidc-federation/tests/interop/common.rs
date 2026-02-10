@@ -226,6 +226,24 @@ impl IdpMockServer {
     pub fn base_url(&self) -> String {
         self.server.uri()
     }
+
+    /// Create a `TokenVerifierService` that allows local IPs (for mock server testing).
+    pub fn verifier(
+        &self,
+        config: xavyo_api_oidc_federation::services::VerificationConfig,
+    ) -> xavyo_api_oidc_federation::services::TokenVerifierService {
+        let cache = xavyo_api_oidc_federation::services::JwksCache::new_allow_local(
+            std::time::Duration::from_secs(600),
+        );
+        xavyo_api_oidc_federation::services::TokenVerifierService::with_cache(config, cache)
+    }
+
+    /// Create a `JwksCache` that allows local IPs (for mock server testing).
+    pub fn cache(&self) -> xavyo_api_oidc_federation::services::JwksCache {
+        xavyo_api_oidc_federation::services::JwksCache::new_allow_local(
+            std::time::Duration::from_secs(600),
+        )
+    }
 }
 
 /// Generate a standard OIDC discovery document

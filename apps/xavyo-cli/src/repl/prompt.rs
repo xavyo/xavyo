@@ -3,6 +3,8 @@
 //! Generates context-aware prompts showing the current tenant
 //! and authentication status.
 
+use std::io::IsTerminal;
+
 use crate::repl::ShellSession;
 
 /// Prompt generator for the interactive shell
@@ -37,7 +39,7 @@ impl Prompt {
 
     /// Check if the terminal supports colors
     pub fn supports_color() -> bool {
-        std::env::var("NO_COLOR").is_err() && atty::is(atty::Stream::Stdout)
+        std::env::var("NO_COLOR").is_err() && std::io::stdout().is_terminal()
     }
 
     /// Generate the appropriate prompt based on terminal capabilities

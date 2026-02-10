@@ -95,7 +95,7 @@ async fn test_auth0_valid_token_verification() {
     .with_email("user@example.com");
     let token = create_test_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -126,7 +126,7 @@ async fn test_auth0_namespaced_claims() {
     );
     let token = create_test_token_with_custom_claims(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -157,7 +157,7 @@ async fn test_auth0_trailing_slash_issuer() {
     let token = create_test_token(&claims, kid);
 
     // Verify with expected issuer including trailing slash
-    let verifier = TokenVerifierService::new(VerificationConfig::default().issuer(&issuer));
+    let verifier = mock.verifier(VerificationConfig::default().issuer(&issuer));
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -185,7 +185,7 @@ async fn test_auth0_invalid_signature_rejected() {
     );
     let token = create_invalid_signature_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(result.is_err());
@@ -215,7 +215,7 @@ async fn test_auth0_expired_token_rejected() {
     );
     let token = create_test_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(result.is_err());
@@ -239,7 +239,7 @@ async fn test_auth0_subject_format() {
     let claims = TestClaims::new(sub, &issuer, vec!["https://api.myapp.com".to_string()]);
     let token = create_test_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(

@@ -146,11 +146,23 @@ pub async fn finish_webauthn_registration(
         )
         .await?;
 
+    // Revoke all sessions — MFA enrollment is a security-sensitive change
+    let revoked = sqlx::query(
+        "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
+         WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+    )
+    .bind(user_id.as_uuid())
+    .bind(tenant_id.as_uuid())
+    .execute(&state.pool)
+    .await
+    .map_err(ApiAuthError::Database)?;
+
     info!(
         user_id = %user_id.as_uuid(),
         credential_id = %credential.id,
         credential_name = %credential.name,
-        "WebAuthn credential registered"
+        sessions_revoked = revoked.rows_affected(),
+        "WebAuthn credential registered, sessions revoked"
     );
 
     // F085: Publish auth.mfa.enrolled webhook event

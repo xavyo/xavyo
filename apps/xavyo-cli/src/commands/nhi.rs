@@ -1,5 +1,7 @@
 //! Unified NHI management CLI commands
 
+use std::io::IsTerminal;
+
 use crate::api::ApiClient;
 use crate::error::{CliError, CliResult};
 use crate::models::nhi::{
@@ -637,7 +639,7 @@ async fn execute_cred_revoke(args: CredRevokeArgs) -> CliResult<()> {
     let client = ApiClient::from_defaults()?;
 
     if !args.force {
-        if !atty::is(atty::Stream::Stdin) {
+        if !std::io::stdin().is_terminal() {
             return Err(CliError::Validation(
                 "Use --force in non-interactive mode.".to_string(),
             ));
@@ -960,7 +962,7 @@ async fn execute_sod_delete_rule(args: SodDeleteRuleArgs) -> CliResult<()> {
     let client = ApiClient::from_defaults()?;
 
     if !args.force {
-        if !atty::is(atty::Stream::Stdin) {
+        if !std::io::stdin().is_terminal() {
             return Err(CliError::Validation(
                 "Use --force in non-interactive mode.".to_string(),
             ));

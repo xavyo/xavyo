@@ -2,6 +2,8 @@
 //!
 //! Executes batch create, update, and delete operations with progress tracking.
 
+use std::io::IsTerminal;
+
 use crate::api::ApiClient;
 use crate::batch::file::BatchFile;
 use crate::batch::filter::Filter;
@@ -268,7 +270,7 @@ impl BatchExecutor {
 
         // Confirm deletion
         if !options.force {
-            if !atty::is(atty::Stream::Stdin) {
+            if !std::io::stdin().is_terminal() {
                 return Err(CliError::Validation(
                     "Cannot confirm deletion in non-interactive mode. Use --force to skip confirmation."
                         .to_string(),
@@ -371,7 +373,7 @@ impl BatchExecutor {
 
         // Confirm with type-to-confirm
         if !options.force {
-            if !atty::is(atty::Stream::Stdin) {
+            if !std::io::stdin().is_terminal() {
                 return Err(CliError::Validation(
                     "Cannot confirm deletion in non-interactive mode. Use --force to skip confirmation."
                         .to_string(),
@@ -763,7 +765,7 @@ impl BatchExecutor {
 
         // Confirm deletion
         if !options.force {
-            if !atty::is(atty::Stream::Stdin) {
+            if !std::io::stdin().is_terminal() {
                 return Err(CliError::Validation(
                     "Cannot confirm deletion in non-interactive mode. Use --force to skip confirmation."
                         .to_string(),
@@ -866,7 +868,7 @@ impl BatchExecutor {
 
         // Confirm with type-to-confirm
         if !options.force {
-            if !atty::is(atty::Stream::Stdin) {
+            if !std::io::stdin().is_terminal() {
                 return Err(CliError::Validation(
                     "Cannot confirm deletion in non-interactive mode. Use --force to skip confirmation."
                         .to_string(),

@@ -74,7 +74,7 @@ async fn test_ping_valid_token_verification() {
     let claims = ping_fixtures::claims("user123", &issuer);
     let token = create_test_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -101,7 +101,7 @@ async fn test_ping_key_selection_by_kid() {
     let claims = ping_fixtures::claims("user123", &issuer);
     let token = create_test_token(&claims, "ping-key-2");
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -125,7 +125,7 @@ async fn test_ping_invalid_signature_rejected() {
     let claims = ping_fixtures::claims("user123", &issuer);
     let token = create_invalid_signature_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(result.is_err());
@@ -151,7 +151,7 @@ async fn test_ping_expired_token_rejected() {
         TestClaims::with_exp_offset("user123", &issuer, vec!["app-client-id".to_string()], -3600);
     let token = create_test_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(result.is_err());

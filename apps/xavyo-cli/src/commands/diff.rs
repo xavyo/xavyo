@@ -20,6 +20,8 @@
 //! xavyo diff config.yaml --remote --output json
 //! ```
 
+use std::io::IsTerminal;
+
 use crate::api::ApiClient;
 use crate::commands::apply::{fetch_current_state, load_config};
 use crate::config::{Config, ConfigPaths};
@@ -189,7 +191,7 @@ fn should_use_color(no_color_flag: bool) -> bool {
     }
 
     // Check if stdout is a TTY
-    atty::is(atty::Stream::Stdout)
+    std::io::stdout().is_terminal()
 }
 
 /// Compare two local configuration files

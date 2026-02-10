@@ -84,7 +84,7 @@ async fn test_google_valid_token_verification() {
     .with_email("user@gmail.com");
     let token = create_test_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -111,7 +111,7 @@ async fn test_google_workspace_hd_claim() {
     );
     let token = create_test_token_with_custom_claims(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -133,7 +133,7 @@ async fn test_google_personal_account_no_hd() {
     let claims = google_fixtures::gmail_claims("118234567890123456789", "user@gmail.com");
     let token = create_test_token_with_custom_claims(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -159,7 +159,7 @@ async fn test_google_invalid_signature_rejected() {
     );
     let token = create_invalid_signature_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(result.is_err());
@@ -188,7 +188,7 @@ async fn test_google_expired_token_rejected() {
     );
     let token = create_test_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(result.is_err());
@@ -213,8 +213,7 @@ async fn test_google_issuer_always_accounts_google() {
     let token = create_test_token(&claims, kid);
 
     // Verify with expected Google issuer
-    let verifier =
-        TokenVerifierService::new(VerificationConfig::default().issuer(google_fixtures::ISSUER));
+    let verifier = mock.verifier(VerificationConfig::default().issuer(google_fixtures::ISSUER));
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(

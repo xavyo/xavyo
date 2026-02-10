@@ -1,5 +1,7 @@
 //! Tool management CLI commands
 
+use std::io::IsTerminal;
+
 use crate::api::ApiClient;
 use crate::config::{Config, ConfigPaths};
 use crate::error::{CliError, CliResult};
@@ -279,7 +281,7 @@ async fn execute_delete(args: DeleteArgs) -> CliResult<()> {
 
     // Confirm deletion unless --force is used
     if !args.force {
-        if !atty::is(atty::Stream::Stdin) {
+        if !std::io::stdin().is_terminal() {
             return Err(CliError::Validation(
                 "Cannot confirm deletion in non-interactive mode. Use --force to skip confirmation."
                     .to_string(),
@@ -353,7 +355,7 @@ fn parse_json_schema(schema_str: &str) -> CliResult<serde_json::Value> {
 
 /// Interactive prompt for JSON schema
 fn prompt_schema() -> CliResult<serde_json::Value> {
-    if !atty::is(atty::Stream::Stdin) {
+    if !std::io::stdin().is_terminal() {
         return Err(CliError::Validation(
             "Schema is required. Use --schema flag in non-interactive mode.".to_string(),
         ));

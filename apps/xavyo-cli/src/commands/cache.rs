@@ -1,5 +1,7 @@
 //! Cache management CLI commands
 
+use std::io::IsTerminal;
+
 use crate::cache::{CacheStore, FileCacheStore};
 use crate::config::ConfigPaths;
 use crate::error::CliResult;
@@ -107,7 +109,7 @@ async fn execute_cache_clear(args: CacheClearArgs) -> CliResult<()> {
 
     // Confirm unless --yes is used
     if !args.yes {
-        if !atty::is(atty::Stream::Stdin) {
+        if !std::io::stdin().is_terminal() {
             return Err(crate::error::CliError::Validation(
                 "Cannot confirm cache clear in non-interactive mode. Use --yes to skip confirmation."
                     .to_string(),
