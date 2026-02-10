@@ -71,9 +71,9 @@ pub struct RevokeResponse {
 /// POST /{id}/call/{target_id}/grant — Grant NHI calling permission.
 #[cfg_attr(feature = "openapi", utoipa::path(
     post,
-    path = "/nhi/{source_id}/call/{target_id}/grant",
+    path = "/nhi/{id}/call/{target_id}/grant",
     params(
-        ("source_id" = Uuid, Path, description = "Source NHI identity ID"),
+        ("id" = Uuid, Path, description = "Source NHI identity ID"),
         ("target_id" = Uuid, Path, description = "Target NHI identity ID"),
     ),
     request_body = GrantNhiPermissionRequest,
@@ -118,9 +118,9 @@ pub async fn grant_nhi_permission(
 /// POST /{id}/call/{target_id}/revoke — Revoke NHI calling permission.
 #[cfg_attr(feature = "openapi", utoipa::path(
     post,
-    path = "/nhi/{source_id}/call/{target_id}/revoke",
+    path = "/nhi/{id}/call/{target_id}/revoke",
     params(
-        ("source_id" = Uuid, Path, description = "Source NHI identity ID"),
+        ("id" = Uuid, Path, description = "Source NHI identity ID"),
         ("target_id" = Uuid, Path, description = "Target NHI identity ID"),
     ),
     request_body = RevokeNhiPermissionRequest,
@@ -159,9 +159,9 @@ pub async fn revoke_nhi_permission(
 /// GET /{id}/callers — List NHIs with calling permission TO this NHI.
 #[cfg_attr(feature = "openapi", utoipa::path(
     get,
-    path = "/nhi/{nhi_id}/callers",
+    path = "/nhi/{id}/callers",
     params(
-        ("nhi_id" = Uuid, Path, description = "NHI identity ID"),
+        ("id" = Uuid, Path, description = "NHI identity ID"),
     ),
     responses(
         (status = 200, description = "Paginated list of caller NHIs", body = PaginatedNhiPermissionResponse),
@@ -198,9 +198,9 @@ pub async fn list_callers(
 /// GET /{id}/callees — List NHIs this NHI has calling permission FOR.
 #[cfg_attr(feature = "openapi", utoipa::path(
     get,
-    path = "/nhi/{nhi_id}/callees",
+    path = "/nhi/{id}/callees",
     params(
-        ("nhi_id" = Uuid, Path, description = "NHI identity ID"),
+        ("id" = Uuid, Path, description = "NHI identity ID"),
     ),
     responses(
         (status = 200, description = "Paginated list of callee NHIs", body = PaginatedNhiPermissionResponse),

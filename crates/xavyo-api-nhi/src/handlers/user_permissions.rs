@@ -69,9 +69,9 @@ pub struct RevokeResponse {
 /// POST /{id}/users/{user_id}/grant — Grant a user permission to access an NHI.
 #[cfg_attr(feature = "openapi", utoipa::path(
     post,
-    path = "/nhi/{nhi_id}/users/{user_id}/grant",
+    path = "/nhi/{id}/users/{user_id}/grant",
     params(
-        ("nhi_id" = Uuid, Path, description = "NHI identity ID"),
+        ("id" = Uuid, Path, description = "NHI identity ID"),
         ("user_id" = Uuid, Path, description = "User ID"),
     ),
     request_body = GrantUserPermissionRequest,
@@ -114,9 +114,9 @@ pub async fn grant_user_permission(
 /// POST /{id}/users/{user_id}/revoke — Revoke a user's permission on an NHI.
 #[cfg_attr(feature = "openapi", utoipa::path(
     post,
-    path = "/nhi/{nhi_id}/users/{user_id}/revoke",
+    path = "/nhi/{id}/users/{user_id}/revoke",
     params(
-        ("nhi_id" = Uuid, Path, description = "NHI identity ID"),
+        ("id" = Uuid, Path, description = "NHI identity ID"),
         ("user_id" = Uuid, Path, description = "User ID"),
     ),
     request_body = RevokeUserPermissionRequest,
@@ -155,9 +155,9 @@ pub async fn revoke_user_permission(
 /// GET /{id}/users — List users with permissions on a specific NHI.
 #[cfg_attr(feature = "openapi", utoipa::path(
     get,
-    path = "/nhi/{nhi_id}/users",
+    path = "/nhi/{id}/users",
     params(
-        ("nhi_id" = Uuid, Path, description = "NHI identity ID"),
+        ("id" = Uuid, Path, description = "NHI identity ID"),
     ),
     responses(
         (status = 200, description = "Paginated list of user permissions", body = PaginatedUserPermissionResponse),
