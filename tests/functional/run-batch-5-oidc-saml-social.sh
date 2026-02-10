@@ -651,6 +651,7 @@ log "═══ Part 3: OIDC ID Tokens ═══"
 # First, create an OAuth client for testing
 OAUTH_CLIENT=$(admin_call POST "/admin/oauth/clients" -d "{
   \"name\": \"batch5-oidc-${TS}\",
+  \"client_type\": \"confidential\",
   \"grant_types\": [\"client_credentials\", \"authorization_code\", \"refresh_token\"],
   \"redirect_uris\": [\"http://localhost:3000/callback\"],
   \"scopes\": [\"openid\", \"profile\", \"email\"]

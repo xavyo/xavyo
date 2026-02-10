@@ -13,6 +13,7 @@ use xavyo_db::models::{
     AdminAction, AdminAuditLog, AdminResourceType, ApiKey, CreateApiKey, CreateAuditLogEntry,
     Tenant, TenantMfaConfig, TenantPasswordPolicy, TenantSessionPolicy, TenantType, User,
 };
+use xavyo_db::set_tenant_context;
 
 use crate::error::TenantError;
 use crate::models::{
@@ -143,6 +144,15 @@ impl ProvisioningService {
             TenantError::Database(e.to_string())
         })?;
 
+        // Set RLS context to system tenant for tenant creation (tenants table
+        // uses system tenant context for admin operations).
+        set_tenant_context(
+            &mut *tx,
+            xavyo_core::TenantId::from_uuid(context.system_tenant_id),
+        )
+        .await
+        .map_err(|e| TenantError::Database(format!("Failed to set tenant context: {e}")))?;
+
         // 1. Create tenant with free tier settings
         let settings = self.free_tier_settings();
         let tenant = Tenant::create_in_tx(
@@ -158,7 +168,7 @@ impl ProvisioningService {
             TenantError::Database(e.to_string())
         })?;
 
-        // Audit: tenant.provisioned
+        // Audit: tenant.provisioned (audit logs belong to system tenant)
         self.log_audit(
             &mut tx,
             &context,
@@ -171,6 +181,14 @@ impl ProvisioningService {
             }),
         )
         .await?;
+
+        // Switch RLS context to the new tenant for resource creation
+        set_tenant_context(
+            &mut *tx,
+            xavyo_core::TenantId::from_uuid(tenant.id),
+        )
+        .await
+        .map_err(|e| TenantError::Database(format!("Failed to set tenant context: {e}")))?;
 
         // 2. Create admin user (passwordless, email verified)
         let admin_user =
@@ -223,6 +241,14 @@ impl ProvisioningService {
             TenantError::Database(e.to_string())
         })?;
 
+        // Switch back to system tenant for audit logging
+        set_tenant_context(
+            &mut *tx,
+            xavyo_core::TenantId::from_uuid(context.system_tenant_id),
+        )
+        .await
+        .map_err(|e| TenantError::Database(format!("Failed to set tenant context: {e}")))?;
+
         // Audit: user.created
         self.log_audit(
             &mut tx,
@@ -236,6 +262,14 @@ impl ProvisioningService {
             }),
         )
         .await?;
+
+        // Switch to new tenant for resource creation
+        set_tenant_context(
+            &mut *tx,
+            xavyo_core::TenantId::from_uuid(tenant.id),
+        )
+        .await
+        .map_err(|e| TenantError::Database(format!("Failed to set tenant context: {e}")))?;
 
         // 3. Create API key
         let (plaintext_key, key_hash, key_prefix) = self.api_key_service.create_key_pair();
@@ -256,39 +290,10 @@ impl ProvisioningService {
                 TenantError::Database(e.to_string())
             })?;
 
-        // Audit: api_key.created (never log the actual key!)
-        self.log_audit(
-            &mut tx,
-            &context,
-            AdminResourceType::ApiKey,
-            api_key.id,
-            serde_json::json!({
-                "name": "Default Admin Key",
-                "key_prefix": key_prefix,
-                "tenant_id": tenant.id,
-                "user_id": admin_user.id
-            }),
-        )
-        .await?;
-
         // 4. Create default OAuth client
         let (client_id, client_secret, oauth_client_id) = self
             .create_oauth_client_in_tx(&mut tx, tenant.id, &request.organization_name)
             .await?;
-
-        // Audit: oauth_client.created (never log the secret!)
-        self.log_audit(
-            &mut tx,
-            &context,
-            AdminResourceType::OauthClient,
-            oauth_client_id,
-            serde_json::json!({
-                "client_id": client_id,
-                "tenant_id": tenant.id,
-                "name": format!("{} - Default Client", request.organization_name)
-            }),
-        )
-        .await?;
 
         // 5. Create default MFA policy
         TenantMfaConfig::create_default(&mut *tx, tenant.id)
@@ -313,6 +318,43 @@ impl ProvisioningService {
                 tracing::error!("Failed to create password policy: {}", e);
                 TenantError::Database(e.to_string())
             })?;
+
+        // Switch back to system tenant for remaining audit logs
+        set_tenant_context(
+            &mut *tx,
+            xavyo_core::TenantId::from_uuid(context.system_tenant_id),
+        )
+        .await
+        .map_err(|e| TenantError::Database(format!("Failed to set tenant context: {e}")))?;
+
+        // Audit: api_key.created (never log the actual key!)
+        self.log_audit(
+            &mut tx,
+            &context,
+            AdminResourceType::ApiKey,
+            api_key.id,
+            serde_json::json!({
+                "name": "Default Admin Key",
+                "key_prefix": key_prefix,
+                "tenant_id": tenant.id,
+                "user_id": admin_user.id
+            }),
+        )
+        .await?;
+
+        // Audit: oauth_client.created (never log the secret!)
+        self.log_audit(
+            &mut tx,
+            &context,
+            AdminResourceType::OauthClient,
+            oauth_client_id,
+            serde_json::json!({
+                "client_id": client_id,
+                "tenant_id": tenant.id,
+                "name": format!("{} - Default Client", request.organization_name)
+            }),
+        )
+        .await?;
 
         // Commit transaction
         tx.commit().await.map_err(|e| {
