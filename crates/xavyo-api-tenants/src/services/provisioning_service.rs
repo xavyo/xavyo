@@ -183,12 +183,9 @@ impl ProvisioningService {
         .await?;
 
         // Switch RLS context to the new tenant for resource creation
-        set_tenant_context(
-            &mut *tx,
-            xavyo_core::TenantId::from_uuid(tenant.id),
-        )
-        .await
-        .map_err(|e| TenantError::Database(format!("Failed to set tenant context: {e}")))?;
+        set_tenant_context(&mut *tx, xavyo_core::TenantId::from_uuid(tenant.id))
+            .await
+            .map_err(|e| TenantError::Database(format!("Failed to set tenant context: {e}")))?;
 
         // 2. Create admin user (passwordless, email verified)
         let admin_user =
@@ -264,12 +261,9 @@ impl ProvisioningService {
         .await?;
 
         // Switch to new tenant for resource creation
-        set_tenant_context(
-            &mut *tx,
-            xavyo_core::TenantId::from_uuid(tenant.id),
-        )
-        .await
-        .map_err(|e| TenantError::Database(format!("Failed to set tenant context: {e}")))?;
+        set_tenant_context(&mut *tx, xavyo_core::TenantId::from_uuid(tenant.id))
+            .await
+            .map_err(|e| TenantError::Database(format!("Failed to set tenant context: {e}")))?;
 
         // 3. Create API key
         let (plaintext_key, key_hash, key_prefix) = self.api_key_service.create_key_pair();
