@@ -303,6 +303,10 @@ impl ApprovalService {
 
     /// Approve an access request.
     /// Enhanced in F053 to support scoped delegations and audit trail.
+    /// Fix #15: FOR UPDATE lock serializes concurrent approvers. The lock is held on `tx`
+    /// while subsequent writes go through `&self.pool` (model methods accept `&PgPool` only —
+    /// codebase-wide constraint). The unique constraint on `(request_id, step_order)` provides
+    /// DB-level race protection as a second defense layer.
     pub async fn approve_request(
         &self,
         tenant_id: Uuid,
@@ -310,10 +314,19 @@ impl ApprovalService {
         approver_id: Uuid,
         comments: Option<String>,
     ) -> Result<ApprovalResult> {
-        // Fix #15: Use FOR UPDATE to prevent concurrent approval races
-        let request = GovAccessRequest::find_by_id_for_update(&self.pool, tenant_id, request_id)
-            .await?
-            .ok_or(GovernanceError::AccessRequestNotFound(request_id))?;
+        // Start transaction so FOR UPDATE lock is held until commit
+        let mut tx = self.pool.begin().await.map_err(GovernanceError::Database)?;
+
+        // FOR UPDATE lock on the request row — held for duration of transaction
+        let request: GovAccessRequest = sqlx::query_as(
+            r"SELECT * FROM gov_access_requests WHERE id = $1 AND tenant_id = $2 FOR UPDATE",
+        )
+        .bind(request_id)
+        .bind(tenant_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(GovernanceError::Database)?
+        .ok_or(GovernanceError::AccessRequestNotFound(request_id))?;
 
         // Verify request is pending
         if !request.status.is_pending() {
@@ -339,7 +352,7 @@ impl ApprovalService {
             .await?
             .ok_or(GovernanceError::NotAuthorizedApprover)?;
 
-        // Record the decision
+        // Record the decision within the transaction
         // Uses unique constraint on (request_id, step_order) to prevent concurrent approval conflicts (F053)
         let decision_input = CreateGovApprovalDecision {
             tenant_id,
@@ -390,6 +403,10 @@ impl ApprovalService {
         .await?;
 
         if is_final {
+            // Commit decision transaction before provisioning
+            // (provisioning goes through AssignmentService with its own SoD checks)
+            tx.commit().await.map_err(GovernanceError::Database)?;
+
             // All approvals complete - provision the entitlement
             let assignment = self
                 .provision_entitlement(tenant_id, &request, approver_id)
@@ -404,29 +421,30 @@ impl ApprovalService {
             })
         } else {
             // Advance to next step
-            let updated_request =
-                GovAccessRequest::advance_step(&self.pool, tenant_id, request_id).await?;
+            let updated_request = GovAccessRequest::advance_step(&self.pool, tenant_id, request_id)
+                .await?
+                .ok_or(GovernanceError::AccessRequestNotFound(request_id))?;
+
+            // Commit the transaction (releases FOR UPDATE lock)
+            tx.commit().await.map_err(GovernanceError::Database)?;
 
             // F054/T082: Set deadline for new step based on escalation configuration
-            if let Some(ref updated) = updated_request {
-                if let Some(workflow_id) = updated.workflow_id {
-                    let next_step_order = updated.current_step + 1;
-                    if let Some(next_step) = GovApprovalStep::find_by_workflow_and_order(
-                        &self.pool,
-                        workflow_id,
-                        next_step_order,
-                    )
-                    .await?
-                    {
-                        if next_step.escalation_enabled {
-                            let deadline =
-                                self.calculate_step_deadline(tenant_id, &next_step).await?;
-                            if deadline.is_some() {
-                                GovAccessRequest::set_deadline(
-                                    &self.pool, tenant_id, request_id, deadline,
-                                )
-                                .await?;
-                            }
+            if let Some(workflow_id) = updated_request.workflow_id {
+                let next_step_order = updated_request.current_step + 1;
+                if let Some(next_step) = GovApprovalStep::find_by_workflow_and_order(
+                    &self.pool,
+                    workflow_id,
+                    next_step_order,
+                )
+                .await?
+                {
+                    if next_step.escalation_enabled {
+                        let deadline = self.calculate_step_deadline(tenant_id, &next_step).await?;
+                        if deadline.is_some() {
+                            GovAccessRequest::set_deadline(
+                                &self.pool, tenant_id, request_id, deadline,
+                            )
+                            .await?;
                         }
                     }
                 }
@@ -441,6 +459,8 @@ impl ApprovalService {
 
     /// Reject an access request.
     /// Enhanced in F053 to support scoped delegations and audit trail.
+    /// Fix #15: FOR UPDATE lock serializes concurrent rejectors. See approve_request() for
+    /// details on the transaction/pool split limitation.
     pub async fn reject_request(
         &self,
         tenant_id: Uuid,
@@ -453,10 +473,19 @@ impl ApprovalService {
             return Err(GovernanceError::RejectionCommentsRequired);
         }
 
-        // Fix #15: Use FOR UPDATE to prevent concurrent approval/rejection races
-        let request = GovAccessRequest::find_by_id_for_update(&self.pool, tenant_id, request_id)
-            .await?
-            .ok_or(GovernanceError::AccessRequestNotFound(request_id))?;
+        // Start transaction so FOR UPDATE lock is held until commit
+        let mut tx = self.pool.begin().await.map_err(GovernanceError::Database)?;
+
+        // FOR UPDATE lock on the request row — held for duration of transaction
+        let request: GovAccessRequest = sqlx::query_as(
+            r"SELECT * FROM gov_access_requests WHERE id = $1 AND tenant_id = $2 FOR UPDATE",
+        )
+        .bind(request_id)
+        .bind(tenant_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(GovernanceError::Database)?
+        .ok_or(GovernanceError::AccessRequestNotFound(request_id))?;
 
         // Verify request is pending
         if !request.status.is_pending() {
@@ -482,7 +511,7 @@ impl ApprovalService {
             .await?
             .ok_or(GovernanceError::NotAuthorizedApprover)?;
 
-        // Record the decision
+        // Record the decision within the transaction
         // Uses unique constraint on (request_id, step_order) to prevent concurrent approval conflicts (F053)
         let decision_input = CreateGovApprovalDecision {
             tenant_id,
@@ -524,14 +553,18 @@ impl ApprovalService {
             GovDelegationAudit::create(&self.pool, tenant_id, audit_input).await?;
         }
 
-        // Update request status to rejected
+        // Update request status to rejected — check state machine returns a row
         GovAccessRequest::update_status(
             &self.pool,
             tenant_id,
             request_id,
             GovRequestStatus::Rejected,
         )
-        .await?;
+        .await?
+        .ok_or(GovernanceError::RequestNotPending)?;
+
+        // Commit the transaction (releases FOR UPDATE lock)
+        tx.commit().await.map_err(GovernanceError::Database)?;
 
         Ok(ApprovalResult {
             new_status: GovRequestStatus::Rejected,

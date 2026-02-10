@@ -6,12 +6,10 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sqlx::FromRow;
-
 use xavyo_db::models::{
     AddCartItem, CartItemWithDetails, CatalogCategory, CatalogCategoryFilter, CatalogItem,
     CatalogItemFilter, CatalogItemType, CreateCatalogCategory, CreateCatalogItem, GovAccessRequest,
-    GovRole, GovSodExemption, RequestCart, RequestCartItem, RequestabilityRules,
+    GovRole, GovSodExemption, GovSodRule, RequestCart, RequestCartItem, RequestabilityRules,
     UpdateCartItem as DbUpdateCartItem, UpdateCatalogCategory, UpdateCatalogItem, User,
 };
 use xavyo_governance::error::{GovernanceError, Result};
@@ -77,16 +75,6 @@ pub struct CartSubmissionResult {
     pub items: Vec<SubmittedItemResult>,
     /// Number of access requests created.
     pub request_count: i64,
-}
-
-/// Internal helper struct for reading SoD rules.
-#[derive(Debug, Clone, FromRow)]
-struct SodRuleRow {
-    id: Uuid,
-    name: String,
-    conflict_type: String,
-    entitlement_ids: serde_json::Value,
-    max_count: Option<i32>,
 }
 
 /// Context for evaluating requestability rules.
@@ -1270,6 +1258,7 @@ impl CatalogService {
     ///
     /// Fix #7: Now uses `EffectiveAccessService.get_effective_access()` to check
     /// all entitlement sources (direct + group + role), and respects active exemptions.
+    /// Uses the actual pairwise SoD rule schema (first_entitlement_id / second_entitlement_id).
     /// Returns a list of SoD violations (for warning display, not blocking).
     async fn check_sod_violations(
         &self,
@@ -1277,6 +1266,10 @@ impl CatalogService {
         user_id: Uuid,
         proposed_entitlements: &[Uuid],
     ) -> Result<Vec<CartSodViolation>> {
+        if proposed_entitlements.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let mut violations = Vec::new();
 
         // Get user's effective entitlements (direct + group + role)
@@ -1291,104 +1284,52 @@ impl CatalogService {
             .map(|e| e.entitlement.id)
             .collect();
 
-        // Get all active SoD rules
-        let sod_rules: Vec<SodRuleRow> = sqlx::query_as(
-            r"
-            SELECT id, name, conflict_type, entitlement_ids, max_count
-            FROM gov_sod_rules
-            WHERE tenant_id = $1 AND status = 'active'
-            ",
-        )
-        .bind(tenant_id)
-        .fetch_all(&self.pool)
-        .await?;
+        // Combine current and proposed into a single set for conflict detection
+        let mut all_entitlements = current_entitlements.clone();
+        for &eid in proposed_entitlements {
+            all_entitlements.insert(eid);
+        }
 
-        // Combine current and proposed entitlements
-        let mut all_entitlements: Vec<Uuid> = current_entitlements.iter().copied().collect();
-        all_entitlements.extend(proposed_entitlements.iter().copied());
+        // For each proposed entitlement, find active SoD rules involving it
+        for &proposed_eid in proposed_entitlements {
+            let rules = GovSodRule::find_active_by_entitlement(&self.pool, tenant_id, proposed_eid)
+                .await
+                .map_err(GovernanceError::Database)?;
 
-        // Check each rule
-        for rule in &sod_rules {
-            let rule_entitlements: Vec<Uuid> =
-                serde_json::from_value(rule.entitlement_ids.clone()).unwrap_or_default();
+            for rule in &rules {
+                // Get the other side of the pairwise rule
+                let conflicting_id = match rule.get_conflicting_entitlement(proposed_eid) {
+                    Some(id) => id,
+                    None => continue,
+                };
 
-            // Check based on conflict type
-            match rule.conflict_type.as_str() {
-                "exclusive" => {
-                    let matching: Vec<Uuid> = all_entitlements
-                        .iter()
-                        .filter(|e| rule_entitlements.contains(e))
-                        .copied()
-                        .collect();
+                // Check if the user has (or is requesting) the conflicting entitlement
+                if all_entitlements.contains(&conflicting_id) {
+                    // Check for active exemption before reporting
+                    let has_exemption = GovSodExemption::has_active_exemption(
+                        &self.pool, tenant_id, rule.id, user_id,
+                    )
+                    .await
+                    .unwrap_or(false);
 
-                    if matching.len() >= 2 {
-                        // Check for active exemption before reporting
-                        let has_exemption = GovSodExemption::has_active_exemption(
-                            &self.pool, tenant_id, rule.id, user_id,
-                        )
-                        .await
-                        .unwrap_or(false);
-
-                        if !has_exemption {
+                    if !has_exemption {
+                        // Avoid duplicate violations (same rule reported from both sides)
+                        if !violations
+                            .iter()
+                            .any(|v: &CartSodViolation| v.rule_id == rule.id)
+                        {
                             violations.push(CartSodViolation {
                                 rule_id: rule.id,
                                 rule_name: rule.name.clone(),
-                                conflicting_item_ids: matching,
+                                conflicting_item_ids: vec![proposed_eid, conflicting_id],
                                 description: format!(
-                                    "Rule '{}' prohibits having multiple entitlements from this set",
+                                    "Rule '{}' prohibits having both entitlements simultaneously",
                                     rule.name
                                 ),
                             });
                         }
                     }
                 }
-                "cardinality" => {
-                    let max_count = rule.max_count.unwrap_or(1) as usize;
-                    let matching: Vec<Uuid> = all_entitlements
-                        .iter()
-                        .filter(|e| rule_entitlements.contains(e))
-                        .copied()
-                        .collect();
-
-                    if matching.len() > max_count {
-                        let has_exemption = GovSodExemption::has_active_exemption(
-                            &self.pool, tenant_id, rule.id, user_id,
-                        )
-                        .await
-                        .unwrap_or(false);
-
-                        if !has_exemption {
-                            violations.push(CartSodViolation {
-                                rule_id: rule.id,
-                                rule_name: rule.name.clone(),
-                                conflicting_item_ids: matching,
-                                description: format!(
-                                    "Rule '{}' limits having at most {} of these entitlements",
-                                    rule.name, max_count
-                                ),
-                            });
-                        }
-                    }
-                }
-                "inclusive" => {
-                    let matching_count = all_entitlements
-                        .iter()
-                        .filter(|e| rule_entitlements.contains(e))
-                        .count();
-
-                    if matching_count > 0 && matching_count < rule_entitlements.len() {
-                        violations.push(CartSodViolation {
-                            rule_id: rule.id,
-                            rule_name: rule.name.clone(),
-                            conflicting_item_ids: rule_entitlements.clone(),
-                            description: format!(
-                                "Rule '{}' requires having all entitlements from this set",
-                                rule.name
-                            ),
-                        });
-                    }
-                }
-                _ => {}
             }
         }
 

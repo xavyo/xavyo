@@ -248,9 +248,10 @@ impl AssignmentService {
             .collect();
 
         for rule in rules {
-            let conflicting_id = rule
-                .get_conflicting_entitlement(entitlement_id)
-                .expect("Rule should contain the entitlement");
+            let conflicting_id = match rule.get_conflicting_entitlement(entitlement_id) {
+                Some(id) => id,
+                None => continue,
+            };
 
             // Check if user has the conflicting entitlement
             if user_entitlements.contains(&conflicting_id) {

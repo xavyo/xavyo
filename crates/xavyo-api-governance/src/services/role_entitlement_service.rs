@@ -14,17 +14,13 @@ use crate::services::EffectiveAccessService;
 /// Service for governance role-entitlement mapping operations.
 pub struct RoleEntitlementService {
     pool: PgPool,
-    effective_access_service: EffectiveAccessService,
 }
 
 impl RoleEntitlementService {
     /// Create a new role entitlement service.
     #[must_use]
     pub fn new(pool: PgPool) -> Self {
-        Self {
-            effective_access_service: EffectiveAccessService::new(pool.clone()),
-            pool,
-        }
+        Self { pool }
     }
 
     /// List role entitlements for a tenant with pagination and filtering.
@@ -103,9 +99,21 @@ impl RoleEntitlementService {
             .map_err(GovernanceError::Database)?;
 
         // Fix #2: Warn about potential SoD violations for users who hold this role.
-        // Non-blocking — log warnings but don't prevent the mapping from being created.
-        self.warn_sod_for_role_members(tenant_id, &result.role_name, result.entitlement_id)
+        // Non-blocking — spawned as background task to avoid blocking the HTTP response.
+        let bg_pool = self.pool.clone();
+        let bg_effective = EffectiveAccessService::new(bg_pool.clone());
+        let bg_role_name = result.role_name.clone();
+        let bg_entitlement_id = result.entitlement_id;
+        tokio::spawn(async move {
+            Self::warn_sod_for_role_members_bg(
+                &bg_pool,
+                &bg_effective,
+                tenant_id,
+                &bg_role_name,
+                bg_entitlement_id,
+            )
             .await;
+        });
 
         Ok(result)
     }
@@ -114,8 +122,10 @@ impl RoleEntitlementService {
     ///
     /// Fix #2: When an entitlement is added to a role, all role members retroactively
     /// gain that entitlement. This check warns about potential SoD violations.
-    async fn warn_sod_for_role_members(
-        &self,
+    /// Runs as a background task (static method) to avoid blocking the HTTP response.
+    async fn warn_sod_for_role_members_bg(
+        pool: &PgPool,
+        effective_access_service: &EffectiveAccessService,
         tenant_id: Uuid,
         role_name: &str,
         entitlement_id: Uuid,
@@ -125,6 +135,7 @@ impl RoleEntitlementService {
             r"
             SELECT DISTINCT gea.target_id FROM gov_entitlement_assignments gea
             JOIN gov_role_entitlements gre ON gea.entitlement_id = gre.entitlement_id
+              AND gea.tenant_id = gre.tenant_id
             WHERE gre.tenant_id = $1 AND gre.role_name = $2
               AND gea.target_type = 'user' AND gea.status = 'active'
             LIMIT 1000
@@ -132,7 +143,7 @@ impl RoleEntitlementService {
         )
         .bind(tenant_id)
         .bind(role_name)
-        .fetch_all(&self.pool)
+        .fetch_all(pool)
         .await
         {
             Ok(ids) => ids,
@@ -150,12 +161,8 @@ impl RoleEntitlementService {
         }
 
         // Check SoD rules for the new entitlement
-        let rules = match GovSodRule::find_active_by_entitlement(
-            &self.pool,
-            tenant_id,
-            entitlement_id,
-        )
-        .await
+        let rules = match GovSodRule::find_active_by_entitlement(pool, tenant_id, entitlement_id)
+            .await
         {
             Ok(rules) => rules,
             Err(e) => {
@@ -170,8 +177,7 @@ impl RoleEntitlementService {
 
         let mut violation_count = 0u64;
         for user_id in user_ids {
-            let effective = match self
-                .effective_access_service
+            let effective = match effective_access_service
                 .get_effective_access(tenant_id, user_id, None)
                 .await
             {
@@ -189,7 +195,7 @@ impl RoleEntitlementService {
                 if let Some(conflicting_id) = rule.get_conflicting_entitlement(entitlement_id) {
                     if user_entitlements.contains(&conflicting_id) {
                         let has_exemption = GovSodExemption::has_active_exemption(
-                            &self.pool, tenant_id, rule.id, user_id,
+                            pool, tenant_id, rule.id, user_id,
                         )
                         .await
                         .unwrap_or(false);
