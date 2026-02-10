@@ -221,8 +221,8 @@ use crate::handlers::{
     verify_totp_setup,
 };
 use crate::middleware::{
-    rate_limit_middleware, require_super_admin_middleware, signup_rate_limit_middleware,
-    signup_rate_limiter, EmailRateLimiter, RateLimiter,
+    rate_limit_middleware, require_super_admin_middleware, sensitive_rate_limiter,
+    signup_rate_limit_middleware, signup_rate_limiter, EmailRateLimiter, RateLimiter,
 };
 use crate::services::{
     AdminInviteService, AlertService, AssetService, AssetStorage, AuditService, AuthService,
@@ -255,6 +255,8 @@ pub struct AuthState {
     pub signup_rate_limiter: Arc<RateLimiter>,
     /// Email rate limiter for password reset and verification endpoints.
     pub email_rate_limiter: Arc<EmailRateLimiter>,
+    /// Rate limiter for sensitive endpoints (MFA, password change, email change).
+    pub sensitive_rate_limiter: Arc<RateLimiter>,
     /// Email sender service.
     pub email_sender: Arc<dyn EmailSender>,
     /// MFA service for TOTP authentication.
@@ -355,6 +357,9 @@ impl AuthState {
         // Create signup rate limiter (F111)
         let signup_limiter = signup_rate_limiter();
 
+        // Create sensitive endpoint rate limiter (MFA, password change, email change)
+        let sensitive_limiter = sensitive_rate_limiter();
+
         // Create passwordless service (F079)
         let token_service_arc = Arc::new(token_service);
         let passwordless_rate_limiter =
@@ -380,6 +385,7 @@ impl AuthState {
             rate_limiter: Arc::new(rate_limiter),
             signup_rate_limiter: Arc::new(signup_limiter),
             email_rate_limiter: Arc::new(email_rate_limiter),
+            sensitive_rate_limiter: Arc::new(sensitive_limiter),
             email_sender,
             mfa_service: Arc::new(mfa_service),
             session_service: Arc::new(session_service),
@@ -438,16 +444,22 @@ pub fn auth_router(state: AuthState) -> Router {
         .route("/register", post(register_handler))
         .layer(Extension(state.email_sender.clone()));
 
+    // Rate-limited password change route (5 attempts/min/IP)
+    let password_change_route = Router::new()
+        .route("/password", put(password_change_handler))
+        .layer(middleware::from_fn(rate_limit_middleware))
+        .layer(Extension(state.sensitive_rate_limiter.clone()));
+
     // Routes without rate limiting
     let other_routes = Router::new()
         .route("/reset-password", post(reset_password_handler))
-        .route("/verify-email", post(verify_email_handler))
-        .route("/password", put(password_change_handler));
+        .route("/verify-email", post(verify_email_handler));
 
     Router::new()
         .merge(login_route)
         .merge(email_rate_limited_routes)
         .merge(register_route)
+        .merge(password_change_route)
         .merge(other_routes)
         .layer(Extension(state.pool))
         .layer(Extension(state.auth_service))
@@ -510,23 +522,10 @@ pub fn public_auth_router(state: AuthState) -> Router {
 /// Create the MFA router for TOTP and `WebAuthn` authentication (F022, F032).
 /// These routes require JWT authentication and should have `jwt_auth_middleware` applied.
 pub fn mfa_router(state: AuthState) -> Router {
-    Router::new()
-        // TOTP routes (F022)
-        .route("/totp/setup", post(setup_totp))
-        .route("/totp/verify-setup", post(verify_totp_setup))
+    // Rate-limited verification routes (brute-force protection: 5 attempts/min/IP)
+    let verification_routes = Router::new()
         .route("/totp/verify", post(verify_totp))
-        .route("/totp", delete(disable_mfa))
-        .route("/recovery/generate", post(regenerate_recovery_codes))
         .route("/recovery/verify", post(verify_recovery_code))
-        // WebAuthn routes (F032)
-        .route(
-            "/webauthn/register/start",
-            post(start_webauthn_registration),
-        )
-        .route(
-            "/webauthn/register/finish",
-            post(finish_webauthn_registration),
-        )
         .route(
             "/webauthn/authenticate/start",
             post(start_webauthn_authentication),
@@ -535,11 +534,32 @@ pub fn mfa_router(state: AuthState) -> Router {
             "/webauthn/authenticate/finish",
             post(finish_webauthn_authentication),
         )
+        .layer(middleware::from_fn(rate_limit_middleware))
+        .layer(Extension(state.sensitive_rate_limiter.clone()));
+
+    // Management routes (require full auth, no additional rate limiting)
+    let management_routes = Router::new()
+        .route("/totp/setup", post(setup_totp))
+        .route("/totp/verify-setup", post(verify_totp_setup))
+        .route("/totp", delete(disable_mfa))
+        .route("/recovery/generate", post(regenerate_recovery_codes))
+        .route(
+            "/webauthn/register/start",
+            post(start_webauthn_registration),
+        )
+        .route(
+            "/webauthn/register/finish",
+            post(finish_webauthn_registration),
+        )
         .route("/webauthn/credentials", get(list_webauthn_credentials))
         .route(
             "/webauthn/credentials/:credential_id",
             axum::routing::patch(update_webauthn_credential).delete(delete_webauthn_credential),
-        )
+        );
+
+    Router::new()
+        .merge(verification_routes)
+        .merge(management_routes)
         .layer(Extension(state.mfa_service.clone()))
         .layer(Extension(state.webauthn_service.clone()))
         .layer(Extension(state.pool.clone()))
@@ -685,14 +705,20 @@ pub fn alerts_router(state: AuthState) -> Router {
 /// - `GET /me/sessions` - List active sessions (alias)
 /// - `GET /me/devices` - List devices (alias)
 pub fn me_router(state: AuthState) -> Router {
+    // Rate-limited email change routes (5 attempts/min/IP)
+    let email_change_routes = Router::new()
+        .route("/email/change", post(initiate_email_change))
+        .route("/email/verify", post(verify_email_change))
+        .layer(middleware::from_fn(rate_limit_middleware))
+        .layer(Extension(state.sensitive_rate_limiter.clone()));
+
     Router::new()
         // Profile endpoints
         .route("/profile", get(get_profile).put(update_profile))
-        // Email change endpoints
-        .route("/email/change", post(initiate_email_change))
-        .route("/email/verify", post(verify_email_change))
         // Password change endpoint
         .route("/password", put(me_password_change))
+        // Email change endpoints (rate limited)
+        .merge(email_change_routes)
         // Security overview endpoints
         .route("/security", get(get_security_overview))
         .route("/mfa", get(get_me_mfa_status))

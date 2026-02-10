@@ -51,11 +51,14 @@ impl IntoResponse for ApiAuthorizationError {
                 "database_error",
                 "Internal server error".to_string(),
             ),
-            Self::Authorization(e) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "authorization_error",
-                e.to_string(),
-            ),
+            Self::Authorization(ref e) => {
+                tracing::error!("Authorization engine error: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "authorization_error",
+                    "An authorization error occurred".to_string(),
+                )
+            }
         };
         let body = json!({ "error": error_code, "message": message });
         (status, Json(body)).into_response()

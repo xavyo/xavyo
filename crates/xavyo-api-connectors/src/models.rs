@@ -4,13 +4,15 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
+use validator::Validate;
 
 use xavyo_db::models::{ConnectorStatus, ConnectorType};
 
 /// Request to create a new connector.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct CreateConnectorRequest {
     /// Connector display name.
+    #[validate(length(min = 1, max = 255, message = "Name must be 1-255 characters"))]
     pub name: String,
 
     /// Connector type (ldap, database, rest).
@@ -18,6 +20,7 @@ pub struct CreateConnectorRequest {
 
     /// Optional description.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[validate(length(max = 2000, message = "Description cannot exceed 2000 characters"))]
     pub description: Option<String>,
 
     /// Non-sensitive configuration (JSON).
@@ -28,14 +31,16 @@ pub struct CreateConnectorRequest {
 }
 
 /// Request to update a connector.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct UpdateConnectorRequest {
     /// New display name.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[validate(length(min = 1, max = 255, message = "Name must be 1-255 characters"))]
     pub name: Option<String>,
 
     /// New description.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[validate(length(max = 2000, message = "Description cannot exceed 2000 characters"))]
     pub description: Option<String>,
 
     /// Updated configuration.
