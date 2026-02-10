@@ -306,7 +306,11 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
     })
 }
 
-/// Verify the reference digest matches the actual content
+/// Verify the reference digest matches the actual content.
+///
+/// Uses proper XML parsing to find the referenced element by ID attribute,
+/// preventing XML Signature Wrapping (XSW) attacks that exploit string-based
+/// element boundary detection.
 fn verify_reference_digest(xml: &str, sig_info: &SignatureInfo) -> SamlResult<()> {
     // Find the referenced element (remove # prefix from URI)
     let element_id = sig_info.reference_uri.trim_start_matches('#');
@@ -315,30 +319,13 @@ fn verify_reference_digest(xml: &str, sig_info: &SignatureInfo) -> SamlResult<()
         return verify_document_digest(xml, sig_info);
     }
 
-    // Find element with this ID
-    let id_pattern = format!("ID=\"{element_id}\"");
-    let element_start = xml.find(&id_pattern).ok_or_else(|| {
-        SamlError::SignatureValidationFailed(format!("Referenced element not found: {element_id}"))
-    })?;
-
-    // Find the element boundaries (this is a simplified approach)
-    // In production, you'd want to properly parse the XML
-    let open_tag_start = xml[..element_start].rfind('<').unwrap_or(0);
-
-    // Find the corresponding end tag - for AuthnRequest this is usually the root element
-    let tag_name = extract_tag_name(&xml[open_tag_start..]);
-    let close_tag = format!("</{tag_name}");
-    let element_end = xml
-        .find(&close_tag)
-        .map(|pos| pos + close_tag.len() + 1) // +1 for the >
-        .ok_or_else(|| {
-            SamlError::SignatureValidationFailed("Cannot find element end".to_string())
-        })?;
-
-    let element_content = &xml[open_tag_start..element_end];
+    // Use XML parser to find the referenced element by ID and extract it safely.
+    // This prevents XSW attacks where duplicate IDs or injected closing tags
+    // could trick string-based boundary detection.
+    let element_content = extract_element_by_id(xml, element_id)?;
 
     // Remove the Signature element from the content (enveloped signature transform)
-    let content_without_sig = remove_signature_element(element_content);
+    let content_without_sig = remove_signature_element_parsed(&element_content)?;
 
     // Canonicalize and compute digest
     let canonicalized = canonicalize_xml(&content_without_sig)?;
@@ -359,8 +346,8 @@ fn verify_reference_digest(xml: &str, sig_info: &SignatureInfo) -> SamlResult<()
 
 /// Verify digest when URI is empty (whole document)
 fn verify_document_digest(xml: &str, sig_info: &SignatureInfo) -> SamlResult<()> {
-    // Remove the Signature element
-    let content_without_sig = remove_signature_element(xml);
+    // Remove the Signature element using parser-based approach
+    let content_without_sig = remove_signature_element_parsed(xml)?;
 
     // Canonicalize and compute digest
     let canonicalized = canonicalize_xml(&content_without_sig)?;
@@ -378,38 +365,153 @@ fn verify_document_digest(xml: &str, sig_info: &SignatureInfo) -> SamlResult<()>
     Ok(())
 }
 
-/// Extract tag name from XML opening tag
-fn extract_tag_name(tag_start: &str) -> String {
-    let tag = tag_start
-        .trim_start_matches('<')
-        .split_whitespace()
-        .next()
-        .unwrap_or("")
-        .trim_end_matches('>');
-    tag.to_string()
+/// Extract an element and all its children by ID attribute using XML parsing.
+///
+/// This uses quick-xml to properly track nesting depth, preventing XSW attacks
+/// where injected duplicate closing tags could truncate the element early.
+fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
+    use quick_xml::events::Event;
+    use quick_xml::Reader;
+
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(false);
+
+    let mut depth: u32 = 0;
+    let mut capturing = false;
+    let mut result = String::new();
+    let mut capture_start_offset: Option<usize> = None;
+
+    loop {
+        let event_offset = reader.buffer_position() as usize;
+        match reader.read_event() {
+            Ok(Event::Start(ref e)) => {
+                if !capturing {
+                    for attr in e.attributes().flatten() {
+                        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                        if key == "ID" {
+                            let val = attr.unescape_value().unwrap_or_default();
+                            if val.as_ref() == element_id {
+                                capturing = true;
+                                depth = 1;
+                                capture_start_offset = Some(event_offset);
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    depth += 1;
+                }
+            }
+            Ok(Event::End(_)) => {
+                if capturing {
+                    depth -= 1;
+                    if depth == 0 {
+                        let end_offset = reader.buffer_position() as usize;
+                        if let Some(start) = capture_start_offset {
+                            result = xml[start..end_offset].to_string();
+                        }
+                        return Ok(result);
+                    }
+                }
+            }
+            Ok(Event::Empty(ref e)) => {
+                if !capturing {
+                    for attr in e.attributes().flatten() {
+                        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                        if key == "ID" {
+                            let val = attr.unescape_value().unwrap_or_default();
+                            if val.as_ref() == element_id {
+                                let end_offset = reader.buffer_position() as usize;
+                                return Ok(xml[event_offset..end_offset].to_string());
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => {
+                return Err(SamlError::SignatureValidationFailed(format!(
+                    "XML parse error: {e}"
+                )));
+            }
+            _ => {}
+        }
+    }
+
+    Err(SamlError::SignatureValidationFailed(format!(
+        "Referenced element not found: {element_id}"
+    )))
 }
 
-/// Remove the ds:Signature element from XML (for enveloped signature transform)
-fn remove_signature_element(xml: &str) -> String {
-    // Find and remove the Signature element
-    if let Some(sig_start) = xml.find("<ds:Signature") {
-        if let Some(sig_end) = xml.find("</ds:Signature>") {
-            let mut result = String::with_capacity(xml.len());
-            result.push_str(&xml[..sig_start]);
-            result.push_str(&xml[sig_end + "</ds:Signature>".len()..]);
-            return result;
+/// Remove ALL Signature elements from XML using proper XML parsing.
+///
+/// This prevents XSW attacks by:
+/// 1. Correctly tracking nesting depth to find the true end of each Signature element
+/// 2. Removing ALL Signature elements (not just the first one found)
+/// 3. Handling both `ds:Signature` and unprefixed `Signature` elements
+fn remove_signature_element_parsed(xml: &str) -> SamlResult<String> {
+    use quick_xml::events::Event;
+    use quick_xml::Reader;
+
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(false);
+
+    let mut sig_ranges: Vec<(usize, usize)> = Vec::new();
+    let mut sig_depth: u32 = 0;
+    let mut sig_start_offset: Option<usize> = None;
+
+    loop {
+        let event_offset = reader.buffer_position() as usize;
+        match reader.read_event() {
+            Ok(Event::Start(ref e)) => {
+                let local_name = e.local_name();
+                let name = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                if name == "Signature" && sig_depth == 0 {
+                    sig_depth = 1;
+                    sig_start_offset = Some(event_offset);
+                } else if sig_depth > 0 {
+                    sig_depth += 1;
+                }
+            }
+            Ok(Event::End(_)) => {
+                if sig_depth > 0 {
+                    sig_depth -= 1;
+                    if sig_depth == 0 {
+                        let end_offset = reader.buffer_position() as usize;
+                        if let Some(start) = sig_start_offset.take() {
+                            sig_ranges.push((start, end_offset));
+                        }
+                    }
+                }
+            }
+            Ok(Event::Empty(ref e)) => {
+                let local_name = e.local_name();
+                let name = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                if name == "Signature" && sig_depth == 0 {
+                    let end_offset = reader.buffer_position() as usize;
+                    sig_ranges.push((event_offset, end_offset));
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => {
+                return Err(SamlError::SignatureValidationFailed(format!(
+                    "XML parse error during signature removal: {e}"
+                )));
+            }
+            _ => {}
         }
     }
-    // Also try without namespace prefix
-    if let Some(sig_start) = xml.find("<Signature") {
-        if let Some(sig_end) = xml.find("</Signature>") {
-            let mut result = String::with_capacity(xml.len());
-            result.push_str(&xml[..sig_start]);
-            result.push_str(&xml[sig_end + "</Signature>".len()..]);
-            return result;
-        }
+
+    // Reconstruct XML without any Signature elements
+    let mut result = String::with_capacity(xml.len());
+    let mut last_end = 0;
+    for (start, end) in &sig_ranges {
+        result.push_str(&xml[last_end..*start]);
+        last_end = *end;
     }
-    xml.to_string()
+    result.push_str(&xml[last_end..]);
+
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -461,22 +563,52 @@ t6Rp
     }
 
     #[test]
-    fn test_remove_signature_element() {
+    fn test_remove_signature_element_parsed() {
         let xml = r#"<AuthnRequest ID="test"><ds:Signature>...</ds:Signature><Issuer>test</Issuer></AuthnRequest>"#;
-        let result = remove_signature_element(xml);
+        let result = remove_signature_element_parsed(xml).unwrap();
         assert!(!result.contains("Signature"));
         assert!(result.contains("Issuer"));
     }
 
     #[test]
-    fn test_extract_tag_name() {
-        assert_eq!(
-            extract_tag_name("<samlp:AuthnRequest xmlns:samlp=\"...\""),
-            "samlp:AuthnRequest"
-        );
-        assert_eq!(
-            extract_tag_name("<AuthnRequest ID=\"test\">"),
-            "AuthnRequest"
-        );
+    fn test_remove_signature_element_no_prefix() {
+        let xml = r#"<AuthnRequest ID="test"><Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo/></Signature><Issuer>test</Issuer></AuthnRequest>"#;
+        let result = remove_signature_element_parsed(xml).unwrap();
+        assert!(!result.contains("Signature"));
+        assert!(result.contains("Issuer"));
+    }
+
+    #[test]
+    fn test_remove_multiple_signature_elements_xsw() {
+        // XSW attack: multiple Signature elements — all must be removed
+        let xml = r#"<AuthnRequest ID="test"><ds:Signature>legit</ds:Signature><ds:Signature>injected</ds:Signature><Issuer>test</Issuer></AuthnRequest>"#;
+        let result = remove_signature_element_parsed(xml).unwrap();
+        assert!(!result.contains("Signature"), "All Signature elements must be removed");
+        assert!(result.contains("Issuer"));
+    }
+
+    #[test]
+    fn test_extract_element_by_id() {
+        let xml = r#"<Root><AuthnRequest ID="req123" xmlns="urn:oasis:names:tc:SAML:2.0:protocol"><Issuer>test</Issuer></AuthnRequest></Root>"#;
+        let result = extract_element_by_id(xml, "req123").unwrap();
+        assert!(result.contains("AuthnRequest"));
+        assert!(result.contains("Issuer"));
+        assert!(result.contains("req123"));
+    }
+
+    #[test]
+    fn test_extract_element_by_id_not_found() {
+        let xml = r#"<AuthnRequest ID="req123"><Issuer>test</Issuer></AuthnRequest>"#;
+        let result = extract_element_by_id(xml, "nonexistent");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_xsw_nested_closing_tags() {
+        // Ensure nested elements with same tag name don't confuse depth tracking
+        let xml = r##"<AuthnRequest ID="req1"><ds:Signature><ds:SignedInfo><ds:Reference URI="#req1"><ds:Transforms/></ds:Reference></ds:SignedInfo></ds:Signature></AuthnRequest>"##;
+        let result = remove_signature_element_parsed(xml).unwrap();
+        assert!(!result.contains("Signature"));
+        assert!(result.contains("AuthnRequest"));
     }
 }

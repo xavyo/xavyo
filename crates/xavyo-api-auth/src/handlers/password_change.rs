@@ -4,7 +4,7 @@
 
 use crate::error::ApiAuthError;
 use crate::models::{PasswordChangeRequest, PasswordChangeResponse};
-use crate::services::{AlertService, PasswordPolicyService};
+use crate::services::{AlertService, PasswordPolicyService, SessionService};
 use axum::{extract::ConnectInfo, http::HeaderMap, Extension, Json};
 use sqlx::PgPool;
 use std::net::SocketAddr;
@@ -12,7 +12,7 @@ use std::sync::Arc;
 use validator::Validate;
 use xavyo_auth::{hash_password, verify_password};
 use xavyo_core::{TenantId, UserId};
-use xavyo_db::User;
+use xavyo_db::{RevokeReason, User};
 
 /// Handle password change request.
 ///
@@ -37,6 +37,7 @@ pub async fn password_change_handler(
     Extension(user_id): Extension<UserId>,
     Extension(password_policy_service): Extension<Arc<PasswordPolicyService>>,
     Extension(alert_service): Extension<Arc<AlertService>>,
+    Extension(session_service): Extension<Arc<SessionService>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(request): Json<PasswordChangeRequest>,
@@ -157,28 +158,13 @@ pub async fn password_change_handler(
 
     // Always revoke all other sessions on password change (security best practice).
     // This forces re-authentication on all other devices.
-    let sessions_revoked = {
-        let result = sqlx::query(
-            "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'password_change' \
-             WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+    let sessions_revoked = session_service
+        .revoke_all_user_sessions(
+            *user_id.as_uuid(),
+            *tenant_id.as_uuid(),
+            RevokeReason::PasswordChange,
         )
-        .bind(user_id.as_uuid())
-        .bind(tenant_id.as_uuid())
-        .execute(&pool)
-        .await?;
-
-        // Also revoke all refresh tokens
-        let _ = sqlx::query(
-            "UPDATE refresh_tokens SET revoked_at = NOW() \
-             WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
-        )
-        .bind(user_id.as_uuid())
-        .bind(tenant_id.as_uuid())
-        .execute(&pool)
-        .await?;
-
-        result.rows_affected() as i64
-    };
+        .await? as i64;
 
     // Generate password change alert (F025)
     let _ = alert_service
