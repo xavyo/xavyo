@@ -146,6 +146,7 @@ impl AdminInviteService {
                 expires_at,
                 invited_by_user_id,
                 role_template_id,
+                role: "admin".to_string(),
             },
         )
         .await

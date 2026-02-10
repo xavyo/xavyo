@@ -67,6 +67,9 @@ pub struct UserInvitation {
 
     /// Invitee email address (for admin invites where user doesn't exist yet).
     pub email: Option<String>,
+
+    /// Role to assign on acceptance (e.g. "member", "admin").
+    pub role: String,
 }
 
 /// Data required to create a new invitation (F086 bulk import).
@@ -88,6 +91,7 @@ pub struct CreateAdminInvitation {
     pub expires_at: DateTime<Utc>,
     pub invited_by_user_id: Uuid,
     pub role_template_id: Option<Uuid>,
+    pub role: String,
 }
 
 impl UserInvitation {
@@ -121,8 +125,8 @@ impl UserInvitation {
         sqlx::query_as(
             r"
             INSERT INTO user_invitations
-                (tenant_id, email, token_hash, expires_at, invited_by_user_id, role_template_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
+                (tenant_id, email, token_hash, expires_at, invited_by_user_id, role_template_id, role)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
             ",
         )
@@ -132,6 +136,7 @@ impl UserInvitation {
         .bind(data.expires_at)
         .bind(data.invited_by_user_id)
         .bind(data.role_template_id)
+        .bind(&data.role)
         .fetch_one(pool)
         .await
     }

@@ -98,8 +98,6 @@ impl TenantInvitationService {
         // FR-003: Set expiration to 7 days
         let expires_at = Utc::now() + Duration::days(DEFAULT_EXPIRY_DAYS);
 
-        // Note: role_template_id could be mapped from role string in future
-        // For now, we store the role string in the invitation
         let invitation = UserInvitation::create_admin_invitation(
             &self.pool,
             &CreateAdminInvitation {
@@ -108,7 +106,8 @@ impl TenantInvitationService {
                 token_hash,
                 expires_at,
                 invited_by_user_id,
-                role_template_id: None, // Role stored as string for simplicity
+                role_template_id: None,
+                role: role.to_string(),
             },
         )
         .await
@@ -304,9 +303,8 @@ impl TenantInvitationService {
             new_user_id
         };
 
-        // Get role from invitation (default to member)
-        // Note: In a full implementation, we'd look up the role_template_id
-        let role = "member".to_string();
+        // Use the role stored on the invitation
+        let role = invitation.role.clone();
 
         // Assign the role to the user in user_roles table
         sqlx::query(

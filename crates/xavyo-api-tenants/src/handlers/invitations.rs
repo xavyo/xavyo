@@ -200,7 +200,7 @@ pub async fn list_invitations_handler(
         .map(|inv| InvitationResponse {
             id: inv.id,
             email: inv.email.unwrap_or_default(),
-            role: "member".to_string(), // Default role
+            role: inv.role,
             status: inv.status,
             created_at: inv.created_at,
             expires_at: inv.expires_at,
@@ -304,7 +304,7 @@ pub async fn cancel_invitation_handler(
     Ok(Json(InvitationResponse {
         id: invitation.id,
         email: invitation.email.unwrap_or_default(),
-        role: "member".to_string(),
+        role: invitation.role,
         status: invitation.status,
         created_at: invitation.created_at,
         expires_at: invitation.expires_at,
