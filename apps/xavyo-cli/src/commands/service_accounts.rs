@@ -1,5 +1,7 @@
 //! Service account management CLI commands
 
+use std::io::IsTerminal;
+
 use crate::api::ApiClient;
 use crate::error::{CliError, CliResult};
 use crate::models::service_account::{
@@ -206,7 +208,7 @@ async fn execute_delete(args: DeleteArgs) -> CliResult<()> {
     let sa = client.get_service_account(id).await?;
 
     if !args.force {
-        if !atty::is(atty::Stream::Stdin) {
+        if !std::io::stdin().is_terminal() {
             return Err(CliError::Validation(
                 "Use --force in non-interactive mode.".to_string(),
             ));

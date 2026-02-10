@@ -71,9 +71,6 @@ indicatif = "0.17"
 # Interactive prompts
 dialoguer = "0.11"
 
-# TTY detection
-atty = "0.2"
-
 # UUID for parsing JWT claims
 uuid = { version = "1", features = ["serde", "v4"] }
 

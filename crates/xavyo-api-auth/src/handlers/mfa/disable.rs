@@ -70,6 +70,23 @@ pub async fn disable_mfa(
         )
         .await?;
 
+    // Revoke all sessions — MFA removal is a security-sensitive change
+    let revoked = sqlx::query(
+        "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
+         WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+    )
+    .bind(user_id.as_uuid())
+    .bind(tenant_id.as_uuid())
+    .execute(&state.pool)
+    .await
+    .map_err(ApiAuthError::Database)?;
+
+    info!(
+        user_id = %user_id.as_uuid(),
+        sessions_revoked = revoked.rows_affected(),
+        "Revoked sessions after MFA disable"
+    );
+
     // Generate MFA disabled alert (F025)
     let ip_str = ip_address.map(|ip| ip.to_string());
     let _ = alert_service

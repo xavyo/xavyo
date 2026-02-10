@@ -183,6 +183,9 @@ impl ScimTargetService {
             ));
         }
 
+        // SSRF protection: validate base_url before making outbound requests.
+        Self::validate_url_not_internal(&req.base_url)?;
+
         // Encrypt credentials.
         let credentials_encrypted = self
             .encryption
@@ -354,6 +357,11 @@ impl ScimTargetService {
             }
         }
 
+        // SSRF protection: validate base_url when changed.
+        if let Some(ref base_url) = req.base_url {
+            Self::validate_url_not_internal(base_url)?;
+        }
+
         // Encrypt new credentials if provided.
         let credentials_encrypted = if let Some(ref creds) = req.credentials {
             Some(
@@ -518,6 +526,67 @@ impl ScimTargetService {
         self.encryption
             .decrypt_json(tenant_id, &target.credentials_encrypted)
             .map_err(|e| ConnectorApiError::DecryptionFailed(e.to_string()))
+    }
+
+    /// SSRF protection: validate that a URL does not target internal/private services.
+    fn validate_url_not_internal(url_str: &str) -> Result<()> {
+        use std::net::IpAddr;
+
+        let url = reqwest::Url::parse(url_str)
+            .map_err(|e| ConnectorApiError::Validation(format!("Invalid URL: {e}")))?;
+
+        let scheme = url.scheme();
+        if scheme != "https" && scheme != "http" {
+            return Err(ConnectorApiError::Validation(format!(
+                "Unsupported scheme: {scheme}"
+            )));
+        }
+
+        let host = url
+            .host_str()
+            .ok_or_else(|| ConnectorApiError::Validation("URL has no host".to_string()))?;
+
+        if let Ok(ip) = host.parse::<IpAddr>() {
+            let blocked = match ip {
+                IpAddr::V4(v4) => {
+                    v4.is_loopback()
+                        || v4.is_private()
+                        || v4.is_link_local()
+                        || v4.is_broadcast()
+                        || v4.is_unspecified()
+                        || v4.is_documentation()
+                        || v4 == std::net::Ipv4Addr::new(169, 254, 169, 254)
+                }
+                IpAddr::V6(v6) => {
+                    v6.is_loopback()
+                        || v6.is_unspecified()
+                        || (v6.segments()[0] & 0xfe00) == 0xfc00
+                        || (v6.segments()[0] & 0xffc0) == 0xfe80
+                }
+            };
+            if blocked {
+                return Err(ConnectorApiError::Validation(format!(
+                    "SSRF protection: internal/private IP not allowed: {host}"
+                )));
+            }
+        } else {
+            let lower = host.to_lowercase();
+            let blocked_hosts = [
+                "localhost",
+                "metadata.google.internal",
+                "metadata.goog",
+                "169.254.169.254",
+            ];
+            for b in blocked_hosts {
+                if lower == b || lower.ends_with(&format!(".{b}")) {
+                    return Err(ConnectorApiError::Validation(format!(
+                        "SSRF protection: blocked hostname: {host}"
+                    )));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Validate a SCIM target connection by discovering `ServiceProviderConfig`.

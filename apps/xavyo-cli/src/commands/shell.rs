@@ -3,6 +3,8 @@
 //! Provides a REPL (Read-Eval-Print-Loop) interface for executing
 //! multiple xavyo commands in sequence with tab completion and history.
 
+use std::io::IsTerminal;
+
 use crate::config::ConfigPaths;
 use crate::error::{CliError, CliResult};
 use crate::repl::{CommandExecutor, ExecuteResult, Prompt, ShellSession};
@@ -23,7 +25,7 @@ pub struct ShellArgs {
 /// Execute the shell command
 pub async fn execute(args: ShellArgs) -> CliResult<()> {
     // Check if running in a TTY
-    if !atty::is(atty::Stream::Stdin) {
+    if !std::io::stdin().is_terminal() {
         return Err(CliError::Validation(
             "Interactive shell requires a terminal.\nUse standard commands for scripted operations.".to_string(),
         ));

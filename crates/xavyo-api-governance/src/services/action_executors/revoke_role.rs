@@ -51,6 +51,33 @@ impl RevokeRoleExecutor {
         Ok(count.0 > 0)
     }
 
+    /// Revoke all sessions for a user (force re-authentication after role change).
+    async fn revoke_user_sessions(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
+             WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .execute(pool)
+        .await?;
+
+        let count = result.rows_affected();
+        if count > 0 {
+            tracing::info!(
+                user_id = %user_id,
+                tenant_id = %tenant_id,
+                revoked_count = count,
+                "Revoked sessions after role revocation"
+            );
+        }
+        Ok(count)
+    }
+
     /// Revoke the role from the user.
     async fn revoke_role(
         pool: &PgPool,
@@ -119,18 +146,30 @@ impl ActionExecutor for RevokeRoleExecutor {
 
         // Revoke the role
         match Self::revoke_role(pool, target_user_id, &role_name).await {
-            Ok(true) => ExecutionResult::success(
-                serde_json::json!({
-                    "has_role": true,
-                    "role_id": role_id.to_string(),
-                    "role_name": role_name
-                }),
-                serde_json::json!({
-                    "has_role": false,
-                    "role_id": role_id.to_string(),
-                    "role_name": role_name
-                }),
-            ),
+            Ok(true) => {
+                // Invalidate all sessions for the user so they lose revoked permissions
+                if let Err(e) =
+                    Self::revoke_user_sessions(pool, ctx.tenant_id, target_user_id).await
+                {
+                    tracing::warn!(
+                        user_id = %target_user_id,
+                        error = %e,
+                        "Failed to revoke sessions after role revocation"
+                    );
+                }
+                ExecutionResult::success(
+                    serde_json::json!({
+                        "has_role": true,
+                        "role_id": role_id.to_string(),
+                        "role_name": role_name
+                    }),
+                    serde_json::json!({
+                        "has_role": false,
+                        "role_id": role_id.to_string(),
+                        "role_name": role_name
+                    }),
+                )
+            }
             Ok(false) => {
                 // Race condition - role was already removed
                 ExecutionResult::skipped(serde_json::json!({

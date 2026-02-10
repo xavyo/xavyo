@@ -155,21 +155,29 @@ pub async fn password_change_handler(
         )
         .await?;
 
-    // Revoke other sessions if requested
-    let sessions_revoked = if request.revoke_other_sessions {
-        // Note: This requires knowing the current session ID to exclude it
-        // For now, we revoke all refresh tokens. A more complete implementation
-        // would take the current refresh token and exclude it.
+    // Always revoke all other sessions on password change (security best practice).
+    // This forces re-authentication on all other devices.
+    let sessions_revoked = {
         let result = sqlx::query(
-            "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL",
+            "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'password_change' \
+             WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
         )
         .bind(user_id.as_uuid())
+        .bind(tenant_id.as_uuid())
+        .execute(&pool)
+        .await?;
+
+        // Also revoke all refresh tokens
+        let _ = sqlx::query(
+            "UPDATE refresh_tokens SET revoked_at = NOW() \
+             WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
+        )
+        .bind(user_id.as_uuid())
+        .bind(tenant_id.as_uuid())
         .execute(&pool)
         .await?;
 
         result.rows_affected() as i64
-    } else {
-        0
     };
 
     // Generate password change alert (F025)

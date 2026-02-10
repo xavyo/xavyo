@@ -3,6 +3,7 @@
 use crate::error::{FederationError, FederationResult};
 use openidconnect::{core::CoreProviderMetadata, IssuerUrl};
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
 use tracing::instrument;
 
 /// Discovered OIDC endpoints from provider metadata.
@@ -31,6 +32,10 @@ impl DiscoveryService {
     pub async fn discover(&self, issuer_url: &str) -> FederationResult<DiscoveredEndpoints> {
         // Normalize issuer URL (remove trailing slash)
         let issuer_url = issuer_url.trim_end_matches('/');
+
+        // SSRF protection: validate URL before making outbound requests
+        validate_url_not_internal(issuer_url)
+            .map_err(|e| FederationError::InvalidConfiguration(format!("SSRF protection: {e}")))?;
 
         // Parse issuer URL
         let issuer = IssuerUrl::new(issuer_url.to_string()).map_err(|e| {
@@ -94,6 +99,61 @@ impl DiscoveryService {
         let issuer_url = issuer_url.trim_end_matches('/');
         format!("{issuer_url}/.well-known/openid-configuration")
     }
+}
+
+/// SSRF protection: validate that a URL does not target internal/private services.
+fn validate_url_not_internal(url_str: &str) -> Result<(), String> {
+    let url = url::Url::parse(url_str).map_err(|e| format!("Invalid URL: {e}"))?;
+
+    let scheme = url.scheme();
+    if scheme != "https" && scheme != "http" {
+        return Err(format!("Unsupported scheme: {scheme}"));
+    }
+
+    let host = url
+        .host_str()
+        .ok_or_else(|| "URL has no host".to_string())?;
+
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        match ip {
+            IpAddr::V4(v4) => {
+                if v4.is_loopback()
+                    || v4.is_private()
+                    || v4.is_link_local()
+                    || v4.is_broadcast()
+                    || v4.is_unspecified()
+                    || v4.is_documentation()
+                    || v4 == std::net::Ipv4Addr::new(169, 254, 169, 254)
+                {
+                    return Err(format!("Internal/private IP not allowed: {host}"));
+                }
+            }
+            IpAddr::V6(v6) => {
+                if v6.is_loopback() || v6.is_unspecified() {
+                    return Err(format!("Internal/private IP not allowed: {host}"));
+                }
+                let segs = v6.segments();
+                if (segs[0] & 0xfe00) == 0xfc00 || (segs[0] & 0xffc0) == 0xfe80 {
+                    return Err(format!("Internal/private IP not allowed: {host}"));
+                }
+            }
+        }
+    } else {
+        let lower = host.to_lowercase();
+        let blocked = [
+            "localhost",
+            "metadata.google.internal",
+            "metadata.goog",
+            "169.254.169.254",
+        ];
+        for b in blocked {
+            if lower == b || lower.ends_with(&format!(".{b}")) {
+                return Err(format!("Blocked hostname: {host}"));
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

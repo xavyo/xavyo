@@ -2,6 +2,8 @@
 //!
 //! Detects whether the current environment supports passkey authentication.
 
+use std::io::IsTerminal;
+
 use crate::models::webauthn::{AuthenticatorCapability, DetectedKey};
 
 /// Detect WebAuthn capabilities of the current environment
@@ -33,7 +35,7 @@ pub fn detect_capabilities() -> AuthenticatorCapability {
 /// - No display available
 pub fn is_headless() -> bool {
     // Check if stdin is a TTY
-    if !atty::is(atty::Stream::Stdin) {
+    if !std::io::stdin().is_terminal() {
         return true;
     }
 

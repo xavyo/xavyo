@@ -108,7 +108,7 @@ async fn test_azure_ad_v2_valid_token() {
     );
     let token = create_test_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -129,7 +129,7 @@ async fn test_azure_ad_jwks_with_x5t() {
     // Azure AD JWKS includes x5t (thumbprint)
     mock.mount_jwks(azure_fixtures::jwks(kid)).await;
 
-    let cache = xavyo_api_oidc_federation::services::JwksCache::default();
+    let cache = mock.cache();
     let result = cache.get_keys(&mock.jwks_uri).await;
 
     assert!(result.is_ok());
@@ -159,7 +159,7 @@ async fn test_azure_ad_tid_oid_claims() {
     );
     let token = create_test_token_with_custom_claims(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -192,7 +192,7 @@ async fn test_azure_ad_groups_claim() {
     );
     let token = create_test_token_with_custom_claims(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(
@@ -218,7 +218,7 @@ async fn test_azure_ad_invalid_signature_rejected() {
     );
     let token = create_invalid_signature_token(&claims, kid);
 
-    let verifier = TokenVerifierService::new(VerificationConfig::default());
+    let verifier = mock.verifier(VerificationConfig::default());
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(result.is_err());
@@ -249,7 +249,7 @@ async fn test_azure_ad_multi_tenant_issuer_validation() {
     let token = create_test_token(&claims, kid);
 
     // Verify with expected issuer matching
-    let verifier = TokenVerifierService::new(VerificationConfig::default().issuer(&issuer));
+    let verifier = mock.verifier(VerificationConfig::default().issuer(&issuer));
     let result = verifier.verify_token(&token, &mock.jwks_uri).await;
 
     assert!(

@@ -40,6 +40,8 @@ pub struct JwksCache {
     default_ttl: Duration,
     /// HTTP client for fetching JWKS.
     http_client: reqwest::Client,
+    /// Allow local/private IPs (only for testing with mock servers).
+    allow_local: bool,
 }
 
 /// Cache statistics for monitoring.
@@ -66,6 +68,7 @@ impl JwksCache {
                 .timeout(Duration::from_secs(30))
                 .build()
                 .expect("Failed to create HTTP client"),
+            allow_local: false,
         }
     }
 
@@ -76,6 +79,21 @@ impl JwksCache {
             cache: Arc::new(RwLock::new(HashMap::new())),
             default_ttl,
             http_client,
+            allow_local: false,
+        }
+    }
+
+    /// Create a new JWKS cache that allows local/private IPs (for testing only).
+    #[must_use]
+    pub fn new_allow_local(default_ttl: Duration) -> Self {
+        Self {
+            cache: Arc::new(RwLock::new(HashMap::new())),
+            default_ttl,
+            http_client: reqwest::Client::builder()
+                .timeout(Duration::from_secs(30))
+                .build()
+                .expect("Failed to create HTTP client"),
+            allow_local: true,
         }
     }
 
@@ -179,8 +197,74 @@ impl JwksCache {
         Ok(jwks)
     }
 
+    /// SSRF protection: validate that a URI does not target internal/private services.
+    fn validate_uri_not_internal(uri: &str) -> FederationResult<()> {
+        use std::net::IpAddr;
+
+        let url = url::Url::parse(uri)
+            .map_err(|e| FederationError::JwksFetchFailed(format!("Invalid JWKS URI: {e}")))?;
+
+        let scheme = url.scheme();
+        if scheme != "https" && scheme != "http" {
+            return Err(FederationError::JwksFetchFailed(format!(
+                "Unsupported scheme: {scheme}"
+            )));
+        }
+
+        let host = url
+            .host_str()
+            .ok_or_else(|| FederationError::JwksFetchFailed("JWKS URI has no host".to_string()))?;
+
+        if let Ok(ip) = host.parse::<IpAddr>() {
+            let blocked = match ip {
+                IpAddr::V4(v4) => {
+                    v4.is_loopback()
+                        || v4.is_private()
+                        || v4.is_link_local()
+                        || v4.is_broadcast()
+                        || v4.is_unspecified()
+                        || v4.is_documentation()
+                        || v4 == std::net::Ipv4Addr::new(169, 254, 169, 254)
+                }
+                IpAddr::V6(v6) => {
+                    v6.is_loopback()
+                        || v6.is_unspecified()
+                        || (v6.segments()[0] & 0xfe00) == 0xfc00
+                        || (v6.segments()[0] & 0xffc0) == 0xfe80
+                }
+            };
+            if blocked {
+                return Err(FederationError::JwksFetchFailed(format!(
+                    "SSRF protection: internal/private IP not allowed: {host}"
+                )));
+            }
+        } else {
+            let lower = host.to_lowercase();
+            let blocked_hosts = [
+                "localhost",
+                "metadata.google.internal",
+                "metadata.goog",
+                "169.254.169.254",
+            ];
+            for b in blocked_hosts {
+                if lower == b || lower.ends_with(&format!(".{b}")) {
+                    return Err(FederationError::JwksFetchFailed(format!(
+                        "SSRF protection: blocked hostname: {host}"
+                    )));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Fetch JWKS from the given URI.
     async fn fetch_jwks(&self, jwks_uri: &str) -> FederationResult<JwkSet> {
+        // SSRF protection (skip when allow_local is set for test mock servers)
+        if !self.allow_local {
+            Self::validate_uri_not_internal(jwks_uri)?;
+        }
+
         let response = self
             .http_client
             .get(jwks_uri)
@@ -246,7 +330,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let cache = JwksCache::new(Duration::from_secs(60));
+        let cache = JwksCache::new_allow_local(Duration::from_secs(60));
         let jwks_uri = format!("{}/.well-known/jwks.json", mock_server.uri());
 
         let result = cache.get_keys(&jwks_uri).await;
@@ -268,7 +352,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let cache = JwksCache::new(Duration::from_secs(60));
+        let cache = JwksCache::new_allow_local(Duration::from_secs(60));
         let jwks_uri = format!("{}/.well-known/jwks.json", mock_server.uri());
 
         // First call - should fetch
@@ -294,7 +378,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let cache = JwksCache::new(Duration::from_secs(60));
+        let cache = JwksCache::new_allow_local(Duration::from_secs(60));
         let jwks_uri = format!("{}/.well-known/jwks.json", mock_server.uri());
 
         // First call
@@ -315,7 +399,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let cache = JwksCache::new(Duration::from_secs(60));
+        let cache = JwksCache::new_allow_local(Duration::from_secs(60));
         let jwks_uri = format!("{}/.well-known/jwks.json", mock_server.uri());
 
         let key = cache.find_key(&jwks_uri, "key-1").await.unwrap();
@@ -336,7 +420,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let cache = JwksCache::new(Duration::from_secs(60));
+        let cache = JwksCache::new_allow_local(Duration::from_secs(60));
         let jwks_uri = format!("{}/.well-known/jwks.json", mock_server.uri());
 
         let result = cache.get_keys(&jwks_uri).await;
@@ -358,7 +442,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let cache = JwksCache::new(Duration::from_secs(60));
+        let cache = JwksCache::new_allow_local(Duration::from_secs(60));
         let jwks_uri = format!("{}/.well-known/jwks.json", mock_server.uri());
 
         // Fetch and cache

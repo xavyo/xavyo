@@ -1,5 +1,7 @@
 //! Apply configuration from YAML file
 
+use std::io::IsTerminal;
+
 use crate::api::ApiClient;
 use crate::config::{Config, ConfigPaths};
 use crate::error::{CliError, CliResult};
@@ -79,7 +81,7 @@ pub async fn execute(args: ApplyArgs) -> CliResult<()> {
 
     // Confirm before applying (unless --yes is passed)
     if !args.yes {
-        if !atty::is(atty::Stream::Stdin) {
+        if !std::io::stdin().is_terminal() {
             return Err(CliError::Validation(
                 "Cannot confirm in non-interactive mode. Use --yes to skip confirmation."
                     .to_string(),
