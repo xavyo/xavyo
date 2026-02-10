@@ -71,7 +71,7 @@ signup_and_verify() {
   uid=$(extract_json "$SIGNUP" '.user_id')
 
   sleep 2
-  local MAIL_SEARCH MAIL_ID MAIL_MSG TOKEN
+  local MAIL_SEARCH MAIL_ID MAIL_MSG TOKEN=""
   MAIL_SEARCH=$(curl -s "http://localhost:8025/api/v1/search?query=to:$email")
   MAIL_ID=$(extract_json "$MAIL_SEARCH" '.messages[0].ID')
   if [ -n "$MAIL_ID" ] && [ "$MAIL_ID" != "null" ]; then
@@ -1041,6 +1041,20 @@ if [[ "$CODE" == "200" ]]; then
   pass "TC-GOV-AR-001" "200, access requests listed"
 else
   fail "TC-GOV-AR-001" "Expected 200, got $CODE"
+fi
+
+# ── Setup: Create default approval workflow (required since governance fix #12) ──
+RAW=$(admin_call POST /governance/approval-workflows -d "{
+  \"name\": \"Default-Approval-${TS}\",
+  \"description\": \"Default approval workflow for batch 6 tests\",
+  \"is_default\": true,
+  \"steps\": [{\"approver_type\": \"manager\"}]
+}")
+parse_response "$RAW"
+if [[ "$CODE" == "200" || "$CODE" == "201" ]]; then
+  log "INFO  Default approval workflow created for access request tests"
+else
+  log "WARN  Could not create default workflow ($CODE) — access request tests may fail"
 fi
 
 # ── TC-GOV-AR-002: Create access request ──────────────────────────────────

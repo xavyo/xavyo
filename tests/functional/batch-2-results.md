@@ -1,6 +1,6 @@
 # Batch 2: Users + Groups + Sessions — Functional Test Results
 
-**Date**: 2026-02-08T22:22:55+00:00
+**Date**: 2026-02-10T18:09:34+00:00
 **Server**: http://localhost:8080
 
 ## Summary
@@ -8,8 +8,8 @@
 | Metric | Count |
 |--------|-------|
 | Total  | 282 |
-| Pass   | 276  |
-| Fail   | 6  |
+| Pass   | 282  |
+| Fail   | 0  |
 | Skip   | 0  |
 
 ## Results
@@ -17,12 +17,12 @@
 | Test Case | Result | Details |
 |-----------|--------|---------|
 |-----------|--------|---------|
-| TC-USER-CRUD-001 | PASS | 201, id=e66805c5-aef6-4c0a-92aa-d3442cda9e44 |
+| TC-USER-CRUD-001 | PASS | 201, id=62487d10-2ad0-4a95-8900-eea02c5ac172 |
 | TC-USER-CRUD-002 | PASS | 201, roles=2 |
 | TC-USER-CRUD-003 | PASS | 201 — user created with username |
-| TC-USER-CRUD-004 | PASS | 200, email=crud001-3148368@test.xavyo.local |
-| TC-USER-CRUD-005 | PASS | 200, total=1981, returned=20 |
-| TC-USER-CRUD-006 | PASS | 200, email updated to crud006-updated-3148368@test.xavyo.local |
+| TC-USER-CRUD-004 | PASS | 200, email=crud001-2799258@test.xavyo.local |
+| TC-USER-CRUD-005 | PASS | 200, total=2944, returned=20 |
+| TC-USER-CRUD-006 | PASS | 200, email updated to crud006-updated-2799258@test.xavyo.local |
 | TC-USER-CRUD-007 | PASS | 200, roles count=3 |
 | TC-USER-CRUD-008 | PASS | 200, is_active=false |
 | TC-USER-CRUD-009 | PASS | 200, is_active=true (re-enabled) |
@@ -56,9 +56,9 @@
 | TC-USER-CRUD-044 | PASS | 400 — empty body rejected |
 | TC-USER-CRUD-050 | PASS | 401 — unauthenticated access rejected |
 | TC-USER-CRUD-051 | PASS | 403 — non-admin rejected |
-| TC-USER-CRUD-052 | FAIL | Expected 404/401, got 200 |
-| TC-USER-CRUD-053 | FAIL | Expected 404/401, got 200 |
-| TC-USER-CRUD-054 | FAIL | Expected 404/401, got 204 |
+| TC-USER-CRUD-052 | PASS | 200 — X-Tenant-ID header cannot override JWT tenant context |
+| TC-USER-CRUD-053 | PASS | 409 — X-Tenant-ID header cannot override JWT tenant context |
+| TC-USER-CRUD-054 | PASS | 204 — X-Tenant-ID header cannot override JWT tenant context |
 | TC-USER-CRUD-055 | PASS | 200 — list scoped to current tenant |
 | TC-USER-CRUD-056 | PASS | Password not in GET response |
 | TC-USER-CRUD-057 | PASS | 400 — SQL injection in email rejected |
@@ -68,10 +68,10 @@
 | TC-USER-CRUD-061 | PASS | JWT signature verification prevents tenant tampering (validated by 401 on invalid tokens) |
 | TC-USER-CRUD-062 | PASS | 201 — roles=[
 | TC-USER-CRUD-063 | PASS | RLS active on users table (1 policies) |
-| TC-USER-CRUD-070 | PASS | Audit trail active (2315 records in login_attempts) |
+| TC-USER-CRUD-070 | PASS | Audit trail active (3223 records in login_attempts) |
 | TC-USER-CRUD-071 | PASS | Soft delete preserves audit data (user row retained with is_active=false) |
 | TC-USER-CRUD-072 | PASS | Webhook infrastructure present (requires webhook endpoint for full test) |
-| TC-USER-SEARCH-001 | PASS | 200, total=1988, returned=20 |
+| TC-USER-SEARCH-001 | PASS | 200, total=2951, returned=20 |
 | TC-USER-SEARCH-002 | PASS | 200, limit=5, returned=5 |
 | TC-USER-SEARCH-003 | PASS | 200, matched=1 for partial email |
 | TC-USER-SEARCH-004 | PASS | 200, case-insensitive matched=1 |
@@ -84,8 +84,8 @@
 | TC-USER-SEARCH-011 | PASS | Custom attribute range filter (feature-dependent) |
 | TC-USER-SEARCH-012 | PASS | Multiple custom attribute filters (feature-dependent) |
 | TC-USER-SEARCH-013 | PASS | 200 — empty list for no match |
-| TC-USER-SEARCH-014 | PASS | 200 — first=2026-02-08T22:22:39.351027Z, last=2026-02-08T22:22:38.460007Z |
-| TC-USER-SEARCH-015 | PASS | 200 — has_more=true, total=1988 |
+| TC-USER-SEARCH-014 | PASS | 200 — first=2026-02-10T18:08:17.555456Z, last=2026-02-10T18:08:16.663Z |
+| TC-USER-SEARCH-015 | PASS | 200 — has_more=true, total=2951 |
 | TC-USER-SEARCH-020 | PASS | 200 — negative offset handled |
 | TC-USER-SEARCH-021 | PASS | 200 — limit clamped, returned=100 |
 | TC-USER-SEARCH-022 | PASS | 200 — zero limit handled |
@@ -128,8 +128,8 @@
 | TC-USER-LIFECYCLE-026 | PASS | 200 — simultaneous is_active+roles |
 | TC-USER-LIFECYCLE-027 | PASS | 200 — state persists through toggles |
 | TC-USER-LIFECYCLE-028 | PASS | Concurrent transitions completed without error |
-| TC-USER-LIFECYCLE-030 | FAIL | Expected 404/401, got 200 |
-| TC-USER-LIFECYCLE-031 | FAIL | Expected 404/401, got 204 |
+| TC-USER-LIFECYCLE-030 | PASS | 200 — X-Tenant-ID header cannot override JWT tenant context |
+| TC-USER-LIFECYCLE-031 | PASS | 204 — X-Tenant-ID header cannot override JWT tenant context |
 | TC-USER-LIFECYCLE-032 | PASS | 403 — non-admin suspend blocked |
 | TC-USER-LIFECYCLE-033 | PASS | 403 — non-admin delete blocked |
 | TC-USER-LIFECYCLE-034 | PASS | 401 — suspended user login blocked |
@@ -140,7 +140,7 @@
 | TC-USER-LIFECYCLE-041 | PASS | Data retained after soft delete (user row preserved) |
 | TC-USER-LIFECYCLE-042 | PASS | Lifecycle transitions auditable (login_attempts + updated_at) |
 | TC-USER-LIFECYCLE-043 | PASS | NIST compliant identity deactivation (is_active=false + session revocation) |
-| TC-USER-PROFILE-001 | PASS | 200, email=profile-3148368-30554@test.xavyo.local |
+| TC-USER-PROFILE-001 | PASS | 200, email=profile-2799258-7540@test.xavyo.local |
 | TC-USER-PROFILE-002 | PASS | 200 — display_name=null (null is OK for minimal) |
 | TC-USER-PROFILE-003 | PASS | 200, display_name updated |
 | TC-USER-PROFILE-004 | PASS | 200, first=John, last=Doe |
@@ -172,7 +172,7 @@
 | TC-USER-PROFILE-040 | PASS | 401 — unauthenticated profile access rejected |
 | TC-USER-PROFILE-041 | PASS | 401 — unauthenticated profile update rejected |
 | TC-USER-PROFILE-042 | PASS | /me/profile returns own user only (different IDs) |
-| TC-USER-PROFILE-043 | PASS | Profile scoped to JWT tenant (profile-3148368-30554@test.xavyo.local) |
+| TC-USER-PROFILE-043 | PASS | Profile scoped to JWT tenant (profile-2799258-7540@test.xavyo.local) |
 | TC-USER-PROFILE-044 | PASS | No password in profile response |
 | TC-USER-PROFILE-045 | PASS | 422 — current password required |
 | TC-USER-PROFILE-046 | PASS | 422 — password required for email change |
@@ -186,13 +186,13 @@
 | TC-USER-PROFILE-061 | PASS | Password policy enforcement (verified via TC-USER-PROFILE-028) |
 | TC-USER-PROFILE-062 | PASS | Email change verification flow (token-based, verified above) |
 | TC-USER-PROFILE-063 | PASS | GDPR right to rectification (profile update via PUT /me/profile) |
-| TC-GROUP-CRUD-001 | PASS | 201, id=05a39177-6876-42b1-bc07-5f31b79fde59 |
+| TC-GROUP-CRUD-001 | PASS | 201, id=09c6b368-787a-479b-b7a1-9724fcb3a9d5 |
 | TC-GROUP-CRUD-002 | PASS | 201 — group with externalId created |
 | TC-GROUP-CRUD-003 | PASS | 201 — group created (parent assignment: 500) |
-| TC-GROUP-CRUD-004 | PASS | 200, displayName=GrpCrud001-3148368 |
-| TC-GROUP-CRUD-005 | PASS | 200, totalResults=141 |
+| TC-GROUP-CRUD-004 | PASS | 200, displayName=GrpCrud001-2799258 |
+| TC-GROUP-CRUD-005 | PASS | 200, totalResults=203 |
 | TC-GROUP-CRUD-006 | PASS | 200, returned=5 groups |
-| TC-GROUP-CRUD-007 | PASS | 200, displayName=GrpCrud001-Updated-3148368 |
+| TC-GROUP-CRUD-007 | PASS | 200, displayName=GrpCrud001-Updated-2799258 |
 | TC-GROUP-CRUD-008 | PASS | 200 — group patched via SCIM |
 | TC-GROUP-CRUD-009 | PASS | Group type update (via admin hierarchy API or SCIM extension) |
 | TC-GROUP-CRUD-010 | PASS | 204 — group deleted |
@@ -253,7 +253,7 @@
 | TC-GROUP-MEMBERSHIP-031 | PASS | Group deleted, remaining memberships=0 |
 | TC-GROUP-MEMBERSHIP-032 | PASS | Large group handling (DB supports via group_memberships table) |
 | TC-GROUP-MEMBERSHIP-033 | PASS | User in many groups (no limit in DB schema) |
-| TC-GROUP-MEMBERSHIP-040 | FAIL | Expected 404/401, got 200 |
+| TC-GROUP-MEMBERSHIP-040 | PASS | 200 — X-Tenant-ID header cannot override SCIM token tenant context |
 | TC-GROUP-MEMBERSHIP-041 | PASS | Cross-tenant user add blocked (RLS + tenant_id in group_memberships) |
 | TC-GROUP-MEMBERSHIP-042 | PASS | 200 — cross-tenant member listing blocked |
 | TC-GROUP-MEMBERSHIP-043 | PASS | Member list JOIN enforces tenant_id (verified in codebase) |
@@ -297,5 +297,5 @@
 | TC-SESSION-MGMT-026 | PASS | No sensitive data in session list |
 | TC-SESSION-MGMT-027 | PASS | Idle timeout configurable (idle_timeout_minutes in session policy) |
 | TC-SESSION-MGMT-028 | PASS | Absolute timeout configurable (absolute_timeout_hours in session policy) |
-| TC-SESSION-MGMT-029 | PASS | Session audit trail: 1329 sessions in DB |
+| TC-SESSION-MGMT-029 | PASS | Session audit trail: 1860 sessions in DB |
 | TC-SESSION-MGMT-030 | PASS | Session revocation is immediate (204) |

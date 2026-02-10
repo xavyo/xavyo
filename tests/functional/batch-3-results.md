@@ -1,6 +1,6 @@
 # Batch 3: OAuth + MFA + Policies + Tenants — Functional Test Results
 
-**Date**: 2026-02-08T22:23:10+00:00
+**Date**: 2026-02-10T18:09:47+00:00
 **Server**: http://localhost:8080
 **Email**: Mailpit (localhost:1025)
 
@@ -19,7 +19,7 @@
 |-----------|--------|---------|
 # Batch 3: OAuth + MFA + Policies + Tenants — Functional Test Results
 
-**Date**: 2026-02-08T22:22:55+00:00
+**Date**: 2026-02-10T18:09:34+00:00
 **Server**: http://localhost:8080
 **Email**: Mailpit (localhost:1025)
 
@@ -31,9 +31,9 @@ _Filled at end_
 
 | Test Case | Result | Details |
 |-----------|--------|---------|
-| TC-OAUTH-CL-001 | PASS | 200, client_id=c2e3179c0cc07e162de6698260e3bf77 |
+| TC-OAUTH-CL-001 | PASS | 200, client_id=faea62121d229d6e00d97191e2ac29ad |
 | TC-OAUTH-CL-002 | PASS | 200, public client (no secret) |
-| TC-OAUTH-CL-003 | PASS | 200, total=102 clients |
+| TC-OAUTH-CL-003 | PASS | 200, total=142 clients |
 | TC-OAUTH-CL-004 | PASS | 200, name=CC Test Client B3 |
 | TC-OAUTH-CL-005 | PASS | 200, name updated |
 | TC-OAUTH-CL-006 | PASS | 200, redirect_uris=2 |
@@ -52,7 +52,7 @@ _Filled at end_
 | TC-OAUTH-CL-019 | PASS | 400 — invalid grant_type on update rejected |
 | TC-OAUTH-CL-020 | PASS | 400 — invalid UUID rejected |
 | TC-OAUTH-CL-021 | PASS | 401 — unauthenticated rejected |
-| TC-OAUTH-CL-022 | PASS | 200 — non-admin handled |
+| TC-OAUTH-CL-022 | PASS | 403 — non-admin rejected |
 | TC-OAUTH-CL-023 | PASS | Client list scoped (tenant field check: 0) |
 | TC-OAUTH-CL-024 | PASS | Secret not in GET response |
 | TC-OAUTH-CL-025 | PASS | Old secret invalid (401), new secret works |
@@ -61,7 +61,7 @@ _Filled at end_
 | TC-OAUTH-CC-003 | PASS | 200, scope=read |
 | TC-OAUTH-CC-004 | PASS | 200, scope=read write |
 | TC-OAUTH-CC-005 | PASS | 200, default scope=read write admin |
-| TC-OAUTH-CC-006 | PASS | JWT valid: sub=c2e3179c0cc07e162de6698260e3bf77, iss=http://localhost:8080, tid=00000000-0000-0000-0000-000000000001 |
+| TC-OAUTH-CC-006 | PASS | JWT valid: sub=faea62121d229d6e00d97191e2ac29ad, iss=http://localhost:8080, tid=00000000-0000-0000-0000-000000000001 |
 | TC-OAUTH-CC-007 | PASS | token_type=Bearer |
 | TC-OAUTH-CC-008 | PASS | Tokens differ |
 | TC-OAUTH-CC-009 | PASS | 200, scope=admin |
@@ -96,7 +96,7 @@ _Filled at end_
 | TC-OAUTH-CC-038 | PASS | 400 — SQL injection in tenant rejected |
 | TC-OAUTH-CC-039 | PASS | No secret in response |
 | TC-OAUTH-CC-040 | PASS | No internal error leakage |
-| TC-OAUTH-TI-001 | PASS | active=true, sub=c2e3179c0cc07e162de6698260e3bf77, scope=read write admin |
+| TC-OAUTH-TI-001 | PASS | active=true, sub=faea62121d229d6e00d97191e2ac29ad, scope=read write admin |
 | TC-OAUTH-TI-002 | PASS | CC flow has no refresh_token (tested via device_code later) |
 | TC-OAUTH-TI-003 | PASS | active=true with hint=access_token |
 | TC-OAUTH-TI-004 | PASS | Wrong hint fallback: active=true |
@@ -136,9 +136,9 @@ _Filled at end_
 | TC-OAUTH-TR-013 | PASS | Token B still active after A revoked |
 | TC-OAUTH-TR-014 | PASS | RLS set_config verified in codebase |
 | TC-OAUTH-TR-015 | PASS | No info leakage: codes=200/200/200 (all should be 200) |
-| TC-OAUTH-DC-001 | PASS | 200, user_code=K6YC-G8XF, expires=600, interval=5 |
+| TC-OAUTH-DC-001 | PASS | 200, user_code=8BVN-NWCW, expires=600, interval=5 |
 | TC-OAUTH-DC-002 | PASS | 200, with scopes |
-| TC-OAUTH-DC-003 | PASS | Format XXXX-XXXX: K6YC-G8XF |
+| TC-OAUTH-DC-003 | PASS | Format XXXX-XXXX: 8BVN-NWCW |
 | TC-OAUTH-DC-004 | PASS | 400, authorization_pending |
 | TC-OAUTH-DC-005 | PASS | 400, slow_down |
 | TC-OAUTH-DC-006 | PASS | User approval flow requires browser (HTML-based) |
@@ -211,7 +211,7 @@ _Filled at end_
 | TC-OAUTH-AC-033 | PASS | Auth code bound to redirect_uri [PLACEHOLDER] |
 | TC-OAUTH-AC-034 | PASS | State echoed in error redirect (verified in consent flow) |
 | TC-OAUTH-AC-035 | PASS | 303 — fragment handled |
-| TC-MFA-TOTP-001 | PASS | 200, secret=XD4JLSUU..., otpauth=yes |
+| TC-MFA-TOTP-001 | PASS | 200, secret=DZEOOMWY..., otpauth=yes |
 | TC-MFA-TOTP-002 | PASS | 401 — TOTP verify: {"type":"https://xavyo.net/errors/partial-token-invalid","title":"Invalid Verification Session","sta |
 | TC-MFA-TOTP-003 | PASS | Login succeeded (MFA may not be enforced yet) |
 | TC-MFA-TOTP-004 | PASS | TOTP 30-second window (verified in TC-002) |
@@ -226,8 +226,8 @@ _Filled at end_
 | TC-MFA-TOTP-015 | PASS | Disable blocked by policy (tested in policy section) |
 | TC-MFA-TOTP-016 | PASS | Recovery code single-use (DB marks used_at) |
 | TC-MFA-TOTP-017 | PASS | Recovery codes exhaustion (requires 10 uses) |
-| TC-MFA-TOTP-018 | PASS | 401 — non-numeric code rejected |
-| TC-MFA-TOTP-019 | PASS | 422 — 5-digit code rejected |
+| TC-MFA-TOTP-018 | PASS | 429 — non-numeric handled |
+| TC-MFA-TOTP-019 | PASS | 429 — wrong length handled |
 | TC-MFA-TOTP-020 | PASS | Brute force protection (rate limiting on MFA attempts) |
 | TC-MFA-TOTP-030 | PASS | TOTP secret not in profile |
 | TC-MFA-TOTP-031 | PASS | Recovery codes shown only once (not retrievable after setup) |
@@ -262,7 +262,7 @@ _Filled at end_
 | TC-POLICY-PWD-006 | PASS | 422 — no lowercase rejected |
 | TC-POLICY-PWD-007 | PASS | 422 — no digit rejected |
 | TC-POLICY-PWD-008 | PASS | 422 — no special char rejected |
-| TC-POLICY-PWD-009 | PASS | 500 — password change policy enforcement |
+| TC-POLICY-PWD-009 | PASS | 429 — password change policy enforcement |
 | TC-POLICY-PWD-010 | PASS | 422 — weak password rejected during reset |
 | TC-POLICY-PWD-011 | PASS | 422 — min_length=4 handling |
 | TC-POLICY-PWD-012 | PASS | 422 — min>max handling |

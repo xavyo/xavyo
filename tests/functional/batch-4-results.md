@@ -1,6 +1,6 @@
 # Batch 4: SCIM · API Keys · Connectors · Webhooks — Functional Test Results
 
-**Date**: 2026-02-08T22:23:10+00:00
+**Date**: 2026-02-10T18:09:47+00:00
 **Server**: http://localhost:8080
 
 ## Summary
@@ -16,13 +16,13 @@
 
 | Test Case | Result | Details |
 |-----------|--------|---------|
-| TC-SCIM-USER-001 | PASS | 201, user_id=263b7941-618d-4bc3-b62d-6a407f6c3320, userName=scim-alice-1770589390@example.com |
-| TC-SCIM-USER-002 | PASS | 201, id=2b697a05-61a1-4bb0-9e84-c3f75d1c8fb6, externalId=entra-abc-1770589390, displayName=Bob Smith |
-| TC-SCIM-USER-003 | PASS | 201, id=097e33a4-736b-40f9-b822-d9d064092243 with enterprise extension |
-| TC-SCIM-USER-004 | PASS | 200, id=263b7941-618d-4bc3-b62d-6a407f6c3320, resourceType=User |
-| TC-SCIM-USER-005 | PASS | 200, totalResults=2019, startIndex=1, itemsPerPage=25 |
+| TC-SCIM-USER-001 | PASS | 201, user_id=e034a4c9-6a6a-4aec-9153-c70712d3cd72, userName=scim-alice-1770746987@example.com |
+| TC-SCIM-USER-002 | PASS | 201, id=d59d50e1-336d-443c-8887-132eedf3097c, externalId=entra-abc-1770746987, displayName=Bob Smith |
+| TC-SCIM-USER-003 | PASS | 201, id=4a063f2d-4e00-4b86-912f-599ca7f22761 with enterprise extension |
+| TC-SCIM-USER-004 | PASS | 200, id=e034a4c9-6a6a-4aec-9153-c70712d3cd72, resourceType=User |
+| TC-SCIM-USER-005 | PASS | 200, totalResults=2982, startIndex=1, itemsPerPage=25 |
 | TC-SCIM-USER-006 | PASS | 200, itemsPerPage=2, resources=2 |
-| TC-SCIM-USER-007 | PASS | 200, userName=scim-updated-1770589390@example.com, displayName=Updated Name |
+| TC-SCIM-USER-007 | PASS | 200, userName=scim-updated-1770746987@example.com, displayName=Updated Name |
 | TC-SCIM-USER-008 | PASS | 200, active=false |
 | TC-SCIM-USER-009 | PASS | 200, displayName=New Display Name |
 | TC-SCIM-USER-010 | PASS | 200, multiple ops applied |
@@ -49,11 +49,11 @@
 | TC-SCIM-USER-060 | PASS | schemas array present: urn:ietf:params:scim:api:messages:2.0:Error |
 | TC-SCIM-USER-062 | PASS | meta.resourceType=User |
 | TC-SCIM-USER-064 | PASS | Uses capital R 'Resources' key |
-| TC-SCIM-GROUP-001 | PASS | 201, id=afb96f4b-69b1-49b3-b740-b3edb76a4745, displayName=Engineering-1770589390 |
-| TC-SCIM-GROUP-002 | PASS | 201, id=89dc70f1-d8d6-4fec-a8d9-1106940a5ab7, members=1 |
-| TC-SCIM-GROUP-004 | PASS | 200, id=afb96f4b-69b1-49b3-b740-b3edb76a4745, resourceType=Group |
-| TC-SCIM-GROUP-005 | PASS | 200, totalResults=146 |
-| TC-SCIM-GROUP-006 | PASS | 200, group replaced, displayName=Updated-Team-1770589390 |
+| TC-SCIM-GROUP-001 | PASS | 201, id=f2cd36b2-d43a-4346-bc7d-0b59cb84a125, displayName=Engineering-1770746987 |
+| TC-SCIM-GROUP-002 | PASS | 201, id=54908d4e-f3fa-4bd3-bc22-ba2f96bce097, members=1 |
+| TC-SCIM-GROUP-004 | PASS | 200, id=f2cd36b2-d43a-4346-bc7d-0b59cb84a125, resourceType=Group |
+| TC-SCIM-GROUP-005 | PASS | 200, totalResults=208 |
+| TC-SCIM-GROUP-006 | PASS | 200, group replaced, displayName=Updated-Team-1770746987 |
 | TC-SCIM-GROUP-007 | PASS | 200, member added |
 | TC-SCIM-GROUP-008 | PASS | 200, member removed |
 | TC-SCIM-GROUP-009 | PASS | 200, displayName replaced |
@@ -87,7 +87,7 @@
 | TC-SCIM-FILTER-002 | PASS | 200, displayName co |
 | TC-SCIM-FILTER-003 | PASS | 200, userName sw |
 | TC-SCIM-FILTER-004 | PASS | 200, externalId pr |
-| TC-SCIM-FILTER-005 | PASS | 200, active eq true, totalResults=1885 |
+| TC-SCIM-FILTER-005 | PASS | 200, active eq true, totalResults=2619 |
 | TC-SCIM-FILTER-006 | PASS | 200, AND filter |
 | TC-SCIM-FILTER-007 | PASS | 200, OR filter |
 | TC-SCIM-FILTER-008 | PASS | 200, name.givenName filter |
@@ -128,32 +128,32 @@
 | TC-SCIM-SCHEMA-036 | PASS | Content-Type: content-type: application/scim+json |
 | TC-SCIM-SCHEMA-037 | PASS | status is string '404' |
 | TC-SCIM-SCHEMA-038 | PASS | ServiceProviderConfig not implemented (401) |
-| TC-APIKEY-MGMT-001 | PASS | Created key id=eb63eecc-4b27-46bd-917d-ce066ca821b2, prefix=xavyo_sk_live_6f... |
-| TC-APIKEY-MGMT-002 | PASS | Key format ok: xavyo_sk_live_6fb933... |
-| TC-APIKEY-MGMT-003 | PASS | Listed 116 API key(s) |
-| TC-APIKEY-MGMT-004 | PASS | Second key created id=84ee0904-90b8-4f3a-9348-a06484298067 |
+| TC-APIKEY-MGMT-001 | PASS | Created key id=e525df10-4c5a-4e28-9252-def06c6963bb, prefix=xavyo_sk_live_e5... |
+| TC-APIKEY-MGMT-002 | PASS | Key format ok: xavyo_sk_live_e5c092... |
+| TC-APIKEY-MGMT-003 | PASS | Listed 198 API key(s) |
+| TC-APIKEY-MGMT-004 | PASS | Second key created id=eafc6a8a-0e92-4565-b87a-b0f56186b42f |
 | TC-APIKEY-MGMT-005 | PASS | Keys are unique |
-| TC-APIKEY-MGMT-006 | PASS | Rotated: new_key_id=f2b86ee7-cabd-4ddf-86fb-3a42087b11a0, prefix=xavyo_sk_live_40... |
+| TC-APIKEY-MGMT-006 | PASS | Rotated: new_key_id=03bed9da-2e69-43f5-aca7-164faffe0b4e, prefix=xavyo_sk_live_b3... |
 | TC-APIKEY-MGMT-007 | PASS | Rotation invalidates old key (grace period may apply) |
 | TC-APIKEY-MGMT-010 | PASS | Deactivated key2: 204 |
 | TC-APIKEY-MGMT-011 | PASS | Key may still appear (soft-delete with is_active=false) |
 | TC-APIKEY-MGMT-015 | PASS | Non-admin allowed: 201 (admin-only not enforced) |
 | TC-APIKEY-MGMT-016 | PASS | Non-admin list allowed: 200 (admin-only not enforced) |
 | TC-APIKEY-MGMT-017 | PASS | Scopes not supported — key created without scopes |
-| TC-APIKEY-MGMT-018 | PASS | Key with expiration created id=4d5fd23a-3127-4675-8808-ea6d4a2c0c29 |
+| TC-APIKEY-MGMT-018 | PASS | Key with expiration created id=5bf8b266-d262-4ec0-af6f-23cbb8486fe3 |
 | TC-APIKEY-MGMT-020 | PASS | Duplicate name allowed (unique key created) |
 | TC-APIKEY-MGMT-021 | PASS | Missing name rejected: 422 |
 | TC-APIKEY-MGMT-025 | PASS | Non-existent delete: 404 |
 | TC-APIKEY-MGMT-026 | PASS | Invalid UUID rejected: 405 |
 | TC-APIKEY-MGMT-028 | PASS | No hash/secret in response |
-| TC-APIKEY-USAGE-003 | PASS | Introspect ok: key_id=f2b86ee7-cabd-4ddf-86fb-3a42087b11a0 |
+| TC-APIKEY-USAGE-003 | PASS | Introspect ok: key_id=03bed9da-2e69-43f5-aca7-164faffe0b4e |
 | TC-APIKEY-USAGE-009 | PASS | Invalid key rejected: 401 |
 | TC-APIKEY-USAGE-011 | PASS | No key header: 401 |
 | TC-APIKEY-USAGE-014 | PASS | No hash in introspect response |
 | TC-APIKEY-USAGE-001 | PASS | Usage stats: {"total_requests":null,"last_used_at":null} |
-| TC-CONN-CFG-001 | PASS | Connector created id=76174134-a0f6-4fe3-b234-2dc30d3e6bde |
+| TC-CONN-CFG-001 | PASS | Connector created id=03c1e4c8-94a1-49b1-a345-2da50192603a |
 | TC-CONN-CFG-002 | PASS | Listed 12 connector(s) |
-| TC-CONN-CFG-003 | PASS | GET by id: name=batch4-conn-1770589390 |
+| TC-CONN-CFG-003 | PASS | GET by id: name=batch4-conn-1770746987 |
 | TC-CONN-CFG-004 | PASS | Updated connector: 200 |
 | TC-CONN-CFG-005 | PASS | Activated: 200 |
 | TC-CONN-CFG-006 | PASS | Deactivated: 200 |
@@ -169,17 +169,17 @@
 | TC-CONN-SYNC-003 | PASS | Operations read allowed (200) |
 | TC-CONN-SYNC-005 | PASS | Jobs endpoint: 200 |
 | TC-CONN-SYNC-006 | PASS | DLQ endpoint: 200 |
-| TC-WEBHOOK-MGMT-001 | PASS | Webhook created id=0a97d4f8-9516-45a7-995e-f4271aed2af4 |
-| TC-WEBHOOK-MGMT-002 | PASS | Listed 17 webhook(s) |
-| TC-WEBHOOK-MGMT-003 | PASS | GET by id: name=batch4-hook-1770589390 |
+| TC-WEBHOOK-MGMT-001 | PASS | Webhook created id=00ed24da-f6c6-47e2-9dae-8d1ae6593c3d |
+| TC-WEBHOOK-MGMT-002 | PASS | Listed 20 webhook(s) |
+| TC-WEBHOOK-MGMT-003 | PASS | GET by id: name=batch4-hook-1770746987 |
 | TC-WEBHOOK-MGMT-004 | PASS | PATCH update: 200 |
 | TC-WEBHOOK-MGMT-005 | PASS | PUT returns 405 (only PATCH supported) |
 | TC-WEBHOOK-MGMT-006 | PASS | Disabled webhook: enabled= |
 | TC-WEBHOOK-MGMT-007 | PASS | Re-enabled: 200 |
 | TC-WEBHOOK-MGMT-008 | PASS | Event types updated: 3 types |
-| TC-WEBHOOK-MGMT-010 | PASS | Second webhook created id=3c7267a5-cfa3-464c-ae02-1e8934a12a1e |
-| TC-WEBHOOK-MGMT-011 | PASS | List shows 18 webhooks (>=2) |
-| TC-WEBHOOK-MGMT-015 | PASS | Non-admin create allowed (201) — admin auth not enforced |
+| TC-WEBHOOK-MGMT-010 | PASS | Second webhook created id=40701dc2-09a7-4a17-8391-ac82a95f53cb |
+| TC-WEBHOOK-MGMT-011 | PASS | List shows 20 webhooks (>=2) |
+| TC-WEBHOOK-MGMT-015 | PASS | Non-admin create blocked: 403 |
 | TC-WEBHOOK-MGMT-016 | PASS | List allowed for authenticated user (200) |
 | TC-WEBHOOK-MGMT-018 | PASS | Missing url rejected: 422 |
 | TC-WEBHOOK-MGMT-019 | PASS | Invalid URL rejected: 400 |

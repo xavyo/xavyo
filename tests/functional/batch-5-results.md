@@ -1,6 +1,6 @@
 # Batch 5: OIDC · SAML · Social — Functional Test Results
 
-**Date**: 2026-02-10T10:03:51+00:00
+**Date**: 2026-02-10T18:09:54+00:00
 **Server**: http://localhost:8080
 
 ## Summary
@@ -60,8 +60,8 @@ PASS=109 FAIL=0 SKIP=0 TOTAL=109
 | TC-OIDC-IDT-040 | PASS | JWT alg=RS256 |
 | TC-OIDC-IDT-050 | PASS | JWT has 3 parts |
 | TC-OIDC-IDT-051 | PASS | Header has alg=RS256, typ=JWT |
-| TC-OIDC-IDT-052 | PASS | sub=0af6cfda-daf7-43b0-bbc2-d93f7f525e8a (UUID) |
-| TC-OIDC-IDT-054 | PASS | exp=1770718732, iat=1770717832 (numeric) |
+| TC-OIDC-IDT-052 | PASS | sub=9ddf5014-469d-42c6-99d4-67ec0ec373ab (UUID) |
+| TC-OIDC-IDT-054 | PASS | exp=1770747895, iat=1770746995 (numeric) |
 | TC-OIDC-IDT-055 | PASS | Content-Type: application/json |
 | TC-OIDC-IDT-056 | PASS | Error response has 'error' field: invalid_request |
 | TC-OIDC-IDT-057 | PASS | token_type=Bearer |
@@ -76,17 +76,17 @@ PASS=109 FAIL=0 SKIP=0 TOTAL=109
 | TC-OIDC-FED-023 | PASS | 400, no code or error |
 | TC-SAML-META-001 | PASS | 200, EntityDescriptor present |
 | TC-SAML-META-003 | PASS | Both HTTP-Redirect and HTTP-POST bindings present |
-| TC-SAML-META-004 | PASS | 201, sp_id=a981aa56-560c-4b90-aa89-f824553dd143 |
+| TC-SAML-META-004 | PASS | 201, sp_id=b013fd1e-4c56-461f-ba5a-ee0ff84e2a90 |
 | TC-SAML-META-005 | PASS | 201, minimal SP created |
-| TC-SAML-META-007 | PASS | 200, total=20 |
-| TC-SAML-META-009 | PASS | 200, name=Batch5 SP 1770717831 |
+| TC-SAML-META-007 | PASS | 200, total=23 |
+| TC-SAML-META-009 | PASS | 200, name=Batch5 SP 1770746994 |
 | TC-SAML-META-010 | PASS | 200, SP updated |
 | TC-SAML-META-014 | PASS | 409, duplicate entity_id rejected |
 | TC-SAML-META-015 | PASS | 400, empty acs_urls rejected |
 | TC-SAML-META-016 | PASS | 404, nonexistent SP |
 | TC-SAML-META-017 | PASS | 404, delete nonexistent SP |
 | TC-SAML-META-023 | PASS | 401, unauthenticated |
-| TC-SAML-META-024 | PASS | 200, read access allowed for non-admin |
+| TC-SAML-META-024 | PASS | 403, non-admin rejected |
 | TC-SAML-META-029 | PASS | Content-Type: content-type: application/xml; charset=utf-8 |
 | TC-SAML-META-031 | PASS | SAML 2.0 metadata namespace present |
 | TC-SAML-META-032 | PASS | SAML 2.0 protocol enumeration present |
@@ -100,7 +100,7 @@ PASS=109 FAIL=0 SKIP=0 TOTAL=109
 | TC-SAML-CERT-017 | PASS | 404, nonexistent certificate |
 | TC-SAML-CERT-023 | PASS | No private key in list response |
 | TC-SAML-CERT-027 | PASS | 401, unauthenticated |
-| TC-SAML-CERT-028 | PASS | 422, validation before admin check (permissive) |
+| TC-SAML-CERT-028 | PASS | 403, non-admin rejected |
 | TC-SAML-CERT-029 | PASS | No key material in error response |
 | TC-SAML-SSO-015 | PASS | 400, unknown SP rejected |
 | TC-SAML-SSO-019 | PASS | 400, empty issuer rejected |

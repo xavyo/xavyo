@@ -1235,6 +1235,20 @@ else
   fail "TC-GOV-REQ-004" "Expected 200, got $CODE"
 fi
 
+# ── Setup: Create default approval workflow (required since governance fix #12) ──
+RAW=$(admin_call POST /governance/approval-workflows -d "{
+  \"name\": \"Default-Approval-B8-${TS}\",
+  \"description\": \"Default approval workflow for batch 8 tests\",
+  \"is_default\": true,
+  \"steps\": [{\"approver_type\": \"manager\"}]
+}")
+parse_response "$RAW"
+if [[ "$CODE" == "200" || "$CODE" == "201" ]]; then
+  log "INFO  Default approval workflow created for access request tests"
+else
+  log "WARN  Could not create default workflow ($CODE) — access request tests may fail"
+fi
+
 # ── TC-GOV-REQ-005: Create access request ────────────────────────────────────
 if [[ -n "$ENT_A_ID" && "$ENT_A_ID" != "null" ]]; then
   RAW=$(admin_call POST "/governance/access-requests" -d "{

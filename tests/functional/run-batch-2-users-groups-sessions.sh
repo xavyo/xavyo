@@ -1382,6 +1382,9 @@ else
   record "TC-USER-PROFILE-032" "PASS" "$CODE — invalid token handled"
 fi
 
+# Wait for rate limit window to expire (5 req/60s on email change/verify endpoints)
+sleep 61
+
 # TC-USER-PROFILE-033: Invalid email format in change
 api_call POST "/me/email/change" "$PROF_JWT" '{"new_email":"not-an-email","current_password":"'$NEW_PW'"}'
 if [ "$CODE" = "400" ] || [ "$CODE" = "422" ]; then
