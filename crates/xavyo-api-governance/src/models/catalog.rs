@@ -74,12 +74,15 @@ pub struct ListCategoriesQuery {
     /// Filter by parent category ID. Use "null" for root categories.
     pub parent_id: Option<String>,
 
-    /// Maximum number of results to return.
-    #[serde(default = "default_limit")]
+    /// Maximum number of results to return (clamped to 1-100).
+    #[serde(
+        default = "default_limit",
+        deserialize_with = "deserialize_clamped_limit"
+    )]
     pub limit: i64,
 
-    /// Number of results to skip.
-    #[serde(default)]
+    /// Number of results to skip (non-negative).
+    #[serde(default, deserialize_with = "deserialize_non_negative_offset")]
     pub offset: i64,
 }
 
@@ -242,12 +245,15 @@ pub struct ListCatalogItemsQuery {
     /// Beneficiary ID for eligibility check.
     pub beneficiary_id: Option<Uuid>,
 
-    /// Maximum number of results to return.
-    #[serde(default = "default_limit")]
+    /// Maximum number of results to return (clamped to 1-100).
+    #[serde(
+        default = "default_limit",
+        deserialize_with = "deserialize_clamped_limit"
+    )]
     pub limit: i64,
 
-    /// Number of results to skip.
-    #[serde(default)]
+    /// Number of results to skip (non-negative).
+    #[serde(default, deserialize_with = "deserialize_non_negative_offset")]
     pub offset: i64,
 }
 
@@ -594,12 +600,15 @@ pub struct ListCatalogRequestsQuery {
     /// Filter by submission ID.
     pub submission_id: Option<Uuid>,
 
-    /// Maximum number of results to return.
-    #[serde(default = "default_limit")]
+    /// Maximum number of results to return (clamped to 1-100).
+    #[serde(
+        default = "default_limit",
+        deserialize_with = "deserialize_clamped_limit"
+    )]
     pub limit: i64,
 
-    /// Number of results to skip.
-    #[serde(default)]
+    /// Number of results to skip (non-negative).
+    #[serde(default, deserialize_with = "deserialize_non_negative_offset")]
     pub offset: i64,
 }
 
@@ -662,6 +671,24 @@ pub struct CatalogRequestListResponse {
 
 fn default_limit() -> i64 {
     50
+}
+
+/// Deserialize limit with clamping to [1, 100].
+fn deserialize_clamped_limit<'de, D>(deserializer: D) -> Result<i64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let v = i64::deserialize(deserializer)?;
+    Ok(v.clamp(1, 100))
+}
+
+/// Deserialize offset ensuring non-negative.
+fn deserialize_non_negative_offset<'de, D>(deserializer: D) -> Result<i64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let v = i64::deserialize(deserializer)?;
+    Ok(v.max(0))
 }
 
 #[cfg(test)]

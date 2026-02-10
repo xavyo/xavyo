@@ -218,9 +218,26 @@ impl OAuthError {
     }
 
     /// Convert to `OAuth2` error response.
+    ///
+    /// Internal errors are sanitized to prevent information leakage.
     #[must_use]
     pub fn to_response(&self) -> OAuthErrorResponse {
-        OAuthErrorResponse::new(self.error_code(), self.to_string())
+        let description = match self {
+            Self::Database(ref e) => {
+                tracing::error!("OAuth database error: {:?}", e);
+                "An internal error occurred".to_string()
+            }
+            Self::Jwt(ref e) => {
+                tracing::error!("OAuth JWT error: {:?}", e);
+                "An internal error occurred".to_string()
+            }
+            Self::Internal(ref msg) => {
+                tracing::error!("OAuth internal error: {}", msg);
+                "An internal error occurred".to_string()
+            }
+            _ => self.to_string(),
+        };
+        OAuthErrorResponse::new(self.error_code(), description)
     }
 }
 

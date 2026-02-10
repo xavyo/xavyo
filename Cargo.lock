@@ -8410,6 +8410,7 @@ dependencies = [
  "tracing",
  "utoipa",
  "uuid",
+ "validator",
  "xavyo-auth",
  "xavyo-connector",
  "xavyo-connector-database",

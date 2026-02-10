@@ -459,6 +459,18 @@ pub fn signup_rate_limiter() -> RateLimiter {
     })
 }
 
+/// Rate limiter for sensitive endpoints (MFA verification, password change, email change).
+///
+/// Configuration: 5 attempts per IP per minute.
+/// Protects against brute-force attacks on authentication factors.
+#[must_use]
+pub fn sensitive_rate_limiter() -> RateLimiter {
+    RateLimiter::new(RateLimitConfig {
+        max_attempts: 5,
+        window: Duration::from_secs(60),
+    })
+}
+
 /// Rate limiting middleware specifically for signup endpoint (F111).
 ///
 /// Similar to `rate_limit_middleware` but uses a separate rate limiter

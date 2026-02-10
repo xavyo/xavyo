@@ -8,6 +8,7 @@ use axum::{
 use chrono::Utc;
 use uuid::Uuid;
 
+use validator::Validate;
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::{
     ConnectorFilter, CreateConnectorConfiguration, UpdateConnectorConfiguration,
@@ -114,6 +115,9 @@ pub async fn create_connector(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
+    request
+        .validate()
+        .map_err(|e| ConnectorApiError::Validation(e.to_string()))?;
     let tenant_id = extract_tenant_id(&claims)?;
 
     let input = CreateConnectorConfiguration {
@@ -160,6 +164,9 @@ pub async fn update_connector(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
+    request
+        .validate()
+        .map_err(|e| ConnectorApiError::Validation(e.to_string()))?;
     let tenant_id = extract_tenant_id(&claims)?;
 
     let input = UpdateConnectorConfiguration {

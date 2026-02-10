@@ -16,7 +16,8 @@ pub use permission_guard::{
     PermissionGuardState, ScopeCheckResult,
 };
 pub use rate_limit::{
-    rate_limit_middleware, signup_rate_limit_middleware, signup_rate_limiter, ApiKeyRateLimiter,
+    rate_limit_middleware, sensitive_rate_limiter, signup_rate_limit_middleware,
+    signup_rate_limiter, ApiKeyRateLimiter,
     EmailRateLimiter, RateLimitConfig, RateLimitKey, RateLimiter, DEFAULT_MAX_ATTEMPTS,
     DEFAULT_WINDOW_SECS, EMAIL_IP_RATE_LIMIT_MAX, EMAIL_RATE_LIMIT_MAX,
     EMAIL_RATE_LIMIT_WINDOW_SECS, SIGNUP_RATE_LIMIT_MAX, SIGNUP_RATE_LIMIT_WINDOW_SECS,
