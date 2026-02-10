@@ -176,28 +176,15 @@ impl Modify for SecurityAddon {
         (name = "SCIM Target Sync", description = "SCIM 2.0 outbound sync triggering and run history"),
         (name = "SCIM Target Provisioning", description = "SCIM 2.0 outbound provisioning state and retry management"),
         (name = "SCIM Target Logs", description = "SCIM 2.0 outbound provisioning operation logs"),
-        // AI Agent Security (F089)
-        (name = "AI Agents", description = "AI agent registry and lifecycle management"),
-        (name = "AI Agent Tools", description = "AI tool registry and schema management"),
-        (name = "AI Agent Permissions", description = "Agent-tool permission grants and revocation"),
-        (name = "AI Agent Authorization", description = "Real-time authorization decisions for agent tool invocations"),
-        (name = "AI Agent Audit", description = "Agent activity audit trail queries"),
+        // AI Agent Security (F089) — replaced by MCP/A2A protocol handlers
         (name = "AI Agent Discovery", description = "A2A Protocol AgentCard discovery"),
         // MCP & A2A Protocol (F091)
         (name = "MCP Tools", description = "Model Context Protocol tool discovery and invocation"),
         (name = "A2A Tasks", description = "Agent-to-Agent Protocol task management"),
-        // Human-in-the-Loop Approval (F092)
-        (name = "AI Agent Approvals", description = "Human-in-the-loop approval workflow for AI agent tool invocations"),
+        // (F092 — AI Agent Approvals superseded by NHI Permissions)
         // Tenant Provisioning (F097)
         (name = "Tenant Provisioning", description = "Self-service tenant creation for authenticated users"),
-        // Unified NHI (F108, F109)
-        (name = "Unified NHI", description = "Unified Non-Human Identity view spanning service accounts and AI agents"),
-        (name = "Unified NHI Certification", description = "Cross-type certification campaigns for unified NHI governance"),
-        // NHI API Consolidation (F109)
-        (name = "NHI - Service Accounts", description = "Service account lifecycle, credentials, usage, risk, and self-service requests"),
-        (name = "NHI - Agents", description = "AI agent management, permissions, authorization, audit, and anomaly detection"),
-        (name = "NHI - Tools", description = "Tool registry for AI agent capabilities"),
-        (name = "NHI - Approvals", description = "Human-in-the-loop approval workflow for agent tool invocations"),
+        // (F108/F109 — Unified NHI and NHI API Consolidation superseded by Feature 201 unified model)
         // Unified NHI Data Model (201-tool-nhi-promotion)
         (name = "NHI", description = "Unified Non-Human Identity list and detail endpoints"),
         (name = "NHI Lifecycle", description = "NHI lifecycle state transitions (suspend, reactivate, deprecate, archive, deactivate, activate)"),
@@ -222,8 +209,29 @@ impl Modify for SecurityAddon {
         // SCIM
         (name = "SCIM Groups", description = "SCIM 2.0 group provisioning"),
         (name = "SCIM Admin", description = "SCIM token and mapping management"),
+        // Connector Mappings & Schemas
+        (name = "Connector Mappings", description = "Connector attribute mapping configuration"),
+        (name = "Connector Conflicts", description = "Provisioning conflict detection and resolution"),
+        (name = "Connector Schemas", description = "Connector schema management"),
+        (name = "Schema Discovery", description = "Connector schema discovery and diff"),
+        (name = "Schema Browsing", description = "Connector schema object class browsing"),
+        (name = "Schema Scheduling", description = "Connector schema refresh scheduling"),
         // Connector Jobs
-        (name = "Connector Jobs", description = "Connector job tracking and dead letter queue")
+        (name = "Connector Jobs", description = "Connector job tracking and dead letter queue"),
+        // Governance - Correlation
+        (name = "Governance - Correlation Audit", description = "Identity correlation audit events"),
+        (name = "Governance - Correlation Review", description = "Identity correlation case review and resolution"),
+        (name = "Governance - Correlation Statistics", description = "Identity correlation statistics and trends"),
+        // Governance - Manual Tasks & Ticketing
+        (name = "Governance - Manual Provisioning Tasks", description = "Manual provisioning task management and SLA tracking"),
+        (name = "Governance - Ticketing Admin", description = "Ticketing system configuration management"),
+        (name = "Governance - Ticketing Webhooks", description = "Ticketing system webhook integration"),
+        // Governance - NHI sub-tags
+        (name = "Governance - NHI Certification", description = "Governance NHI certification campaigns, items, and decisions"),
+        (name = "Governance - NHI Credentials", description = "Governance NHI credential lifecycle management"),
+        (name = "Governance - NHI Requests", description = "Governance NHI access request workflow"),
+        (name = "Governance - NHI Risk", description = "Governance NHI risk scoring and batch calculation"),
+        (name = "Governance - NHI Usage", description = "Governance NHI usage tracking and summary")
     ),
     paths(
         // Health

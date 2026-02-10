@@ -41,7 +41,7 @@ use xavyo_db::{GovLifecycleState, GovLifecycleTransition};
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Lifecycle Configuration"
+    tag = "Governance - Lifecycle Config"
 )]
 pub async fn list_configs(
     State(state): State<GovernanceState>,
@@ -76,7 +76,7 @@ pub async fn list_configs(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Lifecycle Configuration"
+    tag = "Governance - Lifecycle Config"
 )]
 pub async fn get_config(
     State(state): State<GovernanceState>,
@@ -110,7 +110,7 @@ pub async fn get_config(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Lifecycle Configuration"
+    tag = "Governance - Lifecycle Config"
 )]
 pub async fn create_config(
     State(state): State<GovernanceState>,
@@ -149,7 +149,7 @@ pub async fn create_config(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Lifecycle Configuration"
+    tag = "Governance - Lifecycle Config"
 )]
 pub async fn update_config(
     State(state): State<GovernanceState>,
@@ -189,7 +189,7 @@ pub async fn update_config(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Lifecycle Configuration"
+    tag = "Governance - Lifecycle Config"
 )]
 pub async fn delete_config(
     State(state): State<GovernanceState>,
@@ -229,7 +229,7 @@ pub async fn delete_config(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Lifecycle Configuration"
+    tag = "Governance - Lifecycle Config"
 )]
 pub async fn add_state(
     State(state): State<GovernanceState>,
@@ -270,7 +270,7 @@ pub async fn add_state(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Lifecycle Configuration"
+    tag = "Governance - Lifecycle Config"
 )]
 pub async fn update_state(
     State(state): State<GovernanceState>,
@@ -311,7 +311,7 @@ pub async fn update_state(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Lifecycle Configuration"
+    tag = "Governance - Lifecycle Config"
 )]
 pub async fn delete_state(
     State(state): State<GovernanceState>,
@@ -351,7 +351,7 @@ pub async fn delete_state(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Lifecycle Configuration"
+    tag = "Governance - Lifecycle Config"
 )]
 pub async fn add_transition(
     State(state): State<GovernanceState>,
@@ -391,7 +391,7 @@ pub async fn add_transition(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Lifecycle Configuration"
+    tag = "Governance - Lifecycle Config"
 )]
 pub async fn delete_transition(
     State(state): State<GovernanceState>,
@@ -799,7 +799,7 @@ pub async fn update_state_actions(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Lifecycle Configuration"
+    tag = "Governance - Lifecycle Config"
 )]
 pub async fn get_user_lifecycle_status(
     State(state): State<GovernanceState>,

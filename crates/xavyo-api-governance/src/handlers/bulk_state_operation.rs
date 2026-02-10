@@ -35,7 +35,7 @@ use xavyo_auth::JwtClaims;
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Bulk State Operations"
+    tag = "Governance - Bulk Operations"
 )]
 pub async fn create_bulk_operation(
     State(state): State<GovernanceState>,
@@ -68,7 +68,7 @@ pub async fn create_bulk_operation(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Bulk State Operations"
+    tag = "Governance - Bulk Operations"
 )]
 pub async fn list_bulk_operations(
     State(state): State<GovernanceState>,
@@ -103,7 +103,7 @@ pub async fn list_bulk_operations(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Bulk State Operations"
+    tag = "Governance - Bulk Operations"
 )]
 pub async fn get_bulk_operation(
     State(state): State<GovernanceState>,
@@ -139,7 +139,7 @@ pub async fn get_bulk_operation(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Bulk State Operations"
+    tag = "Governance - Bulk Operations"
 )]
 pub async fn cancel_bulk_operation(
     State(state): State<GovernanceState>,
@@ -172,7 +172,7 @@ pub async fn cancel_bulk_operation(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Bulk State Operations"
+    tag = "Governance - Bulk Operations"
 )]
 pub async fn process_bulk_operations(
     State(state): State<GovernanceState>,

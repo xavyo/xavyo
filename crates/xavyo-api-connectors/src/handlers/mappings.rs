@@ -51,7 +51,7 @@ pub struct ListMappingsQuery {
     params(
         ("connector_id" = Uuid, Path, description = "Connector ID"),
     ),
-    tag = "mappings"
+    tag = "Connector Mappings"
 )]
 pub async fn create_mapping(
     State(state): State<ConnectorState>,
@@ -92,7 +92,7 @@ pub async fn create_mapping(
         ("connector_id" = Uuid, Path, description = "Connector ID"),
         ("object_class" = Option<String>, Query, description = "Filter by object class"),
     ),
-    tag = "mappings"
+    tag = "Connector Mappings"
 )]
 pub async fn list_mappings(
     State(state): State<ConnectorState>,
@@ -124,7 +124,7 @@ pub async fn list_mappings(
         ("connector_id" = Uuid, Path, description = "Connector ID"),
         ("mapping_id" = Uuid, Path, description = "Mapping ID"),
     ),
-    tag = "mappings"
+    tag = "Connector Mappings"
 )]
 pub async fn get_mapping(
     State(state): State<ConnectorState>,
@@ -157,7 +157,7 @@ pub async fn get_mapping(
         ("connector_id" = Uuid, Path, description = "Connector ID"),
         ("mapping_id" = Uuid, Path, description = "Mapping ID"),
     ),
-    tag = "mappings"
+    tag = "Connector Mappings"
 )]
 pub async fn update_mapping(
     State(state): State<ConnectorState>,
@@ -192,7 +192,7 @@ pub async fn update_mapping(
         ("connector_id" = Uuid, Path, description = "Connector ID"),
         ("mapping_id" = Uuid, Path, description = "Mapping ID"),
     ),
-    tag = "mappings"
+    tag = "Connector Mappings"
 )]
 pub async fn delete_mapping(
     State(state): State<ConnectorState>,
@@ -228,7 +228,7 @@ pub async fn delete_mapping(
         ("connector_id" = Uuid, Path, description = "Connector ID"),
         ("mapping_id" = Uuid, Path, description = "Mapping ID"),
     ),
-    tag = "mappings"
+    tag = "Connector Mappings"
 )]
 pub async fn preview_mapping(
     State(state): State<ConnectorState>,

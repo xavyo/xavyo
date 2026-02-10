@@ -291,7 +291,7 @@ pub struct RefreshScheduleResponse {
         (status = 404, description = "Connector not found"),
         (status = 500, description = "Schema discovery failed")
     ),
-    tag = "Schemas"
+    tag = "Connector Schemas"
 )]
 pub async fn discover_schema(
     State(state): State<ConnectorState>,
@@ -322,7 +322,7 @@ pub async fn discover_schema(
         (status = 200, description = "Cached schema", body = SchemaResponse),
         (status = 404, description = "No cached schema found")
     ),
-    tag = "Schemas"
+    tag = "Connector Schemas"
 )]
 pub async fn get_schema(
     State(state): State<ConnectorState>,
@@ -355,7 +355,7 @@ pub async fn get_schema(
         (status = 200, description = "Object class details", body = ObjectClassResponse),
         (status = 404, description = "Object class not found")
     ),
-    tag = "Schemas"
+    tag = "Connector Schemas"
 )]
 pub async fn get_object_class(
     State(state): State<ConnectorState>,
@@ -387,7 +387,7 @@ pub async fn get_object_class(
         (status = 204, description = "Schema cache cleared"),
         (status = 404, description = "Connector not found")
     ),
-    tag = "Schemas"
+    tag = "Connector Schemas"
 )]
 pub async fn clear_schema_cache(
     State(state): State<ConnectorState>,

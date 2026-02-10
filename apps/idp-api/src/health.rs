@@ -61,7 +61,7 @@ pub enum HealthState {
 #[utoipa::path(
     get,
     path = "/health",
-    tag = "health",
+    tag = "Health",
     responses(
         (status = 200, description = "Service health status", body = HealthResponse),
     )

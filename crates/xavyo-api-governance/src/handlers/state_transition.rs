@@ -51,7 +51,7 @@ pub struct RollbackRequest {
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "State Transitions"
+    tag = "Governance - State Transitions"
 )]
 pub async fn execute_transition(
     State(state): State<GovernanceState>,
@@ -88,7 +88,7 @@ pub async fn execute_transition(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "State Transitions"
+    tag = "Governance - State Transitions"
 )]
 pub async fn get_object_state(
     State(state): State<GovernanceState>,
@@ -119,7 +119,7 @@ pub async fn get_object_state(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "State Transitions"
+    tag = "Governance - State Transitions"
 )]
 pub async fn list_transition_requests(
     State(state): State<GovernanceState>,
@@ -153,7 +153,7 @@ pub async fn list_transition_requests(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "State Transitions"
+    tag = "Governance - State Transitions"
 )]
 pub async fn get_transition_request(
     State(state): State<GovernanceState>,
@@ -184,7 +184,7 @@ pub async fn get_transition_request(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "State Transitions"
+    tag = "Governance - State Transitions"
 )]
 pub async fn list_transition_audit(
     State(state): State<GovernanceState>,
@@ -218,7 +218,7 @@ pub async fn list_transition_audit(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "State Transitions"
+    tag = "Governance - State Transitions"
 )]
 pub async fn get_transition_audit(
     State(state): State<GovernanceState>,
@@ -255,7 +255,7 @@ pub async fn get_transition_audit(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "State Transitions"
+    tag = "Governance - State Transitions"
 )]
 pub async fn rollback_transition(
     State(state): State<GovernanceState>,
@@ -294,7 +294,7 @@ pub async fn rollback_transition(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "State Transitions"
+    tag = "Governance - State Transitions"
 )]
 pub async fn get_affected_entitlements(
     State(state): State<GovernanceState>,
@@ -377,7 +377,7 @@ impl From<ExportFormat> for OutputFormat {
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "State Transitions"
+    tag = "Governance - State Transitions"
 )]
 pub async fn export_transition_audit(
     State(state): State<GovernanceState>,

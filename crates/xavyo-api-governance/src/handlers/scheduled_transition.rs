@@ -35,7 +35,7 @@ const DEFAULT_BATCH_SIZE: i64 = 100;
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Scheduled Transitions"
+    tag = "Governance - Scheduled Transitions"
 )]
 pub async fn list_scheduled_transitions(
     State(state): State<GovernanceState>,
@@ -69,7 +69,7 @@ pub async fn list_scheduled_transitions(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Scheduled Transitions"
+    tag = "Governance - Scheduled Transitions"
 )]
 pub async fn get_scheduled_transition(
     State(state): State<GovernanceState>,
@@ -104,7 +104,7 @@ pub async fn get_scheduled_transition(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Scheduled Transitions"
+    tag = "Governance - Scheduled Transitions"
 )]
 pub async fn cancel_scheduled_transition(
     State(state): State<GovernanceState>,
@@ -137,7 +137,7 @@ pub async fn cancel_scheduled_transition(
         (status = 500, description = "Internal server error")
     ),
     security(("bearer_auth" = [])),
-    tag = "Scheduled Transitions"
+    tag = "Governance - Scheduled Transitions"
 )]
 pub async fn trigger_due_transitions(
     State(state): State<GovernanceState>,

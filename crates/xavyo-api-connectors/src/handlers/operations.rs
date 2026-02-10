@@ -73,7 +73,7 @@ fn default_limit() -> i64 {
 #[utoipa::path(
     get,
     path = "/operations",
-    tag = "Operations",
+    tag = "Connector Operations",
     params(ListOperationsQuery),
     responses(
         (status = 200, description = "List of operations", body = OperationListResponse),
@@ -110,7 +110,7 @@ pub async fn list_operations(
 #[utoipa::path(
     get,
     path = "/operations/{id}",
-    tag = "Operations",
+    tag = "Connector Operations",
     params(
         ("id" = Uuid, Path, description = "Operation ID")
     ),
@@ -138,7 +138,7 @@ pub async fn get_operation(
 #[utoipa::path(
     post,
     path = "/operations",
-    tag = "Operations",
+    tag = "Connector Operations",
     request_body = TriggerOperationRequest,
     responses(
         (status = 201, description = "Operation created", body = OperationResponse),
@@ -171,7 +171,7 @@ pub async fn trigger_operation(
 #[utoipa::path(
     post,
     path = "/operations/{id}/retry",
-    tag = "Operations",
+    tag = "Connector Operations",
     params(
         ("id" = Uuid, Path, description = "Operation ID")
     ),
@@ -206,7 +206,7 @@ pub async fn retry_operation(
 #[utoipa::path(
     post,
     path = "/operations/{id}/cancel",
-    tag = "Operations",
+    tag = "Connector Operations",
     params(
         ("id" = Uuid, Path, description = "Operation ID")
     ),
@@ -241,7 +241,7 @@ pub async fn cancel_operation(
 #[utoipa::path(
     get,
     path = "/operations/{id}/logs",
-    tag = "Operations",
+    tag = "Connector Operations",
     params(
         ("id" = Uuid, Path, description = "Operation ID")
     ),
@@ -272,7 +272,7 @@ pub async fn get_operation_logs(
 #[utoipa::path(
     get,
     path = "/operations/stats",
-    tag = "Operations",
+    tag = "Connector Operations",
     params(
         ("connector_id" = Option<Uuid>, Query, description = "Filter by connector ID")
     ),
@@ -334,7 +334,7 @@ impl Default for DlqQuery {
 #[utoipa::path(
     get,
     path = "/operations/dlq",
-    tag = "Operations",
+    tag = "Connector Operations",
     params(DlqQuery),
     responses(
         (status = 200, description = "List of dead letter operations", body = DlqListResponse),
@@ -367,7 +367,7 @@ pub async fn list_dead_letter(
 #[utoipa::path(
     post,
     path = "/operations/{id}/resolve",
-    tag = "Operations",
+    tag = "Connector Operations",
     params(
         ("id" = Uuid, Path, description = "Operation ID")
     ),
@@ -405,7 +405,7 @@ pub async fn resolve_operation(
 #[utoipa::path(
     get,
     path = "/operations/{id}/attempts",
-    tag = "Operations",
+    tag = "Connector Operations",
     params(
         ("id" = Uuid, Path, description = "Operation ID")
     ),
@@ -439,7 +439,7 @@ pub async fn get_operation_attempts(
 #[utoipa::path(
     get,
     path = "/operations/conflicts",
-    tag = "Conflicts",
+    tag = "Connector Conflicts",
     params(ListConflictsQuery),
     responses(
         (status = 200, description = "List of conflicts", body = ConflictListResponse),
@@ -506,7 +506,7 @@ pub async fn list_conflicts(
 #[utoipa::path(
     get,
     path = "/operations/conflicts/{conflict_id}",
-    tag = "Conflicts",
+    tag = "Connector Conflicts",
     params(
         ("conflict_id" = Uuid, Path, description = "Conflict ID")
     ),
@@ -547,7 +547,7 @@ pub async fn get_conflict(
 #[utoipa::path(
     post,
     path = "/operations/conflicts/{conflict_id}/resolve",
-    tag = "Conflicts",
+    tag = "Connector Conflicts",
     params(
         ("conflict_id" = Uuid, Path, description = "Conflict ID")
     ),
