@@ -54,7 +54,10 @@ use xavyo_api_nhi::{nhi_router, NhiState};
 use xavyo_api_oauth::router::{
     admin_oauth_router, device_router, oauth_router, well_known_router, OAuthState,
 };
-use xavyo_api_oidc_federation::{admin_routes as federation_admin_routes_fn, auth_routes as federation_auth_routes_fn, FederationConfig, FederationState};
+use xavyo_api_oidc_federation::{
+    admin_routes as federation_admin_routes_fn, auth_routes as federation_auth_routes_fn,
+    FederationConfig, FederationState,
+};
 use xavyo_api_saml::{create_saml_state, saml_admin_router, saml_public_router};
 use xavyo_api_scim::{scim_admin_router, scim_resource_router, ScimConfig};
 use xavyo_api_social::{admin_social_router, public_social_router, SocialConfig, SocialState};
@@ -63,8 +66,8 @@ use xavyo_api_tenants::{
     tenant_router,
 };
 use xavyo_api_users::{
-    attribute_definitions_router, bulk_operations_router, groups_router,
-    middleware::admin_guard, users_router, UsersState,
+    attribute_definitions_router, bulk_operations_router, groups_router, middleware::admin_guard,
+    users_router, UsersState,
 };
 use xavyo_connector::crypto::CredentialEncryption;
 use xavyo_connector::registry::ConnectorRegistry;

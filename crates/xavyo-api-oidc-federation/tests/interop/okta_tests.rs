@@ -5,7 +5,7 @@
 use super::common::*;
 use serde_json::json;
 use xavyo_api_oidc_federation::error::FederationError;
-use xavyo_api_oidc_federation::services::{TokenVerifierService, VerificationConfig};
+use xavyo_api_oidc_federation::services::VerificationConfig;
 
 /// Okta-specific test fixtures
 mod okta_fixtures {
