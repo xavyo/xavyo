@@ -69,7 +69,6 @@ Comprehensive integration guides available in `docs/`:
 - `xavyo-tenant` - Multi-tenant middleware
 
 ### External (key)
-- `samael` - SAML 2.0 protocol library
 - `openssl` - Certificate/signature handling
 - `axum` - Web framework
 - `quick-xml` - XML parsing

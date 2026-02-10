@@ -8,9 +8,6 @@ license = "BSL-1.1"
 publish = false
 
 [dependencies]
-# SAML 2.0 library
-samael = "0.0.17"
-
 # Cryptography
 openssl = "0.10"
 
