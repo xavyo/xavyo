@@ -775,12 +775,11 @@ fi
 
 # ── TC-OIDC-IDT-055: Token response Content-Type is application/json ──────
 if [ -n "$CLIENT_ID" ] && [ "$CLIENT_ID" != "null" ]; then
-  HEADERS=$(curl -sI -X POST \
+  CT=$(curl -s -o /dev/null -w "%{content_type}" -X POST \
     -H "X-Tenant-ID: $TENANT_ID" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     "$BASE/oauth/token" \
     -d "grant_type=client_credentials&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET")
-  CT=$(echo "$HEADERS" | grep -i 'content-type' | head -1)
   if echo "$CT" | grep -qi 'application/json'; then
     pass "TC-OIDC-IDT-055" "Content-Type: application/json"
   else

@@ -1,11 +1,11 @@
 # Batch 5: OIDC · SAML · Social — Functional Test Results
 
-**Date**: 2026-02-08T22:23:16+00:00
+**Date**: 2026-02-10T10:03:51+00:00
 **Server**: http://localhost:8080
 
 ## Summary
 
-PASS=102 FAIL=0 SKIP=7 TOTAL=109
+PASS=109 FAIL=0 SKIP=0 TOTAL=109
 
 ## Results
 
@@ -54,18 +54,18 @@ PASS=102 FAIL=0 SKIP=7 TOTAL=109
 | TC-OIDC-UI-020 | PASS | 403, insufficient scope: Insufficient scope: The access token must have openid scope for userinfo |
 | TC-OIDC-UI-022 | PASS | No sensitive fields in response |
 | TC-OIDC-UI-024 | PASS | No CORS wildcard |
-| TC-OIDC-IDT-008 | SKIP | No OAuth client |
-| TC-OIDC-IDT-029 | SKIP | No OAuth client |
-| TC-OIDC-IDT-030 | SKIP | No OAuth client |
+| TC-OIDC-IDT-008 | PASS | 200, no id_token for client_credentials (correct) |
+| TC-OIDC-IDT-029 | PASS | 400, unsupported grant_type rejected |
+| TC-OIDC-IDT-030 | PASS | 400, empty grant_type rejected |
 | TC-OIDC-IDT-040 | PASS | JWT alg=RS256 |
 | TC-OIDC-IDT-050 | PASS | JWT has 3 parts |
 | TC-OIDC-IDT-051 | PASS | Header has alg=RS256, typ=JWT |
-| TC-OIDC-IDT-052 | PASS | sub=062e9b80-81d4-4b59-9e48-159d50c788fd (UUID) |
-| TC-OIDC-IDT-054 | PASS | exp=1770590297, iat=1770589397 (numeric) |
-| TC-OIDC-IDT-055 | SKIP | No OAuth client |
-| TC-OIDC-IDT-056 | SKIP | No OAuth client |
-| TC-OIDC-IDT-057 | SKIP | No OAuth client |
-| TC-OIDC-IDT-058 | SKIP | No OAuth client |
+| TC-OIDC-IDT-052 | PASS | sub=0af6cfda-daf7-43b0-bbc2-d93f7f525e8a (UUID) |
+| TC-OIDC-IDT-054 | PASS | exp=1770718732, iat=1770717832 (numeric) |
+| TC-OIDC-IDT-055 | PASS | Content-Type: application/json |
+| TC-OIDC-IDT-056 | PASS | Error response has 'error' field: invalid_request |
+| TC-OIDC-IDT-057 | PASS | token_type=Bearer |
+| TC-OIDC-IDT-058 | PASS | expires_in=900 |
 | TC-OIDC-FED-001 | PASS | 200, authentication_method=standard |
 | TC-OIDC-FED-002 | PASS | 200, standard for unknown domain |
 | TC-OIDC-FED-025 | PASS | 400, non-existent IdP rejected |
@@ -76,10 +76,10 @@ PASS=102 FAIL=0 SKIP=7 TOTAL=109
 | TC-OIDC-FED-023 | PASS | 400, no code or error |
 | TC-SAML-META-001 | PASS | 200, EntityDescriptor present |
 | TC-SAML-META-003 | PASS | Both HTTP-Redirect and HTTP-POST bindings present |
-| TC-SAML-META-004 | PASS | 201, sp_id=8cda6ba6-1319-4397-8221-f030fce84093 |
+| TC-SAML-META-004 | PASS | 201, sp_id=a981aa56-560c-4b90-aa89-f824553dd143 |
 | TC-SAML-META-005 | PASS | 201, minimal SP created |
-| TC-SAML-META-007 | PASS | 200, total=16 |
-| TC-SAML-META-009 | PASS | 200, name=Batch5 SP 1770589396 |
+| TC-SAML-META-007 | PASS | 200, total=20 |
+| TC-SAML-META-009 | PASS | 200, name=Batch5 SP 1770717831 |
 | TC-SAML-META-010 | PASS | 200, SP updated |
 | TC-SAML-META-014 | PASS | 409, duplicate entity_id rejected |
 | TC-SAML-META-015 | PASS | 400, empty acs_urls rejected |
