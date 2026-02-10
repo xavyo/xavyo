@@ -543,6 +543,16 @@ impl DelegatedAdminService {
         // Invalidate user's permission cache
         self.invalidate_user_permission_cache(tenant_id, user_id);
 
+        // Revoke user's active sessions so new permissions take effect immediately
+        let _ = sqlx::query(
+            "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
+             WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .execute(&self.pool)
+        .await;
+
         // Log the action
         self.log_admin_action(
             tenant_id,
@@ -709,6 +719,16 @@ impl DelegatedAdminService {
 
         // Invalidate user's permission cache
         self.invalidate_user_permission_cache(tenant_id, assignment.user_id);
+
+        // Revoke user's active sessions so permission removal takes effect immediately
+        let _ = sqlx::query(
+            "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
+             WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+        )
+        .bind(assignment.user_id)
+        .bind(tenant_id)
+        .execute(&self.pool)
+        .await;
 
         // Log the action
         self.log_admin_action(
