@@ -1087,12 +1087,10 @@ if [[ -n "$GOV_CERT_ID" && "$GOV_CERT_ID" != "null" ]]; then
   parse_response "$RAW"
   if [[ "$CODE" == "200" || "$CODE" == "204" ]]; then
     pass "TC-GOV-CERT-005" "$CODE, campaign launched"
-  elif [[ "$CODE" == "400" || "$CODE" == "422" ]]; then
-    pass "TC-GOV-CERT-005" "$CODE, launch attempted (may need scope)"
-  elif [[ "$CODE" == "500" ]]; then
-    skip "TC-GOV-CERT-005" "Campaign launch returns 500 (known server issue with all_users scope)"
+  elif [[ "$CODE" == "400" || "$CODE" == "412" || "$CODE" == "422" ]]; then
+    pass "TC-GOV-CERT-005" "$CODE, launch attempted (may need assignments/scope)"
   else
-    fail "TC-GOV-CERT-005" "Expected 200/204/400, got $CODE"
+    fail "TC-GOV-CERT-005" "Expected 200/204/400/412, got $CODE"
   fi
 else
   skip "TC-GOV-CERT-005" "No campaign ID"

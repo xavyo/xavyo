@@ -342,14 +342,17 @@ impl CertificationCampaignService {
         &self,
         tenant_id: Uuid,
     ) -> Result<Vec<GovEntitlementAssignment>> {
-        // Get all active user assignments (not group assignments for certification)
+        // Get all active user assignments (not group assignments for certification).
+        // JOIN gov_entitlements to ensure the referenced entitlement still exists,
+        // preventing FK violations when creating certification items.
         sqlx::query_as::<_, GovEntitlementAssignment>(
             r"
-            SELECT * FROM gov_entitlement_assignments
-            WHERE tenant_id = $1
-              AND target_type = 'user'
-              AND status = 'active'
-            ORDER BY created_at
+            SELECT a.* FROM gov_entitlement_assignments a
+            JOIN gov_entitlements e ON a.entitlement_id = e.id AND e.tenant_id = $1
+            WHERE a.tenant_id = $1
+              AND a.target_type = 'user'
+              AND a.status = 'active'
+            ORDER BY a.created_at
             LIMIT 50000
             ",
         )

@@ -326,15 +326,15 @@ pub async fn delete_archetype(
     let archetype = state.persona_archetype_service.get(tenant_id, id).await?;
     let name = archetype.name.clone();
 
-    state
-        .persona_archetype_service
-        .delete(tenant_id, id)
-        .await?;
-
-    // Log audit event
+    // Log audit event BEFORE deletion so the FK reference is still valid
     state
         .persona_audit_service
         .log_archetype_deleted(tenant_id, actor_id, id, &name)
+        .await?;
+
+    state
+        .persona_archetype_service
+        .delete(tenant_id, id)
         .await?;
 
     Ok(StatusCode::NO_CONTENT)

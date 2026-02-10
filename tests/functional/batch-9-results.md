@@ -1,11 +1,11 @@
 # Batch 9: Governance Deep — Role Mining, Identity Merge, Personas, Risk
 
-**Date**: 2026-02-08T22:23:55+00:00
+**Date**: 2026-02-10T11:59:31+00:00
 **Server**: http://localhost:8080
 
 ## Summary
 
-PASS=121 FAIL=0 SKIP=1 TOTAL=122
+PASS=122 FAIL=0 SKIP=0 TOTAL=122
 
 ## Results
 
@@ -99,7 +99,7 @@ PASS=121 FAIL=0 SKIP=1 TOTAL=122
 | TC-PER-030 | PASS | Get persona audit trail — 200 |
 | TC-PER-031 | PASS | Deactivate persona — 200 |
 | TC-PER-032 | PASS | Archive persona — 200 |
-| TC-PER-033 | SKIP | Delete blocked by audit events FK (500) |
+| TC-PER-033 | PASS | Create+delete archetype — 204 |
 | TC-RISK-001 | PASS | Get user risk score — 200 |
 | TC-RISK-002 | PASS | Calculate risk score — 200 |
 | TC-RISK-003 | PASS | Risk score history — 200 |

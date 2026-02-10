@@ -69,7 +69,7 @@ signup_and_verify() {
   uid=$(extract_json "$SIGNUP" '.user_id')
 
   sleep 2
-  local MAIL_SEARCH MAIL_ID MAIL_MSG TOKEN
+  local MAIL_SEARCH MAIL_ID MAIL_MSG TOKEN=""
   MAIL_SEARCH=$(curl -s "http://localhost:8025/api/v1/search?query=to:$email")
   MAIL_ID=$(extract_json "$MAIL_SEARCH" '.messages[0].ID')
   if [ -n "$MAIL_ID" ] && [ "$MAIL_ID" != "null" ]; then
