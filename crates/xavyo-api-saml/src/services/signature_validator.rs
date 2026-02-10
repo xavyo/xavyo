@@ -583,7 +583,10 @@ t6Rp
         // XSW attack: multiple Signature elements — all must be removed
         let xml = r#"<AuthnRequest ID="test"><ds:Signature>legit</ds:Signature><ds:Signature>injected</ds:Signature><Issuer>test</Issuer></AuthnRequest>"#;
         let result = remove_signature_element_parsed(xml).unwrap();
-        assert!(!result.contains("Signature"), "All Signature elements must be removed");
+        assert!(
+            !result.contains("Signature"),
+            "All Signature elements must be removed"
+        );
         assert!(result.contains("Issuer"));
     }
 
