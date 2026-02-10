@@ -356,7 +356,7 @@ TOOL_ID=$(extract_json "$BODY" '.id')
 log "Test tool: $TOOL_ID"
 
 RAW=$(admin_call POST "/nhi/service-accounts" \
-  -d "{\"name\":\"perm-test-sa-${TS}\",\"nhi_type\":\"service_account\"}")
+  -d "{\"name\":\"perm-test-sa-${TS}\",\"nhi_type\":\"service_account\",\"purpose\":\"Permission test service account\"}")
 parse_response "$RAW"
 SA_ID=$(extract_json "$BODY" '.id')
 log "Test SA: $SA_ID"

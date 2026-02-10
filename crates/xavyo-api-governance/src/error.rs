@@ -210,6 +210,12 @@ impl IntoResponse for ApiGovernanceError {
                         | GovernanceError::InvalidMiningParameters(_) => {
                             (StatusCode::BAD_REQUEST, "validation_error", e.to_string())
                         }
+                        GovernanceError::RequestCartEmpty
+                        | GovernanceError::RequestCartNotFound(_) => (
+                            StatusCode::UNPROCESSABLE_ENTITY,
+                            "unprocessable_entity",
+                            e.to_string(),
+                        ),
                         GovernanceError::Database(ref db_err) => {
                             tracing::error!("GovernanceError::Database: {:?}", db_err);
                             (
