@@ -52,7 +52,7 @@ xavyo-db = { path = "../xavyo-db" }
 xavyo-tenant = { path = "../xavyo-tenant" }
 
 # Database
-sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "macros", "uuid", "chrono", "json"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "macros", "uuid", "chrono", "json"] }
 
 # Async runtime
 tokio = { version = "1", features = ["sync"] }

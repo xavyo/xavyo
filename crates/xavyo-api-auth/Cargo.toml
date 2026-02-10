@@ -55,7 +55,7 @@ parking_lot = "0.12"
 dashmap = "5.5"
 
 # Database (for token storage)
-sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "macros", "uuid", "chrono"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "macros", "uuid", "chrono"] }
 
 # Hashing for refresh tokens
 sha2 = "0.10"
@@ -115,7 +115,7 @@ ciborium = "0.2"
 tokio = { version = "1.35", features = ["full", "test-util"] }
 tower = { version = "0.4", features = ["util"] }
 axum-test = { workspace = true }
-sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "macros"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "macros"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 proptest = "1.4"
 

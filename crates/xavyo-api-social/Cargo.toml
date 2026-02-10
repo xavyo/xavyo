@@ -55,7 +55,7 @@ async-trait = "0.1"
 urlencoding = "2"
 
 # SQLx for database
-sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "macros", "uuid", "chrono"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "macros", "uuid", "chrono"] }
 
 # Tracing
 tracing = "0.1"

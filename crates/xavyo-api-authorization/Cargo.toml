@@ -48,7 +48,7 @@ tracing = "0.1"
 validator = { version = "0.20", features = ["derive"] }
 
 # Database
-sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "macros", "uuid", "chrono"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "macros", "uuid", "chrono"] }
 
 # HTTP types
 http = "1.0"
