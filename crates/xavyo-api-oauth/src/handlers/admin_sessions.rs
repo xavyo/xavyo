@@ -43,6 +43,17 @@ pub struct ActiveSessionsQuery {
 /// Revokes all refresh tokens and blacklists all access tokens
 /// for the specified user. Requires admin JWT authentication
 /// (enforced by the admin router middleware).
+#[utoipa::path(
+    post,
+    path = "/admin/oauth/revoke-user",
+    request_body = AdminRevokeUserRequest,
+    responses(
+        (status = 200, description = "All tokens revoked for user", body = AdminRevokeUserResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "OAuth2 Admin"
+)]
 pub async fn admin_revoke_user_handler(
     State(state): State<OAuthState>,
     axum::Extension(claims): axum::Extension<JwtClaims>,
@@ -134,6 +145,19 @@ pub async fn admin_revoke_user_handler(
 ///
 /// Returns all non-revoked, non-expired refresh tokens for a user,
 /// joined with client names for display.
+#[utoipa::path(
+    get,
+    path = "/admin/oauth/active-sessions",
+    params(
+        ("user_id" = Uuid, Query, description = "User ID to list sessions for")
+    ),
+    responses(
+        (status = 200, description = "List of active sessions", body = ActiveSessionsResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "OAuth2 Admin"
+)]
 pub async fn list_active_sessions_handler(
     State(state): State<OAuthState>,
     axum::Extension(claims): axum::Extension<JwtClaims>,
@@ -208,6 +232,19 @@ pub async fn list_active_sessions_handler(
 /// DELETE /`admin/oauth/sessions/:token_id` — revoke a specific session.
 ///
 /// Revokes a single refresh token by its ID.
+#[utoipa::path(
+    delete,
+    path = "/admin/oauth/sessions/{token_id}",
+    params(
+        ("token_id" = Uuid, Path, description = "Token ID of the session to revoke")
+    ),
+    responses(
+        (status = 200, description = "Session revoked", body = SessionRevokedResponse),
+        (status = 400, description = "Invalid request or session already revoked"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "OAuth2 Admin"
+)]
 pub async fn delete_session_handler(
     State(state): State<OAuthState>,
     axum::Extension(claims): axum::Extension<JwtClaims>,

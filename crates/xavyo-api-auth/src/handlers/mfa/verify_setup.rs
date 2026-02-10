@@ -18,6 +18,17 @@ use crate::{
 ///
 /// Complete TOTP setup by verifying a code from the authenticator app.
 /// Returns recovery codes on success (displayed only once).
+#[utoipa::path(
+    post,
+    path = "/auth/mfa/totp/verify-setup",
+    request_body = TotpVerifySetupRequest,
+    responses(
+        (status = 200, description = "TOTP setup verified, MFA enabled", body = TotpVerifySetupResponse),
+        (status = 400, description = "Invalid verification code"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "MFA"
+)]
 pub async fn verify_totp_setup(
     State(state): State<AuthState>,
     Extension(user_id): Extension<UserId>,

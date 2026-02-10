@@ -30,6 +30,20 @@ use crate::{
 ///
 /// List all devices for a specific user (admin view).
 /// Query params: `include_revoked=true` to include revoked devices.
+#[utoipa::path(
+    get,
+    path = "/admin/users/{user_id}/devices",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID"),
+        AdminListDevicesQuery,
+    ),
+    responses(
+        (status = 200, description = "User devices listed", body = DeviceListResponse),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Admin role required"),
+    ),
+    tag = "Admin - Devices"
+)]
 pub async fn admin_list_user_devices(
     Extension(device_service): Extension<Arc<DeviceService>>,
     Extension(tenant_id): Extension<TenantId>,
@@ -59,6 +73,21 @@ pub async fn admin_list_user_devices(
 /// DELETE /`admin/users/:user_id/devices/:device_id`
 ///
 /// Revoke a device for a specific user (admin action).
+#[utoipa::path(
+    delete,
+    path = "/admin/users/{user_id}/devices/{device_id}",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID"),
+        ("device_id" = Uuid, Path, description = "Device ID"),
+    ),
+    responses(
+        (status = 204, description = "Device revoked"),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Admin role required"),
+        (status = 404, description = "Device not found"),
+    ),
+    tag = "Admin - Devices"
+)]
 pub async fn admin_revoke_device(
     Extension(device_service): Extension<Arc<DeviceService>>,
     Extension(tenant_id): Extension<TenantId>,
@@ -78,6 +107,19 @@ pub async fn admin_revoke_device(
 /// GET /admin/tenants/:tenant_id/device-policy
 ///
 /// Get device policy for the tenant.
+#[utoipa::path(
+    get,
+    path = "/admin/tenants/{id}/device-policy",
+    params(
+        ("id" = Uuid, Path, description = "Tenant ID")
+    ),
+    responses(
+        (status = 200, description = "Device policy returned", body = DevicePolicyResponse),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Admin role required"),
+    ),
+    tag = "Admin - Devices"
+)]
 pub async fn get_device_policy(
     Extension(device_policy_service): Extension<Arc<DevicePolicyService>>,
     Path(tenant_id): Path<Uuid>,
@@ -90,6 +132,21 @@ pub async fn get_device_policy(
 /// PUT /admin/tenants/:tenant_id/device-policy
 ///
 /// Update device policy for the tenant.
+#[utoipa::path(
+    put,
+    path = "/admin/tenants/{id}/device-policy",
+    params(
+        ("id" = Uuid, Path, description = "Tenant ID")
+    ),
+    request_body = UpdateDevicePolicyRequest,
+    responses(
+        (status = 200, description = "Device policy updated", body = DevicePolicyResponse),
+        (status = 400, description = "Validation error"),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Admin role required"),
+    ),
+    tag = "Admin - Devices"
+)]
 pub async fn update_device_policy(
     Extension(device_policy_service): Extension<Arc<DevicePolicyService>>,
     Path(tenant_id): Path<Uuid>,

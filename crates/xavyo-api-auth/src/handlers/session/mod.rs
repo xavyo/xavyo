@@ -1,9 +1,9 @@
 //! Session management handlers.
 
-mod list;
-mod policy;
-mod revoke;
-mod revoke_all;
+pub mod list;
+pub mod policy;
+pub mod revoke;
+pub mod revoke_all;
 
 pub use list::list_sessions;
 pub use policy::{get_session_policy, update_session_policy};

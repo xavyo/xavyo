@@ -2,12 +2,12 @@
 //!
 //! Endpoints for TOTP setup, verification, recovery codes, and `WebAuthn`.
 
-mod disable;
-mod recovery;
-mod setup;
-mod status;
-mod verify;
-mod verify_setup;
+pub mod disable;
+pub mod recovery;
+pub mod setup;
+pub mod status;
+pub mod verify;
+pub mod verify_setup;
 pub mod webauthn;
 
 pub use disable::disable_mfa;

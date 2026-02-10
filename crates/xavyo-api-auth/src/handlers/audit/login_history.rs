@@ -11,6 +11,16 @@ use xavyo_core::TenantId;
 /// GET /audit/login-history
 ///
 /// Returns paginated login history for the authenticated user.
+#[utoipa::path(
+    get,
+    path = "/audit/login-history",
+    params(LoginHistoryQuery),
+    responses(
+        (status = 200, description = "Login history retrieved", body = LoginHistoryResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "Audit"
+)]
 pub async fn get_login_history(
     Extension(audit_service): Extension<Arc<AuditService>>,
     Extension(tenant_id): Extension<TenantId>,

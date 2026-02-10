@@ -42,6 +42,18 @@ struct DiscoveryTool {
 ///
 /// Uses SECURITY DEFINER functions to bypass RLS (since this endpoint has no
 /// authentication and no tenant context).
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/.well-known/agents/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Agent ID"),
+    ),
+    responses(
+        (status = 200, description = "Agent card for A2A discovery", body = AgentCard),
+        (status = 404, description = "Agent not found or not active"),
+    ),
+    tag = "AI Agent Discovery"
+))]
 pub async fn get_agent_card(
     State(state): State<NhiState>,
     Path(id): Path<Uuid>,

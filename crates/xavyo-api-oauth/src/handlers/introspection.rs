@@ -29,6 +29,16 @@ struct RefreshTokenRow {
 }
 
 /// Handle RFC 7662 token introspection.
+#[utoipa::path(
+    post,
+    path = "/oauth/introspect",
+    request_body = IntrospectionRequest,
+    responses(
+        (status = 200, description = "Token introspection result", body = IntrospectionResponse),
+        (status = 401, description = "Invalid client credentials"),
+    ),
+    tag = "OAuth2"
+)]
 pub async fn introspect_token_handler(
     State(state): State<OAuthState>,
     headers: HeaderMap,

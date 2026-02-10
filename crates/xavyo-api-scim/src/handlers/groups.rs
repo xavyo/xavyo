@@ -80,6 +80,15 @@ fn extract_user_agent(headers: &axum::http::HeaderMap) -> Option<String> {
 /// List groups with optional filtering.
 ///
 /// GET /scim/v2/Groups
+#[utoipa::path(
+    get,
+    path = "/scim/v2/Groups",
+    responses(
+        (status = 200, description = "List of SCIM groups"),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = "SCIM Groups"
+)]
 pub async fn list_groups(
     Extension(auth): Extension<ScimAuthContext>,
     Extension(group_service): Extension<Arc<GroupService>>,
@@ -138,6 +147,18 @@ pub async fn list_groups(
 /// Create a new group.
 ///
 /// POST /scim/v2/Groups
+#[utoipa::path(
+    post,
+    path = "/scim/v2/Groups",
+    request_body = CreateScimGroupRequest,
+    responses(
+        (status = 201, description = "Group created", body = ScimGroup),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Not authenticated"),
+        (status = 409, description = "Group already exists"),
+    ),
+    tag = "SCIM Groups"
+)]
 pub async fn create_group(
     Extension(auth): Extension<ScimAuthContext>,
     Extension(group_service): Extension<Arc<GroupService>>,
@@ -208,6 +229,19 @@ pub async fn create_group(
 /// Get a group by ID.
 ///
 /// GET /scim/v2/Groups/{id}
+#[utoipa::path(
+    get,
+    path = "/scim/v2/Groups/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Group ID"),
+    ),
+    responses(
+        (status = 200, description = "Group details", body = ScimGroup),
+        (status = 401, description = "Not authenticated"),
+        (status = 404, description = "Group not found"),
+    ),
+    tag = "SCIM Groups"
+)]
 pub async fn get_group(
     Extension(auth): Extension<ScimAuthContext>,
     Extension(group_service): Extension<Arc<GroupService>>,
@@ -261,6 +295,21 @@ pub async fn get_group(
 /// Replace a group (full update).
 ///
 /// PUT /scim/v2/Groups/{id}
+#[utoipa::path(
+    put,
+    path = "/scim/v2/Groups/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Group ID"),
+    ),
+    request_body = ReplaceScimGroupRequest,
+    responses(
+        (status = 200, description = "Group replaced", body = ScimGroup),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Not authenticated"),
+        (status = 404, description = "Group not found"),
+    ),
+    tag = "SCIM Groups"
+)]
 pub async fn replace_group(
     Extension(auth): Extension<ScimAuthContext>,
     Extension(group_service): Extension<Arc<GroupService>>,
@@ -317,6 +366,21 @@ pub async fn replace_group(
 /// Patch a group (partial update).
 ///
 /// PATCH /scim/v2/Groups/{id}
+#[utoipa::path(
+    patch,
+    path = "/scim/v2/Groups/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Group ID"),
+    ),
+    request_body = ScimPatchRequest,
+    responses(
+        (status = 200, description = "Group patched", body = ScimGroup),
+        (status = 400, description = "Invalid patch operations"),
+        (status = 401, description = "Not authenticated"),
+        (status = 404, description = "Group not found"),
+    ),
+    tag = "SCIM Groups"
+)]
 pub async fn update_group(
     Extension(auth): Extension<ScimAuthContext>,
     Extension(group_service): Extension<Arc<GroupService>>,
@@ -371,6 +435,19 @@ pub async fn update_group(
 /// Delete a group.
 ///
 /// DELETE /scim/v2/Groups/{id}
+#[utoipa::path(
+    delete,
+    path = "/scim/v2/Groups/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Group ID"),
+    ),
+    responses(
+        (status = 204, description = "Group deleted"),
+        (status = 401, description = "Not authenticated"),
+        (status = 404, description = "Group not found"),
+    ),
+    tag = "SCIM Groups"
+)]
 pub async fn delete_group(
     Extension(auth): Extension<ScimAuthContext>,
     Extension(group_service): Extension<Arc<GroupService>>,

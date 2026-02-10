@@ -62,6 +62,15 @@ fn mcp_error_response(error: McpErrorResponse) -> Response {
 }
 
 /// GET /mcp/tools - List available tools for the authenticated agent.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/mcp/tools",
+    responses(
+        (status = 200, description = "List of available MCP tools", body = McpToolsResponse),
+        (status = 400, description = "Invalid request"),
+    ),
+    tag = "MCP Tools"
+))]
 pub async fn list_tools(
     State(state): State<NhiState>,
     Extension(claims): Extension<JwtClaims>,
@@ -81,6 +90,22 @@ pub async fn list_tools(
 }
 
 /// POST /mcp/tools/{name}/call - Invoke a tool.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/mcp/tools/{name}/call",
+    params(
+        ("name" = String, Path, description = "Tool name"),
+    ),
+    request_body = McpCallRequest,
+    responses(
+        (status = 200, description = "Tool invocation result", body = McpCallResponse),
+        (status = 400, description = "Invalid parameters"),
+        (status = 403, description = "Agent not authorized"),
+        (status = 404, description = "Tool not found"),
+        (status = 429, description = "Rate limit exceeded"),
+    ),
+    tag = "MCP Tools"
+))]
 pub async fn call_tool(
     State(state): State<NhiState>,
     Extension(claims): Extension<JwtClaims>,

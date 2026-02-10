@@ -86,6 +86,17 @@ fn sanitize_filename(raw_filename: &str) -> String {
 /// POST /admin/users/import
 ///
 /// Upload a CSV file and create an import job. Processing happens asynchronously.
+#[utoipa::path(
+    post,
+    path = "/admin/users/import",
+    tag = "Import",
+    responses(
+        (status = 202, description = "Import job created", body = ImportJobCreatedResponse),
+        (status = 400, description = "Invalid file type or CSV format"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+    ),
+)]
 pub async fn create_import_job(
     Extension(claims): Extension<JwtClaims>,
     Extension(pool): Extension<PgPool>,
@@ -194,6 +205,21 @@ pub async fn create_import_job(
 /// GET /admin/users/imports
 ///
 /// List import jobs with optional status filter and pagination.
+#[utoipa::path(
+    get,
+    path = "/admin/users/imports",
+    tag = "Import",
+    params(
+        ("limit" = Option<i64>, Query, description = "Maximum results to return"),
+        ("offset" = Option<i64>, Query, description = "Results to skip"),
+        ("status" = Option<String>, Query, description = "Filter by job status"),
+    ),
+    responses(
+        (status = 200, description = "Import jobs listed", body = ImportJobListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+    ),
+)]
 pub async fn list_import_jobs(
     Extension(claims): Extension<JwtClaims>,
     Extension(pool): Extension<PgPool>,
@@ -223,6 +249,20 @@ pub async fn list_import_jobs(
 /// GET /`admin/users/imports/:job_id`
 ///
 /// Get detailed import job status.
+#[utoipa::path(
+    get,
+    path = "/admin/users/imports/{job_id}",
+    tag = "Import",
+    params(
+        ("job_id" = Uuid, Path, description = "Import job ID"),
+    ),
+    responses(
+        (status = 200, description = "Import job details", body = ImportJobResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Job not found"),
+    ),
+)]
 pub async fn get_import_job(
     Extension(claims): Extension<JwtClaims>,
     Extension(pool): Extension<PgPool>,

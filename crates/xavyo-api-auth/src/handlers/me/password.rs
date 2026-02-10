@@ -35,6 +35,17 @@ use xavyo_db::User;
 /// - 200 OK: Password changed successfully
 /// - 400 Bad Request: Validation failed
 /// - 401 Unauthorized: Invalid current password
+#[utoipa::path(
+    put,
+    path = "/me/password",
+    request_body = PasswordChangeRequest,
+    responses(
+        (status = 200, description = "Password changed successfully", body = PasswordChangeResponse),
+        (status = 400, description = "Validation failed"),
+        (status = 401, description = "Invalid current password"),
+    ),
+    tag = "User Profile"
+)]
 #[allow(clippy::too_many_arguments)]
 pub async fn me_password_change(
     Extension(pool): Extension<PgPool>,

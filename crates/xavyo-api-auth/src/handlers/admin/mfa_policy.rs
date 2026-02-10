@@ -6,6 +6,7 @@ use axum::{extract::Path, http::StatusCode, Extension, Json};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use tracing::info;
+use utoipa::ToSchema;
 use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
 use xavyo_db::{MfaPolicy, TenantMfaPolicy};
@@ -13,21 +14,36 @@ use xavyo_db::{MfaPolicy, TenantMfaPolicy};
 use crate::error::ApiAuthError;
 
 /// Response for MFA policy endpoints.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MfaPolicyResponse {
     pub tenant_id: uuid::Uuid,
+    #[schema(value_type = String)]
     pub mfa_policy: MfaPolicy,
 }
 
 /// Request to update MFA policy.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateMfaPolicyRequest {
+    #[schema(value_type = String)]
     pub mfa_policy: MfaPolicy,
 }
 
 /// GET /admin/tenants/:tenant_id/mfa-policy
 ///
 /// Get the MFA policy for a tenant.
+#[utoipa::path(
+    get,
+    path = "/admin/tenants/{id}/mfa-policy",
+    params(
+        ("id" = Uuid, Path, description = "Tenant ID"),
+    ),
+    responses(
+        (status = 200, description = "MFA policy retrieved", body = MfaPolicyResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Cannot access other tenant's policy"),
+    ),
+    tag = "Admin - MFA Policy"
+)]
 pub async fn get_mfa_policy(
     Extension(pool): Extension<PgPool>,
     Extension(tenant_id): Extension<TenantId>,
@@ -56,6 +72,20 @@ pub async fn get_mfa_policy(
 /// PUT /admin/tenants/:tenant_id/mfa-policy
 ///
 /// Update the MFA policy for a tenant.
+#[utoipa::path(
+    put,
+    path = "/admin/tenants/{id}/mfa-policy",
+    params(
+        ("id" = Uuid, Path, description = "Tenant ID"),
+    ),
+    request_body = UpdateMfaPolicyRequest,
+    responses(
+        (status = 200, description = "MFA policy updated", body = MfaPolicyResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Admin role required"),
+    ),
+    tag = "Admin - MFA Policy"
+)]
 pub async fn update_mfa_policy(
     Extension(pool): Extension<PgPool>,
     Extension(claims): Extension<JwtClaims>,

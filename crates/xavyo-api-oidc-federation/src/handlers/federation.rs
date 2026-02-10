@@ -18,6 +18,16 @@ use crate::services::InitiateAuthInput;
 /// Discover authentication realm for an email address.
 ///
 /// POST /auth/federation/discover
+#[utoipa::path(
+    post,
+    path = "/auth/federation/discover",
+    request_body = DiscoverRequest,
+    responses(
+        (status = 200, description = "Realm discovery result", body = DiscoverResponse),
+        (status = 400, description = "Invalid request"),
+    ),
+    tag = "OIDC Federation"
+)]
 #[instrument(skip(state))]
 pub async fn discover_realm(
     State(state): State<FederationState>,
@@ -56,6 +66,17 @@ pub async fn discover_realm(
 /// Initiate authorization flow with external `IdP`.
 ///
 /// GET /auth/federation/authorize
+#[utoipa::path(
+    get,
+    path = "/auth/federation/authorize",
+    params(AuthorizeParams),
+    responses(
+        (status = 307, description = "Redirect to external IdP authorization endpoint"),
+        (status = 400, description = "Invalid request"),
+        (status = 404, description = "Identity provider not found"),
+    ),
+    tag = "OIDC Federation"
+)]
 #[instrument(skip(state))]
 pub async fn authorize(
     State(state): State<FederationState>,
@@ -94,6 +115,17 @@ pub async fn authorize(
 /// Handle callback from external `IdP`.
 ///
 /// GET /auth/federation/callback
+#[utoipa::path(
+    get,
+    path = "/auth/federation/callback",
+    params(CallbackParams),
+    responses(
+        (status = 200, description = "Token response after successful federation", body = FederationTokenResponse),
+        (status = 307, description = "Redirect with access token fragment"),
+        (status = 400, description = "Invalid callback or IdP error"),
+    ),
+    tag = "OIDC Federation"
+)]
 #[instrument(skip(state))]
 pub async fn callback(
     State(state): State<FederationState>,
@@ -205,6 +237,14 @@ impl IntoResponse for CallbackResponse {
 /// Handle logout from federation (optional).
 ///
 /// POST /auth/federation/logout
+#[utoipa::path(
+    post,
+    path = "/auth/federation/logout",
+    responses(
+        (status = 204, description = "Federation session cleanup completed"),
+    ),
+    tag = "OIDC Federation"
+)]
 #[instrument(skip(state))]
 pub async fn logout(
     State(state): State<FederationState>,

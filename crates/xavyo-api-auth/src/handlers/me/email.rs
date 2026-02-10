@@ -34,6 +34,18 @@ use xavyo_core::{TenantId, UserId};
 /// - 400 Bad Request: Validation error or same email
 /// - 401 Unauthorized: Invalid password or not authenticated
 /// - 409 Conflict: Email already in use
+#[utoipa::path(
+    post,
+    path = "/me/email/change",
+    request_body = EmailChangeRequest,
+    responses(
+        (status = 200, description = "Verification email sent", body = EmailChangeInitiatedResponse),
+        (status = 400, description = "Validation error or same email"),
+        (status = 401, description = "Invalid password or not authenticated"),
+        (status = 409, description = "Email already in use"),
+    ),
+    tag = "User Profile"
+)]
 pub async fn initiate_email_change(
     Extension(email_change_service): Extension<Arc<EmailChangeService>>,
     Extension(email_sender): Extension<Arc<dyn EmailSender>>,
@@ -86,6 +98,18 @@ pub async fn initiate_email_change(
 /// - 400 Bad Request: Invalid or expired token
 /// - 401 Unauthorized: Not authenticated
 /// - 409 Conflict: Email taken during verification
+#[utoipa::path(
+    post,
+    path = "/me/email/verify",
+    request_body = EmailVerifyChangeRequest,
+    responses(
+        (status = 200, description = "Email changed successfully", body = EmailChangeCompletedResponse),
+        (status = 400, description = "Invalid or expired token"),
+        (status = 401, description = "Not authenticated"),
+        (status = 409, description = "Email taken during verification"),
+    ),
+    tag = "User Profile"
+)]
 pub async fn verify_email_change(
     Extension(email_change_service): Extension<Arc<EmailChangeService>>,
     Extension(tenant_id): Extension<TenantId>,

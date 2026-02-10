@@ -16,6 +16,19 @@ use crate::{
 /// GET /admin/tenants/:id/session-policy
 ///
 /// Get session policy for a tenant (admin only).
+#[utoipa::path(
+    get,
+    path = "/admin/tenants/{id}/session-policy",
+    params(
+        ("id" = Uuid, Path, description = "Tenant ID")
+    ),
+    responses(
+        (status = 200, description = "Session policy returned", body = SessionPolicyResponse),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Admin role required"),
+    ),
+    tag = "Admin - Sessions"
+)]
 pub async fn get_session_policy(
     Extension(claims): Extension<JwtClaims>,
     Extension(session_service): Extension<Arc<SessionService>>,
@@ -44,6 +57,21 @@ pub async fn get_session_policy(
 /// PUT /admin/tenants/:id/session-policy
 ///
 /// Update session policy for a tenant (admin only).
+#[utoipa::path(
+    put,
+    path = "/admin/tenants/{id}/session-policy",
+    params(
+        ("id" = Uuid, Path, description = "Tenant ID")
+    ),
+    request_body = UpdateSessionPolicyRequest,
+    responses(
+        (status = 200, description = "Session policy updated", body = SessionPolicyResponse),
+        (status = 400, description = "Validation error"),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Admin role required"),
+    ),
+    tag = "Admin - Sessions"
+)]
 pub async fn update_session_policy(
     Extension(claims): Extension<JwtClaims>,
     Extension(session_service): Extension<Arc<SessionService>>,

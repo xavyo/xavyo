@@ -18,6 +18,17 @@ use crate::{
 ///
 /// Verify TOTP code during login to complete MFA authentication.
 /// Requires a `partial_token` from the initial login response.
+#[utoipa::path(
+    post,
+    path = "/auth/mfa/totp/verify",
+    request_body = TotpVerifyRequest,
+    responses(
+        (status = 200, description = "MFA verification successful, tokens issued", body = TokenResponse),
+        (status = 400, description = "Invalid TOTP code"),
+        (status = 401, description = "Invalid or expired partial token"),
+    ),
+    tag = "MFA"
+)]
 pub async fn verify_totp(
     State(state): State<AuthState>,
     Extension(claims): Extension<JwtClaims>,

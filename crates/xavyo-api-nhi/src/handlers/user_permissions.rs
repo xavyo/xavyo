@@ -67,6 +67,21 @@ pub struct RevokeResponse {
 // ---------------------------------------------------------------------------
 
 /// POST /{id}/users/{user_id}/grant — Grant a user permission to access an NHI.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/{nhi_id}/users/{user_id}/grant",
+    params(
+        ("nhi_id" = Uuid, Path, description = "NHI identity ID"),
+        ("user_id" = Uuid, Path, description = "User ID"),
+    ),
+    request_body = GrantUserPermissionRequest,
+    responses(
+        (status = 201, description = "Permission granted", body = NhiUserPermission),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "NHI not found"),
+    ),
+    tag = "NHI User Permissions"
+))]
 pub async fn grant_user_permission(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -97,6 +112,21 @@ pub async fn grant_user_permission(
 }
 
 /// POST /{id}/users/{user_id}/revoke — Revoke a user's permission on an NHI.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/nhi/{nhi_id}/users/{user_id}/revoke",
+    params(
+        ("nhi_id" = Uuid, Path, description = "NHI identity ID"),
+        ("user_id" = Uuid, Path, description = "User ID"),
+    ),
+    request_body = RevokeUserPermissionRequest,
+    responses(
+        (status = 200, description = "Permission revoked", body = RevokeResponse),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "NHI not found"),
+    ),
+    tag = "NHI User Permissions"
+))]
 pub async fn revoke_user_permission(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -123,6 +153,18 @@ pub async fn revoke_user_permission(
 }
 
 /// GET /{id}/users — List users with permissions on a specific NHI.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/{nhi_id}/users",
+    params(
+        ("nhi_id" = Uuid, Path, description = "NHI identity ID"),
+    ),
+    responses(
+        (status = 200, description = "Paginated list of user permissions", body = PaginatedUserPermissionResponse),
+        (status = 403, description = "Forbidden"),
+    ),
+    tag = "NHI User Permissions"
+))]
 pub async fn list_nhi_users(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -150,6 +192,18 @@ pub async fn list_nhi_users(
 }
 
 /// GET /users/{user_id}/accessible — List NHIs accessible by a specific user.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/nhi/users/{user_id}/accessible",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID"),
+    ),
+    responses(
+        (status = 200, description = "Paginated list of accessible NHIs", body = PaginatedUserPermissionResponse),
+        (status = 403, description = "Forbidden"),
+    ),
+    tag = "NHI User Permissions"
+))]
 pub async fn list_user_nhis(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,

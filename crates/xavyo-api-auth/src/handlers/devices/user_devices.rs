@@ -25,6 +25,15 @@ use crate::{
 /// GET /devices
 ///
 /// List all active (non-revoked) devices for the current user.
+#[utoipa::path(
+    get,
+    path = "/devices",
+    responses(
+        (status = 200, description = "Devices listed successfully", body = DeviceListResponse),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = "User Devices"
+)]
 pub async fn list_devices(
     Extension(device_service): Extension<Arc<DeviceService>>,
     Extension(user_id): Extension<UserId>,
@@ -65,6 +74,21 @@ pub async fn list_devices(
 /// POST /devices/:id/trust
 ///
 /// Mark a device as trusted. Optionally specify trust duration in days.
+#[utoipa::path(
+    post,
+    path = "/devices/{id}/trust",
+    params(
+        ("id" = Uuid, Path, description = "Device ID")
+    ),
+    request_body = TrustDeviceRequest,
+    responses(
+        (status = 200, description = "Device trusted", body = TrustDeviceResponse),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Trust not allowed by policy"),
+        (status = 404, description = "Device not found"),
+    ),
+    tag = "User Devices"
+)]
 pub async fn trust_device(
     Extension(device_service): Extension<Arc<DeviceService>>,
     Extension(device_policy_service): Extension<Arc<DevicePolicyService>>,
@@ -120,6 +144,19 @@ pub async fn trust_device(
 /// DELETE /devices/:id/trust
 ///
 /// Remove trust from a device.
+#[utoipa::path(
+    delete,
+    path = "/devices/{id}/trust",
+    params(
+        ("id" = Uuid, Path, description = "Device ID")
+    ),
+    responses(
+        (status = 200, description = "Device untrusted", body = TrustDeviceResponse),
+        (status = 401, description = "Not authenticated"),
+        (status = 404, description = "Device not found"),
+    ),
+    tag = "User Devices"
+)]
 pub async fn untrust_device(
     Extension(device_service): Extension<Arc<DeviceService>>,
     Extension(user_id): Extension<UserId>,
@@ -147,6 +184,21 @@ pub async fn untrust_device(
 /// PUT /devices/:id
 ///
 /// Rename a device.
+#[utoipa::path(
+    put,
+    path = "/devices/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Device ID")
+    ),
+    request_body = RenameDeviceRequest,
+    responses(
+        (status = 200, description = "Device renamed", body = RenameDeviceResponse),
+        (status = 400, description = "Validation error"),
+        (status = 401, description = "Not authenticated"),
+        (status = 404, description = "Device not found"),
+    ),
+    tag = "User Devices"
+)]
 pub async fn rename_device(
     Extension(device_service): Extension<Arc<DeviceService>>,
     Extension(user_id): Extension<UserId>,
@@ -183,6 +235,19 @@ pub async fn rename_device(
 /// DELETE /devices/:id
 ///
 /// Revoke (soft-delete) a device.
+#[utoipa::path(
+    delete,
+    path = "/devices/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Device ID")
+    ),
+    responses(
+        (status = 204, description = "Device revoked"),
+        (status = 401, description = "Not authenticated"),
+        (status = 404, description = "Device not found"),
+    ),
+    tag = "User Devices"
+)]
 pub async fn revoke_device(
     Extension(device_service): Extension<Arc<DeviceService>>,
     Extension(user_id): Extension<UserId>,

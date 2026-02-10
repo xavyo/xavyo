@@ -16,6 +16,19 @@ use xavyo_core::TenantId;
 /// Get lockout policy for a tenant.
 ///
 /// GET /admin/tenants/:tenant_id/lockout-policy
+#[utoipa::path(
+    get,
+    path = "/admin/tenants/{id}/lockout-policy",
+    params(
+        ("id" = Uuid, Path, description = "Tenant ID"),
+    ),
+    responses(
+        (status = 200, description = "Lockout policy retrieved", body = LockoutPolicyResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Cannot access other tenant's policy"),
+    ),
+    tag = "Admin - Lockout Policy"
+)]
 pub async fn get_lockout_policy(
     Extension(lockout_service): Extension<Arc<LockoutService>>,
     Extension(tenant_id): Extension<TenantId>,
@@ -33,6 +46,21 @@ pub async fn get_lockout_policy(
 /// Update lockout policy for a tenant.
 ///
 /// PUT /admin/tenants/:tenant_id/lockout-policy
+#[utoipa::path(
+    put,
+    path = "/admin/tenants/{id}/lockout-policy",
+    params(
+        ("id" = Uuid, Path, description = "Tenant ID"),
+    ),
+    request_body = UpdateLockoutPolicyRequest,
+    responses(
+        (status = 200, description = "Lockout policy updated", body = LockoutPolicyResponse),
+        (status = 400, description = "Invalid policy values"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Admin role required"),
+    ),
+    tag = "Admin - Lockout Policy"
+)]
 pub async fn update_lockout_policy(
     Extension(claims): Extension<JwtClaims>,
     Extension(lockout_service): Extension<Arc<LockoutService>>,

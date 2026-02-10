@@ -21,6 +21,16 @@ use crate::services::TokenService;
 /// List all SCIM tokens for the tenant.
 ///
 /// GET /admin/scim/tokens
+#[utoipa::path(
+    get,
+    path = "/admin/scim/tokens",
+    responses(
+        (status = 200, description = "List of SCIM tokens"),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Not authorized"),
+    ),
+    tag = "SCIM Admin"
+)]
 pub async fn list_tokens(
     Extension(claims): Extension<JwtClaims>,
     Extension(tenant_id): Extension<TenantId>,
@@ -38,6 +48,17 @@ pub async fn list_tokens(
 /// Create a new SCIM token.
 ///
 /// POST /admin/scim/tokens
+#[utoipa::path(
+    post,
+    path = "/admin/scim/tokens",
+    request_body = CreateScimToken,
+    responses(
+        (status = 201, description = "Token created"),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Not authorized"),
+    ),
+    tag = "SCIM Admin"
+)]
 pub async fn create_token(
     Extension(claims): Extension<JwtClaims>,
     Extension(tenant_id): Extension<TenantId>,
@@ -60,6 +81,20 @@ pub async fn create_token(
 /// Revoke a SCIM token.
 ///
 /// DELETE /admin/scim/tokens/{id}
+#[utoipa::path(
+    delete,
+    path = "/admin/scim/tokens/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Token ID"),
+    ),
+    responses(
+        (status = 204, description = "Token revoked"),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Not authorized"),
+        (status = 404, description = "Token not found"),
+    ),
+    tag = "SCIM Admin"
+)]
 pub async fn revoke_token(
     Extension(claims): Extension<JwtClaims>,
     Extension(tenant_id): Extension<TenantId>,
@@ -78,6 +113,16 @@ pub async fn revoke_token(
 /// Get attribute mappings for the tenant.
 ///
 /// GET /admin/scim/mappings
+#[utoipa::path(
+    get,
+    path = "/admin/scim/mappings",
+    responses(
+        (status = 200, description = "List of attribute mappings"),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Not authorized"),
+    ),
+    tag = "SCIM Admin"
+)]
 pub async fn get_mappings(
     Extension(claims): Extension<JwtClaims>,
     Extension(tenant_id): Extension<TenantId>,
@@ -95,6 +140,17 @@ pub async fn get_mappings(
 /// Update attribute mappings for the tenant.
 ///
 /// PUT /admin/scim/mappings
+#[utoipa::path(
+    put,
+    path = "/admin/scim/mappings",
+    request_body = UpdateMappingsRequest,
+    responses(
+        (status = 200, description = "Mappings updated"),
+        (status = 401, description = "Not authenticated"),
+        (status = 403, description = "Not authorized"),
+    ),
+    tag = "SCIM Admin"
+)]
 pub async fn update_mappings(
     Extension(claims): Extension<JwtClaims>,
     Extension(tenant_id): Extension<TenantId>,

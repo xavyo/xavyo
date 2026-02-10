@@ -20,6 +20,19 @@ use std::sync::Arc;
 ///
 /// Get MFA status for a specific user (admin view).
 /// Requires authentication and admin role.
+#[utoipa::path(
+    get,
+    path = "/admin/users/{user_id}/mfa/status",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID"),
+    ),
+    responses(
+        (status = 200, description = "User MFA status retrieved", body = MfaStatusResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Admin role required"),
+    ),
+    tag = "Admin - MFA Policy"
+)]
 pub async fn get_user_mfa_status(
     Extension(pool): Extension<PgPool>,
     Extension(claims): Extension<JwtClaims>,

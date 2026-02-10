@@ -13,6 +13,20 @@ use crate::{error::ApiAuthError, services::SessionService};
 ///
 /// Revoke a specific session.
 /// Users cannot revoke their current session via this endpoint.
+#[utoipa::path(
+    delete,
+    path = "/users/me/sessions/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Session ID to revoke")
+    ),
+    responses(
+        (status = 204, description = "Session revoked"),
+        (status = 401, description = "Not authenticated"),
+        (status = 404, description = "Session not found"),
+        (status = 409, description = "Cannot revoke current session"),
+    ),
+    tag = "User Sessions"
+)]
 pub async fn revoke_session(
     Extension(session_service): Extension<Arc<SessionService>>,
     Extension(user_id): Extension<UserId>,

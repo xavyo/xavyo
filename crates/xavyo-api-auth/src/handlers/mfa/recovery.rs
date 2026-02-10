@@ -20,6 +20,17 @@ use crate::{
 ///
 /// Verify a recovery code during login to complete MFA authentication.
 /// Requires a `partial_token` from the initial login response.
+#[utoipa::path(
+    post,
+    path = "/auth/mfa/recovery/verify",
+    request_body = RecoveryVerifyRequest,
+    responses(
+        (status = 200, description = "Recovery code verified, tokens issued", body = TokenResponse),
+        (status = 400, description = "Invalid recovery code"),
+        (status = 401, description = "Invalid or expired partial token"),
+    ),
+    tag = "MFA"
+)]
 pub async fn verify_recovery_code(
     State(state): State<AuthState>,
     Extension(claims): Extension<JwtClaims>,
@@ -89,6 +100,16 @@ pub async fn verify_recovery_code(
 ///
 /// Regenerate recovery codes. Requires password verification.
 /// Invalidates all previous recovery codes.
+#[utoipa::path(
+    post,
+    path = "/auth/mfa/recovery/generate",
+    request_body = RecoveryRegenerateRequest,
+    responses(
+        (status = 200, description = "Recovery codes regenerated", body = RecoveryCodesResponse),
+        (status = 401, description = "Invalid credentials"),
+    ),
+    tag = "MFA"
+)]
 pub async fn regenerate_recovery_codes(
     State(state): State<AuthState>,
     Extension(user_id): Extension<UserId>,

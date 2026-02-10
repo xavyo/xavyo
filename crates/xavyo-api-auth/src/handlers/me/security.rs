@@ -21,6 +21,15 @@ use xavyo_core::{TenantId, UserId};
 ///
 /// - 200 OK: Security overview returned
 /// - 401 Unauthorized: Not authenticated
+#[utoipa::path(
+    get,
+    path = "/me/security",
+    responses(
+        (status = 200, description = "Security overview returned", body = SecurityOverviewResponse),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = "User Security"
+)]
 pub async fn get_security_overview(
     Extension(profile_service): Extension<Arc<ProfileService>>,
     Extension(mfa_service): Extension<Arc<MfaService>>,
@@ -52,6 +61,15 @@ pub async fn get_security_overview(
 ///
 /// - 200 OK: MFA status returned
 /// - 401 Unauthorized: Not authenticated
+#[utoipa::path(
+    get,
+    path = "/me/mfa",
+    responses(
+        (status = 200, description = "MFA status returned", body = MfaStatusResponse),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = "User Security"
+)]
 pub async fn get_mfa_status(
     Extension(profile_service): Extension<Arc<ProfileService>>,
     Extension(mfa_service): Extension<Arc<MfaService>>,

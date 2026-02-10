@@ -12,6 +12,16 @@ use crate::{error::ApiAuthError, models::TotpSetupResponse, router::AuthState};
 ///
 /// Initiate TOTP setup for the authenticated user.
 /// Returns a QR code and secret for the authenticator app.
+#[utoipa::path(
+    post,
+    path = "/auth/mfa/totp/setup",
+    responses(
+        (status = 200, description = "TOTP setup initiated", body = TotpSetupResponse),
+        (status = 400, description = "MFA disabled by policy"),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "MFA"
+)]
 pub async fn setup_totp(
     State(state): State<AuthState>,
     Extension(user_id): Extension<UserId>,

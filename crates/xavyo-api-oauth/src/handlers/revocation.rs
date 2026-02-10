@@ -25,6 +25,16 @@ use xavyo_db::models::{CreateRevokedToken, RevokedToken};
 ///
 /// Always returns 200 OK per RFC 7009 Section 2.1 — never leak information
 /// about token validity to unauthenticated clients.
+#[utoipa::path(
+    post,
+    path = "/oauth/revoke",
+    request_body = RevocationRequest,
+    responses(
+        (status = 200, description = "Token revoked (always 200 per RFC 7009)"),
+        (status = 401, description = "Invalid client credentials"),
+    ),
+    tag = "OAuth2"
+)]
 pub async fn revoke_token_handler(
     State(state): State<OAuthState>,
     headers: HeaderMap,

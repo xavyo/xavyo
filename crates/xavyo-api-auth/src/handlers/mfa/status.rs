@@ -12,6 +12,15 @@ use crate::{
 /// GET /users/me/mfa/status or GET /users/:id/mfa/status (admin)
 ///
 /// Get MFA status for a user.
+#[utoipa::path(
+    get,
+    path = "/users/me/mfa/status",
+    responses(
+        (status = 200, description = "MFA status retrieved", body = MfaStatusResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "MFA"
+)]
 pub async fn get_mfa_status(
     State(state): State<AuthState>,
     Extension(user_id): Extension<UserId>,

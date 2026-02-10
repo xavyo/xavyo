@@ -14,6 +14,16 @@ use xavyo_core::TenantId;
 /// GET /security-alerts
 ///
 /// Returns paginated security alerts for the authenticated user.
+#[utoipa::path(
+    get,
+    path = "/security-alerts",
+    params(SecurityAlertsQuery),
+    responses(
+        (status = 200, description = "Security alerts retrieved", body = SecurityAlertsResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "Security Alerts"
+)]
 pub async fn get_security_alerts(
     Extension(alert_service): Extension<Arc<AlertService>>,
     Extension(tenant_id): Extension<TenantId>,
@@ -55,6 +65,20 @@ pub async fn get_security_alerts(
 /// POST /security-alerts/:id/acknowledge
 ///
 /// Acknowledges a security alert for the authenticated user.
+#[utoipa::path(
+    post,
+    path = "/security-alerts/{id}/acknowledge",
+    params(
+        ("id" = Uuid, Path, description = "Alert ID"),
+    ),
+    responses(
+        (status = 200, description = "Alert acknowledged", body = SecurityAlertResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Alert not found"),
+        (status = 409, description = "Alert already acknowledged"),
+    ),
+    tag = "Security Alerts"
+)]
 pub async fn acknowledge_alert(
     Extension(alert_service): Extension<Arc<AlertService>>,
     Extension(tenant_id): Extension<TenantId>,

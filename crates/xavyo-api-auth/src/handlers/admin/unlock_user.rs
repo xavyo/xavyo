@@ -15,6 +15,19 @@ use xavyo_core::TenantId;
 /// Unlock a user account (admin action).
 ///
 /// POST /`admin/users/:user_id/unlock`
+#[utoipa::path(
+    post,
+    path = "/admin/users/{id}/unlock",
+    params(
+        ("id" = Uuid, Path, description = "User ID"),
+    ),
+    responses(
+        (status = 200, description = "User unlocked", body = UnlockUserResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Admin role required"),
+    ),
+    tag = "Admin - Lockout Policy"
+)]
 pub async fn unlock_user(
     Extension(claims): Extension<JwtClaims>,
     Extension(lockout_service): Extension<Arc<LockoutService>>,

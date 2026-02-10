@@ -13,6 +13,17 @@ use xavyo_core::TenantId;
 /// GET /admin/audit/login-attempts
 ///
 /// Returns paginated login attempts for the entire tenant (admin only).
+#[utoipa::path(
+    get,
+    path = "/admin/audit/login-attempts",
+    params(AdminLoginAttemptsQuery),
+    responses(
+        (status = 200, description = "Login attempts retrieved", body = AdminLoginAttemptsResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Admin role required"),
+    ),
+    tag = "Audit"
+)]
 pub async fn get_admin_login_attempts(
     Extension(audit_service): Extension<Arc<AuditService>>,
     Extension(tenant_id): Extension<TenantId>,
@@ -54,6 +65,17 @@ pub async fn get_admin_login_attempts(
 /// GET /admin/audit/login-attempts/stats
 ///
 /// Returns aggregated statistics for login attempts in the tenant.
+#[utoipa::path(
+    get,
+    path = "/admin/audit/login-attempts/stats",
+    params(LoginAttemptStatsQuery),
+    responses(
+        (status = 200, description = "Login attempt statistics", body = LoginAttemptStatsResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Admin role required"),
+    ),
+    tag = "Audit"
+)]
 pub async fn get_login_attempt_stats(
     Extension(audit_service): Extension<Arc<AuditService>>,
     Extension(tenant_id): Extension<TenantId>,

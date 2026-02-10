@@ -16,6 +16,19 @@ use xavyo_core::TenantId;
 /// Get password policy for a tenant.
 ///
 /// GET /admin/tenants/:tenant_id/password-policy
+#[utoipa::path(
+    get,
+    path = "/admin/tenants/{id}/password-policy",
+    params(
+        ("id" = Uuid, Path, description = "Tenant ID"),
+    ),
+    responses(
+        (status = 200, description = "Password policy retrieved", body = PasswordPolicyResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Cannot access other tenant's policy"),
+    ),
+    tag = "Admin - Password Policy"
+)]
 pub async fn get_password_policy(
     Extension(password_policy_service): Extension<Arc<PasswordPolicyService>>,
     Extension(tenant_id): Extension<TenantId>,
@@ -35,6 +48,21 @@ pub async fn get_password_policy(
 /// Update password policy for a tenant.
 ///
 /// PUT /admin/tenants/:tenant_id/password-policy
+#[utoipa::path(
+    put,
+    path = "/admin/tenants/{id}/password-policy",
+    params(
+        ("id" = Uuid, Path, description = "Tenant ID"),
+    ),
+    request_body = UpdatePasswordPolicyRequest,
+    responses(
+        (status = 200, description = "Password policy updated", body = PasswordPolicyResponse),
+        (status = 400, description = "Invalid policy values"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Admin role required"),
+    ),
+    tag = "Admin - Password Policy"
+)]
 pub async fn update_password_policy(
     Extension(claims): Extension<JwtClaims>,
     Extension(password_policy_service): Extension<Arc<PasswordPolicyService>>,

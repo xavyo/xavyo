@@ -19,6 +19,15 @@ use xavyo_core::{TenantId, UserId};
 ///
 /// - 200 OK: Profile returned successfully
 /// - 401 Unauthorized: Not authenticated
+#[utoipa::path(
+    get,
+    path = "/me/profile",
+    responses(
+        (status = 200, description = "Profile returned successfully", body = ProfileResponse),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = "User Profile"
+)]
 pub async fn get_profile(
     Extension(profile_service): Extension<Arc<ProfileService>>,
     Extension(tenant_id): Extension<TenantId>,
@@ -51,6 +60,17 @@ pub async fn get_profile(
 /// - 200 OK: Profile updated successfully
 /// - 400 Bad Request: Validation error
 /// - 401 Unauthorized: Not authenticated
+#[utoipa::path(
+    put,
+    path = "/me/profile",
+    request_body = UpdateProfileRequest,
+    responses(
+        (status = 200, description = "Profile updated successfully", body = ProfileResponse),
+        (status = 400, description = "Validation error"),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = "User Profile"
+)]
 pub async fn update_profile(
     Extension(profile_service): Extension<Arc<ProfileService>>,
     Extension(tenant_id): Extension<TenantId>,

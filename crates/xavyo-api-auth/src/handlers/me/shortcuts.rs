@@ -68,6 +68,15 @@ impl From<UserDevice> for DeviceInfo {
 ///
 /// - 200 OK: Sessions list returned
 /// - 401 Unauthorized: Not authenticated
+#[utoipa::path(
+    get,
+    path = "/me/sessions",
+    responses(
+        (status = 200, description = "Sessions list returned", body = SessionListResponse),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = "User Profile"
+)]
 pub async fn get_me_sessions(
     Extension(session_service): Extension<Arc<SessionService>>,
     Extension(tenant_id): Extension<TenantId>,
@@ -105,6 +114,15 @@ pub async fn get_me_sessions(
 ///
 /// - 200 OK: Devices list returned
 /// - 401 Unauthorized: Not authenticated
+#[utoipa::path(
+    get,
+    path = "/me/devices",
+    responses(
+        (status = 200, description = "Devices list returned", body = DeviceListResponse),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = "User Profile"
+)]
 pub async fn get_me_devices(
     Extension(device_service): Extension<Arc<DeviceService>>,
     Extension(tenant_id): Extension<TenantId>,

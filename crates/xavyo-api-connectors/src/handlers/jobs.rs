@@ -10,6 +10,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use xavyo_auth::JwtClaims;
@@ -45,7 +46,7 @@ fn default_limit() -> i64 {
 }
 
 /// Summary of a job for list responses.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct JobSummary {
     /// Job unique identifier.
     pub id: Uuid,
@@ -72,7 +73,7 @@ pub struct JobSummary {
 }
 
 /// Detailed job response including execution history.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct JobDetailResponse {
     /// Job unique identifier.
     pub id: Uuid,
@@ -116,7 +117,7 @@ pub struct JobDetailResponse {
 }
 
 /// A single execution attempt for a job.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct JobAttempt {
     /// Attempt number (1-based).
     pub attempt_number: i32,
@@ -139,7 +140,7 @@ pub struct JobAttempt {
 }
 
 /// Response for job list endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct JobListResponse {
     /// List of jobs.
     pub jobs: Vec<JobSummary>,
@@ -152,7 +153,7 @@ pub struct JobListResponse {
 }
 
 /// Response for job cancellation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CancelJobResponse {
     /// Job ID.
     pub id: Uuid,
@@ -183,7 +184,7 @@ pub struct ListDlqQuery {
 }
 
 /// A dead letter queue entry.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct DlqEntry {
     /// Entry unique identifier.
     pub id: Uuid,
@@ -206,7 +207,7 @@ pub struct DlqEntry {
 }
 
 /// Response for DLQ list endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct DlqListResponse {
     /// List of DLQ entries.
     pub entries: Vec<DlqEntry>,
@@ -219,7 +220,7 @@ pub struct DlqListResponse {
 }
 
 /// Request to replay a DLQ entry.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct ReplayRequest {
     /// Force replay even if already replayed.
     #[serde(default)]
@@ -227,7 +228,7 @@ pub struct ReplayRequest {
 }
 
 /// Response for replay operation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ReplayResponse {
     /// Entry ID.
     pub id: Uuid,
@@ -239,7 +240,7 @@ pub struct ReplayResponse {
 }
 
 /// Request to bulk replay DLQ entries.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct BulkReplayRequest {
     /// IDs of entries to replay (max 100).
     pub ids: Vec<Uuid>,
@@ -249,7 +250,7 @@ pub struct BulkReplayRequest {
 }
 
 /// Response for bulk replay operation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct BulkReplayResponse {
     /// Total entries processed.
     pub total: i32,
@@ -313,6 +314,24 @@ fn extract_user_id(claims: &JwtClaims) -> Result<Uuid, ApiError> {
 /// - to: Filter jobs created before this time
 /// - limit: Page size (default 50, max 100)
 /// - offset: Page offset
+#[utoipa::path(
+    get,
+    path = "/connectors/jobs",
+    tag = "Connector Jobs",
+    params(
+        ("connector_id" = Option<Uuid>, Query, description = "Filter by connector ID"),
+        ("status" = Option<String>, Query, description = "Filter by status"),
+        ("from" = Option<String>, Query, description = "Filter jobs created after this time"),
+        ("to" = Option<String>, Query, description = "Filter jobs created before this time"),
+        ("limit" = Option<i64>, Query, description = "Page size (default 50, max 100)"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
+    ),
+    responses(
+        (status = 200, description = "Jobs listed", body = JobListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+    ),
+)]
 pub async fn list_jobs(
     State(state): State<JobState>,
     Extension(claims): Extension<JwtClaims>,
@@ -348,6 +367,20 @@ pub async fn list_jobs(
 /// GET /jobs/{id}
 ///
 /// Returns detailed job information including execution attempts.
+#[utoipa::path(
+    get,
+    path = "/connectors/jobs/{id}",
+    tag = "Connector Jobs",
+    params(
+        ("id" = Uuid, Path, description = "Job ID"),
+    ),
+    responses(
+        (status = 200, description = "Job details", body = JobDetailResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Job not found"),
+    ),
+)]
 pub async fn get_job(
     State(state): State<JobState>,
     Extension(claims): Extension<JwtClaims>,
@@ -372,6 +405,21 @@ pub async fn get_job(
 /// POST /jobs/{id}/cancel
 ///
 /// Cancels a pending or in-progress job. Cannot cancel completed jobs.
+#[utoipa::path(
+    post,
+    path = "/connectors/jobs/{id}/cancel",
+    tag = "Connector Jobs",
+    params(
+        ("id" = Uuid, Path, description = "Job ID"),
+    ),
+    responses(
+        (status = 200, description = "Job cancelled", body = CancelJobResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Job not found"),
+        (status = 409, description = "Job cannot be cancelled"),
+    ),
+)]
 pub async fn cancel_job(
     State(state): State<JobState>,
     Extension(claims): Extension<JwtClaims>,
@@ -403,6 +451,21 @@ pub async fn cancel_job(
 /// - `connector_id`: Filter by connector ID
 /// - limit: Page size (default 50, max 100)
 /// - offset: Page offset
+#[utoipa::path(
+    get,
+    path = "/connectors/dlq",
+    tag = "Connector Jobs",
+    params(
+        ("connector_id" = Option<Uuid>, Query, description = "Filter by connector ID"),
+        ("limit" = Option<i64>, Query, description = "Page size (default 50, max 100)"),
+        ("offset" = Option<i64>, Query, description = "Page offset"),
+    ),
+    responses(
+        (status = 200, description = "DLQ entries listed", body = DlqListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+    ),
+)]
 pub async fn list_dlq(
     State(state): State<JobState>,
     Extension(claims): Extension<JwtClaims>,
@@ -430,6 +493,21 @@ pub async fn list_dlq(
 /// POST /dlq/{id}/replay
 ///
 /// Re-queues a dead letter entry for processing.
+#[utoipa::path(
+    post,
+    path = "/connectors/dlq/{id}/replay",
+    tag = "Connector Jobs",
+    params(
+        ("id" = Uuid, Path, description = "DLQ entry ID"),
+    ),
+    request_body = ReplayRequest,
+    responses(
+        (status = 200, description = "Entry replayed", body = ReplayResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Entry not found"),
+    ),
+)]
 pub async fn replay_dlq_entry(
     State(state): State<JobState>,
     Extension(claims): Extension<JwtClaims>,
@@ -454,6 +532,18 @@ pub async fn replay_dlq_entry(
 /// POST /dlq/replay
 ///
 /// Re-queues multiple dead letter entries for processing.
+#[utoipa::path(
+    post,
+    path = "/connectors/dlq/replay",
+    tag = "Connector Jobs",
+    request_body = BulkReplayRequest,
+    responses(
+        (status = 200, description = "Entries replayed", body = BulkReplayResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 422, description = "Too many entries (max 100)"),
+    ),
+)]
 pub async fn bulk_replay_dlq(
     State(state): State<JobState>,
     Extension(claims): Extension<JwtClaims>,

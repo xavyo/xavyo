@@ -5,6 +5,7 @@ use serde::Serialize;
 use std::net::IpAddr;
 use std::sync::Arc;
 use tracing::info;
+use utoipa::ToSchema;
 use validator::Validate;
 use xavyo_core::UserId;
 
@@ -13,7 +14,7 @@ use crate::{
 };
 
 /// Response for MFA disable.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MfaDisableResponse {
     pub message: String,
 }
@@ -22,6 +23,17 @@ pub struct MfaDisableResponse {
 ///
 /// Disable MFA for the authenticated user.
 /// Requires password and TOTP code verification.
+#[utoipa::path(
+    delete,
+    path = "/auth/mfa/totp",
+    request_body = TotpDisableRequest,
+    responses(
+        (status = 200, description = "MFA disabled", body = MfaDisableResponse),
+        (status = 400, description = "Cannot disable MFA when policy requires it"),
+        (status = 401, description = "Invalid credentials"),
+    ),
+    tag = "MFA"
+)]
 pub async fn disable_mfa(
     State(state): State<AuthState>,
     Extension(user_id): Extension<UserId>,

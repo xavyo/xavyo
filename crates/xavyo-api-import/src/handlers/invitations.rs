@@ -28,6 +28,20 @@ use xavyo_db::models::{User, UserInvitation};
 /// POST /`admin/users/:user_id/invite`
 ///
 /// Send or resend an invitation for a specific user.
+#[utoipa::path(
+    post,
+    path = "/admin/users/{user_id}/invite",
+    tag = "Import",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID to invite"),
+    ),
+    responses(
+        (status = 200, description = "Invitation sent", body = InvitationResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "User not found"),
+    ),
+)]
 pub async fn resend_user_invitation(
     Extension(claims): Extension<JwtClaims>,
     Extension(pool): Extension<PgPool>,
@@ -62,6 +76,20 @@ pub async fn resend_user_invitation(
 /// POST /admin/users/imports/:job_id/resend-invitations
 ///
 /// Bulk resend invitations for all pending/sent users in an import job.
+#[utoipa::path(
+    post,
+    path = "/admin/users/imports/{job_id}/resend-invitations",
+    tag = "Import",
+    params(
+        ("job_id" = Uuid, Path, description = "Import job ID"),
+    ),
+    responses(
+        (status = 200, description = "Invitations resent", body = BulkResendResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Job not found"),
+    ),
+)]
 pub async fn bulk_resend_invitations(
     Extension(claims): Extension<JwtClaims>,
     Extension(pool): Extension<PgPool>,
@@ -99,6 +127,17 @@ pub async fn bulk_resend_invitations(
 /// GET /invite/:token (PUBLIC — no auth required)
 ///
 /// Validate an invitation token and return status.
+#[utoipa::path(
+    get,
+    path = "/invite/{token}",
+    tag = "Import",
+    params(
+        ("token" = String, Path, description = "Invitation token"),
+    ),
+    responses(
+        (status = 200, description = "Token validation result", body = InvitationValidationResponse),
+    ),
+)]
 pub async fn validate_invitation_token(
     Extension(pool): Extension<PgPool>,
     Path(token): Path<String>,
@@ -168,6 +207,21 @@ pub async fn validate_invitation_token(
 /// POST /invite/:token (PUBLIC — no auth required)
 ///
 /// Accept an invitation by setting a password and activating the account.
+#[utoipa::path(
+    post,
+    path = "/invite/{token}",
+    tag = "Import",
+    params(
+        ("token" = String, Path, description = "Invitation token"),
+    ),
+    request_body = AcceptInvitationRequest,
+    responses(
+        (status = 200, description = "Invitation accepted", body = AcceptInvitationResponse),
+        (status = 400, description = "Invalid token or password"),
+        (status = 409, description = "Token already used"),
+        (status = 410, description = "Token expired"),
+    ),
+)]
 pub async fn accept_invitation(
     Extension(pool): Extension<PgPool>,
     Path(token): Path<String>,

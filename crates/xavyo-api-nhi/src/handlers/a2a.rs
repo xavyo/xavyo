@@ -44,6 +44,17 @@ fn extract_agent_id(claims: &JwtClaims) -> Result<Uuid, NhiApiError> {
 /// If the caller is an admin/super_admin user (not an NHI agent), they can
 /// specify `source_agent_id` in the request body to create tasks on behalf
 /// of an agent. If the JWT subject is an NHI identity, it is used as the source.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/a2a/tasks",
+    request_body = CreateA2aTaskRequest,
+    responses(
+        (status = 201, description = "Task created", body = CreateA2aTaskResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 403, description = "Forbidden"),
+    ),
+    tag = "A2A Tasks"
+))]
 pub async fn create_task(
     State(state): State<NhiState>,
     Extension(claims): Extension<JwtClaims>,
@@ -78,6 +89,15 @@ pub async fn create_task(
 }
 
 /// GET /a2a/tasks - List tasks created by the authenticated agent.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/a2a/tasks",
+    responses(
+        (status = 200, description = "List of A2A tasks", body = A2aTaskListResponse),
+        (status = 400, description = "Invalid request"),
+    ),
+    tag = "A2A Tasks"
+))]
 pub async fn list_tasks(
     State(state): State<NhiState>,
     Extension(claims): Extension<JwtClaims>,
@@ -99,6 +119,18 @@ pub async fn list_tasks(
 }
 
 /// GET /a2a/tasks/{id} - Get task status.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    get,
+    path = "/a2a/tasks/{id}",
+    params(
+        ("id" = Uuid, Path, description = "Task ID"),
+    ),
+    responses(
+        (status = 200, description = "Task details", body = A2aTaskResponse),
+        (status = 404, description = "Task not found"),
+    ),
+    tag = "A2A Tasks"
+))]
 pub async fn get_task(
     State(state): State<NhiState>,
     Extension(claims): Extension<JwtClaims>,
@@ -122,6 +154,19 @@ pub async fn get_task(
 }
 
 /// POST /a2a/tasks/{id}/cancel - Cancel a task.
+#[cfg_attr(feature = "openapi", utoipa::path(
+    post,
+    path = "/a2a/tasks/{id}/cancel",
+    params(
+        ("id" = Uuid, Path, description = "Task ID"),
+    ),
+    responses(
+        (status = 200, description = "Task cancelled", body = CancelA2aTaskResponse),
+        (status = 404, description = "Task not found"),
+        (status = 409, description = "Task cannot be cancelled"),
+    ),
+    tag = "A2A Tasks"
+))]
 pub async fn cancel_task(
     State(state): State<NhiState>,
     Extension(claims): Extension<JwtClaims>,

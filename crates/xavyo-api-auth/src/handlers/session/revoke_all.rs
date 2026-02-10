@@ -11,6 +11,15 @@ use crate::{error::ApiAuthError, models::RevokeAllSessionsResponse, services::Se
 /// DELETE /users/me/sessions
 ///
 /// Revoke all sessions except the current one.
+#[utoipa::path(
+    delete,
+    path = "/users/me/sessions",
+    responses(
+        (status = 200, description = "All other sessions revoked", body = RevokeAllSessionsResponse),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = "User Sessions"
+)]
 pub async fn revoke_all_sessions(
     Extension(session_service): Extension<Arc<SessionService>>,
     Extension(user_id): Extension<UserId>,

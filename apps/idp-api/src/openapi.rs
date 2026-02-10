@@ -209,7 +209,21 @@ impl Modify for SecurityAddon {
         (name = "NHI Inactivity", description = "NHI inactivity detection, auto-suspend, and orphan management"),
         (name = "NHI Agents", description = "NHI AI agent type-specific CRUD"),
         (name = "NHI Service Accounts", description = "NHI service account type-specific CRUD"),
-        (name = "NHI Tools", description = "NHI tool type-specific CRUD")
+        (name = "NHI Tools", description = "NHI tool type-specific CRUD"),
+        // NHI Permission Model (204)
+        (name = "NHI User Permissions", description = "User-to-NHI access permission grants and queries"),
+        // Admin policies
+        (name = "Admin - Org Security Policy", description = "Organizational security policy management"),
+        (name = "Admin - MFA Policy", description = "MFA policy administration"),
+        (name = "Admin - Password Policy", description = "Password policy administration"),
+        (name = "Admin - Lockout Policy", description = "Account lockout policy administration"),
+        (name = "Admin - Sessions", description = "Session policy administration"),
+        (name = "Admin - Devices", description = "Device management and policy administration"),
+        // SCIM
+        (name = "SCIM Groups", description = "SCIM 2.0 group provisioning"),
+        (name = "SCIM Admin", description = "SCIM token and mapping management"),
+        // Connector Jobs
+        (name = "Connector Jobs", description = "Connector job tracking and dead letter queue")
     ),
     paths(
         // Health
@@ -1217,9 +1231,139 @@ impl Modify for SecurityAddon {
         xavyo_api_nhi::handlers::tools::get_tool,
         xavyo_api_nhi::handlers::tools::update_tool,
         xavyo_api_nhi::handlers::tools::delete_tool,
-        // NOTE: The following handlers need #[utoipa::path] annotations to be included in OpenAPI:
-        // - Bulk Import (F086): import.rs, errors.rs, invitations.rs handlers (9 endpoints)
-        // - Prometheus Metrics (F072): metrics.rs handler (1 endpoint)
+        // Auth - User Profile (me/)
+        xavyo_api_auth::handlers::me::profile::get_profile,
+        xavyo_api_auth::handlers::me::profile::update_profile,
+        xavyo_api_auth::handlers::me::email::initiate_email_change,
+        xavyo_api_auth::handlers::me::email::verify_email_change,
+        xavyo_api_auth::handlers::me::password::me_password_change,
+        xavyo_api_auth::handlers::me::security::get_security_overview,
+        xavyo_api_auth::handlers::me::security::get_mfa_status,
+        xavyo_api_auth::handlers::me::shortcuts::get_me_sessions,
+        xavyo_api_auth::handlers::me::shortcuts::get_me_devices,
+        // Auth - User Sessions
+        xavyo_api_auth::handlers::session::list::list_sessions,
+        xavyo_api_auth::handlers::session::policy::get_session_policy,
+        xavyo_api_auth::handlers::session::policy::update_session_policy,
+        xavyo_api_auth::handlers::session::revoke::revoke_session,
+        xavyo_api_auth::handlers::session::revoke_all::revoke_all_sessions,
+        // Auth - User Devices
+        xavyo_api_auth::handlers::devices::user_devices::list_devices,
+        xavyo_api_auth::handlers::devices::user_devices::trust_device,
+        xavyo_api_auth::handlers::devices::user_devices::untrust_device,
+        xavyo_api_auth::handlers::devices::user_devices::rename_device,
+        xavyo_api_auth::handlers::devices::user_devices::revoke_device,
+        // Auth - Admin Devices
+        xavyo_api_auth::handlers::devices::admin_devices::admin_list_user_devices,
+        xavyo_api_auth::handlers::devices::admin_devices::admin_revoke_device,
+        xavyo_api_auth::handlers::devices::admin_devices::get_device_policy,
+        xavyo_api_auth::handlers::devices::admin_devices::update_device_policy,
+        // Auth - MFA
+        xavyo_api_auth::handlers::mfa::status::get_mfa_status,
+        xavyo_api_auth::handlers::mfa::setup::setup_totp,
+        xavyo_api_auth::handlers::mfa::verify_setup::verify_totp_setup,
+        xavyo_api_auth::handlers::mfa::verify::verify_totp,
+        xavyo_api_auth::handlers::mfa::disable::disable_mfa,
+        xavyo_api_auth::handlers::mfa::recovery::verify_recovery_code,
+        xavyo_api_auth::handlers::mfa::recovery::regenerate_recovery_codes,
+        // Auth - Admin Org Security Policy
+        xavyo_api_auth::handlers::admin::org_security_policy::list_org_policies,
+        xavyo_api_auth::handlers::admin::org_security_policy::create_org_policy,
+        xavyo_api_auth::handlers::admin::org_security_policy::get_org_policy,
+        xavyo_api_auth::handlers::admin::org_security_policy::upsert_org_policy,
+        xavyo_api_auth::handlers::admin::org_security_policy::delete_org_policy,
+        xavyo_api_auth::handlers::admin::org_security_policy::get_effective_org_policy,
+        xavyo_api_auth::handlers::admin::org_security_policy::get_effective_user_policy,
+        xavyo_api_auth::handlers::admin::org_security_policy::validate_org_policy,
+        // Auth - Admin MFA Policy
+        xavyo_api_auth::handlers::admin::mfa_policy::get_mfa_policy,
+        xavyo_api_auth::handlers::admin::mfa_policy::update_mfa_policy,
+        // Auth - Admin Password Policy
+        xavyo_api_auth::handlers::admin::password_policy::get_password_policy,
+        xavyo_api_auth::handlers::admin::password_policy::update_password_policy,
+        // Auth - Admin Lockout Policy
+        xavyo_api_auth::handlers::admin::lockout_policy::get_lockout_policy,
+        xavyo_api_auth::handlers::admin::lockout_policy::update_lockout_policy,
+        // Auth - Admin User Management
+        xavyo_api_auth::handlers::admin::unlock_user::unlock_user,
+        xavyo_api_auth::handlers::admin::user_mfa_status::get_user_mfa_status,
+        // Auth - Audit
+        xavyo_api_auth::handlers::audit::login_history::get_login_history,
+        xavyo_api_auth::handlers::audit::admin_audit::get_admin_login_attempts,
+        xavyo_api_auth::handlers::audit::admin_audit::get_login_attempt_stats,
+        // Auth - Security Alerts
+        xavyo_api_auth::handlers::alerts::security_alerts::get_security_alerts,
+        xavyo_api_auth::handlers::alerts::security_alerts::acknowledge_alert,
+        // OAuth2 - Admin Sessions
+        xavyo_api_oauth::handlers::admin_sessions::admin_revoke_user_handler,
+        xavyo_api_oauth::handlers::admin_sessions::list_active_sessions_handler,
+        xavyo_api_oauth::handlers::admin_sessions::delete_session_handler,
+        // OAuth2 - Device Code (browser flow)
+        xavyo_api_oauth::handlers::device::device_verification_page_handler,
+        xavyo_api_oauth::handlers::device::device_verify_code_handler,
+        xavyo_api_oauth::handlers::device::device_authorize_handler,
+        xavyo_api_oauth::handlers::device::device_confirm_handler,
+        xavyo_api_oauth::handlers::device::device_resend_confirmation_handler,
+        // OAuth2 - Token Introspection (RFC 7662)
+        xavyo_api_oauth::handlers::introspection::introspect_token_handler,
+        // OAuth2 - Token Revocation (RFC 7009)
+        xavyo_api_oauth::handlers::revocation::revoke_token_handler,
+        // OIDC Federation - Auth Endpoints
+        xavyo_api_oidc_federation::handlers::federation::discover_realm,
+        xavyo_api_oidc_federation::handlers::federation::authorize,
+        xavyo_api_oidc_federation::handlers::federation::callback,
+        xavyo_api_oidc_federation::handlers::federation::logout,
+        // NHI - User Permissions (204)
+        xavyo_api_nhi::handlers::user_permissions::grant_user_permission,
+        xavyo_api_nhi::handlers::user_permissions::revoke_user_permission,
+        xavyo_api_nhi::handlers::user_permissions::list_nhi_users,
+        xavyo_api_nhi::handlers::user_permissions::list_user_nhis,
+        // NHI - NHI-to-NHI Permissions (204)
+        xavyo_api_nhi::handlers::nhi_permissions::grant_nhi_permission,
+        xavyo_api_nhi::handlers::nhi_permissions::revoke_nhi_permission,
+        xavyo_api_nhi::handlers::nhi_permissions::list_callers,
+        xavyo_api_nhi::handlers::nhi_permissions::list_callees,
+        // A2A Protocol Tasks (F091)
+        xavyo_api_nhi::handlers::a2a::create_task,
+        xavyo_api_nhi::handlers::a2a::list_tasks,
+        xavyo_api_nhi::handlers::a2a::get_task,
+        xavyo_api_nhi::handlers::a2a::cancel_task,
+        // A2A Discovery
+        xavyo_api_nhi::handlers::discovery::get_agent_card,
+        // MCP Protocol (F091)
+        xavyo_api_nhi::handlers::mcp::list_tools,
+        xavyo_api_nhi::handlers::mcp::call_tool,
+        // SCIM Groups
+        xavyo_api_scim::handlers::groups::list_groups,
+        xavyo_api_scim::handlers::groups::create_group,
+        xavyo_api_scim::handlers::groups::get_group,
+        xavyo_api_scim::handlers::groups::replace_group,
+        xavyo_api_scim::handlers::groups::update_group,
+        xavyo_api_scim::handlers::groups::delete_group,
+        // SCIM Admin
+        xavyo_api_scim::handlers::admin::list_tokens,
+        xavyo_api_scim::handlers::admin::create_token,
+        xavyo_api_scim::handlers::admin::revoke_token,
+        xavyo_api_scim::handlers::admin::get_mappings,
+        xavyo_api_scim::handlers::admin::update_mappings,
+        // Bulk Import (F086)
+        xavyo_api_import::handlers::import::create_import_job,
+        xavyo_api_import::handlers::import::list_import_jobs,
+        xavyo_api_import::handlers::import::get_import_job,
+        xavyo_api_import::handlers::errors::list_import_errors,
+        xavyo_api_import::handlers::errors::download_import_errors,
+        // Invitations (F086)
+        xavyo_api_import::handlers::invitations::resend_user_invitation,
+        xavyo_api_import::handlers::invitations::bulk_resend_invitations,
+        xavyo_api_import::handlers::invitations::validate_invitation_token,
+        xavyo_api_import::handlers::invitations::accept_invitation,
+        // Connector Jobs
+        xavyo_api_connectors::handlers::jobs::list_jobs,
+        xavyo_api_connectors::handlers::jobs::get_job,
+        xavyo_api_connectors::handlers::jobs::cancel_job,
+        xavyo_api_connectors::handlers::jobs::list_dlq,
+        xavyo_api_connectors::handlers::jobs::replay_dlq_entry,
+        xavyo_api_connectors::handlers::jobs::bulk_replay_dlq,
     ),
     components(schemas(
         // Health

@@ -21,6 +21,22 @@ use xavyo_db::models::UserImportError;
 /// GET /`admin/users/imports/:job_id/errors`
 ///
 /// List per-row errors for an import job with pagination.
+#[utoipa::path(
+    get,
+    path = "/admin/users/imports/{job_id}/errors",
+    tag = "Import",
+    params(
+        ("job_id" = Uuid, Path, description = "Import job ID"),
+        ("limit" = Option<i64>, Query, description = "Maximum results to return"),
+        ("offset" = Option<i64>, Query, description = "Results to skip"),
+    ),
+    responses(
+        (status = 200, description = "Import errors listed", body = ImportErrorListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Job not found"),
+    ),
+)]
 pub async fn list_import_errors(
     Extension(claims): Extension<JwtClaims>,
     Extension(pool): Extension<PgPool>,
@@ -55,6 +71,20 @@ pub async fn list_import_errors(
 /// GET /`admin/users/imports/:job_id/errors/download`
 ///
 /// Download all errors for an import job as a CSV file.
+#[utoipa::path(
+    get,
+    path = "/admin/users/imports/{job_id}/errors/download",
+    tag = "Import",
+    params(
+        ("job_id" = Uuid, Path, description = "Import job ID"),
+    ),
+    responses(
+        (status = 200, description = "Error CSV file", content_type = "text/csv"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
+        (status = 404, description = "Job not found"),
+    ),
+)]
 pub async fn download_import_errors(
     Extension(claims): Extension<JwtClaims>,
     Extension(pool): Extension<PgPool>,

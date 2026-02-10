@@ -280,6 +280,17 @@ pub async fn device_authorization_handler(
 /// If `code` query parameter is provided (from `verification_uri_complete`),
 /// the code is pre-filled in the form.
 /// Sets a CSRF token cookie for form protection.
+#[utoipa::path(
+    get,
+    path = "/device",
+    params(
+        ("code" = Option<String>, Query, description = "Pre-filled user code from verification_uri_complete")
+    ),
+    responses(
+        (status = 200, description = "Device verification page (HTML)", content_type = "text/html"),
+    ),
+    tag = "OAuth2 Device Code"
+)]
 pub async fn device_verification_page_handler(
     State(state): State<OAuthState>,
     Query(query): Query<DeviceVerificationQuery>,
@@ -309,6 +320,14 @@ pub async fn device_verification_page_handler(
 /// Validates the user code and either shows the approval page or an error.
 /// F112: Now checks authentication status and shows login form if not authenticated.
 /// Validates CSRF token to prevent cross-site request forgery.
+#[utoipa::path(
+    post,
+    path = "/device/verify",
+    responses(
+        (status = 200, description = "Verification result page (HTML)", content_type = "text/html"),
+    ),
+    tag = "OAuth2 Device Code"
+)]
 pub async fn device_verify_code_handler(
     State(state): State<OAuthState>,
     Extension(session_service): Extension<Arc<SessionService>>,
@@ -455,6 +474,14 @@ pub async fn device_verify_code_handler(
 /// User approves or denies the authorization request.
 /// F112: Now uses session cookie for authentication instead of X-User-ID header.
 /// Validates CSRF token to prevent cross-site request forgery.
+#[utoipa::path(
+    post,
+    path = "/device/authorize",
+    responses(
+        (status = 200, description = "Authorization result page (HTML)", content_type = "text/html"),
+    ),
+    tag = "OAuth2 Device Code"
+)]
 pub async fn device_authorize_handler(
     State(state): State<OAuthState>,
     Extension(session_service): Extension<Arc<SessionService>>,

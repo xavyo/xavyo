@@ -143,6 +143,19 @@ fn policy_source_to_dto(source: &PolicySource) -> PolicySourceInfo {
 /// GET /admin/organizations/:org_id/security-policies
 ///
 /// List all security policies for an organization.
+#[utoipa::path(
+    get,
+    path = "/organizations/{org_id}/security-policies",
+    params(
+        ("org_id" = Uuid, Path, description = "Organization ID"),
+    ),
+    responses(
+        (status = 200, description = "Policies listed", body = OrgSecurityPolicyListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Organization not found"),
+    ),
+    tag = "Admin - Org Security Policy"
+)]
 pub async fn list_org_policies(
     Extension(pool): Extension<PgPool>,
     Extension(claims): Extension<JwtClaims>,
@@ -215,6 +228,22 @@ pub async fn list_org_policies(
 /// POST /admin/organizations/:org_id/security-policies
 ///
 /// Create a new security policy for an organization.
+#[utoipa::path(
+    post,
+    path = "/organizations/{org_id}/security-policies",
+    params(
+        ("org_id" = Uuid, Path, description = "Organization ID"),
+    ),
+    request_body = CreateOrgSecurityPolicyRequest,
+    responses(
+        (status = 201, description = "Policy created", body = OrgSecurityPolicyResponse),
+        (status = 400, description = "Invalid policy configuration"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Admin role required"),
+        (status = 404, description = "Organization not found"),
+    ),
+    tag = "Admin - Org Security Policy"
+)]
 pub async fn create_org_policy(
     Extension(pool): Extension<PgPool>,
     Extension(claims): Extension<JwtClaims>,
@@ -287,6 +316,20 @@ pub async fn create_org_policy(
 /// GET /admin/organizations/:org_id/security-policies/:policy_type
 ///
 /// Get a specific policy for an organization.
+#[utoipa::path(
+    get,
+    path = "/organizations/{org_id}/security-policies/{policy_type}",
+    params(
+        ("org_id" = Uuid, Path, description = "Organization ID"),
+        ("policy_type" = String, Path, description = "Policy type (password, mfa, session, ip_restriction)"),
+    ),
+    responses(
+        (status = 200, description = "Policy retrieved", body = OrgSecurityPolicyResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Policy or organization not found"),
+    ),
+    tag = "Admin - Org Security Policy"
+)]
 pub async fn get_org_policy(
     Extension(pool): Extension<PgPool>,
     Extension(claims): Extension<JwtClaims>,
@@ -335,6 +378,24 @@ pub async fn get_org_policy(
 /// PUT /admin/organizations/:org_id/security-policies/:policy_type
 ///
 /// Create or update a policy for an organization.
+#[utoipa::path(
+    put,
+    path = "/organizations/{org_id}/security-policies/{policy_type}",
+    params(
+        ("org_id" = Uuid, Path, description = "Organization ID"),
+        ("policy_type" = String, Path, description = "Policy type (password, mfa, session, ip_restriction)"),
+    ),
+    request_body = UpdateOrgSecurityPolicyRequest,
+    responses(
+        (status = 200, description = "Policy updated", body = OrgSecurityPolicyResponse),
+        (status = 201, description = "Policy created", body = OrgSecurityPolicyResponse),
+        (status = 400, description = "Invalid policy configuration"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Admin role required"),
+        (status = 404, description = "Organization not found"),
+    ),
+    tag = "Admin - Org Security Policy"
+)]
 pub async fn upsert_org_policy(
     Extension(pool): Extension<PgPool>,
     Extension(claims): Extension<JwtClaims>,
@@ -419,6 +480,21 @@ pub async fn upsert_org_policy(
 /// DELETE /admin/organizations/:org_id/security-policies/:policy_type
 ///
 /// Delete a policy for an organization.
+#[utoipa::path(
+    delete,
+    path = "/organizations/{org_id}/security-policies/{policy_type}",
+    params(
+        ("org_id" = Uuid, Path, description = "Organization ID"),
+        ("policy_type" = String, Path, description = "Policy type (password, mfa, session, ip_restriction)"),
+    ),
+    responses(
+        (status = 204, description = "Policy deleted"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Admin role required"),
+        (status = 404, description = "Policy or organization not found"),
+    ),
+    tag = "Admin - Org Security Policy"
+)]
 pub async fn delete_org_policy(
     Extension(pool): Extension<PgPool>,
     Extension(claims): Extension<JwtClaims>,
@@ -463,6 +539,20 @@ pub async fn delete_org_policy(
 /// GET /admin/organizations/:org_id/effective-policy/:policy_type
 ///
 /// Get the effective (resolved) policy for an organization.
+#[utoipa::path(
+    get,
+    path = "/organizations/{org_id}/effective-policy/{policy_type}",
+    params(
+        ("org_id" = Uuid, Path, description = "Organization ID"),
+        ("policy_type" = String, Path, description = "Policy type (password, mfa, session, ip_restriction)"),
+    ),
+    responses(
+        (status = 200, description = "Effective policy retrieved", body = EffectiveOrgPolicyResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Organization not found"),
+    ),
+    tag = "Admin - Org Security Policy"
+)]
 pub async fn get_effective_org_policy(
     Extension(pool): Extension<PgPool>,
     Extension(claims): Extension<JwtClaims>,
@@ -502,6 +592,19 @@ pub async fn get_effective_org_policy(
 /// GET /admin/users/:user_id/effective-policy/:policy_type
 ///
 /// Get the effective policy for a user (most restrictive across all groups).
+#[utoipa::path(
+    get,
+    path = "/users/{user_id}/effective-policy/{policy_type}",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID"),
+        ("policy_type" = String, Path, description = "Policy type (password, mfa, session, ip_restriction)"),
+    ),
+    responses(
+        (status = 200, description = "Effective user policy retrieved", body = EffectiveUserPolicyResponse),
+        (status = 401, description = "Unauthorized"),
+    ),
+    tag = "Admin - Org Security Policy"
+)]
 pub async fn get_effective_user_policy(
     Extension(pool): Extension<PgPool>,
     Extension(claims): Extension<JwtClaims>,
@@ -542,6 +645,21 @@ pub async fn get_effective_user_policy(
 /// POST /admin/organizations/:org_id/security-policies/validate
 ///
 /// Validate a policy configuration for conflicts.
+#[utoipa::path(
+    post,
+    path = "/organizations/{org_id}/security-policies/validate",
+    params(
+        ("org_id" = Uuid, Path, description = "Organization ID"),
+    ),
+    request_body = ValidatePolicyRequest,
+    responses(
+        (status = 200, description = "Validation result", body = PolicyValidationResponse),
+        (status = 400, description = "Invalid policy configuration"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Organization not found"),
+    ),
+    tag = "Admin - Org Security Policy"
+)]
 pub async fn validate_org_policy(
     Extension(pool): Extension<PgPool>,
     Extension(claims): Extension<JwtClaims>,

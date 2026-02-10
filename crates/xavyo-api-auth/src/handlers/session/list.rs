@@ -15,6 +15,15 @@ use crate::{
 /// GET /users/me/sessions
 ///
 /// List all active sessions for the current user.
+#[utoipa::path(
+    get,
+    path = "/users/me/sessions",
+    responses(
+        (status = 200, description = "Sessions listed successfully", body = SessionListResponse),
+        (status = 401, description = "Not authenticated"),
+    ),
+    tag = "User Sessions"
+)]
 pub async fn list_sessions(
     Extension(session_service): Extension<Arc<SessionService>>,
     Extension(user_id): Extension<UserId>,
