@@ -10,6 +10,7 @@ use xavyo_db::models::{
     CampaignFilter, CertCampaignStatus, CertItemSummary, CertReviewerType, CertScopeType,
     CreateCertificationCampaign, CreateCertificationItem, GovApplication, GovCertificationCampaign,
     GovCertificationItem, GovEntitlement, GovEntitlementAssignment, UpdateCertificationCampaign,
+    User,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -217,6 +218,11 @@ impl CertificationCampaignService {
     }
 
     /// Generate certification items for a campaign based on its scope.
+    ///
+    /// **Snapshot semantics**: Items are generated from assignments that exist at launch time.
+    /// Assignments created after launch are NOT retroactively added to the campaign.
+    /// This is by design — each campaign represents a point-in-time access review.
+    /// New assignments will be covered by subsequent campaigns.
     async fn generate_items_for_campaign(
         &self,
         tenant_id: Uuid,
@@ -231,23 +237,26 @@ impl CertificationCampaignService {
 
         // Convert assignments to certification items
         let mut items: Vec<CreateCertificationItem> = Vec::new();
+        let mut skipped_count: u64 = 0;
 
-        for assignment in assignments {
-            // Skip if there's already a pending item for this user-entitlement
+        for (idx, assignment) in assignments.iter().enumerate() {
+            // Skip if there's already a pending item for this user-entitlement in this campaign
             if GovCertificationItem::exists_pending_for_user_entitlement(
                 &self.pool,
                 tenant_id,
+                campaign.id,
                 assignment.target_id,
                 assignment.entitlement_id,
             )
             .await?
             {
+                skipped_count += 1;
                 continue;
             }
 
             // Resolve reviewer
             let reviewer_id = match self
-                .resolve_reviewer_for_assignment(tenant_id, campaign, &assignment)
+                .resolve_reviewer_for_assignment(tenant_id, campaign, assignment, idx)
                 .await
             {
                 Ok(id) => id,
@@ -258,6 +267,7 @@ impl CertificationCampaignService {
                         assignment.id,
                         e
                     );
+                    skipped_count += 1;
                     continue;
                 }
             };
@@ -279,6 +289,14 @@ impl CertificationCampaignService {
                 reviewer_id,
                 assignment_snapshot: snapshot,
             });
+        }
+
+        if skipped_count > 0 {
+            tracing::warn!(
+                campaign_id = %campaign.id,
+                skipped_count,
+                "Skipped {skipped_count} assignments during campaign item generation"
+            );
         }
 
         if items.is_empty() {
@@ -443,6 +461,7 @@ impl CertificationCampaignService {
         tenant_id: Uuid,
         campaign: &GovCertificationCampaign,
         assignment: &GovEntitlementAssignment,
+        item_index: usize,
     ) -> Result<Uuid> {
         match campaign.reviewer_type {
             CertReviewerType::UserManager => {
@@ -460,27 +479,30 @@ impl CertificationCampaignService {
                     .await
             }
             CertReviewerType::SpecificUsers => {
-                // Use the first specific reviewer (could be round-robin in future)
-                campaign.specific_reviewers.first().copied().ok_or_else(|| {
-                    GovernanceError::ReviewerNotFound(
+                // Round-robin across configured reviewers
+                let reviewers = &campaign.specific_reviewers;
+                if reviewers.is_empty() {
+                    return Err(GovernanceError::ReviewerNotFound(
                         "No specific reviewers configured".to_string(),
-                    )
-                })
+                    ));
+                }
+                Ok(reviewers[item_index % reviewers.len()])
             }
         }
     }
 
-    /// Get a user's manager.
-    ///
-    /// Note: The User model doesn't currently have a `manager_id` field.
-    /// This is a placeholder that requires extension of the User model
-    /// or integration with an HR data source.
-    async fn get_user_manager(&self, _tenant_id: Uuid, user_id: Uuid) -> Result<Uuid> {
-        // TODO: User model needs manager_id field or HR integration
-        // For now, this feature is not available
-        Err(GovernanceError::ReviewerNotFound(format!(
-            "Manager-based reviewer assignment not yet supported. User {user_id} has no manager data available."
-        )))
+    /// Get a user's manager from their `manager_id` field.
+    async fn get_user_manager(&self, tenant_id: Uuid, user_id: Uuid) -> Result<Uuid> {
+        let user = User::find_by_id_in_tenant(&self.pool, tenant_id, user_id)
+            .await
+            .map_err(GovernanceError::Database)?;
+
+        match user.and_then(|u| u.manager_id) {
+            Some(manager_id) => Ok(manager_id),
+            None => Err(GovernanceError::ReviewerNotFound(format!(
+                "User {user_id} has no manager assigned"
+            ))),
+        }
     }
 
     /// Get the application owner for an entitlement.

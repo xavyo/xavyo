@@ -10,12 +10,13 @@ use sqlx::FromRow;
 
 use xavyo_db::models::{
     AddCartItem, CartItemWithDetails, CatalogCategory, CatalogCategoryFilter, CatalogItem,
-    CatalogItemFilter, CatalogItemType, CreateCatalogCategory, CreateCatalogItem,
-    CreateGovAccessRequest, GovAccessRequest, GovRole, RequestCart, RequestCartItem,
-    RequestabilityRules, UpdateCartItem as DbUpdateCartItem, UpdateCatalogCategory,
-    UpdateCatalogItem, User,
+    CatalogItemFilter, CatalogItemType, CreateCatalogCategory, CreateCatalogItem, GovAccessRequest,
+    GovRole, GovSodExemption, RequestCart, RequestCartItem, RequestabilityRules,
+    UpdateCartItem as DbUpdateCartItem, UpdateCatalogCategory, UpdateCatalogItem, User,
 };
 use xavyo_governance::error::{GovernanceError, Result};
+
+use crate::services::EffectiveAccessService;
 
 // ============================================================================
 // Cart Validation Types
@@ -154,13 +155,17 @@ impl RequestabilityResult {
 /// Service for catalog operations.
 pub struct CatalogService {
     pool: PgPool,
+    effective_access_service: EffectiveAccessService,
 }
 
 impl CatalogService {
     /// Create a new catalog service.
     #[must_use]
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            effective_access_service: EffectiveAccessService::new(pool.clone()),
+            pool,
+        }
     }
 
     // =========================================================================
@@ -1125,6 +1130,9 @@ impl CatalogService {
     ///
     /// Creates a `GovAccessRequest` for each item in the cart.
     /// Returns a submission result with all created request IDs.
+    ///
+    /// Fix #4: Wrapped in a transaction to prevent partial submission
+    /// (all-or-nothing: either all requests are created and cart cleared, or nothing).
     pub async fn submit_cart(
         &self,
         tenant_id: Uuid,
@@ -1157,11 +1165,16 @@ impl CatalogService {
         let effective_beneficiary = beneficiary_id.unwrap_or(requester_id);
         let justification = global_justification.unwrap_or_default();
 
+        // Fix #4: Begin transaction for atomic cart submission
+        let mut tx = self.pool.begin().await.map_err(GovernanceError::Database)?;
+
         let mut submitted_items: Vec<SubmittedItemResult> = Vec::new();
 
         for item in &items {
             // Get the catalog item to find the reference ID
-            let catalog_item = self.get_item(tenant_id, item.catalog_item_id).await?;
+            let catalog_item = CatalogItem::find_by_id(&self.pool, tenant_id, item.catalog_item_id)
+                .await?
+                .ok_or(GovernanceError::CatalogItemNotFound(item.catalog_item_id))?;
 
             // Only create access requests for items that have a reference ID
             // (role or entitlement references)
@@ -1177,20 +1190,30 @@ impl CatalogService {
                         None
                     };
 
-                    // Create the access request
-                    let input = CreateGovAccessRequest {
-                        requester_id: effective_beneficiary,
-                        entitlement_id,
-                        workflow_id: None, // Let the system select default workflow
-                        justification: justification.clone(),
-                        requested_expires_at: None,
-                        has_sod_warning,
-                        sod_violations: sod_violations_json.clone(),
-                        expires_at: None,
-                    };
-
-                    let access_request =
-                        GovAccessRequest::create(&self.pool, tenant_id, input).await?;
+                    // Create the access request within the transaction
+                    let access_request: GovAccessRequest = sqlx::query_as(
+                        r"
+                        INSERT INTO gov_access_requests (
+                            tenant_id, requester_id, entitlement_id, workflow_id,
+                            justification, requested_expires_at, has_sod_warning,
+                            sod_violations, expires_at
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                        RETURNING *
+                        ",
+                    )
+                    .bind(tenant_id)
+                    .bind(effective_beneficiary)
+                    .bind(entitlement_id)
+                    .bind(None::<Uuid>) // workflow_id — let system select default
+                    .bind(&justification)
+                    .bind(None::<chrono::DateTime<chrono::Utc>>) // requested_expires_at
+                    .bind(has_sod_warning)
+                    .bind(&sod_violations_json)
+                    .bind(None::<chrono::DateTime<chrono::Utc>>) // expires_at
+                    .fetch_one(&mut *tx)
+                    .await
+                    .map_err(GovernanceError::Database)?;
 
                     submitted_items.push(SubmittedItemResult {
                         cart_item_id: item.id,
@@ -1201,8 +1224,15 @@ impl CatalogService {
             }
         }
 
-        // Clear the cart after successful submission
-        RequestCart::clear_items(&self.pool, tenant_id, cart.id).await?;
+        // Clear the cart within the same transaction
+        sqlx::query("DELETE FROM request_cart_items WHERE cart_id = $1")
+            .bind(cart.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(GovernanceError::Database)?;
+
+        // Commit the transaction — all or nothing
+        tx.commit().await.map_err(GovernanceError::Database)?;
 
         Ok(CartSubmissionResult {
             submission_id,
@@ -1238,6 +1268,8 @@ impl CatalogService {
 
     /// Check SoD violations for a set of proposed entitlements.
     ///
+    /// Fix #7: Now uses `EffectiveAccessService.get_effective_access()` to check
+    /// all entitlement sources (direct + group + role), and respects active exemptions.
     /// Returns a list of SoD violations (for warning display, not blocking).
     async fn check_sod_violations(
         &self,
@@ -1247,21 +1279,17 @@ impl CatalogService {
     ) -> Result<Vec<CartSodViolation>> {
         let mut violations = Vec::new();
 
-        // Get user's current entitlements
-        let current_entitlements: Vec<Uuid> = sqlx::query_scalar(
-            r"
-            SELECT entitlement_id FROM gov_entitlement_assignments
-            WHERE tenant_id = $1
-              AND target_id = $2
-              AND target_type = 'user'
-              AND status = 'active'
-              AND (expires_at IS NULL OR expires_at > NOW())
-            ",
-        )
-        .bind(tenant_id)
-        .bind(user_id)
-        .fetch_all(&self.pool)
-        .await?;
+        // Get user's effective entitlements (direct + group + role)
+        let effective = self
+            .effective_access_service
+            .get_effective_access(tenant_id, user_id, None)
+            .await?;
+
+        let current_entitlements: std::collections::HashSet<Uuid> = effective
+            .entitlements
+            .iter()
+            .map(|e| e.entitlement.id)
+            .collect();
 
         // Get all active SoD rules
         let sod_rules: Vec<SodRuleRow> = sqlx::query_as(
@@ -1275,60 +1303,74 @@ impl CatalogService {
         .fetch_all(&self.pool)
         .await?;
 
+        // Combine current and proposed entitlements
+        let mut all_entitlements: Vec<Uuid> = current_entitlements.iter().copied().collect();
+        all_entitlements.extend(proposed_entitlements.iter().copied());
+
         // Check each rule
         for rule in &sod_rules {
             let rule_entitlements: Vec<Uuid> =
                 serde_json::from_value(rule.entitlement_ids.clone()).unwrap_or_default();
 
-            // Combine current and proposed entitlements
-            let mut all_entitlements: Vec<Uuid> = current_entitlements.clone();
-            all_entitlements.extend(proposed_entitlements.iter().cloned());
-
             // Check based on conflict type
             match rule.conflict_type.as_str() {
                 "exclusive" => {
-                    // User cannot have any two entitlements in the rule set
                     let matching: Vec<Uuid> = all_entitlements
                         .iter()
                         .filter(|e| rule_entitlements.contains(e))
-                        .cloned()
+                        .copied()
                         .collect();
 
                     if matching.len() >= 2 {
-                        violations.push(CartSodViolation {
-                            rule_id: rule.id,
-                            rule_name: rule.name.clone(),
-                            conflicting_item_ids: matching,
-                            description: format!(
-                                "Rule '{}' prohibits having multiple entitlements from this set",
-                                rule.name
-                            ),
-                        });
+                        // Check for active exemption before reporting
+                        let has_exemption = GovSodExemption::has_active_exemption(
+                            &self.pool, tenant_id, rule.id, user_id,
+                        )
+                        .await
+                        .unwrap_or(false);
+
+                        if !has_exemption {
+                            violations.push(CartSodViolation {
+                                rule_id: rule.id,
+                                rule_name: rule.name.clone(),
+                                conflicting_item_ids: matching,
+                                description: format!(
+                                    "Rule '{}' prohibits having multiple entitlements from this set",
+                                    rule.name
+                                ),
+                            });
+                        }
                     }
                 }
                 "cardinality" => {
-                    // User cannot exceed max_count of entitlements from the rule set
                     let max_count = rule.max_count.unwrap_or(1) as usize;
                     let matching: Vec<Uuid> = all_entitlements
                         .iter()
                         .filter(|e| rule_entitlements.contains(e))
-                        .cloned()
+                        .copied()
                         .collect();
 
                     if matching.len() > max_count {
-                        violations.push(CartSodViolation {
-                            rule_id: rule.id,
-                            rule_name: rule.name.clone(),
-                            conflicting_item_ids: matching,
-                            description: format!(
-                                "Rule '{}' limits having at most {} of these entitlements",
-                                rule.name, max_count
-                            ),
-                        });
+                        let has_exemption = GovSodExemption::has_active_exemption(
+                            &self.pool, tenant_id, rule.id, user_id,
+                        )
+                        .await
+                        .unwrap_or(false);
+
+                        if !has_exemption {
+                            violations.push(CartSodViolation {
+                                rule_id: rule.id,
+                                rule_name: rule.name.clone(),
+                                conflicting_item_ids: matching,
+                                description: format!(
+                                    "Rule '{}' limits having at most {} of these entitlements",
+                                    rule.name, max_count
+                                ),
+                            });
+                        }
                     }
                 }
                 "inclusive" => {
-                    // If user has any from the set, they must have all
                     let matching_count = all_entitlements
                         .iter()
                         .filter(|e| rule_entitlements.contains(e))

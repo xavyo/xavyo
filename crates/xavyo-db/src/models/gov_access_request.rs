@@ -46,6 +46,30 @@ impl GovRequestStatus {
             Self::Provisioned | Self::Rejected | Self::Cancelled | Self::Expired | Self::Failed
         )
     }
+
+    /// Check if a status transition is valid.
+    ///
+    /// Valid transitions:
+    /// - Pending → PendingApproval, Cancelled, Expired, Rejected
+    /// - PendingApproval → Approved, Rejected, Cancelled, Expired
+    /// - Approved → Provisioned, Failed
+    /// - Provisioned, Rejected, Cancelled, Expired, Failed → (terminal, no transitions)
+    #[must_use]
+    pub fn is_valid_transition(&self, to: Self) -> bool {
+        matches!(
+            (self, to),
+            (Self::Pending, Self::PendingApproval)
+                | (Self::Pending, Self::Cancelled)
+                | (Self::Pending, Self::Expired)
+                | (Self::Pending, Self::Rejected)
+                | (Self::PendingApproval, Self::Approved)
+                | (Self::PendingApproval, Self::Rejected)
+                | (Self::PendingApproval, Self::Cancelled)
+                | (Self::PendingApproval, Self::Expired)
+                | (Self::Approved, Self::Provisioned)
+                | (Self::Approved, Self::Failed)
+        )
+    }
 }
 
 /// A user's access request.
@@ -330,24 +354,35 @@ impl GovAccessRequest {
         .await
     }
 
-    /// Update request status.
+    /// Update request status with state machine validation.
+    ///
+    /// Only allows valid transitions (enforced in SQL):
+    /// - Pending → PendingApproval, Cancelled, Expired, Rejected
+    /// - PendingApproval → Approved, Rejected, Cancelled, Expired
+    /// - Approved → Provisioned, Failed
+    /// - Terminal states → no transitions (returns None)
     pub async fn update_status(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         id: Uuid,
-        status: GovRequestStatus,
+        new_status: GovRequestStatus,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
             UPDATE gov_access_requests
             SET status = $3, updated_at = NOW()
             WHERE id = $1 AND tenant_id = $2
+              AND (
+                (status = 'pending' AND $3 IN ('pending_approval', 'cancelled', 'expired', 'rejected'))
+                OR (status = 'pending_approval' AND $3 IN ('approved', 'rejected', 'cancelled', 'expired'))
+                OR (status = 'approved' AND $3 IN ('provisioned', 'failed'))
+              )
             RETURNING *
             ",
         )
         .bind(id)
         .bind(tenant_id)
-        .bind(status)
+        .bind(new_status)
         .fetch_optional(pool)
         .await
     }
@@ -645,6 +680,41 @@ mod tests {
         let pending_approval = GovRequestStatus::PendingApproval;
         let json = serde_json::to_string(&pending_approval).unwrap();
         assert_eq!(json, "\"pending_approval\"");
+    }
+
+    #[test]
+    fn test_valid_transitions() {
+        assert!(GovRequestStatus::Pending.is_valid_transition(GovRequestStatus::PendingApproval));
+        assert!(GovRequestStatus::Pending.is_valid_transition(GovRequestStatus::Cancelled));
+        assert!(GovRequestStatus::Pending.is_valid_transition(GovRequestStatus::Expired));
+        assert!(GovRequestStatus::Pending.is_valid_transition(GovRequestStatus::Rejected));
+        assert!(GovRequestStatus::PendingApproval.is_valid_transition(GovRequestStatus::Approved));
+        assert!(GovRequestStatus::PendingApproval.is_valid_transition(GovRequestStatus::Rejected));
+        assert!(GovRequestStatus::PendingApproval.is_valid_transition(GovRequestStatus::Cancelled));
+        assert!(GovRequestStatus::PendingApproval.is_valid_transition(GovRequestStatus::Expired));
+        assert!(GovRequestStatus::Approved.is_valid_transition(GovRequestStatus::Provisioned));
+        assert!(GovRequestStatus::Approved.is_valid_transition(GovRequestStatus::Failed));
+    }
+
+    #[test]
+    fn test_invalid_transitions() {
+        // Terminal states cannot transition
+        assert!(!GovRequestStatus::Cancelled.is_valid_transition(GovRequestStatus::Provisioned));
+        assert!(!GovRequestStatus::Rejected.is_valid_transition(GovRequestStatus::PendingApproval));
+        assert!(!GovRequestStatus::Provisioned.is_valid_transition(GovRequestStatus::Pending));
+        assert!(!GovRequestStatus::Expired.is_valid_transition(GovRequestStatus::Approved));
+        assert!(!GovRequestStatus::Failed.is_valid_transition(GovRequestStatus::Provisioned));
+
+        // Invalid forward transitions
+        assert!(!GovRequestStatus::Pending.is_valid_transition(GovRequestStatus::Approved));
+        assert!(!GovRequestStatus::Pending.is_valid_transition(GovRequestStatus::Provisioned));
+        assert!(
+            !GovRequestStatus::PendingApproval.is_valid_transition(GovRequestStatus::Provisioned)
+        );
+        assert!(!GovRequestStatus::Approved.is_valid_transition(GovRequestStatus::Rejected));
+
+        // Self-transition not allowed
+        assert!(!GovRequestStatus::Pending.is_valid_transition(GovRequestStatus::Pending));
     }
 
     #[test]

@@ -150,20 +150,25 @@ impl GovCertificationItem {
         .await
     }
 
-    /// Check if a pending item exists for this user-entitlement combination.
+    /// Check if a pending item exists for this user-entitlement in the given campaign.
+    ///
+    /// Scoped to a single campaign so that the same user+entitlement pair can be
+    /// reviewed in multiple concurrent campaigns.
     pub async fn exists_pending_for_user_entitlement(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
+        campaign_id: Uuid,
         user_id: Uuid,
         entitlement_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
         let count: i64 = sqlx::query_scalar(
             r"
             SELECT COUNT(*) FROM gov_certification_items
-            WHERE tenant_id = $1 AND user_id = $2 AND entitlement_id = $3 AND status = 'pending'
+            WHERE tenant_id = $1 AND campaign_id = $2 AND user_id = $3 AND entitlement_id = $4 AND status = 'pending'
             ",
         )
         .bind(tenant_id)
+        .bind(campaign_id)
         .bind(user_id)
         .bind(entitlement_id)
         .fetch_one(pool)

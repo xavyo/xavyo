@@ -209,6 +209,22 @@ impl RoleHierarchyService {
         let children = GovRole::get_children(&self.pool, tenant_id, role_id).await?;
         let child_ids: Vec<Uuid> = children.iter().map(|c| c.id).collect();
 
+        // Count active assignments that will be orphaned by this role deletion
+        let affected_assignment_count: i64 = sqlx::query_scalar(
+            r"
+            SELECT COUNT(*) FROM gov_entitlement_assignments gea
+            JOIN gov_role_entitlements gre ON gea.entitlement_id = gre.entitlement_id
+              AND gea.tenant_id = gre.tenant_id
+            WHERE gre.tenant_id = $1 AND gre.role_id = $2
+              AND gea.status = 'active'
+            ",
+        )
+        .bind(tenant_id)
+        .bind(role_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)?;
+
         // Delete the role (CASCADE handles effective entitlements and blocks)
         let deleted = GovRole::delete(&self.pool, tenant_id, role_id).await?;
         if !deleted {
@@ -234,6 +250,7 @@ impl RoleHierarchyService {
                     "parent_role_id": role.parent_role_id,
                     "is_abstract": role.is_abstract,
                     "orphaned_children": child_ids,
+                    "affected_assignment_count": affected_assignment_count,
                 })),
                 None,
             )

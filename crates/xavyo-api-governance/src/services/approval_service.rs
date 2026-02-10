@@ -5,6 +5,7 @@
 
 use chrono::Utc;
 use sqlx::PgPool;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use xavyo_db::models::{
@@ -16,16 +17,22 @@ use xavyo_db::models::{
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
+use crate::services::AssignmentService;
+
 /// Service for approval operations.
 pub struct ApprovalService {
     pool: PgPool,
+    assignment_service: Arc<AssignmentService>,
 }
 
 impl ApprovalService {
     /// Create a new approval service.
     #[must_use]
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            assignment_service: Arc::new(AssignmentService::new(pool.clone())),
+            pool,
+        }
     }
 
     /// Get pending approvals for a user (approver queue).
@@ -126,6 +133,9 @@ impl ApprovalService {
                 request.entitlement_id,
             )
             .await?;
+
+        // Fix #13: Filter out the requester to prevent self-approval via circular manager
+        approvers.retain(|&id| id != request.requester_id);
 
         // F054: Also include escalation targets who can approve (IGA behavior)
         // If the request has been escalated, the escalation targets can also approve
@@ -300,7 +310,8 @@ impl ApprovalService {
         approver_id: Uuid,
         comments: Option<String>,
     ) -> Result<ApprovalResult> {
-        let request = GovAccessRequest::find_by_id(&self.pool, tenant_id, request_id)
+        // Fix #15: Use FOR UPDATE to prevent concurrent approval races
+        let request = GovAccessRequest::find_by_id_for_update(&self.pool, tenant_id, request_id)
             .await?
             .ok_or(GovernanceError::AccessRequestNotFound(request_id))?;
 
@@ -442,7 +453,8 @@ impl ApprovalService {
             return Err(GovernanceError::RejectionCommentsRequired);
         }
 
-        let request = GovAccessRequest::find_by_id(&self.pool, tenant_id, request_id)
+        // Fix #15: Use FOR UPDATE to prevent concurrent approval/rejection races
+        let request = GovAccessRequest::find_by_id_for_update(&self.pool, tenant_id, request_id)
             .await?
             .ok_or(GovernanceError::AccessRequestNotFound(request_id))?;
 
@@ -528,6 +540,10 @@ impl ApprovalService {
     }
 
     /// Provision the entitlement assignment after final approval.
+    ///
+    /// Fix #1: Uses `AssignmentService.create_assignment()` instead of direct DB insert
+    /// to ensure SoD checks run at provisioning time (user's access may have changed
+    /// between cart submission and approval).
     async fn provision_entitlement(
         &self,
         tenant_id: Uuid,
@@ -546,9 +562,9 @@ impl ApprovalService {
             valid_to: None,
         };
 
-        GovEntitlementAssignment::create(&self.pool, tenant_id, input)
+        self.assignment_service
+            .create_assignment(tenant_id, input)
             .await
-            .map_err(GovernanceError::Database)
     }
 
     /// Get previous decisions for a request within a tenant.

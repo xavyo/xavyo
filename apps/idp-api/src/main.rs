@@ -47,6 +47,10 @@ use xavyo_api_connectors::{
     ScimTargetService, ScimTargetState, SyncService, SyncState,
 };
 use xavyo_api_governance::governance_router;
+use xavyo_api_governance::services::{
+    AccessRequestService, CertificationCampaignService, EscalationPolicyService, EscalationService,
+};
+use xavyo_api_governance::EscalationJob;
 use xavyo_api_import::{import_admin_router, import_public_router, ImportState};
 use xavyo_api_nhi::{a2a_router, discovery_router, mcp_router};
 use xavyo_api_nhi::{nhi_router, NhiState};
@@ -1371,6 +1375,99 @@ async fn main() {
                             target: "oauth",
                             error = %e,
                             "Failed to clean up expired device codes"
+                        );
+                    }
+                }
+            }
+        });
+    }
+
+    // Spawn governance escalation job (F054 — Fix #8)
+    {
+        let escalation_pool = pool.clone();
+        tokio::spawn(async move {
+            let escalation_service = EscalationService::new(escalation_pool.clone());
+            let escalation_policy_service = EscalationPolicyService::new(escalation_pool);
+            let job = EscalationJob::new(escalation_service, escalation_policy_service);
+            let interval = Duration::from_secs(60); // Check every minute
+            loop {
+                tokio::time::sleep(interval).await;
+                match job.poll().await {
+                    Ok(stats) => {
+                        if stats.escalated > 0 || stats.warnings_sent > 0 {
+                            tracing::info!(
+                                target: "governance",
+                                escalated = stats.escalated,
+                                warnings = stats.warnings_sent,
+                                fallbacks = stats.fallbacks_applied,
+                                "Escalation job completed"
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            target: "governance",
+                            error = %e,
+                            "Escalation job failed"
+                        );
+                    }
+                }
+            }
+        });
+        info!("Governance escalation background job started");
+    }
+
+    // Spawn governance access request expiration job (F035 — Fix #9)
+    {
+        let expiry_pool = pool.clone();
+        tokio::spawn(async move {
+            let service = AccessRequestService::new(expiry_pool);
+            let interval = Duration::from_secs(5 * 60); // Check every 5 minutes
+            loop {
+                tokio::time::sleep(interval).await;
+                match service.expire_stale_requests().await {
+                    Ok(count) if count > 0 => {
+                        tracing::info!(
+                            target: "governance",
+                            expired = count,
+                            "Expired stale access requests"
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!(
+                            target: "governance",
+                            error = %e,
+                            "Failed to expire stale access requests"
+                        );
+                    }
+                }
+            }
+        });
+    }
+
+    // Spawn governance certification campaign overdue detection job (F036 — Fix #9)
+    {
+        let campaign_pool = pool.clone();
+        tokio::spawn(async move {
+            let service = CertificationCampaignService::new(campaign_pool);
+            let interval = Duration::from_secs(15 * 60); // Check every 15 minutes
+            loop {
+                tokio::time::sleep(interval).await;
+                match service.mark_overdue_campaigns().await {
+                    Ok(count) if count > 0 => {
+                        tracing::info!(
+                            target: "governance",
+                            overdue = count,
+                            "Marked overdue certification campaigns"
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!(
+                            target: "governance",
+                            error = %e,
+                            "Failed to mark overdue certification campaigns"
                         );
                     }
                 }

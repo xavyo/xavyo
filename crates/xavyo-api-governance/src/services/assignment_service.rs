@@ -8,7 +8,7 @@ use xavyo_db::models::{
     BulkAssignmentFailure, BulkAssignmentRequest, BulkAssignmentResult, CreateGovAssignment,
     CreateManualTask, GovApplication, GovAssignmentFilter, GovAssignmentStatus,
     GovAssignmentTargetType, GovEntitlement, GovEntitlementAssignment, GovManualProvisioningTask,
-    GovSlaPolicy, GovSodExemption, GovSodRule, ManualTaskOperation,
+    GovSlaPolicy, GovSodExemption, GovSodRule, GroupMembership, ManualTaskOperation,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -114,6 +114,12 @@ impl AssignmentService {
         // SoD Check: For user assignments, check for conflicts
         if input.target_type == GovAssignmentTargetType::User {
             self.check_sod_for_user(tenant_id, input.target_id, input.entitlement_id)
+                .await?;
+        }
+
+        // Fix #3: SoD check for group assignments — check all group members
+        if input.target_type == GovAssignmentTargetType::Group {
+            self.check_sod_for_group_members(tenant_id, input.target_id, input.entitlement_id)
                 .await?;
         }
 
@@ -268,6 +274,28 @@ impl AssignmentService {
         Ok(())
     }
 
+    /// Check SoD rules for all members of a group assignment.
+    ///
+    /// Fix #3: Group assignments previously bypassed SoD checks entirely.
+    /// Now checks each group member and fails if any member would have a violation.
+    async fn check_sod_for_group_members(
+        &self,
+        tenant_id: Uuid,
+        group_id: Uuid,
+        entitlement_id: Uuid,
+    ) -> Result<()> {
+        let members = GroupMembership::get_group_members(&self.pool, tenant_id, group_id)
+            .await
+            .map_err(GovernanceError::Database)?;
+
+        for member in members {
+            self.check_sod_for_user(tenant_id, member.user_id, entitlement_id)
+                .await?;
+        }
+
+        Ok(())
+    }
+
     /// Create multiple assignments in bulk.
     pub async fn bulk_create_assignments(
         &self,
@@ -334,6 +362,20 @@ impl AssignmentService {
             if input.target_type == GovAssignmentTargetType::User {
                 if let Err(e) = self
                     .check_sod_for_user(tenant_id, target_id, input.entitlement_id)
+                    .await
+                {
+                    failed.push(BulkAssignmentFailure {
+                        target_id,
+                        reason: e.to_string(),
+                    });
+                    continue;
+                }
+            }
+
+            // SoD Check for group assignments — check all group members
+            if input.target_type == GovAssignmentTargetType::Group {
+                if let Err(e) = self
+                    .check_sod_for_group_members(tenant_id, target_id, input.entitlement_id)
                     .await
                 {
                     failed.push(BulkAssignmentFailure {

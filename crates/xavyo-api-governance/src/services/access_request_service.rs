@@ -114,10 +114,16 @@ impl AccessRequestService {
         };
 
         // Find applicable workflow
+        // Fix #12: Return error if no workflow is configured, preventing stuck requests
         let workflow = self
             .find_workflow_for_entitlement(tenant_id, &entitlement)
-            .await?;
-        let workflow_id = workflow.as_ref().map(|w| w.id);
+            .await?
+            .ok_or_else(|| {
+                GovernanceError::Validation(
+                    "No approval workflow configured for this entitlement or tenant".to_string(),
+                )
+            })?;
+        let workflow_id = Some(workflow.id);
 
         // Set request expiration
         let expires_at = Some(Utc::now() + Duration::days(DEFAULT_REQUEST_EXPIRY_DAYS));
