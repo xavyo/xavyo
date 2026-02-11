@@ -2,16 +2,16 @@
 
 | Test ID | Result | Details |
 |---------|--------|---------|
-| TC-F202-001 | PASS | Created admin API key id=08056a50-b7d6-4c20-b955-f793286846ca |
+| TC-F202-001 | PASS | Created admin API key id=a2e206f9-d845-48ad-a512-d450d46b7e94 |
 | TC-F202-002 | PASS | Admin key can access /admin/users (role inherited) |
 | TC-F202-003 | PASS | Admin key can access /nhi |
-| TC-F202-004 | PASS | Created scoped key id=9146c2d4-747a-4b46-86e8-42e68852be3e scope=[nhi:read] |
+| TC-F202-004 | PASS | Created scoped key id=2f982c60-ccbf-4f69-b09a-f420cb6a6a95 scope=[nhi:read] |
 | TC-F202-005 | PASS | Scoped key GET /nhi allowed |
 | TC-F202-006 | PASS | Scoped key POST /nhi/agents blocked (403) |
 | TC-F202-007 | PASS | Scoped key GET /admin/users blocked (out of scope) |
 | TC-F202-008 | PASS | Empty scope key has full access to /admin/groups |
-| TC-F202-009 | PASS | Created wildcard NHI key id=3f53175a-5563-48b3-8e87-0bced8c3f13b scope=[nhi:*] |
-| TC-F202-010 | PASS | nhi:* key can POST /nhi/agents, agent=3c71fad1-f93c-4a6f-8584-b7f176094d6a |
+| TC-F202-009 | PASS | Created wildcard NHI key id=172ab9aa-2746-4154-91cc-fc2ea71bef97 scope=[nhi:*] |
+| TC-F202-010 | PASS | nhi:* key can POST /nhi/agents, agent=27cbdea1-cc5a-4af5-880f-0154b67de2c9 |
 | TC-F202-011 | PASS | nhi:* key blocked from /admin/users (403) |
 | TC-F202-012 | PASS | User key created, inherits user role |
 | TC-F202-013 | PASS | Invalid API key returns 401 |
@@ -54,14 +54,14 @@
 | TC-F205-MCP-004 | PASS | MCP call nonexistent tool returns 404 |
 | TC-F205-A2A-001 | PASS | GET /a2a/tasks returns 200 |
 | TC-F205-A2A-002 | PASS | GET /a2a/tasks unauthenticated returns 401 |
-| TC-F205-A2A-003 | PASS | Created A2A task id=d32b5286-04dd-42b9-b927-67e9486da8c9 |
+| TC-F205-A2A-003 | PASS | Created A2A task id=6e458922-bb29-42dd-ab90-bb9fd1f19087 |
 | TC-F205-A2A-004 | PASS | Got A2A task status: pending |
 | TC-F205-A2A-005 | PASS | Cancelled A2A task |
 | TC-F205-A2A-006 | PASS | Get nonexistent A2A task returns 404 |
 | TC-F205-A2A-007 | PASS | Cancel nonexistent A2A task returns 404 |
 | TC-F205-A2A-008 | PASS | A2A task list with state filter works |
-| TC-F205-DISC-001 | PASS | AgentCard returned for perm-test-agent-1770747108 |
-| TC-F205-DISC-002 | PASS | AgentCard has name=perm-test-agent-1770747108 type=null |
+| TC-F205-DISC-001 | PASS | AgentCard returned for perm-test-agent-1770762232 |
+| TC-F205-DISC-002 | PASS | AgentCard has name=perm-test-agent-1770762232 type=null |
 | TC-F205-DISC-003 | PASS | AgentCard for nonexistent agent returns 404 |
 | TC-F205-DISC-004 | PASS | Discovery is public (no auth header needed) |
 | TC-F205-DISC-005 | PASS | Discovery for tool NHI returns 404 (agents only) |
