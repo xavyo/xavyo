@@ -105,15 +105,17 @@ pub async fn list_tasks(
 ) -> Result<Json<A2aTaskListResponse>, NhiApiError> {
     let tenant_id = extract_tenant_id(&claims)?;
     let agent_id = extract_agent_id(&claims)?;
+    let is_admin = claims.has_role("admin") || claims.has_role("super_admin");
 
     debug!(
         tenant_id = %tenant_id,
         agent_id = %agent_id,
+        is_admin = is_admin,
         state_filter = ?query.state,
         "Listing A2A tasks"
     );
 
-    let response = a2a_service::list_tasks(&state.pool, tenant_id, agent_id, query).await?;
+    let response = a2a_service::list_tasks(&state.pool, tenant_id, agent_id, is_admin, query).await?;
 
     Ok(Json(response))
 }

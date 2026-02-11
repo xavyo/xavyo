@@ -125,27 +125,32 @@ pub async fn get_task(
 
 /// List tasks with optional filters.
 ///
-/// Filters tasks by the source NHI and optional query parameters
+/// Admin users see all tasks for the tenant. Non-admin agents see only
+/// tasks where they are the source. Supports optional query parameters
 /// (state, target agent, pagination).
 pub async fn list_tasks(
     pool: &PgPool,
     tenant_id: Uuid,
     source_nhi_id: Uuid,
+    is_admin: bool,
     query: ListA2aTasksQuery,
 ) -> Result<A2aTaskListResponse, NhiApiError> {
     let limit = query.limit.unwrap_or(100).min(1000);
     let offset = query.offset.unwrap_or(0);
 
+    // Admins see all tasks; non-admins see only their own
+    let source_filter = if is_admin { None } else { Some(source_nhi_id) };
+
     let filter = A2aTaskFilter {
         state: query.state.clone(),
         target_nhi_id: query.target_agent_id,
-        source_nhi_id: Some(source_nhi_id),
+        source_nhi_id: source_filter,
         limit: Some(limit),
         offset: Some(offset),
     };
 
-    let tasks = A2aTask::list(pool, tenant_id, Some(source_nhi_id), filter.clone()).await?;
-    let total = A2aTask::count(pool, tenant_id, Some(source_nhi_id), &filter).await?;
+    let tasks = A2aTask::list(pool, tenant_id, source_filter, filter.clone()).await?;
+    let total = A2aTask::count(pool, tenant_id, source_filter, &filter).await?;
 
     let task_responses: Vec<A2aTaskResponse> = tasks.iter().map(task_to_response).collect();
 
