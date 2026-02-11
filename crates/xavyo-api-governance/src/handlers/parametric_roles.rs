@@ -204,6 +204,10 @@ pub async fn update_role_parameter(
     Path((role_id, parameter_id)): Path<(Uuid, Uuid)>,
     Json(request): Json<UpdateRoleParameterRequest>,
 ) -> ApiResult<Json<RoleParameterResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -265,6 +269,10 @@ pub async fn delete_role_parameter(
     Extension(claims): Extension<JwtClaims>,
     Path((role_id, parameter_id)): Path<(Uuid, Uuid)>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -382,6 +390,10 @@ pub async fn create_parametric_assignment(
     Path(role_id): Path<Uuid>,
     Json(request): Json<CreateParametricAssignmentRequest>,
 ) -> ApiResult<(StatusCode, Json<ParametricAssignmentResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -841,6 +853,10 @@ pub async fn update_assignment_parameters(
     Path(assignment_id): Path<Uuid>,
     Json(request): Json<ValidateParametersRequest>,
 ) -> ApiResult<Json<Vec<AssignmentParameterResponse>>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims

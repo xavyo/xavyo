@@ -111,6 +111,9 @@ pub async fn create_policy(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateBirthrightPolicyRequest>,
 ) -> ApiResult<(StatusCode, Json<BirthrightPolicyResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -162,6 +165,9 @@ pub async fn update_policy(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateBirthrightPolicyRequest>,
 ) -> ApiResult<Json<BirthrightPolicyResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -208,6 +214,9 @@ pub async fn archive_policy(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<BirthrightPolicyResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -243,6 +252,9 @@ pub async fn enable_policy(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<BirthrightPolicyResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -278,6 +290,9 @@ pub async fn disable_policy(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<BirthrightPolicyResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

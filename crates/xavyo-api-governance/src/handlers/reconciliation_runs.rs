@@ -225,6 +225,10 @@ pub async fn delete_schedule(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

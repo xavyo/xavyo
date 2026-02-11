@@ -109,6 +109,10 @@ pub async fn create_schedule(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateReportScheduleRequest>,
 ) -> ApiResult<(StatusCode, Json<ReportScheduleResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -160,6 +164,10 @@ pub async fn update_schedule(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateReportScheduleRequest>,
 ) -> ApiResult<Json<ReportScheduleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -205,6 +213,10 @@ pub async fn delete_schedule(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

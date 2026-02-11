@@ -105,6 +105,10 @@ pub async fn create_ticketing_configuration(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateTicketingConfigurationRequest>,
 ) -> ApiResult<(StatusCode, Json<TicketingConfigurationResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -144,6 +148,10 @@ pub async fn update_ticketing_configuration(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateTicketingConfigurationRequest>,
 ) -> ApiResult<Json<TicketingConfigurationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -181,6 +189,10 @@ pub async fn delete_ticketing_configuration(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

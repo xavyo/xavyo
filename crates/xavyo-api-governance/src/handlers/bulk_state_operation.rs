@@ -42,6 +42,9 @@ pub async fn create_bulk_operation(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateBulkOperationRequest>,
 ) -> ApiResult<(StatusCode, Json<BulkOperationResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
@@ -146,6 +149,9 @@ pub async fn cancel_bulk_operation(
     Extension(claims): Extension<JwtClaims>,
     Path(operation_id): Path<Uuid>,
 ) -> ApiResult<Json<BulkOperationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?
@@ -178,6 +184,9 @@ pub async fn process_bulk_operations(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(crate::error::ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(crate::error::ApiGovernanceError::Unauthorized)?

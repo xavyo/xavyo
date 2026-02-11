@@ -79,6 +79,10 @@ pub async fn create_destination(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateSiemDestinationRequest>,
 ) -> ApiResult<(StatusCode, Json<SiemDestinationResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -179,6 +183,10 @@ pub async fn update_destination(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateSiemDestinationRequest>,
 ) -> ApiResult<Json<SiemDestinationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -242,6 +250,10 @@ pub async fn delete_destination(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -353,6 +365,10 @@ pub async fn create_batch_export(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateBatchExportRequest>,
 ) -> ApiResult<(StatusCode, Json<SiemBatchExportResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims

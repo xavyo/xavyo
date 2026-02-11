@@ -100,6 +100,9 @@ pub async fn confirm_correlation_case(
     Path(case_id): Path<Uuid>,
     Json(request): Json<ConfirmCaseRequest>,
 ) -> ApiResult<Json<CorrelationCaseDetailResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -143,6 +146,9 @@ pub async fn reject_correlation_case(
     Path(case_id): Path<Uuid>,
     Json(request): Json<RejectCaseRequest>,
 ) -> ApiResult<Json<CorrelationCaseDetailResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -180,6 +186,9 @@ pub async fn create_identity_from_case(
     Path(case_id): Path<Uuid>,
     Json(request): Json<CreateIdentityFromCaseRequest>,
 ) -> ApiResult<Json<CorrelationCaseDetailResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -217,6 +226,9 @@ pub async fn reassign_correlation_case(
     Path(case_id): Path<Uuid>,
     Json(request): Json<ReassignCaseRequest>,
 ) -> ApiResult<Json<CorrelationCaseDetailResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

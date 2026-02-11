@@ -116,6 +116,10 @@ pub async fn create_rule(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateReclamationRuleRequest>,
 ) -> ApiResult<(StatusCode, Json<ReclamationRuleResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -159,6 +163,10 @@ pub async fn update_rule(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateReclamationRuleRequest>,
 ) -> ApiResult<Json<ReclamationRuleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -196,6 +204,10 @@ pub async fn delete_rule(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

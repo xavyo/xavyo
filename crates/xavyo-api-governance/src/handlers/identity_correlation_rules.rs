@@ -181,6 +181,9 @@ pub async fn create_identity_correlation_rule(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateCorrelationRuleRequest>,
 ) -> ApiResult<(StatusCode, Json<CorrelationRuleResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -254,6 +257,9 @@ pub async fn update_identity_correlation_rule(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateCorrelationRuleRequest>,
 ) -> ApiResult<Json<CorrelationRuleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -319,6 +325,9 @@ pub async fn delete_identity_correlation_rule(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

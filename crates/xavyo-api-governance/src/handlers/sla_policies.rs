@@ -100,6 +100,10 @@ pub async fn create_sla_policy(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateSlaPolicyRequest>,
 ) -> ApiResult<(StatusCode, Json<SlaPolicyResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -136,6 +140,10 @@ pub async fn update_sla_policy(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateSlaPolicyRequest>,
 ) -> ApiResult<Json<SlaPolicyResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -173,6 +181,10 @@ pub async fn delete_sla_policy(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

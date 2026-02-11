@@ -250,6 +250,10 @@ pub async fn delete_orphan(
     Path(id): Path<Uuid>,
     Json(request): Json<DeleteOrphanRequest>,
 ) -> ApiResult<Json<DeleteOrphanResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims

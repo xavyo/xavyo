@@ -101,6 +101,10 @@ pub async fn create_archetype(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateArchetypeRequest>,
 ) -> ApiResult<(StatusCode, Json<ArchetypeResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -235,6 +239,10 @@ pub async fn update_archetype(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateArchetypeRequest>,
 ) -> ApiResult<Json<ArchetypeResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -316,6 +324,10 @@ pub async fn delete_archetype(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -481,6 +493,10 @@ pub async fn create_persona(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreatePersonaRequest>,
 ) -> ApiResult<(StatusCode, Json<PersonaResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -584,6 +600,10 @@ pub async fn update_persona(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdatePersonaRequest>,
 ) -> ApiResult<Json<PersonaResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims

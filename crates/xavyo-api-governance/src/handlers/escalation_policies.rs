@@ -136,6 +136,9 @@ pub async fn create_policy(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateEscalationPolicyRequest>,
 ) -> ApiResult<(StatusCode, Json<EscalationPolicyResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -190,6 +193,9 @@ pub async fn update_policy(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateEscalationPolicyRequest>,
 ) -> ApiResult<Json<EscalationPolicyResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -242,6 +248,9 @@ pub async fn delete_policy(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -276,6 +285,9 @@ pub async fn set_default_policy(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<EscalationPolicyResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -320,6 +332,9 @@ pub async fn add_level(
     Path(policy_id): Path<Uuid>,
     Json(request): Json<CreateEscalationLevelRequest>,
 ) -> ApiResult<(StatusCode, Json<EscalationLevelResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -369,6 +384,9 @@ pub async fn remove_level(
     Extension(claims): Extension<JwtClaims>,
     Path((policy_id, level_id)): Path<(Uuid, Uuid)>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -465,6 +483,9 @@ pub async fn configure_step_escalation(
     Path(step_id): Path<Uuid>,
     Json(request): Json<ConfigureStepEscalationRequest>,
 ) -> ApiResult<Json<StepEscalationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -520,6 +541,9 @@ pub async fn remove_step_escalation(
     Extension(claims): Extension<JwtClaims>,
     Path(step_id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -558,6 +582,9 @@ pub async fn enable_step_escalation(
     Extension(claims): Extension<JwtClaims>,
     Path(step_id): Path<Uuid>,
 ) -> ApiResult<Json<StepEscalationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -599,6 +626,9 @@ pub async fn disable_step_escalation(
     Extension(claims): Extension<JwtClaims>,
     Path(step_id): Path<Uuid>,
 ) -> ApiResult<Json<StepEscalationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

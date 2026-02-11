@@ -70,6 +70,10 @@ pub async fn create_risk_event(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateRiskEventRequest>,
 ) -> ApiResult<(StatusCode, Json<RiskEventResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -132,6 +136,10 @@ pub async fn delete_risk_event(
     Extension(claims): Extension<JwtClaims>,
     Path(event_id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

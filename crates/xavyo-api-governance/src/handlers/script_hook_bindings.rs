@@ -92,6 +92,10 @@ pub async fn create_binding(
     Extension(claims): Extension<JwtClaims>,
     Json(body): Json<CreateBindingRequest>,
 ) -> ApiResult<(StatusCode, Json<BindingResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -212,6 +216,10 @@ pub async fn update_binding(
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateBindingRequest>,
 ) -> ApiResult<Json<BindingResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -264,6 +272,10 @@ pub async fn delete_binding(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

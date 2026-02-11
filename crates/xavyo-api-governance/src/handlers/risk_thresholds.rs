@@ -64,6 +64,10 @@ pub async fn create_risk_threshold(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateRiskThresholdRequest>,
 ) -> ApiResult<(StatusCode, Json<RiskThresholdResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -136,6 +140,10 @@ pub async fn update_risk_threshold(
     Path(threshold_id): Path<Uuid>,
     Json(request): Json<UpdateRiskThresholdRequest>,
 ) -> ApiResult<Json<RiskThresholdResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -170,6 +178,10 @@ pub async fn delete_risk_threshold(
     Extension(claims): Extension<JwtClaims>,
     Path(threshold_id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

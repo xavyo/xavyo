@@ -119,6 +119,10 @@ pub async fn create_mining_job(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateMiningJobRequest>,
 ) -> ApiResult<(StatusCode, Json<MiningJobResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -819,6 +823,10 @@ pub async fn create_simulation(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateSimulationRequest>,
 ) -> ApiResult<(StatusCode, Json<SimulationResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

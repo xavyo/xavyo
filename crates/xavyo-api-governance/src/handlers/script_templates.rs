@@ -127,6 +127,10 @@ pub async fn create_template(
     Extension(claims): Extension<JwtClaims>,
     Json(body): Json<CreateTemplateRequest>,
 ) -> ApiResult<(StatusCode, Json<TemplateResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -212,6 +216,10 @@ pub async fn update_template(
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateTemplateRequest>,
 ) -> ApiResult<Json<TemplateResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -261,6 +269,10 @@ pub async fn delete_template(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

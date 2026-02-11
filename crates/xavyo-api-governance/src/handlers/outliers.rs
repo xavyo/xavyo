@@ -83,6 +83,10 @@ pub async fn update_config(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<UpdateOutlierConfigRequest>,
 ) -> ApiResult<Json<OutlierConfigResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -628,6 +632,10 @@ pub async fn create_disposition(
     Path(result_id): Path<Uuid>,
     Json(request): Json<CreateDispositionRequest>,
 ) -> ApiResult<Json<DispositionResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -729,6 +737,10 @@ pub async fn update_disposition(
     Path(disposition_id): Path<Uuid>,
     Json(request): Json<CreateDispositionRequest>,
 ) -> ApiResult<Json<DispositionResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

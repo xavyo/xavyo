@@ -126,6 +126,10 @@ pub async fn create_policy_simulation(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreatePolicySimulationRequest>,
 ) -> ApiResult<Json<PolicySimulationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -311,6 +315,10 @@ pub async fn update_policy_simulation_notes(
     Path(simulation_id): Path<Uuid>,
     Json(request): Json<UpdateNotesRequest>,
 ) -> ApiResult<Json<PolicySimulationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -434,6 +442,10 @@ pub async fn delete_policy_simulation(
     Extension(claims): Extension<JwtClaims>,
     Path(simulation_id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

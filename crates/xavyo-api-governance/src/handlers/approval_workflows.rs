@@ -128,6 +128,9 @@ pub async fn create_workflow(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateApprovalWorkflowRequest>,
 ) -> ApiResult<(StatusCode, Json<ApprovalWorkflowResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -189,6 +192,9 @@ pub async fn update_workflow(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateApprovalWorkflowRequest>,
 ) -> ApiResult<Json<ApprovalWorkflowResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -246,6 +252,9 @@ pub async fn delete_workflow(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -280,6 +289,9 @@ pub async fn set_default_workflow(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<ApprovalWorkflowResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

@@ -134,6 +134,10 @@ pub async fn create_script(
     Extension(claims): Extension<JwtClaims>,
     Json(body): Json<CreateScriptRequest>,
 ) -> ApiResult<(StatusCode, Json<ScriptResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -214,6 +218,10 @@ pub async fn update_script(
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateScriptRequest>,
 ) -> ApiResult<Json<ScriptResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -260,6 +268,10 @@ pub async fn delete_script(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -452,6 +464,10 @@ pub async fn create_script_version(
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateScriptBodyRequest>,
 ) -> ApiResult<(StatusCode, Json<ScriptVersionResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

@@ -115,6 +115,9 @@ pub async fn create_group(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateApprovalGroupRequest>,
 ) -> ApiResult<(StatusCode, Json<ApprovalGroupResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -164,6 +167,9 @@ pub async fn update_group(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateApprovalGroupRequest>,
 ) -> ApiResult<Json<ApprovalGroupResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -207,6 +213,9 @@ pub async fn delete_group(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -244,6 +253,9 @@ pub async fn add_members(
     Path(id): Path<Uuid>,
     Json(request): Json<ModifyMembersRequest>,
 ) -> ApiResult<Json<ApprovalGroupResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -283,6 +295,9 @@ pub async fn remove_members(
     Path(id): Path<Uuid>,
     Json(request): Json<ModifyMembersRequest>,
 ) -> ApiResult<Json<ApprovalGroupResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -319,6 +334,9 @@ pub async fn enable_group(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<ApprovalGroupResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -353,6 +371,9 @@ pub async fn disable_group(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<ApprovalGroupResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

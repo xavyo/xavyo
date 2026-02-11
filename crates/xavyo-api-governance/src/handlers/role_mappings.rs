@@ -81,6 +81,10 @@ pub async fn create_role_entitlement(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateRoleEntitlementRequest>,
 ) -> ApiResult<(StatusCode, Json<RoleEntitlementResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -124,6 +128,10 @@ pub async fn delete_role_entitlement(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

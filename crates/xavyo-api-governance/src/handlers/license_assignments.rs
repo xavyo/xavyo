@@ -43,6 +43,9 @@ pub async fn create_assignment(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<AssignLicenseRequest>,
 ) -> ApiResult<(StatusCode, Json<LicenseAssignmentResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -155,6 +158,9 @@ pub async fn deallocate_assignment(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -191,6 +197,9 @@ pub async fn bulk_assign(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<BulkAssignLicenseRequest>,
 ) -> ApiResult<(StatusCode, Json<BulkOperationResult>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -229,6 +238,9 @@ pub async fn bulk_reclaim(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<BulkReclaimLicenseRequest>,
 ) -> ApiResult<Json<BulkOperationResult>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims

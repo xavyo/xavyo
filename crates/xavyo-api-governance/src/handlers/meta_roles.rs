@@ -104,6 +104,10 @@ pub async fn create_meta_role(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateMetaRoleRequest>,
 ) -> ApiResult<Json<MetaRoleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -234,6 +238,10 @@ pub async fn update_meta_role(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateMetaRoleRequest>,
 ) -> ApiResult<Json<MetaRoleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -279,6 +287,10 @@ pub async fn delete_meta_role(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

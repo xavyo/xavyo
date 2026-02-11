@@ -165,6 +165,10 @@ pub async fn update_service_account(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateServiceAccountRequest>,
 ) -> ApiResult<Json<ServiceAccountResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims

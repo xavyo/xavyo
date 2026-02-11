@@ -126,6 +126,9 @@ pub async fn create_batch_simulation(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateBatchSimulationRequest>,
 ) -> ApiResult<Json<BatchSimulationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -178,6 +181,9 @@ pub async fn execute_batch_simulation(
     Path(simulation_id): Path<Uuid>,
     Json(request): Json<ExecuteBatchSimulationRequest>,
 ) -> ApiResult<Json<BatchSimulationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -216,6 +222,9 @@ pub async fn apply_batch_simulation(
     Path(simulation_id): Path<Uuid>,
     Json(request): Json<ApplyBatchSimulationRequest>,
 ) -> ApiResult<Json<BatchSimulationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
     let tenant_id = *claims
         .tenant_id()
@@ -259,6 +268,9 @@ pub async fn cancel_batch_simulation(
     Extension(claims): Extension<JwtClaims>,
     Path(simulation_id): Path<Uuid>,
 ) -> ApiResult<Json<BatchSimulationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -293,6 +305,9 @@ pub async fn archive_batch_simulation(
     Extension(claims): Extension<JwtClaims>,
     Path(simulation_id): Path<Uuid>,
 ) -> ApiResult<Json<BatchSimulationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -327,6 +342,9 @@ pub async fn restore_batch_simulation(
     Extension(claims): Extension<JwtClaims>,
     Path(simulation_id): Path<Uuid>,
 ) -> ApiResult<Json<BatchSimulationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -363,6 +381,9 @@ pub async fn update_batch_simulation_notes(
     Path(simulation_id): Path<Uuid>,
     Json(request): Json<UpdateNotesRequest>,
 ) -> ApiResult<Json<BatchSimulationResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
     let tenant_id = *claims
         .tenant_id()
@@ -452,6 +473,9 @@ pub async fn delete_batch_simulation(
     Extension(claims): Extension<JwtClaims>,
     Path(simulation_id): Path<Uuid>,
 ) -> ApiResult<()> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

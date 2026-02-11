@@ -96,6 +96,9 @@ pub async fn create_detection_rule(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateDetectionRuleRequest>,
 ) -> ApiResult<(StatusCode, Json<DetectionRuleResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -136,6 +139,9 @@ pub async fn update_detection_rule(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateDetectionRuleRequest>,
 ) -> ApiResult<Json<DetectionRuleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -172,6 +178,9 @@ pub async fn delete_detection_rule(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -203,6 +212,9 @@ pub async fn enable_detection_rule(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<DetectionRuleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -234,6 +246,9 @@ pub async fn disable_detection_rule(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<DetectionRuleResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -260,6 +275,9 @@ pub async fn seed_default_rules(
     State(state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
 ) -> ApiResult<Json<Vec<DetectionRuleResponse>>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

@@ -109,6 +109,9 @@ pub async fn create_license_pool(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateLicensePoolRequest>,
 ) -> ApiResult<(StatusCode, Json<LicensePoolResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -150,6 +153,9 @@ pub async fn update_license_pool(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateLicensePoolRequest>,
 ) -> ApiResult<Json<LicensePoolResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     request.validate()?;
 
     let tenant_id = *claims
@@ -191,6 +197,9 @@ pub async fn delete_license_pool(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -230,6 +239,9 @@ pub async fn archive_license_pool(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<Json<LicensePoolResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?

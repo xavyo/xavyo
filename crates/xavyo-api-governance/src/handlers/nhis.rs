@@ -129,6 +129,10 @@ pub async fn create_nhi(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateNhiRequest>,
 ) -> ApiResult<(StatusCode, Json<NhiResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -171,6 +175,10 @@ pub async fn update_nhi(
     Path(id): Path<Uuid>,
     Json(request): Json<UpdateNhiRequest>,
 ) -> ApiResult<Json<NhiResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -209,6 +217,10 @@ pub async fn delete_nhi(
     Extension(claims): Extension<JwtClaims>,
     Path(id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
@@ -533,6 +545,10 @@ pub async fn revoke_nhi_credential(
     Path((nhi_id, credential_id)): Path<(Uuid, Uuid)>,
     Json(request): Json<RevokeCredentialRequest>,
 ) -> ApiResult<Json<NhiCredentialResponse>> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims
@@ -893,6 +909,10 @@ pub async fn create_nhi_certification_campaign(
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<CreateNhiCertificationCampaignRequest>,
 ) -> ApiResult<(StatusCode, Json<NhiCertificationCampaignResponse>)> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     request.validate()?;
 
     let tenant_id = *claims

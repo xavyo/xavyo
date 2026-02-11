@@ -194,6 +194,10 @@ pub async fn delete_risk_alert(
     Extension(claims): Extension<JwtClaims>,
     Path(alert_id): Path<Uuid>,
 ) -> ApiResult<StatusCode> {
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Forbidden);
+    }
+
     let tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
