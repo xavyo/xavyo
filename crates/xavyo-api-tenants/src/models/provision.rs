@@ -49,6 +49,12 @@ pub struct ProvisionTenantResponse {
     /// API endpoints for this tenant.
     pub endpoints: EndpointInfo,
 
+    /// JWT tokens scoped to the new tenant with `super_admin` role.
+    ///
+    /// Use these tokens immediately after provisioning to manage the new tenant
+    /// without needing to re-authenticate.
+    pub tokens: TokenInfo,
+
     /// Suggested next steps for getting started.
     pub next_steps: Vec<String>,
 }
@@ -112,6 +118,23 @@ pub struct EndpointInfo {
     /// Authentication URL.
     #[schema(example = "https://auth.xavyo.net")]
     pub auth: String,
+}
+
+/// JWT token information returned after provisioning.
+///
+/// These tokens are scoped to the newly created tenant with `super_admin` role,
+/// allowing the user to immediately start managing their tenant without
+/// needing to re-authenticate.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct TokenInfo {
+    /// JWT access token scoped to the new tenant.
+    pub access_token: String,
+    /// Opaque refresh token for obtaining new access tokens.
+    pub refresh_token: String,
+    /// Token type (always "Bearer").
+    pub token_type: String,
+    /// Access token validity in seconds.
+    pub expires_in: i64,
 }
 
 impl ProvisionTenantRequest {

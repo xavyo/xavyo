@@ -8,6 +8,7 @@ use axum::{
 use sqlx::PgPool;
 use std::sync::Arc;
 use xavyo_api_auth::middleware::RateLimiter;
+use xavyo_api_auth::services::{TokenConfig, TokenService};
 
 use crate::handlers::{
     accept_invitation_handler, cancel_downgrade_handler, cancel_invitation_handler,
@@ -35,6 +36,8 @@ pub struct TenantAppState {
     pub plan_service: Arc<PlanService>,
     /// Rate limiter for the provisioning endpoint.
     pub rate_limiter: Arc<RateLimiter>,
+    /// Service for issuing JWT tokens (used by provisioning to return tokens scoped to the new tenant).
+    pub token_service: Arc<TokenService>,
 }
 
 /// Create the tenant provisioning router.
@@ -46,7 +49,7 @@ pub struct TenantAppState {
 ///
 /// The provisioning endpoint is protected by rate limiting to prevent abuse.
 /// Each IP address is limited to 10 provisioning requests per hour.
-pub fn tenant_router(pool: PgPool) -> Router {
+pub fn tenant_router(pool: PgPool, token_config: TokenConfig) -> Router {
     let slug_service = Arc::new(SlugService::new(pool.clone()));
     let api_key_service = Arc::new(ApiKeyService::new());
     let provisioning_service = Arc::new(ProvisioningService::new(
@@ -55,6 +58,7 @@ pub fn tenant_router(pool: PgPool) -> Router {
         api_key_service,
     ));
     let plan_service = Arc::new(PlanService::new(pool.clone()));
+    let token_service = Arc::new(TokenService::new(token_config, pool.clone()));
 
     // Create rate limiter for provisioning endpoint
     let rate_limiter = Arc::new(provision_rate_limiter());
@@ -64,6 +68,7 @@ pub fn tenant_router(pool: PgPool) -> Router {
         provisioning_service,
         plan_service,
         rate_limiter: rate_limiter.clone(),
+        token_service,
     };
 
     Router::new()
@@ -91,7 +96,7 @@ pub fn tenant_router(pool: PgPool) -> Router {
 ///
 /// All endpoints require authentication as a system tenant administrator.
 /// Only users with JWT claims containing `tid == SYSTEM_TENANT_ID` can access.
-pub fn system_admin_router(pool: PgPool) -> Router {
+pub fn system_admin_router(pool: PgPool, token_config: TokenConfig) -> Router {
     let slug_service = Arc::new(SlugService::new(pool.clone()));
     let api_key_service = Arc::new(ApiKeyService::new());
     let provisioning_service = Arc::new(ProvisioningService::new(
@@ -100,6 +105,7 @@ pub fn system_admin_router(pool: PgPool) -> Router {
         api_key_service,
     ));
     let plan_service = Arc::new(PlanService::new(pool.clone()));
+    let token_service = Arc::new(TokenService::new(token_config, pool.clone()));
 
     // Rate limiter not applied to system admin routes (already protected by auth)
     let rate_limiter = Arc::new(provision_rate_limiter());
@@ -109,6 +115,7 @@ pub fn system_admin_router(pool: PgPool) -> Router {
         provisioning_service,
         plan_service,
         rate_limiter,
+        token_service,
     };
 
     Router::new()
@@ -155,7 +162,7 @@ pub fn system_admin_router(pool: PgPool) -> Router {
 /// - Tenant admins (can manage all keys/invitations within their tenant)
 /// - Tenant's own users (can only manage their own keys)
 /// - /api-keys/introspect requires a valid API key (introspects itself)
-pub fn api_keys_router(pool: PgPool) -> Router {
+pub fn api_keys_router(pool: PgPool, token_config: TokenConfig) -> Router {
     let slug_service = Arc::new(SlugService::new(pool.clone()));
     let api_key_service = Arc::new(ApiKeyService::new());
     let provisioning_service = Arc::new(ProvisioningService::new(
@@ -164,6 +171,7 @@ pub fn api_keys_router(pool: PgPool) -> Router {
         api_key_service,
     ));
     let plan_service = Arc::new(PlanService::new(pool.clone()));
+    let token_service = Arc::new(TokenService::new(token_config, pool.clone()));
 
     let rate_limiter = Arc::new(provision_rate_limiter());
 
@@ -172,6 +180,7 @@ pub fn api_keys_router(pool: PgPool) -> Router {
         provisioning_service,
         plan_service,
         rate_limiter,
+        token_service,
     };
 
     Router::new()
@@ -225,7 +234,7 @@ pub fn api_keys_router(pool: PgPool) -> Router {
 /// Endpoints are accessible by:
 /// - Tenant admins (can manage all OAuth clients within their tenant)
 /// - Tenant's own users (can only access their tenant's clients)
-pub fn oauth_clients_router(pool: PgPool) -> Router {
+pub fn oauth_clients_router(pool: PgPool, token_config: TokenConfig) -> Router {
     let slug_service = Arc::new(SlugService::new(pool.clone()));
     let api_key_service = Arc::new(ApiKeyService::new());
     let provisioning_service = Arc::new(ProvisioningService::new(
@@ -234,6 +243,7 @@ pub fn oauth_clients_router(pool: PgPool) -> Router {
         api_key_service,
     ));
     let plan_service = Arc::new(PlanService::new(pool.clone()));
+    let token_service = Arc::new(TokenService::new(token_config, pool.clone()));
 
     let rate_limiter = Arc::new(provision_rate_limiter());
 
@@ -242,6 +252,7 @@ pub fn oauth_clients_router(pool: PgPool) -> Router {
         provisioning_service,
         plan_service,
         rate_limiter,
+        token_service,
     };
 
     Router::new()

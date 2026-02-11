@@ -28,7 +28,7 @@ pub use oauth_clients::{
 };
 pub use provision::{
     AdminInfo, EndpointInfo, OAuthClientInfo, ProvisionContext, ProvisionTenantRequest,
-    ProvisionTenantResponse, TenantInfo,
+    ProvisionTenantResponse, TenantInfo, TokenInfo,
 };
 pub use settings::{
     check_restricted_fields, GetSettingsResponse, TenantUserUpdateSettingsRequest,

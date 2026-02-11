@@ -1037,7 +1037,7 @@ async fn main() {
     // F113: Support both API key and JWT authentication for programmatic access
     // F-IDEMPOTENCY: Support Idempotency-Key header for safe retries
     let idempotency_state = middleware::IdempotencyState { pool: pool.clone() };
-    let tenant_routes = tenant_router(pool.clone())
+    let tenant_routes = tenant_router(pool.clone(), token_config.clone())
         // F-IDEMPOTENCY: Idempotency middleware must run after JWT auth to access claims
         .layer(axum::middleware::from_fn_with_state(
             idempotency_state,
@@ -1053,7 +1053,7 @@ async fn main() {
 
     // System administration routes (F-SUSPEND, F-DELETE, F-USAGE-TRACK, F-PLAN-MGMT, F-SETTINGS-API)
     // Requires JWT authentication against the system tenant
-    let system_admin_routes = system_admin_router(pool.clone())
+    let system_admin_routes = system_admin_router(pool.clone(), token_config.clone())
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::middleware::from_fn(api_key_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
@@ -1061,7 +1061,7 @@ async fn main() {
 
     // API key management routes (F-KEY-ROTATE)
     // Requires JWT authentication
-    let api_keys_routes = api_keys_router(pool.clone())
+    let api_keys_routes = api_keys_router(pool.clone(), token_config.clone())
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::middleware::from_fn(api_key_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
@@ -1069,7 +1069,7 @@ async fn main() {
 
     // OAuth client management routes (F-SECRET-ROTATE)
     // Requires JWT authentication
-    let oauth_clients_routes = oauth_clients_router(pool.clone())
+    let oauth_clients_routes = oauth_clients_router(pool.clone(), token_config.clone())
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::middleware::from_fn(api_key_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))

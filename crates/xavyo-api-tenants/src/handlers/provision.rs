@@ -3,10 +3,11 @@
 use axum::{body::Body, extract::State, http::Request, Extension, Json};
 use xavyo_api_auth::middleware::extract_client_ip;
 use xavyo_auth::JwtClaims;
+use xavyo_core::{TenantId, UserId};
 use xavyo_db::bootstrap::SYSTEM_TENANT_ID;
 
 use crate::error::TenantError;
-use crate::models::{ProvisionContext, ProvisionTenantRequest, ProvisionTenantResponse};
+use crate::models::{ProvisionContext, ProvisionTenantRequest, ProvisionTenantResponse, TokenInfo};
 use crate::router::TenantAppState;
 
 /// POST /tenants/provision
@@ -102,15 +103,38 @@ pub async fn provision_handler(
     let context = ProvisionContext {
         system_tenant_id: tenant_id,
         admin_user_id,
-        ip_address,
-        user_agent,
+        ip_address: ip_address.clone(),
+        user_agent: user_agent.clone(),
     };
 
     // Provision the tenant
-    let response = state
+    let mut response = state
         .provisioning_service
         .provision(request, email, context)
         .await?;
+
+    // Issue JWT tokens scoped to the new tenant with super_admin role
+    let new_tenant_id = TenantId::from_uuid(response.tenant.id);
+    let new_user_id = UserId::from_uuid(admin_user_id);
+    let (access_token, refresh_token, expires_in) = state
+        .token_service
+        .create_tokens(
+            new_user_id,
+            new_tenant_id,
+            vec!["super_admin".to_string()],
+            Some(email.clone()),
+            user_agent.clone(),
+            ip_address.as_deref().and_then(|ip| ip.parse().ok()),
+        )
+        .await
+        .map_err(|e| TenantError::Internal(format!("Failed to create tokens: {e}")))?;
+
+    response.tokens = TokenInfo {
+        access_token,
+        refresh_token,
+        token_type: "Bearer".to_string(),
+        expires_in,
+    };
 
     Ok((axum::http::StatusCode::CREATED, Json(response)))
 }

@@ -18,7 +18,7 @@ use xavyo_db::set_tenant_context;
 use crate::error::TenantError;
 use crate::models::{
     AdminInfo, EndpointInfo, OAuthClientInfo, ProvisionContext, ProvisionTenantRequest,
-    ProvisionTenantResponse, TenantInfo,
+    ProvisionTenantResponse, TenantInfo, TokenInfo,
 };
 use crate::services::{ApiKeyService, SlugService};
 
@@ -375,6 +375,13 @@ impl ProvisioningService {
             endpoints: EndpointInfo {
                 api: self.endpoint_config.api_url.clone(),
                 auth: self.endpoint_config.auth_url.clone(),
+            },
+            // Placeholder — the handler overwrites this with real tokens after provisioning
+            tokens: TokenInfo {
+                access_token: String::new(),
+                refresh_token: String::new(),
+                token_type: "Bearer".to_string(),
+                expires_in: 0,
             },
             next_steps: vec![
                 "Create your first AI agent: xavyo agents create".to_string(),
