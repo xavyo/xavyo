@@ -115,7 +115,7 @@ pub async fn provision_handler(
 
     // Issue JWT tokens scoped to the new tenant with super_admin role
     let new_tenant_id = TenantId::from_uuid(response.tenant.id);
-    let new_user_id = UserId::from_uuid(admin_user_id);
+    let new_user_id = UserId::from_uuid(response.admin.id);
     let (access_token, refresh_token, expires_in) = state
         .token_service
         .create_tokens(
