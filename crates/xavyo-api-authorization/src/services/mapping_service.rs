@@ -56,11 +56,21 @@ impl MappingService {
         let mapping = EntitlementActionMapping::create(&self.pool, tenant_id, create_input)
             .await
             .map_err(|e| {
-                // Check for unique constraint violation
                 if let sqlx::Error::Database(ref db_err) = e {
-                    if db_err.constraint().is_some() {
+                    // Check for unique constraint violation
+                    if db_err.constraint().map_or(false, |c| {
+                        c == "eam_tenant_entitlement_action_resource_unique"
+                    }) {
                         return ApiAuthorizationError::Conflict(
                             "A mapping with this entitlement, action, and resource type already exists".to_string(),
+                        );
+                    }
+                    // Check for foreign key violation (e.g. entitlement doesn't exist)
+                    if db_err.constraint().map_or(false, |c| {
+                        c.contains("entitlement")
+                    }) {
+                        return ApiAuthorizationError::Validation(
+                            "The specified entitlement does not exist".to_string(),
                         );
                     }
                 }

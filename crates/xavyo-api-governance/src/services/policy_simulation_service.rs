@@ -791,7 +791,7 @@ impl PolicySimulationService {
         let count: i64 = sqlx::query_scalar(
             r"
             SELECT COUNT(*) FROM users
-            WHERE tenant_id = $1 AND deleted_at IS NULL
+            WHERE tenant_id = $1 AND is_active = true
             ",
         )
         .bind(tenant_id)
@@ -813,14 +813,13 @@ impl PolicySimulationService {
                 SELECT
                     id,
                     jsonb_build_object(
-                        'department', department,
-                        'job_title', title,
-                        'location', locale,
-                        'metadata', COALESCE(metadata, '{}'::jsonb),
+                        'department', custom_attributes->>'department',
+                        'job_title', custom_attributes->>'job_title',
+                        'location', custom_attributes->>'location',
                         'custom_attributes', COALESCE(custom_attributes, '{}'::jsonb)
                     ) as attributes
                 FROM users
-                WHERE tenant_id = $1 AND deleted_at IS NULL AND id = ANY($2)
+                WHERE tenant_id = $1 AND is_active = true AND id = ANY($2)
                 ",
             )
             .bind(tenant_id)
@@ -833,14 +832,13 @@ impl PolicySimulationService {
                 SELECT
                     id,
                     jsonb_build_object(
-                        'department', department,
-                        'job_title', title,
-                        'location', locale,
-                        'metadata', COALESCE(metadata, '{}'::jsonb),
+                        'department', custom_attributes->>'department',
+                        'job_title', custom_attributes->>'job_title',
+                        'location', custom_attributes->>'location',
                         'custom_attributes', COALESCE(custom_attributes, '{}'::jsonb)
                     ) as attributes
                 FROM users
-                WHERE tenant_id = $1 AND deleted_at IS NULL
+                WHERE tenant_id = $1 AND is_active = true
                 ",
             )
             .bind(tenant_id)

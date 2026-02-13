@@ -535,8 +535,7 @@ pub async fn skip_certification(
     // Get the certification first to find its assignment
     let cert = state.micro_certification_service.get(tenant_id, id).await?;
 
-    // Skip requires the assignment to be deleted - mark it as skipped
-    // For now, we use the skip_by_assignment method if there's an assignment, otherwise error
+    // Skip the certification - use assignment-based skip if available, otherwise skip by ID
     if let Some(assignment_id) = cert.assignment_id {
         state
             .micro_certification_service
@@ -547,11 +546,12 @@ pub async fn skip_certification(
         let updated = state.micro_certification_service.get(tenant_id, id).await?;
         Ok(Json(MicroCertificationResponse::from(updated)))
     } else {
-        // Assignment already deleted, record the skip with a manual event
-        // For now, we don't have a direct skip method on a single cert by ID
-        // This would need to be added to the service
-        Err(ApiGovernanceError::Validation(
-            "Cannot skip certification without assignment context".to_string(),
-        ))
+        // No assignment context (e.g., manually triggered) - skip by ID directly
+        let updated = state
+            .micro_certification_service
+            .skip_by_id(tenant_id, id)
+            .await?
+            .ok_or(ApiGovernanceError::MicroCertificationNotFound(id))?;
+        Ok(Json(MicroCertificationResponse::from(updated)))
     }
 }

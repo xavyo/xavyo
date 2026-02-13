@@ -63,12 +63,17 @@ where
     type Rejection = SocialError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        // Try to get user context from extensions (set by auth middleware)
-        // This depends on xavyo-auth or xavyo-tenant middleware
-        if let Some(claims) = parts.extensions.get::<JwtClaims>() {
+        // Try to get user context from extensions (set by xavyo-auth JWT middleware)
+        if let Some(claims) = parts.extensions.get::<xavyo_auth::JwtClaims>() {
+            let user_id = Uuid::parse_str(&claims.sub).map_err(|_| SocialError::InternalError {
+                message: "Invalid user ID in JWT claims".to_string(),
+            })?;
+            let tenant_id = claims.tenant_id().map(|tid| *tid.as_uuid()).ok_or_else(|| SocialError::InternalError {
+                message: "Tenant ID not found in JWT claims".to_string(),
+            })?;
             return Ok(AuthenticatedUser {
-                user_id: claims.sub,
-                tenant_id: claims.tenant_id,
+                user_id,
+                tenant_id,
             });
         }
 

@@ -30,17 +30,17 @@ pub mod validation;
 // Re-export public API
 pub use error::{ApiUsersError, AttributeFieldError, ProblemDetails};
 pub use models::{
-    parse_custom_attr_filters, AncestorEntry, AncestorPathResponse,
+    parse_custom_attr_filters, AddGroupMembersRequest, AncestorEntry, AncestorPathResponse,
     AttributeDefinitionListResponse, AttributeDefinitionResponse, BulkUpdateFailure,
     BulkUpdateFilter, BulkUpdateRequest, BulkUpdateResponse, CreateAttributeDefinitionRequest,
-    CreateUserRequest, CustomAttributeFilter, DeleteAttributeDefinitionQuery, FilterOperator,
-    GroupDetail, GroupListResponse, HierarchyPaginationParams, LifecycleStateInfo,
-    ListAttributeDefinitionsQuery, ListGroupsQuery, ListUsersQuery, MissingAttributeAuditResponse,
-    MoveGroupRequest, Pagination, PaginationMeta, PaginationWithTotal,
-    PatchCustomAttributesRequest, SetCustomAttributesRequest, SubtreeEntry, SubtreeMember,
-    SubtreeMembershipResponse, SubtreeResponse, UpdateAttributeDefinitionRequest,
-    UpdateUserRequest, UserCustomAttributesResponse, UserListResponse, UserMissingAttributes,
-    UserResponse, ValidationRules,
+    CreateGroupRequest, CreateUserRequest, CustomAttributeFilter, DeleteAttributeDefinitionQuery,
+    FilterOperator, GroupDetail, GroupListResponse, GroupMemberResponse, GroupMembersResponse,
+    HierarchyPaginationParams, LifecycleStateInfo, ListAttributeDefinitionsQuery, ListGroupsQuery,
+    ListUsersQuery, MissingAttributeAuditResponse, MoveGroupRequest, Pagination, PaginationMeta,
+    PaginationWithTotal, PatchCustomAttributesRequest, SetCustomAttributesRequest, SubtreeEntry,
+    SubtreeMember, SubtreeMembershipResponse, SubtreeResponse, UpdateAttributeDefinitionRequest,
+    UpdateGroupRequest, UpdateUserRequest, UserCustomAttributesResponse, UserListResponse,
+    UserMissingAttributes, UserResponse, ValidationRules,
 };
 pub use router::{
     attribute_definitions_router, bulk_operations_router, groups_router, users_router, UsersState,

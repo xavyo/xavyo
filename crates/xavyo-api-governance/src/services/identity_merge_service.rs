@@ -398,38 +398,77 @@ impl IdentityMergeService {
             .await?;
         let entitlements_removed = 0; // Source entitlements are archived, not removed
 
-        // 4. Transfer group memberships (IGA edge case)
-        let groups_transferred = self
-            .transfer_group_memberships(
-                &mut *tx,
-                tenant_id,
-                request.source_identity_id,
-                request.target_identity_id,
-            )
-            .await
-            .unwrap_or(0);
+        // 4. Transfer group memberships (IGA edge case) — use savepoint to protect transaction
+        let groups_transferred = {
+            sqlx::query("SAVEPOINT sp_groups").execute(&mut *tx).await.ok();
+            match self
+                .transfer_group_memberships(
+                    &mut *tx,
+                    tenant_id,
+                    request.source_identity_id,
+                    request.target_identity_id,
+                )
+                .await
+            {
+                Ok(count) => {
+                    sqlx::query("RELEASE SAVEPOINT sp_groups").execute(&mut *tx).await.ok();
+                    count
+                }
+                Err(e) => {
+                    tracing::debug!(error = %e, "Group membership transfer failed, rolling back savepoint");
+                    sqlx::query("ROLLBACK TO SAVEPOINT sp_groups").execute(&mut *tx).await.ok();
+                    0
+                }
+            }
+        };
 
-        // 5. Handle pending access requests (IGA edge case)
-        let access_requests_cancelled = self
-            .handle_pending_access_requests(
-                &mut *tx,
-                tenant_id,
-                request.source_identity_id,
-                request.target_identity_id,
-            )
-            .await
-            .unwrap_or(0);
+        // 5. Handle pending access requests (IGA edge case) — use savepoint to protect transaction
+        let access_requests_cancelled = {
+            sqlx::query("SAVEPOINT sp_access_requests").execute(&mut *tx).await.ok();
+            match self
+                .handle_pending_access_requests(
+                    &mut *tx,
+                    tenant_id,
+                    request.source_identity_id,
+                    request.target_identity_id,
+                )
+                .await
+            {
+                Ok(count) => {
+                    sqlx::query("RELEASE SAVEPOINT sp_access_requests").execute(&mut *tx).await.ok();
+                    count
+                }
+                Err(e) => {
+                    tracing::debug!(error = %e, "Access request cancellation failed, rolling back savepoint");
+                    sqlx::query("ROLLBACK TO SAVEPOINT sp_access_requests").execute(&mut *tx).await.ok();
+                    0
+                }
+            }
+        };
 
-        // 6. Transfer resource ownerships (IGA edge case)
-        let ownerships_transferred = self
-            .transfer_ownerships(
-                &mut tx,
-                tenant_id,
-                request.source_identity_id,
-                request.target_identity_id,
-            )
-            .await
-            .unwrap_or(0);
+        // 6. Transfer resource ownerships (IGA edge case) — use savepoint to protect transaction
+        let ownerships_transferred = {
+            sqlx::query("SAVEPOINT sp_ownerships").execute(&mut *tx).await.ok();
+            match self
+                .transfer_ownerships(
+                    &mut tx,
+                    tenant_id,
+                    request.source_identity_id,
+                    request.target_identity_id,
+                )
+                .await
+            {
+                Ok(count) => {
+                    sqlx::query("RELEASE SAVEPOINT sp_ownerships").execute(&mut *tx).await.ok();
+                    count
+                }
+                Err(e) => {
+                    tracing::debug!(error = %e, "Ownership transfer failed, rolling back savepoint");
+                    sqlx::query("ROLLBACK TO SAVEPOINT sp_ownerships").execute(&mut *tx).await.ok();
+                    0
+                }
+            }
+        };
 
         // 7. Collect external references for archive
         let external_references = self
@@ -1114,11 +1153,8 @@ impl IdentityMergeService {
             r"
             UPDATE gov_access_requests
             SET status = 'cancelled',
-                updated_at = NOW(),
-                metadata = COALESCE(metadata, '{}'::jsonb) ||
-                    jsonb_build_object('cancelled_reason', 'identity_merged',
-                                       'merged_into', $3::text)
-            WHERE user_id = $1 AND tenant_id = $2
+                updated_at = NOW()
+            WHERE requester_id = $1 AND tenant_id = $2
             AND status IN ('pending', 'pending_approval')
             ",
         )

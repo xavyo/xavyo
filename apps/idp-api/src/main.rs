@@ -64,7 +64,7 @@ use xavyo_api_oidc_federation::{
 };
 use xavyo_api_saml::{create_saml_state, saml_admin_router, saml_public_router};
 use xavyo_api_scim::{scim_admin_router, scim_resource_router, ScimConfig};
-use xavyo_api_social::{admin_social_router, public_social_router, SocialConfig, SocialState};
+use xavyo_api_social::{admin_social_router, authenticated_social_router, public_social_router, SocialConfig, SocialState};
 use xavyo_api_tenants::{
     api_keys_router, oauth_clients_router, suspension_check_middleware, system_admin_router,
     tenant_router,
@@ -723,6 +723,17 @@ async fn main() {
     // Social login public routes (no auth required, tenant from header)
     let social_public_routes = public_social_router().with_state(social_state.clone());
 
+    // Social login authenticated routes (requires JWT auth, user-level)
+    let social_authenticated_routes = authenticated_social_router()
+        .with_state(social_state.clone())
+        .layer(axum::middleware::from_fn(jwt_auth_middleware))
+        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(true)
+                .build(),
+        ));
+
     // Social login admin routes (requires admin role and tenant)
     let social_admin_routes = admin_social_router()
         .with_state(social_state)
@@ -1117,6 +1128,8 @@ async fn main() {
         .nest("/admin/oauth", oauth_admin_routes)
         // Social login routes (public, with tenant from header)
         .nest("/auth/social", social_public_routes)
+        // Social login authenticated routes (requires JWT, user-level)
+        .nest("/auth/social", social_authenticated_routes)
         // Social login admin routes (requires admin role)
         .nest("/admin/social-providers", social_admin_routes)
         // SAML IdP public routes (metadata, SSO)

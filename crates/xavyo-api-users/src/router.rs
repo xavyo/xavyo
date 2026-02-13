@@ -15,12 +15,15 @@
 //! - DELETE /attribute-definitions/:id - Delete definition
 
 use crate::handlers::{
-    audit_missing_required_attributes, bulk_update_custom_attribute, create_attribute_definition,
-    create_user_handler, delete_attribute_definition, delete_user_handler, get_ancestors,
-    get_attribute_definition, get_children, get_subtree, get_subtree_members,
-    get_user_custom_attributes, get_user_handler, list_attribute_definitions, list_groups,
-    list_root_groups, list_users_handler, move_group, patch_user_custom_attributes, seed_wellknown,
-    set_user_custom_attributes, update_attribute_definition, update_user_handler,
+    add_group_members_handler, audit_missing_required_attributes, bulk_update_custom_attribute,
+    create_attribute_definition, create_group_handler, create_user_handler,
+    delete_attribute_definition, delete_group_handler, delete_user_handler, get_ancestors,
+    get_attribute_definition, get_children, get_group_handler, get_group_members_handler,
+    get_subtree, get_subtree_members, get_user_custom_attributes, get_user_handler,
+    list_attribute_definitions, list_groups, list_root_groups, list_users_handler, move_group,
+    patch_user_custom_attributes, remove_group_member_handler, seed_wellknown,
+    set_user_custom_attributes, update_attribute_definition, update_group_handler,
+    update_user_handler,
 };
 use crate::middleware::admin_guard;
 use crate::services::{
@@ -165,12 +168,22 @@ pub fn attribute_definitions_router(state: UsersState) -> Router {
         .layer(axum::Extension(state.pool))
 }
 
-/// Create the group hierarchy router (F071).
+/// Create the group hierarchy and CRUD router (F071).
 ///
 /// # Endpoints
 ///
 /// All endpoints require authentication with "admin" role.
 ///
+/// ## CRUD endpoints
+/// - `POST /groups` - Create a new group
+/// - `GET /groups/:group_id` - Get a single group
+/// - `PUT /groups/:group_id` - Update a group
+/// - `DELETE /groups/:group_id` - Delete a group
+/// - `GET /groups/:group_id/members` - List group members
+/// - `POST /groups/:group_id/members` - Add members to a group
+/// - `DELETE /groups/:group_id/members/:user_id` - Remove a member from a group
+///
+/// ## Hierarchy endpoints
 /// - `GET /groups` - List groups with optional type filter
 /// - `GET /groups/roots` - List root groups (no parent)
 /// - `GET /groups/:group_id/children` - List direct children
@@ -182,12 +195,30 @@ pub fn groups_router(state: UsersState) -> Router {
     Router::new()
         // IMPORTANT: Register /roots BEFORE /:group_id to prevent path capture
         .route("/roots", get(list_root_groups))
-        .route("/", get(list_groups))
+        // List (GET /) and Create (POST /)
+        .route("/", get(list_groups).post(create_group_handler))
+        // Hierarchy sub-resource routes (must be before /:group_id to avoid capture)
         .route("/:group_id/parent", put(move_group))
         .route("/:group_id/children", get(get_children))
         .route("/:group_id/ancestors", get(get_ancestors))
         .route("/:group_id/subtree", get(get_subtree))
         .route("/:group_id/subtree-members", get(get_subtree_members))
+        // Member management routes
+        .route(
+            "/:group_id/members",
+            get(get_group_members_handler).post(add_group_members_handler),
+        )
+        .route(
+            "/:group_id/members/:user_id",
+            delete(remove_group_member_handler),
+        )
+        // CRUD routes on /:group_id (GET, PUT, DELETE)
+        .route(
+            "/:group_id",
+            get(get_group_handler)
+                .put(update_group_handler)
+                .delete(delete_group_handler),
+        )
         .layer(middleware::from_fn(admin_guard))
         .layer(axum::Extension(state.group_hierarchy_service))
         .layer(axum::Extension(state.pool))

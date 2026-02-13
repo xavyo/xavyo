@@ -445,8 +445,9 @@ pub struct MicroCertificationResponse {
     /// Tenant ID.
     pub tenant_id: Uuid,
 
-    /// Trigger rule ID that created this certification.
-    pub trigger_rule_id: Uuid,
+    /// Trigger rule ID that created this certification (NULL if rule was deleted).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trigger_rule_id: Option<Uuid>,
 
     /// Assignment ID being certified (NULL if deleted).
     #[serde(skip_serializing_if = "Option::is_none")]

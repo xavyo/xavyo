@@ -681,21 +681,21 @@ impl BirthrightPolicyService {
     /// Get all users for a tenant with their attributes.
     /// Returns a lightweight user representation for impact analysis.
     async fn get_tenant_users(&self, tenant_id: Uuid) -> Result<Vec<UserForImpact>> {
-        // Query users with their profile data
+        // Query users with their profile data.
+        // User attributes like department, job_title, location are stored in custom_attributes JSONB.
         let rows = sqlx::query_as::<_, UserForImpact>(
             r"
             SELECT
                 id,
                 email,
                 jsonb_build_object(
-                    'department', department,
-                    'job_title', title,
-                    'location', locale,
-                    'metadata', COALESCE(metadata, '{}'::jsonb),
+                    'department', custom_attributes->>'department',
+                    'job_title', custom_attributes->>'job_title',
+                    'location', custom_attributes->>'location',
                     'custom_attributes', COALESCE(custom_attributes, '{}'::jsonb)
                 ) as attributes
             FROM users
-            WHERE tenant_id = $1 AND deleted_at IS NULL
+            WHERE tenant_id = $1 AND is_active = true
             ",
         )
         .bind(tenant_id)

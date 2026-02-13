@@ -628,13 +628,12 @@ impl MicroCertificationService {
             ));
         }
 
-        // Get the trigger rule for context
-        let rule =
-            GovMicroCertTrigger::find_by_id(&self.pool, tenant_id, certification.trigger_rule_id)
-                .await?
-                .ok_or(GovernanceError::MicroCertTriggerNotFound(
-                    certification.trigger_rule_id,
-                ))?;
+        // Get the trigger rule for context (may be None if rule was deleted)
+        let rule = if let Some(rule_id) = certification.trigger_rule_id {
+            GovMicroCertTrigger::find_by_id(&self.pool, tenant_id, rule_id).await?
+        } else {
+            None
+        };
 
         let input = DecideMicroCertification {
             decision,
@@ -674,7 +673,7 @@ impl MicroCertificationService {
 
                 // For SoD violations, create an exemption (would need SodExemptionService)
                 // This is a placeholder - actual implementation depends on SoD integration
-                if rule.trigger_type == MicroCertTriggerType::SodViolation {
+                if rule.as_ref().map_or(false, |r| r.trigger_type == MicroCertTriggerType::SodViolation) {
                     // TODO: Create SoD exemption via SodExemptionService
                     info!(
                         certification_id = %certification_id,
@@ -692,8 +691,8 @@ impl MicroCertificationService {
                 // Revoke the assignment
                 if let Some(assignment_id) = certification.assignment_id {
                     // For SoD violations with revoke_triggering_assignment, revoke the newest assignment
-                    if rule.trigger_type == MicroCertTriggerType::SodViolation
-                        && rule.revoke_triggering_assignment
+                    if rule.as_ref().map_or(false, |r| r.trigger_type == MicroCertTriggerType::SodViolation
+                        && r.revoke_triggering_assignment)
                     {
                         // The assignment_id on the certification is the triggering one
                         revoked_assignment_id = Some(assignment_id);
@@ -1214,6 +1213,27 @@ impl MicroCertificationService {
         Ok(count)
     }
 
+    /// Skip a single certification by its ID (for manual skip without assignment context).
+    /// Returns None if no pending certification was found.
+    pub async fn skip_by_id(
+        &self,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<GovMicroCertification>> {
+        let cert = GovMicroCertification::skip_by_id(&self.pool, tenant_id, id)
+            .await
+            .map_err(GovernanceError::Database)?;
+
+        if cert.is_some() {
+            info!(
+                certification_id = %id,
+                "Micro-certification skipped by ID"
+            );
+        }
+
+        Ok(cert)
+    }
+
     // =========================================================================
     // Expiration and escalation methods (used by background job)
     // =========================================================================
@@ -1405,13 +1425,16 @@ impl MicroCertificationService {
                         .await?;
                 if let Some(ref c) = cert {
                     // Get auto_revoke from trigger rule
-                    let auto_revoke = if let Ok(Some(rule)) =
-                        GovMicroCertTrigger::find_by_id(&self.pool, tenant_id, c.trigger_rule_id)
-                            .await
-                    {
-                        rule.auto_revoke
+                    let auto_revoke = if let Some(rule_id) = c.trigger_rule_id {
+                        if let Ok(Some(rule)) =
+                            GovMicroCertTrigger::find_by_id(&self.pool, tenant_id, rule_id).await
+                        {
+                            rule.auto_revoke
+                        } else {
+                            true // default to true for safety
+                        }
                     } else {
-                        true // default to true for safety
+                        true // default to true for safety (rule was deleted)
                     };
                     self.emit_reminder_event(tenant_id, c, auto_revoke).await;
                 }

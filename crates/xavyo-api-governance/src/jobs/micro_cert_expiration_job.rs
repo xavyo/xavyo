@@ -290,13 +290,17 @@ impl MicroCertExpirationJob {
             stats.processed += 1;
 
             // Get the trigger rule to check auto_revoke setting
-            let rule = GovMicroCertTrigger::find_by_id(
-                self.service.pool(),
-                cert.tenant_id,
-                cert.trigger_rule_id,
-            )
-            .await
-            .map_err(|e| MicroCertExpirationJobError::Database(e.to_string()))?;
+            let rule = if let Some(rule_id) = cert.trigger_rule_id {
+                GovMicroCertTrigger::find_by_id(
+                    self.service.pool(),
+                    cert.tenant_id,
+                    rule_id,
+                )
+                .await
+                .map_err(|e| MicroCertExpirationJobError::Database(e.to_string()))?
+            } else {
+                None
+            };
 
             match rule {
                 Some(rule) if rule.auto_revoke => {

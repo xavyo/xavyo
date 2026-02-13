@@ -271,7 +271,7 @@ pub async fn deactivate_oauth_client_handler(
 
     let oauth_service = xavyo_api_oauth::services::OAuth2ClientService::new(state.pool.clone());
 
-    // Get client details for audit log before deactivation
+    // Get client details for audit log before deletion
     let client = oauth_service
         .get_client_by_id(tenant_id, client_id)
         .await
@@ -282,9 +282,9 @@ pub async fn deactivate_oauth_client_handler(
             _ => TenantError::Database(e.to_string()),
         })?;
 
-    // Deactivate the client
+    // Hard-delete the client
     oauth_service
-        .deactivate_client(tenant_id, client_id)
+        .delete_client(tenant_id, client_id)
         .await
         .map_err(|e| match e {
             xavyo_api_oauth::error::OAuthError::ClientNotFound => {
@@ -307,9 +307,7 @@ pub async fn deactivate_oauth_client_handler(
                 "name": client.name,
                 "is_active": client.is_active,
             })),
-            new_value: Some(serde_json::json!({
-                "is_active": false,
-            })),
+            new_value: None,
             ip_address: None,
             user_agent: None,
         },
@@ -321,7 +319,7 @@ pub async fn deactivate_oauth_client_handler(
         client_id = %client_id,
         client_public_id = %client.client_id,
         admin_user_id = %admin_user_id,
-        "OAuth client deactivated"
+        "OAuth client deleted"
     );
 
     Ok(StatusCode::NO_CONTENT)

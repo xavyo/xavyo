@@ -218,7 +218,7 @@ pub async fn delete_client_handler(
     }
     let tid = *tenant_id.as_uuid();
 
-    state.client_service.deactivate_client(tid, id).await?;
+    state.client_service.delete_client(tid, id).await?;
 
     Ok(StatusCode::NO_CONTENT)
 }

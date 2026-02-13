@@ -16,10 +16,12 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use xavyo_db::{
-    CreateGovNhiAuditEvent, CreateGovServiceAccount, GovNhiAuditEvent, GovServiceAccount,
-    NhiAuditEventType, NhiSuspensionReason, ServiceAccountFilter, ServiceAccountStatus,
-    UpdateGovServiceAccount, User,
+    CreateGovNhiAuditEvent, CreateNhiIdentity, CreateNhiServiceAccount, GovNhiAuditEvent,
+    GovServiceAccount, NhiAuditEventType, NhiIdentity,
+    NhiServiceAccount as NhiServiceAccountModel, NhiSuspensionReason, ServiceAccountFilter,
+    ServiceAccountStatus, UpdateGovServiceAccount, User,
 };
+use xavyo_nhi::NhiType;
 #[cfg(feature = "kafka")]
 use xavyo_events::{
     events::nhi::{
@@ -176,48 +178,59 @@ impl NhiService {
             }
         }
 
-        // Check if user is already registered as an NHI
-        if GovServiceAccount::is_service_account(&self.pool, tenant_id, request.user_id)
-            .await
-            .map_err(GovernanceError::Database)?
-        {
-            return Err(GovernanceError::NhiUserAlreadyRegistered(request.user_id));
-        }
+        // Check if name already exists in nhi_identities
+        let name_count: i64 = sqlx::query_scalar(
+            r"SELECT COUNT(*) FROM nhi_identities WHERE tenant_id = $1 AND LOWER(name) = LOWER($2)",
+        )
+        .bind(tenant_id)
+        .bind(&request.name)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)?;
 
-        // Check if name already exists
-        if GovServiceAccount::name_exists(&self.pool, tenant_id, &request.name)
-            .await
-            .map_err(GovernanceError::Database)?
-        {
+        if name_count > 0 {
             return Err(GovernanceError::NhiNameExists(request.name));
         }
 
-        let input = CreateGovServiceAccount {
-            user_id: request.user_id,
-            name: request.name,
-            purpose: request.purpose,
-            owner_id: request.owner_id,
-            expires_at: request.expires_at,
+        // Create the base NHI identity row
+        let identity_input = CreateNhiIdentity {
+            nhi_type: NhiType::ServiceAccount,
+            name: request.name.clone(),
+            description: Some(request.purpose.clone()),
+            owner_id: Some(request.owner_id),
             backup_owner_id: request.backup_owner_id,
-            rotation_interval_days: request.rotation_interval_days,
+            expires_at: request.expires_at,
             inactivity_threshold_days: request.inactivity_threshold_days,
+            rotation_interval_days: request.rotation_interval_days,
+            created_by: Some(actor_id),
         };
 
-        let account = GovServiceAccount::create(&self.pool, tenant_id, input)
+        let identity = NhiIdentity::create(&self.pool, tenant_id, identity_input)
             .await
             .map_err(GovernanceError::Database)?;
 
+        // Create the service account extension row
+        let sa_input = CreateNhiServiceAccount {
+            nhi_id: identity.id,
+            purpose: request.purpose.clone(),
+            environment: None,
+        };
+
+        if let Err(e) = NhiServiceAccountModel::create(&self.pool, sa_input).await {
+            tracing::warn!(error = %e, "Failed to create NHI service account extension row");
+        }
+
         // Record audit event
         let audit_event = CreateGovNhiAuditEvent {
-            nhi_id: account.id,
+            nhi_id: identity.id,
             event_type: NhiAuditEventType::Created,
             actor_id: Some(actor_id),
             changes: None,
             metadata: Some(serde_json::json!({
-                "name": account.name,
-                "owner_id": account.owner_id,
-                "backup_owner_id": account.backup_owner_id,
-                "expires_at": account.expires_at,
+                "name": identity.name,
+                "owner_id": identity.owner_id,
+                "backup_owner_id": identity.backup_owner_id,
+                "expires_at": identity.expires_at,
             })),
             source_ip: None,
         };
@@ -228,17 +241,42 @@ impl NhiService {
 
         tracing::info!(
             tenant_id = %tenant_id,
-            nhi_id = %account.id,
-            user_id = %account.user_id,
-            name = %account.name,
+            nhi_id = %identity.id,
+            name = %identity.name,
             "NHI created"
         );
 
-        // Emit Kafka event
-        #[cfg(feature = "kafka")]
-        self.emit_created_event(tenant_id, &account, actor_id).await;
+        // Build NhiResponse from the new NhiIdentity
+        let nhi_response = NhiResponse {
+            id: identity.id,
+            user_id: request.user_id,
+            name: identity.name,
+            purpose: request.purpose,
+            owner_id: identity.owner_id.unwrap_or(request.owner_id),
+            backup_owner_id: identity.backup_owner_id,
+            status: ServiceAccountStatus::Active,
+            expires_at: identity.expires_at,
+            days_until_expiry: identity.expires_at.map(|e| {
+                (e - Utc::now()).num_days()
+            }),
+            rotation_interval_days: identity.rotation_interval_days,
+            last_rotation_at: identity.last_rotation_at,
+            needs_rotation: false,
+            last_used_at: identity.last_activity_at,
+            days_since_last_use: None,
+            inactivity_threshold_days: identity.inactivity_threshold_days,
+            is_inactive: false,
+            grace_period_ends_at: identity.grace_period_ends_at,
+            is_in_grace_period: false,
+            suspension_reason: None,
+            last_certified_at: identity.last_certified_at,
+            certified_by: identity.last_certified_by,
+            needs_certification: false,
+            created_at: identity.created_at,
+            updated_at: identity.updated_at,
+        };
 
-        Ok(NhiResponse::from(account))
+        Ok(nhi_response)
     }
 
     /// Update an NHI.

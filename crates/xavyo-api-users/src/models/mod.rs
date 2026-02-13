@@ -15,9 +15,10 @@ pub use attribute_definitions::{
     UserCustomAttributesResponse, UserMissingAttributes, ValidationRules,
 };
 pub use group_hierarchy::{
-    AncestorEntry, AncestorPathResponse, GroupDetail, GroupListResponse, HierarchyPaginationParams,
+    AddGroupMembersRequest, AncestorEntry, AncestorPathResponse, CreateGroupRequest, GroupDetail,
+    GroupListResponse, GroupMemberResponse, GroupMembersResponse, HierarchyPaginationParams,
     ListGroupsQuery, MoveGroupRequest, Pagination, PaginationWithTotal, SubtreeEntry,
-    SubtreeMember, SubtreeMembershipResponse, SubtreeResponse,
+    SubtreeMember, SubtreeMembershipResponse, SubtreeResponse, UpdateGroupRequest,
 };
 pub use requests::{CreateUserRequest, ListUsersQuery, UpdateUserRequest};
 pub use responses::{LifecycleStateInfo, PaginationMeta, UserListResponse, UserResponse};

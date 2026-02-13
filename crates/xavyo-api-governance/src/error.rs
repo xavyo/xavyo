@@ -207,7 +207,32 @@ impl IntoResponse for ApiGovernanceError {
                         | GovernanceError::InvalidRecipientEmail(_)
                         | GovernanceError::ReportGenerationFailed(_)
                         | GovernanceError::PersonaExtensionExceedsMax { .. }
-                        | GovernanceError::InvalidMiningParameters(_) => {
+                        | GovernanceError::InvalidMiningParameters(_)
+                        // Power of Attorney validation errors
+                        | GovernanceError::PoaSelfDelegationNotAllowed
+                        | GovernanceError::PoaDurationExceedsMaximum
+                        | GovernanceError::PoaStartDateInPast
+                        | GovernanceError::PoaInvalidPeriod
+                        | GovernanceError::PoaExtensionExceedsMaximum
+                        | GovernanceError::PoaDonorNotActive(_)
+                        | GovernanceError::PoaAttorneyNotActive(_)
+                        // Object template validation errors
+                        | GovernanceError::ObjectTemplateNotDraft(_)
+                        | GovernanceError::ObjectTemplateNotActive(_)
+                        | GovernanceError::ObjectTemplateNoScopes
+                        | GovernanceError::ObjectTemplateHasActiveChildren(_)
+                        | GovernanceError::ObjectTemplateParentTypeMismatch
+                        | GovernanceError::ObjectTemplateCircularInheritance
+                        | GovernanceError::InvalidTemplatePriority
+                        | GovernanceError::InvalidTemplateRulePriority
+                        | GovernanceError::TemplateRuleCircularDependency(_)
+                        | GovernanceError::TemplateRuleExpressionError { .. }
+                        | GovernanceError::TemplateRuleInvalidAttribute { .. }
+                        | GovernanceError::TemplateScopeInvalid(_)
+                        | GovernanceError::TemplateScopeInvalidOrganization(_)
+                        | GovernanceError::TemplateScopeConditionError(_)
+                        | GovernanceError::TemplateValidationFailed { .. }
+                        | GovernanceError::TemplateExclusionInvalidRule(_) => {
                             (StatusCode::BAD_REQUEST, "validation_error", e.to_string())
                         }
                         GovernanceError::RequestCartEmpty

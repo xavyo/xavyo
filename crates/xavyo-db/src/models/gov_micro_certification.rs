@@ -18,8 +18,8 @@ pub struct GovMicroCertification {
     /// The tenant this certification belongs to.
     pub tenant_id: Uuid,
 
-    /// Rule that created this certification.
-    pub trigger_rule_id: Uuid,
+    /// Rule that created this certification (NULL if rule was deleted).
+    pub trigger_rule_id: Option<Uuid>,
 
     /// Source assignment (NULL if deleted).
     pub assignment_id: Option<Uuid>,
@@ -762,6 +762,26 @@ impl GovMicroCertification {
         .await?;
 
         Ok(result.rows_affected())
+    }
+
+    /// Skip a single certification by its ID (for manual skip without assignment context).
+    pub async fn skip_by_id(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as::<_, Self>(
+            r"
+            UPDATE gov_micro_certifications
+            SET status = 'skipped', updated_at = NOW()
+            WHERE tenant_id = $1 AND id = $2 AND status = 'pending'
+            RETURNING *
+            ",
+        )
+        .bind(tenant_id)
+        .bind(id)
+        .fetch_optional(pool)
+        .await
     }
 
     // =========================================================================

@@ -453,6 +453,65 @@ impl OAuth2ClientService {
         Ok(())
     }
 
+    /// Hard-delete a client.
+    ///
+    /// Permanently removes the client record and revokes all refresh tokens.
+    /// Unlike `deactivate_client`, this cannot be undone.
+    pub async fn delete_client(&self, tenant_id: Uuid, id: Uuid) -> Result<(), OAuthError> {
+        let mut conn = self.pool.acquire().await.map_err(|e| {
+            tracing::error!("Failed to acquire connection: {}", e);
+            OAuthError::Internal("Failed to acquire database connection".to_string())
+        })?;
+
+        // Set tenant context for RLS
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to set tenant context: {}", e);
+                OAuthError::Internal("Failed to set tenant context".to_string())
+            })?;
+
+        // Revoke all refresh tokens for this client first
+        sqlx::query(
+            r"
+            DELETE FROM oauth_refresh_tokens
+            WHERE client_id = $1 AND tenant_id = $2
+            ",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .execute(&mut *conn)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to delete client tokens: {}", e);
+            OAuthError::Internal("Failed to delete client tokens".to_string())
+        })?;
+
+        // Delete the client record
+        let result = sqlx::query(
+            r"
+            DELETE FROM oauth_clients
+            WHERE id = $1 AND tenant_id = $2
+            ",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .execute(&mut *conn)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to delete client: {}", e);
+            OAuthError::Internal("Failed to delete client".to_string())
+        })?;
+
+        if result.rows_affected() == 0 {
+            return Err(OAuthError::ClientNotFound);
+        }
+
+        Ok(())
+    }
+
     /// Regenerate client secret for a confidential client.
     ///
     /// Returns the new plaintext secret (only shown once).

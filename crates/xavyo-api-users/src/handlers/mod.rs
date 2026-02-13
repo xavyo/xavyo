@@ -5,6 +5,7 @@ pub mod attribute_definitions;
 pub mod create;
 pub mod delete;
 pub mod get;
+pub mod group_crud;
 pub mod group_hierarchy;
 pub mod list;
 pub mod update;
@@ -18,6 +19,10 @@ pub use attribute_definitions::{
 pub use create::create_user_handler;
 pub use delete::delete_user_handler;
 pub use get::get_user_handler;
+pub use group_crud::{
+    add_group_members_handler, create_group_handler, delete_group_handler, get_group_handler,
+    get_group_members_handler, remove_group_member_handler, update_group_handler,
+};
 pub use group_hierarchy::{
     get_ancestors, get_children, get_subtree, get_subtree_members, list_groups, list_root_groups,
     move_group,

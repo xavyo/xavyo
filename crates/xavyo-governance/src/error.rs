@@ -2414,6 +2414,12 @@ impl GovernanceError {
                 | Self::RoleConstructionNotFound(_)
                 | Self::RoleInducementNotFound(_)
                 | Self::ConnectorNotFound(_)
+                // Power of Attorney (F-PoA)
+                | Self::PoaNotFound(_)
+                | Self::PoaAssumedSessionNotFound(_)
+                | Self::PoaDonorNotFound(_)
+                | Self::PoaAttorneyNotFound(_)
+                | Self::PoaAuditEventNotFound(_)
         )
     }
 
@@ -2545,6 +2551,9 @@ impl GovernanceError {
                 | Self::RoleConstructionExists
                 | Self::RoleInducementExists
                 | Self::RoleInducementCycleDetected(_)
+                // Power of Attorney (F-PoA)
+                | Self::PoaAlreadyRevoked(_)
+                | Self::PoaAlreadyAssuming
         )
     }
 
@@ -2645,6 +2654,13 @@ impl GovernanceError {
                 | Self::SiemBatchExportNotReady(_, _)
                 // Lifecycle State Machine Extensions (F-193)
                 | Self::TransitionConditionsNotSatisfied { .. }
+                // Power of Attorney (F-PoA)
+                | Self::PoaNotActive(_)
+                | Self::PoaTerminalState(_)
+                | Self::PoaNotAssuming
+                | Self::PoaCannotExtendExpired(_)
+                | Self::PoaCannotExtendRevoked(_)
+                | Self::PoaInvalidExtension
         )
     }
 
@@ -2660,6 +2676,8 @@ impl GovernanceError {
                 | Self::NoMatchingDelegation { .. }
                 | Self::NotAuthorizedMicroCertReviewer
                 | Self::MicroCertCannotDecide(_, _)
+                // Power of Attorney (F-PoA)
+                | Self::PoaScopeViolation(_)
         )
     }
 

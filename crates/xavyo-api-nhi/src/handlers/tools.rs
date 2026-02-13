@@ -164,7 +164,18 @@ pub async fn create_tool(
     .bind(request.rotation_interval_days)
     .bind(user_id)
     .fetch_one(&mut *tx)
-    .await?;
+    .await
+    .map_err(|e| {
+        if let sqlx::Error::Database(ref db_err) = e {
+            if db_err.constraint() == Some("nhi_identities_tenant_type_name_unique") {
+                return NhiApiError::Conflict(format!(
+                    "A tool with the name '{}' already exists",
+                    request.name
+                ));
+            }
+        }
+        NhiApiError::Database(e)
+    })?;
 
     // 2. Insert tool extension
     let _tool: crate::handlers::tools::RawNhiTool = sqlx::query_as(

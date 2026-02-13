@@ -558,8 +558,12 @@ impl ConnectorService {
             }
         }
 
-        // Apply password
-        if let Some(pwd) = credentials.get("password").and_then(|v| v.as_str()) {
+        // Apply password (try both "bind_password" and "password" keys for flexibility)
+        if let Some(pwd) = credentials
+            .get("bind_password")
+            .or_else(|| credentials.get("password"))
+            .and_then(|v| v.as_str())
+        {
             ldap_config = ldap_config.with_password(pwd);
         }
 

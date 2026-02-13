@@ -51,8 +51,7 @@ pub struct CreateA2aTaskResponse {
 
 /// Response for GET /a2a/tasks/{id} - task details.
 ///
-/// Note: Response fields use `source_agent_id`/`target_agent_id` for backward
-/// compatibility even though the DB columns are now `source_nhi_id`/`target_nhi_id`.
+/// Response fields use `source_agent_id`/`target_agent_id` matching the DB columns.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(ToSchema))]
 pub struct A2aTaskResponse {

@@ -30,8 +30,8 @@ use xavyo_events::{
 };
 
 use xavyo_db::{
-    CreateGovNhiAuditEvent, CreateGovNhiCredential, GovNhiAuditEvent, GovNhiCredential,
-    GovServiceAccount, NhiAuditEventType, NhiCredentialType,
+    CreateGovNhiAuditEvent, CreateNhiCredential, GovNhiAuditEvent, GovNhiCredential,
+    GovServiceAccount, NhiAuditEventType, NhiCredential, NhiCredentialType, NhiIdentity,
 };
 
 /// Default credential validity period in days.
@@ -96,13 +96,14 @@ impl NhiCredentialService {
         actor_id: Option<Uuid>,
         request: RotateCredentialsRequest,
     ) -> Result<NhiCredentialCreatedResponse> {
-        // Validate NHI exists and is active
-        let nhi = GovServiceAccount::find_by_id(&self.pool, tenant_id, nhi_id)
+        // Validate NHI exists and is active (using new nhi_identities table)
+        let nhi_identity = NhiIdentity::find_by_id(&self.pool, tenant_id, nhi_id)
             .await
             .map_err(GovernanceError::Database)?
             .ok_or(GovernanceError::NhiNotFound(nhi_id))?;
 
-        if !nhi.status.is_operational() {
+        // Check lifecycle state - only active identities can rotate credentials
+        if nhi_identity.lifecycle_state != xavyo_nhi::NhiLifecycleState::Active {
             return Err(GovernanceError::NhiSuspended(nhi_id));
         }
 
@@ -113,7 +114,7 @@ impl NhiCredentialService {
         let valid_from = Utc::now();
         let valid_until = request.expires_at.unwrap_or_else(|| {
             // Use NHI's rotation interval if set, otherwise default
-            let days = nhi
+            let days = nhi_identity
                 .rotation_interval_days
                 .unwrap_or(DEFAULT_CREDENTIAL_VALIDITY_DAYS as i32);
             Utc::now() + Duration::days(i64::from(days))
@@ -124,18 +125,23 @@ impl NhiCredentialService {
             return Err(GovernanceError::InvalidExpirationDate);
         }
 
-        // Create the new credential
-        let create_data = CreateGovNhiCredential {
+        // Create the new credential using new nhi_credentials table
+        let cred_type_str = match request.credential_type {
+            NhiCredentialType::ApiKey => "api_key",
+            NhiCredentialType::Secret => "secret",
+            NhiCredentialType::Certificate => "certificate",
+        };
+
+        let create_data = CreateNhiCredential {
             nhi_id,
-            credential_type: request.credential_type,
+            credential_type: cred_type_str.to_string(),
             credential_hash,
             valid_from,
             valid_until,
             rotated_by: actor_id,
-            nhi_type: xavyo_db::NhiEntityType::ServiceAccount,
         };
 
-        let new_credential = GovNhiCredential::create(&self.pool, tenant_id, create_data)
+        let new_credential = NhiCredential::create(&self.pool, tenant_id, create_data)
             .await
             .map_err(GovernanceError::Database)?;
 
@@ -155,7 +161,7 @@ impl NhiCredentialService {
         };
 
         // Get old active credential (if any) to include in event
-        let old_credential = GovNhiCredential::list_active_by_nhi(&self.pool, tenant_id, nhi_id)
+        let old_credential = NhiCredential::list_active_by_nhi(&self.pool, tenant_id, nhi_id)
             .await
             .map_err(GovernanceError::Database)?
             .into_iter()
@@ -163,22 +169,27 @@ impl NhiCredentialService {
 
         // If no grace period, deactivate old credentials immediately
         if grace_period_ends_at.is_none() {
-            for cred in GovNhiCredential::list_active_by_nhi(&self.pool, tenant_id, nhi_id)
+            for cred in NhiCredential::list_active_by_nhi(&self.pool, tenant_id, nhi_id)
                 .await
                 .map_err(GovernanceError::Database)?
             {
                 if cred.id != new_credential.id {
-                    GovNhiCredential::deactivate(&self.pool, tenant_id, cred.id)
+                    NhiCredential::deactivate(&self.pool, tenant_id, cred.id)
                         .await
                         .map_err(GovernanceError::Database)?;
                 }
             }
         }
 
-        // Update NHI's last_rotation_at
-        GovServiceAccount::update_last_rotation(&self.pool, tenant_id, nhi_id)
-            .await
-            .map_err(GovernanceError::Database)?;
+        // Update NHI's last_rotation_at via nhi_identities
+        let _ = sqlx::query(
+            "UPDATE nhi_identities SET last_rotation_at = NOW(), updated_at = NOW() WHERE tenant_id = $1 AND id = $2",
+        )
+        .bind(tenant_id)
+        .bind(nhi_id)
+        .execute(&self.pool)
+        .await
+        .map_err(GovernanceError::Database)?;
 
         // Record audit event
         let audit_event = CreateGovNhiAuditEvent {
@@ -210,20 +221,21 @@ impl NhiCredentialService {
             "NHI credentials rotated"
         );
 
-        // Emit Kafka event
-        #[cfg(feature = "kafka")]
-        self.emit_rotated_event(
-            tenant_id,
-            &nhi,
-            &new_credential,
-            old_credential.as_ref().map(|c| c.id),
-            actor_id,
-            grace_period_ends_at,
-        )
-        .await;
+        // Build NhiCredentialResponse from the new NhiCredential
+        let cred_response = NhiCredentialResponse {
+            id: new_credential.id,
+            nhi_id: new_credential.nhi_id,
+            credential_type: request.credential_type,
+            is_active: new_credential.is_active,
+            valid_from: new_credential.valid_from,
+            valid_until: new_credential.valid_until,
+            days_until_expiry: (new_credential.valid_until - Utc::now()).num_days(),
+            rotated_by: new_credential.rotated_by,
+            created_at: new_credential.created_at,
+        };
 
         Ok(NhiCredentialCreatedResponse {
-            credential: NhiCredentialResponse::from(new_credential),
+            credential: cred_response,
             secret_value: plaintext,
             warning: "This is the only time the credential value will be shown. Store it securely."
                 .to_string(),

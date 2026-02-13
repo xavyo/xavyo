@@ -262,6 +262,67 @@ impl PaginationWithTotal {
     }
 }
 
+// --- Group CRUD request/response types ---
+
+/// Request to create a new group.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct CreateGroupRequest {
+    /// Group display name (required).
+    pub display_name: String,
+
+    /// Group description (optional).
+    #[serde(default)]
+    pub description: Option<String>,
+
+    /// Parent group ID for hierarchy (optional, null = root group).
+    #[serde(default)]
+    pub parent_id: Option<Uuid>,
+
+    /// Group type classification (optional, defaults to "security_group").
+    #[serde(default)]
+    pub group_type: Option<String>,
+}
+
+/// Request to update an existing group.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct UpdateGroupRequest {
+    /// New display name (optional).
+    #[serde(default)]
+    pub display_name: Option<String>,
+
+    /// New description (optional).
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+/// Request to add members to a group.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct AddGroupMembersRequest {
+    /// List of user IDs to add as members.
+    pub member_ids: Vec<Uuid>,
+}
+
+/// A group member entry in the members list response.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct GroupMemberResponse {
+    /// User ID.
+    pub user_id: Uuid,
+
+    /// User display name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+
+    /// User email.
+    pub email: String,
+}
+
+/// Response for listing group members.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct GroupMembersResponse {
+    /// List of group members.
+    pub members: Vec<GroupMemberResponse>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
