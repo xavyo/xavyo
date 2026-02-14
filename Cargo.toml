@@ -39,7 +39,7 @@ utoipa = { version = "4.2", features = ["axum_extras", "uuid", "chrono"] }
 utoipa-swagger-ui = { version = "7.1", features = ["axum"] }
 
 # Database (default-features = false to exclude mysql/sqlite and avoid rsa vulnerability)
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "macros", "migrate", "uuid", "chrono"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "migrate", "uuid", "chrono"] }
 
 # Utilities
 uuid = { version = "1.6", features = ["v4", "serde"] }
