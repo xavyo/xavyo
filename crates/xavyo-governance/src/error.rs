@@ -2414,12 +2414,6 @@ impl GovernanceError {
                 | Self::RoleConstructionNotFound(_)
                 | Self::RoleInducementNotFound(_)
                 | Self::ConnectorNotFound(_)
-                // Power of Attorney (F-PoA)
-                | Self::PoaNotFound(_)
-                | Self::PoaAssumedSessionNotFound(_)
-                | Self::PoaDonorNotFound(_)
-                | Self::PoaAttorneyNotFound(_)
-                | Self::PoaAuditEventNotFound(_)
         )
     }
 

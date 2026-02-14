@@ -952,7 +952,7 @@ mod tests {
         let cert = GovMicroCertification {
             id: Uuid::new_v4(),
             tenant_id: Uuid::new_v4(),
-            trigger_rule_id: Uuid::new_v4(),
+            trigger_rule_id: Some(Uuid::new_v4()),
             assignment_id: Some(Uuid::new_v4()),
             user_id: Uuid::new_v4(),
             entitlement_id: Uuid::new_v4(),
@@ -990,7 +990,7 @@ mod tests {
         let mut cert = GovMicroCertification {
             id: Uuid::new_v4(),
             tenant_id: Uuid::new_v4(),
-            trigger_rule_id: Uuid::new_v4(),
+            trigger_rule_id: Some(Uuid::new_v4()),
             assignment_id: Some(Uuid::new_v4()),
             user_id: Uuid::new_v4(),
             entitlement_id: Uuid::new_v4(),
@@ -1030,7 +1030,7 @@ mod tests {
         let cert = GovMicroCertification {
             id: Uuid::new_v4(),
             tenant_id: Uuid::new_v4(),
-            trigger_rule_id: Uuid::new_v4(),
+            trigger_rule_id: Some(Uuid::new_v4()),
             assignment_id: Some(Uuid::new_v4()),
             user_id: Uuid::new_v4(),
             entitlement_id: Uuid::new_v4(),
@@ -1065,7 +1065,7 @@ mod tests {
         let mut cert = GovMicroCertification {
             id: Uuid::new_v4(),
             tenant_id: Uuid::new_v4(),
-            trigger_rule_id: Uuid::new_v4(),
+            trigger_rule_id: Some(Uuid::new_v4()),
             assignment_id: Some(Uuid::new_v4()),
             user_id: Uuid::new_v4(),
             entitlement_id: Uuid::new_v4(),

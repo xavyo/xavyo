@@ -103,13 +103,10 @@ async fn disable_rls(pool: &PgPool) -> Result<(), BootstrapError> {
             warn!("session_replication_role not available (managed DB?): {e}");
             // Fallback: set the RLS context variable to system tenant ID
             // This allows bootstrap INSERTs to pass RLS WITH CHECK policies
-            sqlx::query(&format!(
-                "SET app.current_tenant = '{}'",
-                SYSTEM_TENANT_ID
-            ))
-            .execute(pool)
-            .await
-            .map_err(BootstrapError::RlsBypass)?;
+            sqlx::query(&format!("SET app.current_tenant = '{}'", SYSTEM_TENANT_ID))
+                .execute(pool)
+                .await
+                .map_err(BootstrapError::RlsBypass)?;
             info!("RLS context set to system tenant ID (managed DB fallback)");
         }
     }
@@ -129,9 +126,7 @@ async fn enable_rls(pool: &PgPool) -> Result<(), BootstrapError> {
         }
         Err(_) => {
             // On managed DBs, just reset the tenant context
-            let _ = sqlx::query("RESET app.current_tenant")
-                .execute(pool)
-                .await;
+            let _ = sqlx::query("RESET app.current_tenant").execute(pool).await;
             info!("RLS context reset after bootstrap operations (managed DB)");
         }
     }

@@ -115,7 +115,8 @@ pub async fn list_tasks(
         "Listing A2A tasks"
     );
 
-    let response = a2a_service::list_tasks(&state.pool, tenant_id, agent_id, is_admin, query).await?;
+    let response =
+        a2a_service::list_tasks(&state.pool, tenant_id, agent_id, is_admin, query).await?;
 
     Ok(Json(response))
 }

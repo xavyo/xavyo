@@ -400,7 +400,10 @@ impl IdentityMergeService {
 
         // 4. Transfer group memberships (IGA edge case) — use savepoint to protect transaction
         let groups_transferred = {
-            sqlx::query("SAVEPOINT sp_groups").execute(&mut *tx).await.ok();
+            sqlx::query("SAVEPOINT sp_groups")
+                .execute(&mut *tx)
+                .await
+                .ok();
             match self
                 .transfer_group_memberships(
                     &mut *tx,
@@ -411,12 +414,18 @@ impl IdentityMergeService {
                 .await
             {
                 Ok(count) => {
-                    sqlx::query("RELEASE SAVEPOINT sp_groups").execute(&mut *tx).await.ok();
+                    sqlx::query("RELEASE SAVEPOINT sp_groups")
+                        .execute(&mut *tx)
+                        .await
+                        .ok();
                     count
                 }
                 Err(e) => {
                     tracing::debug!(error = %e, "Group membership transfer failed, rolling back savepoint");
-                    sqlx::query("ROLLBACK TO SAVEPOINT sp_groups").execute(&mut *tx).await.ok();
+                    sqlx::query("ROLLBACK TO SAVEPOINT sp_groups")
+                        .execute(&mut *tx)
+                        .await
+                        .ok();
                     0
                 }
             }
@@ -424,7 +433,10 @@ impl IdentityMergeService {
 
         // 5. Handle pending access requests (IGA edge case) — use savepoint to protect transaction
         let access_requests_cancelled = {
-            sqlx::query("SAVEPOINT sp_access_requests").execute(&mut *tx).await.ok();
+            sqlx::query("SAVEPOINT sp_access_requests")
+                .execute(&mut *tx)
+                .await
+                .ok();
             match self
                 .handle_pending_access_requests(
                     &mut *tx,
@@ -435,12 +447,18 @@ impl IdentityMergeService {
                 .await
             {
                 Ok(count) => {
-                    sqlx::query("RELEASE SAVEPOINT sp_access_requests").execute(&mut *tx).await.ok();
+                    sqlx::query("RELEASE SAVEPOINT sp_access_requests")
+                        .execute(&mut *tx)
+                        .await
+                        .ok();
                     count
                 }
                 Err(e) => {
                     tracing::debug!(error = %e, "Access request cancellation failed, rolling back savepoint");
-                    sqlx::query("ROLLBACK TO SAVEPOINT sp_access_requests").execute(&mut *tx).await.ok();
+                    sqlx::query("ROLLBACK TO SAVEPOINT sp_access_requests")
+                        .execute(&mut *tx)
+                        .await
+                        .ok();
                     0
                 }
             }
@@ -448,7 +466,10 @@ impl IdentityMergeService {
 
         // 6. Transfer resource ownerships (IGA edge case) — use savepoint to protect transaction
         let ownerships_transferred = {
-            sqlx::query("SAVEPOINT sp_ownerships").execute(&mut *tx).await.ok();
+            sqlx::query("SAVEPOINT sp_ownerships")
+                .execute(&mut *tx)
+                .await
+                .ok();
             match self
                 .transfer_ownerships(
                     &mut tx,
@@ -459,12 +480,18 @@ impl IdentityMergeService {
                 .await
             {
                 Ok(count) => {
-                    sqlx::query("RELEASE SAVEPOINT sp_ownerships").execute(&mut *tx).await.ok();
+                    sqlx::query("RELEASE SAVEPOINT sp_ownerships")
+                        .execute(&mut *tx)
+                        .await
+                        .ok();
                     count
                 }
                 Err(e) => {
                     tracing::debug!(error = %e, "Ownership transfer failed, rolling back savepoint");
-                    sqlx::query("ROLLBACK TO SAVEPOINT sp_ownerships").execute(&mut *tx).await.ok();
+                    sqlx::query("ROLLBACK TO SAVEPOINT sp_ownerships")
+                        .execute(&mut *tx)
+                        .await
+                        .ok();
                     0
                 }
             }
