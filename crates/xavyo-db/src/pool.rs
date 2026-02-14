@@ -77,6 +77,14 @@ impl DbPool {
         Ok(Self { inner: pool })
     }
 
+    /// Wrap an existing `SQLx` `PgPool`.
+    ///
+    /// Useful when the pool is already created externally (e.g., in `main.rs`).
+    #[must_use]
+    pub fn from_raw(pool: PgPool) -> Self {
+        Self { inner: pool }
+    }
+
     /// Get a reference to the inner `SQLx` pool.
     ///
     /// This allows direct access to `SQLx`'s `PgPool` for advanced use cases.

@@ -175,6 +175,16 @@ async fn main() {
         }
     };
 
+    // Run database migrations before bootstrap
+    // Uses admin_pool (superuser) since migrations need full DDL permissions
+    {
+        let db_pool = xavyo_db::DbPool::from_raw(admin_pool.clone());
+        if let Err(e) = xavyo_db::run_migrations(&db_pool).await {
+            eprintln!("FATAL: Database migration failed: {e}");
+            std::process::exit(1);
+        }
+    }
+
     // F095: Bootstrap system tenant and CLI OAuth client
     // This must happen after DB connection but before any services that depend on tenants
     // Uses admin_pool (superuser) since bootstrap needs to create system tenant without RLS
