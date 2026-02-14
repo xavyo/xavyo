@@ -328,7 +328,7 @@ pub use persona_validation_service::{
 };
 
 // Power of Attorney exports (F-061)
-pub use poa_service::PoaService;
+pub use poa_service::{compute_role_intersection, PoaService, RoleIntersection};
 
 // Semi-manual Resources exports (F064)
 pub use manual_task_service::ManualTaskService;

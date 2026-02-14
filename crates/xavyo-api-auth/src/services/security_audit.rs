@@ -18,6 +18,8 @@ pub enum SecurityEventType {
     CorsRejected,
     RateLimited,
     CsrfFailed,
+    RefreshTokenIpChange,
+    SessionCreationFailed,
 }
 
 impl std::fmt::Display for SecurityEventType {
@@ -31,6 +33,8 @@ impl std::fmt::Display for SecurityEventType {
             Self::CorsRejected => write!(f, "cors_rejected"),
             Self::RateLimited => write!(f, "rate_limited"),
             Self::CsrfFailed => write!(f, "csrf_failed"),
+            Self::RefreshTokenIpChange => write!(f, "refresh_token_ip_change"),
+            Self::SessionCreationFailed => write!(f, "session_creation_failed"),
         }
     }
 }
@@ -84,6 +88,14 @@ mod tests {
         assert_eq!(SecurityEventType::CorsRejected.to_string(), "cors_rejected");
         assert_eq!(SecurityEventType::RateLimited.to_string(), "rate_limited");
         assert_eq!(SecurityEventType::CsrfFailed.to_string(), "csrf_failed");
+        assert_eq!(
+            SecurityEventType::RefreshTokenIpChange.to_string(),
+            "refresh_token_ip_change"
+        );
+        assert_eq!(
+            SecurityEventType::SessionCreationFailed.to_string(),
+            "session_creation_failed"
+        );
     }
 
     #[test]

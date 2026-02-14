@@ -560,8 +560,16 @@ pub async fn login_handler(
         )
         .await
     {
-        // Log but don't fail login if session creation fails
-        tracing::warn!("Failed to create session entry: {}", e);
+        // Emit structured security audit event for session creation failure
+        SecurityAudit::emit(
+            SecurityEventType::SessionCreationFailed,
+            Some(*tenant_id_val.as_uuid()),
+            Some(*user_id.as_uuid()),
+            ip_str.as_deref(),
+            user_agent.as_deref(),
+            "failure",
+            &format!("Failed to create session entry: {e}"),
+        );
     }
 
     let response = TokenResponse::new(access_token, refresh_token, expires_in);

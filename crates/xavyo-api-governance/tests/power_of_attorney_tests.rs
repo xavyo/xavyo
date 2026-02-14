@@ -794,4 +794,113 @@ mod tests {
         assert!(!poa.status.is_actionable());
         assert!(poa.status.is_terminal());
     }
+
+    // ========================================================================
+    // Role Intersection Tests (Security: Privilege Escalation Prevention)
+    // Tests call the actual `compute_role_intersection` function from poa_service.
+    // ========================================================================
+
+    use xavyo_api_governance::services::compute_role_intersection;
+
+    #[test]
+    fn test_role_intersection_prevents_privilege_escalation() {
+        let donor = vec!["admin".into(), "user".into()];
+        let attorney = vec!["user".into()];
+        let result = compute_role_intersection(&donor, &attorney);
+
+        assert_eq!(result.effective_roles, vec!["user".to_string()]);
+        assert_eq!(result.restricted_roles, vec!["admin".to_string()]);
+        assert!(result.was_restricted());
+    }
+
+    #[test]
+    fn test_role_intersection_same_roles() {
+        let roles = vec!["admin".into(), "user".into()];
+        let result = compute_role_intersection(&roles, &roles);
+
+        assert_eq!(result.effective_roles.len(), 2);
+        assert!(result.effective_roles.contains(&"admin".into()));
+        assert!(result.effective_roles.contains(&"user".into()));
+        assert!(!result.was_restricted());
+        assert!(result.restricted_roles.is_empty());
+    }
+
+    #[test]
+    fn test_role_intersection_no_overlap() {
+        let donor = vec!["admin".into(), "super_admin".into()];
+        let attorney = vec!["user".into(), "member".into()];
+        let result = compute_role_intersection(&donor, &attorney);
+
+        assert!(result.effective_roles.is_empty());
+        assert!(result.was_restricted());
+        assert_eq!(result.restricted_roles.len(), 2);
+    }
+
+    #[test]
+    fn test_role_intersection_partial_overlap() {
+        let donor = vec!["admin".into(), "user".into(), "auditor".into()];
+        let attorney = vec!["user".into(), "auditor".into(), "member".into()];
+        let result = compute_role_intersection(&donor, &attorney);
+
+        assert_eq!(result.effective_roles.len(), 2);
+        assert!(result.effective_roles.contains(&"user".into()));
+        assert!(result.effective_roles.contains(&"auditor".into()));
+        assert!(!result.effective_roles.contains(&"admin".into()));
+        assert_eq!(result.restricted_roles, vec!["admin".to_string()]);
+    }
+
+    #[test]
+    fn test_role_restriction_detection() {
+        let donor = vec!["admin".into(), "user".into()];
+        let attorney = vec!["user".into()];
+        let result = compute_role_intersection(&donor, &attorney);
+
+        assert!(result.was_restricted());
+        assert_eq!(result.restricted_roles, vec!["admin".to_string()]);
+    }
+
+    #[test]
+    fn test_no_role_restriction_when_attorney_has_superset() {
+        let donor = vec!["user".into()];
+        let attorney = vec!["user".into(), "admin".into()];
+        let result = compute_role_intersection(&donor, &attorney);
+
+        assert!(!result.was_restricted());
+        assert_eq!(result.effective_roles, vec!["user".to_string()]);
+        assert!(result.restricted_roles.is_empty());
+    }
+
+    #[test]
+    fn test_super_admin_escalation_prevented() {
+        let donor = vec!["super_admin".into(), "admin".into(), "user".into()];
+        let attorney = vec!["admin".into(), "user".into()];
+        let result = compute_role_intersection(&donor, &attorney);
+
+        assert_eq!(result.effective_roles.len(), 2);
+        assert!(result.effective_roles.contains(&"admin".into()));
+        assert!(result.effective_roles.contains(&"user".into()));
+        assert!(!result.effective_roles.contains(&"super_admin".into()));
+        assert_eq!(result.restricted_roles, vec!["super_admin".to_string()]);
+    }
+
+    #[test]
+    fn test_empty_donor_roles() {
+        let donor: Vec<String> = vec![];
+        let attorney = vec!["admin".into(), "user".into()];
+        let result = compute_role_intersection(&donor, &attorney);
+
+        assert!(result.effective_roles.is_empty());
+        assert!(!result.was_restricted());
+    }
+
+    #[test]
+    fn test_empty_attorney_roles() {
+        let donor = vec!["admin".into(), "user".into()];
+        let attorney: Vec<String> = vec![];
+        let result = compute_role_intersection(&donor, &attorney);
+
+        assert!(result.effective_roles.is_empty());
+        assert!(result.was_restricted());
+        assert_eq!(result.restricted_roles.len(), 2);
+    }
 }

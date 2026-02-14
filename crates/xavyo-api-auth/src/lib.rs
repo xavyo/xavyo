@@ -33,9 +33,9 @@ pub use crypto::{TotpEncryption, TotpEncryptionError};
 pub use error::{ApiAuthError, ProblemDetails};
 pub use handlers::revocation_router;
 pub use middleware::{
-    api_key_auth_middleware, jwt_auth_middleware, session_activity_middleware, ApiKeyContext,
-    ApiKeyError, ApiKeyRateLimiter, EmailRateLimiter, JwtPublicKey, JwtPublicKeys, RateLimitConfig,
-    RateLimiter,
+    api_key_auth_middleware, jwt_auth_middleware, session_activity_middleware, AllowPartialToken,
+    ApiKeyContext, ApiKeyError, ApiKeyRateLimiter, EmailRateLimiter, JwtPublicKey, JwtPublicKeys,
+    RateLimitConfig, RateLimiter, TrustXff,
 };
 pub use models::{
     ForgotPasswordRequest, ForgotPasswordResponse, LoginRequest, LogoutRequest, RefreshRequest,

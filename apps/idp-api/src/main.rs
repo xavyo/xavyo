@@ -244,6 +244,15 @@ async fn main() {
     // F082-US9: Input validation config (body size limit, timeout)
     let input_validation_config = InputValidationConfig::from_env();
 
+    // Trusted proxy configuration for X-Forwarded-For validation
+    let trusted_proxy_config = config::TrustedProxyConfig::from_env();
+    if trusted_proxy_config.has_trusted_proxies() {
+        info!(
+            count = trusted_proxy_config.cidrs.len(),
+            "Trusted proxy CIDRs configured for X-Forwarded-For validation"
+        );
+    }
+
     // Create authentication services
     let auth_service = AuthService::new(pool.clone());
 
@@ -456,9 +465,9 @@ async fn main() {
         .layer(axum::Extension(endpoint_rate_limiters.clone()));
 
     // Build MFA routes with JWT authentication (F022)
-    let mfa_routes = mfa_router(auth_state.clone())
-        .layer(axum::middleware::from_fn(jwt_auth_middleware))
-        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+    // JWT auth is applied internally by mfa_router: verification routes get AllowPartialToken
+    // (accepting `purpose: "mfa_verification"` tokens), management routes reject partial tokens.
+    let mfa_routes = mfa_router(auth_state.clone(), config.jwt_public_key.clone())
         .layer(TenantLayer::with_config(
             xavyo_tenant::TenantConfig::builder()
                 .require_tenant(true)
@@ -1316,6 +1325,12 @@ async fn main() {
         .layer(axum::Extension(revocation_cache))
         // F085: Webhook event publisher for identity lifecycle events
         .layer(axum::Extension(event_publisher))
+        // Trusted proxy config for X-Forwarded-For validation
+        .layer(axum::Extension(trusted_proxy_config))
+        // Set TrustXff marker when connecting IP is from a trusted proxy CIDR
+        .layer(axum::middleware::from_fn(
+            middleware::proxy_trust_middleware,
+        ))
         // RLS: Set task-local tenant context for automatic app.current_tenant on DB connections.
         // This is the outermost middleware — runs first on request, wraps everything.
         // Reads X-Tenant-ID header and scopes the entire request in a task-local.

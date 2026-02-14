@@ -3035,6 +3035,7 @@ dependencies = [
  "hex",
  "hmac",
  "hyper 1.8.1",
+ "ipnetwork",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",

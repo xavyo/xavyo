@@ -61,6 +61,9 @@ hex = "0.4"
 # Rate limiting (F082)
 governor = "0.6"
 
+# CIDR parsing for trusted proxy validation
+ipnetwork = "0.20"
+
 # HMAC/SHA2 for CSRF (F082)
 hmac = "0.12"
 sha2 = "0.10"
