@@ -13,6 +13,9 @@ pub struct CreateInvitationRequest {
 
     /// Optional role template to assign on acceptance.
     pub role_template_id: Option<Uuid>,
+
+    /// Role to assign: "member" or "admin". Defaults to "admin" if omitted.
+    pub role: Option<String>,
 }
 
 impl CreateInvitationRequest {
@@ -21,7 +24,17 @@ impl CreateInvitationRequest {
         if self.email.is_empty() {
             return Err("Email is required".to_string());
         }
+        if let Some(ref role) = self.role {
+            if role != "member" && role != "admin" {
+                return Err("Role must be 'member' or 'admin'".to_string());
+            }
+        }
         Ok(())
+    }
+
+    /// Get the resolved role, defaulting to "admin" if not specified.
+    pub fn resolved_role(&self) -> &str {
+        self.role.as_deref().unwrap_or("admin")
     }
 }
 
@@ -109,6 +122,9 @@ pub struct InvitationResponse {
     /// Invitation status.
     pub status: String,
 
+    /// Role assigned on acceptance ("member" or "admin").
+    pub role: String,
+
     /// Role template ID (if assigned).
     pub role_template_id: Option<Uuid>,
 
@@ -131,6 +147,7 @@ impl From<xavyo_db::models::UserInvitation> for InvitationResponse {
             id: inv.id,
             email: inv.email.unwrap_or_default(),
             status: inv.status,
+            role: inv.role,
             role_template_id: inv.role_template_id,
             invited_by_user_id: inv.invited_by_user_id,
             expires_at: inv.expires_at,
@@ -178,14 +195,47 @@ mod tests {
         let req = CreateInvitationRequest {
             email: "".to_string(),
             role_template_id: None,
+            role: None,
         };
         assert!(req.validate().is_err());
 
         let req = CreateInvitationRequest {
             email: "test@example.com".to_string(),
             role_template_id: None,
+            role: None,
         };
         assert!(req.validate().is_ok());
+
+        let req = CreateInvitationRequest {
+            email: "test@example.com".to_string(),
+            role_template_id: None,
+            role: Some("member".to_string()),
+        };
+        assert!(req.validate().is_ok());
+
+        let req = CreateInvitationRequest {
+            email: "test@example.com".to_string(),
+            role_template_id: None,
+            role: Some("invalid".to_string()),
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_resolved_role_defaults_to_admin() {
+        let req = CreateInvitationRequest {
+            email: "test@example.com".to_string(),
+            role_template_id: None,
+            role: None,
+        };
+        assert_eq!(req.resolved_role(), "admin");
+
+        let req = CreateInvitationRequest {
+            email: "test@example.com".to_string(),
+            role_template_id: None,
+            role: Some("member".to_string()),
+        };
+        assert_eq!(req.resolved_role(), "member");
     }
 
     #[test]
