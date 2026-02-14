@@ -13,10 +13,7 @@ use crate::models::{
     GroupMembersResponse, UpdateGroupRequest,
 };
 use crate::services::GroupHierarchyService;
-use axum::{
-    extract::Path,
-    Extension, Json,
-};
+use axum::{extract::Path, Extension, Json};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;

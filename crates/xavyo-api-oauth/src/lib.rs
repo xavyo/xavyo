@@ -56,5 +56,7 @@ pub use middleware::{
     clear_session_cookie, create_session_cookie, extract_session_cookie, set_session_cookie,
     SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME,
 };
-pub use router::{device_router, oauth_router, user_oauth_router, well_known_router, OAuthSigningKey, OAuthState};
+pub use router::{
+    device_router, oauth_router, user_oauth_router, well_known_router, OAuthSigningKey, OAuthState,
+};
 pub use utils::{extract_country_code, extract_origin_ip, UNKNOWN_COUNTRY};

@@ -130,8 +130,14 @@ impl Validate for UpdateBrandingRequest {
 
         // Consent button text: max 100 chars (VARCHAR(100))
         let button_fields: &[(&Option<String>, &str)] = &[
-            (&self.consent_approval_button_text, "consent_approval_button_text"),
-            (&self.consent_denial_button_text, "consent_denial_button_text"),
+            (
+                &self.consent_approval_button_text,
+                "consent_approval_button_text",
+            ),
+            (
+                &self.consent_denial_button_text,
+                "consent_denial_button_text",
+            ),
         ];
         for (field, name) in button_fields {
             if let Some(v) = field {

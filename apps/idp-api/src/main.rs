@@ -65,7 +65,10 @@ use xavyo_api_oidc_federation::{
 };
 use xavyo_api_saml::{create_saml_state, saml_admin_router, saml_public_router};
 use xavyo_api_scim::{scim_admin_router, scim_resource_router, ScimConfig};
-use xavyo_api_social::{admin_social_router, authenticated_social_router, public_social_router, SocialConfig, SocialState};
+use xavyo_api_social::{
+    admin_social_router, authenticated_social_router, public_social_router, SocialConfig,
+    SocialState,
+};
 use xavyo_api_tenants::{
     api_keys_router, oauth_clients_router, suspension_check_middleware, system_admin_router,
     tenant_router,

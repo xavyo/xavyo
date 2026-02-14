@@ -17,11 +17,9 @@ use uuid::Uuid;
 
 use xavyo_db::{
     CreateGovNhiAuditEvent, CreateNhiIdentity, CreateNhiServiceAccount, GovNhiAuditEvent,
-    GovServiceAccount, NhiAuditEventType, NhiIdentity,
-    NhiServiceAccount as NhiServiceAccountModel, NhiSuspensionReason, ServiceAccountFilter,
-    ServiceAccountStatus, UpdateGovServiceAccount, User,
+    GovServiceAccount, NhiAuditEventType, NhiIdentity, NhiServiceAccount as NhiServiceAccountModel,
+    NhiSuspensionReason, ServiceAccountFilter, ServiceAccountStatus, UpdateGovServiceAccount, User,
 };
-use xavyo_nhi::NhiType;
 #[cfg(feature = "kafka")]
 use xavyo_events::{
     events::nhi::{
@@ -30,6 +28,7 @@ use xavyo_events::{
     EventProducer,
 };
 use xavyo_governance::error::{GovernanceError, Result};
+use xavyo_nhi::NhiType;
 
 use crate::models::{
     CreateNhiRequest, ListNhisQuery, NhiListResponse, NhiResponse, NhiSummary, UpdateNhiRequest,
@@ -256,9 +255,7 @@ impl NhiService {
             backup_owner_id: identity.backup_owner_id,
             status: ServiceAccountStatus::Active,
             expires_at: identity.expires_at,
-            days_until_expiry: identity.expires_at.map(|e| {
-                (e - Utc::now()).num_days()
-            }),
+            days_until_expiry: identity.expires_at.map(|e| (e - Utc::now()).num_days()),
             rotation_interval_days: identity.rotation_interval_days,
             last_rotation_at: identity.last_rotation_at,
             needs_rotation: false,

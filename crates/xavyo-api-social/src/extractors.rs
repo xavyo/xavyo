@@ -68,13 +68,13 @@ where
             let user_id = Uuid::parse_str(&claims.sub).map_err(|_| SocialError::InternalError {
                 message: "Invalid user ID in JWT claims".to_string(),
             })?;
-            let tenant_id = claims.tenant_id().map(|tid| *tid.as_uuid()).ok_or_else(|| SocialError::InternalError {
-                message: "Tenant ID not found in JWT claims".to_string(),
-            })?;
-            return Ok(AuthenticatedUser {
-                user_id,
-                tenant_id,
-            });
+            let tenant_id = claims
+                .tenant_id()
+                .map(|tid| *tid.as_uuid())
+                .ok_or_else(|| SocialError::InternalError {
+                    message: "Tenant ID not found in JWT claims".to_string(),
+                })?;
+            return Ok(AuthenticatedUser { user_id, tenant_id });
         }
 
         // Fallback: try to get from typed extensions

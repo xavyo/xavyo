@@ -673,7 +673,10 @@ impl MicroCertificationService {
 
                 // For SoD violations, create an exemption (would need SodExemptionService)
                 // This is a placeholder - actual implementation depends on SoD integration
-                if rule.as_ref().map_or(false, |r| r.trigger_type == MicroCertTriggerType::SodViolation) {
+                if rule
+                    .as_ref()
+                    .is_some_and(|r| r.trigger_type == MicroCertTriggerType::SodViolation)
+                {
                     // TODO: Create SoD exemption via SodExemptionService
                     info!(
                         certification_id = %certification_id,
@@ -691,9 +694,10 @@ impl MicroCertificationService {
                 // Revoke the assignment
                 if let Some(assignment_id) = certification.assignment_id {
                     // For SoD violations with revoke_triggering_assignment, revoke the newest assignment
-                    if rule.as_ref().map_or(false, |r| r.trigger_type == MicroCertTriggerType::SodViolation
-                        && r.revoke_triggering_assignment)
-                    {
+                    if rule.as_ref().is_some_and(|r| {
+                        r.trigger_type == MicroCertTriggerType::SodViolation
+                            && r.revoke_triggering_assignment
+                    }) {
                         // The assignment_id on the certification is the triggering one
                         revoked_assignment_id = Some(assignment_id);
                     } else {
@@ -1690,7 +1694,7 @@ mod tests {
         GovMicroCertification {
             id: Uuid::new_v4(),
             tenant_id: Uuid::new_v4(),
-            trigger_rule_id: Uuid::new_v4(),
+            trigger_rule_id: Some(Uuid::new_v4()),
             assignment_id: Some(Uuid::new_v4()),
             user_id: Uuid::new_v4(),
             entitlement_id: Uuid::new_v4(),

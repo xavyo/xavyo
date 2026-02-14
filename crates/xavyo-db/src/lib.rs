@@ -781,6 +781,6 @@ pub use models::{
 // Unified NHI Identity exports (201-tool-nhi-promotion)
 pub use models::{
     CreateNhiCredential, CreateNhiIdentity, CreateNhiServiceAccount, NhiCredential, NhiIdentity,
-    NhiIdentityFilter, NhiServiceAccount, NhiServiceAccountFilter,
-    NhiServiceAccountWithIdentity, UpdateNhiIdentity, UpdateNhiServiceAccount,
+    NhiIdentityFilter, NhiServiceAccount, NhiServiceAccountFilter, NhiServiceAccountWithIdentity,
+    UpdateNhiIdentity, UpdateNhiServiceAccount,
 };

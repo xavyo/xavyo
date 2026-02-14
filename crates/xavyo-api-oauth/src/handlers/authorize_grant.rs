@@ -40,9 +40,7 @@ async fn validate_authorize_request(
         .client_service
         .validate_redirect_uri(&client, redirect_uri)?;
 
-    let validated_scope = state
-        .client_service
-        .validate_scopes(&client, scope)?;
+    let validated_scope = state.client_service.validate_scopes(&client, scope)?;
 
     state
         .client_service

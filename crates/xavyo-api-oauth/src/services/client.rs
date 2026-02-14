@@ -967,6 +967,8 @@ mod tests {
             grant_types: vec!["client_credentials".to_string()],
             scopes: vec!["api:read".to_string(), "api:write".to_string()],
             is_active: true,
+            logo_url: None,
+            description: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -1003,6 +1005,8 @@ mod tests {
             grant_types: vec!["authorization_code".to_string()],
             scopes: vec!["openid".to_string(), "profile".to_string()],
             is_active: true,
+            logo_url: None,
+            description: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

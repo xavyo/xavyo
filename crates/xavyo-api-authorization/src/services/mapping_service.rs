@@ -58,7 +58,7 @@ impl MappingService {
             .map_err(|e| {
                 if let sqlx::Error::Database(ref db_err) = e {
                     // Check for unique constraint violation
-                    if db_err.constraint().map_or(false, |c| {
+                    if db_err.constraint().is_some_and(|c| {
                         c == "eam_tenant_entitlement_action_resource_unique"
                     }) {
                         return ApiAuthorizationError::Conflict(
@@ -66,7 +66,7 @@ impl MappingService {
                         );
                     }
                     // Check for foreign key violation (e.g. entitlement doesn't exist)
-                    if db_err.constraint().map_or(false, |c| {
+                    if db_err.constraint().is_some_and(|c| {
                         c.contains("entitlement")
                     }) {
                         return ApiAuthorizationError::Validation(
