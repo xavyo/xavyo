@@ -312,6 +312,76 @@ impl InputValidationConfig {
     }
 }
 
+/// Trusted proxy CIDR configuration.
+///
+/// When set, only trust `X-Forwarded-For` headers from requests originating
+/// from these CIDR ranges. When empty (default), X-Forwarded-For is not
+/// parsed and the direct connection IP is used instead.
+#[derive(Debug, Clone)]
+pub struct TrustedProxyConfig {
+    /// List of trusted proxy CIDR ranges.
+    /// Empty means don't trust X-Forwarded-For (use direct connection IP only).
+    pub cidrs: Vec<ipnetwork::IpNetwork>,
+}
+
+impl TrustedProxyConfig {
+    /// Load trusted proxy configuration from environment variables.
+    ///
+    /// `TRUSTED_PROXY_CIDRS` — comma-separated CIDR list (e.g., "10.0.0.0/8,172.16.0.0/12").
+    /// When not set or empty, all proxies are trusted (backward compatible).
+    pub fn from_env() -> Self {
+        match env::var("TRUSTED_PROXY_CIDRS") {
+            Ok(val) if !val.is_empty() => Self::parse(&val),
+            _ => Self { cidrs: vec![] },
+        }
+    }
+
+    /// Parse a comma-separated CIDR string into a `TrustedProxyConfig`.
+    ///
+    /// Invalid CIDRs are logged and skipped.
+    pub fn parse(cidrs_str: &str) -> Self {
+        let cidrs = cidrs_str
+            .split(',')
+            .filter_map(|cidr| {
+                let trimmed = cidr.trim();
+                if trimmed.is_empty() {
+                    return None;
+                }
+                match trimmed.parse::<ipnetwork::IpNetwork>() {
+                    Ok(network) => Some(network),
+                    Err(e) => {
+                        tracing::warn!(
+                            cidr = trimmed,
+                            error = %e,
+                            "Invalid CIDR in TRUSTED_PROXY_CIDRS, skipping"
+                        );
+                        None
+                    }
+                }
+            })
+            .collect();
+
+        Self { cidrs }
+    }
+
+    /// Check if a given IP is from a trusted proxy.
+    ///
+    /// Returns `true` if no CIDRs are configured (backward compatible: trust all).
+    /// Returns `true` if the IP falls within one of the configured trusted CIDR ranges.
+    pub fn is_trusted(&self, ip: &std::net::IpAddr) -> bool {
+        if self.cidrs.is_empty() {
+            return true; // Backward compatible: trust all when not configured
+        }
+        self.cidrs.iter().any(|cidr| cidr.contains(*ip))
+    }
+
+    /// Returns true if any trusted proxy CIDRs are configured.
+    #[must_use]
+    pub fn has_trusted_proxies(&self) -> bool {
+        !self.cidrs.is_empty()
+    }
+}
+
 /// Health check configuration (F074).
 ///
 /// Controls timeouts for dependency health checks used by the readiness probe.
@@ -1520,5 +1590,78 @@ mod tests {
         let origins = vec!["not-a-url".to_string()];
         // Development mode should not error
         assert!(validate_cors_origins(&origins, &AppEnvironment::Development).is_ok());
+    }
+
+    // ── TrustedProxyConfig tests ─────────────────────────────────────
+
+    #[test]
+    fn test_trusted_proxy_empty_trusts_all() {
+        let config = TrustedProxyConfig {
+            cidrs: vec![],
+        };
+        let ip: std::net::IpAddr = "192.168.1.1".parse().unwrap();
+        assert!(config.is_trusted(&ip), "Empty CIDRs should trust all");
+    }
+
+    #[test]
+    fn test_trusted_proxy_cidr_match() {
+        let config = TrustedProxyConfig {
+            cidrs: vec!["10.0.0.0/8".parse().unwrap()],
+        };
+        let trusted_ip: std::net::IpAddr = "10.1.2.3".parse().unwrap();
+        let untrusted_ip: std::net::IpAddr = "192.168.1.1".parse().unwrap();
+        assert!(config.is_trusted(&trusted_ip));
+        assert!(!config.is_trusted(&untrusted_ip));
+    }
+
+    #[test]
+    fn test_trusted_proxy_multiple_cidrs() {
+        let config = TrustedProxyConfig {
+            cidrs: vec![
+                "10.0.0.0/8".parse().unwrap(),
+                "172.16.0.0/12".parse().unwrap(),
+            ],
+        };
+        let ip1: std::net::IpAddr = "10.0.0.1".parse().unwrap();
+        let ip2: std::net::IpAddr = "172.20.0.1".parse().unwrap();
+        let ip3: std::net::IpAddr = "8.8.8.8".parse().unwrap();
+        assert!(config.is_trusted(&ip1));
+        assert!(config.is_trusted(&ip2));
+        assert!(!config.is_trusted(&ip3));
+    }
+
+    #[test]
+    fn test_trusted_proxy_parse_valid_cidrs() {
+        let config = TrustedProxyConfig::parse("10.0.0.0/8,172.16.0.0/12");
+        assert_eq!(config.cidrs.len(), 2);
+    }
+
+    #[test]
+    fn test_trusted_proxy_parse_invalid_cidrs_skipped() {
+        let config = TrustedProxyConfig::parse("10.0.0.0/8,not-a-cidr,172.16.0.0/12");
+        assert_eq!(config.cidrs.len(), 2);
+    }
+
+    #[test]
+    fn test_trusted_proxy_parse_empty_string() {
+        let config = TrustedProxyConfig::parse("");
+        assert!(config.cidrs.is_empty());
+    }
+
+    #[test]
+    fn test_trusted_proxy_parse_with_whitespace() {
+        let config = TrustedProxyConfig::parse(" 10.0.0.0/8 , 172.16.0.0/12 ");
+        assert_eq!(config.cidrs.len(), 2);
+    }
+
+    #[test]
+    fn test_trusted_proxy_has_trusted_proxies() {
+        let empty = TrustedProxyConfig { cidrs: vec![] };
+        assert!(!empty.has_trusted_proxies());
+
+        let with_cidrs = TrustedProxyConfig {
+            cidrs: vec!["10.0.0.0/8".parse().unwrap()],
+        };
+        assert!(with_cidrs.has_trusted_proxies());
     }
 }

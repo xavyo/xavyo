@@ -226,19 +226,42 @@ pub async fn jwt_auth_middleware(
         .and_then(|h| h.to_str().ok())
         .map(std::string::ToString::to_string);
 
-    // Extract IP address from X-Forwarded-For header or connection info
-    let ip_address: Option<IpAddr> = request
-        .headers()
-        .get("X-Forwarded-For")
-        .and_then(|h| h.to_str().ok())
-        .and_then(|s| s.split(',').next())
-        .and_then(|ip| ip.trim().parse::<IpAddr>().ok())
-        .or_else(|| {
-            request
-                .extensions()
-                .get::<ConnectInfo<SocketAddr>>()
-                .map(|ci| ci.0.ip())
-        });
+    // Extract IP address: only trust X-Forwarded-For if TrustXff marker is present.
+    // Without the marker, fall back to direct connection IP for security.
+    let connect_ip = request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ci| ci.0.ip());
+
+    let trust_xff = request.extensions().get::<TrustXff>().is_some();
+
+    let ip_address: Option<IpAddr> = if trust_xff {
+        request
+            .headers()
+            .get("X-Forwarded-For")
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| s.split(',').next())
+            .and_then(|ip| ip.trim().parse::<IpAddr>().ok())
+            .or(connect_ip)
+    } else {
+        connect_ip
+    };
+
+    // SECURITY: Reject partial (MFA) tokens on routes that don't explicitly allow them.
+    // Partial tokens have `purpose: "mfa_verification"` and empty roles — if allowed through,
+    // they could access endpoints that only require authentication (no role check).
+    if claims.purpose.as_deref() == Some("mfa_verification")
+        && request.extensions().get::<AllowPartialToken>().is_none()
+    {
+        tracing::warn!(
+            sub = %claims.sub,
+            "Rejected partial MFA token on route without AllowPartialToken marker"
+        );
+        return Err(
+            (StatusCode::UNAUTHORIZED, "Partial token not accepted on this endpoint")
+                .into_response(),
+        );
+    }
 
     // Insert claims and IDs into request extensions
     // Insert both wrapped types (UserId, TenantId) and raw UUIDs for handler compatibility
@@ -255,6 +278,14 @@ pub async fn jwt_auth_middleware(
 
     Ok(next.run(request).await)
 }
+
+/// Marker extension indicating that X-Forwarded-For should be trusted for this request.
+///
+/// Set by the application layer (e.g., `idp-api` middleware) when the direct connection
+/// IP matches a trusted proxy CIDR. Without this marker, `jwt_auth_middleware` uses
+/// the direct connection IP only.
+#[derive(Clone, Copy, Debug)]
+pub struct TrustXff;
 
 /// Wrapper for JWT public key to allow putting it in extensions.
 #[derive(Clone)]
@@ -276,6 +307,14 @@ impl ServiceAccountMarker {
         self.0
     }
 }
+
+/// Marker extension that allows partial (MFA) tokens on specific routes.
+///
+/// Routes that accept `purpose: "mfa_verification"` tokens (e.g., TOTP verify,
+/// recovery code verify, WebAuthn authenticate) must have this extension set.
+/// All other routes will reject partial tokens at the middleware level.
+#[derive(Clone, Copy, Debug)]
+pub struct AllowPartialToken;
 
 #[cfg(test)]
 mod tests {

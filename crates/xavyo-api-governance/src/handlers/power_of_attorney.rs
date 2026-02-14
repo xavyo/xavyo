@@ -405,7 +405,9 @@ pub async fn assume_identity(
     let ip_address: Option<String> = None;
     let user_agent: Option<String> = None;
 
-    let (session, donor_id) = state
+    // SECURITY: The service computes role intersection (donor_roles ∩ attorney_roles)
+    // to prevent privilege escalation. The attorney cannot gain roles they don't already have.
+    let (session, donor_id, effective_roles, roles_restricted) = state
         .poa_service
         .assume_identity(
             tenant_id,
@@ -421,6 +423,7 @@ pub async fn assume_identity(
     // - acting_as_user_id: donor_id
     // - acting_as_poa_id: poa_id
     // - acting_as_session_id: session.id
+    // - roles: effective_roles (intersection, NOT donor_roles)
     // For now, we return a placeholder token
     let access_token = format!("assumed_token_{}", session.id);
 
@@ -431,6 +434,8 @@ pub async fn assume_identity(
         donor_name: None, // Would be populated from user lookup
         donor_email: None,
         scope: None,
+        effective_roles: Some(effective_roles),
+        roles_restricted: Some(roles_restricted),
     }))
 }
 

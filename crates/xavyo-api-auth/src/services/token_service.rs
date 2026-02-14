@@ -4,6 +4,7 @@
 //! Also provides secure token generation for password reset and email verification.
 
 use crate::error::ApiAuthError;
+use crate::services::security_audit::{SecurityAudit, SecurityEventType};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{Duration, Utc};
 use rand::RngCore;
@@ -262,6 +263,27 @@ impl TokenService {
     ) -> Result<(String, String, i64), ApiAuthError> {
         // Validate the current refresh token
         let token = self.validate_refresh_token(opaque_token).await?;
+
+        // Log IP change on refresh for security monitoring
+        if let Some(current_ip) = ip_address {
+            let current_ip_str = current_ip.to_string();
+            if let Some(ref original_ip) = token.ip_address {
+                if !original_ip.is_empty() && *original_ip != current_ip_str {
+                    SecurityAudit::emit(
+                        SecurityEventType::RefreshTokenIpChange,
+                        Some(token.tenant_id),
+                        Some(token.user_id),
+                        Some(&current_ip_str),
+                        user_agent.as_deref(),
+                        "warning",
+                        &format!(
+                            "Refresh token used from different IP: original={}, current={}",
+                            original_ip, current_ip_str
+                        ),
+                    );
+                }
+            }
+        }
 
         // Check if user is still active (include tenant_id for defense-in-depth)
         let user_active = self.is_user_active(token.user_id, token.tenant_id).await?;

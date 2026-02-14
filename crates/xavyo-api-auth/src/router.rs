@@ -222,7 +222,8 @@ use crate::handlers::{
 };
 use crate::middleware::{
     rate_limit_middleware, require_super_admin_middleware, sensitive_rate_limiter,
-    signup_rate_limit_middleware, signup_rate_limiter, EmailRateLimiter, RateLimiter,
+    signup_rate_limit_middleware, signup_rate_limiter, AllowPartialToken, EmailRateLimiter,
+    RateLimiter,
 };
 use crate::services::{
     AdminInviteService, AlertService, AssetService, AssetStorage, AuditService, AuthService,
@@ -520,9 +521,14 @@ pub fn public_auth_router(state: AuthState) -> Router {
 }
 
 /// Create the MFA router for TOTP and `WebAuthn` authentication (F022, F032).
-/// These routes require JWT authentication and should have `jwt_auth_middleware` applied.
-pub fn mfa_router(state: AuthState) -> Router {
+///
+/// JWT authentication is applied internally with `AllowPartialToken` on verification routes.
+/// Callers should NOT apply `jwt_auth_middleware` externally — pass the JWT public key instead.
+pub fn mfa_router(state: AuthState, jwt_public_key: String) -> Router {
     // Rate-limited verification routes (brute-force protection: 5 attempts/min/IP)
+    // These routes accept partial (MFA) tokens via AllowPartialToken marker.
+    // Layer order (outer→inner): AllowPartialToken → jwt_auth → rate_limit → handler
+    // AllowPartialToken must be outermost so it's set before jwt_auth_middleware checks it.
     let verification_routes = Router::new()
         .route("/totp/verify", post(verify_totp))
         .route("/recovery/verify", post(verify_recovery_code))
@@ -535,7 +541,11 @@ pub fn mfa_router(state: AuthState) -> Router {
             post(finish_webauthn_authentication),
         )
         .layer(middleware::from_fn(rate_limit_middleware))
-        .layer(Extension(state.sensitive_rate_limiter.clone()));
+        .layer(Extension(state.sensitive_rate_limiter.clone()))
+        .layer(middleware::from_fn(
+            crate::middleware::jwt_auth::jwt_auth_middleware,
+        ))
+        .layer(Extension(AllowPartialToken));
 
     // Management routes (require full auth, no additional rate limiting)
     let management_routes = Router::new()
@@ -555,11 +565,17 @@ pub fn mfa_router(state: AuthState) -> Router {
         .route(
             "/webauthn/credentials/:credential_id",
             axum::routing::patch(update_webauthn_credential).delete(delete_webauthn_credential),
-        );
+        )
+        .layer(middleware::from_fn(
+            crate::middleware::jwt_auth::jwt_auth_middleware,
+        ));
 
     Router::new()
         .merge(verification_routes)
         .merge(management_routes)
+        .layer(Extension(
+            crate::middleware::jwt_auth::JwtPublicKey(jwt_public_key),
+        ))
         .layer(Extension(state.mfa_service.clone()))
         .layer(Extension(state.webauthn_service.clone()))
         .layer(Extension(state.pool.clone()))

@@ -448,36 +448,39 @@ impl GovernanceState {
     }
 
     /// Load the SIEM encryption key from the environment.
-    fn load_siem_encryption_key() -> [u8; 32] {
+    ///
+    /// SECURITY: This function requires the `XAVYO_SIEM_ENCRYPTION_KEY` environment
+    /// variable to be set. There is no fallback to a hardcoded key to prevent
+    /// accidental use of weak encryption in production.
+    ///
+    /// To generate a key: `openssl rand -base64 32`
+    fn load_siem_encryption_key() -> Result<[u8; 32], String> {
         use base64::Engine;
-        if let Ok(key_b64) = std::env::var("XAVYO_SIEM_ENCRYPTION_KEY") {
-            let key_bytes = base64::engine::general_purpose::STANDARD
-                .decode(&key_b64)
-                .expect("XAVYO_SIEM_ENCRYPTION_KEY must be valid base64");
-            assert!(
-                key_bytes.len() == 32,
+        let key_b64 = std::env::var("XAVYO_SIEM_ENCRYPTION_KEY").map_err(|_| {
+            "XAVYO_SIEM_ENCRYPTION_KEY environment variable not set. \
+             Generate a key with: openssl rand -base64 32"
+                .to_string()
+        })?;
+        let key_bytes = base64::engine::general_purpose::STANDARD
+            .decode(&key_b64)
+            .map_err(|e| format!("XAVYO_SIEM_ENCRYPTION_KEY must be valid base64: {e}"))?;
+        if key_bytes.len() != 32 {
+            return Err(format!(
                 "XAVYO_SIEM_ENCRYPTION_KEY must decode to 32 bytes, got {}",
                 key_bytes.len()
-            );
-            let mut key = [0u8; 32];
-            key.copy_from_slice(&key_bytes);
-            key
-        } else {
-            tracing::warn!(
-                "XAVYO_SIEM_ENCRYPTION_KEY not set, using development key. DO NOT USE IN PRODUCTION!"
-            );
-            // SHA-256 hash of "xavyo-siem-dev-key" for deterministic dev key
-            [
-                0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6, 0x07, 0x18, 0x29, 0x3a, 0x4b, 0x5c, 0x6d, 0x7e,
-                0x8f, 0x90, 0x01, 0x12, 0x23, 0x34, 0x45, 0x56, 0x67, 0x78, 0x89, 0x9a, 0xab, 0xbc,
-                0xcd, 0xde, 0xef, 0xf0,
-            ]
+            ));
         }
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&key_bytes);
+        Ok(key)
     }
 
     /// Create a new governance state with all services.
-    #[must_use]
-    pub fn new(pool: PgPool) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the SIEM encryption key environment variable is not set or invalid.
+    pub fn new(pool: PgPool) -> Result<Self, String> {
         let sod_enforcement_service = Arc::new(SodEnforcementService::new(pool.clone()));
         let matching_service = Arc::new(MetaRoleMatchingService::new(pool.clone()));
         // NHI services need to be created first as NhiRequestService depends on them
@@ -487,7 +490,7 @@ impl GovernanceState {
         // Identity Merge service needs to be created first as BatchMergeService depends on it
         let identity_merge_service = Arc::new(IdentityMergeService::new(pool.clone()));
 
-        Self {
+        Ok(Self {
             pool: pool.clone(),
             application_service: Arc::new(ApplicationService::new(pool.clone())),
             entitlement_service: Arc::new(EntitlementService::new(pool.clone())),
@@ -674,7 +677,7 @@ impl GovernanceState {
             siem_destination_service: Arc::new(SiemDestinationService::new(pool.clone())),
             siem_batch_export_service: Arc::new(SiemBatchExportService::new(pool.clone())),
             siem_health_service: Arc::new(SiemHealthService::new(pool.clone())),
-            siem_encryption_key: Self::load_siem_encryption_key(),
+            siem_encryption_key: Self::load_siem_encryption_key()?,
             // Business Role Hierarchy services (F088)
             role_hierarchy_service: Arc::new(RoleHierarchyService::new(pool.clone())),
             // Self-Service Request Catalog services (F-062)
@@ -688,7 +691,7 @@ impl GovernanceState {
             bulk_action_service: Arc::new(BulkActionService::new(pool.clone())),
             // GDPR Report services (F-067)
             gdpr_report_service: Arc::new(GdprReportService::new(pool)),
-        }
+        })
     }
 }
 
@@ -696,7 +699,8 @@ impl GovernanceState {
 ///
 /// All routes are prefixed with `/governance` and require authentication.
 pub fn governance_router(pool: PgPool) -> Router {
-    let state = GovernanceState::new(pool);
+    let state = GovernanceState::new(pool)
+        .expect("Failed to initialize GovernanceState (check XAVYO_SIEM_ENCRYPTION_KEY)");
 
     Router::new()
         // Applications

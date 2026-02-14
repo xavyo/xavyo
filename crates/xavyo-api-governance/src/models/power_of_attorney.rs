@@ -208,6 +208,15 @@ pub struct AssumeIdentityResponse {
     /// Scope restrictions (if any).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scope: Option<PoaScopeResponse>,
+
+    /// Effective roles for the assumed identity session (intersection of donor and attorney roles).
+    /// The attorney cannot gain roles they don't already possess.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effective_roles: Option<Vec<String>>,
+
+    /// True if any donor roles were restricted because the attorney lacks them.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub roles_restricted: Option<bool>,
 }
 
 /// Response for dropping an assumed identity.

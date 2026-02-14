@@ -384,25 +384,63 @@ impl EndpointRateLimiters {
 }
 
 /// Extract client IP from request, checking X-Forwarded-For first, then `ConnectInfo`.
+///
+/// Only trusts X-Forwarded-For headers when the `TrustXff` marker is present in
+/// request extensions (set by `proxy_trust_middleware` for trusted proxy CIDRs).
 fn extract_client_ip(request: &axum::http::Request<Body>) -> String {
-    // Check X-Forwarded-For header (first IP in chain)
-    if let Some(forwarded) = request.headers().get("x-forwarded-for") {
-        if let Ok(val) = forwarded.to_str() {
-            if let Some(first_ip) = val.split(',').next() {
-                return first_ip.trim().to_string();
+    let connect_ip = request
+        .extensions()
+        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+        .map(|ci| ci.0.ip());
+
+    // Only trust X-Forwarded-For when proxy_trust_middleware has set the TrustXff marker
+    if request.extensions().get::<xavyo_api_auth::TrustXff>().is_some() {
+        if let Some(forwarded) = request.headers().get("x-forwarded-for") {
+            if let Ok(val) = forwarded.to_str() {
+                if let Some(first_ip) = val.split(',').next() {
+                    return first_ip.trim().to_string();
+                }
             }
         }
     }
 
     // Fall back to ConnectInfo
-    if let Some(connect_info) = request
-        .extensions()
-        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-    {
-        return connect_info.0.ip().to_string();
+    if let Some(ip) = connect_ip {
+        return ip.to_string();
     }
 
     "unknown".to_string()
+}
+
+/// Axum middleware that sets `TrustXff` in request extensions when the direct
+/// connection IP matches a trusted proxy CIDR.
+///
+/// This enables downstream middleware (like `jwt_auth_middleware`) to safely
+/// parse X-Forwarded-For headers only from trusted sources.
+pub async fn proxy_trust_middleware(
+    mut request: axum::http::Request<Body>,
+    next: Next,
+) -> Response {
+    let should_trust = request
+        .extensions()
+        .get::<crate::config::TrustedProxyConfig>()
+        .is_some_and(|config| {
+            if !config.has_trusted_proxies() {
+                return false;
+            }
+            request
+                .extensions()
+                .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+                .is_some_and(|ci| config.is_trusted(&ci.0.ip()))
+        });
+
+    if should_trust {
+        request
+            .extensions_mut()
+            .insert(xavyo_api_auth::TrustXff);
+    }
+
+    next.run(request).await
 }
 
 /// Axum middleware for login endpoint rate limiting (IP + account based).
@@ -526,6 +564,15 @@ use axum::http::StatusCode;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use xavyo_db::models::{CreateIdempotentRequest, IdempotentRequest, IdempotentState, InsertResult};
+
+/// Maximum request body size for idempotency middleware buffering (1 MB).
+/// Prevents unbounded memory allocation from oversized request bodies.
+const IDEMPOTENCY_MAX_REQUEST_BODY: usize = 1_048_576;
+
+/// Maximum response body size for idempotency middleware caching (8 MB).
+/// Larger than request limit to accommodate batch/list API responses.
+/// Responses exceeding this are not cached but still returned to the client.
+const IDEMPOTENCY_MAX_RESPONSE_BODY: usize = 8_388_608;
 
 /// Header name for client-provided idempotency key.
 pub const IDEMPOTENCY_KEY_HEADER: &str = "idempotency-key";
@@ -710,7 +757,7 @@ async fn idempotency_middleware_inner(
 
     // Buffer request body for hashing
     let (parts, body) = request.into_parts();
-    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+    let body_bytes = match axum::body::to_bytes(body, IDEMPOTENCY_MAX_REQUEST_BODY).await {
         Ok(bytes) => bytes,
         Err(e) => {
             tracing::error!(error = %e, "Failed to read request body");
@@ -752,7 +799,7 @@ async fn idempotency_middleware_inner(
             let status = response.status().as_u16() as i16;
             let (resp_parts, resp_body) = response.into_parts();
 
-            let resp_bytes = match axum::body::to_bytes(resp_body, usize::MAX).await {
+            let resp_bytes = match axum::body::to_bytes(resp_body, IDEMPOTENCY_MAX_RESPONSE_BODY).await {
                 Ok(bytes) => bytes.to_vec(),
                 Err(e) => {
                     tracing::error!(error = %e, "Failed to read response body");

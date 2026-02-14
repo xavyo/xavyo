@@ -5,13 +5,58 @@
 
 use chrono::{DateTime, Duration, Utc};
 use sqlx::PgPool;
+use std::collections::HashSet;
 use uuid::Uuid;
 
 use xavyo_db::models::{
     CreatePoaAssumedSession, CreatePoaAuditEvent, CreatePowerOfAttorney, PoaAssumedSession,
     PoaAuditEvent, PoaAuditEventFilter, PoaEventType, PoaFilter, PoaStatus, PowerOfAttorney, User,
 };
+use xavyo_db::UserRole;
 use xavyo_governance::error::{GovernanceError, Result};
+
+/// Result of computing the role intersection for a PoA assumption.
+///
+/// The attorney can only act with roles that BOTH the donor and attorney possess.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoleIntersection {
+    /// Roles the assumed identity will operate with (donor ∩ attorney).
+    pub effective_roles: Vec<String>,
+    /// Donor roles that were excluded because the attorney doesn't hold them.
+    pub restricted_roles: Vec<String>,
+}
+
+impl RoleIntersection {
+    /// Returns true if any donor roles were restricted.
+    pub fn was_restricted(&self) -> bool {
+        !self.restricted_roles.is_empty()
+    }
+}
+
+/// Compute the intersection of donor and attorney roles for PoA assumption.
+///
+/// The assumed identity token should only carry roles present in BOTH sets.
+/// This prevents privilege escalation: an attorney cannot gain roles they don't already have.
+pub fn compute_role_intersection(donor_roles: &[String], attorney_roles: &[String]) -> RoleIntersection {
+    let attorney_set: HashSet<&str> = attorney_roles.iter().map(String::as_str).collect();
+
+    let effective_roles: Vec<String> = donor_roles
+        .iter()
+        .filter(|r| attorney_set.contains(r.as_str()))
+        .cloned()
+        .collect();
+
+    let restricted_roles: Vec<String> = donor_roles
+        .iter()
+        .filter(|r| !attorney_set.contains(r.as_str()))
+        .cloned()
+        .collect();
+
+    RoleIntersection {
+        effective_roles,
+        restricted_roles,
+    }
+}
 
 use crate::models::power_of_attorney::{GrantPoaRequest, PoaDirection, PoaScopeRequest};
 
@@ -469,7 +514,7 @@ impl PoaService {
         session_jti: String,
         ip_address: Option<String>,
         user_agent: Option<String>,
-    ) -> Result<(PoaAssumedSession, Uuid)> {
+    ) -> Result<(PoaAssumedSession, Uuid, Vec<String>, bool)> {
         // Validate the PoA exists and is valid
         let poa = self.get_poa(tenant_id, poa_id).await?;
 
@@ -492,6 +537,17 @@ impl PoaService {
             return Err(GovernanceError::PoaAlreadyAssuming);
         }
 
+        // SECURITY: Fetch roles for both donor and attorney, then compute intersection.
+        // The attorney must NEVER gain roles they don't already possess through PoA assumption.
+        let donor_roles = UserRole::get_user_roles(&self.pool, poa.donor_id)
+            .await
+            .unwrap_or_else(|_| vec!["user".to_string()]);
+        let attorney_roles = UserRole::get_user_roles(&self.pool, attorney_id)
+            .await
+            .unwrap_or_else(|_| vec!["user".to_string()]);
+
+        let intersection = compute_role_intersection(&donor_roles, &attorney_roles);
+
         // Create the assumed session
         let create_request = CreatePoaAssumedSession {
             poa_id,
@@ -503,6 +559,27 @@ impl PoaService {
 
         let session = PoaAssumedSession::create(&self.pool, tenant_id, create_request).await?;
 
+        // Build audit details including role intersection info
+        let mut audit_details = serde_json::json!({
+            "session_id": session.id,
+            "donor_id": poa.donor_id,
+            "assumed_roles": intersection.effective_roles,
+        });
+
+        // Log restricted roles if any were removed via intersection
+        if intersection.was_restricted() {
+            audit_details["restricted_roles"] = serde_json::json!(intersection.restricted_roles);
+            audit_details["role_restriction_applied"] = serde_json::json!(true);
+
+            tracing::warn!(
+                poa_id = %poa_id,
+                attorney_id = %attorney_id,
+                donor_id = %poa.donor_id,
+                restricted_roles = ?intersection.restricted_roles,
+                "PoA role restriction applied: donor roles not held by attorney were excluded"
+            );
+        }
+
         // T036: Create audit event for identity_assumed
         self.create_audit_event(
             tenant_id,
@@ -511,10 +588,7 @@ impl PoaService {
             Some(poa.donor_id),
             PoaEventType::IdentityAssumed,
             None,
-            Some(serde_json::json!({
-                "session_id": session.id,
-                "donor_id": poa.donor_id
-            })),
+            Some(audit_details),
         )
         .await?;
 
@@ -524,10 +598,12 @@ impl PoaService {
             attorney_id = %attorney_id,
             donor_id = %poa.donor_id,
             tenant_id = %tenant_id,
-            "Identity assumed"
+            assumed_roles = ?intersection.effective_roles,
+            "Identity assumed with role intersection"
         );
 
-        Ok((session, poa.donor_id))
+        let roles_were_restricted = intersection.was_restricted();
+        Ok((session, poa.donor_id, intersection.effective_roles, roles_were_restricted))
     }
 
     /// Drop the currently assumed identity.
