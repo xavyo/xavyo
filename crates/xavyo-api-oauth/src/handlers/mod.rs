@@ -2,6 +2,7 @@
 
 pub mod admin_sessions;
 pub mod authorize;
+pub mod authorize_grant;
 pub mod client_admin;
 pub mod client_auth;
 pub mod device;
@@ -16,6 +17,7 @@ pub use admin_sessions::{
     admin_revoke_user_handler, delete_session_handler, list_active_sessions_handler,
 };
 pub use authorize::{authorize_handler, consent_handler};
+pub use authorize_grant::{authorize_grant_handler, authorize_info_handler};
 pub use client_admin::{
     create_client_handler, delete_client_handler, get_client_handler, list_clients_handler,
     regenerate_secret_handler, update_client_handler, RegenerateSecretResponse,

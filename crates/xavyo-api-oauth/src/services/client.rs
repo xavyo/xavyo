@@ -27,6 +27,8 @@ struct DbOAuth2Client {
     pub grant_types: Vec<String>,
     pub scopes: Vec<String>,
     pub is_active: bool,
+    pub logo_url: Option<String>,
+    pub description: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -107,8 +109,9 @@ impl OAuth2ClientService {
             r"
             INSERT INTO oauth_clients (
                 id, tenant_id, client_id, client_secret_hash, name, client_type,
-                redirect_uris, grant_types, scopes, is_active, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $10)
+                redirect_uris, grant_types, scopes, is_active, logo_url, description,
+                created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $12)
             ",
         )
         .bind(id)
@@ -120,6 +123,8 @@ impl OAuth2ClientService {
         .bind(&request.redirect_uris)
         .bind(&request.grant_types)
         .bind(&request.scopes)
+        .bind(&request.logo_url)
+        .bind(&request.description)
         .bind(now)
         .execute(&mut *conn)
         .await
@@ -137,6 +142,8 @@ impl OAuth2ClientService {
             grant_types: request.grant_types,
             scopes: request.scopes,
             is_active: true,
+            logo_url: request.logo_url,
+            description: request.description,
             created_at: now,
             updated_at: now,
         };
@@ -189,7 +196,7 @@ impl OAuth2ClientService {
         let client: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, created_at, updated_at
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at
             FROM oauth_clients
             WHERE client_id = $1 AND tenant_id = $2
             ",
@@ -232,7 +239,7 @@ impl OAuth2ClientService {
         let client: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, created_at, updated_at
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -273,7 +280,7 @@ impl OAuth2ClientService {
         let clients: Vec<DbOAuth2Client> = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, created_at, updated_at
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at
             FROM oauth_clients
             WHERE tenant_id = $1
             ORDER BY created_at DESC
@@ -323,7 +330,7 @@ impl OAuth2ClientService {
         let existing: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, created_at, updated_at
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -344,14 +351,16 @@ impl OAuth2ClientService {
         let grant_types = request.grant_types.unwrap_or(existing.grant_types);
         let scopes = request.scopes.unwrap_or(existing.scopes);
         let is_active = request.is_active.unwrap_or(existing.is_active);
+        let logo_url = request.logo_url.or(existing.logo_url);
+        let description = request.description.or(existing.description);
         let now = chrono::Utc::now();
 
         sqlx::query(
             r"
             UPDATE oauth_clients
             SET name = $1, redirect_uris = $2, grant_types = $3, scopes = $4,
-                is_active = $5, updated_at = $6
-            WHERE id = $7 AND tenant_id = $8
+                is_active = $5, logo_url = $6, description = $7, updated_at = $8
+            WHERE id = $9 AND tenant_id = $10
             ",
         )
         .bind(&name)
@@ -359,6 +368,8 @@ impl OAuth2ClientService {
         .bind(&grant_types)
         .bind(&scopes)
         .bind(is_active)
+        .bind(&logo_url)
+        .bind(&description)
         .bind(now)
         .bind(id)
         .bind(tenant_id)
@@ -384,6 +395,8 @@ impl OAuth2ClientService {
             grant_types,
             scopes,
             is_active,
+            logo_url,
+            description,
             created_at: existing.created_at,
             updated_at: now,
         })
@@ -540,7 +553,7 @@ impl OAuth2ClientService {
         let client: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, created_at, updated_at
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -661,7 +674,7 @@ impl OAuth2ClientService {
         let client: Option<DbOAuth2Client> = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, created_at, updated_at
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at
             FROM oauth_clients
             WHERE client_id = $1 AND tenant_id = $2
             ",
@@ -748,6 +761,8 @@ impl OAuth2ClientService {
             grant_types: client.grant_types,
             scopes: client.scopes,
             is_active: client.is_active,
+            logo_url: client.logo_url,
+            description: client.description,
             created_at: client.created_at,
             updated_at: client.updated_at,
         }
@@ -1181,6 +1196,8 @@ mod tests {
             grant_types: vec!["authorization_code".to_string()],
             scopes: vec!["openid".to_string()],
             is_active: true,
+            logo_url: None,
+            description: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

@@ -49,6 +49,10 @@ pub struct CreateClientRequest {
     pub grant_types: Vec<String>,
     /// Allowed scopes.
     pub scopes: Vec<String>,
+    /// Client logo URL (shown on consent page).
+    pub logo_url: Option<String>,
+    /// Client description (shown on consent page).
+    pub description: Option<String>,
 }
 
 /// Request to update an `OAuth2` client.
@@ -64,6 +68,10 @@ pub struct UpdateClientRequest {
     pub scopes: Option<Vec<String>>,
     /// Whether the client is active.
     pub is_active: Option<bool>,
+    /// Client logo URL (shown on consent page).
+    pub logo_url: Option<String>,
+    /// Client description (shown on consent page).
+    pub description: Option<String>,
 }
 
 /// `OAuth2` client response.
@@ -85,6 +93,10 @@ pub struct ClientResponse {
     pub scopes: Vec<String>,
     /// Whether the client is active.
     pub is_active: bool,
+    /// Client logo URL (shown on consent page).
+    pub logo_url: Option<String>,
+    /// Client description (shown on consent page).
+    pub description: Option<String>,
     /// Creation timestamp.
     pub created_at: DateTime<Utc>,
     /// Last update timestamp.

@@ -177,6 +177,10 @@ impl BrandingService {
             privacy_policy_url: request.privacy_policy_url,
             terms_of_service_url: request.terms_of_service_url,
             support_url: request.support_url,
+            consent_page_title: request.consent_page_title,
+            consent_page_subtitle: request.consent_page_subtitle,
+            consent_approval_button_text: request.consent_approval_button_text,
+            consent_denial_button_text: request.consent_denial_button_text,
         };
 
         let branding = TenantBranding::upsert(&self.pool, tenant_id, update_data, Some(user_id))

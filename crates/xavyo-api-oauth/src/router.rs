@@ -13,10 +13,10 @@
 //! - GET /.well-known/jwks.json - JSON Web Key Set
 
 use crate::handlers::{
-    admin_revoke_user_handler, authorize_handler, consent_handler, create_client_handler,
-    delete_client_handler, delete_session_handler, device_authorization_handler,
-    device_authorize_handler, device_confirm_handler, device_login_handler,
-    device_login_page_handler, device_mfa_handler, device_mfa_page_handler,
+    admin_revoke_user_handler, authorize_grant_handler, authorize_handler, authorize_info_handler,
+    consent_handler, create_client_handler, delete_client_handler, delete_session_handler,
+    device_authorization_handler, device_authorize_handler, device_confirm_handler,
+    device_login_handler, device_login_page_handler, device_mfa_handler, device_mfa_page_handler,
     device_resend_confirmation_handler, device_verification_page_handler,
     device_verify_code_handler, discovery_handler, get_client_handler, introspect_token_handler,
     jwks_handler, list_active_sessions_handler, list_clients_handler, regenerate_secret_handler,
@@ -380,6 +380,18 @@ pub fn admin_oauth_router(state: OAuthState) -> Router {
         .route("/revoke-user", post(admin_revoke_user_handler))
         .route("/active-sessions", get(list_active_sessions_handler))
         .route("/sessions/:token_id", delete(delete_session_handler))
+        .with_state(state)
+}
+
+/// Create user-level OAuth routes (requires JWT auth but NOT admin role).
+///
+/// These routes power the SvelteKit consent UI:
+/// - `GET /authorize/info` - Get client info for consent display
+/// - `POST /authorize/grant` - Issue authorization code after user consent
+pub fn user_oauth_router(state: OAuthState) -> Router {
+    Router::new()
+        .route("/authorize/info", get(authorize_info_handler))
+        .route("/authorize/grant", post(authorize_grant_handler))
         .with_state(state)
 }
 

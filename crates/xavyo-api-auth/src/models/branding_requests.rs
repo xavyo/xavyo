@@ -27,6 +27,10 @@ pub struct UpdateBrandingRequest {
     pub privacy_policy_url: Option<String>,
     pub terms_of_service_url: Option<String>,
     pub support_url: Option<String>,
+    pub consent_page_title: Option<String>,
+    pub consent_page_subtitle: Option<String>,
+    pub consent_approval_button_text: Option<String>,
+    pub consent_denial_button_text: Option<String>,
 }
 
 impl Validate for UpdateBrandingRequest {
@@ -106,6 +110,39 @@ impl Validate for UpdateBrandingRequest {
             }
         }
 
+        // Consent title: max 255 chars (VARCHAR(255))
+        if let Some(ref v) = self.consent_page_title {
+            if v.len() > 255 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("consent_page_title must be at most 255 characters".into());
+                errors.add("consent_page_title", err);
+            }
+        }
+
+        // Consent subtitle: max 500 chars (VARCHAR(500))
+        if let Some(ref v) = self.consent_page_subtitle {
+            if v.len() > 500 {
+                let mut err = validator::ValidationError::new("length");
+                err.message = Some("consent_page_subtitle must be at most 500 characters".into());
+                errors.add("consent_page_subtitle", err);
+            }
+        }
+
+        // Consent button text: max 100 chars (VARCHAR(100))
+        let button_fields: &[(&Option<String>, &str)] = &[
+            (&self.consent_approval_button_text, "consent_approval_button_text"),
+            (&self.consent_denial_button_text, "consent_denial_button_text"),
+        ];
+        for (field, name) in button_fields {
+            if let Some(v) = field {
+                if v.len() > 100 {
+                    let mut err = validator::ValidationError::new("length");
+                    err.message = Some(format!("{name} must be at most 100 characters").into());
+                    errors.add(name, err);
+                }
+            }
+        }
+
         if errors.is_empty() {
             Ok(())
         } else {
@@ -135,6 +172,10 @@ pub struct BrandingResponse {
     pub privacy_policy_url: Option<String>,
     pub terms_of_service_url: Option<String>,
     pub support_url: Option<String>,
+    pub consent_page_title: Option<String>,
+    pub consent_page_subtitle: Option<String>,
+    pub consent_approval_button_text: Option<String>,
+    pub consent_denial_button_text: Option<String>,
     pub updated_at: Option<DateTime<Utc>>,
 }
 
@@ -157,6 +198,10 @@ pub struct PublicBrandingResponse {
     pub privacy_policy_url: Option<String>,
     pub terms_of_service_url: Option<String>,
     pub support_url: Option<String>,
+    pub consent_page_title: Option<String>,
+    pub consent_page_subtitle: Option<String>,
+    pub consent_approval_button_text: Option<String>,
+    pub consent_denial_button_text: Option<String>,
 }
 
 /// Response for branding asset upload.
@@ -292,6 +337,10 @@ impl From<xavyo_db::models::TenantBranding> for BrandingResponse {
             privacy_policy_url: branding.privacy_policy_url,
             terms_of_service_url: branding.terms_of_service_url,
             support_url: branding.support_url,
+            consent_page_title: branding.consent_page_title,
+            consent_page_subtitle: branding.consent_page_subtitle,
+            consent_approval_button_text: branding.consent_approval_button_text,
+            consent_denial_button_text: branding.consent_denial_button_text,
             updated_at: Some(branding.updated_at),
         }
     }
@@ -316,6 +365,10 @@ impl From<xavyo_db::models::PublicBranding> for PublicBrandingResponse {
             privacy_policy_url: branding.privacy_policy_url,
             terms_of_service_url: branding.terms_of_service_url,
             support_url: branding.support_url,
+            consent_page_title: branding.consent_page_title,
+            consent_page_subtitle: branding.consent_page_subtitle,
+            consent_approval_button_text: branding.consent_approval_button_text,
+            consent_denial_button_text: branding.consent_denial_button_text,
         }
     }
 }
@@ -360,6 +413,10 @@ impl BrandingResponse {
             privacy_policy_url: None,
             terms_of_service_url: None,
             support_url: None,
+            consent_page_title: None,
+            consent_page_subtitle: None,
+            consent_approval_button_text: None,
+            consent_denial_button_text: None,
             updated_at: None,
         }
     }
@@ -384,6 +441,10 @@ impl Default for PublicBrandingResponse {
             privacy_policy_url: None,
             terms_of_service_url: None,
             support_url: None,
+            consent_page_title: None,
+            consent_page_subtitle: None,
+            consent_approval_button_text: None,
+            consent_denial_button_text: None,
         }
     }
 }

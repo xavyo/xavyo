@@ -74,6 +74,12 @@ pub struct OAuth2Client {
     /// Whether the client is active (false = deactivated).
     pub is_active: bool,
 
+    /// Client logo URL (shown on consent page).
+    pub logo_url: Option<String>,
+
+    /// Client description (shown on consent page).
+    pub description: Option<String>,
+
     /// When the client was created.
     pub created_at: DateTime<Utc>,
 

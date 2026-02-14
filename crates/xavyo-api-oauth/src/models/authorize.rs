@@ -72,3 +72,62 @@ pub struct ConsentRequest {
     #[serde(default)]
     pub csrf_sig: Option<String>,
 }
+
+/// Query parameters for GET /oauth/authorize/info.
+#[derive(Debug, Clone, Deserialize, IntoParams)]
+pub struct AuthorizeInfoQuery {
+    /// Client ID (public string identifier).
+    pub client_id: String,
+    /// Redirect URI.
+    pub redirect_uri: String,
+    /// Requested scopes (space-separated).
+    #[serde(default)]
+    pub scope: String,
+}
+
+/// Response from GET /oauth/authorize/info.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct AuthorizeInfoResponse {
+    /// Display name of the OAuth client application.
+    pub client_name: String,
+    /// Public client ID.
+    pub client_id: String,
+    /// Validated scopes as individual strings.
+    pub scopes: Vec<String>,
+    /// Validated redirect URI.
+    pub redirect_uri: String,
+    /// Client logo URL (for consent page branding).
+    pub client_logo_url: Option<String>,
+    /// Client description (for consent page branding).
+    pub client_description: Option<String>,
+}
+
+/// Request body for POST /oauth/authorize/grant.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct AuthorizeGrantRequest {
+    /// Client ID (public string identifier).
+    pub client_id: String,
+    /// Redirect URI.
+    pub redirect_uri: String,
+    /// Requested scopes (space-separated).
+    pub scope: String,
+    /// State parameter (echoed back to client).
+    pub state: String,
+    /// PKCE code challenge.
+    pub code_challenge: String,
+    /// PKCE code challenge method (must be "S256").
+    pub code_challenge_method: String,
+    /// OIDC nonce (optional).
+    pub nonce: Option<String>,
+}
+
+/// Response from POST /oauth/authorize/grant.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct AuthorizeGrantResponse {
+    /// The generated authorization code.
+    pub authorization_code: String,
+    /// State parameter (echoed from request).
+    pub state: String,
+    /// Redirect URI to send user back to.
+    pub redirect_uri: String,
+}

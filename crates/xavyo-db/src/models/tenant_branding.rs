@@ -67,6 +67,18 @@ pub struct TenantBranding {
     /// Support/help link.
     pub support_url: Option<String>,
 
+    /// Consent page title (e.g., "Authorize Application").
+    pub consent_page_title: Option<String>,
+
+    /// Consent page subtitle (e.g., "{client_name} wants to access your account").
+    pub consent_page_subtitle: Option<String>,
+
+    /// Consent approval button text (e.g., "Allow").
+    pub consent_approval_button_text: Option<String>,
+
+    /// Consent denial button text (e.g., "Deny").
+    pub consent_denial_button_text: Option<String>,
+
     /// User who last updated the branding.
     pub updated_by: Option<Uuid>,
 
@@ -95,6 +107,10 @@ pub struct UpdateBranding {
     pub privacy_policy_url: Option<String>,
     pub terms_of_service_url: Option<String>,
     pub support_url: Option<String>,
+    pub consent_page_title: Option<String>,
+    pub consent_page_subtitle: Option<String>,
+    pub consent_approval_button_text: Option<String>,
+    pub consent_denial_button_text: Option<String>,
 }
 
 /// Public branding data (for unauthenticated login pages).
@@ -116,6 +132,10 @@ pub struct PublicBranding {
     pub privacy_policy_url: Option<String>,
     pub terms_of_service_url: Option<String>,
     pub support_url: Option<String>,
+    pub consent_page_title: Option<String>,
+    pub consent_page_subtitle: Option<String>,
+    pub consent_approval_button_text: Option<String>,
+    pub consent_denial_button_text: Option<String>,
 }
 
 impl Default for PublicBranding {
@@ -137,6 +157,10 @@ impl Default for PublicBranding {
             privacy_policy_url: None,
             terms_of_service_url: None,
             support_url: None,
+            consent_page_title: None,
+            consent_page_subtitle: None,
+            consent_approval_button_text: None,
+            consent_denial_button_text: None,
         }
     }
 }
@@ -164,6 +188,10 @@ impl From<TenantBranding> for PublicBranding {
             privacy_policy_url: branding.privacy_policy_url,
             terms_of_service_url: branding.terms_of_service_url,
             support_url: branding.support_url,
+            consent_page_title: branding.consent_page_title,
+            consent_page_subtitle: branding.consent_page_subtitle,
+            consent_approval_button_text: branding.consent_approval_button_text,
+            consent_denial_button_text: branding.consent_denial_button_text,
         }
     }
 }
@@ -233,10 +261,14 @@ impl TenantBranding {
                 privacy_policy_url,
                 terms_of_service_url,
                 support_url,
+                consent_page_title,
+                consent_page_subtitle,
+                consent_approval_button_text,
+                consent_denial_button_text,
                 updated_by,
                 updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, NOW())
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, NOW())
             ON CONFLICT (tenant_id) DO UPDATE SET
                 logo_url = COALESCE($2, tenant_branding.logo_url),
                 logo_dark_url = COALESCE($3, tenant_branding.logo_dark_url),
@@ -256,7 +288,11 @@ impl TenantBranding {
                 privacy_policy_url = COALESCE($17, tenant_branding.privacy_policy_url),
                 terms_of_service_url = COALESCE($18, tenant_branding.terms_of_service_url),
                 support_url = COALESCE($19, tenant_branding.support_url),
-                updated_by = $20,
+                consent_page_title = COALESCE($20, tenant_branding.consent_page_title),
+                consent_page_subtitle = COALESCE($21, tenant_branding.consent_page_subtitle),
+                consent_approval_button_text = COALESCE($22, tenant_branding.consent_approval_button_text),
+                consent_denial_button_text = COALESCE($23, tenant_branding.consent_denial_button_text),
+                updated_by = $24,
                 updated_at = NOW()
             RETURNING *
             ",
@@ -280,6 +316,10 @@ impl TenantBranding {
         .bind(&data.privacy_policy_url)
         .bind(&data.terms_of_service_url)
         .bind(&data.support_url)
+        .bind(&data.consent_page_title)
+        .bind(&data.consent_page_subtitle)
+        .bind(&data.consent_approval_button_text)
+        .bind(&data.consent_denial_button_text)
         .bind(updated_by)
         .fetch_one(executor)
         .await

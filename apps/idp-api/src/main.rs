@@ -56,7 +56,8 @@ use xavyo_api_nhi::{a2a_router, discovery_router, mcp_router};
 use xavyo_api_nhi::{nhi_router, NhiState};
 // NOTE: a2a_router, discovery_router, mcp_router are now imported from xavyo_api_nhi (Feature 205)
 use xavyo_api_oauth::router::{
-    admin_oauth_router, device_router, oauth_router, well_known_router, OAuthState,
+    admin_oauth_router, device_router, oauth_router, user_oauth_router, well_known_router,
+    OAuthState,
 };
 use xavyo_api_oidc_federation::{
     admin_routes as federation_admin_routes_fn, auth_routes as federation_auth_routes_fn,
@@ -691,7 +692,17 @@ async fn main() {
         ));
 
     // OAuth admin routes (client management - requires admin role)
-    let oauth_admin_routes = admin_oauth_router(oauth_state)
+    let oauth_admin_routes = admin_oauth_router(oauth_state.clone())
+        .layer(axum::middleware::from_fn(jwt_auth_middleware))
+        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(true)
+                .build(),
+        ));
+
+    // OAuth user-level routes (authorize info + grant - requires JWT but NOT admin)
+    let oauth_user_routes = user_oauth_router(oauth_state)
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
         .layer(TenantLayer::with_config(
@@ -1126,6 +1137,8 @@ async fn main() {
         .nest("/device", device_routes)
         // OAuth admin routes (requires admin role)
         .nest("/admin/oauth", oauth_admin_routes)
+        // OAuth user-level routes (consent info + grant - requires JWT, no admin)
+        .nest("/oauth", oauth_user_routes)
         // Social login routes (public, with tenant from header)
         .nest("/auth/social", social_public_routes)
         // Social login authenticated routes (requires JWT, user-level)
