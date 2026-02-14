@@ -23,5 +23,9 @@ ALTER TABLE device_mfa_sessions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY device_mfa_sessions_tenant_isolation ON device_mfa_sessions
     USING (tenant_id = current_setting('app.current_tenant', true)::uuid);
 
--- Grant permissions
-GRANT SELECT, INSERT, UPDATE, DELETE ON device_mfa_sessions TO authenticated;
+-- Grant permissions (only if role exists — not available on all managed DBs)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON device_mfa_sessions TO authenticated';
+  END IF;
+END $$;

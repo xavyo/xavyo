@@ -7,7 +7,7 @@
 
 -- Create the org_security_policies table
 CREATE TABLE IF NOT EXISTS org_security_policies (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     policy_type VARCHAR(20) NOT NULL,
@@ -67,5 +67,9 @@ ON org_security_policies
 FOR ALL
 USING (tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::uuid);
 
--- Grant permissions
-GRANT SELECT, INSERT, UPDATE, DELETE ON org_security_policies TO authenticated;
+-- Grant permissions (only if role exists — not available on all managed DBs)
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON org_security_policies TO authenticated';
+  END IF;
+END $$;

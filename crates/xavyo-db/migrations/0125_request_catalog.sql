@@ -72,9 +72,15 @@ CREATE INDEX idx_catalog_items_category ON catalog_items(tenant_id, category_id)
 -- Index for type filtering
 CREATE INDEX idx_catalog_items_type ON catalog_items(tenant_id, item_type);
 
+-- Immutable wrapper for to_tsvector (needed for GIN index expressions)
+CREATE OR REPLACE FUNCTION catalog_items_tsvector(p_name TEXT, p_description TEXT, p_tags TEXT[])
+RETURNS tsvector LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+    SELECT to_tsvector('english'::regconfig, p_name || ' ' || COALESCE(p_description, '') || ' ' || array_to_string(p_tags, ' '));
+$$;
+
 -- GIN index for full-text search on name, description, and tags
 CREATE INDEX idx_catalog_items_search ON catalog_items
-    USING GIN (to_tsvector('english', name || ' ' || COALESCE(description, '') || ' ' || array_to_string(tags, ' ')));
+    USING GIN (catalog_items_tsvector(name, description, tags));
 
 -- ============================================================================
 -- REQUEST CARTS
