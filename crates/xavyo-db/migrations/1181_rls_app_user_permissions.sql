@@ -32,11 +32,16 @@ END $$;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO xavyo_app;
 
 -- 4. Set default privileges so future tables/sequences are automatically accessible
-ALTER DEFAULT PRIVILEGES FOR ROLE xavyo IN SCHEMA public
-    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO xavyo_app;
-
-ALTER DEFAULT PRIVILEGES FOR ROLE xavyo IN SCHEMA public
-    GRANT USAGE, SELECT ON SEQUENCES TO xavyo_app;
+-- Only if 'xavyo' role exists (not available on managed DBs like Koyeb/Neon)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'xavyo') THEN
+        EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE xavyo IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO xavyo_app';
+        EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE xavyo IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO xavyo_app';
+    ELSE
+        RAISE NOTICE 'Skipping ALTER DEFAULT PRIVILEGES FOR ROLE xavyo (role not found, managed DB)';
+    END IF;
+END $$;
 
 -- 5. Enable RLS on ALL tables and create tenant_isolation_policy for tables with tenant_id
 DO $$

@@ -175,6 +175,26 @@ async fn main() {
         }
     };
 
+    // Ensure xavyo_app role exists before migrations (some migrations GRANT to it)
+    // On managed PostgreSQL (e.g., Koyeb/Neon), this role doesn't exist by default.
+    if let Err(e) = sqlx::query(
+        "DO $$ BEGIN \
+           IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'xavyo_app') THEN \
+             CREATE ROLE xavyo_app WITH LOGIN; \
+           END IF; \
+         END $$",
+    )
+    .execute(&admin_pool)
+    .await
+    {
+        tracing::warn!(
+            "Could not create xavyo_app role: {e}. \
+             Migrations referencing this role may fail."
+        );
+    } else {
+        info!("Role xavyo_app ensured");
+    }
+
     // Run database migrations before bootstrap
     // Uses admin_pool (superuser) since migrations need full DDL permissions
     {

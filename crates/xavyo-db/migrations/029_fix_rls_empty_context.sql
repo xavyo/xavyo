@@ -312,4 +312,4 @@ CREATE POLICY tenant_isolation_policy ON tenant_policies
 -- tenant_webauthn_policies already has tenant_isolation_webauthn_policies policy
 -- webauthn_audit_log already has tenant_isolation_webauthn_audit policy
 
-COMMENT ON EXTENSION plpgsql IS 'Migration 029: Fixed all RLS policies to handle empty tenant context using NULLIF';
+-- Note: COMMENT ON EXTENSION plpgsql removed (requires extension owner privileges, not available on managed DBs)
