@@ -87,28 +87,54 @@ async fn release_bootstrap_lock(pool: &PgPool) -> Result<(), BootstrapError> {
 
 /// Disables Row-Level Security for the current session.
 /// This is required because the system tenant doesn't exist yet when we're creating it.
+/// On managed databases without superuser access, falls back to setting the RLS
+/// context variable to the system tenant ID so bootstrap queries pass RLS policies.
 #[instrument(skip(pool))]
 async fn disable_rls(pool: &PgPool) -> Result<(), BootstrapError> {
-    // Using session_replication_role = 'replica' bypasses RLS policies
-    // This is the same pattern used in docker/postgres/seed.sql
-    sqlx::query("SET session_replication_role = 'replica'")
+    // Try session_replication_role first (requires superuser)
+    match sqlx::query("SET session_replication_role = 'replica'")
         .execute(pool)
         .await
-        .map_err(BootstrapError::RlsBypass)?;
-
-    info!("RLS bypassed for bootstrap operations");
+    {
+        Ok(_) => {
+            info!("RLS bypassed via session_replication_role (superuser)");
+        }
+        Err(e) => {
+            warn!("session_replication_role not available (managed DB?): {e}");
+            // Fallback: set the RLS context variable to system tenant ID
+            // This allows bootstrap INSERTs to pass RLS WITH CHECK policies
+            sqlx::query(&format!(
+                "SET app.current_tenant = '{}'",
+                SYSTEM_TENANT_ID
+            ))
+            .execute(pool)
+            .await
+            .map_err(BootstrapError::RlsBypass)?;
+            info!("RLS context set to system tenant ID (managed DB fallback)");
+        }
+    }
     Ok(())
 }
 
 /// Re-enables Row-Level Security for the current session.
 #[instrument(skip(pool))]
 async fn enable_rls(pool: &PgPool) -> Result<(), BootstrapError> {
-    sqlx::query("SET session_replication_role = 'origin'")
+    // Try to restore session_replication_role (may fail on managed DBs, that's ok)
+    match sqlx::query("SET session_replication_role = 'origin'")
         .execute(pool)
         .await
-        .map_err(BootstrapError::RlsRestore)?;
-
-    info!("RLS restored after bootstrap operations");
+    {
+        Ok(_) => {
+            info!("RLS restored after bootstrap operations");
+        }
+        Err(_) => {
+            // On managed DBs, just reset the tenant context
+            let _ = sqlx::query("RESET app.current_tenant")
+                .execute(pool)
+                .await;
+            info!("RLS context reset after bootstrap operations (managed DB)");
+        }
+    }
     Ok(())
 }
 
