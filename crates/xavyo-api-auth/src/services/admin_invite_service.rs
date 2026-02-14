@@ -69,6 +69,7 @@ impl AdminInviteService {
         tenant_id: Uuid,
         email: &str,
         role_template_id: Option<Uuid>,
+        role: &str,
         invited_by_user_id: Uuid,
         ip_address: Option<String>,
         user_agent: Option<String>,
@@ -146,7 +147,7 @@ impl AdminInviteService {
                 expires_at,
                 invited_by_user_id,
                 role_template_id,
-                role: "admin".to_string(),
+                role: role.to_string(),
             },
         )
         .await
@@ -154,11 +155,12 @@ impl AdminInviteService {
 
         // Send invitation email
         let invitation_url = format!("{}/invite/{}", self.frontend_base_url, raw_token);
-        let subject = "You're invited to join as an administrator";
+        let role_label = if role == "admin" { "an administrator" } else { "a member" };
+        let subject = format!("You're invited to join as {role_label}");
         let body = format!(
             r"Hi,
 
-You have been invited to set up an administrator account.
+You have been invited to join as {role_label}.
 
 Click the link below to set your password and activate your account:
 {invitation_url}
@@ -171,7 +173,7 @@ If you didn't expect this invitation, you can safely ignore this email.
         );
 
         self.email_sender
-            .send(&normalized_email, subject, &body)
+            .send(&normalized_email, &subject, &body)
             .await
             .map_err(|e| ApiAuthError::EmailSendFailed(e.to_string()))?;
 
@@ -184,6 +186,7 @@ If you didn't expect this invitation, you can safely ignore this email.
         // Log audit trail
         let new_value = serde_json::json!({
             "email": normalized_email,
+            "role": role,
             "role_template_id": role_template_id,
             "expires_at": expires_at.to_rfc3339(),
         });
@@ -312,14 +315,26 @@ If you didn't expect this invitation, you can safely ignore this email.
         .map_err(|e| ApiAuthError::Internal(e.to_string()))?
         .unwrap_or(invitation.clone());
 
+        // Assign the invitation role to the new user
+        sqlx::query(
+            r"
+            INSERT INTO user_roles (user_id, role_name, created_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (user_id, role_name) DO NOTHING
+            ",
+        )
+        .bind(user.id)
+        .bind(&invitation.role)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| ApiAuthError::Internal(e.to_string()))?;
+
         // Assign role template if specified
         if let Some(template_id) = invitation.role_template_id {
-            // Note: Role assignment logic would go here
-            // For now, we just log it
             tracing::info!(
                 user_id = %user.id,
                 template_id = %template_id,
-                "Role template should be assigned (not implemented)"
+                "Role template assignment not yet implemented"
             );
         }
 
@@ -407,11 +422,12 @@ If you didn't expect this invitation, you can safely ignore this email.
 
         // Send new email
         let invitation_url = format!("{}/invite/{}", self.frontend_base_url, raw_token);
-        let subject = "You're invited to join as an administrator";
+        let role_label = if invitation.role == "admin" { "an administrator" } else { "a member" };
+        let subject = format!("You're invited to join as {role_label}");
         let body = format!(
             r"Hi,
 
-You have been invited to set up an administrator account.
+You have been invited to join as {role_label}.
 
 Click the link below to set your password and activate your account:
 {invitation_url}
@@ -424,7 +440,7 @@ If you didn't expect this invitation, you can safely ignore this email.
         );
 
         self.email_sender
-            .send(email, subject, &body)
+            .send(email, &subject, &body)
             .await
             .map_err(|e| ApiAuthError::EmailSendFailed(e.to_string()))?;
 

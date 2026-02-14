@@ -66,12 +66,15 @@ pub async fn create_invitation_handler(
     let ip_address = None; // Would come from request headers in real impl
     let user_agent = None;
 
+    let role = request.resolved_role();
+
     let invitation = state
         .service
         .create_invitation(
             tenant_uuid,
             &request.email,
             request.role_template_id,
+            role,
             admin_user_id,
             ip_address,
             user_agent,
