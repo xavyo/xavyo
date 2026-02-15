@@ -3480,6 +3480,66 @@ let event_id = producer.publish(event, tenant_id, Some(actor_id)).await?;
 
 ---
 
+# xavyo-ext-authz
+
+> Envoy ext_authz v3 gRPC server for AgentGateway integration.
+
+## Purpose
+
+Implements the `envoy.service.auth.v3.Authorization/Check` gRPC service, allowing AgentGateway to delegate all authorization decisions to Xavyo-IDP at runtime. Extracts JWT claims, verifies NHI lifecycle state and risk score, evaluates ABAC policies via PDP, and returns rich dynamic_metadata for CEL policy evaluation in AgentGateway.
+
+## Layer
+
+domain
+
+## Status
+
+🟡 **beta**
+
+Core implementation complete with 36+ unit tests. Requires integration tests with PostgreSQL and end-to-end testing with AgentGateway for stable promotion.
+
+## Dependencies
+
+### Internal (xavyo)
+- `xavyo-core` — TenantId type-safe identifiers
+- `xavyo-db` — NHI database models (NhiIdentity, NhiAgent, NhiToolPermission, GovNhiRiskScore)
+- `xavyo-nhi` — NHI types (NhiType, NhiLifecycleState, NhiRiskLevel)
+- `xavyo-authorization` — PolicyDecisionPoint, PolicyCache, MappingCache
+
+### External (key)
+- `tonic` 0.12 — gRPC server framework
+- `moka` 0.12 — Async in-memory cache
+- `prost` 0.13 — Protobuf serialization
+
+## Public API
+
+### Types
+
+```rust
+pub struct AuthzContext {
+    pub subject_id: Uuid,
+    pub tenant_id: TenantId,
+    pub roles: Vec<String>,
+    pub method: String,
+    pub path: String,
+    pub action: String,
+    pub resource_type: String,
+}
+
+pub struct ExtAuthzConfig { /* from_env(), from_reader() */ }
+pub struct ExtAuthzService { /* new(), implements Authorization/Check */ }
+pub struct NhiCache { /* get_or_load(), invalidate() */ }
+pub struct ActivityTracker { /* record() — fire-and-forget */ }
+```
+
+## Related Crates
+
+- `xavyo-authorization` — Policy Decision Point engine
+- `xavyo-nhi` — NHI type definitions
+- `xavyo-db` — Database models for NHI identities
+
+---
+
 # xavyo-governance
 
 > Identity Governance and Administration (IGA) domain logic for xavyo.

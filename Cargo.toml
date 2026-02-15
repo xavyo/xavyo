@@ -4,6 +4,7 @@ members = [
   "apps/idp-api",
   "apps/gateway",
   "apps/xavyo-cli",
+  "apps/ext-authz",
   "crates/*"
 ]
 exclude = []

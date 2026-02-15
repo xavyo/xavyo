@@ -1,6 +1,6 @@
 # Crate Index
 
-All 32 crates in xavyo organized by architectural layer.
+All 33 crates in xavyo organized by architectural layer.
 
 See [Maturity Matrix](maturity-matrix.md) for detailed assessment criteria.
 
@@ -31,6 +31,7 @@ Business logic independent of HTTP transport.
 | [xavyo-siem](../../crates/xavyo-siem/CRATE.md) | Audit log export (syslog, Splunk) | 🟡 beta |
 | [xavyo-secrets](../../crates/xavyo-secrets/CRATE.md) | External secret providers | 🟢 stable |
 | [xavyo-scim-client](../../crates/xavyo-scim-client/CRATE.md) | Outbound SCIM provisioning | 🟢 stable |
+| [xavyo-ext-authz](../../crates/xavyo-ext-authz/CRATE.md) | Envoy ext_authz v3 gRPC server for AgentGateway | 🟡 beta |
 
 ## Connector Layer
 

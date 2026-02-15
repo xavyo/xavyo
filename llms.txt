@@ -7,7 +7,7 @@
 - [Documentation Site](docs-site/): Comprehensive Docusaurus docs (866 pages) — run `cd docs-site && npm run serve`
 - [Architecture](docs/ARCHITECTURE.md): System overview and design principles
 - [INSTALL](INSTALL.md): Development environment setup
-- [Crate Index](docs/crates/index.md): All 32 crates organized by layer
+- [Crate Index](docs/crates/index.md): All 33 crates organized by layer
 - [Maturity Matrix](docs/crates/maturity-matrix.md): Crate stability assessment
 - [Dependency Graph](docs/crates/dependency-graph.md): How crates relate
 - [OpenAPI Spec](docs/api/openapi.json): 700 paths, 933 operations
@@ -44,7 +44,7 @@ The `docs-site/` contains a full Docusaurus documentation site:
 - [xavyo-events](crates/xavyo-events/CRATE.md): 🟢 Kafka event bus
 - [xavyo-nhi](crates/xavyo-nhi/CRATE.md): 🟢 Non-human identity types and traits
 
-### Domain (8 crates)
+### Domain (9 crates)
 - [xavyo-connector](crates/xavyo-connector/CRATE.md): 🟢 Connector framework
 - [xavyo-provisioning](crates/xavyo-provisioning/CRATE.md): 🟡 Sync engine
 - [xavyo-governance](crates/xavyo-governance/CRATE.md): 🟢 IGA logic
@@ -53,6 +53,7 @@ The `docs-site/` contains a full Docusaurus documentation site:
 - [xavyo-siem](crates/xavyo-siem/CRATE.md): 🟡 Audit export
 - [xavyo-secrets](crates/xavyo-secrets/CRATE.md): 🟢 Secret providers
 - [xavyo-scim-client](crates/xavyo-scim-client/CRATE.md): 🟢 Outbound SCIM
+- [xavyo-ext-authz](crates/xavyo-ext-authz/CRATE.md): 🟡 Envoy ext_authz for AgentGateway
 
 ### Connectors (4 crates)
 - [xavyo-connector-ldap](crates/xavyo-connector-ldap/CRATE.md): 🟢 LDAP/AD

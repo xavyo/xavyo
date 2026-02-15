@@ -217,6 +217,33 @@ impl NhiToolPermission {
         Ok(result.rows_affected())
     }
 
+    /// Resolve tool names for an agent's non-expired permissions via a single JOIN.
+    ///
+    /// Returns tool identity names (not UUIDs), suitable for populating
+    /// `allowed_tools` in ext_authz dynamic_metadata.
+    pub async fn tool_names_by_agent(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        agent_nhi_id: Uuid,
+    ) -> Result<Vec<String>, sqlx::Error> {
+        let rows: Vec<(String,)> = sqlx::query_as(
+            r"
+            SELECT ni.name
+            FROM nhi_tool_permissions tp
+            JOIN nhi_identities ni ON ni.id = tp.tool_nhi_id AND ni.tenant_id = tp.tenant_id
+            WHERE tp.tenant_id = $1 AND tp.agent_nhi_id = $2
+              AND (tp.expires_at IS NULL OR tp.expires_at > NOW())
+            ORDER BY ni.name
+            ",
+        )
+        .bind(tenant_id)
+        .bind(agent_nhi_id)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(rows.into_iter().map(|(name,)| name).collect())
+    }
+
     /// Clean up expired permissions for a tenant.
     pub async fn cleanup_expired(pool: &PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(

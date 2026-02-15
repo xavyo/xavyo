@@ -1,0 +1,54 @@
+# AgentGateway configuration for Xavyo-IDP integration.
+#
+# This file configures AgentGateway to use Xavyo as the identity and
+# authorization provider via the ext_authz gRPC protocol.
+#
+# No code changes to AgentGateway are required — only this YAML config.
+
+# --- JWT validation ---
+# Points AgentGateway at Xavyo's JWKS endpoint for token verification.
+jwt:
+  issuer: "xavyo"
+  jwks:
+    url: "http://xavyo-idp:8080/.well-known/jwks.json"
+
+# --- External Authorization ---
+# Routes every request through Xavyo's ext_authz server for NHI-aware checks.
+extAuthz:
+  host: xavyo-ext-authz:50051
+  protocol:
+    grpc: {}
+  timeout: 500ms
+  failureMode: deny
+
+# --- CEL policies using dynamic_metadata from ext_authz ---
+
+# Block agents with critical risk level
+authorization:
+  - action: Deny
+    policy:
+      matchExpressions:
+        - 'extauthz.risk_level == "critical"'
+
+# Rate limiting per-tenant and per-agent
+rateLimit:
+  descriptors:
+    - key: tenant
+      expression: 'extauthz.tenant_id'
+    - key: nhi
+      expression: 'extauthz.nhi_id'
+
+# MCP RBAC: filter tools by NHI permissions
+mcp:
+  authorization:
+    policy:
+      matchExpressions:
+        - 'mcp.tool.name in extauthz.allowed_tools'
+
+# Enriched access logging with NHI context
+accessLog:
+  add:
+    nhi.id: extauthz.nhi_id
+    nhi.type: extauthz.nhi_type
+    nhi.risk: extauthz.risk_level
+    tenant.id: extauthz.tenant_id

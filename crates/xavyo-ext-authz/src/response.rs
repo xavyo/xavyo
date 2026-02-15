@@ -1,0 +1,370 @@
+use std::collections::BTreeMap;
+
+use uuid::Uuid;
+use xavyo_core::TenantId;
+
+use crate::error::ExtAuthzError;
+use crate::proto;
+
+/// Data to include in the ALLOW response's dynamic_metadata.
+#[derive(Debug)]
+pub struct AllowMetadata {
+    pub nhi_id: Uuid,
+    pub nhi_type: String,
+    pub nhi_name: String,
+    pub lifecycle_state: String,
+    pub tenant_id: TenantId,
+    pub risk_score: i32,
+    pub risk_level: String,
+    pub allowed_tools: Vec<String>,
+    pub agent_type: Option<String>,
+    pub model_provider: Option<String>,
+    pub requires_human_approval: Option<bool>,
+    pub decision_id: Uuid,
+}
+
+/// Build an ALLOW CheckResponse with dynamic_metadata.
+pub fn build_allow_response(metadata: &AllowMetadata) -> proto::CheckResponse {
+    let mut fields = BTreeMap::new();
+
+    insert_string(&mut fields, "nhi_id", &metadata.nhi_id.to_string());
+    insert_string(&mut fields, "nhi_type", &metadata.nhi_type);
+    insert_string(&mut fields, "nhi_name", &metadata.nhi_name);
+    insert_string(&mut fields, "lifecycle_state", &metadata.lifecycle_state);
+    insert_string(&mut fields, "tenant_id", &metadata.tenant_id.to_string());
+    insert_number(&mut fields, "risk_score", metadata.risk_score as f64);
+    insert_string(&mut fields, "risk_level", &metadata.risk_level);
+    insert_string_list(&mut fields, "allowed_tools", &metadata.allowed_tools);
+    insert_string(
+        &mut fields,
+        "decision_id",
+        &metadata.decision_id.to_string(),
+    );
+
+    if let Some(ref agent_type) = metadata.agent_type {
+        insert_string(&mut fields, "agent_type", agent_type);
+    }
+    if let Some(ref model_provider) = metadata.model_provider {
+        insert_string(&mut fields, "model_provider", model_provider);
+    }
+    if let Some(requires_approval) = metadata.requires_human_approval {
+        insert_bool(&mut fields, "requires_human_approval", requires_approval);
+    }
+
+    proto::CheckResponse {
+        status: Some(proto::Status {
+            code: 0, // OK
+            message: String::new(),
+            details: vec![],
+        }),
+        http_response: Some(proto::check_response::HttpResponse::OkResponse(
+            #[allow(deprecated)]
+            proto::OkHttpResponse {
+                headers: vec![],
+                headers_to_remove: vec![],
+                dynamic_metadata: None, // deprecated field, use top-level dynamic_metadata
+                response_headers_to_add: vec![],
+                query_parameters_to_set: vec![],
+                query_parameters_to_remove: vec![],
+            },
+        )),
+        dynamic_metadata: Some(prost_types::Struct { fields }),
+    }
+}
+
+/// Build a DENY CheckResponse with error details.
+pub fn build_deny_response(err: &ExtAuthzError) -> proto::CheckResponse {
+    let status_code = err.status_code();
+    let body = serde_json::json!({
+        "error": err.error_code(),
+        "message": err.to_string(),
+    })
+    .to_string();
+
+    let http_status = match status_code {
+        400 => proto::StatusCode::BadRequest,
+        401 => proto::StatusCode::Unauthorized,
+        403 => proto::StatusCode::Forbidden,
+        _ => proto::StatusCode::InternalServerError,
+    };
+
+    proto::CheckResponse {
+        status: Some(proto::Status {
+            code: 7, // PERMISSION_DENIED
+            message: err.to_string(),
+            details: vec![],
+        }),
+        http_response: Some(proto::check_response::HttpResponse::DeniedResponse(
+            proto::DeniedHttpResponse {
+                status: Some(proto::HttpStatus {
+                    code: http_status.into(),
+                }),
+                headers: vec![proto::HeaderValueOption {
+                    header: Some(proto::HeaderValue {
+                        key: "content-type".to_string(),
+                        value: String::new(),
+                        raw_value: b"application/json".to_vec(),
+                    }),
+                    append: None,
+                    append_action: 0,
+                }],
+                body,
+            },
+        )),
+        dynamic_metadata: None,
+    }
+}
+
+// --- Protobuf value helpers ---
+
+fn insert_string(fields: &mut BTreeMap<String, prost_types::Value>, key: &str, value: &str) {
+    fields.insert(
+        key.to_string(),
+        prost_types::Value {
+            kind: Some(prost_types::value::Kind::StringValue(value.to_string())),
+        },
+    );
+}
+
+fn insert_number(fields: &mut BTreeMap<String, prost_types::Value>, key: &str, value: f64) {
+    fields.insert(
+        key.to_string(),
+        prost_types::Value {
+            kind: Some(prost_types::value::Kind::NumberValue(value)),
+        },
+    );
+}
+
+fn insert_bool(fields: &mut BTreeMap<String, prost_types::Value>, key: &str, value: bool) {
+    fields.insert(
+        key.to_string(),
+        prost_types::Value {
+            kind: Some(prost_types::value::Kind::BoolValue(value)),
+        },
+    );
+}
+
+fn insert_string_list(
+    fields: &mut BTreeMap<String, prost_types::Value>,
+    key: &str,
+    values: &[String],
+) {
+    let list_values: Vec<prost_types::Value> = values
+        .iter()
+        .map(|v| prost_types::Value {
+            kind: Some(prost_types::value::Kind::StringValue(v.clone())),
+        })
+        .collect();
+
+    fields.insert(
+        key.to_string(),
+        prost_types::Value {
+            kind: Some(prost_types::value::Kind::ListValue(
+                prost_types::ListValue {
+                    values: list_values,
+                },
+            )),
+        },
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use xavyo_core::TenantId;
+
+    #[test]
+    fn test_build_allow_response() {
+        let metadata = AllowMetadata {
+            nhi_id: Uuid::new_v4(),
+            nhi_type: "agent".to_string(),
+            nhi_name: "test-agent".to_string(),
+            lifecycle_state: "active".to_string(),
+            tenant_id: TenantId::new(),
+            risk_score: 25,
+            risk_level: "low".to_string(),
+            allowed_tools: vec!["tool_a".to_string(), "tool_b".to_string()],
+            agent_type: Some("ai_agent".to_string()),
+            model_provider: Some("openai".to_string()),
+            requires_human_approval: Some(false),
+            decision_id: Uuid::new_v4(),
+        };
+
+        let response = build_allow_response(&metadata);
+
+        // Status should be OK (code 0)
+        assert_eq!(response.status.as_ref().unwrap().code, 0);
+
+        // Should have dynamic_metadata
+        let dm = response.dynamic_metadata.as_ref().unwrap();
+        assert!(dm.fields.contains_key("nhi_id"));
+        assert!(dm.fields.contains_key("nhi_type"));
+        assert!(dm.fields.contains_key("risk_score"));
+        assert!(dm.fields.contains_key("allowed_tools"));
+        assert!(dm.fields.contains_key("decision_id"));
+        assert!(dm.fields.contains_key("agent_type"));
+        assert!(dm.fields.contains_key("model_provider"));
+        assert!(dm.fields.contains_key("requires_human_approval"));
+        assert!(dm.fields.contains_key("tenant_id"));
+        assert!(dm.fields.contains_key("lifecycle_state"));
+        assert!(dm.fields.contains_key("nhi_name"));
+
+        // Check risk_score is a number
+        if let Some(prost_types::value::Kind::NumberValue(score)) =
+            &dm.fields.get("risk_score").unwrap().kind
+        {
+            assert_eq!(*score, 25.0);
+        } else {
+            panic!("risk_score should be a number");
+        }
+
+        // Check allowed_tools is a list
+        if let Some(prost_types::value::Kind::ListValue(list)) =
+            &dm.fields.get("allowed_tools").unwrap().kind
+        {
+            assert_eq!(list.values.len(), 2);
+        } else {
+            panic!("allowed_tools should be a list");
+        }
+
+        // Check requires_human_approval is a bool
+        if let Some(prost_types::value::Kind::BoolValue(val)) =
+            &dm.fields.get("requires_human_approval").unwrap().kind
+        {
+            assert!(!val);
+        } else {
+            panic!("requires_human_approval should be a bool");
+        }
+    }
+
+    #[test]
+    fn test_build_allow_response_without_optional_fields() {
+        let metadata = AllowMetadata {
+            nhi_id: Uuid::new_v4(),
+            nhi_type: "service_account".to_string(),
+            nhi_name: "svc-test".to_string(),
+            lifecycle_state: "active".to_string(),
+            tenant_id: TenantId::new(),
+            risk_score: 0,
+            risk_level: "low".to_string(),
+            allowed_tools: vec![],
+            agent_type: None,
+            model_provider: None,
+            requires_human_approval: None,
+            decision_id: Uuid::new_v4(),
+        };
+
+        let response = build_allow_response(&metadata);
+        let dm = response.dynamic_metadata.as_ref().unwrap();
+
+        // Optional fields should be absent
+        assert!(!dm.fields.contains_key("agent_type"));
+        assert!(!dm.fields.contains_key("model_provider"));
+        assert!(!dm.fields.contains_key("requires_human_approval"));
+
+        // Required fields should still be present
+        assert!(dm.fields.contains_key("nhi_id"));
+        assert!(dm.fields.contains_key("tenant_id"));
+
+        // Allowed tools should be an empty list
+        if let Some(prost_types::value::Kind::ListValue(list)) =
+            &dm.fields.get("allowed_tools").unwrap().kind
+        {
+            assert!(list.values.is_empty());
+        } else {
+            panic!("allowed_tools should be a list");
+        }
+    }
+
+    #[test]
+    fn test_build_deny_response() {
+        let err = ExtAuthzError::NhiNotUsable("suspended".to_string());
+        let response = build_deny_response(&err);
+
+        // Status code should be non-zero (PERMISSION_DENIED)
+        assert_eq!(response.status.as_ref().unwrap().code, 7);
+
+        // Should have denied_response
+        if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
+            &response.http_response
+        {
+            assert!(!denied.body.is_empty());
+            let body: serde_json::Value = serde_json::from_str(&denied.body).unwrap();
+            assert_eq!(body["error"], "nhi_not_usable");
+            assert!(body["message"].as_str().unwrap().contains("suspended"));
+        } else {
+            panic!("expected denied_response");
+        }
+
+        // No dynamic_metadata for deny responses
+        assert!(response.dynamic_metadata.is_none());
+    }
+
+    #[test]
+    fn test_build_deny_response_status_codes() {
+        // 400 Bad Request
+        let err = ExtAuthzError::MissingAttributes;
+        let response = build_deny_response(&err);
+        if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
+            &response.http_response
+        {
+            let expected: i32 = proto::StatusCode::BadRequest.into();
+            assert_eq!(denied.status.as_ref().unwrap().code, expected);
+        }
+
+        // 401 Unauthorized
+        let err = ExtAuthzError::NhiNotFound(Uuid::new_v4());
+        let response = build_deny_response(&err);
+        if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
+            &response.http_response
+        {
+            let expected: i32 = proto::StatusCode::Unauthorized.into();
+            assert_eq!(denied.status.as_ref().unwrap().code, expected);
+        }
+
+        // 403 Forbidden
+        let err = ExtAuthzError::AuthorizationDenied("denied".into());
+        let response = build_deny_response(&err);
+        if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
+            &response.http_response
+        {
+            let expected: i32 = proto::StatusCode::Forbidden.into();
+            assert_eq!(denied.status.as_ref().unwrap().code, expected);
+        }
+
+        // 500 Internal Server Error
+        let err = ExtAuthzError::Internal("oops".into());
+        let response = build_deny_response(&err);
+        if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
+            &response.http_response
+        {
+            let expected: i32 = proto::StatusCode::InternalServerError.into();
+            assert_eq!(denied.status.as_ref().unwrap().code, expected);
+        }
+    }
+
+    #[test]
+    fn test_build_deny_response_json_body() {
+        let err = ExtAuthzError::RiskScoreExceeded {
+            score: 80,
+            threshold: 75,
+        };
+        let response = build_deny_response(&err);
+
+        if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
+            &response.http_response
+        {
+            let body: serde_json::Value = serde_json::from_str(&denied.body).unwrap();
+            assert_eq!(body["error"], "risk_score_exceeded");
+            assert!(body["message"].as_str().unwrap().contains("80"));
+
+            // Check content-type header
+            assert!(!denied.headers.is_empty());
+            let ct = &denied.headers[0];
+            assert_eq!(ct.header.as_ref().unwrap().key, "content-type");
+            assert_eq!(ct.header.as_ref().unwrap().raw_value, b"application/json");
+        } else {
+            panic!("expected denied_response");
+        }
+    }
+}
