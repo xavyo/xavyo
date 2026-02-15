@@ -52,6 +52,7 @@ pub async fn can_i_handler(
         action: query.action,
         resource_type: query.resource_type,
         resource_id: query.resource_id,
+        delegation: None,
     };
 
     let decision = state
@@ -101,6 +102,7 @@ pub async fn admin_check_handler(
         action: query.action,
         resource_type: query.resource_type,
         resource_id: query.resource_id,
+        delegation: None,
     };
 
     // Note: for admin check, we pass empty roles since the target user's roles
@@ -176,6 +178,7 @@ pub async fn bulk_check_handler(
             action: check.action,
             resource_type: check.resource_type,
             resource_id: check.resource_id,
+            delegation: None,
         };
 
         let decision = state

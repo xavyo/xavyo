@@ -130,13 +130,82 @@ impl ExtAuthzService {
             (0, NhiRiskLevel::Low)
         };
 
-        // Step 6: PDP evaluation
+        // Step 6: PDP evaluation — build delegation context if the token is delegated
+        //
+        // SECURITY: A delegated token (act claim present) MUST have a valid, active
+        // delegation grant. If the grant is revoked, expired, or missing, we DENY
+        // the request outright. We must NOT fall through to non-delegated evaluation,
+        // because that would give the token the principal's FULL permissions — more
+        // permissive than the original scoped grant.
+        let (delegation, delegation_principal_type) = if ctx.act.is_some() {
+            let del_id = ctx.delegation_id.as_ref().ok_or_else(|| {
+                ctx_err(ExtAuthzError::AuthorizationDenied(
+                    "delegated token missing delegation_id claim".into(),
+                ))
+            })?;
+
+            use xavyo_db::models::NhiDelegationGrant;
+            let grant = NhiDelegationGrant::find_by_id(&self.pool, tenant_uuid, *del_id)
+                .await
+                .map_err(|e| ctx_err(e.into()))?;
+
+            // Parse the actor NHI ID from the act claim — must be a valid UUID.
+            let actor_nhi_id = ctx
+                .act
+                .as_ref()
+                .and_then(|a| Uuid::parse_str(&a.sub).ok())
+                .ok_or_else(|| {
+                    ctx_err(ExtAuthzError::AuthorizationDenied(
+                        "delegated token has invalid actor sub claim".into(),
+                    ))
+                })?;
+
+            match grant {
+                Some(g) if g.is_active() => {
+                    // SECURITY: Verify the grant actually belongs to this principal
+                    // and actor pair. Without this, a forged delegation_id could
+                    // reference any grant within the tenant.
+                    if g.principal_id != ctx.subject_id {
+                        return Err(ctx_err(ExtAuthzError::AuthorizationDenied(
+                            "delegation grant principal does not match token subject".into(),
+                        )));
+                    }
+                    if g.actor_nhi_id != actor_nhi_id {
+                        return Err(ctx_err(ExtAuthzError::AuthorizationDenied(
+                            "delegation grant actor does not match token actor".into(),
+                        )));
+                    }
+
+                    let principal_type = g.principal_type.clone();
+                    let del_ctx = xavyo_authorization::types::DelegationContext {
+                        actor_nhi_id,
+                        delegation_id: *del_id,
+                        allowed_scopes: g.allowed_scopes.clone(),
+                        allowed_resource_types: g.allowed_resource_types.clone(),
+                        depth: ctx.delegation_depth.unwrap_or(1),
+                    };
+                    (Some(del_ctx), Some(principal_type))
+                }
+                Some(_) => {
+                    // Grant exists but is no longer active (revoked/expired) — hard deny
+                    return Err(ctx_err(ExtAuthzError::DelegationGrantNotActive(*del_id)));
+                }
+                None => {
+                    // Grant not found — hard deny
+                    return Err(ctx_err(ExtAuthzError::DelegationGrantNotActive(*del_id)));
+                }
+            }
+        } else {
+            (None, None)
+        };
+
         let authz_request = AuthorizationRequest {
             subject_id: ctx.subject_id,
             tenant_id: tenant_uuid,
             action: ctx.action.clone(),
             resource_type: ctx.resource_type.clone(),
             resource_id: None,
+            delegation,
         };
 
         let decision = self
@@ -182,6 +251,11 @@ impl ExtAuthzService {
             model_provider,
             requires_human_approval,
             decision_id: decision.decision_id,
+            is_delegated: ctx.act.is_some(),
+            actor_nhi_id: ctx.act.as_ref().and_then(|a| Uuid::parse_str(&a.sub).ok()),
+            delegation_id: ctx.delegation_id,
+            delegation_depth: ctx.delegation_depth,
+            principal_type: delegation_principal_type,
         };
 
         // Step 9: Record activity (async, non-blocking)

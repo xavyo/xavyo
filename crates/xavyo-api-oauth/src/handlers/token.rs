@@ -2,7 +2,7 @@
 
 use crate::error::OAuthError;
 use crate::handlers::device::{check_device_authorization, exchange_device_code_for_tokens};
-use crate::models::{TokenRequest, TokenResponse, DEVICE_CODE_GRANT_TYPE};
+use crate::models::{TokenRequest, TokenResponse, DEVICE_CODE_GRANT_TYPE, TOKEN_EXCHANGE_GRANT_TYPE};
 use crate::router::OAuthState;
 use crate::services::DeviceAuthorizationStatus;
 use axum::{
@@ -12,6 +12,8 @@ use axum::{
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
 use uuid::Uuid;
+use xavyo_auth::decode_token;
+use xavyo_db::models::{NhiDelegationGrant, NhiIdentity};
 
 /// Exchange authorization code for tokens or refresh tokens.
 #[utoipa::path(
@@ -60,6 +62,16 @@ pub async fn token_handler(
         }
         gt if gt == DEVICE_CODE_GRANT_TYPE => {
             handle_device_code_grant(&state, &headers, &request, &client_id).await
+        }
+        gt if gt == TOKEN_EXCHANGE_GRANT_TYPE => {
+            handle_token_exchange_grant(
+                &state,
+                &headers,
+                &request,
+                &client_id,
+                client_secret.as_deref(),
+            )
+            .await
         }
         _ => Err(OAuthError::UnsupportedGrantType(request.grant_type)),
     }
@@ -465,6 +477,203 @@ async fn handle_refresh_token_grant(
     Ok(Json(token_response))
 }
 
+/// Handle `urn:ietf:params:oauth:grant-type:token-exchange` grant type (RFC 8693).
+///
+/// Allows an NHI (agent) to obtain a delegated token to act on behalf of
+/// a user or another NHI. Requires an active `NhiDelegationGrant`.
+///
+/// # Security
+///
+/// - Both subject and actor tokens are verified cryptographically via RS256
+/// - Client must be authorized for the `token-exchange` grant type
+/// - Tenant ID from the header must match the subject token's `tid` claim
+/// - Delegation grant must be active and not expired
+/// - Requested scopes must be a subset of the grant's allowed scopes
+/// - Delegation depth is enforced per grant's `max_delegation_depth`
+async fn handle_token_exchange_grant(
+    state: &OAuthState,
+    headers: &HeaderMap,
+    request: &TokenRequest,
+    client_id: &str,
+    client_secret: Option<&str>,
+) -> Result<Json<TokenResponse>, OAuthError> {
+    // Extract required parameters
+    let subject_token = request
+        .subject_token
+        .as_ref()
+        .ok_or_else(|| OAuthError::InvalidRequest("subject_token is required".to_string()))?;
+    let _subject_token_type = request
+        .subject_token_type
+        .as_ref()
+        .ok_or_else(|| OAuthError::InvalidRequest("subject_token_type is required".to_string()))?;
+    let actor_token = request
+        .actor_token
+        .as_ref()
+        .ok_or_else(|| {
+            OAuthError::InvalidRequest("actor_token is required for delegation".to_string())
+        })?;
+
+    // S13: Reject self-referential exchange (same token as both subject and actor)
+    if subject_token == actor_token {
+        return Err(OAuthError::InvalidRequest(
+            "subject_token and actor_token must be different".to_string(),
+        ));
+    }
+
+    // Extract tenant_id from header
+    let tenant_id = extract_tenant_id_from_headers(headers)?;
+
+    // Authenticate the client and validate it is authorized for token exchange
+    let secret = client_secret.ok_or_else(|| {
+        OAuthError::InvalidClient(
+            "client_secret is required for token exchange grant".to_string(),
+        )
+    })?;
+    let client = state
+        .client_service
+        .verify_client_credentials(tenant_id, client_id, secret)
+        .await?;
+    state
+        .client_service
+        .validate_grant_type(&client, TOKEN_EXCHANGE_GRANT_TYPE)?;
+
+    // Step 1: Verify subject_token signature and extract claims
+    let subject_claims = decode_token(subject_token, &state.public_key)
+        .map_err(|e| OAuthError::InvalidGrant(format!("invalid subject_token: {e}")))?;
+
+    let principal_id = Uuid::parse_str(&subject_claims.sub).map_err(|_| {
+        OAuthError::InvalidGrant("subject_token has invalid sub claim".to_string())
+    })?;
+
+    // SECURITY: subject token MUST have a tid claim matching the request tenant.
+    // Without this, a token from another tenant (or without tid) bypasses isolation.
+    let subject_tid = subject_claims.tid.ok_or_else(|| {
+        OAuthError::InvalidGrant("subject_token missing required tid claim".to_string())
+    })?;
+    if subject_tid != tenant_id {
+        return Err(OAuthError::InvalidGrant(
+            "subject_token tenant does not match X-Tenant-ID".to_string(),
+        ));
+    }
+
+    // Step 2: Verify actor_token signature and extract claims
+    let actor_claims = decode_token(actor_token, &state.public_key)
+        .map_err(|e| OAuthError::InvalidGrant(format!("invalid actor_token: {e}")))?;
+
+    let actor_nhi_id = Uuid::parse_str(&actor_claims.sub)
+        .map_err(|_| OAuthError::InvalidGrant("actor_token has invalid sub claim".to_string()))?;
+
+    // SECURITY: actor token MUST have a tid claim matching the request tenant.
+    let actor_tid = actor_claims.tid.ok_or_else(|| {
+        OAuthError::InvalidGrant("actor_token missing required tid claim".to_string())
+    })?;
+    if actor_tid != tenant_id {
+        return Err(OAuthError::InvalidGrant(
+            "actor_token tenant does not match X-Tenant-ID".to_string(),
+        ));
+    }
+
+    // S9: Validate actor claim chain depth to prevent stack overflow / abuse
+    if let Some(ref act) = actor_claims.act {
+        act.validate_depth().map_err(|e| OAuthError::InvalidGrant(e))?;
+    }
+
+    // Step 3: Look up active delegation grant
+    let grant = NhiDelegationGrant::find_active(&state.pool, tenant_id, principal_id, actor_nhi_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to lookup delegation grant: {}", e);
+            OAuthError::Internal("Database error".to_string())
+        })?
+        .ok_or_else(|| {
+            OAuthError::InvalidGrant(
+                "no active delegation grant found for this principal/actor pair".to_string(),
+            )
+        })?;
+
+    // Step 4: Validate requested scopes against grant
+    let requested_scope = request.scope.clone().unwrap_or_default();
+    if !requested_scope.is_empty() {
+        for scope in requested_scope.split_whitespace() {
+            if !grant.is_scope_allowed(scope) {
+                return Err(OAuthError::InvalidScope(format!(
+                    "scope '{scope}' not permitted by delegation grant"
+                )));
+            }
+        }
+    }
+
+    // Step 5: Check delegation depth (checked arithmetic to prevent overflow)
+    let current_depth = actor_claims.delegation_depth.unwrap_or(0);
+    let new_depth = current_depth.checked_add(1).ok_or_else(|| {
+        OAuthError::InvalidGrant("delegation depth overflow".to_string())
+    })?;
+    if new_depth > grant.max_delegation_depth {
+        return Err(OAuthError::InvalidGrant(format!(
+            "delegation depth {} exceeds maximum {} for this grant",
+            new_depth, grant.max_delegation_depth
+        )));
+    }
+
+    // Step 6: Verify actor NHI is active (lifecycle check via DB)
+    let actor_identity = NhiIdentity::find_by_id(&state.pool, tenant_id, actor_nhi_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to lookup actor NHI: {}", e);
+            OAuthError::Internal("Database error".to_string())
+        })?
+        .ok_or_else(|| OAuthError::InvalidGrant("actor NHI not found".to_string()))?;
+
+    if !actor_identity.lifecycle_state.is_usable() {
+        return Err(OAuthError::InvalidGrant(format!(
+            "actor NHI is not active (state: {})",
+            actor_identity.lifecycle_state.as_str()
+        )));
+    }
+
+    // Step 7: Mint delegated token with `act` claim
+    let token_response = state
+        .token_service
+        .issue_token_exchange_tokens(
+            principal_id,
+            actor_nhi_id,
+            &grant,
+            client_id,
+            tenant_id,
+            &requested_scope,
+            new_depth,
+            actor_claims.act.as_ref(),
+        )
+        .await?;
+
+    tracing::info!(
+        principal_id = %principal_id,
+        actor_nhi_id = %actor_nhi_id,
+        delegation_id = %grant.id,
+        delegation_depth = new_depth,
+        "token exchange: delegated token issued"
+    );
+
+    // Emit DelegationExercised event (fire-and-forget)
+    #[cfg(feature = "kafka")]
+    if let Some(ref producer) = state.event_producer {
+        let event = xavyo_events::events::nhi_delegation::NhiDelegationExercised {
+            grant_id: grant.id,
+            tenant_id,
+            principal_id,
+            actor_nhi_id,
+            scope_used: requested_scope.clone(),
+            delegation_depth: new_depth,
+            exercised_at: chrono::Utc::now(),
+        };
+        if let Err(e) = producer.publish(event, tenant_id, Some(actor_nhi_id)).await {
+            tracing::warn!(error = %e, "Failed to publish NhiDelegationExercised event");
+        }
+    }
+
+    Ok(Json(token_response))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -489,6 +698,11 @@ mod tests {
             refresh_token: None,
             scope: None,
             device_code: None,
+            subject_token: None,
+            subject_token_type: None,
+            actor_token: None,
+            actor_token_type: None,
+            audience: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -511,6 +725,11 @@ mod tests {
             refresh_token: None,
             scope: None,
             device_code: None,
+            subject_token: None,
+            subject_token_type: None,
+            actor_token: None,
+            actor_token_type: None,
+            audience: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -533,6 +752,11 @@ mod tests {
             refresh_token: None,
             scope: None,
             device_code: None,
+            subject_token: None,
+            subject_token_type: None,
+            actor_token: None,
+            actor_token_type: None,
+            audience: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -555,6 +779,11 @@ mod tests {
             refresh_token: None,
             scope: None,
             device_code: None,
+            subject_token: None,
+            subject_token_type: None,
+            actor_token: None,
+            actor_token_type: None,
+            audience: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -609,6 +838,11 @@ mod tests {
             refresh_token: None,
             scope: None,
             device_code: None,
+            subject_token: None,
+            subject_token_type: None,
+            actor_token: None,
+            actor_token_type: None,
+            audience: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -634,6 +868,11 @@ mod tests {
             refresh_token: None,
             scope: None,
             device_code: None,
+            subject_token: None,
+            subject_token_type: None,
+            actor_token: None,
+            actor_token_type: None,
+            audience: None,
         };
 
         let result = extract_client_credentials(&headers, &request);

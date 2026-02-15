@@ -82,6 +82,9 @@ pub struct OAuthState {
     pub device_risk_service: Option<Arc<DeviceRiskService>>,
     /// F117: System tenant ID for device code confirmations.
     pub system_tenant_id: uuid::Uuid,
+    /// Kafka event producer for delegation lifecycle events.
+    #[cfg(feature = "kafka")]
+    pub event_producer: Option<std::sync::Arc<xavyo_events::EventProducer>>,
 }
 
 impl OAuthState {
@@ -168,6 +171,8 @@ impl OAuthState {
             device_confirmation_service: None,
             device_risk_service: None,
             system_tenant_id: SYSTEM_TENANT_ID, // Safe default; overridable via with_system_tenant_id
+            #[cfg(feature = "kafka")]
+            event_producer: None,
         }
     }
 
@@ -209,6 +214,17 @@ impl OAuthState {
     #[must_use]
     pub fn with_system_tenant_id(mut self, tenant_id: uuid::Uuid) -> Self {
         self.system_tenant_id = tenant_id;
+        self
+    }
+
+    /// Set the Kafka event producer for delegation events.
+    #[cfg(feature = "kafka")]
+    #[must_use]
+    pub fn with_event_producer(
+        mut self,
+        producer: std::sync::Arc<xavyo_events::EventProducer>,
+    ) -> Self {
+        self.event_producer = Some(producer);
         self
     }
 

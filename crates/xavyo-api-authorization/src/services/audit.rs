@@ -354,6 +354,7 @@ mod tests {
             action: "read".to_string(),
             resource_type: "report".to_string(),
             resource_id: None,
+            delegation: None,
         };
 
         let decision = AuthorizationDecision {
@@ -379,6 +380,7 @@ mod tests {
             action: "read".to_string(),
             resource_type: "report".to_string(),
             resource_id: None,
+            delegation: None,
         };
 
         let decision = AuthorizationDecision {
@@ -404,6 +406,7 @@ mod tests {
             action: "delete".to_string(),
             resource_type: "user".to_string(),
             resource_id: Some("user-123".to_string()),
+            delegation: None,
         };
 
         let decision = AuthorizationDecision {

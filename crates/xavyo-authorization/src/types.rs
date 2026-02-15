@@ -26,6 +26,10 @@ pub struct AuthorizationRequest {
 
     /// Optional specific resource instance ID.
     pub resource_id: Option<String>,
+
+    /// Delegation context when the request is made on behalf of the subject (RFC 8693).
+    #[serde(default)]
+    pub delegation: Option<DelegationContext>,
 }
 
 // ---------------------------------------------------------------------------
@@ -253,6 +257,28 @@ impl fmt::Display for ComparisonOperator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DelegationContext
+// ---------------------------------------------------------------------------
+
+/// Context for delegated authorization decisions (RFC 8693).
+///
+/// When present in an AuthorizationRequest, the PDP will intersect
+/// the normal authorization result with the delegation grant's scope constraints.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DelegationContext {
+    /// The NHI actually performing the action.
+    pub actor_nhi_id: Uuid,
+    /// The delegation grant ID (for audit trail).
+    pub delegation_id: Uuid,
+    /// Scopes allowed by the delegation grant (empty = all allowed).
+    pub allowed_scopes: Vec<String>,
+    /// Resource types allowed by the delegation grant (empty = all allowed).
+    pub allowed_resource_types: Vec<String>,
+    /// Current depth in the delegation chain.
+    pub depth: i32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -335,12 +361,68 @@ mod tests {
             action: "read".to_string(),
             resource_type: "document".to_string(),
             resource_id: Some("doc-123".to_string()),
+            delegation: None,
         };
 
         let json = serde_json::to_string(&req).unwrap();
         assert!(json.contains("read"));
         assert!(json.contains("document"));
         assert!(json.contains("doc-123"));
+    }
+
+    #[test]
+    fn test_delegation_context_serialization() {
+        let ctx = DelegationContext {
+            actor_nhi_id: Uuid::new_v4(),
+            delegation_id: Uuid::new_v4(),
+            allowed_scopes: vec!["read".to_string(), "write".to_string()],
+            allowed_resource_types: vec!["document".to_string()],
+            depth: 1,
+        };
+
+        let json = serde_json::to_string(&ctx).unwrap();
+        assert!(json.contains("read"));
+        assert!(json.contains("document"));
+
+        let deserialized: DelegationContext = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.depth, 1);
+        assert_eq!(deserialized.allowed_scopes.len(), 2);
+    }
+
+    #[test]
+    fn test_authorization_request_with_delegation() {
+        let req = AuthorizationRequest {
+            subject_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            action: "read".to_string(),
+            resource_type: "document".to_string(),
+            resource_id: None,
+            delegation: Some(DelegationContext {
+                actor_nhi_id: Uuid::new_v4(),
+                delegation_id: Uuid::new_v4(),
+                allowed_scopes: vec!["read".to_string()],
+                allowed_resource_types: vec!["document".to_string()],
+                depth: 0,
+            }),
+        };
+
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("delegation"));
+        assert!(json.contains("actor_nhi_id"));
+    }
+
+    #[test]
+    fn test_authorization_request_without_delegation_deserialize() {
+        // Ensure backward compat: JSON without "delegation" field still deserializes
+        let json = r#"{
+            "subject_id": "00000000-0000-0000-0000-000000000001",
+            "tenant_id": "00000000-0000-0000-0000-000000000002",
+            "action": "read",
+            "resource_type": "document",
+            "resource_id": null
+        }"#;
+        let req: AuthorizationRequest = serde_json::from_str(json).unwrap();
+        assert!(req.delegation.is_none());
     }
 
     #[test]

@@ -16,7 +16,9 @@ use uuid::Uuid;
 use crate::cache::{MappingCache, PolicyCache};
 use crate::entitlement_resolver::EntitlementResolver;
 use crate::policy_evaluator::PolicyEvaluator;
-use crate::types::{AuthorizationDecision, AuthorizationRequest, DecisionSource, PolicyEffect};
+use crate::types::{
+    AuthorizationDecision, AuthorizationRequest, DecisionSource, DelegationContext, PolicyEffect,
+};
 
 /// The Policy Decision Point — evaluates "Can user X do action Y on resource Z?"
 pub struct PolicyDecisionPoint {
@@ -98,6 +100,19 @@ impl PolicyDecisionPoint {
             Some(&entitlements),
         ) {
             let allowed = matches!(effect, PolicyEffect::Allow);
+
+            // If the base policy allows, intersect with delegation scope.
+            if allowed {
+                if let Some(deny) = Self::check_delegation_scope(
+                    request.delegation.as_ref(),
+                    &request,
+                    decision_id,
+                    start,
+                ) {
+                    return deny;
+                }
+            }
+
             return AuthorizationDecision {
                 allowed,
                 reason: format!("{} by policy", if allowed { "allowed" } else { "denied" }),
@@ -159,6 +174,16 @@ impl PolicyDecisionPoint {
                 mapping.resource_type == "*" || mapping.resource_type == request.resource_type;
 
             if action_matches && resource_matches {
+                // Intersect with delegation scope before allowing.
+                if let Some(deny) = Self::check_delegation_scope(
+                    request.delegation.as_ref(),
+                    &request,
+                    decision_id,
+                    start,
+                ) {
+                    return deny;
+                }
+
                 return AuthorizationDecision {
                     allowed: true,
                     reason: format!(
@@ -182,6 +207,67 @@ impl PolicyDecisionPoint {
             decision_id,
             latency_ms: start.elapsed().as_secs_f64() * 1000.0,
         }
+    }
+
+    /// Check delegation scope constraints against an allow decision.
+    ///
+    /// If delegation is `Some`, the action and resource_type must fall within
+    /// the grant's `allowed_scopes` and `allowed_resource_types` respectively.
+    /// An empty list means "all allowed" (no restriction).
+    ///
+    /// Scopes can be in three formats:
+    /// - Simple action: `"read"` — matches `request.action`
+    /// - Compound `action:resource_type`: `"read:tools"` — matches the combination
+    /// - Wildcard action: `"read:*"` — matches any resource for that action
+    ///
+    /// Returns `None` if the delegation scope is satisfied (or no delegation),
+    /// or `Some(AuthorizationDecision)` with a deny if the scope is exceeded.
+    fn check_delegation_scope(
+        delegation: Option<&DelegationContext>,
+        request: &AuthorizationRequest,
+        decision_id: Uuid,
+        start: std::time::Instant,
+    ) -> Option<AuthorizationDecision> {
+        let delegation = match delegation {
+            Some(d) => d,
+            None => return None, // No delegation context — allow stands.
+        };
+
+        // Check allowed_scopes (empty = all allowed).
+        if !delegation.allowed_scopes.is_empty() {
+            let compound = format!("{}:{}", request.action, request.resource_type);
+            let wildcard = format!("{}:*", request.action);
+            let scope_matched = delegation.allowed_scopes.iter().any(|s| {
+                // Match: exact action ("read"), compound ("read:tools"), or wildcard ("read:*")
+                s == &request.action || s == &compound || s == &wildcard
+            });
+            if !scope_matched {
+                return Some(AuthorizationDecision {
+                    allowed: false,
+                    reason: "delegation_scope_exceeded".to_string(),
+                    source: DecisionSource::DefaultDeny,
+                    policy_id: None,
+                    decision_id,
+                    latency_ms: start.elapsed().as_secs_f64() * 1000.0,
+                });
+            }
+        }
+
+        // Check allowed_resource_types (empty = all allowed).
+        if !delegation.allowed_resource_types.is_empty()
+            && !delegation.allowed_resource_types.contains(&request.resource_type)
+        {
+            return Some(AuthorizationDecision {
+                allowed: false,
+                reason: "delegation_scope_exceeded".to_string(),
+                source: DecisionSource::DefaultDeny,
+                policy_id: None,
+                decision_id,
+                latency_ms: start.elapsed().as_secs_f64() * 1000.0,
+            });
+        }
+
+        None // Delegation scope satisfied.
     }
 
     /// Invalidate the policy cache for a tenant.
@@ -226,11 +312,235 @@ mod tests {
             action: "read".to_string(),
             resource_type: "document".to_string(),
             resource_id: Some("doc-123".to_string()),
+            delegation: None,
         };
 
         assert_eq!(req.action, "read");
         assert_eq!(req.resource_type, "document");
         assert_eq!(req.resource_id, Some("doc-123".to_string()));
+        assert!(req.delegation.is_none());
+    }
+
+    #[test]
+    fn test_delegation_scope_check_no_delegation() {
+        let req = AuthorizationRequest {
+            subject_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            action: "read".to_string(),
+            resource_type: "document".to_string(),
+            resource_id: None,
+            delegation: None,
+        };
+        let result = PolicyDecisionPoint::check_delegation_scope(
+            None,
+            &req,
+            Uuid::new_v4(),
+            std::time::Instant::now(),
+        );
+        assert!(result.is_none()); // No delegation = allow stands
+    }
+
+    #[test]
+    fn test_delegation_scope_check_allowed() {
+        use crate::types::DelegationContext;
+
+        let delegation = DelegationContext {
+            actor_nhi_id: Uuid::new_v4(),
+            delegation_id: Uuid::new_v4(),
+            allowed_scopes: vec!["read".to_string(), "write".to_string()],
+            allowed_resource_types: vec!["document".to_string()],
+            depth: 0,
+        };
+        let req = AuthorizationRequest {
+            subject_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            action: "read".to_string(),
+            resource_type: "document".to_string(),
+            resource_id: None,
+            delegation: Some(delegation.clone()),
+        };
+        let result = PolicyDecisionPoint::check_delegation_scope(
+            Some(&delegation),
+            &req,
+            Uuid::new_v4(),
+            std::time::Instant::now(),
+        );
+        assert!(result.is_none()); // Within scope = allow stands
+    }
+
+    #[test]
+    fn test_delegation_scope_check_action_exceeded() {
+        use crate::types::DelegationContext;
+
+        let delegation = DelegationContext {
+            actor_nhi_id: Uuid::new_v4(),
+            delegation_id: Uuid::new_v4(),
+            allowed_scopes: vec!["read".to_string()],
+            allowed_resource_types: vec![],
+            depth: 0,
+        };
+        let req = AuthorizationRequest {
+            subject_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            action: "delete".to_string(),
+            resource_type: "document".to_string(),
+            resource_id: None,
+            delegation: Some(delegation.clone()),
+        };
+        let result = PolicyDecisionPoint::check_delegation_scope(
+            Some(&delegation),
+            &req,
+            Uuid::new_v4(),
+            std::time::Instant::now(),
+        );
+        assert!(result.is_some());
+        let deny = result.unwrap();
+        assert!(!deny.allowed);
+        assert_eq!(deny.reason, "delegation_scope_exceeded");
+    }
+
+    #[test]
+    fn test_delegation_scope_check_resource_type_exceeded() {
+        use crate::types::DelegationContext;
+
+        let delegation = DelegationContext {
+            actor_nhi_id: Uuid::new_v4(),
+            delegation_id: Uuid::new_v4(),
+            allowed_scopes: vec![],
+            allowed_resource_types: vec!["document".to_string()],
+            depth: 0,
+        };
+        let req = AuthorizationRequest {
+            subject_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            action: "read".to_string(),
+            resource_type: "secret".to_string(),
+            resource_id: None,
+            delegation: Some(delegation.clone()),
+        };
+        let result = PolicyDecisionPoint::check_delegation_scope(
+            Some(&delegation),
+            &req,
+            Uuid::new_v4(),
+            std::time::Instant::now(),
+        );
+        assert!(result.is_some());
+        let deny = result.unwrap();
+        assert!(!deny.allowed);
+        assert_eq!(deny.reason, "delegation_scope_exceeded");
+    }
+
+    #[test]
+    fn test_delegation_scope_check_empty_lists_allow_all() {
+        use crate::types::DelegationContext;
+
+        let delegation = DelegationContext {
+            actor_nhi_id: Uuid::new_v4(),
+            delegation_id: Uuid::new_v4(),
+            allowed_scopes: vec![],
+            allowed_resource_types: vec![],
+            depth: 2,
+        };
+        let req = AuthorizationRequest {
+            subject_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            action: "any_action".to_string(),
+            resource_type: "any_resource".to_string(),
+            resource_id: None,
+            delegation: Some(delegation.clone()),
+        };
+        let result = PolicyDecisionPoint::check_delegation_scope(
+            Some(&delegation),
+            &req,
+            Uuid::new_v4(),
+            std::time::Instant::now(),
+        );
+        assert!(result.is_none()); // Empty lists = all allowed
+    }
+
+    #[test]
+    fn test_delegation_scope_check_compound_scope_match() {
+        use crate::types::DelegationContext;
+
+        // OAuth2-style compound scopes "read:tools" should match action="read" + resource_type="tools"
+        let delegation = DelegationContext {
+            actor_nhi_id: Uuid::new_v4(),
+            delegation_id: Uuid::new_v4(),
+            allowed_scopes: vec!["read:tools".to_string(), "write:documents".to_string()],
+            allowed_resource_types: vec![],
+            depth: 1,
+        };
+        let req = AuthorizationRequest {
+            subject_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            action: "read".to_string(),
+            resource_type: "tools".to_string(),
+            resource_id: None,
+            delegation: Some(delegation.clone()),
+        };
+        let result = PolicyDecisionPoint::check_delegation_scope(
+            Some(&delegation),
+            &req,
+            Uuid::new_v4(),
+            std::time::Instant::now(),
+        );
+        assert!(result.is_none(), "compound scope 'read:tools' should match action=read + resource=tools");
+    }
+
+    #[test]
+    fn test_delegation_scope_check_compound_scope_denied() {
+        use crate::types::DelegationContext;
+
+        let delegation = DelegationContext {
+            actor_nhi_id: Uuid::new_v4(),
+            delegation_id: Uuid::new_v4(),
+            allowed_scopes: vec!["read:tools".to_string()],
+            allowed_resource_types: vec![],
+            depth: 1,
+        };
+        let req = AuthorizationRequest {
+            subject_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            action: "write".to_string(),
+            resource_type: "tools".to_string(),
+            resource_id: None,
+            delegation: Some(delegation.clone()),
+        };
+        let result = PolicyDecisionPoint::check_delegation_scope(
+            Some(&delegation),
+            &req,
+            Uuid::new_v4(),
+            std::time::Instant::now(),
+        );
+        assert!(result.is_some(), "scope 'read:tools' should not match action=write");
+    }
+
+    #[test]
+    fn test_delegation_scope_check_wildcard_action() {
+        use crate::types::DelegationContext;
+
+        let delegation = DelegationContext {
+            actor_nhi_id: Uuid::new_v4(),
+            delegation_id: Uuid::new_v4(),
+            allowed_scopes: vec!["read:*".to_string()],
+            allowed_resource_types: vec![],
+            depth: 1,
+        };
+        let req = AuthorizationRequest {
+            subject_id: Uuid::new_v4(),
+            tenant_id: Uuid::new_v4(),
+            action: "read".to_string(),
+            resource_type: "anything".to_string(),
+            resource_id: None,
+            delegation: Some(delegation.clone()),
+        };
+        let result = PolicyDecisionPoint::check_delegation_scope(
+            Some(&delegation),
+            &req,
+            Uuid::new_v4(),
+            std::time::Instant::now(),
+        );
+        assert!(result.is_none(), "wildcard 'read:*' should match any resource for read action");
     }
 
     #[test]

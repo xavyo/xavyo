@@ -92,6 +92,11 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 serde_urlencoded = "0.7"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+[dependencies.xavyo-events]
+path = "../xavyo-events"
+optional = true
+
 [features]
 default = []
 integration = []
+kafka = ["xavyo-events"]

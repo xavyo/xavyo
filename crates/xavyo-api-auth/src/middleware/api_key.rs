@@ -488,6 +488,12 @@ pub async fn api_key_auth_middleware(
         acting_as_poa_id: None,
         acting_as_user_id: None,
         acting_as_session_id: None,
+        // OAuth2 scope: API keys don't carry scopes
+        scope: None,
+        // RFC 8693: API keys don't support delegation
+        act: None,
+        delegation_id: None,
+        delegation_depth: None,
     };
 
     request.extensions_mut().insert(synthetic_claims);

@@ -17,6 +17,7 @@ prost-types = "0.13"
 xavyo-core = { path = "../xavyo-core" }
 xavyo-db = { path = "../xavyo-db" }
 xavyo-nhi = { path = "../xavyo-nhi", features = ["sqlx"] }
+xavyo-auth = { path = "../xavyo-auth" }
 xavyo-authorization = { path = "../xavyo-authorization" }
 
 # Database

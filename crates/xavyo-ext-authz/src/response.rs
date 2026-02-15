@@ -22,6 +22,16 @@ pub struct AllowMetadata {
     pub model_provider: Option<String>,
     pub requires_human_approval: Option<bool>,
     pub decision_id: Uuid,
+    /// Whether this is a delegated request (RFC 8693).
+    pub is_delegated: bool,
+    /// The actual actor NHI ID (if delegated).
+    pub actor_nhi_id: Option<Uuid>,
+    /// The delegation grant ID (if delegated).
+    pub delegation_id: Option<Uuid>,
+    /// The delegation depth (if delegated).
+    pub delegation_depth: Option<i32>,
+    /// The principal type ("user" or "nhi", if delegated).
+    pub principal_type: Option<String>,
 }
 
 /// Build an ALLOW CheckResponse with dynamic_metadata.
@@ -50,6 +60,21 @@ pub fn build_allow_response(metadata: &AllowMetadata) -> proto::CheckResponse {
     }
     if let Some(requires_approval) = metadata.requires_human_approval {
         insert_bool(&mut fields, "requires_human_approval", requires_approval);
+    }
+
+    // Delegation metadata (RFC 8693)
+    insert_bool(&mut fields, "is_delegated", metadata.is_delegated);
+    if let Some(ref actor_id) = metadata.actor_nhi_id {
+        insert_string(&mut fields, "actor_nhi_id", &actor_id.to_string());
+    }
+    if let Some(ref del_id) = metadata.delegation_id {
+        insert_string(&mut fields, "delegation_id", &del_id.to_string());
+    }
+    if let Some(depth) = metadata.delegation_depth {
+        insert_number(&mut fields, "delegation_depth", depth as f64);
+    }
+    if let Some(ref pt) = metadata.principal_type {
+        insert_string(&mut fields, "principal_type", pt);
     }
 
     proto::CheckResponse {
@@ -212,6 +237,9 @@ mod tests {
             action: "read".to_string(),
             resource_type: "tools".to_string(),
             from_metadata_context: true,
+            act: None,
+            delegation_id: None,
+            delegation_depth: None,
         };
 
         let response = build_fail_open_response(&ctx);
@@ -264,6 +292,11 @@ mod tests {
             model_provider: Some("openai".to_string()),
             requires_human_approval: Some(false),
             decision_id: Uuid::new_v4(),
+            is_delegated: false,
+            actor_nhi_id: None,
+            delegation_id: None,
+            delegation_depth: None,
+            principal_type: None,
         };
 
         let response = build_allow_response(&metadata);
@@ -328,6 +361,11 @@ mod tests {
             model_provider: None,
             requires_human_approval: None,
             decision_id: Uuid::new_v4(),
+            is_delegated: false,
+            actor_nhi_id: None,
+            delegation_id: None,
+            delegation_depth: None,
+            principal_type: None,
         };
 
         let response = build_allow_response(&metadata);

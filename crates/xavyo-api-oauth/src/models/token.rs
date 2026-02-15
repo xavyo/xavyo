@@ -27,6 +27,16 @@ pub struct TokenRequest {
     pub scope: Option<String>,
     /// Device code (for `device_code` grant, RFC 8628).
     pub device_code: Option<String>,
+    /// Subject token (for token_exchange grant, RFC 8693).
+    pub subject_token: Option<String>,
+    /// Subject token type (for token_exchange grant).
+    pub subject_token_type: Option<String>,
+    /// Actor token (for token_exchange grant).
+    pub actor_token: Option<String>,
+    /// Actor token type (for token_exchange grant).
+    pub actor_token_type: Option<String>,
+    /// Target audience (for token_exchange grant).
+    pub audience: Option<String>,
 }
 
 /// Token response for POST /oauth/token.

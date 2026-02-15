@@ -28,6 +28,9 @@ pub enum ExtAuthzError {
     #[error("authorization denied: {0}")]
     AuthorizationDenied(String),
 
+    #[error("delegation grant not active (grant_id: {0})")]
+    DelegationGrantNotActive(uuid::Uuid),
+
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 
@@ -43,7 +46,8 @@ impl ExtAuthzError {
             Self::InvalidSubjectId(_) | Self::InvalidTenantId(_) | Self::NhiNotFound(_) => 401,
             Self::NhiNotUsable(_)
             | Self::RiskScoreExceeded { .. }
-            | Self::AuthorizationDenied(_) => 403,
+            | Self::AuthorizationDenied(_)
+            | Self::DelegationGrantNotActive(_) => 403,
             Self::Database(_) | Self::Internal(_) => 500,
         }
     }
@@ -62,7 +66,8 @@ impl ExtAuthzError {
             Self::NhiNotFound(_) => "identity not found",
             Self::NhiNotUsable(_)
             | Self::RiskScoreExceeded { .. }
-            | Self::AuthorizationDenied(_) => "access denied",
+            | Self::AuthorizationDenied(_)
+            | Self::DelegationGrantNotActive(_) => "access denied",
             Self::Database(_) | Self::Internal(_) => "internal error",
         }
     }
@@ -79,6 +84,7 @@ impl ExtAuthzError {
             Self::NhiNotUsable(_) => "nhi_not_usable",
             Self::RiskScoreExceeded { .. } => "risk_score_exceeded",
             Self::AuthorizationDenied(_) => "authorization_denied",
+            Self::DelegationGrantNotActive(_) => "delegation_grant_not_active",
             Self::Database(_) => "database_error",
             Self::Internal(_) => "internal_error",
         }
@@ -123,6 +129,10 @@ mod tests {
         );
         assert_eq!(
             ExtAuthzError::AuthorizationDenied("denied".into()).status_code(),
+            403
+        );
+        assert_eq!(
+            ExtAuthzError::DelegationGrantNotActive(uuid::Uuid::new_v4()).status_code(),
             403
         );
         assert_eq!(ExtAuthzError::Internal("oops".into()).status_code(), 500);
@@ -171,6 +181,10 @@ mod tests {
             "authorization_denied"
         );
         assert_eq!(
+            ExtAuthzError::DelegationGrantNotActive(uuid::Uuid::new_v4()).error_code(),
+            "delegation_grant_not_active"
+        );
+        assert_eq!(
             ExtAuthzError::Internal("oops".into()).error_code(),
             "internal_error"
         );
@@ -192,6 +206,11 @@ mod tests {
 
         let err = ExtAuthzError::AuthorizationDenied("no matching policy".into());
         assert_eq!(err.to_string(), "authorization denied: no matching policy");
+
+        let grant_id = uuid::Uuid::new_v4();
+        let err = ExtAuthzError::DelegationGrantNotActive(grant_id);
+        assert!(err.to_string().contains("not active"));
+        assert!(err.to_string().contains(&grant_id.to_string()));
     }
 
     #[test]
@@ -221,6 +240,12 @@ mod tests {
         let err = ExtAuthzError::JwtExtraction("token expired".into());
         assert_eq!(err.client_message(), "authentication required");
         assert!(!err.client_message().contains("expired"));
+
+        let err = ExtAuthzError::DelegationGrantNotActive(uuid::Uuid::new_v4());
+        assert_eq!(err.client_message(), "access denied");
+        // Display has the UUID, client_message does not
+        assert!(err.to_string().contains('-'));
+        assert!(!err.client_message().contains('-'));
 
         let err = ExtAuthzError::Database(sqlx::Error::RowNotFound);
         assert_eq!(err.client_message(), "internal error");

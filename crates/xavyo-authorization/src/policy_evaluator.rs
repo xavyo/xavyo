@@ -146,6 +146,7 @@ mod tests {
             action: action.to_string(),
             resource_type: resource_type.to_string(),
             resource_id: None,
+            delegation: None,
         }
     }
 

@@ -97,6 +97,7 @@ pub async fn pep_enforcement_middleware(request: Request<Body>, next: Next) -> R
         action: action.to_string(),
         resource_type: pep_config.resource_type,
         resource_id,
+        delegation: None,
     };
 
     let decision = pdp.evaluate(&pool, auth_request, &claims.roles, None).await;
