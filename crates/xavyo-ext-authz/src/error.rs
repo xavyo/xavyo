@@ -48,6 +48,25 @@ impl ExtAuthzError {
         }
     }
 
+    /// Returns a sanitized message safe to return to clients.
+    ///
+    /// Unlike `Display` (which includes operational details for logging),
+    /// this omits UUIDs, risk scores, lifecycle states, and policy reasons
+    /// to prevent information leakage.
+    pub fn client_message(&self) -> &'static str {
+        match self {
+            Self::MissingAttributes | Self::MissingHttpRequest => "invalid request",
+            Self::JwtExtraction(_) | Self::InvalidSubjectId(_) | Self::InvalidTenantId(_) => {
+                "authentication required"
+            }
+            Self::NhiNotFound(_) => "identity not found",
+            Self::NhiNotUsable(_)
+            | Self::RiskScoreExceeded { .. }
+            | Self::AuthorizationDenied(_) => "access denied",
+            Self::Database(_) | Self::Internal(_) => "internal error",
+        }
+    }
+
     /// Returns a machine-readable error code.
     pub fn error_code(&self) -> &'static str {
         match self {
@@ -173,6 +192,38 @@ mod tests {
 
         let err = ExtAuthzError::AuthorizationDenied("no matching policy".into());
         assert_eq!(err.to_string(), "authorization denied: no matching policy");
+    }
+
+    #[test]
+    fn test_client_messages_are_sanitized() {
+        // Verify client messages don't leak operational details
+        let err = ExtAuthzError::NhiNotFound(uuid::Uuid::new_v4());
+        assert_eq!(err.client_message(), "identity not found");
+        // Display has the UUID, client_message does not
+        assert!(err.to_string().contains('-')); // UUID has dashes
+        assert!(!err.client_message().contains('-'));
+
+        let err = ExtAuthzError::NhiNotUsable("suspended".into());
+        assert_eq!(err.client_message(), "access denied");
+        assert!(!err.client_message().contains("suspended"));
+
+        let err = ExtAuthzError::RiskScoreExceeded {
+            score: 80,
+            threshold: 75,
+        };
+        assert_eq!(err.client_message(), "access denied");
+        assert!(!err.client_message().contains("80"));
+
+        let err = ExtAuthzError::AuthorizationDenied("no matching policy".into());
+        assert_eq!(err.client_message(), "access denied");
+        assert!(!err.client_message().contains("policy"));
+
+        let err = ExtAuthzError::JwtExtraction("token expired".into());
+        assert_eq!(err.client_message(), "authentication required");
+        assert!(!err.client_message().contains("expired"));
+
+        let err = ExtAuthzError::Database(sqlx::Error::RowNotFound);
+        assert_eq!(err.client_message(), "internal error");
     }
 
     #[test]

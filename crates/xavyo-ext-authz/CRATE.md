@@ -125,6 +125,7 @@ authorization:
 | `RISK_SCORE_DENY_THRESHOLD` | `75` | Deny above this risk score |
 | `NHI_CACHE_TTL_SECS` | `60` | NHI cache TTL in seconds |
 | `ACTIVITY_FLUSH_INTERVAL_SECS` | `30` | Activity batch flush interval |
+| `REQUIRE_METADATA_CONTEXT` | `false` | Reject requests without trusted metadata_context |
 
 ## Integration Points
 
@@ -138,12 +139,44 @@ authorization:
 |------|-------------|-------------------|
 | `integration` | Enable integration tests | - |
 
+## Security
+
+### Trust Boundary Assumptions
+
+This service assumes it runs **behind AgentGateway** (or an Envoy proxy) that validates JWT signatures before calling ext_authz. The primary JWT extraction path reads pre-validated claims from `metadata_context` (set by Envoy's `jwt_authn` filter). A fallback path decodes the JWT payload from the Authorization header **without signature verification** — it exists for flexibility but logs a warning when used.
+
+**For production deployments**, set `REQUIRE_METADATA_CONTEXT=true` to reject requests that lack trusted `metadata_context`, eliminating the unverified fallback path entirely.
+
+### Multi-Tenant Isolation
+
+- **Cache keys** include `(TenantId, Uuid)` — no cross-tenant data leakage
+- **All DB queries** include `WHERE tenant_id = $1` — enforced at the SQL level
+- **PDP evaluation** loads policies and entitlements scoped to the request tenant
+- **Activity tracking** is keyed by `(TenantId, NhiId)`
+
+### Deny Response Sanitization
+
+Client-facing deny responses use generic messages (`"access denied"`, `"authentication required"`, `"internal error"`) to prevent leaking NHI UUIDs, risk scores, lifecycle states, or policy reasons. Detailed error context is logged server-side with `tracing::warn!`.
+
+### Fail-Open Behavior
+
+When `FAIL_OPEN=true` and a database/internal error occurs:
+- The response includes **minimal metadata**: `tenant_id`, `nhi_id` (from the JWT), empty `allowed_tools`, and `fail_open: true`
+- Downstream CEL policies can detect fail-open via `extauthz.fail_open == true`
+- If JWT parsing itself fails, fail-open is **not applied** (no tenant context available)
+- **Recommendation**: never enable in production without alerting on the `fail_open` flag
+
+### Dynamic Metadata Exposure
+
+ALLOW responses include NHI metadata (`risk_score`, `risk_level`, `model_provider`, etc.) in `dynamic_metadata` for use in AgentGateway CEL policies. This data should be treated as internal — ensure AgentGateway does not expose it to end clients via response headers or logs.
+
 ## Anti-Patterns
 
 - Never bypass the NHI lifecycle check — suspended agents MUST be denied
 - Never cache authorization decisions — only cache NHI identity data
 - Never expose internal error details in deny responses to clients
 - Never use fail_open in production without monitoring
+- Never deploy without upstream JWT signature validation
 
 ## Related Crates
 

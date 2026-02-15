@@ -22,6 +22,11 @@ pub struct ExtAuthzConfig {
 
     /// Activity update flush interval in seconds.
     pub activity_flush_interval_secs: u64,
+
+    /// Require JWT to come from trusted `metadata_context` (set by upstream JWT
+    /// authn filter). When true, requests without `metadata_context` are rejected
+    /// instead of falling back to base64 header decode (no signature verification).
+    pub require_metadata_context: bool,
 }
 
 impl ExtAuthzConfig {
@@ -70,6 +75,11 @@ impl ExtAuthzConfig {
             .parse::<u64>()
             .unwrap_or(30);
 
+        let require_metadata_context = reader("REQUIRE_METADATA_CONTEXT")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
+
         Ok(Self {
             listen_addr,
             database_url,
@@ -77,6 +87,7 @@ impl ExtAuthzConfig {
             risk_score_deny_threshold,
             nhi_cache_ttl_secs,
             activity_flush_interval_secs,
+            require_metadata_context,
         })
     }
 }
@@ -130,6 +141,7 @@ mod tests {
         assert_eq!(config.risk_score_deny_threshold, 75);
         assert_eq!(config.nhi_cache_ttl_secs, 60);
         assert_eq!(config.activity_flush_interval_secs, 30);
+        assert!(!config.require_metadata_context);
     }
 
     #[test]
@@ -141,6 +153,7 @@ mod tests {
             ("RISK_SCORE_DENY_THRESHOLD", "50"),
             ("NHI_CACHE_TTL_SECS", "120"),
             ("ACTIVITY_FLUSH_INTERVAL_SECS", "10"),
+            ("REQUIRE_METADATA_CONTEXT", "true"),
         ]));
 
         let config = ExtAuthzConfig::from_reader(reader).unwrap();
@@ -150,6 +163,7 @@ mod tests {
         assert_eq!(config.risk_score_deny_threshold, 50);
         assert_eq!(config.nhi_cache_ttl_secs, 120);
         assert_eq!(config.activity_flush_interval_secs, 10);
+        assert!(config.require_metadata_context);
     }
 
     #[test]

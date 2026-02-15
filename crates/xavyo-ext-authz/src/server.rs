@@ -17,8 +17,10 @@ use crate::error::ExtAuthzError;
 use crate::nhi_cache::NhiCache;
 use crate::proto;
 use crate::proto::authorization_server::Authorization;
-use crate::request::parse_check_request;
-use crate::response::{build_allow_response, build_deny_response, AllowMetadata};
+use crate::request::{parse_check_request, AuthzContext};
+use crate::response::{
+    build_allow_response, build_deny_response, build_fail_open_response, AllowMetadata,
+};
 
 /// The ext_authz gRPC service implementation.
 pub struct ExtAuthzService {
@@ -28,6 +30,7 @@ pub struct ExtAuthzService {
     activity_tracker: Arc<ActivityTracker>,
     fail_open: bool,
     risk_score_deny_threshold: i32,
+    require_metadata_context: bool,
 }
 
 impl ExtAuthzService {
@@ -52,16 +55,32 @@ impl ExtAuthzService {
             activity_tracker,
             fail_open: config.fail_open,
             risk_score_deny_threshold: config.risk_score_deny_threshold,
+            require_metadata_context: config.require_metadata_context,
         }
     }
 
     /// Core authorization check logic.
+    ///
+    /// Returns `Err((error, Option<AuthzContext>))` — the context is `Some` when
+    /// JWT parsing succeeded but a later step (DB, PDP, risk) failed. This allows
+    /// the caller to include tenant context in fail-open responses.
     async fn do_check(
         &self,
         request: &proto::CheckRequest,
-    ) -> Result<proto::CheckResponse, ExtAuthzError> {
+    ) -> Result<proto::CheckResponse, (ExtAuthzError, Option<AuthzContext>)> {
         // Step 1-2: Extract and parse JWT claims
-        let ctx = parse_check_request(request)?;
+        let ctx = parse_check_request(request).map_err(|e| (e, None))?;
+
+        // Enforce metadata_context requirement if configured
+        if self.require_metadata_context && !ctx.from_metadata_context {
+            return Err((
+                ExtAuthzError::JwtExtraction(
+                    "metadata_context required but JWT extracted from Authorization header fallback"
+                        .into(),
+                ),
+                Some(ctx),
+            ));
+        }
 
         tracing::debug!(
             subject_id = %ctx.subject_id,
@@ -75,30 +94,35 @@ impl ExtAuthzService {
 
         let tenant_uuid = *ctx.tenant_id.as_uuid();
 
+        // Helper: wrap errors with the parsed context for fail-open support
+        let ctx_err =
+            |e: ExtAuthzError| -> (ExtAuthzError, Option<AuthzContext>) { (e, Some(ctx.clone())) };
+
         // Step 3: Lookup NHI identity (with cache)
         let cached = self
             .nhi_cache
             .get_or_load(&self.pool, ctx.tenant_id, ctx.subject_id)
-            .await?
-            .ok_or(ExtAuthzError::NhiNotFound(ctx.subject_id))?;
+            .await
+            .map_err(|e| ctx_err(e.into()))?
+            .ok_or_else(|| ctx_err(ExtAuthzError::NhiNotFound(ctx.subject_id)))?;
 
         let identity = &cached.identity;
 
         // Step 4: Verify lifecycle state
         if !identity.lifecycle_state.is_usable() {
-            return Err(ExtAuthzError::NhiNotUsable(
+            return Err(ctx_err(ExtAuthzError::NhiNotUsable(
                 identity.lifecycle_state.as_str().to_string(),
-            ));
+            )));
         }
 
         // Step 5: Check risk score against threshold
         let (risk_score, risk_level) = if let Some(ref rs) = cached.risk_score {
             let level = NhiRiskLevel::from(rs.total_score);
             if rs.total_score > self.risk_score_deny_threshold {
-                return Err(ExtAuthzError::RiskScoreExceeded {
+                return Err(ctx_err(ExtAuthzError::RiskScoreExceeded {
                     score: rs.total_score,
                     threshold: self.risk_score_deny_threshold,
-                });
+                }));
             }
             (rs.total_score, level)
         } else {
@@ -121,13 +145,14 @@ impl ExtAuthzService {
             .await;
 
         if !decision.allowed {
-            return Err(ExtAuthzError::AuthorizationDenied(decision.reason));
+            return Err(ctx_err(ExtAuthzError::AuthorizationDenied(decision.reason)));
         }
 
         // Step 7: Load tool permissions for agents
         let allowed_tools = if identity.nhi_type == NhiType::Agent {
             self.resolve_tool_names(ctx.tenant_id, ctx.subject_id)
-                .await?
+                .await
+                .map_err(ctx_err)?
         } else {
             vec![]
         };
@@ -197,24 +222,33 @@ impl Authorization for ExtAuthzService {
 
         match self.do_check(&check_request).await {
             Ok(response) => Ok(Response::new(response)),
-            Err(err) => {
-                // Log the denial
-                tracing::warn!(error = %err, "ext_authz DENY");
+            Err((err, ctx)) => {
+                // Log the denial with full operational detail (server-side only)
+                if let Some(ref ctx) = ctx {
+                    tracing::warn!(
+                        error = %err,
+                        tenant_id = %ctx.tenant_id,
+                        subject_id = %ctx.subject_id,
+                        "ext_authz DENY"
+                    );
+                } else {
+                    tracing::warn!(error = %err, "ext_authz DENY (pre-parse)");
+                }
 
-                // If fail_open and it's an internal error, allow the request
+                // If fail_open and it's an internal error, allow with minimal metadata
                 if self.fail_open
                     && matches!(err, ExtAuthzError::Database(_) | ExtAuthzError::Internal(_))
                 {
-                    tracing::warn!("fail_open: allowing request despite internal error");
-                    return Ok(Response::new(proto::CheckResponse {
-                        status: Some(proto::Status {
-                            code: 0,
-                            message: String::new(),
-                            details: vec![],
-                        }),
-                        http_response: None,
-                        dynamic_metadata: None,
-                    }));
+                    if let Some(ref ctx) = ctx {
+                        tracing::warn!(
+                            tenant_id = %ctx.tenant_id,
+                            subject_id = %ctx.subject_id,
+                            "fail_open: allowing with minimal metadata"
+                        );
+                        return Ok(Response::new(build_fail_open_response(ctx)));
+                    }
+                    // No context available (parse failed) — cannot fail-open safely
+                    tracing::warn!("fail_open: no tenant context available, denying");
                 }
 
                 Ok(Response::new(build_deny_response(&err)))
