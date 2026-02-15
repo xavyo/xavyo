@@ -8,6 +8,49 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use xavyo_core::TenantId;
 
+/// Maximum allowed nesting depth for actor claim chains.
+/// Prevents stack overflow from deeply nested `act` claims during deserialization.
+pub const MAX_ACTOR_CHAIN_DEPTH: usize = 10;
+
+/// RFC 8693 actor claim — identifies who is acting on behalf of the subject.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ActorClaim {
+    /// Subject identifier of the actor (NHI ID).
+    pub sub: String,
+    /// NHI type of the actor (e.g., "agent").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nhi_type: Option<String>,
+    /// Nested actor for multi-hop delegation chains.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub act: Option<Box<ActorClaim>>,
+}
+
+impl ActorClaim {
+    /// Returns the nesting depth of this actor claim chain.
+    pub fn chain_depth(&self) -> usize {
+        let mut depth = 1;
+        let mut current = self.act.as_deref();
+        while let Some(actor) = current {
+            depth += 1;
+            current = actor.act.as_deref();
+        }
+        depth
+    }
+
+    /// Validates that the chain depth does not exceed the maximum.
+    /// Returns `Err` with a message if the chain is too deep.
+    pub fn validate_depth(&self) -> Result<(), String> {
+        let depth = self.chain_depth();
+        if depth > MAX_ACTOR_CHAIN_DEPTH {
+            Err(format!(
+                "actor claim chain depth {depth} exceeds maximum {MAX_ACTOR_CHAIN_DEPTH}"
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// JWT claims containing standard and custom claims.
 ///
 /// # Standard Claims (RFC 7519)
@@ -90,6 +133,24 @@ pub struct JwtClaims {
     /// Session ID of the assumed identity session.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub acting_as_session_id: Option<Uuid>,
+
+    /// OAuth2 scopes granted to this token (space-separated in RFC 9068).
+    /// Present on delegated tokens to make scope enforcement self-contained.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+
+    // RFC 8693 Token Exchange delegation claims
+    /// Actor claim (RFC 8693) — who is actually performing the action.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub act: Option<ActorClaim>,
+
+    /// Delegation grant ID for audit correlation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delegation_id: Option<Uuid>,
+
+    /// Current delegation depth (1 = direct, 2+ = chained).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delegation_depth: Option<i32>,
 }
 
 impl JwtClaims {
@@ -155,6 +216,30 @@ impl JwtClaims {
             self.sub.parse().ok()
         }
     }
+
+    /// Check if this is a delegated token (RFC 8693).
+    #[must_use]
+    pub fn is_delegated(&self) -> bool {
+        self.act.is_some()
+    }
+
+    /// Get the actual actor NHI ID (the agent doing the work).
+    #[must_use]
+    pub fn actor_nhi_id(&self) -> Option<Uuid> {
+        self.act.as_ref().and_then(|a| Uuid::parse_str(&a.sub).ok())
+    }
+
+    /// Get the full delegation chain as a list of actor subject IDs.
+    #[must_use]
+    pub fn delegation_chain(&self) -> Vec<String> {
+        let mut chain = Vec::new();
+        let mut current = self.act.as_ref();
+        while let Some(actor) = current {
+            chain.push(actor.sub.clone());
+            current = actor.act.as_deref();
+        }
+        chain
+    }
 }
 
 /// Builder for constructing JWT claims.
@@ -174,6 +259,12 @@ pub struct JwtClaimsBuilder {
     acting_as_poa_id: Option<Uuid>,
     acting_as_user_id: Option<Uuid>,
     acting_as_session_id: Option<Uuid>,
+    // OAuth2 scope
+    scope: Option<String>,
+    // RFC 8693 Token Exchange delegation fields
+    act: Option<ActorClaim>,
+    delegation_id: Option<Uuid>,
+    delegation_depth: Option<i32>,
 }
 
 impl JwtClaimsBuilder {
@@ -305,6 +396,34 @@ impl JwtClaimsBuilder {
         self
     }
 
+    /// Set the OAuth2 scope (space-separated string, per RFC 9068).
+    #[must_use]
+    pub fn scope(mut self, scope: impl Into<String>) -> Self {
+        self.scope = Some(scope.into());
+        self
+    }
+
+    /// Set the actor claim (RFC 8693) for delegation.
+    #[must_use]
+    pub fn act(mut self, act: ActorClaim) -> Self {
+        self.act = Some(act);
+        self
+    }
+
+    /// Set the delegation grant ID for audit correlation.
+    #[must_use]
+    pub fn delegation_id(mut self, id: Uuid) -> Self {
+        self.delegation_id = Some(id);
+        self
+    }
+
+    /// Set the current delegation depth.
+    #[must_use]
+    pub fn delegation_depth(mut self, depth: i32) -> Self {
+        self.delegation_depth = Some(depth);
+        self
+    }
+
     /// Build the JWT claims.
     ///
     /// # Defaults
@@ -330,9 +449,13 @@ impl JwtClaimsBuilder {
             roles: self.roles,
             purpose: self.purpose,
             email: self.email,
+            scope: self.scope,
             acting_as_poa_id: self.acting_as_poa_id,
             acting_as_user_id: self.acting_as_user_id,
             acting_as_session_id: self.acting_as_session_id,
+            act: self.act,
+            delegation_id: self.delegation_id,
+            delegation_depth: self.delegation_depth,
         }
     }
 }
@@ -497,5 +620,142 @@ mod tests {
         assert!(!json.contains("acting_as_poa_id"));
         assert!(!json.contains("acting_as_user_id"));
         assert!(!json.contains("acting_as_session_id"));
+    }
+
+    #[test]
+    fn test_actor_claim_serialization() {
+        let actor = ActorClaim {
+            sub: "agent-001".to_string(),
+            nhi_type: Some("agent".to_string()),
+            act: Some(Box::new(ActorClaim {
+                sub: "agent-000".to_string(),
+                nhi_type: None,
+                act: None,
+            })),
+        };
+
+        let json = serde_json::to_string(&actor).unwrap();
+        let deserialized: ActorClaim = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.sub, "agent-001");
+        assert_eq!(deserialized.nhi_type, Some("agent".to_string()));
+        assert!(deserialized.act.is_some());
+        assert_eq!(deserialized.act.as_ref().unwrap().sub, "agent-000");
+        assert_eq!(deserialized.act.as_ref().unwrap().nhi_type, None);
+        assert!(deserialized.act.as_ref().unwrap().act.is_none());
+    }
+
+    #[test]
+    fn test_claims_delegation() {
+        let agent_id = Uuid::new_v4();
+        let delegation_id = Uuid::new_v4();
+        let actor = ActorClaim {
+            sub: agent_id.to_string(),
+            nhi_type: Some("agent".to_string()),
+            act: None,
+        };
+
+        let claims = JwtClaims::builder()
+            .subject("user-123")
+            .act(actor)
+            .delegation_id(delegation_id)
+            .delegation_depth(1)
+            .build();
+
+        assert!(claims.is_delegated());
+        assert_eq!(claims.actor_nhi_id(), Some(agent_id));
+        assert_eq!(claims.delegation_id, Some(delegation_id));
+        assert_eq!(claims.delegation_depth, Some(1));
+        assert_eq!(claims.delegation_chain(), vec![agent_id.to_string()]);
+    }
+
+    #[test]
+    fn test_delegation_claims_not_serialized_when_none() {
+        let claims = JwtClaims::builder().subject("user-123").build();
+
+        let json = serde_json::to_string(&claims).unwrap();
+
+        assert!(!json.contains("\"act\""));
+        assert!(!json.contains("delegation_id"));
+        assert!(!json.contains("delegation_depth"));
+    }
+
+    #[test]
+    fn test_actor_claim_chain_depth() {
+        // Single actor: depth 1
+        let single = ActorClaim {
+            sub: "a".to_string(),
+            nhi_type: None,
+            act: None,
+        };
+        assert_eq!(single.chain_depth(), 1);
+        assert!(single.validate_depth().is_ok());
+
+        // Chain of 3
+        let chain = ActorClaim {
+            sub: "a".to_string(),
+            nhi_type: None,
+            act: Some(Box::new(ActorClaim {
+                sub: "b".to_string(),
+                nhi_type: None,
+                act: Some(Box::new(ActorClaim {
+                    sub: "c".to_string(),
+                    nhi_type: None,
+                    act: None,
+                })),
+            })),
+        };
+        assert_eq!(chain.chain_depth(), 3);
+        assert!(chain.validate_depth().is_ok());
+    }
+
+    #[test]
+    fn test_actor_claim_chain_depth_exceeds_limit() {
+        // Build a chain exceeding MAX_ACTOR_CHAIN_DEPTH
+        let mut claim = ActorClaim {
+            sub: "leaf".to_string(),
+            nhi_type: None,
+            act: None,
+        };
+        for i in 0..MAX_ACTOR_CHAIN_DEPTH {
+            claim = ActorClaim {
+                sub: format!("actor-{i}"),
+                nhi_type: None,
+                act: Some(Box::new(claim)),
+            };
+        }
+        // depth is now MAX_ACTOR_CHAIN_DEPTH + 1
+        assert!(claim.chain_depth() > MAX_ACTOR_CHAIN_DEPTH);
+        assert!(claim.validate_depth().is_err());
+    }
+
+    #[test]
+    fn test_delegation_chain_multi_hop() {
+        let actor = ActorClaim {
+            sub: "agent-top".to_string(),
+            nhi_type: Some("agent".to_string()),
+            act: Some(Box::new(ActorClaim {
+                sub: "agent-mid".to_string(),
+                nhi_type: Some("agent".to_string()),
+                act: Some(Box::new(ActorClaim {
+                    sub: "agent-leaf".to_string(),
+                    nhi_type: None,
+                    act: None,
+                })),
+            })),
+        };
+
+        let claims = JwtClaims::builder()
+            .subject("user-123")
+            .act(actor)
+            .delegation_depth(3)
+            .build();
+
+        assert!(claims.is_delegated());
+        let chain = claims.delegation_chain();
+        assert_eq!(chain.len(), 3);
+        assert_eq!(chain[0], "agent-top");
+        assert_eq!(chain[1], "agent-mid");
+        assert_eq!(chain[2], "agent-leaf");
     }
 }

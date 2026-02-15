@@ -87,6 +87,7 @@ async fn evaluate_decision(
         action: action.to_string(),
         resource_type: resource_type.to_string(),
         resource_id: resource_id.map(|s| s.to_string()),
+        delegation: None,
     };
 
     let claims = admin_claims(fixture.tenant_id, fixture.admin_user_id);
@@ -254,6 +255,7 @@ async fn test_can_i_missing_tenant() {
         action: "read".to_string(),
         resource_type: "data".to_string(),
         resource_id: None,
+        delegation: None,
     };
 
     let decision = pdp.evaluate(&fixture.pool, request, &[], None).await;
@@ -287,6 +289,7 @@ async fn test_can_i_invalid_user() {
         action: "list".to_string(),
         resource_type: "items".to_string(),
         resource_id: None,
+        delegation: None,
     };
 
     let decision = pdp.evaluate(&fixture.pool, request, &[], None).await;
@@ -316,6 +319,7 @@ async fn test_can_i_missing_fields() {
         action: "".to_string(),
         resource_type: "".to_string(),
         resource_id: None,
+        delegation: None,
     };
 
     let decision = pdp.evaluate(&fixture.pool, request, &[], None).await;
@@ -354,6 +358,7 @@ async fn test_bulk_check_mixed_results() {
             action: "read".to_string(),
             resource_type: "mixed".to_string(),
             resource_id: None,
+            delegation: None,
         },
         AuthorizationRequest {
             subject_id: fixture.admin_user_id,
@@ -361,6 +366,7 @@ async fn test_bulk_check_mixed_results() {
             action: "write".to_string(),
             resource_type: "mixed".to_string(),
             resource_id: None,
+            delegation: None,
         },
     ];
 
@@ -409,6 +415,7 @@ async fn test_bulk_check_exceeds_limit() {
             action: format!("action_{}", i),
             resource_type: "bulk".to_string(),
             resource_id: None,
+            delegation: None,
         })
         .collect();
 
@@ -444,6 +451,7 @@ async fn test_bulk_check_validation_errors() {
             action: "read".to_string(),
             resource_type: "valid".to_string(),
             resource_id: None,
+            delegation: None,
         },
         AuthorizationRequest {
             subject_id: fixture.admin_user_id,
@@ -451,6 +459,7 @@ async fn test_bulk_check_validation_errors() {
             action: "".to_string(), // "invalid" - empty action
             resource_type: "".to_string(),
             resource_id: None,
+            delegation: None,
         },
     ];
 
@@ -494,6 +503,7 @@ async fn test_bulk_check_with_user_id() {
         action: "access".to_string(),
         resource_type: "shared".to_string(),
         resource_id: None,
+        delegation: None,
     };
 
     // Empty roles for the other user (no entitlements)
@@ -527,6 +537,7 @@ async fn test_bulk_check_without_user_id() {
         action: "manage".to_string(),
         resource_type: "personal".to_string(),
         resource_id: None,
+        delegation: None,
     };
 
     let claims = admin_claims(fixture.tenant_id, fixture.admin_user_id);
@@ -610,6 +621,7 @@ async fn test_cache_per_tenant() {
         action: "read".to_string(),
         resource_type: "tenant_data".to_string(),
         resource_id: None,
+        delegation: None,
     };
     let decision2 = pdp.evaluate(&fixture2.pool, request2, &[], None).await;
     assert!(!decision2.allowed, "Tenant 2 should be denied (no policy)");
@@ -671,6 +683,7 @@ async fn test_decision_unauthenticated() {
         action: "read".to_string(),
         resource_type: "protected".to_string(),
         resource_id: None,
+        delegation: None,
     };
 
     let decision = pdp.evaluate(&fixture.pool, request, &[], None).await;
@@ -768,6 +781,7 @@ async fn test_cross_tenant_decision_isolated() {
         action: "read".to_string(),
         resource_type: "isolated".to_string(),
         resource_id: None,
+        delegation: None,
     };
     let decision2 = pdp.evaluate(&fixture2.pool, request2, &[], None).await;
     assert!(
@@ -801,6 +815,7 @@ async fn test_audit_includes_tenant() {
         action: "view".to_string(),
         resource_type: "audited".to_string(),
         resource_id: None,
+        delegation: None,
     };
 
     let decision = pdp
@@ -883,6 +898,7 @@ async fn test_concurrent_requests() {
                 action: "read".to_string(),
                 resource_type: "concurrent".to_string(),
                 resource_id: Some(format!("resource_{}", i)),
+                delegation: None,
             };
             pdp_clone.evaluate(&pool, request, &[], None).await
         });

@@ -20,6 +20,7 @@ fn create_request() -> AuthorizationRequest {
         action: "read".to_string(),
         resource_type: "document".to_string(),
         resource_id: Some(Uuid::new_v4().to_string()),
+        delegation: None,
     }
 }
 

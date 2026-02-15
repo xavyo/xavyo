@@ -19,6 +19,7 @@ use crate::handlers::certification::certification_routes;
 use crate::handlers::credentials::credential_routes;
 use crate::handlers::inactivity::inactivity_routes;
 use crate::handlers::lifecycle::lifecycle_routes;
+use crate::handlers::nhi_delegation::nhi_delegation_routes;
 use crate::handlers::nhi_permissions::nhi_nhi_permission_routes;
 use crate::handlers::permissions::permission_routes;
 use crate::handlers::risk::risk_routes;
@@ -62,6 +63,8 @@ pub fn nhi_router(state: NhiState) -> Router {
         .merge(certification_routes(state.clone()))
         // Phase 10: SoD validation
         .merge(sod_routes(state.clone()))
+        // NHI Delegation management
+        .merge(nhi_delegation_routes(state.clone()))
         // Phase 11: Inactivity detection and orphan management
         .merge(inactivity_routes(state))
 }

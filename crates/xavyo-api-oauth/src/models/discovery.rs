@@ -38,6 +38,7 @@ pub struct OpenIdConfiguration {
 }
 
 use super::token::DEVICE_CODE_GRANT_TYPE;
+use super::token_exchange::TOKEN_EXCHANGE_GRANT_TYPE;
 
 impl OpenIdConfiguration {
     /// Create a new discovery document for the given issuer.
@@ -58,6 +59,8 @@ impl OpenIdConfiguration {
                 "refresh_token".to_string(),
                 // RFC 8628: Device Code grant type
                 DEVICE_CODE_GRANT_TYPE.to_string(),
+                // RFC 8693: Token Exchange grant type
+                TOKEN_EXCHANGE_GRANT_TYPE.to_string(),
             ],
             subject_types_supported: vec!["public".to_string()],
             id_token_signing_alg_values_supported: vec!["RS256".to_string()],
@@ -85,6 +88,7 @@ impl OpenIdConfiguration {
                 "name".to_string(),
                 "given_name".to_string(),
                 "family_name".to_string(),
+                "act".to_string(),
             ],
         }
     }

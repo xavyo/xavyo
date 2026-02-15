@@ -8,6 +8,7 @@ pub mod discovery;
 pub mod introspection;
 pub mod revocation;
 pub mod token;
+pub mod token_exchange;
 
 pub use admin_sessions::*;
 pub use authorize::*;
@@ -17,3 +18,4 @@ pub use discovery::*;
 pub use introspection::*;
 pub use revocation::*;
 pub use token::*;
+pub use token_exchange::*;

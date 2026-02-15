@@ -24,6 +24,7 @@ pub mod discovery;
 pub mod inactivity;
 pub mod lifecycle;
 pub mod mcp;
+pub mod nhi_delegation;
 pub mod nhi_permissions;
 pub mod permissions;
 pub mod risk;

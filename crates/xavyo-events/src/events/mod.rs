@@ -12,6 +12,7 @@
 //! - Micro-certification events (created, reminder, decided, auto-revoked) - F055
 //! - Governance events (assignments, `SoD` violations) - F055 triggers
 //! - NHI events (lifecycle, credentials, risk, suspension, requests) - F061
+//! - NHI delegation events (grant created, revoked, exercised, expired) - RFC 8693
 //! - License events (assigned, reclaimed, expired, expiring, bulk, capacity) - F065
 //! - User attribute events (definition created/updated/deactivated, custom attributes updated) - F081
 //! - Credential events (requested, issued, denied, revoked, expired, `rate_limited`) - F120
@@ -26,6 +27,7 @@ pub mod license;
 pub mod lifecycle;
 pub mod micro_certification;
 pub mod nhi;
+pub mod nhi_delegation;
 pub mod reconciliation;
 pub mod sync;
 pub mod tenant;
@@ -69,6 +71,10 @@ pub use micro_certification::{
     MicroCertTriggerType as MicroCertTriggerTypeEvent, MicroCertificationAutoRevoked,
     MicroCertificationCreated, MicroCertificationDecided, MicroCertificationEscalated,
     MicroCertificationExpired, MicroCertificationReminder, MicroCertificationSkipped,
+};
+pub use nhi_delegation::{
+    NhiDelegationExercised, NhiDelegationExpired, NhiDelegationGrantCreated,
+    NhiDelegationGrantRevoked,
 };
 pub use nhi::{
     NhiCertificationCampaignLaunched, NhiCertificationDecisionMade, NhiCertificationRequired,
@@ -139,6 +145,11 @@ mod tests {
         // Meta-role events (F056)
         assert!(!MetaRoleUpdated::TOPIC.is_empty());
         assert!(!MetaRoleCascadeCompleted::TOPIC.is_empty());
+        // NHI delegation events (RFC 8693)
+        assert!(!NhiDelegationGrantCreated::TOPIC.is_empty());
+        assert!(!NhiDelegationGrantRevoked::TOPIC.is_empty());
+        assert!(!NhiDelegationExercised::TOPIC.is_empty());
+        assert!(!NhiDelegationExpired::TOPIC.is_empty());
         // NHI events (F061)
         assert!(!NhiCreated::TOPIC.is_empty());
         assert!(!NhiUpdated::TOPIC.is_empty());
@@ -280,6 +291,11 @@ mod tests {
         // Meta-role events (F056)
         assert!(MetaRoleUpdated::TOPIC.starts_with("xavyo."));
         assert!(MetaRoleCascadeCompleted::TOPIC.starts_with("xavyo."));
+        // NHI delegation events (RFC 8693)
+        assert!(NhiDelegationGrantCreated::TOPIC.starts_with("xavyo."));
+        assert!(NhiDelegationGrantRevoked::TOPIC.starts_with("xavyo."));
+        assert!(NhiDelegationExercised::TOPIC.starts_with("xavyo."));
+        assert!(NhiDelegationExpired::TOPIC.starts_with("xavyo."));
         // NHI events (F061)
         assert!(NhiCreated::TOPIC.starts_with("xavyo."));
         assert!(NhiUpdated::TOPIC.starts_with("xavyo."));

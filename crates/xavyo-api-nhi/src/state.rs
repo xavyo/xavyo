@@ -1,6 +1,8 @@
 //! Application state for the unified NHI API.
 
 use sqlx::PgPool;
+#[cfg(feature = "kafka")]
+use std::sync::Arc;
 
 /// Application state for the unified NHI API.
 ///
@@ -10,18 +12,32 @@ use sqlx::PgPool;
 pub struct NhiState {
     /// Database connection pool.
     pub pool: PgPool,
-    // Services will be added as they're implemented:
-    // - nhi_lifecycle_service (Phase 4)
-    // - nhi_credential_service (Phase 5)
-    // - nhi_risk_service (Phase 8)
-    // - nhi_permission_service (Phase 7)
-    // - nhi_inactivity_service (Phase 8)
+    /// Kafka event producer for delegation lifecycle events.
+    #[cfg(feature = "kafka")]
+    pub event_producer: Option<Arc<xavyo_events::EventProducer>>,
 }
 
 impl NhiState {
     /// Creates a new `NhiState` with the given database pool.
     #[must_use]
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            #[cfg(feature = "kafka")]
+            event_producer: None,
+        }
+    }
+
+    /// Creates a new `NhiState` with an event producer for Kafka events.
+    #[cfg(feature = "kafka")]
+    #[must_use]
+    pub fn with_event_producer(
+        pool: PgPool,
+        producer: Arc<xavyo_events::EventProducer>,
+    ) -> Self {
+        Self {
+            pool,
+            event_producer: Some(producer),
+        }
     }
 }

@@ -41,7 +41,7 @@ mod jwt;
 mod password;
 
 // Re-export public API
-pub use claims::{JwtClaims, JwtClaimsBuilder};
+pub use claims::{ActorClaim, JwtClaims, JwtClaimsBuilder};
 pub use error::AuthError;
 pub use jwks::{JwkSet, JwksClient};
 pub use jwt::{

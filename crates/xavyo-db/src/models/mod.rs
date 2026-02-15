@@ -1116,6 +1116,7 @@ pub use api_key_usage::{
 pub mod nhi_agent;
 pub mod nhi_certification_campaign;
 pub mod nhi_credential;
+pub mod nhi_delegation_grant;
 pub mod nhi_identity;
 pub mod nhi_nhi_permission;
 pub mod nhi_service_account;
@@ -1131,6 +1132,7 @@ pub use nhi_agent::{
 };
 pub use nhi_certification_campaign::{CreateNhiCertificationCampaign, NhiCertificationCampaign};
 pub use nhi_credential::{CreateNhiCredential, NhiCredential};
+pub use nhi_delegation_grant::{CreateNhiDelegationGrant, NhiDelegationGrant};
 pub use nhi_identity::{CreateNhiIdentity, NhiIdentity, NhiIdentityFilter, UpdateNhiIdentity};
 pub use nhi_nhi_permission::{CreateNhiNhiPermission, NhiNhiPermission};
 pub use nhi_service_account::{

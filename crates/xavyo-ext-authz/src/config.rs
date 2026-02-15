@@ -24,8 +24,9 @@ pub struct ExtAuthzConfig {
     pub activity_flush_interval_secs: u64,
 
     /// Require JWT to come from trusted `metadata_context` (set by upstream JWT
-    /// authn filter). When true, requests without `metadata_context` are rejected
-    /// instead of falling back to base64 header decode (no signature verification).
+    /// authn filter). When true (default), requests without `metadata_context` are
+    /// rejected instead of falling back to base64 header decode (no signature
+    /// verification). Set to false only in development/testing environments.
     pub require_metadata_context: bool,
 }
 
@@ -76,9 +77,9 @@ impl ExtAuthzConfig {
             .unwrap_or(30);
 
         let require_metadata_context = reader("REQUIRE_METADATA_CONTEXT")
-            .unwrap_or_else(|_| "false".to_string())
+            .unwrap_or_else(|_| "true".to_string())
             .parse::<bool>()
-            .unwrap_or(false);
+            .unwrap_or(true);
 
         Ok(Self {
             listen_addr,
@@ -141,7 +142,7 @@ mod tests {
         assert_eq!(config.risk_score_deny_threshold, 75);
         assert_eq!(config.nhi_cache_ttl_secs, 60);
         assert_eq!(config.activity_flush_interval_secs, 30);
-        assert!(!config.require_metadata_context);
+        assert!(config.require_metadata_context);
     }
 
     #[test]

@@ -32,6 +32,15 @@ pub struct AuthzContext {
     /// (set by upstream JWT authn filter with signature verification)
     /// vs the Authorization header fallback (base64 decode only, no verification).
     pub from_metadata_context: bool,
+
+    /// RFC 8693 actor claim (if delegated token).
+    pub act: Option<xavyo_auth::ActorClaim>,
+
+    /// Delegation grant ID (if delegated token).
+    pub delegation_id: Option<Uuid>,
+
+    /// Delegation depth (if delegated token).
+    pub delegation_depth: Option<i32>,
 }
 
 /// Extract authorization context from a CheckRequest.
@@ -66,6 +75,20 @@ pub fn parse_check_request(request: &proto::CheckRequest) -> Result<AuthzContext
     let action = derive_action(&method);
     let resource_type = derive_resource_type(&path);
 
+    // Parse act claim for delegation and validate chain depth
+    let act = claims
+        .act
+        .and_then(|v| serde_json::from_value::<xavyo_auth::ActorClaim>(v).ok())
+        .and_then(|a| match a.validate_depth() {
+            Ok(()) => Some(a),
+            Err(e) => {
+                tracing::warn!("rejecting act claim: {e}");
+                None
+            }
+        });
+    let delegation_id = claims.delegation_id.and_then(|s| Uuid::parse_str(&s).ok());
+    let delegation_depth = claims.delegation_depth;
+
     Ok(AuthzContext {
         subject_id,
         tenant_id,
@@ -75,6 +98,9 @@ pub fn parse_check_request(request: &proto::CheckRequest) -> Result<AuthzContext
         action,
         resource_type,
         from_metadata_context: claims.from_metadata_context,
+        act,
+        delegation_id,
+        delegation_depth,
     })
 }
 
@@ -86,6 +112,10 @@ struct JwtClaims {
     roles: Vec<String>,
     /// True if extracted from trusted metadata_context, false for header fallback.
     from_metadata_context: bool,
+    // Delegation fields
+    act: Option<serde_json::Value>,
+    delegation_id: Option<String>,
+    delegation_depth: Option<i32>,
 }
 
 /// Extract JWT claims from metadata_context or Authorization header.
@@ -131,11 +161,19 @@ fn extract_claims_from_struct(s: &prost_types::Struct) -> Result<JwtClaims, ExtA
 
     let roles = get_string_list_field(s, "roles").unwrap_or_default();
 
+    // Delegation fields
+    let act = get_struct_field_as_json(s, "act");
+    let delegation_id = get_string_field(s, "delegation_id");
+    let delegation_depth = get_number_field(s, "delegation_depth").map(|n| n as i32);
+
     Ok(JwtClaims {
         sub,
         tid,
         roles,
         from_metadata_context: true,
+        act,
+        delegation_id,
+        delegation_depth,
     })
 }
 
@@ -173,11 +211,23 @@ fn decode_jwt_payload(token: &str) -> Result<JwtClaims, ExtAuthzError> {
         })
         .unwrap_or_default();
 
+    // Delegation fields
+    let act = if payload["act"].is_object() {
+        Some(payload["act"].clone())
+    } else {
+        None
+    };
+    let delegation_id = payload["delegation_id"].as_str().map(|s| s.to_string());
+    let delegation_depth = payload["delegation_depth"].as_i64().map(|n| n as i32);
+
     Ok(JwtClaims {
         sub,
         tid,
         roles,
         from_metadata_context: false,
+        act,
+        delegation_id,
+        delegation_depth,
     })
 }
 
@@ -241,6 +291,72 @@ fn get_string_field(s: &prost_types::Struct, key: &str) -> Option<String> {
             None
         }
     })
+}
+
+/// Helper: get a number field from a protobuf Struct.
+fn get_number_field(s: &prost_types::Struct, key: &str) -> Option<f64> {
+    s.fields.get(key).and_then(|v| {
+        if let Some(prost_types::value::Kind::NumberValue(n)) = &v.kind {
+            Some(*n)
+        } else {
+            None
+        }
+    })
+}
+
+/// Helper: convert a protobuf Struct field to a serde_json::Value (for nested structs like `act`).
+fn get_struct_field_as_json(s: &prost_types::Struct, key: &str) -> Option<serde_json::Value> {
+    s.fields.get(key).and_then(|v| {
+        if let Some(prost_types::value::Kind::StructValue(inner)) = &v.kind {
+            Some(prost_struct_to_json(inner))
+        } else {
+            None
+        }
+    })
+}
+
+/// Convert a prost_types::Struct to serde_json::Value.
+fn prost_struct_to_json(s: &prost_types::Struct) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    for (k, v) in &s.fields {
+        if let Some(ref kind) = v.kind {
+            let json_val = match kind {
+                prost_types::value::Kind::StringValue(sv) => {
+                    serde_json::Value::String(sv.clone())
+                }
+                prost_types::value::Kind::NumberValue(n) => {
+                    serde_json::json!(*n)
+                }
+                prost_types::value::Kind::BoolValue(b) => serde_json::Value::Bool(*b),
+                prost_types::value::Kind::NullValue(_) => serde_json::Value::Null,
+                prost_types::value::Kind::StructValue(inner) => prost_struct_to_json(inner),
+                prost_types::value::Kind::ListValue(list) => {
+                    let items: Vec<serde_json::Value> = list
+                        .values
+                        .iter()
+                        .filter_map(|item| {
+                            item.kind.as_ref().map(|k| match k {
+                                prost_types::value::Kind::StringValue(sv) => {
+                                    serde_json::Value::String(sv.clone())
+                                }
+                                prost_types::value::Kind::NumberValue(n) => serde_json::json!(*n),
+                                prost_types::value::Kind::BoolValue(b) => {
+                                    serde_json::Value::Bool(*b)
+                                }
+                                prost_types::value::Kind::StructValue(inner) => {
+                                    prost_struct_to_json(inner)
+                                }
+                                _ => serde_json::Value::Null,
+                            })
+                        })
+                        .collect();
+                    serde_json::Value::Array(items)
+                }
+            };
+            map.insert(k.clone(), json_val);
+        }
+    }
+    serde_json::Value::Object(map)
 }
 
 /// Helper: get a list of strings from a protobuf Struct field.
@@ -557,6 +673,10 @@ mod tests {
         assert_eq!(ctx.resource_type, "agents");
         // Bearer token fallback — not from metadata_context
         assert!(!ctx.from_metadata_context);
+        // No delegation claims
+        assert!(ctx.act.is_none());
+        assert!(ctx.delegation_id.is_none());
+        assert!(ctx.delegation_depth.is_none());
     }
 
     #[test]

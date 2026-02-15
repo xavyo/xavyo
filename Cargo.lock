@@ -8464,6 +8464,7 @@ dependencies = [
  "xavyo-auth",
  "xavyo-core",
  "xavyo-db",
+ "xavyo-events",
  "xavyo-tenant",
  "xavyo-webhooks",
 ]
@@ -8897,6 +8898,7 @@ dependencies = [
  "tonic-build",
  "tracing",
  "uuid",
+ "xavyo-auth",
  "xavyo-authorization",
  "xavyo-core",
  "xavyo-db",

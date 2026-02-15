@@ -781,6 +781,76 @@ impl TokenService {
         })
     }
 
+    /// Issue tokens for RFC 8693 token exchange (delegation).
+    ///
+    /// Mints an access token with the `act` claim for the acting agent.
+    /// The subject remains the principal being represented.
+    ///
+    /// Note: Scopes are stored in the `scope` claim, NOT as `roles`.
+    /// Roles represent entitlements (e.g., `admin`, `nhi:read`) and are
+    /// loaded from the authorization system. Scopes represent OAuth2
+    /// permission boundaries (e.g., `read:tools`).
+    pub async fn issue_token_exchange_tokens(
+        &self,
+        principal_id: Uuid,
+        actor_nhi_id: Uuid,
+        grant: &xavyo_db::models::NhiDelegationGrant,
+        client_id: &str,
+        tenant_id: Uuid,
+        scope: &str,
+        delegation_depth: i32,
+        existing_actor: Option<&xavyo_auth::ActorClaim>,
+    ) -> Result<TokenResponse, OAuthError> {
+        use xavyo_auth::ActorClaim;
+
+        // Build the actor claim, nesting any existing actor for chained delegation
+        let actor_claim = ActorClaim {
+            sub: actor_nhi_id.to_string(),
+            nhi_type: Some("agent".to_string()),
+            act: existing_actor.map(|a| Box::new(a.clone())),
+        };
+
+        // Build claims with delegation context
+        // Scopes are NOT placed in roles — roles are authorization entitlements,
+        // scopes are OAuth2 permission boundaries.
+        let mut builder = JwtClaims::builder()
+            .subject(principal_id.to_string())
+            .issuer(&self.issuer)
+            .audience(vec![client_id.to_string()])
+            .tenant_uuid(tenant_id)
+            .expires_in_secs(ACCESS_TOKEN_EXPIRY_SECS)
+            .act(actor_claim)
+            .delegation_id(grant.id)
+            .delegation_depth(delegation_depth);
+
+        // Include scopes in the JWT itself (RFC 9068) so resource servers
+        // can enforce scopes without a DB round-trip.
+        if !scope.is_empty() {
+            builder = builder.scope(scope);
+        }
+
+        let claims = builder.build();
+
+        let access_token = encode_token_with_kid(&claims, &self.private_key, &self.key_id)
+            .map_err(|e| {
+                tracing::error!("Failed to encode delegated access token: {}", e);
+                OAuthError::Internal("Failed to generate delegated access token".to_string())
+            })?;
+
+        Ok(TokenResponse {
+            access_token,
+            token_type: "Bearer".to_string(),
+            expires_in: ACCESS_TOKEN_EXPIRY_SECS,
+            refresh_token: None,
+            id_token: None,
+            scope: if scope.is_empty() {
+                None
+            } else {
+                Some(scope.to_string())
+            },
+        })
+    }
+
     /// Issue tokens for device code grant (RFC 8628).
     ///
     /// Similar to authorization code grant but:
