@@ -36,6 +36,14 @@ impl NhiCache {
     }
 
     /// Get or load an NHI identity with its related data.
+    ///
+    /// Note: uses check-then-insert rather than Moka's `try_get_with()` because
+    /// the loader can return `Ok(None)` (NHI not found) which should NOT be cached
+    /// (a newly created NHI must be visible immediately). Moka's atomic APIs don't
+    /// cleanly support `Result<Option<V>, E>` without caching the `None` case.
+    /// The resulting benign TOCTOU race on concurrent cache misses is acceptable —
+    /// both loads return identical data and the duplicate DB query only occurs once
+    /// per key.
     pub async fn get_or_load(
         &self,
         pool: &PgPool,
