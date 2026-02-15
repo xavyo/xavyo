@@ -10,7 +10,6 @@ description = "Envoy ext_authz v3 gRPC server for AgentGateway integration"
 [dependencies]
 # gRPC
 tonic = { version = "0.12", features = ["transport"] }
-tonic-health = "0.12"
 prost = "0.13"
 prost-types = "0.13"
 
@@ -27,7 +26,6 @@ sqlx = { workspace = true }
 tokio = { workspace = true }
 
 # Serialization
-serde = { workspace = true }
 serde_json = { workspace = true }
 
 # Utilities

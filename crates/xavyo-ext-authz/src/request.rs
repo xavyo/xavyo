@@ -27,6 +27,11 @@ pub struct AuthzContext {
 
     /// Derived resource type from path.
     pub resource_type: String,
+
+    /// Whether the JWT was extracted from trusted `metadata_context`
+    /// (set by upstream JWT authn filter with signature verification)
+    /// vs the Authorization header fallback (base64 decode only, no verification).
+    pub from_metadata_context: bool,
 }
 
 /// Extract authorization context from a CheckRequest.
@@ -69,6 +74,7 @@ pub fn parse_check_request(request: &proto::CheckRequest) -> Result<AuthzContext
         path,
         action,
         resource_type,
+        from_metadata_context: claims.from_metadata_context,
     })
 }
 
@@ -78,6 +84,8 @@ struct JwtClaims {
     sub: String,
     tid: String,
     roles: Vec<String>,
+    /// True if extracted from trusted metadata_context, false for header fallback.
+    from_metadata_context: bool,
 }
 
 /// Extract JWT claims from metadata_context or Authorization header.
@@ -85,7 +93,7 @@ fn extract_jwt_claims(
     attributes: &proto::AttributeContext,
     http: &proto::attribute_context::HttpRequest,
 ) -> Result<JwtClaims, ExtAuthzError> {
-    // Try metadata_context first (set by JWT authn filter)
+    // Try metadata_context first (set by JWT authn filter — signature already verified upstream)
     if let Some(metadata) = &attributes.metadata_context {
         if let Some(jwt_struct) = metadata.filter_metadata.get("envoy.filters.http.jwt_authn") {
             if let Some(payload) = jwt_struct.fields.get("jwt_payload") {
@@ -96,9 +104,14 @@ fn extract_jwt_claims(
         }
     }
 
-    // Fallback: decode JWT from Authorization header
+    // Fallback: decode JWT from Authorization header (no signature verification!)
     if let Some(auth_header) = http.headers.get("authorization") {
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
+            tracing::warn!(
+                "JWT extracted from Authorization header fallback — \
+                 signature NOT verified by ext_authz. \
+                 Ensure upstream JWT authn filter is configured."
+            );
             return decode_jwt_payload(token);
         }
     }
@@ -108,7 +121,7 @@ fn extract_jwt_claims(
     ))
 }
 
-/// Extract claims from a protobuf Struct (jwt_payload).
+/// Extract claims from a protobuf Struct (jwt_payload from metadata_context).
 fn extract_claims_from_struct(s: &prost_types::Struct) -> Result<JwtClaims, ExtAuthzError> {
     let sub = get_string_field(s, "sub")
         .ok_or_else(|| ExtAuthzError::JwtExtraction("missing 'sub' claim".into()))?;
@@ -118,7 +131,12 @@ fn extract_claims_from_struct(s: &prost_types::Struct) -> Result<JwtClaims, ExtA
 
     let roles = get_string_list_field(s, "roles").unwrap_or_default();
 
-    Ok(JwtClaims { sub, tid, roles })
+    Ok(JwtClaims {
+        sub,
+        tid,
+        roles,
+        from_metadata_context: true,
+    })
 }
 
 /// Decode the payload section of a JWT (base64url, no signature verification).
@@ -155,7 +173,12 @@ fn decode_jwt_payload(token: &str) -> Result<JwtClaims, ExtAuthzError> {
         })
         .unwrap_or_default();
 
-    Ok(JwtClaims { sub, tid, roles })
+    Ok(JwtClaims {
+        sub,
+        tid,
+        roles,
+        from_metadata_context: false,
+    })
 }
 
 /// Derive an action string from the HTTP method.
@@ -532,6 +555,8 @@ mod tests {
         assert_eq!(ctx.roles, vec!["agent"]);
         assert_eq!(ctx.action, "create");
         assert_eq!(ctx.resource_type, "agents");
+        // Bearer token fallback — not from metadata_context
+        assert!(!ctx.from_metadata_context);
     }
 
     #[test]
@@ -623,5 +648,7 @@ mod tests {
         assert_eq!(ctx.roles, vec!["admin"]);
         assert_eq!(ctx.action, "read");
         assert_eq!(ctx.resource_type, "tools");
+        // Extracted from metadata_context — trusted source
+        assert!(ctx.from_metadata_context);
     }
 }

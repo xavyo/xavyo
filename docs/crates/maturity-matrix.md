@@ -64,7 +64,7 @@ Criteria:
 | xavyo-siem | 🟡 beta | 115 | 47 | Good coverage, no integration tests |
 | xavyo-secrets | 🟢 stable | 51 | 28 | Multi-provider (Vault, AWS) |
 | xavyo-scim-client | 🟢 stable | 150+ | 24 | Full integration test coverage |
-| xavyo-ext-authz | 🟡 beta | 39 | 12 | Envoy ext_authz v3 gRPC for AgentGateway |
+| xavyo-ext-authz | 🟡 beta | 41 | 12 | Envoy ext_authz v3 gRPC for AgentGateway |
 
 ### Connector Layer
 

@@ -5,6 +5,7 @@ use xavyo_core::TenantId;
 
 use crate::error::ExtAuthzError;
 use crate::proto;
+use crate::request::AuthzContext;
 
 /// Data to include in the ALLOW response's dynamic_metadata.
 #[derive(Debug)]
@@ -72,12 +73,15 @@ pub fn build_allow_response(metadata: &AllowMetadata) -> proto::CheckResponse {
     }
 }
 
-/// Build a DENY CheckResponse with error details.
+/// Build a DENY CheckResponse with sanitized error details.
+///
+/// Uses `client_message()` instead of `Display` to avoid leaking
+/// operational details (UUIDs, risk scores, lifecycle states) to clients.
 pub fn build_deny_response(err: &ExtAuthzError) -> proto::CheckResponse {
     let status_code = err.status_code();
     let body = serde_json::json!({
         "error": err.error_code(),
-        "message": err.to_string(),
+        "message": err.client_message(),
     })
     .to_string();
 
@@ -91,7 +95,7 @@ pub fn build_deny_response(err: &ExtAuthzError) -> proto::CheckResponse {
     proto::CheckResponse {
         status: Some(proto::Status {
             code: 7, // PERMISSION_DENIED
-            message: err.to_string(),
+            message: err.client_message().to_string(),
             details: vec![],
         }),
         http_response: Some(proto::check_response::HttpResponse::DeniedResponse(
@@ -112,6 +116,30 @@ pub fn build_deny_response(err: &ExtAuthzError) -> proto::CheckResponse {
             },
         )),
         dynamic_metadata: None,
+    }
+}
+
+/// Build a fail-open ALLOW response with minimal tenant context.
+///
+/// Includes only `tenant_id`, `nhi_id` (from the parsed JWT — no DB needed),
+/// an empty `allowed_tools` list (fail-safe for permissions), and a
+/// `fail_open: true` flag so downstream CEL policies can detect this case.
+pub fn build_fail_open_response(ctx: &AuthzContext) -> proto::CheckResponse {
+    let mut fields = BTreeMap::new();
+
+    insert_string(&mut fields, "tenant_id", &ctx.tenant_id.to_string());
+    insert_string(&mut fields, "nhi_id", &ctx.subject_id.to_string());
+    insert_string_list(&mut fields, "allowed_tools", &[]);
+    insert_bool(&mut fields, "fail_open", true);
+
+    proto::CheckResponse {
+        status: Some(proto::Status {
+            code: 0, // OK
+            message: String::new(),
+            details: vec![],
+        }),
+        http_response: None,
+        dynamic_metadata: Some(prost_types::Struct { fields }),
     }
 }
 
@@ -172,6 +200,54 @@ fn insert_string_list(
 mod tests {
     use super::*;
     use xavyo_core::TenantId;
+
+    #[test]
+    fn test_build_fail_open_response() {
+        let ctx = AuthzContext {
+            subject_id: Uuid::new_v4(),
+            tenant_id: TenantId::new(),
+            roles: vec!["agent".to_string()],
+            method: "GET".to_string(),
+            path: "/api/v1/tools".to_string(),
+            action: "read".to_string(),
+            resource_type: "tools".to_string(),
+            from_metadata_context: true,
+        };
+
+        let response = build_fail_open_response(&ctx);
+
+        // Status should be OK
+        assert_eq!(response.status.as_ref().unwrap().code, 0);
+
+        // Must have dynamic_metadata with tenant context
+        let dm = response.dynamic_metadata.as_ref().unwrap();
+        assert!(dm.fields.contains_key("tenant_id"));
+        assert!(dm.fields.contains_key("nhi_id"));
+
+        // allowed_tools must be empty (fail-safe for permissions)
+        if let Some(prost_types::value::Kind::ListValue(list)) =
+            &dm.fields.get("allowed_tools").unwrap().kind
+        {
+            assert!(list.values.is_empty());
+        } else {
+            panic!("allowed_tools should be an empty list");
+        }
+
+        // fail_open flag must be true (so downstream CEL can detect)
+        if let Some(prost_types::value::Kind::BoolValue(val)) =
+            &dm.fields.get("fail_open").unwrap().kind
+        {
+            assert!(val);
+        } else {
+            panic!("fail_open should be a bool");
+        }
+
+        // Must NOT contain sensitive fields
+        assert!(!dm.fields.contains_key("risk_score"));
+        assert!(!dm.fields.contains_key("risk_level"));
+        assert!(!dm.fields.contains_key("model_provider"));
+        assert!(!dm.fields.contains_key("lifecycle_state"));
+    }
 
     #[test]
     fn test_build_allow_response() {
@@ -291,7 +367,8 @@ mod tests {
             assert!(!denied.body.is_empty());
             let body: serde_json::Value = serde_json::from_str(&denied.body).unwrap();
             assert_eq!(body["error"], "nhi_not_usable");
-            assert!(body["message"].as_str().unwrap().contains("suspended"));
+            // Client message is sanitized — no operational details
+            assert_eq!(body["message"], "access denied");
         } else {
             panic!("expected denied_response");
         }
@@ -356,7 +433,8 @@ mod tests {
         {
             let body: serde_json::Value = serde_json::from_str(&denied.body).unwrap();
             assert_eq!(body["error"], "risk_score_exceeded");
-            assert!(body["message"].as_str().unwrap().contains("80"));
+            // Client message is sanitized — no risk score details
+            assert_eq!(body["message"], "access denied");
 
             // Check content-type header
             assert!(!denied.headers.is_empty());
