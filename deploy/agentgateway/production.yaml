@@ -2,12 +2,17 @@
 #
 # AgentGateway — Production Config for Xavyo IDP Integration
 #
-# Environment variables (set at deploy time):
-#   XAVYO_API_URL       - Xavyo IDP API (default: https://api.xavyo.net)
-#   XAVYO_EXTAUTHZ_HOST - ext-authz gRPC host:port (default: localhost:50051)
+# Koyeb deployment:
+#   - Admin UI (public):  port 15000 → exposed via Koyeb route
+#   - MCP data plane:     port 4000  → internal mesh only
+#   - Stats:              port 15020
+#   - Readiness:          port 15021
 #
-# Deploy:
-#   agentgateway -f /config/production.yaml
+# ext-authz runs as a separate internal Koyeb service (gRPC on 50051).
+
+# Admin UI bound to 0.0.0.0 so Koyeb can route to it
+admin_addr: "0.0.0.0:15000"
+readiness_addr: "0.0.0.0:15021"
 
 frontendPolicies:
   accessLog:
@@ -47,7 +52,7 @@ binds:
           exposeHeaders:
           - Mcp-Session-Id
         extAuthz:
-          host: localhost:50051
+          host: ext-authz.xavyo-api.koyeb:50051
           protocol:
             grpc: {}
           includeRequestHeaders:
