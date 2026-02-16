@@ -194,7 +194,7 @@ pub struct ResolvedEntitlement {
 // EntitlementSource
 // ---------------------------------------------------------------------------
 
-/// How an entitlement was resolved for a user.
+/// How an entitlement was resolved for a subject.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EntitlementSource {
@@ -210,6 +210,8 @@ pub enum EntitlementSource {
         /// The role name that grants this entitlement.
         role_name: String,
     },
+    /// Directly assigned to an NHI identity.
+    Nhi,
 }
 
 // ---------------------------------------------------------------------------

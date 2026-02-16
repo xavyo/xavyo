@@ -8269,6 +8269,7 @@ dependencies = [
  "xavyo-authorization",
  "xavyo-core",
  "xavyo-db",
+ "xavyo-nhi",
  "xavyo-tenant",
 ]
 
@@ -8416,6 +8417,7 @@ dependencies = [
  "utoipa",
  "uuid",
  "validator",
+ "xavyo-api-oauth",
  "xavyo-auth",
  "xavyo-core",
  "xavyo-db",

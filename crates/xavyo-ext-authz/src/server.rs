@@ -99,12 +99,20 @@ impl ExtAuthzService {
             |e: ExtAuthzError| -> (ExtAuthzError, Option<AuthzContext>) { (e, Some(ctx.clone())) };
 
         // Step 3: Lookup NHI identity (with cache)
+        // For delegated tokens (act claim present), the NHI is the ACTOR, not the subject.
+        // The subject is the principal (user or NHI being represented).
+        let nhi_lookup_id = if let Some(ref act) = ctx.act {
+            Uuid::parse_str(&act.sub).unwrap_or(ctx.subject_id)
+        } else {
+            ctx.subject_id
+        };
+
         let cached = self
             .nhi_cache
-            .get_or_load(&self.pool, ctx.tenant_id, ctx.subject_id)
+            .get_or_load(&self.pool, ctx.tenant_id, nhi_lookup_id)
             .await
             .map_err(|e| ctx_err(e.into()))?
-            .ok_or_else(|| ctx_err(ExtAuthzError::NhiNotFound(ctx.subject_id)))?;
+            .ok_or_else(|| ctx_err(ExtAuthzError::NhiNotFound(nhi_lookup_id)))?;
 
         let identity = &cached.identity;
 
@@ -325,7 +333,7 @@ impl Authorization for ExtAuthzService {
                     tracing::warn!("fail_open: no tenant context available, denying");
                 }
 
-                Ok(Response::new(build_deny_response(&err)))
+                Ok(Response::new(build_deny_response(&err, ctx.as_ref())))
             }
         }
     }

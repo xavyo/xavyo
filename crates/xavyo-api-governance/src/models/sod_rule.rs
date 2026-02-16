@@ -235,6 +235,8 @@ pub enum EntitlementSourceInfo {
         /// Whether entitlement is inherited from an ancestor role.
         is_inherited: bool,
     },
+    /// Direct NHI assignment (agent, service account, tool).
+    Nhi,
 }
 
 /// Response for scanning a rule for violations.

@@ -32,6 +32,8 @@ pub enum EntitlementSource {
         source_role_name: String,
         is_inherited: bool,
     },
+    /// Direct NHI assignment (agent, service account, tool).
+    Nhi,
 }
 
 /// An effective entitlement with its sources.
@@ -152,6 +154,19 @@ impl EffectiveAccessService {
                         is_inherited: eff.is_inherited,
                     });
             }
+        }
+
+        // 5. Get NHI-direct entitlements
+        // For human users this returns 0 rows immediately via the partial index
+        // on (tenant_id, target_id) WHERE target_type = 'nhi' (migration 0180).
+        let nhi_entitlement_ids =
+            GovEntitlementAssignment::list_nhi_entitlement_ids(&self.pool, tenant_id, user_id)
+                .await?;
+        for eid in nhi_entitlement_ids {
+            entitlement_sources
+                .entry(eid)
+                .or_default()
+                .insert(EntitlementSource::Nhi);
         }
 
         // Fetch all unique entitlements

@@ -35,6 +35,9 @@ pub struct AuthorizationState {
 
     /// Audit verbosity: "all" or "`deny_only`".
     pub audit_verbosity: String,
+
+    /// Risk score threshold above which NHI requests are denied.
+    pub risk_score_deny_threshold: i32,
 }
 
 /// Create the authorization router with all endpoints.
@@ -58,7 +61,10 @@ pub struct AuthorizationState {
 /// - `GET    /authorization/can-i`               - Check current user's authorization
 /// - `GET    /admin/authorization/check`         - Check another user's authorization (admin)
 /// - `POST   /admin/authorization/bulk-check`    - Bulk authorization check (admin)
-pub fn authorization_router(pool: PgPool, audit_verbosity: String) -> Router {
+///
+/// ## Explain API (admin)
+/// - `GET    /admin/authorization/explain-nhi`   - Dry-run NHI authorization pipeline
+pub fn authorization_router(pool: PgPool, audit_verbosity: String, risk_score_deny_threshold: i32) -> Router {
     let policy_cache = Arc::new(PolicyCache::new());
     let mapping_cache = Arc::new(MappingCache::new());
     let pdp = Arc::new(PolicyDecisionPoint::new(
@@ -77,6 +83,7 @@ pub fn authorization_router(pool: PgPool, audit_verbosity: String) -> Router {
         mapping_service,
         policy_service,
         audit_verbosity,
+        risk_score_deny_threshold,
     };
 
     Router::new()
@@ -109,6 +116,11 @@ pub fn authorization_router(pool: PgPool, audit_verbosity: String) -> Router {
         .route(
             "/admin/authorization/bulk-check",
             post(handlers::query::bulk_check_handler),
+        )
+        // Explain API (admin)
+        .route(
+            "/admin/authorization/explain-nhi",
+            get(handlers::explain::explain_nhi_handler),
         )
         .with_state(state)
 }

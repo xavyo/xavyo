@@ -31,6 +31,7 @@ struct DbOAuth2Client {
     pub description: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub nhi_id: Option<Uuid>,
 }
 
 /// Service for managing `OAuth2` clients.
@@ -110,8 +111,8 @@ impl OAuth2ClientService {
             INSERT INTO oauth_clients (
                 id, tenant_id, client_id, client_secret_hash, name, client_type,
                 redirect_uris, grant_types, scopes, is_active, logo_url, description,
-                created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $12)
+                created_at, updated_at, nhi_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $12, $13)
             ",
         )
         .bind(id)
@@ -126,6 +127,7 @@ impl OAuth2ClientService {
         .bind(&request.logo_url)
         .bind(&request.description)
         .bind(now)
+        .bind(request.nhi_id)
         .execute(&mut *conn)
         .await
         .map_err(|e| {
@@ -144,6 +146,7 @@ impl OAuth2ClientService {
             is_active: true,
             logo_url: request.logo_url,
             description: request.description,
+            nhi_id: request.nhi_id,
             created_at: now,
             updated_at: now,
         };
@@ -196,7 +199,7 @@ impl OAuth2ClientService {
         let client: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id
             FROM oauth_clients
             WHERE client_id = $1 AND tenant_id = $2
             ",
@@ -239,7 +242,7 @@ impl OAuth2ClientService {
         let client: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -280,7 +283,7 @@ impl OAuth2ClientService {
         let clients: Vec<DbOAuth2Client> = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id
             FROM oauth_clients
             WHERE tenant_id = $1
             ORDER BY created_at DESC
@@ -330,7 +333,7 @@ impl OAuth2ClientService {
         let existing: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -397,6 +400,7 @@ impl OAuth2ClientService {
             is_active,
             logo_url,
             description,
+            nhi_id: existing.nhi_id,
             created_at: existing.created_at,
             updated_at: now,
         })
@@ -553,7 +557,7 @@ impl OAuth2ClientService {
         let client: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -674,7 +678,7 @@ impl OAuth2ClientService {
         let client: Option<DbOAuth2Client> = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id
             FROM oauth_clients
             WHERE client_id = $1 AND tenant_id = $2
             ",
@@ -763,6 +767,7 @@ impl OAuth2ClientService {
             is_active: client.is_active,
             logo_url: client.logo_url,
             description: client.description,
+            nhi_id: client.nhi_id,
             created_at: client.created_at,
             updated_at: client.updated_at,
         }
@@ -969,6 +974,7 @@ mod tests {
             is_active: true,
             logo_url: None,
             description: None,
+            nhi_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -1007,6 +1013,7 @@ mod tests {
             is_active: true,
             logo_url: None,
             description: None,
+            nhi_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -1202,6 +1209,7 @@ mod tests {
             is_active: true,
             logo_url: None,
             description: None,
+            nhi_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

@@ -406,9 +406,10 @@ pub async fn create_parametric_assignment(
     let target_type = match request.target_type.as_str() {
         "user" => xavyo_db::GovAssignmentTargetType::User,
         "group" => xavyo_db::GovAssignmentTargetType::Group,
+        "nhi" => xavyo_db::GovAssignmentTargetType::Nhi,
         _ => {
             return Err(ApiGovernanceError::Validation(
-                "Invalid target_type, must be 'user' or 'group'".to_string(),
+                "Invalid target_type, must be 'user', 'group', or 'nhi'".to_string(),
             ))
         }
     };

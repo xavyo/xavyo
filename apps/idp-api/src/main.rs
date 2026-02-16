@@ -885,7 +885,11 @@ async fn main() {
 
     // Authorization engine routes (F083 - Fine-Grained Authorization)
     // F113: Support both API key and JWT authentication for programmatic access
-    let authorization_routes = authorization_router(pool.clone(), "all".to_string())
+    let risk_score_deny_threshold: i32 = std::env::var("RISK_SCORE_DENY_THRESHOLD")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(75);
+    let authorization_routes = authorization_router(pool.clone(), "all".to_string(), risk_score_deny_threshold)
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::middleware::from_fn(api_key_auth_middleware))
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))

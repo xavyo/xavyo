@@ -102,7 +102,11 @@ pub fn build_allow_response(metadata: &AllowMetadata) -> proto::CheckResponse {
 ///
 /// Uses `client_message()` instead of `Display` to avoid leaking
 /// operational details (UUIDs, risk scores, lifecycle states) to clients.
-pub fn build_deny_response(err: &ExtAuthzError) -> proto::CheckResponse {
+///
+/// When `ctx` is `Some`, populates `dynamic_metadata` with diagnostic detail
+/// (error code, deny reason, tenant/subject context) so the gateway can log
+/// or route on deny reasons — without changing the client-facing HTTP body.
+pub fn build_deny_response(err: &ExtAuthzError, ctx: Option<&AuthzContext>) -> proto::CheckResponse {
     let status_code = err.status_code();
     let body = serde_json::json!({
         "error": err.error_code(),
@@ -116,6 +120,20 @@ pub fn build_deny_response(err: &ExtAuthzError) -> proto::CheckResponse {
         403 => proto::StatusCode::Forbidden,
         _ => proto::StatusCode::InternalServerError,
     };
+
+    // Build dynamic_metadata when we have parsed context (post-JWT).
+    // Pre-parse errors (ctx == None) get no metadata — we have nothing useful.
+    let dynamic_metadata = ctx.map(|c| {
+        let mut fields = BTreeMap::new();
+        insert_string(&mut fields, "error_code", err.error_code());
+        insert_string(&mut fields, "deny_reason", &err.to_string());
+        insert_number(&mut fields, "status_code", status_code as f64);
+        insert_string(&mut fields, "tenant_id", &c.tenant_id.to_string());
+        insert_string(&mut fields, "subject_id", &c.subject_id.to_string());
+        insert_string(&mut fields, "action", &c.action);
+        insert_string(&mut fields, "resource_type", &c.resource_type);
+        prost_types::Struct { fields }
+    });
 
     proto::CheckResponse {
         status: Some(proto::Status {
@@ -140,7 +158,7 @@ pub fn build_deny_response(err: &ExtAuthzError) -> proto::CheckResponse {
                 body,
             },
         )),
-        dynamic_metadata: None,
+        dynamic_metadata,
     }
 }
 
@@ -393,7 +411,7 @@ mod tests {
     #[test]
     fn test_build_deny_response() {
         let err = ExtAuthzError::NhiNotUsable("suspended".to_string());
-        let response = build_deny_response(&err);
+        let response = build_deny_response(&err, None);
 
         // Status code should be non-zero (PERMISSION_DENIED)
         assert_eq!(response.status.as_ref().unwrap().code, 7);
@@ -419,7 +437,7 @@ mod tests {
     fn test_build_deny_response_status_codes() {
         // 400 Bad Request
         let err = ExtAuthzError::MissingAttributes;
-        let response = build_deny_response(&err);
+        let response = build_deny_response(&err, None);
         if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
             &response.http_response
         {
@@ -429,7 +447,7 @@ mod tests {
 
         // 401 Unauthorized
         let err = ExtAuthzError::NhiNotFound(Uuid::new_v4());
-        let response = build_deny_response(&err);
+        let response = build_deny_response(&err, None);
         if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
             &response.http_response
         {
@@ -439,7 +457,7 @@ mod tests {
 
         // 403 Forbidden
         let err = ExtAuthzError::AuthorizationDenied("denied".into());
-        let response = build_deny_response(&err);
+        let response = build_deny_response(&err, None);
         if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
             &response.http_response
         {
@@ -449,7 +467,7 @@ mod tests {
 
         // 500 Internal Server Error
         let err = ExtAuthzError::Internal("oops".into());
-        let response = build_deny_response(&err);
+        let response = build_deny_response(&err, None);
         if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
             &response.http_response
         {
@@ -464,7 +482,7 @@ mod tests {
             score: 80,
             threshold: 75,
         };
-        let response = build_deny_response(&err);
+        let response = build_deny_response(&err, None);
 
         if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
             &response.http_response
@@ -481,6 +499,312 @@ mod tests {
             assert_eq!(ct.header.as_ref().unwrap().raw_value, b"application/json");
         } else {
             panic!("expected denied_response");
+        }
+    }
+
+    #[test]
+    fn test_delegation_metadata_in_allow_response() {
+        let actor_id = Uuid::new_v4();
+        let delegation_id = Uuid::new_v4();
+
+        let metadata = AllowMetadata {
+            nhi_id: Uuid::new_v4(),
+            nhi_type: "agent".to_string(),
+            nhi_name: "delegated-agent".to_string(),
+            lifecycle_state: "active".to_string(),
+            tenant_id: TenantId::new(),
+            risk_score: 10,
+            risk_level: "low".to_string(),
+            allowed_tools: vec!["tool_x".to_string()],
+            agent_type: Some("ai_agent".to_string()),
+            model_provider: None,
+            requires_human_approval: None,
+            decision_id: Uuid::new_v4(),
+            is_delegated: true,
+            actor_nhi_id: Some(actor_id),
+            delegation_id: Some(delegation_id),
+            delegation_depth: Some(2),
+            principal_type: Some("user".to_string()),
+        };
+
+        let response = build_allow_response(&metadata);
+        let dm = response.dynamic_metadata.as_ref().unwrap();
+
+        // is_delegated must be true
+        if let Some(prost_types::value::Kind::BoolValue(val)) =
+            &dm.fields.get("is_delegated").unwrap().kind
+        {
+            assert!(val, "is_delegated should be true");
+        } else {
+            panic!("is_delegated should be a bool");
+        }
+
+        // actor_nhi_id must match
+        if let Some(prost_types::value::Kind::StringValue(val)) =
+            &dm.fields.get("actor_nhi_id").unwrap().kind
+        {
+            assert_eq!(val, &actor_id.to_string());
+        } else {
+            panic!("actor_nhi_id should be a string");
+        }
+
+        // delegation_id must match
+        if let Some(prost_types::value::Kind::StringValue(val)) =
+            &dm.fields.get("delegation_id").unwrap().kind
+        {
+            assert_eq!(val, &delegation_id.to_string());
+        } else {
+            panic!("delegation_id should be a string");
+        }
+
+        // delegation_depth must be 2
+        if let Some(prost_types::value::Kind::NumberValue(val)) =
+            &dm.fields.get("delegation_depth").unwrap().kind
+        {
+            assert_eq!(*val, 2.0);
+        } else {
+            panic!("delegation_depth should be a number");
+        }
+
+        // principal_type must be "user"
+        if let Some(prost_types::value::Kind::StringValue(val)) =
+            &dm.fields.get("principal_type").unwrap().kind
+        {
+            assert_eq!(val, "user");
+        } else {
+            panic!("principal_type should be a string");
+        }
+    }
+
+    #[test]
+    fn test_non_delegated_token_no_delegation_metadata() {
+        let metadata = AllowMetadata {
+            nhi_id: Uuid::new_v4(),
+            nhi_type: "service_account".to_string(),
+            nhi_name: "svc-plain".to_string(),
+            lifecycle_state: "active".to_string(),
+            tenant_id: TenantId::new(),
+            risk_score: 5,
+            risk_level: "low".to_string(),
+            allowed_tools: vec![],
+            agent_type: None,
+            model_provider: None,
+            requires_human_approval: None,
+            decision_id: Uuid::new_v4(),
+            is_delegated: false,
+            actor_nhi_id: None,
+            delegation_id: None,
+            delegation_depth: None,
+            principal_type: None,
+        };
+
+        let response = build_allow_response(&metadata);
+        let dm = response.dynamic_metadata.as_ref().unwrap();
+
+        // is_delegated must be false
+        if let Some(prost_types::value::Kind::BoolValue(val)) =
+            &dm.fields.get("is_delegated").unwrap().kind
+        {
+            assert!(!val, "is_delegated should be false");
+        } else {
+            panic!("is_delegated should be a bool");
+        }
+
+        // Optional delegation fields must be absent
+        assert!(
+            !dm.fields.contains_key("actor_nhi_id"),
+            "actor_nhi_id should be absent for non-delegated"
+        );
+        assert!(
+            !dm.fields.contains_key("delegation_id"),
+            "delegation_id should be absent for non-delegated"
+        );
+        assert!(
+            !dm.fields.contains_key("delegation_depth"),
+            "delegation_depth should be absent for non-delegated"
+        );
+        assert!(
+            !dm.fields.contains_key("principal_type"),
+            "principal_type should be absent for non-delegated"
+        );
+    }
+
+    #[test]
+    fn test_delegation_grant_not_active_deny_response() {
+        let grant_id = Uuid::new_v4();
+        let err = ExtAuthzError::DelegationGrantNotActive(grant_id);
+        let response = build_deny_response(&err, None);
+
+        // Status should be PERMISSION_DENIED
+        assert_eq!(response.status.as_ref().unwrap().code, 7);
+
+        if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
+            &response.http_response
+        {
+            // Should be 403 Forbidden
+            let expected: i32 = proto::StatusCode::Forbidden.into();
+            assert_eq!(denied.status.as_ref().unwrap().code, expected);
+
+            // Body should have sanitized error (no grant ID leaked)
+            let body: serde_json::Value = serde_json::from_str(&denied.body).unwrap();
+            assert_eq!(body["error"], "delegation_grant_not_active");
+            assert_eq!(body["message"], "access denied");
+            assert!(
+                !denied.body.contains(&grant_id.to_string()),
+                "grant ID must not leak to clients"
+            );
+        } else {
+            panic!("expected denied_response");
+        }
+
+        // No dynamic_metadata for deny (no context passed)
+        assert!(response.dynamic_metadata.is_none());
+    }
+
+    #[test]
+    fn test_build_deny_response_with_context() {
+        let ctx = AuthzContext {
+            subject_id: Uuid::new_v4(),
+            tenant_id: TenantId::new(),
+            roles: vec!["agent".to_string()],
+            method: "POST".to_string(),
+            path: "/api/v1/tools/invoke".to_string(),
+            action: "create".to_string(),
+            resource_type: "mcp".to_string(),
+            from_metadata_context: true,
+            act: None,
+            delegation_id: None,
+            delegation_depth: None,
+        };
+
+        let err = ExtAuthzError::RiskScoreExceeded {
+            score: 90,
+            threshold: 75,
+        };
+        let response = build_deny_response(&err, Some(&ctx));
+
+        // Status should still be PERMISSION_DENIED
+        assert_eq!(response.status.as_ref().unwrap().code, 7);
+
+        // HTTP body must remain sanitized (client_message, not Display)
+        if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
+            &response.http_response
+        {
+            let body: serde_json::Value = serde_json::from_str(&denied.body).unwrap();
+            assert_eq!(body["error"], "risk_score_exceeded");
+            assert_eq!(body["message"], "access denied");
+            // Body must NOT contain the score or threshold
+            assert!(!denied.body.contains("90"));
+            assert!(!denied.body.contains("75"));
+        } else {
+            panic!("expected denied_response");
+        }
+
+        // dynamic_metadata must be populated with diagnostic detail
+        let dm = response.dynamic_metadata.as_ref().expect("should have metadata");
+        assert!(dm.fields.contains_key("error_code"));
+        assert!(dm.fields.contains_key("deny_reason"));
+        assert!(dm.fields.contains_key("status_code"));
+        assert!(dm.fields.contains_key("tenant_id"));
+        assert!(dm.fields.contains_key("subject_id"));
+        assert!(dm.fields.contains_key("action"));
+        assert!(dm.fields.contains_key("resource_type"));
+
+        // status_code should be 403 for RiskScoreExceeded
+        if let Some(prost_types::value::Kind::NumberValue(val)) =
+            &dm.fields.get("status_code").unwrap().kind
+        {
+            assert_eq!(*val, 403.0);
+        } else {
+            panic!("status_code should be a number");
+        }
+
+        // error_code should match
+        if let Some(prost_types::value::Kind::StringValue(val)) =
+            &dm.fields.get("error_code").unwrap().kind
+        {
+            assert_eq!(val, "risk_score_exceeded");
+        } else {
+            panic!("error_code should be a string");
+        }
+
+        // deny_reason should be the Display string (full detail)
+        if let Some(prost_types::value::Kind::StringValue(val)) =
+            &dm.fields.get("deny_reason").unwrap().kind
+        {
+            assert!(val.contains("90"), "deny_reason should contain the score");
+            assert!(val.contains("75"), "deny_reason should contain the threshold");
+        } else {
+            panic!("deny_reason should be a string");
+        }
+
+        // tenant_id and subject_id should match context
+        if let Some(prost_types::value::Kind::StringValue(val)) =
+            &dm.fields.get("tenant_id").unwrap().kind
+        {
+            assert_eq!(val, &ctx.tenant_id.to_string());
+        }
+        if let Some(prost_types::value::Kind::StringValue(val)) =
+            &dm.fields.get("subject_id").unwrap().kind
+        {
+            assert_eq!(val, &ctx.subject_id.to_string());
+        }
+    }
+
+    #[test]
+    fn test_deny_response_body_never_leaks_display_string() {
+        let ctx = AuthzContext {
+            subject_id: Uuid::new_v4(),
+            tenant_id: TenantId::new(),
+            roles: vec![],
+            method: "GET".to_string(),
+            path: "/".to_string(),
+            action: "read".to_string(),
+            resource_type: "tools".to_string(),
+            from_metadata_context: true,
+            act: None,
+            delegation_id: None,
+            delegation_depth: None,
+        };
+
+        // Test multiple error types — body must never contain Display detail
+        let cases: Vec<ExtAuthzError> = vec![
+            ExtAuthzError::NhiNotUsable("suspended".to_string()),
+            ExtAuthzError::RiskScoreExceeded {
+                score: 80,
+                threshold: 75,
+            },
+            ExtAuthzError::AuthorizationDenied("no matching policy".to_string()),
+            ExtAuthzError::DelegationGrantNotActive(Uuid::new_v4()),
+        ];
+
+        for err in &cases {
+            let display = err.to_string();
+            let response = build_deny_response(err, Some(&ctx));
+
+            if let Some(proto::check_response::HttpResponse::DeniedResponse(denied)) =
+                &response.http_response
+            {
+                // The body must use client_message(), NOT Display
+                assert!(
+                    !denied.body.contains(&display),
+                    "body must not contain Display string for {}: body={}, display={}",
+                    err.error_code(),
+                    denied.body,
+                    display
+                );
+            }
+
+            // dynamic_metadata should carry the Display string for server-side diagnostics
+            let dm = response.dynamic_metadata.as_ref().unwrap();
+            if let Some(prost_types::value::Kind::StringValue(reason)) =
+                &dm.fields.get("deny_reason").unwrap().kind
+            {
+                assert_eq!(
+                    reason, &display,
+                    "deny_reason metadata should match Display"
+                );
+            }
         }
     }
 }

@@ -1,9 +1,10 @@
 //! Entitlement resolver for authorization decisions.
 //!
-//! Resolves all effective entitlements for a user from three sources:
+//! Resolves all effective entitlements for a subject from four sources:
 //! 1. Direct user assignments
 //! 2. Group-based assignments (via group membership)
 //! 3. Role-based entitlements (via JWT roles)
+//! 4. NHI-direct assignments (for non-human identities)
 
 use std::collections::HashSet;
 
@@ -15,16 +16,17 @@ use xavyo_db::models::gov_entitlement_assignment::GovEntitlementAssignment;
 use xavyo_db::models::gov_role_entitlement::GovRoleEntitlement;
 use xavyo_db::models::group_membership::GroupMembership;
 
-/// Resolves effective entitlements for a user across all sources.
+/// Resolves effective entitlements for a subject across all sources.
 pub struct EntitlementResolver;
 
 impl EntitlementResolver {
-    /// Resolve all effective entitlements for a user.
+    /// Resolve all effective entitlements for a subject (user or NHI).
     ///
-    /// Gathers entitlements from three sources:
+    /// Gathers entitlements from four sources:
     /// 1. **Direct assignments**: Entitlements assigned directly to the user
     /// 2. **Group-based**: Entitlements assigned to groups the user belongs to
     /// 3. **Role-based**: Entitlements linked to roles the user holds
+    /// 4. **NHI-direct**: Entitlements assigned directly to an NHI identity
     ///
     /// Only active, non-expired assignments are included.
     /// Results are deduplicated by `entitlement_id` (first source wins).
@@ -125,6 +127,29 @@ impl EntitlementResolver {
             }
         }
 
+        // 4. NHI-direct entitlements
+        // For human users this returns 0 rows immediately via the partial index
+        // on (tenant_id, target_id) WHERE target_type = 'nhi' (migration 0180).
+        if let Ok(nhi_ids) =
+            GovEntitlementAssignment::list_nhi_entitlement_ids(pool, tenant_id, user_id).await
+        {
+            for eid in nhi_ids {
+                if seen_ids.insert(eid) {
+                    entitlements.push(ResolvedEntitlement {
+                        entitlement_id: eid,
+                        source: EntitlementSource::Nhi,
+                    });
+                }
+            }
+        } else {
+            tracing::warn!(
+                target: "authorization",
+                tenant_id = %tenant_id,
+                subject_id = %user_id,
+                "Failed to load NHI entitlements"
+            );
+        }
+
         entitlements
     }
 }
@@ -154,11 +179,15 @@ mod tests {
         let role = EntitlementSource::Role {
             role_name: "admin".to_string(),
         };
+        let nhi = EntitlementSource::Nhi;
 
         // Verify they are distinct
         assert_ne!(direct, group);
         assert_ne!(group, role);
         assert_ne!(direct, role);
+        assert_ne!(direct, nhi);
+        assert_ne!(group, nhi);
+        assert_ne!(role, nhi);
     }
 
     #[test]

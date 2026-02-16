@@ -771,4 +771,297 @@ mod tests {
         // Extracted from metadata_context — trusted source
         assert!(ctx.from_metadata_context);
     }
+
+    /// Helper: build a CheckRequest with a bearer token JWT containing the given payload.
+    fn check_request_with_bearer(payload: &serde_json::Value) -> proto::CheckRequest {
+        use base64::Engine;
+
+        let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(serde_json::to_vec(payload).unwrap());
+        let token = format!("Bearer eyJhbGciOiJSUzI1NiJ9.{payload_b64}.sig");
+
+        let mut headers = HashMap::new();
+        headers.insert("authorization".to_string(), token);
+
+        proto::CheckRequest {
+            attributes: Some(proto::AttributeContext {
+                source: None,
+                destination: None,
+                request: Some(proto::attribute_context::Request {
+                    time: None,
+                    http: Some(proto::attribute_context::HttpRequest {
+                        id: String::new(),
+                        method: "GET".to_string(),
+                        headers,
+                        path: "/api/v1/agents".to_string(),
+                        host: String::new(),
+                        scheme: String::new(),
+                        query: String::new(),
+                        fragment: String::new(),
+                        size: 0,
+                        protocol: String::new(),
+                        body: String::new(),
+                        raw_body: vec![],
+                    }),
+                }),
+                context_extensions: Default::default(),
+                metadata_context: None,
+                tls_session: None,
+            }),
+        }
+    }
+
+    #[test]
+    fn test_parse_delegated_token_from_bearer() {
+        let subject_id = Uuid::new_v4();
+        let tenant_id = Uuid::new_v4();
+        let actor_id = Uuid::new_v4();
+        let delegation_uuid = Uuid::new_v4();
+
+        let payload = serde_json::json!({
+            "sub": subject_id.to_string(),
+            "tid": tenant_id.to_string(),
+            "roles": ["agent"],
+            "act": {"sub": actor_id.to_string(), "nhi_type": "agent"},
+            "delegation_id": delegation_uuid.to_string(),
+            "delegation_depth": 1
+        });
+
+        let req = check_request_with_bearer(&payload);
+        let ctx = parse_check_request(&req).unwrap();
+
+        assert_eq!(ctx.subject_id, subject_id);
+        assert_eq!(ctx.tenant_id.to_string(), tenant_id.to_string());
+        assert!(ctx.act.is_some());
+        let act = ctx.act.unwrap();
+        assert_eq!(act.sub, actor_id.to_string());
+        assert_eq!(act.nhi_type, Some("agent".to_string()));
+        assert_eq!(ctx.delegation_id, Some(delegation_uuid));
+        assert_eq!(ctx.delegation_depth, Some(1));
+    }
+
+    #[test]
+    fn test_parse_delegated_token_from_metadata_context() {
+        let subject_id = Uuid::new_v4();
+        let tenant_id = Uuid::new_v4();
+        let actor_id = Uuid::new_v4();
+        let delegation_uuid = Uuid::new_v4();
+
+        let mut jwt_fields = BTreeMap::new();
+        jwt_fields.insert(
+            "sub".to_string(),
+            prost_types::Value {
+                kind: Some(prost_types::value::Kind::StringValue(
+                    subject_id.to_string(),
+                )),
+            },
+        );
+        jwt_fields.insert(
+            "tid".to_string(),
+            prost_types::Value {
+                kind: Some(prost_types::value::Kind::StringValue(
+                    tenant_id.to_string(),
+                )),
+            },
+        );
+        jwt_fields.insert(
+            "roles".to_string(),
+            prost_types::Value {
+                kind: Some(prost_types::value::Kind::ListValue(
+                    prost_types::ListValue {
+                        values: vec![prost_types::Value {
+                            kind: Some(prost_types::value::Kind::StringValue(
+                                "agent".to_string(),
+                            )),
+                        }],
+                    },
+                )),
+            },
+        );
+
+        // Add act as a nested struct
+        let mut act_fields = BTreeMap::new();
+        act_fields.insert(
+            "sub".to_string(),
+            prost_types::Value {
+                kind: Some(prost_types::value::Kind::StringValue(
+                    actor_id.to_string(),
+                )),
+            },
+        );
+        act_fields.insert(
+            "nhi_type".to_string(),
+            prost_types::Value {
+                kind: Some(prost_types::value::Kind::StringValue(
+                    "agent".to_string(),
+                )),
+            },
+        );
+        jwt_fields.insert(
+            "act".to_string(),
+            prost_types::Value {
+                kind: Some(prost_types::value::Kind::StructValue(prost_types::Struct {
+                    fields: act_fields,
+                })),
+            },
+        );
+
+        // Add delegation_id as string
+        jwt_fields.insert(
+            "delegation_id".to_string(),
+            prost_types::Value {
+                kind: Some(prost_types::value::Kind::StringValue(
+                    delegation_uuid.to_string(),
+                )),
+            },
+        );
+
+        // Add delegation_depth as number
+        jwt_fields.insert(
+            "delegation_depth".to_string(),
+            prost_types::Value {
+                kind: Some(prost_types::value::Kind::NumberValue(2.0)),
+            },
+        );
+
+        let jwt_payload = prost_types::Value {
+            kind: Some(prost_types::value::Kind::StructValue(prost_types::Struct {
+                fields: jwt_fields,
+            })),
+        };
+
+        let mut jwt_authn_fields = BTreeMap::new();
+        jwt_authn_fields.insert("jwt_payload".to_string(), jwt_payload);
+
+        let mut filter_metadata = HashMap::new();
+        filter_metadata.insert(
+            "envoy.filters.http.jwt_authn".to_string(),
+            prost_types::Struct {
+                fields: jwt_authn_fields,
+            },
+        );
+
+        let req = proto::CheckRequest {
+            attributes: Some(proto::AttributeContext {
+                source: None,
+                destination: None,
+                request: Some(proto::attribute_context::Request {
+                    time: None,
+                    http: Some(proto::attribute_context::HttpRequest {
+                        id: String::new(),
+                        method: "POST".to_string(),
+                        headers: Default::default(),
+                        path: "/api/v1/agents".to_string(),
+                        host: String::new(),
+                        scheme: String::new(),
+                        query: String::new(),
+                        fragment: String::new(),
+                        size: 0,
+                        protocol: String::new(),
+                        body: String::new(),
+                        raw_body: vec![],
+                    }),
+                }),
+                context_extensions: Default::default(),
+                metadata_context: Some(proto::Metadata { filter_metadata }),
+                tls_session: None,
+            }),
+        };
+
+        let ctx = parse_check_request(&req).unwrap();
+
+        assert_eq!(ctx.subject_id, subject_id);
+        assert!(ctx.from_metadata_context);
+        assert!(ctx.act.is_some());
+        let act = ctx.act.unwrap();
+        assert_eq!(act.sub, actor_id.to_string());
+        assert_eq!(act.nhi_type, Some("agent".to_string()));
+        assert_eq!(ctx.delegation_id, Some(delegation_uuid));
+        assert_eq!(ctx.delegation_depth, Some(2));
+    }
+
+    #[test]
+    fn test_parse_act_claim_with_nested_chain() {
+        let subject_id = Uuid::new_v4();
+        let tenant_id = Uuid::new_v4();
+        let agent_b = Uuid::new_v4();
+        let agent_a = Uuid::new_v4();
+
+        let payload = serde_json::json!({
+            "sub": subject_id.to_string(),
+            "tid": tenant_id.to_string(),
+            "roles": ["agent"],
+            "act": {
+                "sub": agent_b.to_string(),
+                "nhi_type": "agent",
+                "act": {
+                    "sub": agent_a.to_string()
+                }
+            }
+        });
+
+        let req = check_request_with_bearer(&payload);
+        let ctx = parse_check_request(&req).unwrap();
+
+        assert!(ctx.act.is_some());
+        let outer = ctx.act.as_ref().unwrap();
+        assert_eq!(outer.sub, agent_b.to_string());
+        assert_eq!(outer.nhi_type, Some("agent".to_string()));
+
+        // Verify nested act
+        assert!(outer.act.is_some());
+        let inner = outer.act.as_ref().unwrap();
+        assert_eq!(inner.sub, agent_a.to_string());
+        assert!(inner.act.is_none());
+
+        // Chain depth should be 2
+        assert_eq!(outer.chain_depth(), 2);
+    }
+
+    #[test]
+    fn test_parse_act_claim_exceeds_depth() {
+        let subject_id = Uuid::new_v4();
+        let tenant_id = Uuid::new_v4();
+
+        // Build a chain of depth 12 (> MAX_ACTOR_CHAIN_DEPTH which is 10)
+        let mut act = serde_json::json!({"sub": "leaf"});
+        for i in 0..11 {
+            act = serde_json::json!({"sub": format!("actor-{i}"), "act": act});
+        }
+
+        let payload = serde_json::json!({
+            "sub": subject_id.to_string(),
+            "tid": tenant_id.to_string(),
+            "roles": [],
+            "act": act
+        });
+
+        let req = check_request_with_bearer(&payload);
+        let ctx = parse_check_request(&req).unwrap();
+
+        // The parse succeeds but act is None because validate_depth() rejects it
+        assert!(ctx.act.is_none());
+    }
+
+    #[test]
+    fn test_parse_missing_delegation_id_with_act() {
+        let subject_id = Uuid::new_v4();
+        let tenant_id = Uuid::new_v4();
+        let actor_id = Uuid::new_v4();
+
+        let payload = serde_json::json!({
+            "sub": subject_id.to_string(),
+            "tid": tenant_id.to_string(),
+            "roles": [],
+            "act": {"sub": actor_id.to_string()}
+        });
+
+        let req = check_request_with_bearer(&payload);
+        let ctx = parse_check_request(&req).unwrap();
+
+        assert!(ctx.act.is_some());
+        assert_eq!(ctx.act.unwrap().sub, actor_id.to_string());
+        assert!(ctx.delegation_id.is_none());
+        assert!(ctx.delegation_depth.is_none());
+    }
 }

@@ -715,10 +715,12 @@ impl TokenService {
         client_id: &str,
         tenant_id: Uuid,
         scope: &str,
+        nhi_id: Option<Uuid>,
     ) -> Result<TokenResponse, OAuthError> {
-        // Generate access token with client_id as subject (no user)
+        // If an NHI identity is bound to this client, use NHI ID as subject
+        // so the token can be used in delegation flows (RFC 8693 Token Exchange)
         let access_token = self.generate_access_token(
-            None, // No user_id for client credentials
+            nhi_id, // Use NHI ID as subject when bound, otherwise client_id
             client_id,
             tenant_id,
             scope,

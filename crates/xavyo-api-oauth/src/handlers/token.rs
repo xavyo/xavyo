@@ -315,9 +315,10 @@ async fn handle_client_credentials_grant(
     };
 
     // Issue tokens for client credentials grant
+    // If the client is bound to an NHI identity, the NHI ID becomes the JWT subject
     let token_response = state
         .token_service
-        .issue_client_credentials_tokens(&client.client_id, tenant_id, &granted_scope)
+        .issue_client_credentials_tokens(&client.client_id, tenant_id, &granted_scope, client.nhi_id)
         .await?;
 
     Ok(Json(token_response))

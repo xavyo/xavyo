@@ -20,6 +20,7 @@ xavyo-api-auth = { path = "../xavyo-api-auth" }
 xavyo-db = { path = "../xavyo-db" }
 xavyo-tenant = { path = "../xavyo-tenant" }
 xavyo-authorization = { path = "../xavyo-authorization" }
+xavyo-nhi = { path = "../xavyo-nhi" }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

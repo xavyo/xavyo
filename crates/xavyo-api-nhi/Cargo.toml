@@ -16,6 +16,7 @@ xavyo-db = { path = "../xavyo-db", features = ["argon2"] }
 xavyo-auth = { path = "../xavyo-auth" }
 xavyo-tenant = { path = "../xavyo-tenant" }
 xavyo-governance = { path = "../xavyo-governance" }
+xavyo-api-oauth = { path = "../xavyo-api-oauth" }
 
 # Web framework
 axum.workspace = true

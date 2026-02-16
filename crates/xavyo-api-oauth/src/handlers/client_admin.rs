@@ -127,7 +127,13 @@ pub async fn create_client_handler(
     }
 
     // Validate grant types
-    let valid_grant_types = ["authorization_code", "client_credentials", "refresh_token"];
+    let valid_grant_types = [
+        "authorization_code",
+        "client_credentials",
+        "refresh_token",
+        crate::models::token::DEVICE_CODE_GRANT_TYPE,
+        crate::models::token_exchange::TOKEN_EXCHANGE_GRANT_TYPE,
+    ];
     for grant_type in &request.grant_types {
         if !valid_grant_types.contains(&grant_type.as_str()) {
             return Err(OAuthError::InvalidRequest(format!(
@@ -176,7 +182,13 @@ pub async fn update_client_handler(
 
     // Validate grant types if provided
     if let Some(ref grant_types) = request.grant_types {
-        let valid_grant_types = ["authorization_code", "client_credentials", "refresh_token"];
+        let valid_grant_types = [
+            "authorization_code",
+            "client_credentials",
+            "refresh_token",
+            crate::models::token::DEVICE_CODE_GRANT_TYPE,
+            crate::models::token_exchange::TOKEN_EXCHANGE_GRANT_TYPE,
+        ];
         for grant_type in grant_types {
             if !valid_grant_types.contains(&grant_type.as_str()) {
                 return Err(OAuthError::InvalidRequest(format!(

@@ -21,6 +21,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 # ---------------------------------------------------------------------------
 FROM rust:1.88-slim-bookworm AS builder
 RUN cargo install cargo-chef --locked
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev pkg-config curl \
     && rm -rf /var/lib/apt/lists/*
@@ -40,10 +41,19 @@ RUN cargo build --release -p idp-api --features aws-ses && strip target/release/
 # ---------------------------------------------------------------------------
 FROM debian:bookworm-slim AS runtime
 
+LABEL org.opencontainers.image.source="https://github.com/xavyo/xavyo"
+LABEL org.opencontainers.image.title="xavyo-idp"
+LABEL org.opencontainers.image.description="Xavyo Identity Platform API"
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    APP_ENV=production \
+    RUST_BACKTRACE=1
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libssl3 ca-certificates curl \
+    libssl3 ca-certificates curl tini \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd -r -u 1000 -m xavyo
+    && useradd -r -u 1000 -m xavyo \
+    && find / -perm /6000 -type f -exec chmod a-s {} + 2>/dev/null || true
 
 WORKDIR /app
 COPY --from=builder /app/target/release/idp-api /app/idp-api
@@ -52,7 +62,8 @@ RUN mkdir -p /app/keys && chown -R xavyo:xavyo /app
 EXPOSE 8080
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=30s \
-    CMD curl -f http://localhost:8080/readyz || exit 1
+    CMD curl -sf http://localhost:8080/readyz || exit 1
 
 USER xavyo
-ENTRYPOINT ["/app/idp-api"]
+ENTRYPOINT ["tini", "--"]
+CMD ["/app/idp-api"]

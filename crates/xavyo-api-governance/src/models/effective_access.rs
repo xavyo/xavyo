@@ -46,6 +46,8 @@ pub enum EntitlementSourceResponse {
         /// Whether entitlement is inherited from an ancestor role.
         is_inherited: bool,
     },
+    /// Direct NHI assignment (agent, service account, tool).
+    Nhi,
 }
 
 impl From<EntitlementSource> for EntitlementSourceResponse {
@@ -73,6 +75,7 @@ impl From<EntitlementSource> for EntitlementSourceResponse {
                 source_role_name,
                 is_inherited,
             },
+            EntitlementSource::Nhi => Self::Nhi,
         }
     }
 }

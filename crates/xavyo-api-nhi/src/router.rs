@@ -22,6 +22,7 @@ use crate::handlers::lifecycle::lifecycle_routes;
 use crate::handlers::nhi_delegation::nhi_delegation_routes;
 use crate::handlers::nhi_permissions::nhi_nhi_permission_routes;
 use crate::handlers::permissions::permission_routes;
+use crate::handlers::provision;
 use crate::handlers::risk::risk_routes;
 use crate::handlers::service_accounts::service_account_routes;
 use crate::handlers::sod::sod_routes;
@@ -41,6 +42,12 @@ use axum::Router;
 /// * `state` - Application state containing the database pool and services.
 pub fn nhi_router(state: NhiState) -> Router {
     Router::new()
+        // Composite provisioning endpoint
+        .merge(
+            Router::new()
+                .route("/provision-agent", post(provision::provision_agent))
+                .with_state(state.clone()),
+        )
         // Phase 3: Unified endpoints
         .merge(unified_routes(state.clone()))
         // Phase 3: Type-specific CRUD

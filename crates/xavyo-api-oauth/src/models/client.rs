@@ -53,6 +53,10 @@ pub struct CreateClientRequest {
     pub logo_url: Option<String>,
     /// Client description (shown on consent page).
     pub description: Option<String>,
+    /// Optional NHI identity to bind to this client.
+    /// When set, client_credentials tokens use this NHI ID as the JWT subject.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nhi_id: Option<Uuid>,
 }
 
 /// Request to update an `OAuth2` client.
@@ -97,6 +101,9 @@ pub struct ClientResponse {
     pub logo_url: Option<String>,
     /// Client description (shown on consent page).
     pub description: Option<String>,
+    /// Bound NHI identity (if any).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nhi_id: Option<Uuid>,
     /// Creation timestamp.
     pub created_at: DateTime<Utc>,
     /// Last update timestamp.

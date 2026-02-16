@@ -27,6 +27,7 @@ pub mod mcp;
 pub mod nhi_delegation;
 pub mod nhi_permissions;
 pub mod permissions;
+pub mod provision;
 pub mod risk;
 pub mod service_accounts;
 pub mod sod;

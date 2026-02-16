@@ -11,6 +11,7 @@ pub mod common;
 pub mod fixtures;
 
 mod credential_tests;
+mod delegation_tests;
 mod governance_tests;
 mod service_account_tests;
 mod tenant_isolation_tests;

@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=https://agentgateway.dev/schema/config
+#
+# AgentGateway + Xavyo IDP Integration Test Config
+#
+# Prerequisites:
+#   1. Xavyo IDP running on :8080  (docker compose up -d)
+#   2. Xavyo ext-authz running on :50051 (cargo run -p ext-authz)
+#   3. AgentGateway binary available
+#
+# Start:
+#   agentgateway -f deploy/agentgateway/config.yaml
+
+frontendPolicies:
+  accessLog:
+    add:
+      nhi.id: 'extauthz.nhi_id'
+      nhi.type: 'extauthz.nhi_type'
+      nhi.risk: 'extauthz.risk_level'
+      tenant.id: 'extauthz.tenant_id'
+      delegation.active: 'extauthz.is_delegated'
+      delegation.actor: 'extauthz.actor_nhi_id'
+      delegation.depth: 'extauthz.delegation_depth'
+
+binds:
+- port: 4000
+  listeners:
+  - name: mcp-with-xavyo-auth
+    protocol: HTTP
+    routes:
+    - name: mcp-tools
+      backends:
+      - mcp:
+          targets:
+          - name: everything
+            stdio:
+              cmd: npx
+              args:
+              - '@modelcontextprotocol/server-everything'
+      policies:
+        cors:
+          allowHeaders:
+          - mcp-protocol-version
+          - content-type
+          - authorization
+          - x-tenant-id
+          allowOrigins:
+          - '*'
+          exposeHeaders:
+          - Mcp-Session-Id
+        # Xavyo ext_authz: validates JWT, checks NHI lifecycle/risk,
+        # enforces tool permissions, delegation grant validation
+        extAuthz:
+          host: localhost:50051
+          protocol:
+            grpc: {}
+          includeRequestHeaders:
+          - authorization
+          - x-tenant-id
+          timeout: 2s
+          failureMode: deny
+        # JWT validation against Xavyo's JWKS
+        jwtAuth:
+          issuer: http://localhost:8080
+          # audiences not set → audience validation disabled (tokens have dynamic client_id audience)
+          jwks:
+            url: http://localhost:8080/.well-known/jwks.json

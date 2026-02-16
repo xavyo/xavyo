@@ -1,13 +1,13 @@
 //! Governance Entitlement Assignment model.
 //!
-//! Represents entitlement assignments to users or groups.
+//! Represents entitlement assignments to users, groups, or NHI identities.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-/// Assignment target type (user or group).
+/// Assignment target type (user, group, or NHI).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[sqlx(type_name = "gov_assignment_target_type", rename_all = "lowercase")]
@@ -17,6 +17,8 @@ pub enum GovAssignmentTargetType {
     User,
     /// Assignment to a group.
     Group,
+    /// Assignment to a non-human identity (agent, service account, tool).
+    Nhi,
 }
 
 /// Assignment status.
@@ -45,10 +47,10 @@ pub struct GovEntitlementAssignment {
     /// The entitlement being assigned.
     pub entitlement_id: Uuid,
 
-    /// The type of target (user or group).
+    /// The type of target (user, group, or NHI).
     pub target_type: GovAssignmentTargetType,
 
-    /// The target ID (`user_id` or `group_id`).
+    /// The target ID (`user_id`, `group_id`, or `nhi_id`).
     pub target_id: Uuid,
 
     /// Who assigned this entitlement.
@@ -422,6 +424,24 @@ impl GovEntitlementAssignment {
         .await
     }
 
+    /// List all entitlement IDs assigned to an NHI identity (agent, service account, tool).
+    pub async fn list_nhi_entitlement_ids(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        nhi_id: Uuid,
+    ) -> Result<Vec<Uuid>, sqlx::Error> {
+        sqlx::query_scalar(
+            r"
+            SELECT entitlement_id FROM gov_entitlement_assignments
+            WHERE tenant_id = $1 AND target_type = 'nhi' AND target_id = $2 AND status = 'active'
+            ",
+        )
+        .bind(tenant_id)
+        .bind(nhi_id)
+        .fetch_all(pool)
+        .await
+    }
+
     /// Expire assignments past their expiration date.
     pub async fn expire_past_due(pool: &sqlx::PgPool, tenant_id: Uuid) -> Result<u64, sqlx::Error> {
         let result = sqlx::query(
@@ -682,6 +702,10 @@ mod tests {
         let group = GovAssignmentTargetType::Group;
         let json = serde_json::to_string(&group).unwrap();
         assert_eq!(json, "\"group\"");
+
+        let nhi = GovAssignmentTargetType::Nhi;
+        let json = serde_json::to_string(&nhi).unwrap();
+        assert_eq!(json, "\"nhi\"");
     }
 
     #[test]

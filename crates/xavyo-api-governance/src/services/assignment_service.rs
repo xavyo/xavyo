@@ -111,8 +111,10 @@ impl AssignmentService {
             }
         }
 
-        // SoD Check: For user assignments, check for conflicts
-        if input.target_type == GovAssignmentTargetType::User {
+        // SoD Check: For user and NHI assignments, check for conflicts
+        if input.target_type == GovAssignmentTargetType::User
+            || input.target_type == GovAssignmentTargetType::Nhi
+        {
             self.check_sod_for_user(tenant_id, input.target_id, input.entitlement_id)
                 .await?;
         }
@@ -359,8 +361,10 @@ impl AssignmentService {
                 continue;
             }
 
-            // SoD Check for user assignments
-            if input.target_type == GovAssignmentTargetType::User {
+            // SoD Check for user and NHI assignments
+            if input.target_type == GovAssignmentTargetType::User
+                || input.target_type == GovAssignmentTargetType::Nhi
+            {
                 if let Err(e) = self
                     .check_sod_for_user(tenant_id, target_id, input.entitlement_id)
                     .await

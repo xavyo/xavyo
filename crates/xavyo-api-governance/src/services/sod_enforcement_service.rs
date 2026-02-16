@@ -234,6 +234,11 @@ impl SodEnforcementService {
                     violations: all_violations,
                 })
             }
+            GovAssignmentTargetType::Nhi => {
+                // NHI assignments: check SoD directly against the NHI identity
+                self.check_assignment(tenant_id, target_id, entitlement_id, true)
+                    .await
+            }
         }
     }
 
@@ -284,6 +289,7 @@ impl SodEnforcementService {
                 source_role_name: source_role_name.clone(),
                 is_inherited: *is_inherited,
             },
+            EntitlementSource::Nhi => EntitlementSourceInfo::Nhi,
         }
     }
 
