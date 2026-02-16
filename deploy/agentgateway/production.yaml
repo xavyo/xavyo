@@ -10,9 +10,8 @@
 #
 # ext-authz runs as a separate internal Koyeb service (gRPC on 50051).
 
-# Admin UI bound to 0.0.0.0 so Koyeb can route to it
-admin_addr: "0.0.0.0:15000"
-readiness_addr: "0.0.0.0:15021"
+# Admin UI: set via ADMIN_ADDR env var (0.0.0.0:15000)
+# Readiness: set via READINESS_ADDR env var (0.0.0.0:15021)
 
 frontendPolicies:
   accessLog:
