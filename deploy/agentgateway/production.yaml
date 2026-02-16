@@ -39,6 +39,12 @@ binds:
               cmd: npx
               args:
               - '@modelcontextprotocol/server-everything'
+          - name: context7
+            stdio:
+              cmd: npx
+              args:
+              - '-y'
+              - '@upstash/context7-mcp'
       policies:
         cors:
           allowHeaders:
