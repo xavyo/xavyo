@@ -8,7 +8,7 @@
 
 FROM ghcr.io/agentgateway/agentgateway:latest AS upstream
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 LABEL org.opencontainers.image.source="https://github.com/xavyo/xavyo"
 LABEL org.opencontainers.image.title="xavyo-agentgateway"
@@ -17,9 +17,7 @@ LABEL org.opencontainers.image.description="AgentGateway configured for Xavyo Id
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl tini \
-    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
+    ca-certificates tini nodejs npm \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -u 1000 -m agentgateway
 
