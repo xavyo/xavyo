@@ -69,3 +69,9 @@ binds:
           issuer: https://api.xavyo.net
           jwks:
             url: https://api.xavyo.net/.well-known/jwks.json
+        mcpAuthorization:
+          rules:
+          # Dynamic filtering: only tools returned by ext-authz are visible
+          - 'mcp.tool.name in extauthz.allowed_tools'
+          # Super admin bypass — sees all tools
+          - 'jwt.roles.contains("super_admin")'
