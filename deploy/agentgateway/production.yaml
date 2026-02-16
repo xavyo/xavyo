@@ -1,0 +1,61 @@
+# yaml-language-server: $schema=https://agentgateway.dev/schema/config
+#
+# AgentGateway — Production Config for Xavyo IDP Integration
+#
+# Environment variables (set at deploy time):
+#   XAVYO_API_URL       - Xavyo IDP API (default: https://api.xavyo.net)
+#   XAVYO_EXTAUTHZ_HOST - ext-authz gRPC host:port (default: localhost:50051)
+#
+# Deploy:
+#   agentgateway -f /config/production.yaml
+
+frontendPolicies:
+  accessLog:
+    add:
+      nhi.id: 'extauthz.nhi_id'
+      nhi.type: 'extauthz.nhi_type'
+      nhi.risk: 'extauthz.risk_level'
+      tenant.id: 'extauthz.tenant_id'
+      delegation.active: 'extauthz.is_delegated'
+      delegation.actor: 'extauthz.actor_nhi_id'
+      delegation.depth: 'extauthz.delegation_depth'
+
+binds:
+- port: 4000
+  listeners:
+  - name: mcp-xavyo
+    protocol: HTTP
+    routes:
+    - name: mcp-tools
+      backends:
+      - mcp:
+          targets:
+          - name: everything
+            stdio:
+              cmd: npx
+              args:
+              - '@modelcontextprotocol/server-everything'
+      policies:
+        cors:
+          allowHeaders:
+          - mcp-protocol-version
+          - content-type
+          - authorization
+          - x-tenant-id
+          allowOrigins:
+          - 'https://app.xavyo.net'
+          exposeHeaders:
+          - Mcp-Session-Id
+        extAuthz:
+          host: localhost:50051
+          protocol:
+            grpc: {}
+          includeRequestHeaders:
+          - authorization
+          - x-tenant-id
+          timeout: 2s
+          failureMode: deny
+        jwtAuth:
+          issuer: https://api.xavyo.net
+          jwks:
+            url: https://api.xavyo.net/.well-known/jwks.json
