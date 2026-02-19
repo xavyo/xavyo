@@ -4,11 +4,10 @@ use crate::api::ApiClient;
 use crate::error::{CliError, CliResult};
 use crate::models::nhi::{
     AutoSuspendResponse, CampaignListResponse, CampaignResponse, CertifyResponse,
-    CreateCampaignRequest, CreateSodRuleRequest, CredentialIssuedResponse, GracePeriodRequest,
-    GracePeriodResponse, GrantPermissionRequest, InactiveDetectResponse, IssueCredentialRequest,
-    LifecycleActionResponse, NhiCredentialListResponse, NhiIdentityResponse, NhiListResponse,
-    OrphanDetectResponse, PermissionListResponse, PermissionResponse, RevokeCertResponse,
-    RevokePermissionResponse, RiskResponse, RiskSummaryResponse, RotateCredentialRequest,
+    CreateCampaignRequest, CreateSodRuleRequest, GracePeriodRequest, GracePeriodResponse,
+    GrantPermissionRequest, InactiveDetectResponse, LifecycleActionResponse, NhiIdentityResponse,
+    NhiListResponse, OrphanDetectResponse, PermissionListResponse, PermissionResponse,
+    RevokeCertResponse, RevokePermissionResponse, RiskResponse, RiskSummaryResponse,
     SodCheckRequest, SodCheckResponse, SodRuleListResponse, SodRuleResponse, SuspendRequest,
     UpdateToolRequest,
 };
@@ -132,103 +131,6 @@ impl ApiClient {
             response.json().await.map_err(Into::into)
         } else if response.status() == reqwest::StatusCode::NOT_FOUND {
             Err(CliError::NotFound(format!("NHI identity not found: {id}")))
-        } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            Err(CliError::Api {
-                status: status.as_u16(),
-                message: body,
-            })
-        }
-    }
-
-    // --- Credentials ---
-
-    /// Issue a credential for an NHI identity
-    pub async fn nhi_issue_credential(
-        &self,
-        nhi_id: Uuid,
-        request: IssueCredentialRequest,
-    ) -> CliResult<CredentialIssuedResponse> {
-        let url = format!("{}/nhi/{}/credentials", self.config().api_url, nhi_id);
-        let response = self.post_json(&url, &request).await?;
-
-        if response.status().is_success() {
-            response.json().await.map_err(Into::into)
-        } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            Err(CliError::Api {
-                status: status.as_u16(),
-                message: body,
-            })
-        }
-    }
-
-    /// List credentials for an NHI identity
-    pub async fn nhi_list_credentials(&self, nhi_id: Uuid) -> CliResult<NhiCredentialListResponse> {
-        let url = format!("{}/nhi/{}/credentials", self.config().api_url, nhi_id);
-        let response = self.get_authenticated(&url).await?;
-
-        if response.status().is_success() {
-            response.json().await.map_err(Into::into)
-        } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            Err(CliError::Api {
-                status: status.as_u16(),
-                message: body,
-            })
-        }
-    }
-
-    /// Rotate a credential
-    pub async fn nhi_rotate_credential(
-        &self,
-        nhi_id: Uuid,
-        credential_id: Uuid,
-        request: RotateCredentialRequest,
-    ) -> CliResult<CredentialIssuedResponse> {
-        let url = format!(
-            "{}/nhi/{}/credentials/{}/rotate",
-            self.config().api_url,
-            nhi_id,
-            credential_id
-        );
-        let response = self.post_json(&url, &request).await?;
-
-        if response.status().is_success() {
-            response.json().await.map_err(Into::into)
-        } else if response.status() == reqwest::StatusCode::NOT_FOUND {
-            Err(CliError::NotFound(format!(
-                "Credential not found: {credential_id}"
-            )))
-        } else {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            Err(CliError::Api {
-                status: status.as_u16(),
-                message: body,
-            })
-        }
-    }
-
-    /// Revoke (delete) a credential
-    pub async fn nhi_revoke_credential(&self, nhi_id: Uuid, credential_id: Uuid) -> CliResult<()> {
-        let url = format!(
-            "{}/nhi/{}/credentials/{}",
-            self.config().api_url,
-            nhi_id,
-            credential_id
-        );
-        let response = self.delete_authenticated(&url).await?;
-
-        if response.status().is_success() || response.status() == reqwest::StatusCode::NO_CONTENT {
-            Ok(())
-        } else if response.status() == reqwest::StatusCode::NOT_FOUND {
-            Err(CliError::NotFound(format!(
-                "Credential not found: {credential_id}"
-            )))
         } else {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();

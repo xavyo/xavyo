@@ -2,7 +2,6 @@
 //!
 //! Events for NHI governance operations:
 //! - NHI lifecycle (created, updated, deleted)
-//! - Credential events (rotated, revoked, expiring)
 //! - Usage and risk events
 //! - Request workflow events
 //! - Suspension and reactivation events
@@ -86,98 +85,6 @@ pub struct NhiDeleted {
 impl Event for NhiDeleted {
     const TOPIC: &'static str = "xavyo.governance.nhi.deleted";
     const EVENT_TYPE: &'static str = "xavyo.governance.nhi.deleted";
-}
-
-// =============================================================================
-// Credential Events
-// =============================================================================
-
-/// Published when NHI credentials are rotated.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NhiCredentialsRotated {
-    /// The NHI ID.
-    pub nhi_id: Uuid,
-    /// The tenant ID.
-    pub tenant_id: Uuid,
-    /// The NHI name.
-    pub name: String,
-    /// The new credential ID.
-    pub new_credential_id: Uuid,
-    /// The old credential ID (if any).
-    pub old_credential_id: Option<Uuid>,
-    /// Type of credential rotated.
-    pub credential_type: String,
-    /// Whether this was automatic or manual rotation.
-    pub rotation_type: RotationType,
-    /// When grace period ends (both credentials valid until then).
-    pub grace_period_ends_at: Option<DateTime<Utc>>,
-    /// Who triggered the rotation (None for automatic).
-    pub rotated_by: Option<Uuid>,
-    /// When the rotation occurred.
-    pub rotated_at: DateTime<Utc>,
-}
-
-impl Event for NhiCredentialsRotated {
-    const TOPIC: &'static str = "xavyo.governance.nhi.credentials_rotated";
-    const EVENT_TYPE: &'static str = "xavyo.governance.nhi.credentials_rotated";
-}
-
-/// Type of credential rotation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RotationType {
-    /// Automatic rotation based on schedule.
-    Automatic,
-    /// Manual rotation triggered by user.
-    Manual,
-    /// Emergency rotation (security incident).
-    Emergency,
-}
-
-/// Published when a credential is revoked.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NhiCredentialRevoked {
-    /// The NHI ID.
-    pub nhi_id: Uuid,
-    /// The tenant ID.
-    pub tenant_id: Uuid,
-    /// The credential ID.
-    pub credential_id: Uuid,
-    /// Reason for revocation.
-    pub reason: String,
-    /// Who revoked the credential.
-    pub revoked_by: Option<Uuid>,
-    /// When the credential was revoked.
-    pub revoked_at: DateTime<Utc>,
-}
-
-impl Event for NhiCredentialRevoked {
-    const TOPIC: &'static str = "xavyo.governance.nhi.credential_revoked";
-    const EVENT_TYPE: &'static str = "xavyo.governance.nhi.credential_revoked";
-}
-
-/// Published when credentials are expiring soon (warning).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NhiCredentialsExpiring {
-    /// The NHI ID.
-    pub nhi_id: Uuid,
-    /// The tenant ID.
-    pub tenant_id: Uuid,
-    /// The NHI name.
-    pub name: String,
-    /// The credential ID.
-    pub credential_id: Uuid,
-    /// When the credential expires.
-    pub expires_at: DateTime<Utc>,
-    /// Days until expiration.
-    pub days_until_expiry: i32,
-    /// The owner to notify.
-    pub owner_id: Uuid,
-}
-
-impl Event for NhiCredentialsExpiring {
-    const TOPIC: &'static str = "xavyo.governance.nhi.credentials_expiring";
-    const EVENT_TYPE: &'static str = "xavyo.governance.nhi.credentials_expiring";
 }
 
 // =============================================================================
@@ -575,26 +482,6 @@ mod tests {
     }
 
     #[test]
-    fn test_nhi_credentials_rotated_serialization() {
-        let event = NhiCredentialsRotated {
-            nhi_id: Uuid::new_v4(),
-            tenant_id: Uuid::new_v4(),
-            name: "api-service".to_string(),
-            new_credential_id: Uuid::new_v4(),
-            old_credential_id: Some(Uuid::new_v4()),
-            credential_type: "api_key".to_string(),
-            rotation_type: RotationType::Automatic,
-            grace_period_ends_at: Some(Utc::now()),
-            rotated_by: None,
-            rotated_at: Utc::now(),
-        };
-
-        let json = serde_json::to_string(&event).unwrap();
-        let restored: NhiCredentialsRotated = serde_json::from_str(&json).unwrap();
-        assert_eq!(event.nhi_id, restored.nhi_id);
-    }
-
-    #[test]
     fn test_nhi_suspended_serialization() {
         let event = NhiSuspended {
             nhi_id: Uuid::new_v4(),
@@ -609,21 +496,6 @@ mod tests {
         let json = serde_json::to_string(&event).unwrap();
         let restored: NhiSuspended = serde_json::from_str(&json).unwrap();
         assert_eq!(event.nhi_id, restored.nhi_id);
-    }
-
-    #[test]
-    fn test_rotation_type_serialization() {
-        let auto = RotationType::Automatic;
-        let json = serde_json::to_string(&auto).unwrap();
-        assert_eq!(json, "\"automatic\"");
-
-        let manual = RotationType::Manual;
-        let json = serde_json::to_string(&manual).unwrap();
-        assert_eq!(json, "\"manual\"");
-
-        let emergency = RotationType::Emergency;
-        let json = serde_json::to_string(&emergency).unwrap();
-        assert_eq!(json, "\"emergency\"");
     }
 
     #[test]
@@ -642,18 +514,6 @@ mod tests {
         assert_eq!(NhiCreated::TOPIC, "xavyo.governance.nhi.created");
         assert_eq!(NhiUpdated::TOPIC, "xavyo.governance.nhi.updated");
         assert_eq!(NhiDeleted::TOPIC, "xavyo.governance.nhi.deleted");
-        assert_eq!(
-            NhiCredentialsRotated::TOPIC,
-            "xavyo.governance.nhi.credentials_rotated"
-        );
-        assert_eq!(
-            NhiCredentialRevoked::TOPIC,
-            "xavyo.governance.nhi.credential_revoked"
-        );
-        assert_eq!(
-            NhiCredentialsExpiring::TOPIC,
-            "xavyo.governance.nhi.credentials_expiring"
-        );
         assert_eq!(
             NhiRiskScoreChanged::TOPIC,
             "xavyo.governance.nhi.risk_score_changed"
@@ -696,9 +556,6 @@ mod tests {
         assert!(NhiCreated::TOPIC.starts_with("xavyo."));
         assert!(NhiUpdated::TOPIC.starts_with("xavyo."));
         assert!(NhiDeleted::TOPIC.starts_with("xavyo."));
-        assert!(NhiCredentialsRotated::TOPIC.starts_with("xavyo."));
-        assert!(NhiCredentialRevoked::TOPIC.starts_with("xavyo."));
-        assert!(NhiCredentialsExpiring::TOPIC.starts_with("xavyo."));
         assert!(NhiRiskScoreChanged::TOPIC.starts_with("xavyo."));
         assert!(NhiSuspended::TOPIC.starts_with("xavyo."));
         assert!(NhiReactivated::TOPIC.starts_with("xavyo."));

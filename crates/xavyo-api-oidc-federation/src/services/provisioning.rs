@@ -38,6 +38,25 @@ impl ProvisioningService {
         idp_id: Uuid,
         claims: &IdTokenClaims,
     ) -> FederationResult<ProvisioningResult> {
+        // SECURITY: Validate claim sizes to prevent DB bloat from malicious IdPs.
+        if claims.sub.len() > 512 {
+            return Err(FederationError::ProvisioningFailed(
+                "Subject claim exceeds maximum length".to_string(),
+            ));
+        }
+        if claims.iss.len() > 2048 {
+            return Err(FederationError::ProvisioningFailed(
+                "Issuer claim exceeds maximum length".to_string(),
+            ));
+        }
+        if let Some(ref name) = claims.name {
+            if name.len() > 512 {
+                return Err(FederationError::ProvisioningFailed(
+                    "Name claim exceeds maximum length".to_string(),
+                ));
+            }
+        }
+
         // Get IdP configuration for claim mapping
         let idp = TenantIdentityProvider::find_by_id_and_tenant(&self.pool, idp_id, tenant_id)
             .await?
@@ -150,7 +169,11 @@ impl ProvisioningService {
             new_user
         };
 
-        // Create identity link
+        // Create identity link.
+        // SECURITY: Strip non-essential PII from raw_claims before storage.
+        // Only store mapped/used fields; omit `picture`, `additional`, and other PII.
+        let sanitized_claims = Self::sanitize_claims_for_storage(claims);
+
         let link = UserIdentityLink::create(
             &self.pool,
             CreateUserIdentityLink {
@@ -159,7 +182,7 @@ impl ProvisioningService {
                 identity_provider_id: idp_id,
                 subject: claims.sub.clone(),
                 issuer: claims.iss.clone(),
-                raw_claims: Some(serde_json::to_value(claims).unwrap_or_default()),
+                raw_claims: Some(sanitized_claims),
             },
         )
         .await?;
@@ -207,17 +230,38 @@ impl ProvisioningService {
         link: &UserIdentityLink,
         claims: &IdTokenClaims,
     ) -> FederationResult<UserIdentityLink> {
+        let sanitized_claims = Self::sanitize_claims_for_storage(claims);
         let updated = UserIdentityLink::update(
             &self.pool,
             link.tenant_id,
             link.id,
             UpdateUserIdentityLink {
-                raw_claims: Some(serde_json::to_value(claims).unwrap_or_default()),
+                raw_claims: Some(sanitized_claims),
             },
         )
         .await?;
 
         Ok(updated)
+    }
+
+    /// Strip non-essential PII from claims before persisting.
+    ///
+    /// Only retains fields needed for identity matching and display.
+    /// Strips `picture` (may contain authenticated URLs), `additional` (arbitrary IdP claims).
+    fn sanitize_claims_for_storage(claims: &IdTokenClaims) -> serde_json::Value {
+        serde_json::json!({
+            "sub": claims.sub,
+            "iss": claims.iss,
+            "aud": claims.aud,
+            "exp": claims.exp,
+            "iat": claims.iat,
+            "nonce": claims.nonce,
+            "email": claims.email,
+            "email_verified": claims.email_verified,
+            "name": claims.name,
+            "given_name": claims.given_name,
+            "family_name": claims.family_name,
+        })
     }
 
     /// Unlink a user from an `IdP`.

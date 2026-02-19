@@ -321,21 +321,69 @@ async fn process_callback(
 
         ConnectionResult::EmailCollision {
             existing_user_id,
-            email,
+            email: _,
         } => {
-            // Email exists - redirect to linking page
+            // Security: Only allow email-based linking if the provider has
+            // verified the email. An unverified email from a provider could
+            // be attacker-controlled, enabling account takeover via email
+            // collision.
+            if user_info.email_verified != Some(true) {
+                warn!(
+                    provider = %provider_type,
+                    "Email collision with unverified email - creating new account without email to prevent takeover"
+                );
+
+                // Create new user WITHOUT the unverified email
+                let user_id = state
+                    .auth_service
+                    .create_social_user(
+                        tenant_id,
+                        None, // Do not use unverified email
+                        user_info.display_name().as_str(),
+                        false,
+                    )
+                    .await?;
+
+                // Create social connection (still stores the unverified email in the connection record)
+                let connection_id = state
+                    .connection_service
+                    .create_connection(
+                        tenant_id,
+                        user_id,
+                        provider_type,
+                        &user_info,
+                        Some(&tokens.access_token),
+                        tokens.refresh_token.as_deref(),
+                        tokens.expires_in,
+                    )
+                    .await?;
+
+                info!(
+                    user_id = %user_id,
+                    connection_id = %connection_id,
+                    provider = %provider_type,
+                    "Created new user via social login (email collision with unverified email)"
+                );
+
+                let jwt_tokens = state.auth_service.issue_tokens(user_id, tenant_id).await?;
+                return Ok(redirect_with_tokens(
+                    &state.frontend_url,
+                    &claims.redirect_after,
+                    &jwt_tokens,
+                ));
+            }
+
+            // Email exists and is verified - redirect to linking page
+            // M2: Don't include email in URL to prevent email enumeration
             info!(
-                email = %email,
                 existing_user_id = %existing_user_id,
                 provider = %provider_type,
-                "Email collision detected, prompting for account linking"
+                "Email collision detected with verified email, prompting for account linking"
             );
 
             let redirect_url = format!(
-                "{}/link-account?provider={}&email={}",
-                state.frontend_url,
-                provider_type,
-                urlencoding::encode(&email)
+                "{}/link-account?provider={}",
+                state.frontend_url, provider_type,
             );
             Ok(Redirect::temporary(&redirect_url).into_response())
         }
@@ -389,11 +437,20 @@ async fn process_callback(
 }
 
 /// Redirect to frontend with error.
+///
+/// The error string is sanitized: only alphanumeric, underscore, and space
+/// characters are allowed, and it is truncated to 100 characters to prevent
+/// injection of arbitrary content from provider error responses.
 fn redirect_to_error(frontend_url: &str, error: &str) -> Response {
+    let sanitized: String = error
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_' || *c == ' ')
+        .take(100)
+        .collect();
     let url = format!(
         "{}/login?error={}",
         frontend_url,
-        urlencoding::encode(error)
+        urlencoding::encode(&sanitized)
     );
     Redirect::temporary(&url).into_response()
 }

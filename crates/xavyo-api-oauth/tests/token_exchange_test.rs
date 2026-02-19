@@ -78,7 +78,11 @@ mod delegation_grants {
             .await;
         let tenant_id = *tid.as_uuid();
         let user_id = ctx
-            .create_user(tid, "scope1@test.com", "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA")
+            .create_user(
+                tid,
+                "scope1@test.com",
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
             .await;
         let agent_id = create_test_nhi(&ctx, tenant_id, "scope-agent-1").await;
 
@@ -111,7 +115,11 @@ mod delegation_grants {
             .await;
         let tenant_id = *tid.as_uuid();
         let user_id = ctx
-            .create_user(tid, "wc1@test.com", "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA")
+            .create_user(
+                tid,
+                "wc1@test.com",
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
             .await;
         let agent_id = create_test_nhi(&ctx, tenant_id, "wc-agent-1").await;
 
@@ -133,7 +141,11 @@ mod delegation_grants {
             .await;
         let tenant_id = *tid.as_uuid();
         let user_id = ctx
-            .create_user(tid, "rev1@test.com", "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA")
+            .create_user(
+                tid,
+                "rev1@test.com",
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
             .await;
         let agent_id = create_test_nhi(&ctx, tenant_id, "rev-agent-1").await;
 
@@ -187,7 +199,11 @@ mod delegation_grants {
             .await;
         let tenant_id = *tid.as_uuid();
         let user_id = ctx
-            .create_user(tid, "exp1@test.com", "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA")
+            .create_user(
+                tid,
+                "exp1@test.com",
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
             .await;
         let agent_id = create_test_nhi(&ctx, tenant_id, "exp-agent-1").await;
 
@@ -216,20 +232,15 @@ mod delegation_grants {
             .await;
         let tenant_id = *tid.as_uuid();
         let user_id = ctx
-            .create_user(tid, "depth1@test.com", "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA")
+            .create_user(
+                tid,
+                "depth1@test.com",
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
             .await;
         let agent_id = create_test_nhi(&ctx, tenant_id, "depth-agent-1").await;
 
-        let grant = create_grant(
-            &ctx,
-            tenant_id,
-            user_id,
-            agent_id,
-            vec![],
-            Some(3),
-            None,
-        )
-        .await;
+        let grant = create_grant(&ctx, tenant_id, user_id, agent_id, vec![], Some(3), None).await;
 
         assert_eq!(grant.max_delegation_depth, 3);
     }
@@ -397,24 +408,21 @@ mod delegation_grants {
         .await;
 
         // Page 1: limit=2, offset=0 → 2 results
-        let page1 =
-            NhiDelegationGrant::list_by_principal(&ctx.pool, tenant_id, user_id, 2, 0)
-                .await
-                .unwrap();
+        let page1 = NhiDelegationGrant::list_by_principal(&ctx.pool, tenant_id, user_id, 2, 0)
+            .await
+            .unwrap();
         assert_eq!(page1.len(), 2);
 
         // Page 2: limit=2, offset=2 → 1 result
-        let page2 =
-            NhiDelegationGrant::list_by_principal(&ctx.pool, tenant_id, user_id, 2, 2)
-                .await
-                .unwrap();
+        let page2 = NhiDelegationGrant::list_by_principal(&ctx.pool, tenant_id, user_id, 2, 2)
+            .await
+            .unwrap();
         assert_eq!(page2.len(), 1);
 
         // All: limit=10, offset=0 → 3 results
-        let all =
-            NhiDelegationGrant::list_by_principal(&ctx.pool, tenant_id, user_id, 10, 0)
-                .await
-                .unwrap();
+        let all = NhiDelegationGrant::list_by_principal(&ctx.pool, tenant_id, user_id, 10, 0)
+            .await
+            .unwrap();
         assert_eq!(all.len(), 3);
     }
 
@@ -467,10 +475,9 @@ mod delegation_grants {
         )
         .await;
 
-        let results =
-            NhiDelegationGrant::list_by_actor(&ctx.pool, tenant_id, agent_id, 10, 0)
-                .await
-                .unwrap();
+        let results = NhiDelegationGrant::list_by_actor(&ctx.pool, tenant_id, agent_id, 10, 0)
+            .await
+            .unwrap();
         assert_eq!(results.len(), 2);
     }
 
@@ -604,10 +611,9 @@ mod delegation_grants {
             .unwrap();
 
         // find_active with tenant B should not see tenant A's grant
-        let found_active =
-            NhiDelegationGrant::find_active(&ctx.pool, tenant_b, user_a, agent_a)
-                .await
-                .unwrap();
+        let found_active = NhiDelegationGrant::find_active(&ctx.pool, tenant_b, user_a, agent_a)
+            .await
+            .unwrap();
         assert!(
             found_active.is_none(),
             "tenant B must not see tenant A's active grant"
@@ -971,9 +977,9 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 -----END PUBLIC KEY-----";
 
     const TEST_CSRF_SECRET: [u8; 32] = [
-        0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC,
-        0xDE, 0xF0, 0xFE, 0xED, 0xFA, 0xCE, 0x0D, 0xD0, 0x0D, 0xAD, 0xAB, 0xCD, 0xEF, 0x01,
-        0x23, 0x45, 0x67, 0x89,
+        0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE,
+        0xF0, 0xFE, 0xED, 0xFA, 0xCE, 0x0D, 0xD0, 0x0D, 0xAD, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45,
+        0x67, 0x89,
     ];
 
     /// Helper: create a test NHI identity.
@@ -993,10 +999,13 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
     }
 
     /// Helper: create an OAuth client authorised for token-exchange.
+    /// When `nhi_id` is provided, the client is bound to the given NHI identity
+    /// (required for H8: actor token must belong to the requesting client).
     async fn create_exchange_client(
         ctx: &OAuthTestContext,
         tenant_id: Uuid,
         suffix: &str,
+        nhi_id: Option<Uuid>,
     ) -> (String, String) {
         let client_id_str = format!("te-client-{}-{}", suffix, &Uuid::new_v4().to_string()[..8]);
         let client_secret = "test-secret-very-long-enough-for-validation";
@@ -1004,8 +1013,8 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let client_uuid = Uuid::new_v4();
 
         sqlx::query(
-            "INSERT INTO oauth_clients (id, tenant_id, client_id, client_secret_hash, name, client_type, redirect_uris, grant_types, scopes, is_active)
-             VALUES ($1, $2, $3, $4, $5, 'confidential', $6, $7, $8, true)",
+            "INSERT INTO oauth_clients (id, tenant_id, client_id, client_secret_hash, name, client_type, redirect_uris, grant_types, scopes, is_active, nhi_id)
+             VALUES ($1, $2, $3, $4, $5, 'confidential', $6, $7, $8, true, $9)",
         )
         .bind(client_uuid)
         .bind(tenant_id)
@@ -1015,6 +1024,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         .bind(&vec!["https://example.com/callback"] as &[&str])
         .bind(&vec!["urn:ietf:params:oauth:grant-type:token-exchange"] as &[&str])
         .bind(&vec!["read:tools", "write:tools"] as &[&str])
+        .bind(nhi_id)
         .execute(&ctx.admin_pool)
         .await
         .unwrap();
@@ -1079,11 +1089,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
     }
 
     /// Helper: sign a JWT with a specific delegation_depth already set.
-    fn sign_jwt_with_depth(
-        subject: Uuid,
-        tenant_id: Uuid,
-        depth: i32,
-    ) -> String {
+    fn sign_jwt_with_depth(subject: Uuid, tenant_id: Uuid, depth: i32) -> String {
         let actor_claim = xavyo_auth::ActorClaim {
             sub: Uuid::new_v4().to_string(),
             nhi_type: Some("agent".to_string()),
@@ -1110,15 +1116,23 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let ctx = OAuthTestContext::new().await;
         let uid = OAuthTestContext::unique_id();
 
-        let tid = ctx.create_tenant("te-http-hp", &format!("te-http-hp-{uid}")).await;
+        let tid = ctx
+            .create_tenant("te-http-hp", &format!("te-http-hp-{uid}"))
+            .await;
         let tenant_id = *tid.as_uuid();
 
         let user_id = ctx
-            .create_user(tid, &format!("hp-{uid}@test.com"), "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA")
+            .create_user(
+                tid,
+                &format!("hp-{uid}@test.com"),
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
             .await;
-        let agent_id = create_test_nhi(&ctx.admin_pool, tenant_id, &format!("hp-agent-{uid}")).await;
+        let agent_id =
+            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("hp-agent-{uid}")).await;
 
-        let (client_id_str, client_secret) = create_exchange_client(&ctx, tenant_id, &uid).await;
+        let (client_id_str, client_secret) =
+            create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
 
         let _grant = create_grant(
             &ctx,
@@ -1136,9 +1150,15 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let server = build_server(&ctx);
 
         let form_body = serde_urlencoded::to_string(&[
-            ("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange"),
+            (
+                "grant_type",
+                "urn:ietf:params:oauth:grant-type:token-exchange",
+            ),
             ("subject_token", &user_jwt),
-            ("subject_token_type", "urn:ietf:params:oauth:token-type:access_token"),
+            (
+                "subject_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("actor_token", &agent_jwt),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
@@ -1159,7 +1179,10 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         response.assert_status_ok();
 
         let body: serde_json::Value = response.json();
-        assert!(body.get("access_token").is_some(), "response must contain access_token");
+        assert!(
+            body.get("access_token").is_some(),
+            "response must contain access_token"
+        );
         assert_eq!(body["token_type"].as_str().unwrap(), "Bearer");
         assert_eq!(body["scope"].as_str().unwrap(), "read:tools");
 
@@ -1177,19 +1200,29 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let ctx = OAuthTestContext::new().await;
         let uid = OAuthTestContext::unique_id();
 
-        let tid = ctx.create_tenant("te-http-mst", &format!("te-http-mst-{uid}")).await;
+        let tid = ctx
+            .create_tenant("te-http-mst", &format!("te-http-mst-{uid}"))
+            .await;
         let tenant_id = *tid.as_uuid();
 
-        let agent_id = create_test_nhi(&ctx.admin_pool, tenant_id, &format!("mst-agent-{uid}")).await;
-        let (client_id_str, client_secret) = create_exchange_client(&ctx, tenant_id, &uid).await;
+        let agent_id =
+            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("mst-agent-{uid}")).await;
+        let (client_id_str, client_secret) =
+            create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
         let agent_jwt = sign_jwt(agent_id, tenant_id);
 
         let server = build_server(&ctx);
 
         // Omit subject_token entirely
         let form_body = serde_urlencoded::to_string(&[
-            ("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange"),
-            ("subject_token_type", "urn:ietf:params:oauth:token-type:access_token"),
+            (
+                "grant_type",
+                "urn:ietf:params:oauth:grant-type:token-exchange",
+            ),
+            (
+                "subject_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("actor_token", &agent_jwt),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
@@ -1214,22 +1247,35 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let ctx = OAuthTestContext::new().await;
         let uid = OAuthTestContext::unique_id();
 
-        let tid = ctx.create_tenant("te-http-self", &format!("te-http-self-{uid}")).await;
+        let tid = ctx
+            .create_tenant("te-http-self", &format!("te-http-self-{uid}"))
+            .await;
         let tenant_id = *tid.as_uuid();
 
         let user_id = ctx
-            .create_user(tid, &format!("self-{uid}@test.com"), "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA")
+            .create_user(
+                tid,
+                &format!("self-{uid}@test.com"),
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
             .await;
-        let (client_id_str, client_secret) = create_exchange_client(&ctx, tenant_id, &uid).await;
+        let (client_id_str, client_secret) =
+            create_exchange_client(&ctx, tenant_id, &uid, None).await;
 
         let same_jwt = sign_jwt(user_id, tenant_id);
 
         let server = build_server(&ctx);
 
         let form_body = serde_urlencoded::to_string(&[
-            ("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange"),
+            (
+                "grant_type",
+                "urn:ietf:params:oauth:grant-type:token-exchange",
+            ),
             ("subject_token", &same_jwt),
-            ("subject_token_type", "urn:ietf:params:oauth:token-type:access_token"),
+            (
+                "subject_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("actor_token", &same_jwt),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
@@ -1255,20 +1301,29 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let uid = OAuthTestContext::unique_id();
 
         // Tenant A: the subject token's tenant
-        let tid_a = ctx.create_tenant("te-http-ct-a", &format!("te-http-ct-a-{uid}")).await;
+        let tid_a = ctx
+            .create_tenant("te-http-ct-a", &format!("te-http-ct-a-{uid}"))
+            .await;
         let tenant_a = *tid_a.as_uuid();
 
         // Tenant B: the X-Tenant-ID we will send
-        let tid_b = ctx.create_tenant("te-http-ct-b", &format!("te-http-ct-b-{uid}")).await;
+        let tid_b = ctx
+            .create_tenant("te-http-ct-b", &format!("te-http-ct-b-{uid}"))
+            .await;
         let tenant_b = *tid_b.as_uuid();
 
         let user_id = ctx
-            .create_user(tid_a, &format!("ct-{uid}@test.com"), "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA")
+            .create_user(
+                tid_a,
+                &format!("ct-{uid}@test.com"),
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
             .await;
         let agent_id = create_test_nhi(&ctx.admin_pool, tenant_a, &format!("ct-agent-{uid}")).await;
 
-        // Client lives on tenant B
-        let (client_id_str, client_secret) = create_exchange_client(&ctx, tenant_b, &uid).await;
+        // Client lives on tenant B (no NHI binding needed; fails before H8 check)
+        let (client_id_str, client_secret) =
+            create_exchange_client(&ctx, tenant_b, &uid, None).await;
 
         // Sign user JWT with tenant A's UUID
         let user_jwt = sign_jwt(user_id, tenant_a);
@@ -1278,9 +1333,15 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         // Send X-Tenant-ID for tenant B, but the JWT carries tenant A
         let form_body = serde_urlencoded::to_string(&[
-            ("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange"),
+            (
+                "grant_type",
+                "urn:ietf:params:oauth:grant-type:token-exchange",
+            ),
             ("subject_token", &user_jwt),
-            ("subject_token_type", "urn:ietf:params:oauth:token-type:access_token"),
+            (
+                "subject_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("actor_token", &agent_jwt),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
@@ -1311,14 +1372,22 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let ctx = OAuthTestContext::new().await;
         let uid = OAuthTestContext::unique_id();
 
-        let tid = ctx.create_tenant("te-http-nag", &format!("te-http-nag-{uid}")).await;
+        let tid = ctx
+            .create_tenant("te-http-nag", &format!("te-http-nag-{uid}"))
+            .await;
         let tenant_id = *tid.as_uuid();
 
         let user_id = ctx
-            .create_user(tid, &format!("nag-{uid}@test.com"), "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA")
+            .create_user(
+                tid,
+                &format!("nag-{uid}@test.com"),
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
             .await;
-        let agent_id = create_test_nhi(&ctx.admin_pool, tenant_id, &format!("nag-agent-{uid}")).await;
-        let (client_id_str, client_secret) = create_exchange_client(&ctx, tenant_id, &uid).await;
+        let agent_id =
+            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("nag-agent-{uid}")).await;
+        let (client_id_str, client_secret) =
+            create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
 
         // Deliberately do NOT create a delegation grant
 
@@ -1328,9 +1397,15 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let server = build_server(&ctx);
 
         let form_body = serde_urlencoded::to_string(&[
-            ("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange"),
+            (
+                "grant_type",
+                "urn:ietf:params:oauth:grant-type:token-exchange",
+            ),
             ("subject_token", &user_jwt),
-            ("subject_token_type", "urn:ietf:params:oauth:token-type:access_token"),
+            (
+                "subject_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("actor_token", &agent_jwt),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
@@ -1360,14 +1435,22 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let ctx = OAuthTestContext::new().await;
         let uid = OAuthTestContext::unique_id();
 
-        let tid = ctx.create_tenant("te-http-se", &format!("te-http-se-{uid}")).await;
+        let tid = ctx
+            .create_tenant("te-http-se", &format!("te-http-se-{uid}"))
+            .await;
         let tenant_id = *tid.as_uuid();
 
         let user_id = ctx
-            .create_user(tid, &format!("se-{uid}@test.com"), "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA")
+            .create_user(
+                tid,
+                &format!("se-{uid}@test.com"),
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
             .await;
-        let agent_id = create_test_nhi(&ctx.admin_pool, tenant_id, &format!("se-agent-{uid}")).await;
-        let (client_id_str, client_secret) = create_exchange_client(&ctx, tenant_id, &uid).await;
+        let agent_id =
+            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("se-agent-{uid}")).await;
+        let (client_id_str, client_secret) =
+            create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
 
         // Grant only allows read:tools and write:tools
         let _grant = create_grant(
@@ -1387,9 +1470,15 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         // Request scope "admin:everything" which is not in the grant
         let form_body = serde_urlencoded::to_string(&[
-            ("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange"),
+            (
+                "grant_type",
+                "urn:ietf:params:oauth:grant-type:token-exchange",
+            ),
             ("subject_token", &user_jwt),
-            ("subject_token_type", "urn:ietf:params:oauth:token-type:access_token"),
+            (
+                "subject_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("actor_token", &agent_jwt),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
@@ -1419,14 +1508,22 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let ctx = OAuthTestContext::new().await;
         let uid = OAuthTestContext::unique_id();
 
-        let tid = ctx.create_tenant("te-http-de", &format!("te-http-de-{uid}")).await;
+        let tid = ctx
+            .create_tenant("te-http-de", &format!("te-http-de-{uid}"))
+            .await;
         let tenant_id = *tid.as_uuid();
 
         let user_id = ctx
-            .create_user(tid, &format!("de-{uid}@test.com"), "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA")
+            .create_user(
+                tid,
+                &format!("de-{uid}@test.com"),
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
             .await;
-        let agent_id = create_test_nhi(&ctx.admin_pool, tenant_id, &format!("de-agent-{uid}")).await;
-        let (client_id_str, client_secret) = create_exchange_client(&ctx, tenant_id, &uid).await;
+        let agent_id =
+            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("de-agent-{uid}")).await;
+        let (client_id_str, client_secret) =
+            create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
 
         // Grant allows max depth of 1
         let _grant = create_grant(
@@ -1447,9 +1544,15 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         // new_depth would be 2, exceeding max_delegation_depth=1
         let form_body = serde_urlencoded::to_string(&[
-            ("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange"),
+            (
+                "grant_type",
+                "urn:ietf:params:oauth:grant-type:token-exchange",
+            ),
             ("subject_token", &user_jwt),
-            ("subject_token_type", "urn:ietf:params:oauth:token-type:access_token"),
+            (
+                "subject_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("actor_token", &agent_jwt),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
@@ -1479,14 +1582,22 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let ctx = OAuthTestContext::new().await;
         let uid = OAuthTestContext::unique_id();
 
-        let tid = ctx.create_tenant("te-http-mcs", &format!("te-http-mcs-{uid}")).await;
+        let tid = ctx
+            .create_tenant("te-http-mcs", &format!("te-http-mcs-{uid}"))
+            .await;
         let tenant_id = *tid.as_uuid();
 
         let user_id = ctx
-            .create_user(tid, &format!("mcs-{uid}@test.com"), "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA")
+            .create_user(
+                tid,
+                &format!("mcs-{uid}@test.com"),
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
             .await;
-        let agent_id = create_test_nhi(&ctx.admin_pool, tenant_id, &format!("mcs-agent-{uid}")).await;
-        let (client_id_str, _client_secret) = create_exchange_client(&ctx, tenant_id, &uid).await;
+        let agent_id =
+            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("mcs-agent-{uid}")).await;
+        let (client_id_str, _client_secret) =
+            create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
 
         let user_jwt = sign_jwt(user_id, tenant_id);
         let agent_jwt = sign_jwt(agent_id, tenant_id);
@@ -1495,9 +1606,15 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         // Omit client_secret
         let form_body = serde_urlencoded::to_string(&[
-            ("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange"),
+            (
+                "grant_type",
+                "urn:ietf:params:oauth:grant-type:token-exchange",
+            ),
             ("subject_token", &user_jwt),
-            ("subject_token_type", "urn:ietf:params:oauth:token-type:access_token"),
+            (
+                "subject_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
             ("actor_token", &agent_jwt),
             ("client_id", &client_id_str),
         ])
@@ -1569,9 +1686,9 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 -----END PUBLIC KEY-----";
 
     const TEST_CSRF_SECRET: [u8; 32] = [
-        0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC,
-        0xDE, 0xF0, 0xFE, 0xED, 0xFA, 0xCE, 0x0D, 0xD0, 0x0D, 0xAD, 0xAB, 0xCD, 0xEF, 0x01,
-        0x23, 0x45, 0x67, 0x89,
+        0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE,
+        0xF0, 0xFE, 0xED, 0xFA, 0xCE, 0x0D, 0xD0, 0x0D, 0xAD, 0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45,
+        0x67, 0x89,
     ];
 
     /// Helper: create a test NHI identity.
@@ -1645,7 +1762,9 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let ctx = OAuthTestContext::new().await;
         let uid = OAuthTestContext::unique_id();
 
-        let tid = ctx.create_tenant("nhi-bind-1", &format!("nhi-bind-1-{uid}")).await;
+        let tid = ctx
+            .create_tenant("nhi-bind-1", &format!("nhi-bind-1-{uid}"))
+            .await;
         let tenant_id = *tid.as_uuid();
 
         let nhi_id = create_test_nhi(&ctx.admin_pool, tenant_id, &format!("bind-nhi-{uid}")).await;
@@ -1662,7 +1781,11 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         .await
         .expect("client should exist");
 
-        assert_eq!(row.0, Some(nhi_id), "nhi_id must be persisted on the client");
+        assert_eq!(
+            row.0,
+            Some(nhi_id),
+            "nhi_id must be persisted on the client"
+        );
     }
 
     #[tokio::test]
@@ -1670,11 +1793,14 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let ctx = OAuthTestContext::new().await;
         let uid = OAuthTestContext::unique_id();
 
-        let tid = ctx.create_tenant("nhi-cc-1", &format!("nhi-cc-1-{uid}")).await;
+        let tid = ctx
+            .create_tenant("nhi-cc-1", &format!("nhi-cc-1-{uid}"))
+            .await;
         let tenant_id = *tid.as_uuid();
 
         let nhi_id = create_test_nhi(&ctx.admin_pool, tenant_id, &format!("cc-nhi-{uid}")).await;
-        let (client_id_str, client_secret) = create_client(&ctx, tenant_id, &uid, Some(nhi_id)).await;
+        let (client_id_str, client_secret) =
+            create_client(&ctx, tenant_id, &uid, Some(nhi_id)).await;
 
         let server = build_server(&ctx);
 
@@ -1698,7 +1824,9 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         response.assert_status_ok();
 
         let body: serde_json::Value = response.json();
-        let access_token = body["access_token"].as_str().expect("access_token must be present");
+        let access_token = body["access_token"]
+            .as_str()
+            .expect("access_token must be present");
 
         // Decode and verify the subject is the NHI ID, not the client_id
         let decoded = xavyo_auth::decode_token(access_token, TEST_PUBLIC_KEY.as_bytes()).unwrap();
@@ -1714,7 +1842,9 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let ctx = OAuthTestContext::new().await;
         let uid = OAuthTestContext::unique_id();
 
-        let tid = ctx.create_tenant("nhi-cc-2", &format!("nhi-cc-2-{uid}")).await;
+        let tid = ctx
+            .create_tenant("nhi-cc-2", &format!("nhi-cc-2-{uid}"))
+            .await;
         let tenant_id = *tid.as_uuid();
 
         // No nhi_id binding
@@ -1742,7 +1872,9 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         response.assert_status_ok();
 
         let body: serde_json::Value = response.json();
-        let access_token = body["access_token"].as_str().expect("access_token must be present");
+        let access_token = body["access_token"]
+            .as_str()
+            .expect("access_token must be present");
 
         // Decode and verify the subject is the client_id (not an NHI)
         let decoded = xavyo_auth::decode_token(access_token, TEST_PUBLIC_KEY.as_bytes()).unwrap();

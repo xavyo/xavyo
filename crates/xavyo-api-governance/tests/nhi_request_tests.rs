@@ -415,8 +415,7 @@ fn test_approval_creates_nhi_with_requested_params() {
     // 2. NHI is created with purpose
     // 3. NHI is created with requested_expiration (or default)
     // 4. NHI is created with requested_rotation_days (or default)
-    // 5. Initial credentials are generated
-    // 6. Requested permissions are assigned
+    // 5. Requested permissions are assigned
 
     let request = SubmitNhiRequestRequest {
         name: "production-api-service".to_string(),

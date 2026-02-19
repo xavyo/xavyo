@@ -61,9 +61,10 @@ pub enum SocialError {
     #[error("Failed to fetch user info from {provider}")]
     UserInfoFailed { provider: ProviderType },
 
-    #[error("Account linking required: email {email} already exists")]
+    #[error("Account linking required: email already exists for user {existing_user_id}")]
     AccountLinkingRequired {
         existing_user_id: Uuid,
+        /// SECURITY: email stored for internal use only; never exposed in Display/logs.
         email: String,
     },
 
@@ -168,12 +169,8 @@ impl SocialError {
 impl IntoResponse for SocialError {
     fn into_response(self) -> Response {
         let status = self.status_code();
-        let details = match &self {
-            SocialError::AccountLinkingRequired { email, .. } => {
-                Some(serde_json::json!({ "email": email }))
-            }
-            _ => None,
-        };
+        // Security: never expose PII (like email) in error responses.
+        let details: Option<serde_json::Value> = None;
         let message = match &self {
             SocialError::DatabaseError(e) => {
                 tracing::error!("Social database error: {:?}", e);
@@ -202,6 +199,33 @@ impl IntoResponse for SocialError {
             SocialError::ConfigurationError { .. } => {
                 tracing::error!("Social configuration error");
                 "A provider configuration error occurred".to_string()
+            }
+            // SECURITY: AccountLinkingRequired contains email address in the error variant.
+            // Never expose the email in the HTTP response — return a generic message instead.
+            SocialError::AccountLinkingRequired {
+                existing_user_id,
+                email: _,
+            } => {
+                tracing::info!(
+                    target: "social_auth",
+                    user_id = %existing_user_id,
+                    "Account linking required for existing user (email not logged for privacy)"
+                );
+                // Generic message without email to prevent PII leakage
+                "An account with this email already exists. Please link your accounts.".to_string()
+            }
+            // SECURITY: Sanitize errors that may contain IdP-controlled or library-internal details.
+            SocialError::InvalidCallback { .. } => "Invalid OAuth callback".to_string(),
+            SocialError::InvalidState { reason } => {
+                tracing::warn!("Invalid OAuth state: {}", reason);
+                "Invalid or expired state parameter".to_string()
+            }
+            SocialError::TokenExchangeFailed { provider, status } => {
+                tracing::warn!(provider = %provider, status = %status, "Token exchange failed");
+                format!("Token exchange failed with {provider}")
+            }
+            SocialError::UserInfoFailed { provider } => {
+                format!("Failed to fetch user info from {provider}")
             }
             _ => self.to_string(),
         };

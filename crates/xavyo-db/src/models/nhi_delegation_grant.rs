@@ -72,7 +72,10 @@ impl NhiDelegationGrant {
     #[must_use]
     pub fn is_resource_type_allowed(&self, resource_type: &str) -> bool {
         self.allowed_resource_types.is_empty()
-            || self.allowed_resource_types.iter().any(|r| r == resource_type)
+            || self
+                .allowed_resource_types
+                .iter()
+                .any(|r| r == resource_type)
     }
 
     /// Grant a delegation (upsert on tenant_id + principal_id + actor_nhi_id).
@@ -360,9 +363,15 @@ mod tests {
         let json_str = serde_json::to_string(&grant).unwrap();
         let deserialized: NhiDelegationGrant = serde_json::from_str(&json_str).unwrap();
         assert_eq!(grant.id, deserialized.id);
-        assert_eq!(grant.max_delegation_depth, deserialized.max_delegation_depth);
+        assert_eq!(
+            grant.max_delegation_depth,
+            deserialized.max_delegation_depth
+        );
         assert_eq!(grant.allowed_scopes, deserialized.allowed_scopes);
-        assert_eq!(grant.allowed_resource_types, deserialized.allowed_resource_types);
+        assert_eq!(
+            grant.allowed_resource_types,
+            deserialized.allowed_resource_types
+        );
     }
 
     #[test]

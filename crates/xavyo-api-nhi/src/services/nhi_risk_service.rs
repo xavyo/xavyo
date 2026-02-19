@@ -1,14 +1,14 @@
 //! NHI risk scoring service.
 //!
 //! Computes risk scores (0-100) for NHI entities based on:
-//! - Common factors: staleness, credential age, inactivity
+//! - Common factors: staleness, inactivity
 //! - Type-specific factors: blast radius (tools), autonomy (agents), access scope (service accounts)
 
 use chrono::Utc;
 use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
-use xavyo_db::models::{NhiCredential, NhiIdentity, NhiToolPermission};
+use xavyo_db::models::{NhiIdentity, NhiToolPermission};
 use xavyo_nhi::NhiType;
 
 use crate::error::NhiApiError;
@@ -77,7 +77,6 @@ impl NhiRiskService {
 
         // Common factors (apply to all types)
         common_factors.push(Self::staleness_factor(&identity));
-        common_factors.push(Self::credential_age_factor(pool, tenant_id, nhi_id).await);
         common_factors.push(Self::inactivity_factor(&identity));
 
         // Type-specific factors
@@ -127,34 +126,13 @@ impl NhiRiskService {
     }
 
     fn staleness_factor(identity: &NhiIdentity) -> RiskFactor {
-        let days_since = identity
-            .last_rotation_at
-            .map(|lr| (Utc::now() - lr).num_days())
-            .unwrap_or_else(|| (Utc::now() - identity.created_at).num_days()); // Fall back to age since creation
+        let days_since = (Utc::now() - identity.updated_at).num_days();
         let score = ((days_since as f64 / 90.0) * 100.0).min(100.0);
         RiskFactor {
             name: "staleness".into(),
             score,
-            weight: 0.3,
-            description: format!("{days_since} days since last rotation"),
-        }
-    }
-
-    async fn credential_age_factor(pool: &PgPool, tenant_id: Uuid, nhi_id: Uuid) -> RiskFactor {
-        let creds = NhiCredential::list_active_by_nhi(pool, tenant_id, nhi_id)
-            .await
-            .unwrap_or_default();
-        let oldest_days = creds
-            .iter()
-            .map(|c| (Utc::now() - c.created_at).num_days())
-            .max()
-            .unwrap_or(0);
-        let score = ((oldest_days as f64 / 180.0) * 100.0).min(100.0);
-        RiskFactor {
-            name: "credential_age".into(),
-            score,
-            weight: 0.25,
-            description: format!("Oldest active credential: {oldest_days} days"),
+            weight: 0.35,
+            description: format!("{days_since} days since last update"),
         }
     }
 
@@ -172,7 +150,7 @@ impl NhiRiskService {
         RiskFactor {
             name: "inactivity".into(),
             score,
-            weight: 0.2,
+            weight: 0.30,
             description: format!(
                 "{days_inactive} days since last activity (threshold: {threshold})"
             ),
@@ -188,7 +166,7 @@ impl NhiRiskService {
         RiskFactor {
             name: "blast_radius".into(),
             score,
-            weight: 0.25,
+            weight: 0.35,
             description: format!("{count} agents have permissions"),
         }
     }
@@ -209,7 +187,7 @@ impl NhiRiskService {
         RiskFactor {
             name: "autonomy".into(),
             score,
-            weight: 0.25,
+            weight: 0.35,
             description: format!(
                 "Requires human approval: {}",
                 requires_approval.unwrap_or(true)
@@ -218,16 +196,20 @@ impl NhiRiskService {
     }
 
     async fn access_scope_factor(pool: &PgPool, tenant_id: Uuid, sa_nhi_id: Uuid) -> RiskFactor {
-        let creds = NhiCredential::list_active_by_nhi(pool, tenant_id, sa_nhi_id)
-            .await
-            .unwrap_or_default();
-        let count = creds.len();
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM nhi_user_permissions WHERE tenant_id = $1 AND nhi_id = $2",
+        )
+        .bind(tenant_id)
+        .bind(sa_nhi_id)
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
         let score = ((count as f64 / 5.0) * 100.0).min(100.0);
         RiskFactor {
             name: "access_scope".into(),
             score,
-            weight: 0.25,
-            description: format!("{count} active credentials"),
+            weight: 0.35,
+            description: format!("{count} user permission grants"),
         }
     }
 

@@ -219,7 +219,6 @@ pub use models::{
     CreateGovMetaRoleEvent,
     CreateGovMetaRoleInheritance,
     CreateGovNhiAuditEvent,
-    CreateGovNhiCredential,
     CreateGovNhiRequest,
     CreateGovNhiUsageEvent,
     CreateGovOrphanDetection,
@@ -411,7 +410,6 @@ pub use models::{
     GovMicroCertification,
     // NHI Lifecycle models (F061)
     GovNhiAuditEvent,
-    GovNhiCredential,
     GovNhiRequest,
     GovNhiRiskScore,
     GovNhiUsageEvent,
@@ -518,9 +516,6 @@ pub use models::{
     NewOAuthRefreshToken,
     NhiAuditEventFilter,
     NhiAuditEventType,
-    NhiCredentialFilter,
-    NhiCredentialType,
-    NhiEntityType,
     NhiRequestFilter,
     NhiRequestStatus,
     NhiRiskScoreFilter,
@@ -780,7 +775,7 @@ pub use models::{
 
 // Unified NHI Identity exports (201-tool-nhi-promotion)
 pub use models::{
-    CreateNhiCredential, CreateNhiIdentity, CreateNhiServiceAccount, NhiCredential, NhiIdentity,
-    NhiIdentityFilter, NhiServiceAccount, NhiServiceAccountFilter, NhiServiceAccountWithIdentity,
-    UpdateNhiIdentity, UpdateNhiServiceAccount,
+    CreateNhiIdentity, CreateNhiServiceAccount, NhiIdentity, NhiIdentityFilter, NhiServiceAccount,
+    NhiServiceAccountFilter, NhiServiceAccountWithIdentity, UpdateNhiIdentity,
+    UpdateNhiServiceAccount,
 };

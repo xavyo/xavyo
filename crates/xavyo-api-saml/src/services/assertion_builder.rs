@@ -216,27 +216,38 @@ impl AssertionBuilder {
     }
 
     fn sign_response(&self, response_xml: &str, assertion_id: &str) -> SamlResult<String> {
-        // Find insertion point
-        let find_pattern = format!("ID=\"{assertion_id}\"");
-        let assertion_start = response_xml.find(&find_pattern).ok_or_else(|| {
-            SamlError::AssertionGenerationFailed("Cannot find Assertion".to_string())
+        // SECURITY NOTE: This method operates on XML that we generated ourselves
+        // (via build_response_xml above), so the structure is fully controlled.
+        // String-based boundary detection is acceptable here because:
+        // 1. assertion_id is a UUID we generated (no injection risk)
+        // 2. The XML structure is deterministic from our builder
+        // 3. There is exactly one <saml:Assertion> element in our output
+
+        // Find the assertion tag by its ID attribute
+        let assertion_tag = format!("<saml:Assertion xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:assertion\"\n        ID=\"{}\"", xml_escape(assertion_id));
+        let assertion_element_start = response_xml.find(&assertion_tag).ok_or_else(|| {
+            SamlError::AssertionGenerationFailed("Cannot find Assertion element".to_string())
         })?;
 
-        let after_issuer = response_xml[assertion_start..]
+        // Find the Issuer closing tag after the assertion start
+        let after_issuer = response_xml[assertion_element_start..]
             .find("</saml:Issuer>")
-            .map(|pos| assertion_start + pos + "</saml:Issuer>".len())
+            .map(|pos| assertion_element_start + pos + "</saml:Issuer>".len())
             .ok_or_else(|| {
-                SamlError::AssertionGenerationFailed("Cannot find Issuer".to_string())
+                SamlError::AssertionGenerationFailed("Cannot find Issuer in Assertion".to_string())
             })?;
 
         let certificate_base64 = self.credentials.certificate_base64_der()?;
 
-        let assertion_end = response_xml.find("</saml:Assertion>").ok_or_else(|| {
-            SamlError::AssertionGenerationFailed("Cannot find Assertion end".to_string())
-        })?;
+        // Find the assertion end tag AFTER the assertion start (not from the beginning)
+        let assertion_end = response_xml[assertion_element_start..]
+            .find("</saml:Assertion>")
+            .map(|pos| assertion_element_start + pos)
+            .ok_or_else(|| {
+                SamlError::AssertionGenerationFailed("Cannot find Assertion end".to_string())
+            })?;
 
-        // Extract the assertion element
-        let assertion_element_start = response_xml[..assertion_start].rfind('<').unwrap_or(0);
+        // Extract the full assertion element
         let assertion_content =
             &response_xml[assertion_element_start..assertion_end + "</saml:Assertion>".len()];
 

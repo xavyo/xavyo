@@ -13,6 +13,7 @@ pub struct TenantSocialProvider {
     pub provider: String,
     pub enabled: bool,
     pub client_id: String,
+    #[serde(skip_serializing)]
     pub client_secret_encrypted: Vec<u8>,
     pub additional_config: Option<serde_json::Value>,
     pub scopes: Option<Vec<String>>,

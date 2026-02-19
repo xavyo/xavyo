@@ -21,9 +21,9 @@ pub enum NhiAuditEventType {
     Created,
     /// NHI metadata was updated.
     Updated,
-    /// Credentials were rotated.
+    /// Deprecated: NHI credentials removed
     CredentialsRotated,
-    /// A specific credential was revoked.
+    /// Deprecated: NHI credentials removed
     CredentialRevoked,
     /// NHI was suspended.
     Suspended,

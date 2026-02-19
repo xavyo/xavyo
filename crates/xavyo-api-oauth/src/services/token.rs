@@ -353,14 +353,20 @@ impl TokenService {
         let family = family_id.unwrap_or_else(Uuid::new_v4);
         let expires_at = Utc::now() + chrono::Duration::seconds(REFRESH_TOKEN_EXPIRY_SECS);
 
+        // Acquire a single connection so RLS context and query run on the same connection
+        let mut conn = self.pool.acquire().await.map_err(|e| {
+            tracing::error!("Failed to acquire connection: {}", e);
+            OAuthError::Internal(e.to_string())
+        })?;
+
         // Set tenant context for RLS
         sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
             .bind(tenant_id.to_string())
-            .execute(&self.pool)
+            .execute(&mut *conn)
             .await
             .map_err(|e| {
                 tracing::error!("Failed to set tenant context: {}", e);
-                OAuthError::Internal("Failed to set tenant context".to_string())
+                OAuthError::Internal(e.to_string())
             })?;
 
         sqlx::query(
@@ -379,7 +385,7 @@ impl TokenService {
         .bind(scope)
         .bind(family)
         .bind(expires_at)
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await
         .map_err(|e| {
             tracing::error!("Failed to create refresh token: {}", e);
@@ -414,14 +420,20 @@ impl TokenService {
     ) -> Result<(Uuid, String, String), OAuthError> {
         let token_hash = Self::hash_refresh_token(refresh_token);
 
+        // Acquire a single connection so RLS context and all queries run on the same connection
+        let mut conn = self.pool.acquire().await.map_err(|e| {
+            tracing::error!("Failed to acquire connection: {}", e);
+            OAuthError::Internal(e.to_string())
+        })?;
+
         // Set tenant context for RLS
         sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
             .bind(tenant_id.to_string())
-            .execute(&self.pool)
+            .execute(&mut *conn)
             .await
             .map_err(|e| {
                 tracing::error!("Failed to set tenant context: {}", e);
-                OAuthError::Internal("Failed to set tenant context".to_string())
+                OAuthError::Internal(e.to_string())
             })?;
 
         // Look up the refresh token
@@ -435,7 +447,7 @@ impl TokenService {
         )
         .bind(&token_hash)
         .bind(tenant_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *conn)
         .await
         .map_err(|e| {
             tracing::error!("Database error looking up refresh token: {}", e);
@@ -485,7 +497,7 @@ impl TokenService {
         )
         .bind(token.id)
         .bind(tenant_id)
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await
         .map_err(|e| {
             tracing::error!("Failed to revoke old refresh token: {}", e);
@@ -514,14 +526,20 @@ impl TokenService {
         tenant_id: Uuid,
         family_id: Uuid,
     ) -> Result<(), OAuthError> {
+        // Acquire a single connection so RLS context and query run on the same connection
+        let mut conn = self.pool.acquire().await.map_err(|e| {
+            tracing::error!("Failed to acquire connection: {}", e);
+            OAuthError::Internal(e.to_string())
+        })?;
+
         // Set tenant context for RLS
         sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
             .bind(tenant_id.to_string())
-            .execute(&self.pool)
+            .execute(&mut *conn)
             .await
             .map_err(|e| {
                 tracing::error!("Failed to set tenant context: {}", e);
-                OAuthError::Internal("Failed to set tenant context".to_string())
+                OAuthError::Internal(e.to_string())
             })?;
 
         sqlx::query(
@@ -533,7 +551,7 @@ impl TokenService {
         )
         .bind(family_id)
         .bind(tenant_id)
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await
         .map_err(|e| {
             tracing::error!("Failed to revoke token family: {}", e);
@@ -552,14 +570,20 @@ impl TokenService {
         tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<(), OAuthError> {
+        // Acquire a single connection so RLS context and query run on the same connection
+        let mut conn = self.pool.acquire().await.map_err(|e| {
+            tracing::error!("Failed to acquire connection: {}", e);
+            OAuthError::Internal(e.to_string())
+        })?;
+
         // Set tenant context for RLS
         sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
             .bind(tenant_id.to_string())
-            .execute(&self.pool)
+            .execute(&mut *conn)
             .await
             .map_err(|e| {
                 tracing::error!("Failed to set tenant context: {}", e);
-                OAuthError::Internal("Failed to set tenant context".to_string())
+                OAuthError::Internal(e.to_string())
             })?;
 
         let result = sqlx::query(
@@ -571,7 +595,7 @@ impl TokenService {
         )
         .bind(user_id)
         .bind(tenant_id)
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await
         .map_err(|e| {
             tracing::error!("Failed to revoke user tokens: {}", e);
@@ -667,6 +691,22 @@ impl TokenService {
         let token_hash = Self::hash_refresh_token(&token);
         let expires_at = Utc::now() + chrono::Duration::seconds(REFRESH_TOKEN_EXPIRY_SECS);
 
+        // Acquire a single connection so RLS context and query run on the same connection
+        let mut conn = self.pool.acquire().await.map_err(|e| {
+            tracing::error!("Failed to acquire connection: {}", e);
+            OAuthError::Internal(e.to_string())
+        })?;
+
+        // Set tenant context for RLS
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to set tenant context: {}", e);
+                OAuthError::Internal(e.to_string())
+            })?;
+
         sqlx::query(
             r"
             INSERT INTO oauth_refresh_tokens (
@@ -683,7 +723,7 @@ impl TokenService {
         .bind(scope)
         .bind(family_id)
         .bind(expires_at)
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await
         .map_err(|e| {
             tracing::error!("Failed to create refresh token: {}", e);

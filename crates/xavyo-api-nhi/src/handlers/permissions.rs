@@ -20,6 +20,8 @@ use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
 use xavyo_db::models::nhi_tool_permission::NhiToolPermission;
 
+use sqlx;
+
 use crate::error::NhiApiError;
 use crate::services::nhi_permission_service::NhiPermissionService;
 use crate::state::NhiState;
@@ -56,6 +58,43 @@ pub struct PaginatedResponse<T: Serialize> {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RevokeResponse {
     pub revoked: bool,
+}
+
+/// Request to grant tool permissions in bulk.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct BulkGrantRequest {
+    /// Up to 100 tool NHI IDs to grant.
+    pub tool_ids: Vec<Uuid>,
+    /// Optional expiration for all grants.
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
+/// Result of a single grant within a bulk operation.
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct BulkGrantResult {
+    pub tool_id: Uuid,
+    pub tool_name: Option<String>,
+    pub permission_id: Option<Uuid>,
+    pub error: Option<String>,
+}
+
+/// Response from bulk grant operation.
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct BulkGrantResponse {
+    pub granted: Vec<BulkGrantResult>,
+}
+
+/// Request to grant all tools from an MCP server.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct GrantByServerRequest {
+    /// MCP server name (matches `nhi_tools.provider` field).
+    pub server_name: String,
+    /// Optional expiration for all grants.
+    pub expires_at: Option<DateTime<Utc>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -225,6 +264,138 @@ pub async fn list_tool_agents(
     }))
 }
 
+/// POST /agents/{agent_id}/tools/bulk-grant — Grant permissions for multiple tools at once.
+///
+/// Individual failures don't block the batch — each result reports success or error.
+pub async fn bulk_grant_handler(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(agent_id): Path<Uuid>,
+    Json(request): Json<BulkGrantRequest>,
+) -> Result<impl IntoResponse, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
+
+    if request.tool_ids.is_empty() {
+        return Err(NhiApiError::BadRequest("tool_ids must not be empty".into()));
+    }
+    if request.tool_ids.len() > 100 {
+        return Err(NhiApiError::BadRequest(
+            "Maximum 100 tools per bulk-grant request".into(),
+        ));
+    }
+
+    let tenant_uuid = *tenant_id.as_uuid();
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
+
+    let mut results = Vec::with_capacity(request.tool_ids.len());
+
+    for tool_id in &request.tool_ids {
+        match NhiPermissionService::grant(
+            &state.pool,
+            tenant_uuid,
+            agent_id,
+            *tool_id,
+            user_id,
+            request.expires_at,
+        )
+        .await
+        {
+            Ok(perm) => results.push(BulkGrantResult {
+                tool_id: *tool_id,
+                tool_name: None,
+                permission_id: Some(perm.id),
+                error: None,
+            }),
+            Err(e) => results.push(BulkGrantResult {
+                tool_id: *tool_id,
+                tool_name: None,
+                permission_id: None,
+                error: Some(e.to_string()),
+            }),
+        }
+    }
+
+    Ok((StatusCode::OK, Json(BulkGrantResponse { granted: results })))
+}
+
+/// POST /agents/{agent_id}/tools/grant-by-server — Grant all MCP tools from a server.
+///
+/// Looks up tools where `nhi_tools.provider = server_name AND category = 'mcp'`
+/// for the tenant, then bulk-grants them to the agent.
+pub async fn grant_by_server_handler(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
+    Extension(claims): Extension<JwtClaims>,
+    Path(agent_id): Path<Uuid>,
+    Json(request): Json<GrantByServerRequest>,
+) -> Result<impl IntoResponse, NhiApiError> {
+    if !claims.has_role("admin") {
+        return Err(NhiApiError::Forbidden);
+    }
+
+    if request.server_name.trim().is_empty() {
+        return Err(NhiApiError::BadRequest(
+            "server_name must not be empty".into(),
+        ));
+    }
+
+    let tenant_uuid = *tenant_id.as_uuid();
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
+
+    // Look up all MCP tools from this server
+    let tools: Vec<(Uuid, String)> = sqlx::query_as(
+        r"
+        SELECT i.id, i.name
+        FROM nhi_identities i
+        INNER JOIN nhi_tools t ON t.nhi_id = i.id
+        WHERE i.tenant_id = $1
+          AND t.provider = $2
+          AND t.category = 'mcp'
+          AND i.lifecycle_state = 'active'
+        ",
+    )
+    .bind(tenant_uuid)
+    .bind(&request.server_name)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(NhiApiError::Database)?;
+
+    let mut results = Vec::with_capacity(tools.len());
+
+    for (tool_id, tool_name) in &tools {
+        match NhiPermissionService::grant(
+            &state.pool,
+            tenant_uuid,
+            agent_id,
+            *tool_id,
+            user_id,
+            request.expires_at,
+        )
+        .await
+        {
+            Ok(perm) => results.push(BulkGrantResult {
+                tool_id: *tool_id,
+                tool_name: Some(tool_name.clone()),
+                permission_id: Some(perm.id),
+                error: None,
+            }),
+            Err(e) => results.push(BulkGrantResult {
+                tool_id: *tool_id,
+                tool_name: Some(tool_name.clone()),
+                permission_id: None,
+                error: Some(e.to_string()),
+            }),
+        }
+    }
+
+    Ok((StatusCode::OK, Json(BulkGrantResponse { granted: results })))
+}
+
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
@@ -239,6 +410,15 @@ pub fn permission_routes(state: NhiState) -> Router {
         .route(
             "/agents/:agent_id/tools/:tool_id/revoke",
             post(revoke_permission),
+        )
+        // Bulk grant endpoints
+        .route(
+            "/agents/:agent_id/tools/bulk-grant",
+            post(bulk_grant_handler),
+        )
+        .route(
+            "/agents/:agent_id/tools/grant-by-server",
+            post(grant_by_server_handler),
         )
         // List: read-only, tenant-scoped
         .route("/agents/:agent_id/tools", get(list_agent_tools))

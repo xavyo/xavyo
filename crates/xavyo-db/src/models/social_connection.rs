@@ -15,10 +15,13 @@ pub struct SocialConnection {
     pub provider_user_id: String,
     pub email: Option<String>,
     pub display_name: Option<String>,
+    #[serde(skip_serializing)]
     pub access_token_encrypted: Option<Vec<u8>>,
+    #[serde(skip_serializing)]
     pub refresh_token_encrypted: Option<Vec<u8>>,
     pub token_expires_at: Option<DateTime<Utc>>,
     pub is_private_email: bool,
+    #[serde(skip_serializing)]
     pub raw_claims: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

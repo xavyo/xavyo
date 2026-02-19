@@ -573,9 +573,9 @@ pub fn mfa_router(state: AuthState, jwt_public_key: String) -> Router {
     Router::new()
         .merge(verification_routes)
         .merge(management_routes)
-        .layer(Extension(
-            crate::middleware::jwt_auth::JwtPublicKey(jwt_public_key),
-        ))
+        .layer(Extension(crate::middleware::jwt_auth::JwtPublicKey(
+            jwt_public_key,
+        )))
         .layer(Extension(state.mfa_service.clone()))
         .layer(Extension(state.webauthn_service.clone()))
         .layer(Extension(state.pool.clone()))

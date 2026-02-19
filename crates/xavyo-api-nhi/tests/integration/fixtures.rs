@@ -99,51 +99,6 @@ impl NhiFixture {
     }
 }
 
-/// Credential fixture for credential rotation tests.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CredentialFixture {
-    pub id: Uuid,
-    pub nhi_id: Uuid,
-    pub tenant_id: Uuid,
-    pub credential_type: String,
-    pub is_active: bool,
-    pub created_at: DateTime<Utc>,
-    pub expires_at: Option<DateTime<Utc>>,
-}
-
-impl CredentialFixture {
-    /// Create a new credential fixture.
-    pub fn new(nhi_id: Uuid, tenant_id: Uuid) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            nhi_id,
-            tenant_id,
-            credential_type: "api_key".to_string(),
-            is_active: true,
-            created_at: Utc::now(),
-            expires_at: None,
-        }
-    }
-
-    /// Builder method to set credential type.
-    pub fn with_type(mut self, credential_type: &str) -> Self {
-        self.credential_type = credential_type.to_string();
-        self
-    }
-
-    /// Builder method to set expiration.
-    pub fn with_expiration(mut self, expires_at: DateTime<Utc>) -> Self {
-        self.expires_at = Some(expires_at);
-        self
-    }
-
-    /// Builder method to set active status.
-    pub fn with_active(mut self, is_active: bool) -> Self {
-        self.is_active = is_active;
-        self
-    }
-}
-
 /// Risk score fixture for governance tests.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RiskScoreFixture {
@@ -160,7 +115,7 @@ impl RiskScoreFixture {
             nhi_id,
             score: 20,
             level: "low".to_string(),
-            factors: vec![RiskFactorFixture::new("credential_age", 10)],
+            factors: vec![RiskFactorFixture::new("staleness", 10)],
         }
     }
 
@@ -171,7 +126,7 @@ impl RiskScoreFixture {
             score: 50,
             level: "medium".to_string(),
             factors: vec![
-                RiskFactorFixture::new("credential_age", 20),
+                RiskFactorFixture::new("staleness", 20),
                 RiskFactorFixture::new("unused_permissions", 15),
                 RiskFactorFixture::new("inactivity", 15),
             ],
@@ -185,7 +140,7 @@ impl RiskScoreFixture {
             score: 80,
             level: "high".to_string(),
             factors: vec![
-                RiskFactorFixture::new("credential_age", 30),
+                RiskFactorFixture::new("staleness", 30),
                 RiskFactorFixture::new("unused_permissions", 25),
                 RiskFactorFixture::new("inactivity", 25),
             ],

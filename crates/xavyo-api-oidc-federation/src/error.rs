@@ -198,8 +198,17 @@ impl IntoResponse for FederationError {
                 "Authentication session not found or expired".to_string(),
             ),
             FederationError::IdpAuthenticationFailed { error, description } => {
-                let msg = description.clone().unwrap_or_else(|| error.clone());
-                (StatusCode::UNAUTHORIZED, "authentication_failed", msg)
+                // SECURITY: Log IdP-provided details internally but return generic message.
+                tracing::warn!(
+                    idp_error = %error,
+                    idp_description = ?description,
+                    "IdP authentication failed (details not reflected to client)"
+                );
+                (
+                    StatusCode::UNAUTHORIZED,
+                    "authentication_failed",
+                    "Authentication failed at identity provider".to_string(),
+                )
             }
 
             // 403 Forbidden
@@ -216,10 +225,10 @@ impl IntoResponse for FederationError {
                 "idp_not_found",
                 format!("Identity provider {id} not found"),
             ),
-            FederationError::DomainNotConfigured(domain) => (
+            FederationError::DomainNotConfigured(_domain) => (
                 StatusCode::NOT_FOUND,
                 "domain_not_configured",
-                format!("No IdP configured for domain {domain}"),
+                "Domain not configured for any identity provider".to_string(),
             ),
 
             // 409 Conflict
@@ -245,21 +254,27 @@ impl IntoResponse for FederationError {
             ),
 
             // 422 Unprocessable Entity
-            FederationError::DiscoveryFailed { issuer, message } => (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                "discovery_failed",
-                format!("Discovery failed for {issuer}: {message}"),
-            ),
+            FederationError::DiscoveryFailed { issuer, message } => {
+                tracing::warn!("Discovery failed for {issuer}: {message}");
+                (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "discovery_failed",
+                    "Failed to discover OIDC endpoints for the configured issuer".to_string(),
+                )
+            }
             FederationError::ValidationFailed(msg) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "validation_failed",
                 msg.clone(),
             ),
-            FederationError::TokenExchangeFailed(msg) => (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                "token_exchange_failed",
-                msg.clone(),
-            ),
+            FederationError::TokenExchangeFailed(msg) => {
+                tracing::error!("Token exchange failed: {}", msg);
+                (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "token_exchange_failed",
+                    "Token exchange with identity provider failed".to_string(),
+                )
+            }
             FederationError::IdTokenValidationFailed(msg) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "id_token_invalid",
@@ -298,11 +313,20 @@ impl IntoResponse for FederationError {
             FederationError::InvalidCallback(msg) => {
                 (StatusCode::BAD_REQUEST, "invalid_callback", msg.clone())
             }
-            FederationError::IdpError { error, description } => (
-                StatusCode::BAD_REQUEST,
-                "idp_error",
-                format!("{error}: {description}"),
-            ),
+            FederationError::IdpError { error, description } => {
+                // SECURITY: Never reflect IdP-controlled error/description in response body.
+                // An attacker controlling the IdP could inject arbitrary content.
+                tracing::warn!(
+                    idp_error = %error,
+                    idp_description = %description,
+                    "IdP returned error (not reflected to client)"
+                );
+                (
+                    StatusCode::BAD_REQUEST,
+                    "idp_error",
+                    "The identity provider returned an error".to_string(),
+                )
+            }
             FederationError::SessionExpired => (
                 StatusCode::UNAUTHORIZED,
                 "session_expired",
@@ -326,11 +350,14 @@ impl IntoResponse for FederationError {
                     "Failed to issue tokens".to_string(),
                 )
             }
-            FederationError::TokenVerificationFailed(msg) => (
-                StatusCode::UNAUTHORIZED,
-                "token_verification_failed",
-                format!("Token verification failed: {msg}"),
-            ),
+            FederationError::TokenVerificationFailed(msg) => {
+                tracing::warn!("Token verification failed: {}", msg);
+                (
+                    StatusCode::UNAUTHORIZED,
+                    "token_verification_failed",
+                    "Token verification failed".to_string(),
+                )
+            }
             FederationError::TokenExpired => (
                 StatusCode::UNAUTHORIZED,
                 "token_expired",

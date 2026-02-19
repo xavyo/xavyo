@@ -20,7 +20,7 @@ impl NhiLifecycleService {
     /// Validate and execute a lifecycle state transition.
     ///
     /// All operations run within a single database transaction so that
-    /// cascade effects (credential deactivation, permission revocation)
+    /// cascade effects (permission revocation)
     /// are atomic with the state change. If any step fails, all changes
     /// are rolled back.
     pub async fn transition(
@@ -51,17 +51,8 @@ impl NhiLifecycleService {
             )));
         }
 
-        // 3. For archive: cascade-deactivate credentials + revoke permissions
+        // 3. For archive: revoke tool permissions
         if target_state == NhiLifecycleState::Archived {
-            sqlx::query(
-                "UPDATE nhi_credentials SET is_active = false WHERE tenant_id = $1 AND nhi_id = $2 AND is_active = true",
-            )
-            .bind(tenant_id)
-            .bind(nhi_id)
-            .execute(&mut *tx)
-            .await
-            .map_err(NhiApiError::Database)?;
-
             sqlx::query(
                 "DELETE FROM nhi_tool_permissions WHERE tenant_id = $1 AND (agent_nhi_id = $2 OR tool_nhi_id = $2)",
             )
@@ -70,6 +61,43 @@ impl NhiLifecycleService {
             .execute(&mut *tx)
             .await
             .map_err(NhiApiError::Database)?;
+        }
+
+        // 3b. For suspend/deactivate/deprecate/archive: revoke all vault leases
+        if matches!(
+            target_state,
+            NhiLifecycleState::Suspended
+                | NhiLifecycleState::Inactive
+                | NhiLifecycleState::Deprecated
+                | NhiLifecycleState::Archived
+        ) {
+            let reason = format!("nhi_lifecycle_transition_to_{target_state}");
+            let revoked = sqlx::query(
+                r"
+                UPDATE nhi_secret_leases l
+                SET status = 'revoked', revoked_at = NOW(), revocation_reason = $3
+                FROM nhi_vaulted_secrets s
+                WHERE l.secret_id = s.id
+                  AND s.tenant_id = $1
+                  AND s.nhi_id = $2
+                  AND l.status = 'active'
+                ",
+            )
+            .bind(tenant_id)
+            .bind(nhi_id)
+            .bind(&reason)
+            .execute(&mut *tx)
+            .await
+            .map_err(NhiApiError::Database)?;
+
+            if revoked.rows_affected() > 0 {
+                tracing::info!(
+                    nhi_id = %nhi_id,
+                    target_state = %target_state,
+                    leases_revoked = revoked.rows_affected(),
+                    "revoked vault leases on lifecycle transition"
+                );
+            }
         }
 
         // 4. Determine the reason to store:

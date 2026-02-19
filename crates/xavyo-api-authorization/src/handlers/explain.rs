@@ -15,9 +15,7 @@ use xavyo_db::models::{GovNhiRiskScore, NhiAgent, NhiDelegationGrant, NhiIdentit
 use xavyo_nhi::NhiRiskLevel;
 
 use crate::error::{ApiAuthorizationError, ApiResult};
-use crate::models::explain::{
-    ExplainCheckStep, ExplainNhiQuery, ExplainNhiResponse, ExplainStep,
-};
+use crate::models::explain::{ExplainCheckStep, ExplainNhiQuery, ExplainNhiResponse, ExplainStep};
 use crate::router::AuthorizationState;
 
 /// Explain NHI authorization — admin-only dry-run of the full authz pipeline.
@@ -115,7 +113,7 @@ pub async fn explain_nhi_handler(
     // -----------------------------------------------------------------------
     let is_agent = identity
         .as_ref()
-        .map_or(false, |id| id.nhi_type == xavyo_nhi::NhiType::Agent);
+        .is_some_and(|id| id.nhi_type == xavyo_nhi::NhiType::Agent);
 
     let (agent_result, risk_result, delegation_result) = tokio::join!(
         // Step 3: Agent details (informational)

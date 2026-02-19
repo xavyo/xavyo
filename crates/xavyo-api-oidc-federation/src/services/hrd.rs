@@ -20,13 +20,38 @@ pub struct HrdCacheEntry {
     pub cached_at: chrono::DateTime<chrono::Utc>,
 }
 
+/// Wrapper for cache values that supports both positive and negative results.
+#[derive(Debug, Clone)]
+enum HrdCacheValue {
+    /// Positive result: domain maps to an IdP.
+    Found(HrdCacheEntry),
+    /// Negative result: domain has no IdP mapping (cached to prevent DB thrashing).
+    NotFound {
+        cached_at: chrono::DateTime<chrono::Utc>,
+    },
+}
+
+/// Result of a cache lookup.
+enum CacheLookup {
+    /// Domain maps to an IdP.
+    Found(HrdCacheEntry),
+    /// Domain is cached as having no IdP mapping (negative hit).
+    NegativeHit,
+}
+
+/// Default TTL for negative cache entries (30 seconds).
+const NEGATIVE_CACHE_TTL_SECS: i64 = 30;
+
+/// Maximum number of domains cached per tenant (L-5: prevent unbounded growth).
+const MAX_CACHE_ENTRIES_PER_TENANT: usize = 1000;
+
 /// Home Realm Discovery service.
 #[derive(Clone)]
 pub struct HrdService {
     pool: PgPool,
-    /// Cache: `tenant_id` -> (domain -> `cache_entry`)
-    cache: Arc<RwLock<HashMap<Uuid, HashMap<String, HrdCacheEntry>>>>,
-    /// Cache TTL in seconds.
+    /// Cache: `tenant_id` -> (domain -> `cache_value`)
+    cache: Arc<RwLock<HashMap<Uuid, HashMap<String, HrdCacheValue>>>>,
+    /// Cache TTL in seconds (for positive entries).
     cache_ttl_secs: i64,
 }
 
@@ -60,15 +85,24 @@ impl HrdService {
     ) -> FederationResult<Option<HrdResult>> {
         let domain = Self::extract_domain(email)?;
 
-        // Check cache first
-        if let Some(cached) = self.get_from_cache(tenant_id, &domain).await {
-            tracing::debug!(tenant_id = %tenant_id, domain = %domain, "HRD cache hit");
-            return Ok(Some(HrdResult {
-                idp_id: cached.idp_id,
-                idp_name: cached.idp_name,
-                issuer_url: cached.issuer_url,
-                domain: domain.clone(),
-            }));
+        // Check cache first (handles both positive and negative entries)
+        match self.get_cached_value(tenant_id, &domain).await {
+            Some(CacheLookup::Found(cached)) => {
+                tracing::debug!(tenant_id = %tenant_id, domain = %domain, "HRD cache hit (positive)");
+                return Ok(Some(HrdResult {
+                    idp_id: cached.idp_id,
+                    idp_name: cached.idp_name,
+                    issuer_url: cached.issuer_url,
+                    domain: domain.clone(),
+                }));
+            }
+            Some(CacheLookup::NegativeHit) => {
+                tracing::debug!(tenant_id = %tenant_id, domain = %domain, "HRD cache hit (negative)");
+                return Ok(None);
+            }
+            None => {
+                // Cache miss, fall through to DB lookup
+            }
         }
 
         tracing::debug!(tenant_id = %tenant_id, domain = %domain, "HRD cache miss, querying database");
@@ -76,9 +110,14 @@ impl HrdService {
         // Query database for domain mapping
         let result = self.lookup_domain(tenant_id, &domain).await?;
 
-        // Cache the result if found
-        if let Some(ref hrd_result) = result {
-            self.add_to_cache(tenant_id, &domain, hrd_result).await;
+        // Cache the result (positive or negative)
+        match result {
+            Some(ref hrd_result) => {
+                self.add_to_cache(tenant_id, &domain, hrd_result).await;
+            }
+            None => {
+                self.add_negative_to_cache(tenant_id, &domain).await;
+            }
         }
 
         Ok(result)
@@ -148,23 +187,32 @@ impl HrdService {
         }))
     }
 
-    /// Get domain-to-IdP mapping from cache.
-    async fn get_from_cache(&self, tenant_id: Uuid, domain: &str) -> Option<HrdCacheEntry> {
+    /// Get cached value for a domain, handling both positive and negative entries.
+    async fn get_cached_value(&self, tenant_id: Uuid, domain: &str) -> Option<CacheLookup> {
         let cache = self.cache.read().await;
         let tenant_cache = cache.get(&tenant_id)?;
-        let entry = tenant_cache.get(domain)?;
+        let value = tenant_cache.get(domain)?;
 
-        // Check if cache entry is still valid
         let now = chrono::Utc::now();
-        let age = now.signed_duration_since(entry.cached_at);
-        if age.num_seconds() > self.cache_ttl_secs {
-            return None;
+        match value {
+            HrdCacheValue::Found(entry) => {
+                let age = now.signed_duration_since(entry.cached_at);
+                if age.num_seconds() > self.cache_ttl_secs {
+                    return None;
+                }
+                Some(CacheLookup::Found(entry.clone()))
+            }
+            HrdCacheValue::NotFound { cached_at } => {
+                let age = now.signed_duration_since(*cached_at);
+                if age.num_seconds() > NEGATIVE_CACHE_TTL_SECS {
+                    return None;
+                }
+                Some(CacheLookup::NegativeHit)
+            }
         }
-
-        Some(entry.clone())
     }
 
-    /// Add domain-to-IdP mapping to cache.
+    /// Add positive domain-to-IdP mapping to cache.
     async fn add_to_cache(&self, tenant_id: Uuid, domain: &str, result: &HrdResult) {
         let entry = HrdCacheEntry {
             idp_id: result.idp_id,
@@ -175,7 +223,42 @@ impl HrdService {
 
         let mut cache = self.cache.write().await;
         let tenant_cache = cache.entry(tenant_id).or_default();
-        tenant_cache.insert(domain.to_string(), entry);
+        // L-5: Evict oldest entries if cache exceeds max size
+        if tenant_cache.len() >= MAX_CACHE_ENTRIES_PER_TENANT {
+            Self::evict_oldest(tenant_cache);
+        }
+        tenant_cache.insert(domain.to_string(), HrdCacheValue::Found(entry));
+    }
+
+    /// Add negative cache entry for a domain with no IdP mapping.
+    /// Uses a shorter TTL to prevent prolonged stale negative results.
+    async fn add_negative_to_cache(&self, tenant_id: Uuid, domain: &str) {
+        let mut cache = self.cache.write().await;
+        let tenant_cache = cache.entry(tenant_id).or_default();
+        // L-5: Evict oldest entries if cache exceeds max size
+        if tenant_cache.len() >= MAX_CACHE_ENTRIES_PER_TENANT {
+            Self::evict_oldest(tenant_cache);
+        }
+        tenant_cache.insert(
+            domain.to_string(),
+            HrdCacheValue::NotFound {
+                cached_at: chrono::Utc::now(),
+            },
+        );
+    }
+
+    /// Evict the oldest cache entry to make room for new ones.
+    fn evict_oldest(cache: &mut HashMap<String, HrdCacheValue>) {
+        let oldest_key = cache
+            .iter()
+            .min_by_key(|(_, v)| match v {
+                HrdCacheValue::Found(e) => e.cached_at,
+                HrdCacheValue::NotFound { cached_at } => *cached_at,
+            })
+            .map(|(k, _)| k.clone());
+        if let Some(key) = oldest_key {
+            cache.remove(&key);
+        }
     }
 
     /// Clear cache for a specific tenant.

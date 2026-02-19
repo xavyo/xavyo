@@ -6,16 +6,12 @@
 
 use std::collections::HashSet;
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    Extension, Json,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Extension, Json};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
+use xavyo_api_oauth::models::{ClientType, CreateClientRequest};
 use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
 use xavyo_db::models::{
@@ -25,7 +21,6 @@ use xavyo_db::models::{
 };
 use xavyo_db::set_tenant_context;
 use xavyo_nhi::NhiType;
-use xavyo_api_oauth::models::{ClientType, CreateClientRequest};
 
 use crate::error::NhiApiError;
 use crate::state::NhiState;
@@ -395,7 +390,10 @@ pub async fn provision_agent(
             grant_types,
             scopes,
             logo_url: None,
-            description: Some(format!("Auto-provisioned client for NHI agent '{}'", request.name)),
+            description: Some(format!(
+                "Auto-provisioned client for NHI agent '{}'",
+                request.name
+            )),
             nhi_id: Some(nhi_id),
         };
 
@@ -462,7 +460,11 @@ pub async fn provision_agent(
         entitlement_assignments: assignment_ids,
         delegation_grant_id,
         ready,
-        warnings: if warnings.is_empty() { None } else { Some(warnings) },
+        warnings: if warnings.is_empty() {
+            None
+        } else {
+            Some(warnings)
+        },
     };
 
     Ok((StatusCode::CREATED, Json(response)))

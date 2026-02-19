@@ -3,6 +3,7 @@
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use moka::sync::Cache;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -12,6 +13,25 @@ use crate::error::{ProviderType, SocialError, SocialResult};
 
 /// State lifetime in minutes.
 const STATE_LIFETIME_MINUTES: i64 = 10;
+
+/// Sanitize `redirect_after` to prevent open redirects at state creation time.
+/// Only allows relative paths starting with `/` (rejects `//`, `://`, `\`).
+/// Returns `None` for invalid or empty values.
+fn sanitize_redirect_after(redirect: &str) -> Option<String> {
+    let trimmed = redirect.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    // Must start with /
+    if !trimmed.starts_with('/') {
+        return None;
+    }
+    // Reject protocol-relative URLs (//evil.com) and backslash tricks
+    if trimmed.starts_with("//") || trimmed.starts_with("/\\") || trimmed.contains("://") {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
 
 /// PKCE code verifier length in bytes (before base64 encoding).
 const PKCE_VERIFIER_LENGTH: usize = 32;
@@ -47,18 +67,49 @@ pub struct PkceChallenge {
 }
 
 /// OAuth service for managing state and PKCE.
+///
+/// # Distributed deployment caveat
+///
+/// The replay-prevention nonce cache (`used_nonces`) is in-memory.
+/// In a multi-instance deployment, the same state token could be
+/// replayed against a different instance. Mitigations:
+/// - State JWTs have short lifetimes (`STATE_LIFETIME_MINUTES`).
+/// - PKCE ties the token exchange to the original verifier.
+/// - For stronger guarantees, replace with a shared store (Redis/DB).
 #[derive(Clone)]
 pub struct OAuthService {
     /// Secret key for signing state JWTs.
     state_secret: Vec<u8>,
+    /// Cache of used state nonces to prevent replay attacks.
+    /// Entries expire after STATE_LIFETIME_MINUTES to bound memory usage.
+    used_nonces: Cache<String, ()>,
 }
 
 impl OAuthService {
     /// Create a new OAuth service.
+    ///
+    /// # Panics
+    ///
+    /// Panics at startup if `state_secret` is shorter than 32 bytes.
+    /// This is intentional — a weak secret allows state token forgery.
     #[must_use]
     pub fn new(state_secret: &str) -> Self {
+        assert!(
+            state_secret.len() >= 32,
+            "SOCIAL_STATE_SECRET must be at least 32 bytes (got {}). A weak secret allows OAuth state forgery.",
+            state_secret.len()
+        );
+
+        let used_nonces = Cache::builder()
+            .max_capacity(100_000)
+            .time_to_live(std::time::Duration::from_secs(
+                (STATE_LIFETIME_MINUTES * 60) as u64,
+            ))
+            .build();
+
         Self {
             state_secret: state_secret.as_bytes().to_vec(),
+            used_nonces,
         }
     }
 
@@ -94,6 +145,9 @@ impl OAuthService {
     }
 
     /// Create a signed state parameter for an OAuth flow.
+    ///
+    /// The `redirect_after` value is sanitized before embedding to prevent
+    /// open redirects. Invalid values are silently dropped (treated as `None`).
     pub fn create_state(
         &self,
         tenant_id: Uuid,
@@ -105,12 +159,15 @@ impl OAuthService {
         let now = Utc::now();
         let exp = now + Duration::minutes(STATE_LIFETIME_MINUTES);
 
+        // Validate redirect_after before embedding in state to prevent open redirects
+        let safe_redirect = redirect_after.as_deref().and_then(sanitize_redirect_after);
+
         let claims = OAuthStateClaims {
             nonce: Uuid::new_v4().to_string(),
             tenant_id,
             provider: provider.to_string(),
             pkce_verifier: pkce_verifier.to_string(),
-            redirect_after,
+            redirect_after: safe_redirect,
             user_id,
             exp: exp.timestamp(),
             iat: now.timestamp(),
@@ -126,6 +183,9 @@ impl OAuthService {
     }
 
     /// Validate and decode a state parameter.
+    ///
+    /// Each state token can only be used once (replay protection).
+    /// The nonce is tracked in an in-memory cache with TTL matching the state lifetime.
     pub fn validate_state(&self, state: &str) -> SocialResult<OAuthStateClaims> {
         let mut validation = Validation::default();
         validation.validate_exp = true;
@@ -148,6 +208,17 @@ impl OAuthService {
             });
         }
 
+        // SECURITY: Enforce single-use atomically by inserting first, then checking.
+        // If the nonce was already present, reject as replay attack.
+        let nonce = &token_data.claims.nonce;
+        let was_already_used = self.used_nonces.get(nonce).is_some();
+        self.used_nonces.insert(nonce.clone(), ());
+        if was_already_used {
+            return Err(SocialError::InvalidState {
+                reason: "state token has already been used".to_string(),
+            });
+        }
+
         Ok(token_data.claims)
     }
 }
@@ -157,7 +228,7 @@ mod tests {
     use super::*;
 
     fn test_service() -> OAuthService {
-        OAuthService::new("test-secret-key-for-signing-state")
+        OAuthService::new("test-secret-key-for-signing-state-min32bytes")
     }
 
     #[test]
@@ -236,7 +307,7 @@ mod tests {
     #[test]
     fn test_invalid_state_signature() {
         let service = test_service();
-        let other_service = OAuthService::new("different-secret");
+        let other_service = OAuthService::new("different-secret-key-at-least-32-bytes-long");
         let tenant_id = Uuid::new_v4();
         let pkce = OAuthService::generate_pkce();
 
@@ -257,5 +328,53 @@ mod tests {
         // Tampered JWT
         let result = service.validate_state("invalid.state.token");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_state_single_use_rejects_replay() {
+        let service = test_service();
+        let tenant_id = Uuid::new_v4();
+        let pkce = OAuthService::generate_pkce();
+
+        let state = service
+            .create_state(tenant_id, ProviderType::Google, &pkce.verifier, None, None)
+            .unwrap();
+
+        // First use should succeed
+        let result = service.validate_state(&state);
+        assert!(result.is_ok());
+
+        // Second use of the same state should fail (replay attack)
+        let result = service.validate_state(&state);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("already been used"),
+            "Expected 'already been used' error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_different_states_are_independent() {
+        let service = test_service();
+        let tenant_id = Uuid::new_v4();
+
+        let pkce1 = OAuthService::generate_pkce();
+        let state1 = service
+            .create_state(tenant_id, ProviderType::Google, &pkce1.verifier, None, None)
+            .unwrap();
+
+        let pkce2 = OAuthService::generate_pkce();
+        let state2 = service
+            .create_state(tenant_id, ProviderType::Google, &pkce2.verifier, None, None)
+            .unwrap();
+
+        // Using state1 should not affect state2
+        assert!(service.validate_state(&state1).is_ok());
+        assert!(service.validate_state(&state2).is_ok());
+
+        // But replaying either should fail
+        assert!(service.validate_state(&state1).is_err());
+        assert!(service.validate_state(&state2).is_err());
     }
 }

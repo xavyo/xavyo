@@ -63,7 +63,11 @@ impl SignatureValidator {
             "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256" => {
                 (MessageDigest::sha256(), "RSA-SHA256")
             }
-            "http://www.w3.org/2000/09/xmldsig#rsa-sha1" => (MessageDigest::sha1(), "RSA-SHA1"),
+            "http://www.w3.org/2000/09/xmldsig#rsa-sha1" => {
+                return Err(SamlError::SignatureValidationFailed(
+                    "SHA-1 signature algorithm is rejected: cryptographically broken".to_string(),
+                ));
+            }
             "http://www.w3.org/2001/04/xmldsig-more#rsa-sha384" => {
                 (MessageDigest::sha384(), "RSA-SHA384")
             }
@@ -129,8 +133,10 @@ impl SignatureValidator {
                 SamlError::SignatureValidationFailed(format!("Invalid signature encoding: {e}"))
             })?;
 
-        // Verify signature (assume SHA256 for now, can extend based on SignatureMethod)
-        let mut verifier = Verifier::new(MessageDigest::sha256(), &public_key).map_err(|e| {
+        // Determine signature algorithm from SignedInfo's SignatureMethod
+        let sig_digest = resolve_signature_digest(sig_info.signature_algorithm.as_deref())?;
+
+        let mut verifier = Verifier::new(sig_digest, &public_key).map_err(|e| {
             SamlError::SignatureValidationFailed(format!("Verifier creation failed: {e}"))
         })?;
 
@@ -160,6 +166,10 @@ struct SignatureInfo {
     signature_value: String,
     reference_uri: String,
     digest_value: String,
+    /// SignatureMethod Algorithm URI from SignedInfo
+    signature_algorithm: Option<String>,
+    /// DigestMethod Algorithm URI from SignedInfo
+    digest_algorithm: Option<String>,
 }
 
 /// Parse X.509 certificate from PEM format
@@ -176,6 +186,43 @@ fn parse_certificate(pem: &str) -> SamlResult<X509> {
 
     X509::from_pem(pem_data.as_bytes())
         .map_err(|e| SamlError::SignatureValidationFailed(format!("Invalid certificate: {e}")))
+}
+
+/// Resolve the MessageDigest from a SignatureMethod Algorithm URI.
+/// Rejects SHA-1 as cryptographically broken.
+fn resolve_signature_digest(algorithm_uri: Option<&str>) -> SamlResult<MessageDigest> {
+    match algorithm_uri {
+        Some("http://www.w3.org/2001/04/xmldsig-more#rsa-sha256")
+        | Some("http://www.w3.org/2001/04/xmldsig-more#rsa-sha256-mgf1")
+        | None => Ok(MessageDigest::sha256()), // default to SHA-256 when unspecified
+        Some("http://www.w3.org/2001/04/xmldsig-more#rsa-sha384") => Ok(MessageDigest::sha384()),
+        Some("http://www.w3.org/2001/04/xmldsig-more#rsa-sha512") => Ok(MessageDigest::sha512()),
+        Some("http://www.w3.org/2000/09/xmldsig#rsa-sha1") => {
+            Err(SamlError::SignatureValidationFailed(
+                "SHA-1 signature algorithm is rejected: cryptographically broken".to_string(),
+            ))
+        }
+        Some(other) => Err(SamlError::SignatureValidationFailed(format!(
+            "Unsupported signature algorithm: {other}"
+        ))),
+    }
+}
+
+/// Resolve the MessageDigest from a DigestMethod Algorithm URI.
+fn resolve_digest_method(algorithm_uri: Option<&str>) -> SamlResult<MessageDigest> {
+    match algorithm_uri {
+        Some("http://www.w3.org/2001/04/xmlenc#sha256") | None => Ok(MessageDigest::sha256()),
+        Some("http://www.w3.org/2001/04/xmldsig-more#sha384") => Ok(MessageDigest::sha384()),
+        Some("http://www.w3.org/2001/04/xmlenc#sha512") => Ok(MessageDigest::sha512()),
+        Some("http://www.w3.org/2000/09/xmldsig#sha1") => {
+            Err(SamlError::SignatureValidationFailed(
+                "SHA-1 digest algorithm is rejected: cryptographically broken".to_string(),
+            ))
+        }
+        Some(other) => Err(SamlError::SignatureValidationFailed(format!(
+            "Unsupported digest algorithm: {other}"
+        ))),
+    }
 }
 
 /// Apply Exclusive XML Canonicalization (C14N)
@@ -207,6 +254,8 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
     let mut signature_value = String::new();
     let mut digest_value = String::new();
     let mut reference_uri = String::new();
+    let mut signature_algorithm: Option<String> = None;
+    let mut digest_algorithm: Option<String> = None;
 
     loop {
         match reader.read_event() {
@@ -245,24 +294,48 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                     signed_info_content.push('<');
                     signed_info_content.push_str(full_tag);
                     signed_info_content.push_str("/>");
+
+                    // Capture SignatureMethod and DigestMethod Algorithm attributes
+                    let local_name_owned = e.local_name();
+                    let local = std::str::from_utf8(local_name_owned.as_ref()).unwrap_or("");
+                    if local == "SignatureMethod" {
+                        for attr in e.attributes().flatten() {
+                            let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                            if key == "Algorithm" {
+                                signature_algorithm =
+                                    Some(attr.unescape_value().unwrap_or_default().to_string());
+                            }
+                        }
+                    } else if local == "DigestMethod" {
+                        for attr in e.attributes().flatten() {
+                            let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                            if key == "Algorithm" {
+                                digest_algorithm =
+                                    Some(attr.unescape_value().unwrap_or_default().to_string());
+                            }
+                        }
+                    }
                 }
             }
             Ok(Event::End(e)) => {
                 let local_name = e.local_name();
-                let name = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                let local = std::str::from_utf8(local_name.as_ref()).unwrap_or("");
+                // Use the full qualified name (preserving namespace prefix) for correct C14N
+                let name_ref = e.name();
+                let full_name = std::str::from_utf8(name_ref.as_ref()).unwrap_or(local);
 
-                if name == "SignedInfo" && in_signed_info {
+                if local == "SignedInfo" && in_signed_info {
                     signed_info_content.push_str("</");
-                    signed_info_content.push_str(name);
+                    signed_info_content.push_str(full_name);
                     signed_info_content.push('>');
                     in_signed_info = false;
                 } else if in_signed_info {
                     signed_info_content.push_str("</");
-                    signed_info_content.push_str(name);
+                    signed_info_content.push_str(full_name);
                     signed_info_content.push('>');
-                } else if name == "SignatureValue" {
+                } else if local == "SignatureValue" {
                     in_signature_value = false;
-                } else if name == "DigestValue" {
+                } else if local == "DigestValue" {
                     in_digest_value = false;
                 }
             }
@@ -303,6 +376,8 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
         signature_value,
         reference_uri,
         digest_value,
+        signature_algorithm,
+        digest_algorithm,
     })
 }
 
@@ -327,9 +402,10 @@ fn verify_reference_digest(xml: &str, sig_info: &SignatureInfo) -> SamlResult<()
     // Remove the Signature element from the content (enveloped signature transform)
     let content_without_sig = remove_signature_element_parsed(&element_content)?;
 
-    // Canonicalize and compute digest
+    // Canonicalize and compute digest using the specified algorithm
+    let digest_md = resolve_digest_method(sig_info.digest_algorithm.as_deref())?;
     let canonicalized = canonicalize_xml(&content_without_sig)?;
-    let digest = openssl::hash::hash(MessageDigest::sha256(), canonicalized.as_bytes())
+    let digest = openssl::hash::hash(digest_md, canonicalized.as_bytes())
         .map_err(|e| SamlError::SignatureValidationFailed(format!("Hash failed: {e}")))?;
     let computed_digest = STANDARD.encode(digest);
 
@@ -349,9 +425,10 @@ fn verify_document_digest(xml: &str, sig_info: &SignatureInfo) -> SamlResult<()>
     // Remove the Signature element using parser-based approach
     let content_without_sig = remove_signature_element_parsed(xml)?;
 
-    // Canonicalize and compute digest
+    // Canonicalize and compute digest using the specified algorithm
+    let digest_md = resolve_digest_method(sig_info.digest_algorithm.as_deref())?;
     let canonicalized = canonicalize_xml(&content_without_sig)?;
-    let digest = openssl::hash::hash(MessageDigest::sha256(), canonicalized.as_bytes())
+    let digest = openssl::hash::hash(digest_md, canonicalized.as_bytes())
         .map_err(|e| SamlError::SignatureValidationFailed(format!("Hash failed: {e}")))?;
     let computed_digest = STANDARD.encode(digest);
 
@@ -388,7 +465,7 @@ fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
                 if !capturing {
                     for attr in e.attributes().flatten() {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                        if key == "ID" {
+                        if key.eq_ignore_ascii_case("id") {
                             let val = attr.unescape_value().unwrap_or_default();
                             if val.as_ref() == element_id {
                                 capturing = true;
@@ -418,7 +495,7 @@ fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
                 if !capturing {
                     for attr in e.attributes().flatten() {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                        if key == "ID" {
+                        if key.eq_ignore_ascii_case("id") {
                             let val = attr.unescape_value().unwrap_or_default();
                             if val.as_ref() == element_id {
                                 let end_offset = reader.buffer_position() as usize;
@@ -613,5 +690,25 @@ t6Rp
         let result = remove_signature_element_parsed(xml).unwrap();
         assert!(!result.contains("Signature"));
         assert!(result.contains("AuthnRequest"));
+    }
+
+    #[test]
+    fn test_reject_sha1_redirect_signature() {
+        // SHA-1 should be rejected as cryptographically broken.
+        // Use a valid base64 value since signature decoding happens before algorithm check.
+        let dummy_sig = STANDARD.encode(b"dummy signature bytes for testing");
+        let result = SignatureValidator::validate_redirect_signature(
+            "dummyRequest",
+            None,
+            "http%3A%2F%2Fwww.w3.org%2F2000%2F09%2Fxmldsig%23rsa-sha1",
+            &dummy_sig,
+            TEST_CERT_PEM,
+        );
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("SHA-1"),
+            "Error should mention SHA-1: {err}"
+        );
     }
 }

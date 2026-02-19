@@ -394,7 +394,11 @@ fn extract_client_ip(request: &axum::http::Request<Body>) -> String {
         .map(|ci| ci.0.ip());
 
     // Only trust X-Forwarded-For when proxy_trust_middleware has set the TrustXff marker
-    if request.extensions().get::<xavyo_api_auth::TrustXff>().is_some() {
+    if request
+        .extensions()
+        .get::<xavyo_api_auth::TrustXff>()
+        .is_some()
+    {
         if let Some(forwarded) = request.headers().get("x-forwarded-for") {
             if let Ok(val) = forwarded.to_str() {
                 if let Some(first_ip) = val.split(',').next() {
@@ -435,9 +439,7 @@ pub async fn proxy_trust_middleware(
         });
 
     if should_trust {
-        request
-            .extensions_mut()
-            .insert(xavyo_api_auth::TrustXff);
+        request.extensions_mut().insert(xavyo_api_auth::TrustXff);
     }
 
     next.run(request).await
@@ -799,13 +801,14 @@ async fn idempotency_middleware_inner(
             let status = response.status().as_u16() as i16;
             let (resp_parts, resp_body) = response.into_parts();
 
-            let resp_bytes = match axum::body::to_bytes(resp_body, IDEMPOTENCY_MAX_RESPONSE_BODY).await {
-                Ok(bytes) => bytes.to_vec(),
-                Err(e) => {
-                    tracing::error!(error = %e, "Failed to read response body");
-                    Vec::new()
-                }
-            };
+            let resp_bytes =
+                match axum::body::to_bytes(resp_body, IDEMPOTENCY_MAX_RESPONSE_BODY).await {
+                    Ok(bytes) => bytes.to_vec(),
+                    Err(e) => {
+                        tracing::error!(error = %e, "Failed to read response body");
+                        Vec::new()
+                    }
+                };
 
             // Store response headers as JSON
             let headers_json: serde_json::Value = resp_parts

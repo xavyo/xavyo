@@ -257,10 +257,11 @@ pub async fn jwt_auth_middleware(
             sub = %claims.sub,
             "Rejected partial MFA token on route without AllowPartialToken marker"
         );
-        return Err(
-            (StatusCode::UNAUTHORIZED, "Partial token not accepted on this endpoint")
-                .into_response(),
-        );
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "Partial token not accepted on this endpoint",
+        )
+            .into_response());
     }
 
     // Insert claims and IDs into request extensions

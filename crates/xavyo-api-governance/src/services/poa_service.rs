@@ -37,7 +37,10 @@ impl RoleIntersection {
 ///
 /// The assumed identity token should only carry roles present in BOTH sets.
 /// This prevents privilege escalation: an attorney cannot gain roles they don't already have.
-pub fn compute_role_intersection(donor_roles: &[String], attorney_roles: &[String]) -> RoleIntersection {
+pub fn compute_role_intersection(
+    donor_roles: &[String],
+    attorney_roles: &[String],
+) -> RoleIntersection {
     let attorney_set: HashSet<&str> = attorney_roles.iter().map(String::as_str).collect();
 
     let effective_roles: Vec<String> = donor_roles
@@ -603,7 +606,12 @@ impl PoaService {
         );
 
         let roles_were_restricted = intersection.was_restricted();
-        Ok((session, poa.donor_id, intersection.effective_roles, roles_were_restricted))
+        Ok((
+            session,
+            poa.donor_id,
+            intersection.effective_roles,
+            roles_were_restricted,
+        ))
     }
 
     /// Drop the currently assumed identity.

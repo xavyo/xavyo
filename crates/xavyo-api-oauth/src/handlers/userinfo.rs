@@ -36,6 +36,38 @@ pub async fn userinfo_handler(
         OAuthError::InvalidToken("Invalid access token".to_string())
     })?;
 
+    // Check if the token has been revoked (F-3: HIGH - userinfo bypasses revocation cache)
+    // SECURITY: Fail-closed - if revocation check cannot be performed, reject the token.
+    if !claims.jti.is_empty() {
+        if let Some(ref cache) = state.revocation_cache {
+            match cache.is_revoked(&claims.jti).await {
+                Ok(true) => {
+                    tracing::warn!(jti = %claims.jti, "Rejected revoked token in userinfo");
+                    return Err(OAuthError::InvalidToken(
+                        "Token has been revoked".to_string(),
+                    ));
+                }
+                Ok(false) => {} // Token is not revoked, proceed
+                Err(e) => {
+                    // Fail-closed: cache error means we cannot verify, reject
+                    tracing::error!(jti = %claims.jti, error = %e, "Revocation check failed in userinfo (fail-closed)");
+                    return Err(OAuthError::Internal(
+                        "Token verification failed".to_string(),
+                    ));
+                }
+            }
+        } else {
+            // SECURITY: Fail-closed - if no revocation cache is available, reject the token
+            tracing::error!(
+                jti = %claims.jti,
+                "Revocation cache unavailable in userinfo endpoint (fail-closed)"
+            );
+            return Err(OAuthError::Internal(
+                "Token verification unavailable".to_string(),
+            ));
+        }
+    }
+
     // Check token expiration is handled by decode_token
 
     // Extract user_id from subject

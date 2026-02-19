@@ -111,6 +111,48 @@ pub enum BindingType<'a> {
     Post,
 }
 
+/// Normalize a URL for comparison (lowercase scheme/host, strip trailing slash)
+fn normalize_url(url_str: &str) -> SamlResult<String> {
+    let parsed = url::Url::parse(url_str)
+        .map_err(|e| SamlError::InvalidAuthnRequest(format!("Invalid ACS URL format: {e}")))?;
+
+    let mut normalized = format!(
+        "{}://{}",
+        parsed.scheme().to_lowercase(),
+        parsed.host_str().unwrap_or("").to_lowercase()
+    );
+
+    if let Some(port) = parsed.port() {
+        normalized.push(':');
+        normalized.push_str(&format!("{}", port));
+    }
+
+    let path = parsed.path().trim_end_matches('/');
+    normalized.push_str(path);
+
+    if let Some(query) = parsed.query() {
+        normalized.push('?');
+        normalized.push_str(query);
+    }
+
+    Ok(normalized)
+}
+
+/// Check if an ACS URL matches any of the configured URLs (after normalization)
+fn acs_url_matches(acs_url: &str, configured_urls: &[String]) -> SamlResult<bool> {
+    let normalized_acs = normalize_url(acs_url)?;
+
+    for configured in configured_urls {
+        if let Ok(normalized_configured) = normalize_url(configured) {
+            if normalized_acs == normalized_configured {
+                return Ok(true);
+            }
+        }
+    }
+
+    Ok(false)
+}
+
 /// Handle SSO request (shared logic for both bindings)
 async fn handle_sso<'a>(
     state: &SamlState,
@@ -194,22 +236,38 @@ async fn handle_sso<'a>(
                 );
             }
             BindingType::Post => {
-                // For HTTP-POST, signature is embedded in XML
-                if let Some(ref xml) = decoded_xml {
-                    SignatureValidator::validate_post_signature(xml, sp_cert)?;
-                    tracing::debug!(
-                        tenant_id = %tenant_id,
-                        sp_entity_id = %sp.entity_id,
-                        "AuthnRequest signature validated (HTTP-POST)"
-                    );
-                }
+                // For HTTP-POST, signature is embedded in XML.
+                // SECURITY: Require decoded_xml — never silently skip validation.
+                let xml = decoded_xml.as_ref().ok_or_else(|| {
+                    SamlError::SignatureValidationFailed(
+                        "Missing decoded XML for POST binding signature validation".to_string(),
+                    )
+                })?;
+                SignatureValidator::validate_post_signature(xml, sp_cert)?;
+                tracing::debug!(
+                    tenant_id = %tenant_id,
+                    sp_entity_id = %sp.entity_id,
+                    "AuthnRequest signature validated (HTTP-POST)"
+                );
             }
+        }
+    }
+
+    // SECURITY: Validate RelayState length.
+    // SAML spec recommends 80 bytes but many SPs use longer values.
+    // Cap at 1024 bytes to prevent abuse while remaining compatible.
+    if let Some(rs) = relay_state {
+        if rs.len() > 1024 {
+            return Err(SamlError::InvalidAuthnRequest(
+                "RelayState exceeds maximum length (1024 bytes)".to_string(),
+            ));
         }
     }
 
     // Validate ACS URL if provided in request
     if let Some(ref acs_url) = authn_request.assertion_consumer_service_url {
-        if !sp.acs_urls.contains(acs_url) {
+        // Normalize and compare URLs to avoid case-sensitivity and trailing slash issues
+        if !acs_url_matches(acs_url, &sp.acs_urls)? {
             return Err(SamlError::AcsUrlMismatch {
                 expected: sp.acs_urls.clone(),
                 actual: acs_url.clone(),

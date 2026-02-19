@@ -106,7 +106,10 @@ pub fn build_allow_response(metadata: &AllowMetadata) -> proto::CheckResponse {
 /// When `ctx` is `Some`, populates `dynamic_metadata` with diagnostic detail
 /// (error code, deny reason, tenant/subject context) so the gateway can log
 /// or route on deny reasons — without changing the client-facing HTTP body.
-pub fn build_deny_response(err: &ExtAuthzError, ctx: Option<&AuthzContext>) -> proto::CheckResponse {
+pub fn build_deny_response(
+    err: &ExtAuthzError,
+    ctx: Option<&AuthzContext>,
+) -> proto::CheckResponse {
     let status_code = err.status_code();
     let body = serde_json::json!({
         "error": err.error_code(),
@@ -701,7 +704,10 @@ mod tests {
         }
 
         // dynamic_metadata must be populated with diagnostic detail
-        let dm = response.dynamic_metadata.as_ref().expect("should have metadata");
+        let dm = response
+            .dynamic_metadata
+            .as_ref()
+            .expect("should have metadata");
         assert!(dm.fields.contains_key("error_code"));
         assert!(dm.fields.contains_key("deny_reason"));
         assert!(dm.fields.contains_key("status_code"));
@@ -733,7 +739,10 @@ mod tests {
             &dm.fields.get("deny_reason").unwrap().kind
         {
             assert!(val.contains("90"), "deny_reason should contain the score");
-            assert!(val.contains("75"), "deny_reason should contain the threshold");
+            assert!(
+                val.contains("75"),
+                "deny_reason should contain the threshold"
+            );
         } else {
             panic!("deny_reason should be a string");
         }

@@ -3,7 +3,7 @@
 //! Handles the OAuth2/OIDC authorization code flow with PKCE.
 
 use crate::error::{FederationError, FederationResult};
-use crate::services::{DiscoveryService, EncryptionService};
+use crate::services::{DiscoveryService, EncryptionService, TokenVerifierService};
 use chrono::{Duration, Utc};
 use openidconnect::{CsrfToken, Nonce, PkceCodeChallenge};
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,7 @@ pub struct AuthFlowService {
     pool: PgPool,
     discovery: DiscoveryService,
     encryption: EncryptionService,
+    token_verifier: TokenVerifierService,
     /// Base URL for callbacks.
     callback_base_url: String,
 }
@@ -55,6 +56,8 @@ pub struct TokenExchangeResult {
     pub expires_in: Option<i64>,
     /// The session used for this exchange.
     pub session: FederatedAuthSession,
+    /// Verified ID token claims (signature, expiry, nonce, and audience validated).
+    pub claims: IdTokenClaims,
 }
 
 /// Decoded ID token claims.
@@ -104,6 +107,7 @@ impl AuthFlowService {
             pool,
             discovery: DiscoveryService::new(),
             encryption,
+            token_verifier: TokenVerifierService::default(),
             callback_base_url,
         }
     }
@@ -137,6 +141,11 @@ impl AuthFlowService {
 
         // Build callback URL
         let callback_url = format!("{}/auth/federation/callback", self.callback_base_url);
+
+        // Validate redirect URI to prevent open redirects (H2)
+        if let Some(ref uri) = input.redirect_uri {
+            Self::validate_redirect_uri(uri, &self.callback_base_url)?;
+        }
 
         // Determine final redirect URI
         let final_redirect = input
@@ -201,16 +210,18 @@ impl AuthFlowService {
     /// Handle authorization callback.
     #[instrument(skip(self, code))]
     pub async fn callback(&self, state: &str, code: &str) -> FederationResult<TokenExchangeResult> {
-        // Find session by state
-        let session = FederatedAuthSession::find_by_state(&self.pool, state)
+        // Atomically consume session by state (prevents TOCTOU race conditions and replay attacks)
+        let session = FederatedAuthSession::consume_by_state(&self.pool, state)
             .await?
             .ok_or(FederationError::SessionNotFound)?;
 
-        // Check session expiry (10 minutes)
+        // Session is already marked as used by consume_by_state, so we don't need the is_used check
+
+        // Check session expiry (10 minutes) - defensive check, consume_by_state already filters expired
         let now = Utc::now();
         if now.signed_duration_since(session.created_at) > Duration::minutes(10) {
             // Delete expired session
-            FederatedAuthSession::delete(&self.pool, session.id).await?;
+            FederatedAuthSession::delete(&self.pool, session.tenant_id, session.id).await?;
             return Err(FederationError::SessionExpired);
         }
 
@@ -246,14 +257,39 @@ impl AuthFlowService {
             )
             .await?;
 
-        // Mark session as used
-        FederatedAuthSession::mark_used(&self.pool, session.tenant_id, session.id).await?;
+        // C1: Verify ID token signature and expiry using IdP's JWKS
+        self.token_verifier
+            .verify_token_with_issuer(
+                &token_response.id_token,
+                &endpoints.jwks_uri,
+                &endpoints.issuer,
+            )
+            .await?;
+
+        // Decode full claims after signature verification
+        let claims = self.decode_id_token_payload(&token_response.id_token)?;
+
+        // C2: Validate nonce to prevent replay attacks
+        if claims.nonce.as_deref() != Some(&session.nonce) {
+            tracing::warn!(
+                session_id = %session.id,
+                "Nonce mismatch in ID token — possible replay attack"
+            );
+            return Err(FederationError::InvalidIdToken(
+                "Nonce mismatch: possible replay attack".to_string(),
+            ));
+        }
+
+        // H3: Validate audience contains our client_id
+        Self::validate_audience(&claims, &idp.client_id)?;
+
+        // Session already marked as used by consume_by_state (no need to call mark_used separately)
 
         tracing::info!(
             tenant_id = %session.tenant_id,
             idp_id = %session.identity_provider_id,
             session_id = %session.id,
-            "Token exchange successful"
+            "Token exchange and verification successful"
         );
 
         Ok(TokenExchangeResult {
@@ -262,6 +298,7 @@ impl AuthFlowService {
             refresh_token: token_response.refresh_token,
             expires_in: token_response.expires_in,
             session,
+            claims,
         })
     }
 
@@ -275,7 +312,14 @@ impl AuthFlowService {
         redirect_uri: &str,
         pkce_verifier: &str,
     ) -> FederationResult<TokenResponse> {
-        let client = reqwest::Client::new();
+        // M-4: SSRF protection — validate token endpoint URL from discovered metadata
+        super::discovery::validate_url_not_internal(token_endpoint)
+            .map_err(|e| FederationError::InvalidConfiguration(format!("SSRF protection: {e}")))?;
+
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
 
         let params = [
             ("grant_type", "authorization_code"),
@@ -294,13 +338,24 @@ impl AuthFlowService {
             .map_err(|e| FederationError::TokenExchangeFailed(e.to_string()))?;
 
         if !response.status().is_success() {
+            let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
+            // SECURITY: Truncate IdP error response in logs to prevent log injection/bloat.
+            let truncated = if error_text.len() > 500 {
+                format!("{}... (truncated)", &error_text[..500])
+            } else {
+                error_text
+            };
             tracing::error!(
                 token_endpoint = %token_endpoint,
-                error = %error_text,
+                status = %status,
+                error = %truncated,
                 "Token exchange failed"
             );
-            return Err(FederationError::TokenExchangeFailed(error_text));
+            // Never pass raw IdP response to caller — use generic message
+            return Err(FederationError::TokenExchangeFailed(format!(
+                "Token endpoint returned HTTP {status}"
+            )));
         }
 
         let token_response: TokenResponse = response
@@ -311,9 +366,16 @@ impl AuthFlowService {
         Ok(token_response)
     }
 
-    /// Validate and decode an ID token.
-    pub fn decode_id_token(&self, id_token: &str) -> FederationResult<IdTokenClaims> {
-        // Split the JWT
+    /// Get the callback base URL.
+    #[must_use]
+    pub fn callback_base_url(&self) -> &str {
+        &self.callback_base_url
+    }
+
+    /// Decode the ID token payload into claims.
+    ///
+    /// This must only be called after signature verification via `TokenVerifierService`.
+    fn decode_id_token_payload(&self, id_token: &str) -> FederationResult<IdTokenClaims> {
         let parts: Vec<&str> = id_token.split('.').collect();
         if parts.len() != 3 {
             return Err(FederationError::InvalidIdToken(
@@ -321,7 +383,6 @@ impl AuthFlowService {
             ));
         }
 
-        // Decode the payload (we validate signature separately or trust TLS)
         let payload =
             base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, parts[1])
                 .map_err(|e| FederationError::InvalidIdToken(e.to_string()))?;
@@ -332,17 +393,60 @@ impl AuthFlowService {
         Ok(claims)
     }
 
-    /// Get session by ID.
-    pub async fn get_session(
-        &self,
-        session_id: Uuid,
-    ) -> FederationResult<Option<FederatedAuthSession>> {
-        Ok(FederatedAuthSession::find_by_id(&self.pool, session_id).await?)
+    /// Validate that the ID token audience contains our client_id.
+    fn validate_audience(claims: &IdTokenClaims, client_id: &str) -> FederationResult<()> {
+        let valid = match &claims.aud {
+            serde_json::Value::String(s) => s == client_id,
+            serde_json::Value::Array(arr) => arr.iter().any(|v| v.as_str() == Some(client_id)),
+            _ => false,
+        };
+        if !valid {
+            return Err(FederationError::InvalidIdToken(format!(
+                "Audience does not contain expected client_id: {client_id}"
+            )));
+        }
+        Ok(())
     }
 
-    /// Delete a session.
-    pub async fn delete_session(&self, session_id: Uuid) -> FederationResult<()> {
-        FederatedAuthSession::delete(&self.pool, session_id).await?;
+    /// Validate redirect URI to prevent open redirects.
+    fn validate_redirect_uri(redirect_uri: &str, callback_base_url: &str) -> FederationResult<()> {
+        let trimmed = redirect_uri.trim();
+        // Allow relative paths starting with / (but not // or /\)
+        if trimmed.starts_with('/')
+            && !trimmed.starts_with("//")
+            && !trimmed.starts_with("/\\")
+            && !trimmed.contains("://")
+        {
+            return Ok(());
+        }
+        // For absolute URLs: parse both and compare scheme + host + port
+        if let (Ok(redirect), Ok(base)) =
+            (url::Url::parse(trimmed), url::Url::parse(callback_base_url))
+        {
+            if redirect.scheme() == base.scheme()
+                && redirect.host_str() == base.host_str()
+                && redirect.port() == base.port()
+            {
+                return Ok(());
+            }
+        }
+        Err(FederationError::InvalidCallback(
+            "redirect_uri must be a relative path or under the configured base URL".to_string(),
+        ))
+    }
+
+    /// Get session by ID with tenant isolation.
+    pub async fn get_session(
+        &self,
+        tenant_id: Uuid,
+        session_id: Uuid,
+    ) -> FederationResult<Option<FederatedAuthSession>> {
+        Ok(FederatedAuthSession::find_by_id(&self.pool, tenant_id, session_id).await?)
+    }
+
+    /// Delete a session with tenant isolation.
+    pub async fn delete_session(&self, tenant_id: Uuid, session_id: Uuid) -> FederationResult<()> {
+        FederatedAuthSession::delete(&self.pool, tenant_id, session_id).await?;
         Ok(())
     }
 

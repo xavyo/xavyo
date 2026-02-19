@@ -86,6 +86,10 @@ pub enum SamlError {
     #[error("Certificate not found: {0}")]
     CertificateNotFound(String),
 
+    /// Invalid certificate (expired or not yet valid)
+    #[error("Invalid certificate: {0}")]
+    InvalidCertificate(String),
+
     /// Invalid attribute mapping
     #[error("Invalid attribute mapping: {0}")]
     InvalidAttributeMapping(String),
@@ -194,6 +198,9 @@ impl IntoResponse for SamlError {
             SamlError::CertificateNotFound(_) => {
                 (StatusCode::NOT_FOUND, "certificate_not_found", None)
             }
+            SamlError::InvalidCertificate(_) => {
+                (StatusCode::BAD_REQUEST, "invalid_certificate", None)
+            }
             SamlError::InvalidAttributeMapping(_) => {
                 (StatusCode::BAD_REQUEST, "invalid_attribute_mapping", None)
             }
@@ -251,7 +258,8 @@ impl IntoResponse for SamlError {
             | SamlError::UnsupportedNameIdFormat(_)
             | SamlError::EntityIdConflict(_)
             | SamlError::ServiceProviderNotFound(_)
-            | SamlError::CertificateNotFound(_) => self.to_string(),
+            | SamlError::CertificateNotFound(_)
+            | SamlError::InvalidCertificate(_) => self.to_string(),
         };
 
         let body = ErrorResponse {

@@ -1252,26 +1252,6 @@ pub enum GovernanceError {
     #[error("NHI is inactive (no usage for {1} days): {0}")]
     NhiInactive(Uuid, i32),
 
-    /// NHI credential not found.
-    #[error("NHI credential not found: {0}")]
-    NhiCredentialNotFound(Uuid),
-
-    /// NHI credential already revoked.
-    #[error("NHI credential already revoked: {0}")]
-    NhiCredentialAlreadyRevoked(Uuid),
-
-    /// NHI credential invalid (authentication failure).
-    #[error("Invalid NHI credentials")]
-    NhiCredentialInvalid,
-
-    /// NHI credential expired.
-    #[error("NHI credential has expired: {0}")]
-    NhiCredentialExpired(Uuid),
-
-    /// NHI rotation required.
-    #[error("NHI credential rotation is required: {0}")]
-    NhiRotationRequired(Uuid),
-
     /// NHI request not found.
     #[error("NHI request not found: {0}")]
     NhiRequestNotFound(Uuid),
@@ -2354,7 +2334,6 @@ impl GovernanceError {
                 | Self::BatchSimulationNotFound(_)
                 | Self::SimulationComparisonNotFound(_)
                 | Self::NhiNotFound(_)
-                | Self::NhiCredentialNotFound(_)
                 | Self::NhiRequestNotFound(_)
                 | Self::NhiOwnerNotFound(_)
                 | Self::NhiAuditEventNotFound(_)
@@ -2499,7 +2478,6 @@ impl GovernanceError {
                 | Self::NhiUserAlreadyRegistered(_)
                 | Self::NhiRequestAlreadyExists
                 | Self::NhiAlreadySuspended(_)
-                | Self::NhiCredentialAlreadyRevoked(_)
                 | Self::CorrelationRuleNameExists(_)
                 | Self::CircularMergeDetected { .. }
                 | Self::MergeAlreadyInProgress { .. }
@@ -2955,11 +2933,6 @@ impl GovernanceError {
                 | Self::NhiSuspended(_)
                 | Self::NhiExpired(_)
                 | Self::NhiInactive(_, _)
-                | Self::NhiCredentialNotFound(_)
-                | Self::NhiCredentialAlreadyRevoked(_)
-                | Self::NhiCredentialInvalid
-                | Self::NhiCredentialExpired(_)
-                | Self::NhiRotationRequired(_)
                 | Self::NhiRequestNotFound(_)
                 | Self::NhiRequestAlreadyExists
                 | Self::NhiRequestNotPending(_)

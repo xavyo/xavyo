@@ -43,6 +43,9 @@ pub struct FederationConfig {
     pub master_key: [u8; 32],
     /// Base URL for callbacks (e.g., "<https://idp.example.com>").
     pub callback_base_url: String,
+    /// PEM-encoded RSA private key for signing federation JWTs.
+    /// Must be provided — federation login will fail without a valid signing key.
+    pub jwt_private_key_pem: Vec<u8>,
 }
 
 impl FederationState {
@@ -59,7 +62,10 @@ impl FederationState {
             config.callback_base_url.clone(),
         );
         let provisioning = ProvisioningService::new(config.pool.clone());
-        let token_issuer = TokenIssuerService::new_default();
+        let token_issuer = TokenIssuerService::new(crate::services::TokenIssuerConfig {
+            private_key_pem: config.jwt_private_key_pem.clone(),
+            ..Default::default()
+        });
 
         Self {
             pool: config.pool.clone(),

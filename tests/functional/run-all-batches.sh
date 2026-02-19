@@ -17,7 +17,7 @@
 #   Batch 5: oidc, saml, social
 #   Batch 6: governance, agents (NHI), operations, gdpr
 #   Batch 7: import-export, invitations
-#   Batch 8: deep NHI creds/tools/certs, governance SoD/certs/access-requests, SCIM deep
+#   Batch 8: deep NHI tools/certs, governance SoD/certs/access-requests, SCIM deep
 #   Batch 9: governance deep (role mining, merge, personas, risk)
 #   Batch 10: infrastructure & self-service (/me, devices, audit, alerts, authz, system)
 #   Batch 11: admin features (IP, branding, delegation, keys, invitations, org policies, license, escalation)

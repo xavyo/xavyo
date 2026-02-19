@@ -33,7 +33,7 @@ Production-ready with comprehensive test coverage (55 unit tests + 22 integratio
 ### Routers
 
 ```rust
-pub fn nhi_router() -> Router<NhiState>;       // Unified NHI CRUD, lifecycle, credentials, permissions, risk, certs
+pub fn nhi_router() -> Router<NhiState>;       // Unified NHI CRUD, lifecycle, permissions, risk, certs
 pub fn mcp_router(state: NhiState) -> Router;   // MCP protocol (tool listing + invocation)
 pub fn a2a_router(state: NhiState) -> Router;   // A2A protocol (agent-to-agent task management)
 pub fn discovery_router(state: NhiState) -> Router; // Agent discovery (/.well-known/agents/:id)
@@ -123,7 +123,6 @@ The crate implements comprehensive risk scoring for NHIs:
 
 ### Features
 - **Staleness Detection**: Identifies inactive NHIs via `GET /nhi/staleness-report`
-- **Credential Age Tracking**: Flags old credentials for rotation
 - **Risk Summary**: Aggregated statistics via `GET /nhi/risk-summary`
 - **Per-NHI Risk**: Individual scores via `GET /nhi/:id/risk`
 
@@ -131,7 +130,7 @@ The crate implements comprehensive risk scoring for NHIs:
 
 - Never create NHIs without owners
 - Never skip risk scoring
-- Never ignore credential rotation policies
+- Never ignore risk scoring policies
 
 ## Related Crates
 

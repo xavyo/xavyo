@@ -189,6 +189,8 @@ services:
       # Ticketing credentials encryption key
       XAVYO_TICKETING_ENCRYPTION_KEY: ${XAVYO_TICKETING_ENCRYPTION_KEY:-zxDtnpmuQkkoKKupjsjDjgdx/OGnAaS4O65YpGHNY+M=}
       XAVYO_SIEM_ENCRYPTION_KEY: ${XAVYO_SIEM_ENCRYPTION_KEY:-zxDtnpmuQkkoKKupjsjDjgdx/OGnAaS4O65YpGHNY+M=}
+      AGENTGATEWAY_MCP_URL: ${AGENTGATEWAY_MCP_URL:-http://172.18.0.1:4000/mcp}
+      APP_ENV: development
     ports:
       - '${API_PORT:-8080}:8080'
     volumes:

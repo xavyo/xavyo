@@ -154,10 +154,24 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
         return false;
     };
 
-    // Set tenant context for RLS before inserting into revoked_tokens
+    // SECURITY: Acquire dedicated connection for RLS to prevent pool race condition
+    let mut conn = match state.pool.acquire().await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!(
+                target: "token_lifecycle",
+                jti = %jti,
+                error = %e,
+                "Failed to acquire connection for revocation insert"
+            );
+            return false;
+        }
+    };
+
+    // Set tenant context for RLS on this connection
     if sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
         .bind(tenant_id.to_string())
-        .execute(&state.pool)
+        .execute(&mut *conn)
         .await
         .is_err()
     {
@@ -169,7 +183,7 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
         return false;
     }
 
-    // Insert JTI into revoked_tokens table
+    // Insert JTI into revoked_tokens table using the same connection
     let input = CreateRevokedToken {
         jti: jti.clone(),
         user_id,
@@ -180,7 +194,7 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
         revoked_by: None,
     };
 
-    let inserted = match RevokedToken::insert(&state.pool, input).await {
+    let inserted = match RevokedToken::insert(&mut *conn, input).await {
         Ok(_) => true,
         Err(e) => {
             tracing::error!(
@@ -209,17 +223,23 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
 async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &str) -> bool {
     let token_hash = hash_token(token);
 
-    // Set tenant context for RLS
+    // SECURITY: Acquire dedicated connection for RLS to prevent pool race condition
+    let mut conn = match state.pool.acquire().await {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+
+    // Set tenant context for RLS on this connection
     if sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
         .bind(tenant_id.to_string())
-        .execute(&state.pool)
+        .execute(&mut *conn)
         .await
         .is_err()
     {
         return false;
     }
 
-    // Look up the refresh token by hash
+    // Look up the refresh token by hash using the same connection
     let row: Option<(Uuid, Uuid, bool)> = sqlx::query_as(
         r"
         SELECT id, user_id, revoked
@@ -229,7 +249,7 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
     )
     .bind(&token_hash)
     .bind(tenant_id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(&mut *conn)
     .await
     .ok()
     .flatten();
@@ -243,7 +263,7 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
         return true; // Already revoked, nothing to do
     }
 
-    // Mark refresh token as revoked
+    // Mark refresh token as revoked using the same connection
     let _ = sqlx::query(
         r"
         UPDATE oauth_refresh_tokens
@@ -253,7 +273,7 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
     )
     .bind(token_id)
     .bind(tenant_id)
-    .execute(&state.pool)
+    .execute(&mut *conn)
     .await;
 
     // Cascade: revoke all user's access tokens using sentinel pattern
@@ -270,11 +290,36 @@ async fn try_revoke_refresh_token(state: &OAuthState, tenant_id: Uuid, token: &s
 async fn cascade_revoke_user_access_tokens(state: &OAuthState, tenant_id: Uuid, user_id: Uuid) {
     let sentinel_jti = format!("revoke-all:{}:{}", user_id, Utc::now().timestamp());
 
-    // Ensure tenant context is set for RLS
-    let _ = sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+    // SECURITY: Acquire dedicated connection for RLS to prevent pool race condition.
+    // set_config on a shared pool sets context on a random connection that may not be
+    // the same one used for the subsequent insert.
+    let mut conn = match state.pool.acquire().await {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!(
+                target: "token_lifecycle",
+                user_id = %user_id,
+                error = %e,
+                "Failed to acquire connection for cascade revocation"
+            );
+            return;
+        }
+    };
+
+    // Set tenant context for RLS on this connection
+    if sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
         .bind(tenant_id.to_string())
-        .execute(&state.pool)
-        .await;
+        .execute(&mut *conn)
+        .await
+        .is_err()
+    {
+        tracing::error!(
+            target: "token_lifecycle",
+            user_id = %user_id,
+            "Failed to set tenant context for cascade revocation"
+        );
+        return;
+    }
 
     let input = CreateRevokedToken {
         jti: sentinel_jti.clone(),
@@ -286,7 +331,8 @@ async fn cascade_revoke_user_access_tokens(state: &OAuthState, tenant_id: Uuid, 
         revoked_by: None,
     };
 
-    if let Err(e) = RevokedToken::insert(&state.pool, input).await {
+    // Use the same connection for the insert so RLS context applies
+    if let Err(e) = RevokedToken::insert(&mut *conn, input).await {
         tracing::error!(
             target: "token_lifecycle",
             user_id = %user_id,

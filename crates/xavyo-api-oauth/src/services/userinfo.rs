@@ -112,10 +112,17 @@ impl UserInfoService {
         user_id: Uuid,
         scope: &str,
     ) -> Result<UserClaims, OAuthError> {
-        // Set tenant context for RLS
+        // SECURITY: Acquire dedicated connection and set RLS context on it.
+        // Using &self.pool for set_config and a separate &self.pool for the query
+        // would hit different connections, bypassing RLS.
+        let mut conn = self.pool.acquire().await.map_err(|e| {
+            tracing::error!("Failed to acquire connection: {}", e);
+            OAuthError::Internal("Failed to acquire connection".to_string())
+        })?;
+
         sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
             .bind(tenant_id.to_string())
-            .execute(&self.pool)
+            .execute(&mut *conn)
             .await
             .map_err(|e| {
                 tracing::error!("Failed to set tenant context: {}", e);
@@ -132,7 +139,7 @@ impl UserInfoService {
         )
         .bind(user_id)
         .bind(tenant_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *conn)
         .await
         .map_err(|e| {
             tracing::error!("Database error looking up user: {}", e);

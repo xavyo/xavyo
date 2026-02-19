@@ -24,7 +24,7 @@ pub struct VerificationConfig {
 impl Default for VerificationConfig {
     fn default() -> Self {
         Self {
-            clock_skew_tolerance: 300, // 5 minutes
+            clock_skew_tolerance: 60, // 1 minute
             expected_issuer: None,
             expected_audience: None,
             validate_exp: true,
@@ -396,11 +396,11 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
             .await;
 
         let jwks_uri = format!("{}/.well-known/jwks.json", mock_server.uri());
-        // Token expired 2 minutes ago
-        let token = create_test_token(-120, "https://idp.example.com");
+        // Token expired 30 seconds ago
+        let token = create_test_token(-30, "https://idp.example.com");
 
-        // With 5 minute tolerance, should still pass
-        let verifier = test_verifier(VerificationConfig::with_clock_skew(300));
+        // With 1 minute tolerance (default), should still pass
+        let verifier = test_verifier(VerificationConfig::default());
         let result = verifier.verify_token(&token, &jwks_uri).await;
 
         assert!(result.is_ok());

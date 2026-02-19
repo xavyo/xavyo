@@ -16,11 +16,10 @@ use xavyo_auth::JwtClaims;
 use crate::error::{ApiGovernanceError, ApiResult};
 use crate::models::{
     ApproveNhiRequestRequest, CertifyNhiResponse, CreateNhiRequest, ListNhiRequestsQuery,
-    ListNhisQuery, NhiCredentialCreatedResponse, NhiCredentialListResponse, NhiCredentialResponse,
-    NhiListResponse, NhiRequestListResponse, NhiRequestResponse, NhiResponse, NhiRiskScoreResponse,
-    NhiSummary, ReactivateNhiRequest, RejectNhiRequestRequest, RevokeCredentialRequest,
-    RiskLevelSummary, RotateCredentialsRequest, SubmitNhiRequestRequest, SuspendNhiRequest,
-    TransferOwnershipRequest, UpdateNhiRequest,
+    ListNhisQuery, NhiListResponse, NhiRequestListResponse, NhiRequestResponse, NhiResponse,
+    NhiRiskScoreResponse, NhiSummary, ReactivateNhiRequest, RejectNhiRequestRequest,
+    RiskLevelSummary, SubmitNhiRequestRequest, SuspendNhiRequest, TransferOwnershipRequest,
+    UpdateNhiRequest,
 };
 use crate::router::GovernanceState;
 
@@ -393,184 +392,6 @@ pub async fn certify_nhi(
         nhi,
         message: "NHI ownership and purpose confirmed".to_string(),
     }))
-}
-
-// =============================================================================
-// Credential Handlers (US2)
-// =============================================================================
-
-/// List credentials for an NHI.
-#[utoipa::path(
-    get,
-    path = "/governance/nhis/{id}/credentials",
-    tag = "Governance - NHI Credentials",
-    params(
-        ("id" = Uuid, Path, description = "NHI ID"),
-        ("active_only" = Option<bool>, Query, description = "Only return active credentials")
-    ),
-    responses(
-        (status = 200, description = "List of credentials", body = NhiCredentialListResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "NHI not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn list_nhi_credentials(
-    State(state): State<GovernanceState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Query(params): Query<ListCredentialsParams>,
-) -> ApiResult<Json<NhiCredentialListResponse>> {
-    let tenant_id = *claims
-        .tenant_id()
-        .ok_or(ApiGovernanceError::Unauthorized)?
-        .as_uuid();
-
-    let result = state
-        .nhi_credential_service
-        .list(tenant_id, id, params.active_only.unwrap_or(false))
-        .await?;
-
-    Ok(Json(result))
-}
-
-/// Query parameters for listing credentials.
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct ListCredentialsParams {
-    pub active_only: Option<bool>,
-}
-
-/// Get a specific credential by ID.
-#[utoipa::path(
-    get,
-    path = "/governance/nhis/{nhi_id}/credentials/{credential_id}",
-    tag = "Governance - NHI Credentials",
-    params(
-        ("nhi_id" = Uuid, Path, description = "NHI ID"),
-        ("credential_id" = Uuid, Path, description = "Credential ID")
-    ),
-    responses(
-        (status = 200, description = "Credential details", body = NhiCredentialResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "NHI or credential not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn get_nhi_credential(
-    State(state): State<GovernanceState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path((nhi_id, credential_id)): Path<(Uuid, Uuid)>,
-) -> ApiResult<Json<NhiCredentialResponse>> {
-    let tenant_id = *claims
-        .tenant_id()
-        .ok_or(ApiGovernanceError::Unauthorized)?
-        .as_uuid();
-
-    let credential = state
-        .nhi_credential_service
-        .get(tenant_id, nhi_id, credential_id)
-        .await?;
-
-    Ok(Json(credential))
-}
-
-/// Rotate credentials for an NHI.
-///
-/// Creates a new credential and optionally keeps the old one active during a
-/// grace period.
-#[utoipa::path(
-    post,
-    path = "/governance/nhis/{id}/credentials/rotate",
-    tag = "Governance - NHI Credentials",
-    params(
-        ("id" = Uuid, Path, description = "NHI ID")
-    ),
-    request_body = RotateCredentialsRequest,
-    responses(
-        (status = 201, description = "Credentials rotated", body = NhiCredentialCreatedResponse),
-        (status = 400, description = "Invalid request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "NHI not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn rotate_nhi_credentials(
-    State(state): State<GovernanceState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path(id): Path<Uuid>,
-    Json(request): Json<RotateCredentialsRequest>,
-) -> ApiResult<(StatusCode, Json<NhiCredentialCreatedResponse>)> {
-    request.validate()?;
-
-    let tenant_id = *claims
-        .tenant_id()
-        .ok_or(ApiGovernanceError::Unauthorized)?
-        .as_uuid();
-
-    let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
-
-    let result = state
-        .nhi_credential_service
-        .rotate(tenant_id, id, Some(actor_id), request)
-        .await?;
-
-    Ok((StatusCode::CREATED, Json(result)))
-}
-
-/// Revoke a credential.
-#[utoipa::path(
-    post,
-    path = "/governance/nhis/{nhi_id}/credentials/{credential_id}/revoke",
-    tag = "Governance - NHI Credentials",
-    params(
-        ("nhi_id" = Uuid, Path, description = "NHI ID"),
-        ("credential_id" = Uuid, Path, description = "Credential ID")
-    ),
-    request_body = RevokeCredentialRequest,
-    responses(
-        (status = 200, description = "Credential revoked", body = NhiCredentialResponse),
-        (status = 400, description = "Invalid request or credential already revoked"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "NHI or credential not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(("bearer_auth" = []))
-)]
-pub async fn revoke_nhi_credential(
-    State(state): State<GovernanceState>,
-    Extension(claims): Extension<JwtClaims>,
-    Path((nhi_id, credential_id)): Path<(Uuid, Uuid)>,
-    Json(request): Json<RevokeCredentialRequest>,
-) -> ApiResult<Json<NhiCredentialResponse>> {
-    if !claims.has_role("admin") {
-        return Err(ApiGovernanceError::Forbidden);
-    }
-
-    request.validate()?;
-
-    let tenant_id = *claims
-        .tenant_id()
-        .ok_or(ApiGovernanceError::Unauthorized)?
-        .as_uuid();
-
-    let actor_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
-
-    let credential = state
-        .nhi_credential_service
-        .revoke(
-            tenant_id,
-            nhi_id,
-            credential_id,
-            actor_id,
-            request.reason,
-            request.immediate,
-        )
-        .await?;
-
-    Ok(Json(credential))
 }
 
 // =============================================================================
@@ -1511,7 +1332,7 @@ pub async fn get_nhi_request(
     Ok(Json(result))
 }
 
-/// Approve an NHI request (creates the NHI and initial credentials).
+/// Approve an NHI request (creates the NHI).
 #[utoipa::path(
     post,
     path = "/governance/nhis/requests/{request_id}/approve",
@@ -1542,16 +1363,12 @@ pub async fn approve_nhi_request(
 
     let approver_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
-    let (request, secret) = state
+    let request = state
         .nhi_request_service
         .approve_request(tenant_id, request_id, approver_id, body.comments)
         .await?;
 
-    Ok(Json(NhiRequestApprovalResponse {
-        request,
-        secret,
-        warning: "This is the only time the secret will be shown. Store it securely.".to_string(),
-    }))
+    Ok(Json(NhiRequestApprovalResponse { request }))
 }
 
 /// Reject an NHI request.
@@ -1668,8 +1485,4 @@ pub async fn get_nhi_request_summary(
 pub struct NhiRequestApprovalResponse {
     /// The updated request.
     pub request: NhiRequestResponse,
-    /// The initial API key/secret (SHOWN ONLY ONCE).
-    pub secret: String,
-    /// Warning message about one-time display.
-    pub warning: String,
 }

@@ -42,6 +42,13 @@ impl ConnectionService {
         provider: ProviderType,
         provider_user_id: &str,
     ) -> SocialResult<Option<ConnectionInfo>> {
+        // SECURITY: Acquire dedicated connection and set RLS context for defense-in-depth
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
         let row: Option<ConnectionRow> = sqlx::query_as(
             r"
             SELECT id, user_id, provider, email, display_name, is_private_email, created_at
@@ -52,7 +59,7 @@ impl ConnectionService {
         .bind(tenant_id)
         .bind(provider.to_string())
         .bind(provider_user_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *conn)
         .await?;
 
         Ok(row.map(|r| ConnectionInfo {
@@ -86,11 +93,18 @@ impl ConnectionService {
 
         // No existing connection - check for email collision
         if let Some(email) = &user_info.email {
+            // SECURITY: Use dedicated connection with RLS context for defense-in-depth
+            let mut conn = self.pool.acquire().await?;
+            sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+                .bind(tenant_id.to_string())
+                .execute(&mut *conn)
+                .await?;
+
             let existing_user: Option<(Uuid,)> =
                 sqlx::query_as("SELECT id FROM users WHERE tenant_id = $1 AND email = $2")
                     .bind(tenant_id)
                     .bind(email)
-                    .fetch_optional(&self.pool)
+                    .fetch_optional(&mut *conn)
                     .await?;
 
             if let Some((existing_user_id,)) = existing_user {
@@ -132,6 +146,13 @@ impl ConnectionService {
 
         let raw_claims = serde_json::to_value(&user_info.raw_claims).ok();
 
+        // SECURITY: Set RLS context for defense-in-depth (query already has tenant_id filter)
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
         let (id,): (Uuid,) = sqlx::query_as(
             r"
             INSERT INTO social_connections (
@@ -154,7 +175,7 @@ impl ConnectionService {
         .bind(token_expires_at)
         .bind(user_info.is_private_email)
         .bind(&raw_claims)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *conn)
         .await?;
 
         Ok(id)
@@ -183,6 +204,13 @@ impl ConnectionService {
 
         let token_expires_at = expires_in.map(|secs| Utc::now() + Duration::seconds(secs));
 
+        // SECURITY: Set RLS context for defense-in-depth (query already has tenant_id filter)
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
         sqlx::query(
             r"
             UPDATE social_connections
@@ -199,7 +227,7 @@ impl ConnectionService {
         .bind(&access_token_encrypted)
         .bind(&refresh_token_encrypted)
         .bind(token_expires_at)
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await?;
 
         Ok(())
@@ -256,6 +284,13 @@ impl ConnectionService {
         tenant_id: Uuid,
         user_id: Uuid,
     ) -> SocialResult<Vec<ConnectionInfo>> {
+        // SECURITY: Use dedicated connection with RLS context for defense-in-depth
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
         let rows: Vec<ConnectionRow> = sqlx::query_as(
             r"
             SELECT id, user_id, provider, email, display_name, is_private_email, created_at
@@ -266,7 +301,7 @@ impl ConnectionService {
         )
         .bind(tenant_id)
         .bind(user_id)
-        .fetch_all(&self.pool)
+        .fetch_all(&mut *conn)
         .await?;
 
         Ok(rows
@@ -285,13 +320,20 @@ impl ConnectionService {
 
     /// Check if a user can unlink a provider (has other auth methods).
     pub async fn can_unlink(&self, tenant_id: Uuid, user_id: Uuid) -> SocialResult<bool> {
+        // SECURITY: Use dedicated connection with RLS context for defense-in-depth
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
         // Count social connections
         let (connection_count,): (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM social_connections WHERE tenant_id = $1 AND user_id = $2",
         )
         .bind(tenant_id)
         .bind(user_id)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *conn)
         .await?;
 
         // Check if user has a password
@@ -300,7 +342,7 @@ impl ConnectionService {
         )
         .bind(user_id)
         .bind(tenant_id)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *conn)
         .await?;
 
         // Can unlink if: has password OR has more than one social connection
@@ -323,13 +365,20 @@ impl ConnectionService {
             });
         }
 
+        // SECURITY: Set RLS context for defense-in-depth (query already has tenant_id filter)
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
         let result = sqlx::query(
             "DELETE FROM social_connections WHERE tenant_id = $1 AND user_id = $2 AND provider = $3",
         )
         .bind(tenant_id)
         .bind(user_id)
         .bind(provider.to_string())
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await?;
 
         if result.rows_affected() == 0 {

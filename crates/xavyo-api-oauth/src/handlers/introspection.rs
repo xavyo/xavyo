@@ -165,22 +165,32 @@ async fn try_introspect_access_token(
         // Check for revoke-all sentinel: if a revoke-all sentinel was created
         // after this token was issued, the token should be treated as revoked.
         // Filter by tenant_id to prevent cross-tenant leakage.
-        let sentinel_revoked: bool = sqlx::query_scalar(
-            r"
-            SELECT EXISTS(
-                SELECT 1 FROM revoked_tokens
-                WHERE jti LIKE 'revoke-all:' || $1 || ':%'
-                  AND tenant_id = $3
-                  AND created_at > to_timestamp($2)
+        // SECURITY: Acquire dedicated connection for RLS context
+        let sentinel_revoked: bool = if let Ok(mut conn) = state.pool.acquire().await {
+            let _ = sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+                .bind(tenant_id.to_string())
+                .execute(&mut *conn)
+                .await;
+            sqlx::query_scalar(
+                r"
+                SELECT EXISTS(
+                    SELECT 1 FROM revoked_tokens
+                    WHERE jti LIKE 'revoke-all:' || $1 || ':%'
+                      AND tenant_id = $3
+                      AND created_at > to_timestamp($2)
+                )
+                ",
             )
-            ",
-        )
-        .bind(&claims.sub)
-        .bind(claims.iat as f64)
-        .bind(tenant_id)
-        .fetch_one(&state.pool)
-        .await
-        .unwrap_or(false);
+            .bind(&claims.sub)
+            .bind(claims.iat as f64)
+            .bind(tenant_id)
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap_or(false)
+        } else {
+            // Fail-closed: treat connection errors as revoked
+            true
+        };
 
         if sentinel_revoked {
             return Some(IntrospectionResponse::inactive());
@@ -226,14 +236,17 @@ async fn try_introspect_refresh_token(
 ) -> Option<IntrospectionResponse> {
     let token_hash = hash_token(token);
 
-    // Set tenant context for RLS
+    // SECURITY: Acquire dedicated connection for RLS to prevent pool race condition
+    let mut conn = state.pool.acquire().await.ok()?;
+
+    // Set tenant context for RLS on this connection
     sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
         .bind(tenant_id.to_string())
-        .execute(&state.pool)
+        .execute(&mut *conn)
         .await
         .ok()?;
 
-    // Look up the refresh token
+    // Look up the refresh token using the same connection
     let row: Option<RefreshTokenRow> = sqlx::query_as(
         r"
         SELECT rt.id, rt.user_id, rt.scope, rt.revoked, rt.created_at, rt.expires_at
@@ -243,7 +256,7 @@ async fn try_introspect_refresh_token(
     )
     .bind(&token_hash)
     .bind(tenant_id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(&mut *conn)
     .await
     .ok()?;
 

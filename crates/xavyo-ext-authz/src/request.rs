@@ -321,9 +321,7 @@ fn prost_struct_to_json(s: &prost_types::Struct) -> serde_json::Value {
     for (k, v) in &s.fields {
         if let Some(ref kind) = v.kind {
             let json_val = match kind {
-                prost_types::value::Kind::StringValue(sv) => {
-                    serde_json::Value::String(sv.clone())
-                }
+                prost_types::value::Kind::StringValue(sv) => serde_json::Value::String(sv.clone()),
                 prost_types::value::Kind::NumberValue(n) => {
                     serde_json::json!(*n)
                 }
@@ -859,9 +857,7 @@ mod tests {
         jwt_fields.insert(
             "tid".to_string(),
             prost_types::Value {
-                kind: Some(prost_types::value::Kind::StringValue(
-                    tenant_id.to_string(),
-                )),
+                kind: Some(prost_types::value::Kind::StringValue(tenant_id.to_string())),
             },
         );
         jwt_fields.insert(
@@ -870,9 +866,7 @@ mod tests {
                 kind: Some(prost_types::value::Kind::ListValue(
                     prost_types::ListValue {
                         values: vec![prost_types::Value {
-                            kind: Some(prost_types::value::Kind::StringValue(
-                                "agent".to_string(),
-                            )),
+                            kind: Some(prost_types::value::Kind::StringValue("agent".to_string())),
                         }],
                     },
                 )),
@@ -884,17 +878,13 @@ mod tests {
         act_fields.insert(
             "sub".to_string(),
             prost_types::Value {
-                kind: Some(prost_types::value::Kind::StringValue(
-                    actor_id.to_string(),
-                )),
+                kind: Some(prost_types::value::Kind::StringValue(actor_id.to_string())),
             },
         );
         act_fields.insert(
             "nhi_type".to_string(),
             prost_types::Value {
-                kind: Some(prost_types::value::Kind::StringValue(
-                    "agent".to_string(),
-                )),
+                kind: Some(prost_types::value::Kind::StringValue("agent".to_string())),
             },
         );
         jwt_fields.insert(

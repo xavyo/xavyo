@@ -57,55 +57,6 @@ pub struct LifecycleActionResponse {
     pub message: Option<String>,
 }
 
-// --- Credentials ---
-
-/// Request to issue a credential for an NHI identity
-#[derive(Debug, Clone, Serialize)]
-pub struct IssueCredentialRequest {
-    pub credential_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub valid_days: Option<i32>,
-}
-
-/// Response when a credential is issued (includes secret)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CredentialIssuedResponse {
-    pub credential: NhiCredentialResponse,
-    #[serde(default)]
-    pub secret: Option<String>,
-    #[serde(default)]
-    pub api_key: Option<String>,
-}
-
-/// NHI credential details
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NhiCredentialResponse {
-    pub id: Uuid,
-    pub nhi_identity_id: Uuid,
-    pub credential_type: String,
-    #[serde(default)]
-    pub is_active: bool,
-    #[serde(default)]
-    pub expires_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    #[serde(default)]
-    pub rotated_at: Option<DateTime<Utc>>,
-}
-
-/// Paginated credential list
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NhiCredentialListResponse {
-    pub data: Vec<NhiCredentialResponse>,
-    pub total: i64,
-}
-
-/// Request to rotate a credential
-#[derive(Debug, Clone, Serialize)]
-pub struct RotateCredentialRequest {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub grace_period_hours: Option<i32>,
-}
-
 // --- Permissions ---
 
 /// Request to grant a tool permission to an agent
@@ -448,17 +399,6 @@ mod tests {
         let req_none = SuspendRequest { reason: None };
         let json_none = serde_json::to_value(&req_none).unwrap();
         assert!(json_none.get("reason").is_none());
-    }
-
-    #[test]
-    fn test_issue_credential_request_serialization() {
-        let req = IssueCredentialRequest {
-            credential_type: "api_key".to_string(),
-            valid_days: Some(90),
-        };
-        let json = serde_json::to_value(&req).unwrap();
-        assert_eq!(json["credential_type"], "api_key");
-        assert_eq!(json["valid_days"], 90);
     }
 
     #[test]

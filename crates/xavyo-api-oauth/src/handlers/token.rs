@@ -2,7 +2,9 @@
 
 use crate::error::OAuthError;
 use crate::handlers::device::{check_device_authorization, exchange_device_code_for_tokens};
-use crate::models::{TokenRequest, TokenResponse, DEVICE_CODE_GRANT_TYPE, TOKEN_EXCHANGE_GRANT_TYPE};
+use crate::models::{
+    TokenRequest, TokenResponse, DEVICE_CODE_GRANT_TYPE, TOKEN_EXCHANGE_GRANT_TYPE,
+};
 use crate::router::OAuthState;
 use crate::services::DeviceAuthorizationStatus;
 use axum::{
@@ -150,24 +152,47 @@ async fn handle_authorization_code_grant(
     let client_uuid = auth_code_info.client_id;
     let tenant_id = auth_code_info.tenant_id;
 
-    // For confidential clients, verify the secret
-    if let Some(secret) = client_secret {
+    // Look up the client to determine its type and verify credentials
+    let client = state
+        .client_service
+        .get_client_by_id(tenant_id, client_uuid)
+        .await?;
+
+    // SECURITY: Confidential clients MUST always provide client_secret.
+    // Without this check, an attacker could omit the secret and bypass
+    // authentication for confidential clients entirely.
+    if client.client_type == crate::models::ClientType::Confidential {
+        let secret = client_secret.ok_or_else(|| {
+            OAuthError::InvalidClient(
+                "client_secret is required for confidential clients".to_string(),
+            )
+        })?;
+        let _ = state
+            .client_service
+            .verify_client_credentials(tenant_id, client_id, secret)
+            .await?;
+    } else if let Some(secret) = client_secret {
+        // Public client provided a secret — still verify it if present,
+        // but public clients are not required to provide one.
         let _ = state
             .client_service
             .verify_client_credentials(tenant_id, client_id, secret)
             .await?;
     }
 
+    // NOTE: Known ordering issue (MEDIUM-8 from security audit):
+    // The authorization code is consumed BEFORE redirect_uri is validated against
+    // the client's registered URIs. Ideally, redirect_uri validation should happen
+    // before code consumption to prevent DoS via invalid redirect_uri.
+    // This is accepted risk: the code consumption already validates redirect_uri
+    // matches the stored value (preventing token theft), so this is a DoS vector
+    // only, not a security vulnerability. Refactoring would require restructuring
+    // the atomic transaction in validate_and_consume_code.
+
     // Validate and consume the authorization code (with PKCE verification)
     let (user_id, scope, nonce) = state
         .authorization_service
         .validate_and_consume_code(tenant_id, code, client_uuid, redirect_uri, code_verifier)
-        .await?;
-
-    // Look up the client to get its string ID for token generation
-    let client = state
-        .client_service
-        .get_client_by_id(tenant_id, client_uuid)
         .await?;
 
     // Validate redirect_uri against registered URIs
@@ -318,7 +343,12 @@ async fn handle_client_credentials_grant(
     // If the client is bound to an NHI identity, the NHI ID becomes the JWT subject
     let token_response = state
         .token_service
-        .issue_client_credentials_tokens(&client.client_id, tenant_id, &granted_scope, client.nhi_id)
+        .issue_client_credentials_tokens(
+            &client.client_id,
+            tenant_id,
+            &granted_scope,
+            client.nhi_id,
+        )
         .await?;
 
     Ok(Json(token_response))
@@ -507,12 +537,9 @@ async fn handle_token_exchange_grant(
         .subject_token_type
         .as_ref()
         .ok_or_else(|| OAuthError::InvalidRequest("subject_token_type is required".to_string()))?;
-    let actor_token = request
-        .actor_token
-        .as_ref()
-        .ok_or_else(|| {
-            OAuthError::InvalidRequest("actor_token is required for delegation".to_string())
-        })?;
+    let actor_token = request.actor_token.as_ref().ok_or_else(|| {
+        OAuthError::InvalidRequest("actor_token is required for delegation".to_string())
+    })?;
 
     // S13: Reject self-referential exchange (same token as both subject and actor)
     if subject_token == actor_token {
@@ -526,9 +553,7 @@ async fn handle_token_exchange_grant(
 
     // Authenticate the client and validate it is authorized for token exchange
     let secret = client_secret.ok_or_else(|| {
-        OAuthError::InvalidClient(
-            "client_secret is required for token exchange grant".to_string(),
-        )
+        OAuthError::InvalidClient("client_secret is required for token exchange grant".to_string())
     })?;
     let client = state
         .client_service
@@ -542,9 +567,8 @@ async fn handle_token_exchange_grant(
     let subject_claims = decode_token(subject_token, &state.public_key)
         .map_err(|e| OAuthError::InvalidGrant(format!("invalid subject_token: {e}")))?;
 
-    let principal_id = Uuid::parse_str(&subject_claims.sub).map_err(|_| {
-        OAuthError::InvalidGrant("subject_token has invalid sub claim".to_string())
-    })?;
+    let principal_id = Uuid::parse_str(&subject_claims.sub)
+        .map_err(|_| OAuthError::InvalidGrant("subject_token has invalid sub claim".to_string()))?;
 
     // SECURITY: subject token MUST have a tid claim matching the request tenant.
     // Without this, a token from another tenant (or without tid) bypasses isolation.
@@ -576,7 +600,7 @@ async fn handle_token_exchange_grant(
 
     // S9: Validate actor claim chain depth to prevent stack overflow / abuse
     if let Some(ref act) = actor_claims.act {
-        act.validate_depth().map_err(|e| OAuthError::InvalidGrant(e))?;
+        act.validate_depth().map_err(OAuthError::InvalidGrant)?;
     }
 
     // Step 3: Look up active delegation grant
@@ -606,9 +630,9 @@ async fn handle_token_exchange_grant(
 
     // Step 5: Check delegation depth (checked arithmetic to prevent overflow)
     let current_depth = actor_claims.delegation_depth.unwrap_or(0);
-    let new_depth = current_depth.checked_add(1).ok_or_else(|| {
-        OAuthError::InvalidGrant("delegation depth overflow".to_string())
-    })?;
+    let new_depth = current_depth
+        .checked_add(1)
+        .ok_or_else(|| OAuthError::InvalidGrant("delegation depth overflow".to_string()))?;
     if new_depth > grant.max_delegation_depth {
         return Err(OAuthError::InvalidGrant(format!(
             "delegation depth {} exceeds maximum {} for this grant",
@@ -626,10 +650,17 @@ async fn handle_token_exchange_grant(
         .ok_or_else(|| OAuthError::InvalidGrant("actor NHI not found".to_string()))?;
 
     if !actor_identity.lifecycle_state.is_usable() {
-        return Err(OAuthError::InvalidGrant(format!(
-            "actor NHI is not active (state: {})",
-            actor_identity.lifecycle_state.as_str()
-        )));
+        return Err(OAuthError::InvalidGrant(
+            "The provided authorization grant is invalid".to_string(),
+        ));
+    }
+
+    // SECURITY: Verify the requesting client is bound to the actor NHI.
+    // Without this check, any client could impersonate any NHI as an actor.
+    if client.nhi_id != Some(actor_nhi_id) {
+        return Err(OAuthError::InvalidGrant(
+            "Actor token does not belong to the requesting client".to_string(),
+        ));
     }
 
     // Step 7: Mint delegated token with `act` claim

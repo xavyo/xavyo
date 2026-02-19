@@ -25,14 +25,13 @@ fn test_risk_score_response_structure() {
 
     let response = NhiRiskScoreResponse {
         nhi_id,
-        total_score: 45,
+        total_score: 30,
         risk_level: RiskLevel::Medium,
         staleness_factor: 20,
-        credential_age_factor: 15,
+        credential_age_factor: 0,
         access_scope_factor: 10,
         factor_breakdown: serde_json::json!({
             "staleness": {"days_inactive": 50},
-            "credential_age": {"oldest_credential_days": 180},
             "access_scope": {"entitlement_count": 5}
         }),
         calculated_at: now,
@@ -40,10 +39,10 @@ fn test_risk_score_response_structure() {
     };
 
     assert_eq!(response.nhi_id, nhi_id);
-    assert_eq!(response.total_score, 45);
+    assert_eq!(response.total_score, 30);
     assert_eq!(response.risk_level, RiskLevel::Medium);
     assert_eq!(response.staleness_factor, 20);
-    assert_eq!(response.credential_age_factor, 15);
+    assert_eq!(response.credential_age_factor, 0);
     assert_eq!(response.access_scope_factor, 10);
 }
 
@@ -51,10 +50,10 @@ fn test_risk_score_response_structure() {
 fn test_risk_score_serialization() {
     let response = NhiRiskScoreResponse {
         nhi_id: Uuid::new_v4(),
-        total_score: 75,
-        risk_level: RiskLevel::High,
+        total_score: 50,
+        risk_level: RiskLevel::Medium,
         staleness_factor: 30,
-        credential_age_factor: 25,
+        credential_age_factor: 0,
         access_scope_factor: 20,
         factor_breakdown: serde_json::json!({}),
         calculated_at: Utc::now(),
@@ -63,8 +62,8 @@ fn test_risk_score_serialization() {
 
     let json = serde_json::to_string(&response).expect("Serialization failed");
     assert!(json.contains("total_score"));
-    assert!(json.contains("75"));
-    assert!(json.contains("high"));
+    assert!(json.contains("50"));
+    assert!(json.contains("medium"));
     assert!(json.contains("staleness_factor"));
 }
 
@@ -72,10 +71,10 @@ fn test_risk_score_serialization() {
 fn test_risk_factors_sum_to_total() {
     let response = NhiRiskScoreResponse {
         nhi_id: Uuid::new_v4(),
-        total_score: 65,
-        risk_level: RiskLevel::High,
+        total_score: 45,
+        risk_level: RiskLevel::Medium,
         staleness_factor: 25,
-        credential_age_factor: 20,
+        credential_age_factor: 0,
         access_scope_factor: 20,
         factor_breakdown: serde_json::json!({}),
         calculated_at: Utc::now(),
@@ -139,21 +138,21 @@ fn level_from_score(score: i32) -> RiskLevel {
 
 #[test]
 fn test_staleness_factor_calculation() {
-    // Max points: 40
+    // Max points: 50
     // Max days: 180
-    // Linear scaling: factor = days * 40 / 180
+    // Linear scaling: factor = days * 50 / 180
 
-    let max_points = 40;
+    let max_points = 50;
     let max_days = 180;
 
     // Test various day counts
     let test_cases = [
         (0, 0),    // 0 days = 0 points
-        (45, 10),  // 45 days = 10 points
-        (90, 20),  // 90 days = 20 points
-        (135, 30), // 135 days = 30 points
-        (180, 40), // 180 days = 40 points (max)
-        (365, 40), // Over max = capped at max
+        (36, 10),  // 36 days = 10 points
+        (90, 25),  // 90 days = 25 points
+        (144, 40), // 144 days = 40 points
+        (180, 50), // 180 days = 50 points (max)
+        (365, 50), // Over max = capped at max
     ];
 
     for (days, expected_points) in test_cases {
@@ -166,41 +165,6 @@ fn test_staleness_factor_calculation() {
             calculated, expected_points,
             "Staleness factor mismatch for {} days",
             days
-        );
-    }
-}
-
-#[test]
-fn test_credential_age_factor_calculation() {
-    // Max points: 30
-    // Max days: 365
-    // Linear scaling: factor = days * 30 / 365
-
-    let max_points: i32 = 30;
-    let max_days = 365;
-
-    let test_cases = [
-        (0, 0),
-        (73, 6),   // 73 days ~ 6 points
-        (182, 14), // 182 days ~ 14 points (15 rounded)
-        (365, 30), // 365 days = 30 points (max)
-        (730, 30), // Over max = capped
-    ];
-
-    for (days, expected_points) in test_cases {
-        let calculated = if days >= max_days {
-            max_points
-        } else {
-            (days * max_points) / max_days
-        };
-        // Allow +/- 1 for rounding
-        let diff = (calculated - expected_points).abs();
-        assert!(
-            diff <= 1,
-            "Credential age factor mismatch for {} days: expected ~{}, got {}",
-            days,
-            expected_points,
-            calculated
         );
     }
 }
@@ -319,10 +283,10 @@ fn test_risk_score_list_response_with_items() {
     let items = vec![
         NhiRiskScoreResponse {
             nhi_id: Uuid::new_v4(),
-            total_score: 80,
-            risk_level: RiskLevel::Critical,
+            total_score: 55,
+            risk_level: RiskLevel::High,
             staleness_factor: 35,
-            credential_age_factor: 25,
+            credential_age_factor: 0,
             access_scope_factor: 20,
             factor_breakdown: serde_json::json!({}),
             calculated_at: Utc::now(),
@@ -330,10 +294,10 @@ fn test_risk_score_list_response_with_items() {
         },
         NhiRiskScoreResponse {
             nhi_id: Uuid::new_v4(),
-            total_score: 30,
-            risk_level: RiskLevel::Medium,
+            total_score: 20,
+            risk_level: RiskLevel::Low,
             staleness_factor: 15,
-            credential_age_factor: 10,
+            credential_age_factor: 0,
             access_scope_factor: 5,
             factor_breakdown: serde_json::json!({}),
             calculated_at: Utc::now(),
@@ -350,8 +314,8 @@ fn test_risk_score_list_response_with_items() {
 
     assert_eq!(response.items.len(), 2);
     assert_eq!(response.total, 2);
-    assert_eq!(response.items[0].risk_level, RiskLevel::Critical);
-    assert_eq!(response.items[1].risk_level, RiskLevel::Medium);
+    assert_eq!(response.items[0].risk_level, RiskLevel::High);
+    assert_eq!(response.items[1].risk_level, RiskLevel::Low);
 }
 
 // ============================================================================
@@ -360,14 +324,14 @@ fn test_risk_score_list_response_with_items() {
 
 #[test]
 fn test_max_risk_score() {
-    // Maximum possible score: 40 + 30 + 30 = 100
+    // Maximum possible score: 50 + 0 + 50 = 100
     let response = NhiRiskScoreResponse {
         nhi_id: Uuid::new_v4(),
         total_score: 100,
         risk_level: RiskLevel::Critical,
-        staleness_factor: 40,
-        credential_age_factor: 30,
-        access_scope_factor: 30,
+        staleness_factor: 50,
+        credential_age_factor: 0,
+        access_scope_factor: 50,
         factor_breakdown: serde_json::json!({}),
         calculated_at: Utc::now(),
         next_calculation_at: None,
@@ -426,20 +390,13 @@ fn test_factor_breakdown_structure() {
             "last_used_at": null,
             "created_at": "2024-01-01T00:00:00Z",
             "points": 20,
-            "max_points": 40,
+            "max_points": 50,
             "threshold_days": 180
-        },
-        "credential_age": {
-            "oldest_credential_days": 182,
-            "active_credential_count": 2,
-            "points": 15,
-            "max_points": 30,
-            "threshold_days": 365
         },
         "access_scope": {
             "entitlement_count": 8,
             "points": 10,
-            "max_points": 30,
+            "max_points": 50,
             "thresholds": {
                 "low": "1-5 entitlements",
                 "medium": "6-20 entitlements",
@@ -451,10 +408,10 @@ fn test_factor_breakdown_structure() {
 
     let response = NhiRiskScoreResponse {
         nhi_id: Uuid::new_v4(),
-        total_score: 45,
+        total_score: 30,
         risk_level: RiskLevel::Medium,
         staleness_factor: 20,
-        credential_age_factor: 15,
+        credential_age_factor: 0,
         access_scope_factor: 10,
         factor_breakdown: breakdown.clone(),
         calculated_at: Utc::now(),
@@ -462,7 +419,6 @@ fn test_factor_breakdown_structure() {
     };
 
     assert_eq!(response.factor_breakdown["staleness"]["points"], 20);
-    assert_eq!(response.factor_breakdown["credential_age"]["points"], 15);
     assert_eq!(response.factor_breakdown["access_scope"]["points"], 10);
 }
 
@@ -470,10 +426,10 @@ fn test_factor_breakdown_structure() {
 fn test_next_calculation_at_optional() {
     let with_next = NhiRiskScoreResponse {
         nhi_id: Uuid::new_v4(),
-        total_score: 50,
+        total_score: 35,
         risk_level: RiskLevel::Medium,
         staleness_factor: 20,
-        credential_age_factor: 15,
+        credential_age_factor: 0,
         access_scope_factor: 15,
         factor_breakdown: serde_json::json!({}),
         calculated_at: Utc::now(),
@@ -482,10 +438,10 @@ fn test_next_calculation_at_optional() {
 
     let without_next = NhiRiskScoreResponse {
         nhi_id: Uuid::new_v4(),
-        total_score: 50,
+        total_score: 35,
         risk_level: RiskLevel::Medium,
         staleness_factor: 20,
-        credential_age_factor: 15,
+        credential_age_factor: 0,
         access_scope_factor: 15,
         factor_breakdown: serde_json::json!({}),
         calculated_at: Utc::now(),

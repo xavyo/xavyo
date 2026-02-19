@@ -129,7 +129,7 @@ impl Modify for SecurityAddon {
         // Enhanced Simulation (F060)
         (name = "Governance - Enhanced Simulation", description = "Batch simulation management for policy and role change impact analysis"),
         // NHI Lifecycle (F061)
-        (name = "Governance - NHIs", description = "Non-human identity lifecycle, credentials, usage, risk scoring, certification, and access requests"),
+        (name = "Governance - NHIs", description = "Non-human identity lifecycle, usage, risk scoring, certification, and access requests"),
         // Identity Merge (F062)
         (name = "Governance - Identity Merge", description = "Duplicate identity detection, merge preview, and merge execution"),
         // Persona Management (F063)
@@ -188,7 +188,6 @@ impl Modify for SecurityAddon {
         // Unified NHI Data Model (201-tool-nhi-promotion)
         (name = "NHI", description = "Unified Non-Human Identity list and detail endpoints"),
         (name = "NHI Lifecycle", description = "NHI lifecycle state transitions (suspend, reactivate, deprecate, archive, deactivate, activate)"),
-        (name = "NHI Credentials", description = "NHI credential issuance, rotation, and revocation"),
         (name = "NHI Certifications", description = "NHI certification campaign management"),
         (name = "NHI Permissions", description = "Agent-to-tool permission grants and queries"),
         (name = "NHI Risk", description = "NHI risk scoring and summary"),
@@ -228,7 +227,6 @@ impl Modify for SecurityAddon {
         (name = "Governance - Ticketing Webhooks", description = "Ticketing system webhook integration"),
         // Governance - NHI sub-tags
         (name = "Governance - NHI Certification", description = "Governance NHI certification campaigns, items, and decisions"),
-        (name = "Governance - NHI Credentials", description = "Governance NHI credential lifecycle management"),
         (name = "Governance - NHI Requests", description = "Governance NHI access request workflow"),
         (name = "Governance - NHI Risk", description = "Governance NHI risk scoring and batch calculation"),
         (name = "Governance - NHI Usage", description = "Governance NHI usage tracking and summary")
@@ -873,10 +871,6 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::handlers::nhis::reactivate_nhi,
         xavyo_api_governance::handlers::nhis::transfer_nhi_ownership,
         xavyo_api_governance::handlers::nhis::certify_nhi,
-        xavyo_api_governance::handlers::nhis::list_nhi_credentials,
-        xavyo_api_governance::handlers::nhis::get_nhi_credential,
-        xavyo_api_governance::handlers::nhis::rotate_nhi_credentials,
-        xavyo_api_governance::handlers::nhis::revoke_nhi_credential,
         xavyo_api_governance::handlers::nhis::record_nhi_usage,
         xavyo_api_governance::handlers::nhis::list_nhi_usage,
         xavyo_api_governance::handlers::nhis::get_nhi_usage_summary,
@@ -1193,11 +1187,6 @@ impl Modify for SecurityAddon {
         xavyo_api_nhi::handlers::lifecycle::archive,
         xavyo_api_nhi::handlers::lifecycle::deactivate,
         xavyo_api_nhi::handlers::lifecycle::activate,
-        // NHI Credentials
-        xavyo_api_nhi::handlers::credentials::issue_credential,
-        xavyo_api_nhi::handlers::credentials::list_credentials,
-        xavyo_api_nhi::handlers::credentials::rotate_credential,
-        xavyo_api_nhi::handlers::credentials::revoke_credential,
         // NHI Certifications
         xavyo_api_nhi::handlers::certification::create_campaign,
         xavyo_api_nhi::handlers::certification::list_campaigns,
@@ -2053,11 +2042,6 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::models::NhiListResponse,
         xavyo_api_governance::models::NhiSummary,
         xavyo_api_governance::models::NhiRiskBreakdown,
-        xavyo_api_governance::models::NhiCredentialResponse,
-        xavyo_api_governance::models::NhiCredentialCreatedResponse,
-        xavyo_api_governance::models::RotateCredentialsRequest,
-        xavyo_api_governance::models::RevokeCredentialRequest,
-        xavyo_api_governance::models::NhiCredentialListResponse,
         xavyo_api_governance::models::NhiUsageEventResponse,
         xavyo_api_governance::models::NhiUsageEventListResponse,
         xavyo_api_governance::models::NhiUsageSummaryResponse,
@@ -2097,7 +2081,6 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::models::NhiCertCampaignStatus,
         xavyo_api_governance::models::NhiCertificationCampaignListResponse,
         // NHI Lifecycle DB types (F061)
-        xavyo_db::models::NhiCredentialType,
         xavyo_db::models::NhiRequestStatus,
         xavyo_db::models::NhiAuditEventType,
         xavyo_db::models::NhiSuspensionReason,
@@ -2440,10 +2423,6 @@ impl Modify for SecurityAddon {
         xavyo_api_nhi::handlers::unified::ServiceAccountExtension,
         // Lifecycle handler types
         xavyo_api_nhi::handlers::lifecycle::SuspendRequest,
-        // Credential handler types
-        xavyo_api_nhi::handlers::credentials::IssueCredentialRequest,
-        xavyo_api_nhi::handlers::credentials::RotateCredentialRequest,
-        xavyo_api_nhi::handlers::credentials::CredentialIssuedResponse,
         // Certification handler types
         xavyo_api_nhi::handlers::certification::CreateCampaignRequest,
         xavyo_api_nhi::handlers::certification::CertifyResponse,
@@ -2502,7 +2481,6 @@ impl Modify for SecurityAddon {
         xavyo_db::models::GovViolationStatus,
         xavyo_db::models::LifecycleObjectType,
         xavyo_db::models::NhiAgentWithIdentity,
-        xavyo_db::models::NhiCredential,
         xavyo_db::models::NhiIdentity,
         xavyo_db::models::NhiServiceAccountWithIdentity,
         xavyo_db::models::NhiToolPermission,

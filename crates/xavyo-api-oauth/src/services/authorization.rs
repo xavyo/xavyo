@@ -163,7 +163,23 @@ impl AuthorizationService {
         let code_hash = Self::hash_code(&code);
         let expires_at = Utc::now() + Duration::minutes(AUTH_CODE_EXPIRY_MINUTES);
 
-        // Store the hashed code in the database
+        // SECURITY: Acquire dedicated connection and set RLS context for defense-in-depth.
+        // Without tenant context, RLS WITH CHECK policies would reject the insert.
+        let mut conn = self.pool.acquire().await.map_err(|e| {
+            tracing::error!("Failed to acquire connection: {}", e);
+            OAuthError::Internal("Failed to create authorization code".to_string())
+        })?;
+
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to set tenant context: {}", e);
+                OAuthError::Internal("Failed to create authorization code".to_string())
+            })?;
+
+        // Store the hashed code in the database using the same connection
         sqlx::query(
             r"
             INSERT INTO authorization_codes (
@@ -184,7 +200,7 @@ impl AuthorizationService {
         .bind(code_challenge_method)
         .bind(nonce)
         .bind(expires_at)
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await
         .map_err(|e| {
             tracing::error!("Failed to create authorization code: {}", e);
@@ -297,19 +313,19 @@ impl AuthorizationService {
             ));
         }
 
-        // Mark the code as used
+        // Delete the code to prevent replay (RFC 6749 Section 4.1.2)
         sqlx::query(
             r"
-            UPDATE authorization_codes
-            SET used = TRUE
-            WHERE id = $1
+            DELETE FROM authorization_codes
+            WHERE id = $1 AND tenant_id = $2
             ",
         )
         .bind(record.id)
+        .bind(tenant_id)
         .execute(&mut *tx)
         .await
         .map_err(|e| {
-            tracing::error!("Failed to mark authorization code as used: {}", e);
+            tracing::error!("Failed to delete authorization code: {}", e);
             OAuthError::Internal("Database error".to_string())
         })?;
 

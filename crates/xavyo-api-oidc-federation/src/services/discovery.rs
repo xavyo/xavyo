@@ -42,9 +42,10 @@ impl DiscoveryService {
             FederationError::InvalidConfiguration(format!("Invalid issuer URL: {e}"))
         })?;
 
-        // Create HTTP client (no redirects for SSRF protection)
+        // Create HTTP client (no redirects for SSRF protection, with timeout)
         let http_client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
+            .timeout(std::time::Duration::from_secs(10))
             .build()
             .map_err(|e| {
                 FederationError::InvalidConfiguration(format!("Failed to create HTTP client: {e}"))
@@ -102,12 +103,14 @@ impl DiscoveryService {
 }
 
 /// SSRF protection: validate that a URL does not target internal/private services.
-fn validate_url_not_internal(url_str: &str) -> Result<(), String> {
+pub(crate) fn validate_url_not_internal(url_str: &str) -> Result<(), String> {
     let url = url::Url::parse(url_str).map_err(|e| format!("Invalid URL: {e}"))?;
 
     let scheme = url.scheme();
-    if scheme != "https" && scheme != "http" {
-        return Err(format!("Unsupported scheme: {scheme}"));
+    // SECURITY: Only allow HTTPS for IdP URLs in production.
+    // HTTP is insecure and allows MITM attacks on token endpoints.
+    if scheme != "https" {
+        return Err(format!("Only HTTPS is allowed for IdP URLs, got: {scheme}"));
     }
 
     let host = url

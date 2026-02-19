@@ -199,15 +199,6 @@ pub struct NhiRow {
     pub risk_score: i32,
 }
 
-/// Row struct for credential queries.
-#[derive(Debug, FromRow)]
-pub struct CredentialRow {
-    pub id: Uuid,
-    pub nhi_id: Uuid,
-    pub tenant_id: Uuid,
-    pub is_active: bool,
-}
-
 /// Test context containing database pool and tenant IDs.
 pub struct TestContext {
     pub pool: PgPool,
@@ -287,12 +278,6 @@ pub async fn cleanup_test_tenant(pool: &PgPool, tenant_id: Uuid) {
 
     // NHI risk scores (FK to gov_service_accounts)
     let _ = sqlx::query("DELETE FROM gov_nhi_risk_scores WHERE tenant_id = $1")
-        .bind(tenant_id)
-        .execute(pool)
-        .await;
-
-    // NHI credentials
-    let _ = sqlx::query("DELETE FROM gov_nhi_credentials WHERE tenant_id = $1")
         .bind(tenant_id)
         .execute(pool)
         .await;

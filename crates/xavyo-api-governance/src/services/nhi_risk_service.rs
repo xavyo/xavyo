@@ -1,9 +1,8 @@
 //! NHI Risk Service for F061.
 //!
 //! Provides risk scoring for Non-Human Identities:
-//! - Staleness factor (0-40 points based on days inactive)
-//! - Credential age factor (0-30 points based on rotation interval)
-//! - Access scope factor (0-30 points based on entitlement sensitivity)
+//! - Staleness factor (0-50 points based on days inactive)
+//! - Access scope factor (0-50 points based on entitlement sensitivity)
 
 use chrono::{Duration, Utc};
 use serde_json::json;
@@ -20,8 +19,7 @@ use crate::models::{NhiRiskScoreListResponse, NhiRiskScoreResponse, RiskLevelSum
 use xavyo_events::{events::nhi::NhiRiskScoreChanged, EventProducer};
 
 use xavyo_db::{
-    GovNhiCredential, GovNhiRiskScore, GovServiceAccount, NhiRiskScoreFilter, RiskLevel,
-    UpsertGovNhiRiskScore,
+    GovNhiRiskScore, GovServiceAccount, NhiRiskScoreFilter, RiskLevel, UpsertGovNhiRiskScore,
 };
 
 type Result<T> = std::result::Result<T, GovernanceError>;
@@ -33,10 +31,6 @@ pub struct RiskFactorConfig {
     pub staleness_max_points: i32,
     /// Days threshold for maximum staleness.
     pub staleness_max_days: i32,
-    /// Maximum points for credential age factor.
-    pub credential_age_max_points: i32,
-    /// Days threshold for maximum credential age.
-    pub credential_age_max_days: i32,
     /// Maximum points for access scope factor.
     pub access_scope_max_points: i32,
     /// Threshold for significant score change (emit event).
@@ -48,11 +42,9 @@ pub struct RiskFactorConfig {
 impl Default for RiskFactorConfig {
     fn default() -> Self {
         Self {
-            staleness_max_points: 40,
+            staleness_max_points: 50,
             staleness_max_days: 180,
-            credential_age_max_points: 30,
-            credential_age_max_days: 365,
-            access_scope_max_points: 30,
+            access_scope_max_points: 50,
             significant_change_threshold: 10,
             recalculation_interval_hours: 24,
         }
@@ -103,9 +95,8 @@ impl NhiRiskService {
     /// Calculate risk score for an NHI.
     ///
     /// Factors:
-    /// - Staleness: 0-40 points based on days since last use
-    /// - Credential Age: 0-30 points based on oldest credential age
-    /// - Access Scope: 0-30 points based on entitlement count and sensitivity
+    /// - Staleness: 0-50 points based on days since last use
+    /// - Access Scope: 0-50 points based on entitlement count and sensitivity
     pub async fn calculate_score(
         &self,
         tenant_id: Uuid,
@@ -122,27 +113,21 @@ impl NhiRiskService {
             .await
             .map_err(GovernanceError::Database)?;
 
-        // Calculate staleness factor (0-40 points)
+        // Calculate staleness factor (0-50 points)
         let (staleness_factor, staleness_breakdown) = self.calculate_staleness_factor(&nhi);
 
-        // Calculate credential age factor (0-30 points)
-        let (credential_age_factor, credential_breakdown) = self
-            .calculate_credential_age_factor(tenant_id, nhi_id)
-            .await?;
-
-        // Calculate access scope factor (0-30 points)
+        // Calculate access scope factor (0-50 points)
         let (access_scope_factor, access_breakdown) = self
             .calculate_access_scope_factor(tenant_id, nhi_id)
             .await?;
 
         // Total score
-        let total_score = staleness_factor + credential_age_factor + access_scope_factor;
+        let total_score = staleness_factor + access_scope_factor;
         let risk_level = GovNhiRiskScore::level_from_score(total_score);
 
         // Build factor breakdown
         let factor_breakdown = json!({
             "staleness": staleness_breakdown,
-            "credential_age": credential_breakdown,
             "access_scope": access_breakdown
         });
 
@@ -150,13 +135,13 @@ impl NhiRiskService {
         let next_calculation_at =
             Some(Utc::now() + Duration::hours(self.config.recalculation_interval_hours));
 
-        // Upsert the score
+        // Upsert the score (credential_age_factor kept as 0 for DB backward compat)
         let upsert_data = UpsertGovNhiRiskScore {
             nhi_id,
             total_score,
             risk_level,
             staleness_factor,
-            credential_age_factor,
+            credential_age_factor: 0,
             access_scope_factor,
             factor_breakdown: factor_breakdown.clone(),
             next_calculation_at,
@@ -187,7 +172,7 @@ impl NhiRiskService {
         Ok(NhiRiskScoreResponse::from(score))
     }
 
-    /// Calculate staleness factor (0-40 points).
+    /// Calculate staleness factor (0-50 points).
     fn calculate_staleness_factor(&self, nhi: &GovServiceAccount) -> (i32, serde_json::Value) {
         let now = Utc::now();
 
@@ -217,61 +202,7 @@ impl NhiRiskService {
         (factor, breakdown)
     }
 
-    /// Calculate credential age factor (0-30 points).
-    async fn calculate_credential_age_factor(
-        &self,
-        tenant_id: Uuid,
-        nhi_id: Uuid,
-    ) -> Result<(i32, serde_json::Value)> {
-        let now = Utc::now();
-
-        // Get active credentials for this NHI
-        let credentials = GovNhiCredential::list_active_by_nhi(&self.pool, tenant_id, nhi_id)
-            .await
-            .map_err(GovernanceError::Database)?;
-
-        if credentials.is_empty() {
-            // No credentials = moderate risk (could be legitimate or concerning)
-            return Ok((
-                15,
-                json!({
-                    "reason": "no_active_credentials",
-                    "points": 15,
-                    "max_points": self.config.credential_age_max_points
-                }),
-            ));
-        }
-
-        // Find the oldest active credential
-        let oldest_credential_days = credentials
-            .iter()
-            .map(|c| {
-                let duration = now.signed_duration_since(c.created_at);
-                duration.num_days()
-            })
-            .max()
-            .unwrap_or(0) as i32;
-
-        // Linear scaling: 0 days = 0 points, max_days = max_points
-        let factor = if oldest_credential_days >= self.config.credential_age_max_days {
-            self.config.credential_age_max_points
-        } else {
-            (oldest_credential_days * self.config.credential_age_max_points)
-                / self.config.credential_age_max_days
-        };
-
-        let breakdown = json!({
-            "oldest_credential_days": oldest_credential_days,
-            "active_credential_count": credentials.len(),
-            "points": factor,
-            "max_points": self.config.credential_age_max_points,
-            "threshold_days": self.config.credential_age_max_days
-        });
-
-        Ok((factor, breakdown))
-    }
-
-    /// Calculate access scope factor (0-30 points).
+    /// Calculate access scope factor (0-50 points).
     ///
     /// Based on:
     /// - Number of entitlements assigned
@@ -511,13 +442,10 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = RiskFactorConfig::default();
-        assert_eq!(config.staleness_max_points, 40);
-        assert_eq!(config.credential_age_max_points, 30);
-        assert_eq!(config.access_scope_max_points, 30);
+        assert_eq!(config.staleness_max_points, 50);
+        assert_eq!(config.access_scope_max_points, 50);
         assert_eq!(
-            config.staleness_max_points
-                + config.credential_age_max_points
-                + config.access_scope_max_points,
+            config.staleness_max_points + config.access_scope_max_points,
             100
         );
     }

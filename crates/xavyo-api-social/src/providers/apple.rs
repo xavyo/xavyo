@@ -7,12 +7,19 @@
 
 use super::async_trait;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use moka::sync::Cache;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::{SocialProvider, SocialUserInfo, TokenResponse};
 use crate::error::{ProviderType, SocialError, SocialResult};
+
+/// Cache key for Apple JWKS (only one endpoint).
+const APPLE_JWKS_CACHE_KEY: &str = "apple_jwks";
+
+/// JWKS cache TTL: 1 hour.
+const JWKS_CACHE_TTL_SECS: u64 = 3600;
 
 /// Apple `OAuth2` endpoints.
 const AUTHORIZATION_ENDPOINT: &str = "https://appleid.apple.com/auth/authorize";
@@ -56,13 +63,13 @@ struct AppleIdTokenClaims {
 }
 
 /// Apple JWKS response structure.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct AppleJwkSet {
     keys: Vec<AppleJwk>,
 }
 
 /// Individual JWK from Apple's JWKS endpoint.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct AppleJwk {
     kid: String,
     #[allow(dead_code)]
@@ -81,6 +88,8 @@ pub struct AppleProvider {
     key_id: String,
     private_key: EncodingKey,
     http_client: Client,
+    /// Cached JWKS to avoid fetching on every authentication.
+    jwks_cache: Cache<String, AppleJwkSet>,
 }
 
 impl AppleProvider {
@@ -104,15 +113,21 @@ impl AppleProvider {
             }
         })?;
 
+        let jwks_cache = Cache::builder()
+            .max_capacity(1)
+            .time_to_live(Duration::from_secs(JWKS_CACHE_TTL_SECS))
+            .build();
+
         Ok(Self {
             client_id,
             team_id,
             key_id,
             private_key: encoding_key,
             http_client: Client::builder()
-                .timeout(std::time::Duration::from_secs(10))
+                .timeout(Duration::from_secs(10))
                 .build()
                 .unwrap_or_else(|_| Client::new()),
+            jwks_cache,
         })
     }
 
@@ -144,6 +159,9 @@ impl AppleProvider {
     /// Fetches Apple's public keys from their JWKS endpoint, finds the key
     /// matching the token's `kid` header, and verifies the RS256 signature.
     /// Also validates issuer and audience claims.
+    ///
+    /// If the `kid` is not found in the cached JWKS, this function will
+    /// refresh the cache once and retry before failing.
     async fn verify_and_decode_id_token(&self, id_token: &str) -> SocialResult<AppleIdTokenClaims> {
         // Decode header to get the key ID (kid)
         let header =
@@ -155,27 +173,69 @@ impl AppleProvider {
             reason: "Apple ID token missing kid in header".to_string(),
         })?;
 
-        // Fetch Apple's JWKS
-        let jwks: AppleJwkSet = self
-            .http_client
-            .get(APPLE_JWKS_URL)
-            .send()
-            .await
-            .map_err(|e| SocialError::InternalError {
-                message: format!("Failed to fetch Apple JWKS: {e}"),
-            })?
-            .json()
-            .await
-            .map_err(|e| SocialError::InternalError {
-                message: format!("Failed to parse Apple JWKS: {e}"),
-            })?;
+        // Check cache first; on miss, fetch from Apple and cache with TTL
+        let jwks = if let Some(cached) = self.jwks_cache.get(APPLE_JWKS_CACHE_KEY) {
+            cached
+        } else {
+            let fetched: AppleJwkSet = self
+                .http_client
+                .get(APPLE_JWKS_URL)
+                .send()
+                .await
+                .map_err(|e| SocialError::InternalError {
+                    message: format!("Failed to fetch Apple JWKS: {e}"),
+                })?
+                .json()
+                .await
+                .map_err(|e| SocialError::InternalError {
+                    message: format!("Failed to parse Apple JWKS: {e}"),
+                })?;
+            self.jwks_cache
+                .insert(APPLE_JWKS_CACHE_KEY.to_string(), fetched.clone());
+            fetched
+        };
 
-        // Find the matching key by kid
-        let jwk = jwks.keys.iter().find(|k| k.kid == kid).ok_or_else(|| {
-            SocialError::InvalidCallback {
-                reason: format!("No matching Apple public key found for kid '{kid}'"),
-            }
-        })?;
+        // Try to find the matching key by kid. If not found, refresh JWKS once and retry.
+        let jwk = if let Some(key) = jwks.keys.iter().find(|k| k.kid == kid) {
+            key.clone()
+        } else {
+            // SECURITY: kid not found in cached JWKS. Clear cache and re-fetch once
+            // to handle key rotation. This prevents failures when Apple rotates keys.
+            tracing::info!(
+                target: "social_auth",
+                kid = %kid,
+                "Apple JWKS kid not found in cache — refreshing JWKS and retrying"
+            );
+            self.jwks_cache.invalidate(APPLE_JWKS_CACHE_KEY);
+
+            // Re-fetch JWKS from Apple
+            let refreshed: AppleJwkSet = self
+                .http_client
+                .get(APPLE_JWKS_URL)
+                .send()
+                .await
+                .map_err(|e| SocialError::InternalError {
+                    message: format!("Failed to refresh Apple JWKS: {e}"),
+                })?
+                .json()
+                .await
+                .map_err(|e| SocialError::InternalError {
+                    message: format!("Failed to parse refreshed Apple JWKS: {e}"),
+                })?;
+
+            // Retry finding the key in refreshed JWKS
+            let key = refreshed.keys.iter().find(|k| k.kid == kid).ok_or_else(|| {
+                SocialError::InvalidCallback {
+                    reason: format!("No matching Apple public key found for kid '{kid}' (even after JWKS refresh)"),
+                }
+            })?.clone();
+
+            // Cache the refreshed JWKS for future requests
+            self.jwks_cache
+                .insert(APPLE_JWKS_CACHE_KEY.to_string(), refreshed);
+
+            key
+        };
 
         // Build the RSA decoding key from JWK components
         let decoding_key = DecodingKey::from_rsa_components(&jwk.n, &jwk.e).map_err(|e| {

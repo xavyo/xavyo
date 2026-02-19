@@ -14,6 +14,7 @@ pub struct UserIdentityLink {
     pub identity_provider_id: Uuid,
     pub subject: String,
     pub issuer: String,
+    #[serde(skip_serializing)]
     pub raw_claims: Option<serde_json::Value>,
     pub last_login_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
@@ -151,14 +152,16 @@ impl UserIdentityLink {
         .await
     }
 
-    /// Count links for an `IdP` (to prevent deletion when users are linked).
+    /// Count links for an `IdP` within a tenant (to prevent deletion when users are linked).
     pub async fn count_by_idp(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         identity_provider_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
         let result: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM user_identity_links WHERE identity_provider_id = $1",
+            "SELECT COUNT(*) FROM user_identity_links WHERE tenant_id = $1 AND identity_provider_id = $2",
         )
+        .bind(tenant_id)
         .bind(identity_provider_id)
         .fetch_one(pool)
         .await?;

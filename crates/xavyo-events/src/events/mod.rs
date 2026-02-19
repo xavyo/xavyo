@@ -11,7 +11,7 @@
 //! - Escalation events (warning, occurred, cancelled, reset, exhausted) - F054
 //! - Micro-certification events (created, reminder, decided, auto-revoked) - F055
 //! - Governance events (assignments, `SoD` violations) - F055 triggers
-//! - NHI events (lifecycle, credentials, risk, suspension, requests) - F061
+//! - NHI events (lifecycle, risk, suspension, requests) - F061
 //! - NHI delegation events (grant created, revoked, exercised, expired) - RFC 8693
 //! - License events (assigned, reclaimed, expired, expiring, bulk, capacity) - F065
 //! - User attribute events (definition created/updated/deactivated, custom attributes updated) - F081
@@ -72,17 +72,16 @@ pub use micro_certification::{
     MicroCertificationCreated, MicroCertificationDecided, MicroCertificationEscalated,
     MicroCertificationExpired, MicroCertificationReminder, MicroCertificationSkipped,
 };
+pub use nhi::{
+    NhiCertificationCampaignLaunched, NhiCertificationDecisionMade, NhiCertificationRequired,
+    NhiCertified, NhiCreated, NhiDeleted, NhiExpirationWarning, NhiInactivityWarning,
+    NhiOwnershipTransferred, NhiReactivated, NhiRequestApproved, NhiRequestRejected,
+    NhiRequestSubmitted, NhiRiskScoreChanged, NhiSuspended,
+    NhiSuspensionReason as NhiSuspensionReasonEvent, NhiUpdated, NhiUsageRecorded,
+};
 pub use nhi_delegation::{
     NhiDelegationExercised, NhiDelegationExpired, NhiDelegationGrantCreated,
     NhiDelegationGrantRevoked,
-};
-pub use nhi::{
-    NhiCertificationCampaignLaunched, NhiCertificationDecisionMade, NhiCertificationRequired,
-    NhiCertified, NhiCreated, NhiCredentialRevoked, NhiCredentialsExpiring, NhiCredentialsRotated,
-    NhiDeleted, NhiExpirationWarning, NhiInactivityWarning, NhiOwnershipTransferred,
-    NhiReactivated, NhiRequestApproved, NhiRequestRejected, NhiRequestSubmitted,
-    NhiRiskScoreChanged, NhiSuspended, NhiSuspensionReason as NhiSuspensionReasonEvent, NhiUpdated,
-    NhiUsageRecorded, RotationType,
 };
 pub use reconciliation::{
     DiscrepancyDetected, DiscrepancyIgnored, ReconciliationCancelled, ReconciliationCompleted,
@@ -154,9 +153,6 @@ mod tests {
         assert!(!NhiCreated::TOPIC.is_empty());
         assert!(!NhiUpdated::TOPIC.is_empty());
         assert!(!NhiDeleted::TOPIC.is_empty());
-        assert!(!NhiCredentialsRotated::TOPIC.is_empty());
-        assert!(!NhiCredentialRevoked::TOPIC.is_empty());
-        assert!(!NhiCredentialsExpiring::TOPIC.is_empty());
         assert!(!NhiRiskScoreChanged::TOPIC.is_empty());
         assert!(!NhiSuspended::TOPIC.is_empty());
         assert!(!NhiReactivated::TOPIC.is_empty());
@@ -300,9 +296,6 @@ mod tests {
         assert!(NhiCreated::TOPIC.starts_with("xavyo."));
         assert!(NhiUpdated::TOPIC.starts_with("xavyo."));
         assert!(NhiDeleted::TOPIC.starts_with("xavyo."));
-        assert!(NhiCredentialsRotated::TOPIC.starts_with("xavyo."));
-        assert!(NhiCredentialRevoked::TOPIC.starts_with("xavyo."));
-        assert!(NhiCredentialsExpiring::TOPIC.starts_with("xavyo."));
         assert!(NhiRiskScoreChanged::TOPIC.starts_with("xavyo."));
         assert!(NhiSuspended::TOPIC.starts_with("xavyo."));
         assert!(NhiReactivated::TOPIC.starts_with("xavyo."));

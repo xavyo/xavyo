@@ -539,46 +539,6 @@ fn test_nhi_recently_certified() {
 // =============================================================================
 
 #[test]
-fn test_suspended_nhi_credential_rotation_should_be_blocked() {
-    // Edge case: Credentials should not be rotated on suspended NHIs
-    // This is a design decision - suspended NHIs should not have active credentials
-    let id = Uuid::new_v4();
-    let owner_id = Uuid::new_v4();
-    let response = create_test_nhi_response(
-        id,
-        "suspended-nhi",
-        owner_id,
-        ServiceAccountStatus::Suspended,
-    );
-
-    // Verify NHI is suspended
-    assert_eq!(response.status, ServiceAccountStatus::Suspended);
-
-    // TODO: Integration test should verify that rotate_credentials returns error for suspended NHI
-}
-
-#[test]
-fn test_reactivation_after_long_suspension_checks_credential_validity() {
-    // Edge case: When NHI suspended for extended period, credentials may have expired
-    // Reactivation should warn or require credential rotation
-    let id = Uuid::new_v4();
-    let owner_id = Uuid::new_v4();
-    let mut response = create_test_nhi_response(
-        id,
-        "long-suspended-nhi",
-        owner_id,
-        ServiceAccountStatus::Suspended,
-    );
-
-    // Simulate suspension 6 months ago - credentials would typically expire in 90 days
-    response.last_rotation_at = Some(Utc::now() - Duration::days(180));
-    response.needs_rotation = true;
-
-    // When reactivated, system should flag that credentials need rotation
-    assert!(response.needs_rotation);
-}
-
-#[test]
 fn test_owner_must_be_different_user_not_service_account() {
     // Edge case: Owner should be a human user, not another NHI
     // This prevents circular ownership chains
@@ -653,39 +613,6 @@ fn test_nhi_with_no_backup_requires_certification_when_owner_leaves() {
 }
 
 #[test]
-fn test_grace_period_credential_still_valid() {
-    // Edge case: During grace period, both old and new credentials should work
-    let id = Uuid::new_v4();
-    let owner_id = Uuid::new_v4();
-    let mut response =
-        create_test_nhi_response(id, "rotating-creds", owner_id, ServiceAccountStatus::Active);
-
-    // NHI in grace period
-    response.is_in_grace_period = true;
-    response.grace_period_ends_at = Some(Utc::now() + Duration::hours(24));
-
-    assert!(response.is_in_grace_period);
-    assert!(response.grace_period_ends_at.is_some());
-}
-
-#[test]
-fn test_grace_period_expired_old_credential_invalidated() {
-    // Edge case: After grace period, old credential should be invalidated
-    let id = Uuid::new_v4();
-    let owner_id = Uuid::new_v4();
-    let mut response =
-        create_test_nhi_response(id, "grace-expired", owner_id, ServiceAccountStatus::Active);
-
-    // Grace period ended
-    response.is_in_grace_period = false;
-    response.grace_period_ends_at = Some(Utc::now() - Duration::hours(1));
-
-    assert!(!response.is_in_grace_period);
-
-    // Old credential should have been deactivated by scheduled job
-}
-
-#[test]
 fn test_concurrent_ownership_transfer_rejected() {
     // Edge case: Two concurrent ownership transfer requests should be serialized
     // Second request should fail or wait for first to complete
@@ -733,20 +660,6 @@ fn test_certification_campaign_owner_change_mid_campaign() {
 }
 
 #[test]
-fn test_expired_nhi_cannot_have_credentials_rotated() {
-    // Edge case: Expired NHI should not allow credential operations
-    let id = Uuid::new_v4();
-    let owner_id = Uuid::new_v4();
-    let mut response =
-        create_test_nhi_response(id, "expired-nhi", owner_id, ServiceAccountStatus::Expired);
-    response.expires_at = Some(Utc::now() - Duration::days(7));
-
-    assert_eq!(response.status, ServiceAccountStatus::Expired);
-
-    // Credential rotation should be rejected for expired NHIs
-}
-
-#[test]
 fn test_high_volume_usage_aggregation() {
     // Edge case: NHIs with high usage volume need aggregated metrics
     // Individual event storage would be too expensive
@@ -775,29 +688,8 @@ fn test_emergency_suspension_bypasses_normal_flow() {
 
     // Emergency suspension:
     // - Immediate effect
-    // - All credentials revoked immediately
     // - No grace period
     // - High-priority alert sent
 
     assert_eq!(suspend_request.reason, NhiSuspensionReason::Emergency);
-}
-
-#[test]
-fn test_nhi_name_change_updates_credential_names() {
-    // Edge case: When NHI name changes, associated credential display names should update
-    let _id = Uuid::new_v4();
-    let _owner_id = Uuid::new_v4();
-
-    let update = UpdateNhiRequest {
-        name: Some("new-service-name".to_string()),
-        purpose: None,
-        owner_id: None,
-        backup_owner_id: None,
-        expires_at: None,
-        rotation_interval_days: None,
-        inactivity_threshold_days: None,
-    };
-
-    // Credentials should update their display names to reflect new NHI name
-    assert!(update.name.is_some());
 }

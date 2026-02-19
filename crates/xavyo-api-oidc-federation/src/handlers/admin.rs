@@ -38,16 +38,20 @@ pub async fn list_identity_providers(
     Query(params): Query<PaginationParams>,
 ) -> FederationResult<Json<IdentityProviderListResponse>> {
     let tenant_id = *tid.as_uuid();
+    let clamped_limit = params.clamped_limit();
     let (idps, total) = state
         .idp_config
-        .list(tenant_id, params.offset, params.limit)
+        .list(tenant_id, params.offset, clamped_limit)
         .await?;
 
     let mut items = Vec::with_capacity(idps.len());
     for idp in idps {
         let idp_id = idp.id;
-        let domains = state.idp_config.get_domains(idp_id).await?;
-        let linked_users_count = state.idp_config.get_linked_users_count(idp_id).await?;
+        let domains = state.idp_config.get_domains(tenant_id, idp_id).await?;
+        let linked_users_count = state
+            .idp_config
+            .get_linked_users_count(tenant_id, idp_id)
+            .await?;
         items.push(IdentityProviderResponse::from_model(
             idp,
             domains,
@@ -59,7 +63,7 @@ pub async fn list_identity_providers(
         items,
         total,
         offset: params.offset,
-        limit: params.limit,
+        limit: clamped_limit,
     }))
 }
 
@@ -94,7 +98,7 @@ pub async fn create_identity_provider(
     );
 
     let idp = state.idp_config.create(tenant_id, req).await?;
-    let domains = state.idp_config.get_domains(idp.id).await?;
+    let domains = state.idp_config.get_domains(tenant_id, idp.id).await?;
     let response = IdentityProviderResponse::from_model(idp, domains, 0);
 
     Ok((StatusCode::CREATED, Json(response)))
@@ -124,8 +128,11 @@ pub async fn get_identity_provider(
 ) -> FederationResult<Json<IdentityProviderResponse>> {
     let tenant_id = *tid.as_uuid();
     let idp = state.idp_config.get(tenant_id, idp_id).await?;
-    let domains = state.idp_config.get_domains(idp_id).await?;
-    let linked_users_count = state.idp_config.get_linked_users_count(idp_id).await?;
+    let domains = state.idp_config.get_domains(tenant_id, idp_id).await?;
+    let linked_users_count = state
+        .idp_config
+        .get_linked_users_count(tenant_id, idp_id)
+        .await?;
 
     Ok(Json(IdentityProviderResponse::from_model(
         idp,
@@ -169,8 +176,11 @@ pub async fn update_identity_provider(
     );
 
     let idp = state.idp_config.update(tenant_id, idp_id, req).await?;
-    let domains = state.idp_config.get_domains(idp_id).await?;
-    let linked_users_count = state.idp_config.get_linked_users_count(idp_id).await?;
+    let domains = state.idp_config.get_domains(tenant_id, idp_id).await?;
+    let linked_users_count = state
+        .idp_config
+        .get_linked_users_count(tenant_id, idp_id)
+        .await?;
 
     Ok(Json(IdentityProviderResponse::from_model(
         idp,
@@ -289,8 +299,11 @@ pub async fn toggle_identity_provider(
         .idp_config
         .set_enabled(tenant_id, idp_id, req.is_enabled)
         .await?;
-    let domains = state.idp_config.get_domains(idp_id).await?;
-    let linked_users_count = state.idp_config.get_linked_users_count(idp_id).await?;
+    let domains = state.idp_config.get_domains(tenant_id, idp_id).await?;
+    let linked_users_count = state
+        .idp_config
+        .get_linked_users_count(tenant_id, idp_id)
+        .await?;
 
     Ok(Json(IdentityProviderResponse::from_model(
         idp,
@@ -326,7 +339,7 @@ pub async fn list_domains(
     // Verify IdP exists
     let _ = state.idp_config.get(tenant_id, idp_id).await?;
 
-    let domains = state.idp_config.get_domains(idp_id).await?;
+    let domains = state.idp_config.get_domains(tenant_id, idp_id).await?;
 
     Ok(Json(DomainListResponse {
         items: domains.into_iter().map(DomainResponse::from).collect(),

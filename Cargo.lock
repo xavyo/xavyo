@@ -8396,6 +8396,7 @@ dependencies = [
 name = "xavyo-api-nhi"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm",
  "argon2",
  "async-trait",
  "axum",
@@ -8407,6 +8408,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha2",
  "sqlx",
  "thiserror 1.0.69",
  "tokio",
@@ -8425,6 +8427,7 @@ dependencies = [
  "xavyo-governance",
  "xavyo-nhi",
  "xavyo-tenant",
+ "zeroize",
 ]
 
 [[package]]
@@ -8521,6 +8524,7 @@ dependencies = [
  "tower 0.4.13",
  "tower-http 0.5.2",
  "tracing",
+ "url",
  "urlencoding",
  "utoipa",
  "uuid",
@@ -8570,6 +8574,7 @@ dependencies = [
  "hkdf",
  "jsonwebtoken",
  "mockall 0.12.1",
+ "moka",
  "rand 0.8.5",
  "reqwest",
  "serde",

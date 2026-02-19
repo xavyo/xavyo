@@ -36,9 +36,15 @@ pub async fn discover_realm(
 ) -> FederationResult<Json<DiscoverResponse>> {
     let tenant_id = *tid.as_uuid();
 
-    tracing::info!(
+    // M-2: Validate email length to prevent abuse
+    if req.email.len() > 254 {
+        return Err(FederationError::InvalidEmail(
+            "Email address too long".to_string(),
+        ));
+    }
+
+    tracing::debug!(
         tenant_id = %tenant_id,
-        email = %req.email,
         "Discovering authentication realm"
     );
 
@@ -131,20 +137,38 @@ pub async fn callback(
     State(state): State<FederationState>,
     Query(params): Query<CallbackParams>,
 ) -> FederationResult<impl IntoResponse> {
+    // SECURITY: Validate callback parameter lengths to prevent DoS/abuse.
+    // State is a CSRF token (~64 chars), code is an authorization code (~128 chars).
+    if params.state.len() > 512 {
+        return Err(FederationError::InvalidCallback(
+            "State parameter too long".to_string(),
+        ));
+    }
+    if let Some(ref code) = params.code {
+        if code.len() > 2048 {
+            return Err(FederationError::InvalidCallback(
+                "Authorization code too long".to_string(),
+            ));
+        }
+    }
+
     // Check for error response from IdP
     if let Some(error) = &params.error {
+        // SECURITY: Bound error/error_description lengths to prevent log injection/bloat.
+        let error_bounded: String = error.chars().take(256).collect();
         let description = params
             .error_description
-            .clone()
-            .unwrap_or_else(|| "Unknown error".to_string());
+            .as_deref()
+            .unwrap_or("Unknown error");
+        let description_bounded: String = description.chars().take(1024).collect();
         tracing::warn!(
-            error = %error,
-            description = %description,
+            error = %error_bounded,
+            description = %description_bounded,
             "IdP returned error"
         );
         return Err(FederationError::IdpError {
-            error: error.clone(),
-            description,
+            error: error_bounded,
+            description: description_bounded,
         });
     }
 
@@ -156,15 +180,13 @@ pub async fn callback(
     // Exchange code for tokens
     let token_result = state.auth_flow.callback(&params.state, code).await?;
 
-    // Decode ID token to get claims
-    let claims = state.auth_flow.decode_id_token(&token_result.id_token)?;
-
+    // Claims already verified (signature, expiry, nonce, audience) by auth_flow.callback()
+    // SECURITY: Do not log email (PII) at INFO level
     tracing::info!(
         tenant_id = %token_result.session.tenant_id,
         idp_id = %token_result.session.identity_provider_id,
-        subject = %claims.sub,
-        email = ?claims.email,
-        "Token exchange successful"
+        subject = %token_result.claims.sub,
+        "Token exchange and verification successful"
     );
 
     // Provision/sync user
@@ -173,14 +195,17 @@ pub async fn callback(
         .provision_or_sync(
             token_result.session.tenant_id,
             token_result.session.identity_provider_id,
-            &claims,
+            &token_result.claims,
         )
         .await?;
 
     // Generate Xavyo JWT for the user
     let roles = xavyo_db::UserRole::get_user_roles(&state.pool, user.id)
         .await
-        .unwrap_or_else(|_| vec!["user".to_string()]);
+        .map_err(|e| {
+            tracing::error!(user_id = %user.id, error = %e, "Failed to fetch user roles");
+            FederationError::Internal("Failed to fetch user roles".to_string())
+        })?;
     let xavyo_tokens = state
         .token_issuer
         .issue_tokens(user.id, token_result.session.tenant_id, roles, None)
@@ -201,6 +226,30 @@ pub async fn callback(
     // If the redirect_uri contains a path (e.g., callback page), redirect with token
     // Otherwise return JSON response
     if redirect_uri.starts_with("http") {
+        // H2: Validate redirect URI (defense in depth against open redirects)
+        // Use proper URL parsing to prevent prefix bypass (e.g., example.com.evil.com)
+        let redirect_safe = if let (Ok(redirect_url), Ok(base_url)) = (
+            url::Url::parse(&redirect_uri),
+            url::Url::parse(state.auth_flow.callback_base_url()),
+        ) {
+            redirect_url.scheme() == base_url.scheme()
+                && redirect_url.host_str() == base_url.host_str()
+                && redirect_url.port() == base_url.port()
+        } else {
+            false
+        };
+        if !redirect_safe {
+            tracing::warn!(
+                redirect_uri = %redirect_uri,
+                "Blocked potential open redirect in federation callback"
+            );
+            return Ok(CallbackResponse::Json(Json(FederationTokenResponse {
+                access_token: xavyo_tokens.access_token,
+                token_type: "Bearer".to_string(),
+                expires_in: xavyo_tokens.expires_in,
+                refresh_token: xavyo_tokens.refresh_token,
+            })));
+        }
         // Redirect with token as fragment (safer than query params)
         let redirect_url = format!(
             "{}#access_token={}&token_type=Bearer&expires_in={}",

@@ -12,15 +12,13 @@ use uuid::Uuid;
 use xavyo_events::EventProducer;
 
 use xavyo_db::models::{
-    ApproveGovNhiRequest, CreateGovNhiRequest, GovNhiRequest, NhiCredentialType, NhiRequestFilter,
-    NhiRequestStatus, RejectGovNhiRequest,
+    ApproveGovNhiRequest, CreateGovNhiRequest, GovNhiRequest, NhiRequestFilter, NhiRequestStatus,
+    RejectGovNhiRequest,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
-use crate::models::nhi::{
-    CreateNhiRequest, NhiRequestListResponse, NhiRequestResponse, RotateCredentialsRequest,
-};
-use crate::services::{NhiCredentialService, NhiService};
+use crate::models::nhi::{CreateNhiRequest, NhiRequestListResponse, NhiRequestResponse};
+use crate::services::NhiService;
 
 /// Default request expiration in days.
 const DEFAULT_REQUEST_EXPIRY_DAYS: i64 = 14;
@@ -35,7 +33,6 @@ const DEFAULT_ROTATION_INTERVAL_DAYS: i32 = 90;
 pub struct NhiRequestService {
     pool: PgPool,
     nhi_service: Arc<NhiService>,
-    credential_service: Arc<NhiCredentialService>,
     #[cfg(feature = "kafka")]
     event_producer: Option<Arc<EventProducer>>,
 }
@@ -43,15 +40,10 @@ pub struct NhiRequestService {
 impl NhiRequestService {
     /// Create a new NHI request service.
     #[must_use]
-    pub fn new(
-        pool: PgPool,
-        nhi_service: Arc<NhiService>,
-        credential_service: Arc<NhiCredentialService>,
-    ) -> Self {
+    pub fn new(pool: PgPool, nhi_service: Arc<NhiService>) -> Self {
         Self {
             pool,
             nhi_service,
-            credential_service,
             #[cfg(feature = "kafka")]
             event_producer: None,
         }
@@ -62,13 +54,11 @@ impl NhiRequestService {
     pub fn with_event_producer(
         pool: PgPool,
         nhi_service: Arc<NhiService>,
-        credential_service: Arc<NhiCredentialService>,
         event_producer: Arc<EventProducer>,
     ) -> Self {
         Self {
             pool,
             nhi_service,
-            credential_service,
             event_producer: Some(event_producer),
         }
     }
@@ -176,14 +166,14 @@ impl NhiRequestService {
 
     /// Approve an NHI request.
     ///
-    /// Creates the NHI, generates initial credentials, and returns the request.
+    /// Creates the NHI and returns the updated request.
     pub async fn approve_request(
         &self,
         tenant_id: Uuid,
         request_id: Uuid,
         approver_id: Uuid,
         comments: Option<String>,
-    ) -> Result<(NhiRequestResponse, String)> {
+    ) -> Result<NhiRequestResponse> {
         // Get the request
         let request = GovNhiRequest::find_by_id(&self.pool, tenant_id, request_id)
             .await?
@@ -223,19 +213,6 @@ impl NhiRequestService {
             .create(tenant_id, approver_id, create_nhi_request)
             .await?;
 
-        // Generate initial API key credentials
-        let rotate_request = RotateCredentialsRequest {
-            credential_type: NhiCredentialType::ApiKey,
-            name: Some(format!("{}-initial", request.requested_name)),
-            expires_at: Some(nhi_expiration),
-            grace_period_hours: Some(24),
-        };
-
-        let credential_response = self
-            .credential_service
-            .rotate(tenant_id, nhi.id, Some(approver_id), rotate_request)
-            .await?;
-
         // Update the request as approved
         let approve_data = ApproveGovNhiRequest {
             approver_id,
@@ -266,8 +243,7 @@ impl NhiRequestService {
             let _ = producer.send(&event).await;
         }
 
-        // Return the request and the plaintext secret
-        Ok((updated_request.into(), credential_response.secret_value))
+        Ok(updated_request.into())
     }
 
     /// Reject an NHI request.

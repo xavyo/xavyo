@@ -104,9 +104,7 @@ fn test_delegated_allow_response_has_delegation_fields() {
     fields.insert(
         "actor_nhi_id".to_string(),
         prost_types::Value {
-            kind: Some(prost_types::value::Kind::StringValue(
-                actor_id.to_string(),
-            )),
+            kind: Some(prost_types::value::Kind::StringValue(actor_id.to_string())),
         },
     );
     fields.insert(

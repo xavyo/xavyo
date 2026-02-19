@@ -727,7 +727,6 @@ pub use gov_simulation_types::{
 
 // NHI Lifecycle models (F061)
 pub mod gov_nhi_audit_event;
-pub mod gov_nhi_credential;
 pub mod gov_nhi_request;
 pub mod gov_nhi_risk_score;
 pub mod gov_nhi_usage_event;
@@ -736,9 +735,6 @@ pub mod gov_nhi_usage_event;
 pub use gov_nhi_audit_event::{
     CreateGovNhiAuditEvent, GovNhiAuditEvent, NhiAuditEventFilter, NhiAuditEventType,
     NhiSuspensionReason,
-};
-pub use gov_nhi_credential::{
-    CreateGovNhiCredential, GovNhiCredential, NhiCredentialFilter, NhiCredentialType, NhiEntityType,
 };
 pub use gov_nhi_request::{
     ApproveGovNhiRequest, CreateGovNhiRequest, GovNhiRequest, NhiRequestFilter, NhiRequestStatus,
@@ -1113,9 +1109,9 @@ pub use api_key_usage::{
 };
 
 // Unified NHI Models (201-tool-nhi-promotion)
+pub mod nhi_activity_counter;
 pub mod nhi_agent;
 pub mod nhi_certification_campaign;
-pub mod nhi_credential;
 pub mod nhi_delegation_grant;
 pub mod nhi_identity;
 pub mod nhi_nhi_permission;
@@ -1127,11 +1123,11 @@ pub mod nhi_user_permission;
 // Old NHI view/impl models (F108) — deleted, superseded by 201-tool-nhi-promotion unified models
 
 // Unified NHI Model exports (201-tool-nhi-promotion)
+pub use nhi_activity_counter::{NhiActivityCounter, NhiActivitySummary};
 pub use nhi_agent::{
     CreateNhiAgent, NhiAgent, NhiAgentFilter, NhiAgentWithIdentity, UpdateNhiAgent,
 };
 pub use nhi_certification_campaign::{CreateNhiCertificationCampaign, NhiCertificationCampaign};
-pub use nhi_credential::{CreateNhiCredential, NhiCredential};
 pub use nhi_delegation_grant::{CreateNhiDelegationGrant, NhiDelegationGrant};
 pub use nhi_identity::{CreateNhiIdentity, NhiIdentity, NhiIdentityFilter, UpdateNhiIdentity};
 pub use nhi_nhi_permission::{CreateNhiNhiPermission, NhiNhiPermission};
@@ -1280,8 +1276,16 @@ pub use gov_bulk_action::{
     MAX_BULK_ACTION_SIZE, MIN_JUSTIFICATION_LENGTH,
 };
 
+// NHI Vault models (WS2)
+pub mod nhi_secret_lease;
+pub mod nhi_vaulted_secret;
+
 // Organization Security Policies models (F-066)
 pub mod org_security_policy;
+
+// NHI Vault exports (WS2)
+pub use nhi_secret_lease::NhiSecretLease;
+pub use nhi_vaulted_secret::{CreateVaultedSecret, NhiVaultedSecret, SecretMetadata};
 
 // Organization Security Policies exports (F-066)
 pub use org_security_policy::{

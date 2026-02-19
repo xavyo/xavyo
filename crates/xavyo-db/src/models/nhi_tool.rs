@@ -21,6 +21,8 @@ pub struct NhiTool {
     pub provider: Option<String>,
     pub provider_verified: bool,
     pub checksum: Option<String>,
+    pub last_discovered_at: Option<DateTime<Utc>>,
+    pub discovery_source: Option<String>,
 }
 
 /// Combined NHI identity + tool extension fields.
@@ -58,6 +60,8 @@ pub struct NhiToolWithIdentity {
     pub provider: Option<String>,
     pub provider_verified: bool,
     pub checksum: Option<String>,
+    pub last_discovered_at: Option<DateTime<Utc>>,
+    pub discovery_source: Option<String>,
 }
 
 /// Request to create a tool extension row.
@@ -72,6 +76,8 @@ pub struct CreateNhiTool {
     pub provider: Option<String>,
     pub provider_verified: bool,
     pub checksum: Option<String>,
+    pub last_discovered_at: Option<DateTime<Utc>>,
+    pub discovery_source: Option<String>,
 }
 
 /// Request to update a tool extension row.
@@ -104,7 +110,8 @@ const TOOL_JOIN_SELECT: &str = r"
            i.last_certified_at, i.next_certification_at, i.last_certified_by,
            i.rotation_interval_days, i.last_rotation_at, i.created_at, i.updated_at, i.created_by,
            t.category, t.input_schema, t.output_schema, t.requires_approval,
-           t.max_calls_per_hour, t.provider, t.provider_verified, t.checksum
+           t.max_calls_per_hour, t.provider, t.provider_verified, t.checksum,
+           t.last_discovered_at, t.discovery_source
     FROM nhi_identities i
     INNER JOIN nhi_tools t ON t.nhi_id = i.id
 ";
@@ -116,9 +123,10 @@ impl NhiTool {
             r"
             INSERT INTO nhi_tools (
                 nhi_id, category, input_schema, output_schema, requires_approval,
-                max_calls_per_hour, provider, provider_verified, checksum
+                max_calls_per_hour, provider, provider_verified, checksum,
+                last_discovered_at, discovery_source
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
             ",
         )
@@ -131,6 +139,8 @@ impl NhiTool {
         .bind(&input.provider)
         .bind(input.provider_verified)
         .bind(&input.checksum)
+        .bind(input.last_discovered_at)
+        .bind(&input.discovery_source)
         .fetch_one(pool)
         .await
     }
@@ -278,6 +288,8 @@ mod tests {
             provider: Some("mcp:provider".to_string()),
             provider_verified: true,
             checksum: Some("abc123".to_string()),
+            last_discovered_at: None,
+            discovery_source: Some("mcp:Default".to_string()),
         };
 
         let json_str = serde_json::to_string(&tool).unwrap();
@@ -298,6 +310,8 @@ mod tests {
             provider: None,
             provider_verified: false,
             checksum: None,
+            last_discovered_at: None,
+            discovery_source: None,
         };
 
         assert!(input.requires_approval);

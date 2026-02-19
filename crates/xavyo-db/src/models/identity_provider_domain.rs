@@ -82,26 +82,33 @@ impl IdentityProviderDomain {
         .await
     }
 
-    /// Find domain by ID.
-    pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM identity_provider_domains WHERE id = $1")
+    /// Find domain by ID with tenant isolation.
+    pub async fn find_by_id(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as("SELECT * FROM identity_provider_domains WHERE id = $1 AND tenant_id = $2")
             .bind(id)
+            .bind(tenant_id)
             .fetch_optional(pool)
             .await
     }
 
-    /// Find all domains for an identity provider.
+    /// Find all domains for an identity provider within a tenant.
     pub async fn list_by_idp(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         identity_provider_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
             SELECT * FROM identity_provider_domains
-            WHERE identity_provider_id = $1
+            WHERE tenant_id = $1 AND identity_provider_id = $2
             ORDER BY priority DESC, domain ASC
             ",
         )
+        .bind(tenant_id)
         .bind(identity_provider_id)
         .fetch_all(pool)
         .await
@@ -157,9 +164,10 @@ impl IdentityProviderDomain {
         .await
     }
 
-    /// Check if domain exists for this `IdP`.
+    /// Check if domain exists for this `IdP` within a tenant.
     pub async fn domain_exists_for_idp(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         identity_provider_id: Uuid,
         domain: &str,
     ) -> Result<bool, sqlx::Error> {
@@ -168,10 +176,11 @@ impl IdentityProviderDomain {
             r"
             SELECT EXISTS(
                 SELECT 1 FROM identity_provider_domains
-                WHERE identity_provider_id = $1 AND domain = $2
+                WHERE tenant_id = $1 AND identity_provider_id = $2 AND domain = $3
             )
             ",
         )
+        .bind(tenant_id)
         .bind(identity_provider_id)
         .bind(&domain)
         .fetch_one(pool)

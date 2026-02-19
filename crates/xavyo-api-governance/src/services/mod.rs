@@ -110,7 +110,6 @@ pub mod simulation_comparison_service;
 
 // NHI Lifecycle services (F061)
 pub mod nhi_certification_service;
-pub mod nhi_credential_service;
 pub mod nhi_request_service;
 pub mod nhi_risk_service;
 pub mod nhi_service;
@@ -284,7 +283,6 @@ pub use simulation_comparison_service::SimulationComparisonService;
 
 // NHI Lifecycle exports (F061)
 pub use nhi_certification_service::NhiCertificationService;
-pub use nhi_credential_service::NhiCredentialService;
 pub use nhi_request_service::{NhiRequestService, NhiRequestSummary};
 pub use nhi_risk_service::{NhiRiskService, RiskFactorConfig};
 pub use nhi_service::NhiService;

@@ -1521,54 +1521,6 @@ else
   skip "TC-NHI-AGT-014" "No agent created"
 fi
 
-# ── TC-NHI-AGT-015: Rotate credentials ────────────────────────────────────
-# Create a fresh agent for credential rotation
-RAW=$(admin_call POST /nhi/agents -d "{
-  \"name\": \"CredBot-${TS}\",
-  \"agent_type\": \"workflow\",
-  \"owner_id\": \"$ADMIN_USER_ID\"
-}")
-parse_response "$RAW"
-CRED_AGENT_ID=$(echo "$BODY" | grep -oP '"id"\s*:\s*"[^"]*"' | head -1 | cut -d'"' -f4)
-if [[ -n "${CRED_AGENT_ID:-}" ]]; then
-  # Step 1: Issue a credential first (POST /nhi/:id/credentials)
-  RAW=$(admin_call POST "/nhi/$CRED_AGENT_ID/credentials" -d "{\"credential_type\": \"api_key\"}")
-  parse_response "$RAW"
-  CRED_ID=$(echo "$BODY" | grep -oP '"id"\s*:\s*"[^"]*"' | head -1 | cut -d'"' -f4)
-  if [[ -n "${CRED_ID:-}" && "$CODE" == "201" ]]; then
-    # Step 2: Rotate the issued credential (POST /nhi/:id/credentials/:cred_id/rotate)
-    RAW=$(admin_call POST "/nhi/$CRED_AGENT_ID/credentials/$CRED_ID/rotate" -d "{\"grace_period_hours\": 24}")
-    parse_response "$RAW"
-    if [[ "$CODE" == "200" || "$CODE" == "201" ]]; then
-      # Verify credential hash is NOT in response (security)
-      if echo "$BODY" | grep -q '"credential_hash"'; then
-        fail "TC-NHI-AGT-015" "$CODE but credential_hash leaked in response"
-      else
-        pass "TC-NHI-AGT-015" "$CODE, credentials rotated (no hash leaked)"
-      fi
-    else
-      fail "TC-NHI-AGT-015" "Expected 200/201 for rotate, got $CODE"
-    fi
-  else
-    fail "TC-NHI-AGT-015" "Could not issue credential first (code=$CODE)"
-  fi
-else
-  skip "TC-NHI-AGT-015" "Could not create agent for cred test"
-fi
-
-# ── TC-NHI-AGT-016: List credentials ──────────────────────────────────────
-if [[ -n "${CRED_AGENT_ID:-}" ]]; then
-  RAW=$(admin_call GET "/nhi/$CRED_AGENT_ID/credentials")
-  parse_response "$RAW"
-  if [[ "$CODE" == "200" ]]; then
-    pass "TC-NHI-AGT-016" "200, credentials listed"
-  else
-    fail "TC-NHI-AGT-016" "Expected 200, got $CODE"
-  fi
-else
-  skip "TC-NHI-AGT-016" "No agent for creds"
-fi
-
 # =============================================================================
 # PART 8: NHI Service Accounts (10 tests from agents/04-service-accounts.md)
 # =============================================================================

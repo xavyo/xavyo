@@ -169,13 +169,27 @@ impl SocialProvider for MicrosoftProvider {
         let user_info: MicrosoftUserInfo = response.json().await?;
         let raw_claims = serde_json::to_value(&user_info).unwrap_or_default();
 
-        // Use preferred_username as email fallback
-        let email = user_info.email.or(user_info.preferred_username);
+        // Use preferred_username as email fallback only with strict validation.
+        // When falling back to preferred_username, always mark email_verified = false
+        // because Microsoft does not guarantee it is a verified email address.
+        let (email, email_verified) = if let Some(email) = user_info.email {
+            (Some(email), Some(true)) // Microsoft verifies primary emails
+        } else if let Some(ref preferred) = user_info.preferred_username {
+            // Validate with a basic RFC 5322-ish pattern: local@domain.tld
+            // Must have exactly one @, domain must have a dot, no spaces
+            if is_plausible_email(preferred) {
+                (Some(preferred.clone()), Some(false)) // explicitly unverified
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
 
         Ok(SocialUserInfo {
             provider_user_id: user_info.sub,
             email,
-            email_verified: Some(true), // Microsoft verifies emails
+            email_verified,
             name: user_info.name,
             given_name: user_info.given_name,
             family_name: user_info.family_name,
@@ -195,9 +209,55 @@ impl SocialProvider for MicrosoftProvider {
     }
 }
 
+/// Basic email format validation for `preferred_username` fallback.
+///
+/// Checks: non-empty local part, exactly one `@`, domain has at least one dot,
+/// no whitespace, and reasonable length bounds.
+fn is_plausible_email(s: &str) -> bool {
+    // Length bounds: at least a@b.c (5 chars), max 254 per RFC 5321
+    if s.len() < 5 || s.len() > 254 {
+        return false;
+    }
+    // No whitespace
+    if s.chars().any(|c| c.is_whitespace()) {
+        return false;
+    }
+    // Exactly one @
+    let parts: Vec<&str> = s.splitn(3, '@').collect();
+    if parts.len() != 2 {
+        return false;
+    }
+    let (local, domain) = (parts[0], parts[1]);
+    // Local part must be non-empty
+    if local.is_empty() {
+        return false;
+    }
+    // Domain must contain a dot and not start/end with one
+    if !domain.contains('.') || domain.starts_with('.') || domain.ends_with('.') {
+        return false;
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_plausible_email() {
+        assert!(is_plausible_email("user@example.com"));
+        assert!(is_plausible_email("a@b.co"));
+        assert!(!is_plausible_email("not-an-email"));
+        assert!(!is_plausible_email("@example.com"));
+        assert!(!is_plausible_email("user@"));
+        assert!(!is_plausible_email("user@domain"));
+        assert!(!is_plausible_email("user @example.com"));
+        assert!(!is_plausible_email("user@@example.com"));
+        assert!(!is_plausible_email("user@.com"));
+        assert!(!is_plausible_email("user@com."));
+        assert!(!is_plausible_email(""));
+        assert!(!is_plausible_email("ab"));
+    }
 
     #[test]
     fn test_authorization_url_with_default_tenant() {

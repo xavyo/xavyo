@@ -14,6 +14,10 @@ use tracing::{debug, info, instrument, warn};
 /// Default TTL for cached JWKS (10 minutes).
 pub const DEFAULT_JWKS_CACHE_TTL: Duration = Duration::from_secs(600);
 
+/// Maximum number of JWKS entries in the cache (one per IdP).
+/// Prevents unbounded memory growth from many IdP configurations.
+const MAX_JWKS_CACHE_ENTRIES: usize = 500;
+
 /// Cached JWKS entry with TTL tracking.
 #[derive(Debug, Clone)]
 struct CachedJwks {
@@ -65,7 +69,7 @@ impl JwksCache {
             cache: Arc::new(RwLock::new(HashMap::new())),
             default_ttl,
             http_client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(30))
+                .timeout(Duration::from_secs(10))
                 .build()
                 .expect("Failed to create HTTP client"),
             allow_local: false,
@@ -90,7 +94,7 @@ impl JwksCache {
             cache: Arc::new(RwLock::new(HashMap::new())),
             default_ttl,
             http_client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(30))
+                .timeout(Duration::from_secs(10))
                 .build()
                 .expect("Failed to create HTTP client"),
             allow_local: true,
@@ -186,11 +190,25 @@ impl JwksCache {
         };
 
         let mut cache = self.cache.write().await;
+
+        // Evict oldest entry if cache is at capacity (LRU-style)
+        if cache.len() >= MAX_JWKS_CACHE_ENTRIES && !cache.contains_key(jwks_uri) {
+            if let Some(oldest_key) = cache
+                .iter()
+                .min_by_key(|(_, v)| v.fetched_at)
+                .map(|(k, _)| k.clone())
+            {
+                cache.remove(&oldest_key);
+                debug!(evicted_uri = %oldest_key, "JWKS cache entry evicted (at capacity)");
+            }
+        }
+
         cache.insert(jwks_uri.to_string(), cached);
 
         info!(
             jwks_uri = %jwks_uri,
             key_count = jwks.keys.len(),
+            cache_size = cache.len(),
             "JWKS cached"
         );
 
@@ -205,9 +223,10 @@ impl JwksCache {
             .map_err(|e| FederationError::JwksFetchFailed(format!("Invalid JWKS URI: {e}")))?;
 
         let scheme = url.scheme();
-        if scheme != "https" && scheme != "http" {
+        // SECURITY: Only allow HTTPS for JWKS URIs — HTTP allows MITM key injection.
+        if scheme != "https" {
             return Err(FederationError::JwksFetchFailed(format!(
-                "Unsupported scheme: {scheme}"
+                "Only HTTPS is allowed for JWKS URIs, got: {scheme}"
             )));
         }
 

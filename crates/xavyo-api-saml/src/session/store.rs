@@ -138,13 +138,17 @@ impl PostgresSessionStore {
 #[async_trait]
 impl SessionStore for PostgresSessionStore {
     async fn store(&self, session: AuthnRequestSession) -> Result<(), SessionError> {
-        sqlx::query(
+        // SECURITY: Detect duplicate request IDs (replay attack prevention).
+        // Use RETURNING to distinguish insert-success from conflict-silenced.
+        let request_id_for_err = session.request_id.clone();
+        let row = sqlx::query(
             r"
             INSERT INTO saml_authn_request_sessions
                 (id, tenant_id, request_id, sp_entity_id, created_at, expires_at, consumed_at, relay_state)
             VALUES
                 ($1, $2, $3, $4, $5, $6, $7, $8)
             ON CONFLICT (tenant_id, request_id) DO NOTHING
+            RETURNING id
             ",
         )
         .bind(session.id)
@@ -155,9 +159,14 @@ impl SessionStore for PostgresSessionStore {
         .bind(session.expires_at)
         .bind(session.consumed_at)
         .bind(&session.relay_state)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(|e| SessionError::StorageError(e.to_string()))?;
+
+        if row.is_none() {
+            // ON CONFLICT fired — duplicate request_id for this tenant
+            return Err(SessionError::DuplicateRequestId(request_id_for_err));
+        }
 
         tracing::debug!(
             tenant_id = %session.tenant_id,

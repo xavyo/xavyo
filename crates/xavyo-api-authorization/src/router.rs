@@ -64,7 +64,11 @@ pub struct AuthorizationState {
 ///
 /// ## Explain API (admin)
 /// - `GET    /admin/authorization/explain-nhi`   - Dry-run NHI authorization pipeline
-pub fn authorization_router(pool: PgPool, audit_verbosity: String, risk_score_deny_threshold: i32) -> Router {
+pub fn authorization_router(
+    pool: PgPool,
+    audit_verbosity: String,
+    risk_score_deny_threshold: i32,
+) -> Router {
     let policy_cache = Arc::new(PolicyCache::new());
     let mapping_cache = Arc::new(MappingCache::new());
     let pdp = Arc::new(PolicyDecisionPoint::new(

@@ -26,8 +26,6 @@ use crate::models::{
     NhiCertificationStatus, NhiCertificationSummary,
 };
 
-use super::NhiCredentialService;
-
 // ============================================================================
 // Database Models for NHI Certification (stored in-memory for now)
 // In production, these would be in xavyo-db migrations
@@ -75,7 +73,6 @@ pub struct NhiCertificationItem {
 /// Service for NHI certification operations.
 pub struct NhiCertificationService {
     pool: PgPool,
-    credential_service: NhiCredentialService,
     #[cfg(feature = "kafka")]
     event_producer: Option<Arc<EventProducer>>,
 }
@@ -85,7 +82,6 @@ impl NhiCertificationService {
     #[must_use]
     pub fn new(pool: PgPool) -> Self {
         Self {
-            credential_service: NhiCredentialService::new(pool.clone()),
             pool,
             #[cfg(feature = "kafka")]
             event_producer: None,
@@ -96,10 +92,6 @@ impl NhiCertificationService {
     #[cfg(feature = "kafka")]
     pub fn with_event_producer(pool: PgPool, event_producer: Arc<EventProducer>) -> Self {
         Self {
-            credential_service: NhiCredentialService::with_event_producer(
-                pool.clone(),
-                event_producer.clone(),
-            ),
             pool,
             event_producer: Some(event_producer),
         }
@@ -108,7 +100,6 @@ impl NhiCertificationService {
     /// Set the event producer for publishing events.
     #[cfg(feature = "kafka")]
     pub fn set_event_producer(&mut self, producer: Arc<EventProducer>) {
-        self.credential_service.set_event_producer(producer.clone());
         self.event_producer = Some(producer);
     }
 
@@ -415,7 +406,7 @@ impl NhiCertificationService {
                 NhiCertificationStatus::Certified
             }
             NhiCertificationDecision::Revoke => {
-                // Suspend the NHI and revoke credentials
+                // Suspend the NHI
                 self.revoke_nhi(tenant_id, item.nhi_id, decided_by).await?;
                 NhiCertificationStatus::Revoked
             }
@@ -555,8 +546,8 @@ impl NhiCertificationService {
     // Helper Methods
     // =========================================================================
 
-    /// Revoke an NHI: suspend and invalidate all credentials.
-    async fn revoke_nhi(&self, tenant_id: Uuid, nhi_id: Uuid, revoked_by: Uuid) -> Result<()> {
+    /// Revoke an NHI: suspend the identity.
+    async fn revoke_nhi(&self, tenant_id: Uuid, nhi_id: Uuid, _revoked_by: Uuid) -> Result<()> {
         // Suspend the NHI
         sqlx::query(
             r"
@@ -573,12 +564,7 @@ impl NhiCertificationService {
         .await
         .map_err(GovernanceError::Database)?;
 
-        // Revoke all active credentials
-        self.credential_service
-            .revoke_all_for_nhi(tenant_id, nhi_id, revoked_by, "Certification revoked")
-            .await?;
-
-        info!(nhi_id = %nhi_id, "NHI suspended and credentials revoked due to certification revocation");
+        info!(nhi_id = %nhi_id, "NHI suspended due to certification revocation");
 
         Ok(())
     }

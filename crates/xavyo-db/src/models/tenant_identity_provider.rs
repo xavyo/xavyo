@@ -70,6 +70,7 @@ pub struct TenantIdentityProvider {
     pub provider_type: String,
     pub issuer_url: String,
     pub client_id: String,
+    #[serde(skip_serializing)]
     pub client_secret_encrypted: Vec<u8>,
     pub claim_mapping: serde_json::Value,
     pub scopes: String,
@@ -137,6 +138,11 @@ impl TenantIdentityProvider {
     }
 
     /// Find an identity provider by ID.
+    ///
+    /// # Security
+    /// This method does NOT filter by `tenant_id`. Use `find_by_id_and_tenant` instead
+    /// for all tenant-scoped operations.
+    #[deprecated(note = "Use find_by_id_and_tenant for tenant-isolated access")]
     pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as("SELECT * FROM tenant_identity_providers WHERE id = $1")
             .bind(id)
@@ -247,6 +253,7 @@ impl TenantIdentityProvider {
     /// Update an identity provider.
     pub async fn update(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         input: UpdateIdentityProvider,
     ) -> Result<Self, sqlx::Error> {
@@ -254,19 +261,20 @@ impl TenantIdentityProvider {
             r"
             UPDATE tenant_identity_providers
             SET
-                name = COALESCE($2, name),
-                issuer_url = COALESCE($3, issuer_url),
-                client_id = COALESCE($4, client_id),
-                client_secret_encrypted = COALESCE($5, client_secret_encrypted),
-                claim_mapping = COALESCE($6, claim_mapping),
-                scopes = COALESCE($7, scopes),
-                sync_on_login = COALESCE($8, sync_on_login),
+                name = COALESCE($3, name),
+                issuer_url = COALESCE($4, issuer_url),
+                client_id = COALESCE($5, client_id),
+                client_secret_encrypted = COALESCE($6, client_secret_encrypted),
+                claim_mapping = COALESCE($7, claim_mapping),
+                scopes = COALESCE($8, scopes),
+                sync_on_login = COALESCE($9, sync_on_login),
                 updated_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             RETURNING *
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(&input.name)
         .bind(&input.issuer_url)
         .bind(&input.client_id)
@@ -281,6 +289,7 @@ impl TenantIdentityProvider {
     /// Update validation status.
     pub async fn update_validation_status(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         status: ValidationStatus,
     ) -> Result<Self, sqlx::Error> {
@@ -288,14 +297,15 @@ impl TenantIdentityProvider {
             r"
             UPDATE tenant_identity_providers
             SET
-                validation_status = $2,
+                validation_status = $3,
                 last_validated_at = NOW(),
                 updated_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             RETURNING *
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(status.to_string())
         .fetch_one(pool)
         .await
@@ -304,29 +314,37 @@ impl TenantIdentityProvider {
     /// Toggle enabled status.
     pub async fn set_enabled(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         is_enabled: bool,
     ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
             r"
             UPDATE tenant_identity_providers
-            SET is_enabled = $2, updated_at = NOW()
-            WHERE id = $1
+            SET is_enabled = $3, updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2
             RETURNING *
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(is_enabled)
         .fetch_one(pool)
         .await
     }
 
     /// Delete an identity provider.
-    pub async fn delete(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM tenant_identity_providers WHERE id = $1")
-            .bind(id)
-            .execute(pool)
-            .await?;
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let result =
+            sqlx::query("DELETE FROM tenant_identity_providers WHERE id = $1 AND tenant_id = $2")
+                .bind(id)
+                .bind(tenant_id)
+                .execute(pool)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 

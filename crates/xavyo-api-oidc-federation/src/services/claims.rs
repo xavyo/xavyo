@@ -27,8 +27,10 @@ impl ClaimsService {
         claims: &IdTokenClaims,
     ) -> FederationResult<HashMap<String, Value>> {
         // Parse claim mapping from IdP config
-        let mapping: ClaimMappingConfig =
-            serde_json::from_value(idp.claim_mapping.clone()).unwrap_or_default();
+        let mapping: ClaimMappingConfig = serde_json::from_value(idp.claim_mapping.clone())
+            .map_err(|e| {
+                FederationError::InvalidClaimMapping(format!("Failed to parse claim mapping: {e}"))
+            })?;
 
         // Build claims map from IdTokenClaims
         let mut source_claims = claims.additional.clone();
@@ -51,6 +53,9 @@ impl ClaimsService {
         }
         if let Some(picture) = &claims.picture {
             source_claims.insert("picture".to_string(), Value::String(picture.clone()));
+        }
+        if let Some(verified) = &claims.email_verified {
+            source_claims.insert("email_verified".to_string(), Value::Bool(*verified));
         }
 
         // Apply mapping
@@ -86,6 +91,24 @@ impl ClaimsService {
         Ok(result)
     }
 
+    /// Reserved/dangerous target names that must never be set from external claims.
+    const RESERVED_TARGETS: &[&str] = &[
+        "roles",
+        "role",
+        "is_admin",
+        "admin",
+        "tenant_id",
+        "tid",
+        "sub",
+        "iss",
+        "aud",
+        "exp",
+        "iat",
+        "permissions",
+        "scope",
+        "scopes",
+    ];
+
     /// Validate claim mapping configuration.
     pub fn validate_mapping(&self, mapping: &ClaimMappingConfig) -> FederationResult<()> {
         for entry in &mapping.mappings {
@@ -101,6 +124,15 @@ impl ClaimsService {
                 return Err(FederationError::InvalidClaimMapping(
                     "Target claim cannot be empty".to_string(),
                 ));
+            }
+
+            // Reject reserved/dangerous target names
+            let target_lower = entry.target.to_lowercase();
+            if Self::RESERVED_TARGETS.contains(&target_lower.as_str()) {
+                return Err(FederationError::InvalidClaimMapping(format!(
+                    "Target claim '{}' is reserved and cannot be set from external claims",
+                    entry.target
+                )));
             }
 
             // Validate transform if specified

@@ -60,10 +60,9 @@ use xavyo_api_oauth::router::{
     OAuthState,
 };
 use xavyo_api_oidc_federation::{
-    admin_routes as federation_admin_routes_fn, auth_routes as federation_auth_routes_fn,
-    FederationConfig, FederationState,
+    admin_routes as federation_admin_routes_fn, FederationConfig, FederationState,
 };
-use xavyo_api_saml::{create_saml_state, saml_admin_router, saml_public_router};
+use xavyo_api_saml::{create_saml_state, saml_admin_router};
 use xavyo_api_scim::{scim_admin_router, scim_resource_router, ScimConfig};
 use xavyo_api_social::{
     admin_social_router, authenticated_social_router, public_social_router, SocialConfig,
@@ -467,12 +466,13 @@ async fn main() {
     // Build MFA routes with JWT authentication (F022)
     // JWT auth is applied internally by mfa_router: verification routes get AllowPartialToken
     // (accepting `purpose: "mfa_verification"` tokens), management routes reject partial tokens.
-    let mfa_routes = mfa_router(auth_state.clone(), config.jwt_public_key.clone())
-        .layer(TenantLayer::with_config(
+    let mfa_routes = mfa_router(auth_state.clone(), config.jwt_public_key.clone()).layer(
+        TenantLayer::with_config(
             xavyo_tenant::TenantConfig::builder()
                 .require_tenant(true)
                 .build(),
-        ));
+        ),
+    );
 
     // Build auth session routes (for /users/me/sessions)
     let auth_session_routes = auth_users_router(auth_state.clone())
@@ -774,7 +774,14 @@ async fn main() {
     };
 
     // Social login public routes (no auth required, tenant from header)
-    let social_public_routes = public_social_router().with_state(social_state.clone());
+    // F-5: MEDIUM - Add TenantLayer to social public routes
+    let social_public_routes = public_social_router()
+        .with_state(social_state.clone())
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(false)
+                .build(),
+        ));
 
     // Social login authenticated routes (requires JWT auth, user-level)
     let social_authenticated_routes = authenticated_social_router()
@@ -805,16 +812,42 @@ async fn main() {
         config.issuer_url.clone(),
         config.saml_encryption_key,
     );
+
+    // F-4: HIGH - Split SAML routes - initiate requires auth, metadata/SSO do not
     // SAML public routes (metadata, SSO) - require tenant but not auth
-    // Provide default Extension<Option<User>> = None for unauthenticated requests
-    // The SSO handler expects this extension to check if user is authenticated
-    let saml_public_routes = saml_public_router(saml_state.clone())
+    let saml_public_routes = Router::new()
+        .route(
+            "/saml/metadata",
+            axum::routing::get(xavyo_api_saml::handlers::metadata::get_metadata),
+        )
+        .route(
+            "/saml/sso",
+            axum::routing::get(xavyo_api_saml::handlers::sso::sso_redirect)
+                .post(xavyo_api_saml::handlers::sso::sso_post),
+        )
+        .with_state(saml_state.clone())
         .layer(axum::Extension(None::<xavyo_db::models::User>))
         .layer(TenantLayer::with_config(
             xavyo_tenant::TenantConfig::builder()
                 .require_tenant(true)
                 .build(),
         ));
+
+    // SAML authenticated route (initiate SSO) - requires authenticated user
+    let saml_authenticated_routes = Router::new()
+        .route(
+            "/saml/initiate/:sp_id",
+            axum::routing::post(xavyo_api_saml::handlers::initiate_sso),
+        )
+        .with_state(saml_state.clone())
+        .layer(axum::middleware::from_fn(jwt_auth_middleware))
+        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(true)
+                .build(),
+        ));
+
     // SAML admin routes (SP/cert management) - require tenant, JWT auth, and admin role
     let saml_admin_routes = saml_admin_router(saml_state)
         .layer(axum::middleware::from_fn(admin_guard))
@@ -832,15 +865,47 @@ async fn main() {
         pool: pool.clone(),
         master_key: config.federation_encryption_key,
         callback_base_url: config.issuer_url.clone(),
+        jwt_private_key_pem: config.jwt_private_key.as_bytes().to_vec(),
     };
     let federation_state = FederationState::new(&federation_config);
-    // Federation public routes (discover, authorize, callback, logout) - no auth required
-    let federation_public_routes = Router::new()
-        .nest("/auth/federation", federation_auth_routes_fn())
+
+    // F-1: CRITICAL - Split federation routes based on tenant requirements
+    // Routes that need tenant context (discover, authorize, logout) - require X-Tenant-ID
+    let federation_tenant_routes = Router::new()
+        .route(
+            "/auth/federation/discover",
+            axum::routing::post(xavyo_api_oidc_federation::handlers::federation::discover_realm),
+        )
+        .route(
+            "/auth/federation/authorize",
+            axum::routing::get(xavyo_api_oidc_federation::handlers::federation::authorize),
+        )
+        .route(
+            "/auth/federation/logout",
+            axum::routing::post(xavyo_api_oidc_federation::handlers::federation::logout),
+        )
         .with_state(federation_state.clone())
+        // F-2: HIGH - Add rate limiting to federation endpoints
+        .layer(axum::middleware::from_fn(
+            middleware::registration_rate_limit_middleware,
+        ))
+        .layer(axum::Extension(endpoint_rate_limiters.clone()))
         .layer(TenantLayer::with_config(
             xavyo_tenant::TenantConfig::builder()
                 .require_tenant(true)
+                .build(),
+        ));
+
+    // Callback route - tenant comes from DB session, not header
+    let federation_callback_routes = Router::new()
+        .route(
+            "/auth/federation/callback",
+            axum::routing::get(xavyo_api_oidc_federation::handlers::federation::callback),
+        )
+        .with_state(federation_state.clone())
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(false)
                 .build(),
         ));
     // Federation admin routes (IdP CRUD, domains) - require tenant, JWT auth, and admin role
@@ -889,16 +954,17 @@ async fn main() {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(75);
-    let authorization_routes = authorization_router(pool.clone(), "all".to_string(), risk_score_deny_threshold)
-        .layer(axum::middleware::from_fn(jwt_auth_middleware))
-        .layer(axum::middleware::from_fn(api_key_auth_middleware))
-        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
-        .layer(axum::Extension(pool.clone()))
-        .layer(TenantLayer::with_config(
-            xavyo_tenant::TenantConfig::builder()
-                .require_tenant(true)
-                .build(),
-        ));
+    let authorization_routes =
+        authorization_router(pool.clone(), "all".to_string(), risk_score_deny_threshold)
+            .layer(axum::middleware::from_fn(jwt_auth_middleware))
+            .layer(axum::middleware::from_fn(api_key_auth_middleware))
+            .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+            .layer(axum::Extension(pool.clone()))
+            .layer(TenantLayer::with_config(
+                xavyo_tenant::TenantConfig::builder()
+                    .require_tenant(true)
+                    .build(),
+            ));
 
     // Connector routes (F045 - Connector Framework)
     let connector_encryption = Arc::new(CredentialEncryption::new(config.connector_encryption_key));
@@ -1085,7 +1151,25 @@ async fn main() {
     // 3. api_key_auth_middleware - validates API keys, sets TenantId/UserId/JwtClaims
     // 4. jwt_auth_middleware - validates JWTs if not API key
     // 5. TenantLayer - validates tenant context (checks extensions first, then header)
-    let nhi_state = NhiState::new(pool.clone());
+    let agentgateway_url = config::agentgateway_mcp_url();
+    if let Some(ref gw_url) = agentgateway_url {
+        info!(url = %gw_url, "AgentGateway MCP discovery enabled (system default)");
+    }
+    let mut nhi_state = NhiState::new(pool.clone()).with_mcp_discovery(agentgateway_url);
+
+    // Wire vault service if VAULT_MASTER_KEY is configured
+    match xavyo_api_nhi::services::vault_crypto::VaultCrypto::from_env() {
+        Ok(crypto) => {
+            info!("NHI Vault enabled (VAULT_MASTER_KEY configured)");
+            nhi_state = nhi_state.with_vault(
+                xavyo_api_nhi::services::vault_service::VaultService::new(crypto),
+            );
+        }
+        Err(_) => {
+            info!("NHI Vault disabled (VAULT_MASTER_KEY not set)");
+        }
+    }
+
     let nhi_routes = nhi_router(nhi_state)
         // F113: TenantLayer runs last - can see TenantId set by API key auth
         .layer(TenantLayer::with_config(
@@ -1154,6 +1238,9 @@ async fn main() {
         .route("/healthz", get(healthz_handler))
         .route("/startupz", get(startupz_handler))
         // Prometheus metrics endpoint (no auth required, F072 — US2)
+        // SECURITY: This endpoint exposes internal metrics (request counts, latencies, error rates).
+        // In production, restrict access via network policy or reverse proxy (e.g., Kubernetes
+        // NetworkPolicy allowing only the Prometheus scraper's CIDR). Do NOT expose to the public internet.
         .route("/metrics", get(metrics::metrics_handler))
         // Swagger UI and OpenAPI spec
         .merge(swagger_routes())
@@ -1193,10 +1280,14 @@ async fn main() {
         .nest("/admin/social-providers", social_admin_routes)
         // SAML IdP public routes (metadata, SSO)
         .merge(saml_public_routes)
+        // SAML authenticated routes (initiate SSO)
+        .merge(saml_authenticated_routes)
         // SAML admin routes (SP/cert management)
         .nest("/admin/saml", saml_admin_routes)
-        // OIDC Federation public routes (discover, authorize, callback, logout)
-        .merge(federation_public_routes)
+        // OIDC Federation tenant-required routes (discover, authorize, logout)
+        .merge(federation_tenant_routes)
+        // OIDC Federation callback route (tenant from DB session)
+        .merge(federation_callback_routes)
         // OIDC Federation admin routes (IdP CRUD, domains - requires admin role)
         .merge(federation_admin_routes)
         // SCIM 2.0 resource provisioning routes (SCIM Bearer token auth)
@@ -1546,6 +1637,55 @@ async fn main() {
                             target: "governance",
                             error = %e,
                             "Failed to mark overdue certification campaigns"
+                        );
+                    }
+                }
+            }
+        });
+    }
+
+    // Spawn vault lease expiration and activity counter cleanup job
+    {
+        let vault_pool = pool.clone();
+        tokio::spawn(async move {
+            let interval = Duration::from_secs(60); // Check every minute
+            loop {
+                tokio::time::sleep(interval).await;
+
+                // Expire leases past their expiry time
+                match xavyo_db::models::NhiSecretLease::expire_stale(&vault_pool).await {
+                    Ok(count) if count > 0 => {
+                        tracing::info!(
+                            target: "nhi_vault",
+                            expired = count,
+                            "Expired stale vault leases"
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!(
+                            target: "nhi_vault",
+                            error = %e,
+                            "Failed to expire stale vault leases"
+                        );
+                    }
+                }
+
+                // Clean up old activity counters (older than 90 days)
+                match xavyo_db::models::NhiActivityCounter::cleanup_old(&vault_pool, 90).await {
+                    Ok(count) if count > 0 => {
+                        tracing::info!(
+                            target: "nhi_activity",
+                            deleted = count,
+                            "Cleaned up old activity counters"
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!(
+                            target: "nhi_activity",
+                            error = %e,
+                            "Failed to clean up old activity counters"
                         );
                     }
                 }

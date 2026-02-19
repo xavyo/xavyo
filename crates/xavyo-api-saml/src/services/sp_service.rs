@@ -161,6 +161,21 @@ impl SpService {
             ));
         }
 
+        // SECURITY: Enforce HTTPS for ACS URLs to prevent assertion interception via MITM.
+        for acs_url in &req.acs_urls {
+            if let Ok(parsed) = url::Url::parse(acs_url) {
+                if parsed.scheme() != "https" {
+                    return Err(SamlError::InvalidAuthnRequest(format!(
+                        "ACS URL must use HTTPS: {acs_url}"
+                    )));
+                }
+            } else {
+                return Err(SamlError::InvalidAuthnRequest(format!(
+                    "Invalid ACS URL format: {acs_url}"
+                )));
+            }
+        }
+
         let attribute_mapping = req.attribute_mapping.unwrap_or(serde_json::json!({}));
 
         let sp = sqlx::query_as::<_, SamlServiceProvider>(
@@ -214,6 +229,21 @@ impl SpService {
 
         let name = req.name.unwrap_or(existing.name);
         let acs_urls = req.acs_urls.unwrap_or(existing.acs_urls);
+
+        // SECURITY: Re-validate HTTPS for ACS URLs on update (same check as create_sp).
+        for acs_url in &acs_urls {
+            if let Ok(parsed) = url::Url::parse(acs_url) {
+                if parsed.scheme() != "https" {
+                    return Err(SamlError::InvalidAuthnRequest(format!(
+                        "ACS URL must use HTTPS: {acs_url}"
+                    )));
+                }
+            } else {
+                return Err(SamlError::InvalidAuthnRequest(format!(
+                    "Invalid ACS URL format: {acs_url}"
+                )));
+            }
+        }
         let certificate = req.certificate.or(existing.certificate);
         let attribute_mapping = req.attribute_mapping.unwrap_or(existing.attribute_mapping);
         let name_id_format = req.name_id_format.unwrap_or(existing.name_id_format);
@@ -290,12 +320,14 @@ impl SpService {
 
     // Certificate management
 
-    /// Get active certificate for tenant
+    /// Get active certificate for tenant.
+    ///
+    /// Also validates that the certificate is within its validity period.
     pub async fn get_active_certificate(
         &self,
         tenant_id: Uuid,
     ) -> SamlResult<TenantIdpCertificate> {
-        sqlx::query_as::<_, TenantIdpCertificate>(
+        let cert = sqlx::query_as::<_, TenantIdpCertificate>(
             r"
             SELECT id, tenant_id, certificate, private_key_encrypted,
                    key_id, subject_dn, issuer_dn, not_before, not_after,
@@ -307,7 +339,26 @@ impl SpService {
         .bind(tenant_id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or(SamlError::NoActiveCertificate)
+        .ok_or(SamlError::NoActiveCertificate)?;
+
+        // SECURITY: Check certificate validity at signing time, not just at activation.
+        if !cert.is_valid() {
+            return Err(SamlError::InvalidCertificate(format!(
+                "Active certificate has expired or is not yet valid (valid from {} to {})",
+                cert.not_before, cert.not_after
+            )));
+        }
+
+        if cert.is_expiring_soon() {
+            tracing::warn!(
+                tenant_id = %tenant_id,
+                cert_id = %cert.id,
+                not_after = %cert.not_after,
+                "Active IdP certificate is expiring soon — rotate before expiry"
+            );
+        }
+
+        Ok(cert)
     }
 
     /// List all certificates for tenant
@@ -347,6 +398,21 @@ impl SpService {
         // Encrypt private key
         let encrypted_key = encrypt_private_key(req.private_key.as_bytes(), encryption_key)?;
 
+        // SECURITY: Atomically deactivate all existing certs and insert the new one as active.
+        // This prevents having multiple active certificates simultaneously.
+        let mut tx =
+            self.pool.begin().await.map_err(|e| {
+                SamlError::InternalError(format!("Failed to start transaction: {e}"))
+            })?;
+
+        // Deactivate all existing active certificates for this tenant
+        sqlx::query(
+            "UPDATE tenant_idp_certificates SET is_active = FALSE WHERE tenant_id = $1 AND is_active = TRUE"
+        )
+        .bind(tenant_id)
+        .execute(&mut *tx)
+        .await?;
+
         let cert = sqlx::query_as::<_, TenantIdpCertificate>(
             r"
             INSERT INTO tenant_idp_certificates
@@ -366,8 +432,12 @@ impl SpService {
         .bind(creds.issuer_dn())
         .bind(creds.not_before())
         .bind(creds.not_after())
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
+
+        tx.commit()
+            .await
+            .map_err(|e| SamlError::InternalError(format!("Failed to commit transaction: {e}")))?;
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -385,11 +455,36 @@ impl SpService {
         tenant_id: Uuid,
         cert_id: Uuid,
     ) -> SamlResult<TenantIdpCertificate> {
+        // First fetch the certificate to check validity
         let cert = sqlx::query_as::<_, TenantIdpCertificate>(
             r"
-            UPDATE tenant_idp_certificates
-            SET is_active = TRUE
+            SELECT id, tenant_id, certificate, private_key_encrypted,
+                   key_id, subject_dn, issuer_dn, not_before, not_after,
+                   is_active, created_at
+            FROM tenant_idp_certificates
             WHERE id = $1 AND tenant_id = $2
+            ",
+        )
+        .bind(cert_id)
+        .bind(tenant_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| SamlError::CertificateNotFound(cert_id.to_string()))?;
+
+        // Validate certificate is not expired
+        if !cert.is_valid() {
+            return Err(SamlError::InvalidCertificate(format!(
+                "Certificate has expired or is not yet valid (valid from {} to {})",
+                cert.not_before, cert.not_after
+            )));
+        }
+
+        // Atomically set is_active = TRUE for target cert, FALSE for all others
+        let updated_cert = sqlx::query_as::<_, TenantIdpCertificate>(
+            r"
+            UPDATE tenant_idp_certificates
+            SET is_active = (id = $1)
+            WHERE tenant_id = $2
             RETURNING id, tenant_id, certificate, private_key_encrypted,
                       key_id, subject_dn, issuer_dn, not_before, not_after,
                       is_active, created_at
@@ -404,10 +499,10 @@ impl SpService {
         tracing::info!(
             tenant_id = %tenant_id,
             cert_id = %cert_id,
-            "IdP certificate activated"
+            "IdP certificate activated (deactivated all other certs for tenant)"
         );
 
-        Ok(cert)
+        Ok(updated_cert)
     }
 
     /// Decrypt private key for signing

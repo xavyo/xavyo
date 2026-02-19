@@ -43,6 +43,7 @@ impl ValidationService {
                 // Update validation status to valid
                 TenantIdentityProvider::update_validation_status(
                     &self.pool,
+                    tenant_id,
                     idp_id,
                     ValidationStatus::Valid,
                 )
@@ -60,6 +61,7 @@ impl ValidationService {
                 // Update validation status to invalid
                 TenantIdentityProvider::update_validation_status(
                     &self.pool,
+                    tenant_id,
                     idp_id,
                     ValidationStatus::Invalid,
                 )
@@ -71,13 +73,18 @@ impl ValidationService {
                 Ok(ValidationResultResponse {
                     is_valid: false,
                     discovered_endpoints: None,
-                    error: Some(error_message),
+                    error: Some(
+                        "Failed to discover OIDC endpoints for the configured issuer".to_string(),
+                    ),
                 })
             }
         }
     }
 
     /// Validate issuer URL without updating database.
+    ///
+    /// Returns `Ok(None)` if the issuer is unreachable or not a valid OIDC provider.
+    /// Propagates security-related errors (e.g., SSRF protection) as `Err`.
     #[instrument(skip(self))]
     pub async fn validate_issuer_url(
         &self,
@@ -85,7 +92,12 @@ impl ValidationService {
     ) -> FederationResult<Option<DiscoveredEndpoints>> {
         match self.discovery.discover(issuer_url).await {
             Ok(endpoints) => Ok(Some(endpoints)),
-            Err(_) => Ok(None),
+            // Discovery failure means unreachable or not a valid OIDC provider
+            Err(FederationError::DiscoveryFailed { .. }) => Ok(None),
+            // HTTP errors mean the provider is unreachable
+            Err(FederationError::HttpRequest(_)) => Ok(None),
+            // All other errors (InvalidConfiguration/SSRF, Database, etc.) must propagate
+            Err(e) => Err(e),
         }
     }
 }

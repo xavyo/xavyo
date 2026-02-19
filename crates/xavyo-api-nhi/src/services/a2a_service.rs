@@ -73,7 +73,7 @@ pub async fn create_task(
 
     // 5. Create the task
     let create_req = CreateA2aTask {
-        target_agent_id: Some(request.target_agent_id),
+        target_nhi_id: Some(request.target_agent_id),
         task_type: request.task_type,
         input: request.input,
         callback_url: request.callback_url,
@@ -113,8 +113,8 @@ pub async fn get_task(
 
     // Admins can view any task; non-admins must be a participant
     if !is_admin {
-        let is_source = task.source_agent_id == Some(requester_nhi_id);
-        let is_target = task.target_agent_id == Some(requester_nhi_id);
+        let is_source = task.source_nhi_id == Some(requester_nhi_id);
+        let is_target = task.target_nhi_id == Some(requester_nhi_id);
         if !is_source && !is_target {
             return Err(NhiApiError::NotFound);
         }
@@ -143,8 +143,8 @@ pub async fn list_tasks(
 
     let filter = A2aTaskFilter {
         state: query.state.clone(),
-        target_agent_id: query.target_agent_id,
-        source_agent_id: source_filter,
+        target_nhi_id: query.target_agent_id,
+        source_nhi_id: source_filter,
         limit: Some(limit),
         offset: Some(offset),
     };
@@ -182,8 +182,8 @@ pub async fn cancel_task(
 
     // Admins can cancel any task; non-admins must be a participant
     if !is_admin {
-        let is_source = existing.source_agent_id == Some(requester_nhi_id);
-        let is_target = existing.target_agent_id == Some(requester_nhi_id);
+        let is_source = existing.source_nhi_id == Some(requester_nhi_id);
+        let is_target = existing.target_nhi_id == Some(requester_nhi_id);
         if !is_source && !is_target {
             return Err(NhiApiError::NotFound);
         }
@@ -238,8 +238,8 @@ pub async fn cancel_task(
 fn task_to_response(task: &A2aTask) -> A2aTaskResponse {
     A2aTaskResponse {
         id: task.id,
-        source_agent_id: task.source_agent_id,
-        target_agent_id: task.target_agent_id,
+        source_agent_id: task.source_nhi_id,
+        target_agent_id: task.target_nhi_id,
         task_type: task.task_type.clone(),
         state: task.state.clone(),
         result: task.result.clone(),
@@ -364,8 +364,8 @@ mod tests {
         let task = A2aTask {
             id: Uuid::new_v4(),
             tenant_id: Uuid::new_v4(),
-            source_agent_id: Some(source_id),
-            target_agent_id: Some(target_id),
+            source_nhi_id: Some(source_id),
+            target_nhi_id: Some(target_id),
             task_type: "process".to_string(),
             input: serde_json::json!({}),
             state: "pending".to_string(),
@@ -396,8 +396,8 @@ mod tests {
         let task = A2aTask {
             id: Uuid::new_v4(),
             tenant_id: Uuid::new_v4(),
-            source_agent_id: Some(Uuid::new_v4()),
-            target_agent_id: Some(Uuid::new_v4()),
+            source_nhi_id: Some(Uuid::new_v4()),
+            target_nhi_id: Some(Uuid::new_v4()),
             task_type: "analyze".to_string(),
             input: serde_json::json!({"url": "https://example.com"}),
             state: "completed".to_string(),

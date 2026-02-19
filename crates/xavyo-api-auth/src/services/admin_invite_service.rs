@@ -155,7 +155,11 @@ impl AdminInviteService {
 
         // Send invitation email
         let invitation_url = format!("{}/invite/{}", self.frontend_base_url, raw_token);
-        let role_label = if role == "admin" { "an administrator" } else { "a member" };
+        let role_label = if role == "admin" {
+            "an administrator"
+        } else {
+            "a member"
+        };
         let subject = format!("You're invited to join as {role_label}");
         let body = format!(
             r"Hi,
@@ -422,7 +426,11 @@ If you didn't expect this invitation, you can safely ignore this email.
 
         // Send new email
         let invitation_url = format!("{}/invite/{}", self.frontend_base_url, raw_token);
-        let role_label = if invitation.role == "admin" { "an administrator" } else { "a member" };
+        let role_label = if invitation.role == "admin" {
+            "an administrator"
+        } else {
+            "a member"
+        };
         let subject = format!("You're invited to join as {role_label}");
         let body = format!(
             r"Hi,

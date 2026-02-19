@@ -7,7 +7,6 @@ pub mod audit;
 pub mod authorize;
 pub mod completions;
 pub mod connectors;
-pub mod credentials;
 pub mod doctor;
 pub mod export;
 pub mod governance;

@@ -6,9 +6,8 @@ use crate::api::ApiClient;
 use crate::error::{CliError, CliResult};
 use crate::models::nhi::{
     AutoSuspendResponse, CampaignResponse, CreateCampaignRequest, CreateSodRuleRequest,
-    GracePeriodRequest, GrantPermissionRequest, InactiveEntity, IssueCredentialRequest,
-    NhiCredentialResponse, NhiIdentityResponse, OrphanEntity, PermissionResponse, RiskFactor,
-    RotateCredentialRequest, SodCheckRequest, SodRuleResponse, SuspendRequest,
+    GracePeriodRequest, GrantPermissionRequest, InactiveEntity, NhiIdentityResponse, OrphanEntity,
+    PermissionResponse, RiskFactor, SodCheckRequest, SodRuleResponse, SuspendRequest,
 };
 use crate::output::truncate;
 use clap::{Args, Subcommand};
@@ -42,10 +41,6 @@ pub enum NhiCommands {
     Deactivate(IdJsonArgs),
     /// Activate an NHI identity
     Activate(IdJsonArgs),
-
-    /// Manage NHI credentials
-    #[command(subcommand)]
-    Credentials(CredentialsCommands),
 
     /// Manage agent-tool permissions
     #[command(subcommand)]
@@ -141,69 +136,6 @@ pub struct RiskArgs {
     /// Output as JSON
     #[arg(long)]
     pub json: bool,
-}
-
-// --- Credentials ---
-
-#[derive(Subcommand, Debug)]
-pub enum CredentialsCommands {
-    /// Issue a new credential for an NHI identity
-    Issue(CredIssueArgs),
-    /// List credentials for an NHI identity
-    List(CredListArgs),
-    /// Rotate an existing credential
-    Rotate(CredRotateArgs),
-    /// Revoke (delete) a credential
-    Revoke(CredRevokeArgs),
-}
-
-#[derive(Args, Debug)]
-pub struct CredIssueArgs {
-    /// NHI identity ID (UUID)
-    pub nhi_id: String,
-    /// Credential type: api_key, secret, certificate
-    #[arg(long, short = 't')]
-    pub r#type: String,
-    /// Validity in days
-    #[arg(long)]
-    pub valid_days: Option<i32>,
-    /// Output as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-#[derive(Args, Debug)]
-pub struct CredListArgs {
-    /// NHI identity ID (UUID)
-    pub nhi_id: String,
-    /// Output as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-#[derive(Args, Debug)]
-pub struct CredRotateArgs {
-    /// NHI identity ID (UUID)
-    pub nhi_id: String,
-    /// Credential ID (UUID)
-    pub credential_id: String,
-    /// Grace period in hours before old credential expires
-    #[arg(long)]
-    pub grace_period_hours: Option<i32>,
-    /// Output as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-#[derive(Args, Debug)]
-pub struct CredRevokeArgs {
-    /// NHI identity ID (UUID)
-    pub nhi_id: String,
-    /// Credential ID (UUID)
-    pub credential_id: String,
-    /// Skip confirmation prompt
-    #[arg(long, short = 'f')]
-    pub force: bool,
 }
 
 // --- Permissions ---
@@ -424,7 +356,6 @@ pub async fn execute(args: NhiArgs) -> CliResult<()> {
         NhiCommands::Archive(a) => execute_lifecycle(a, "archive").await,
         NhiCommands::Deactivate(a) => execute_lifecycle(a, "deactivate").await,
         NhiCommands::Activate(a) => execute_lifecycle(a, "activate").await,
-        NhiCommands::Credentials(c) => execute_credentials(c).await,
         NhiCommands::Permissions(p) => execute_permissions(p).await,
         NhiCommands::Risk(a) => execute_risk(a).await,
         NhiCommands::RiskSummary(a) => execute_risk_summary(a).await,
@@ -535,130 +466,6 @@ async fn execute_lifecycle(args: IdJsonArgs, action: &str) -> CliResult<()> {
             action_past, result.name, result.lifecycle_state
         );
     }
-
-    Ok(())
-}
-
-// --- Credentials ---
-
-async fn execute_credentials(cmd: CredentialsCommands) -> CliResult<()> {
-    match cmd {
-        CredentialsCommands::Issue(a) => execute_cred_issue(a).await,
-        CredentialsCommands::List(a) => execute_cred_list(a).await,
-        CredentialsCommands::Rotate(a) => execute_cred_rotate(a).await,
-        CredentialsCommands::Revoke(a) => execute_cred_revoke(a).await,
-    }
-}
-
-async fn execute_cred_issue(args: CredIssueArgs) -> CliResult<()> {
-    let nhi_id = parse_uuid(&args.nhi_id)?;
-    let client = ApiClient::from_defaults()?;
-
-    let request = IssueCredentialRequest {
-        credential_type: args.r#type,
-        valid_days: args.valid_days,
-    };
-    let result = client.nhi_issue_credential(nhi_id, request).await?;
-
-    if args.json {
-        println!("{}", serde_json::to_string_pretty(&result)?);
-    } else {
-        println!("Credential issued successfully!");
-        println!();
-        print_credential_details(&result.credential);
-        if let Some(ref secret) = result.secret {
-            println!();
-            println!("Secret (save this now, it will not be shown again):");
-            println!("  {secret}");
-        }
-        if let Some(ref api_key) = result.api_key {
-            println!();
-            println!("API Key (save this now, it will not be shown again):");
-            println!("  {api_key}");
-        }
-    }
-
-    Ok(())
-}
-
-async fn execute_cred_list(args: CredListArgs) -> CliResult<()> {
-    let nhi_id = parse_uuid(&args.nhi_id)?;
-    let client = ApiClient::from_defaults()?;
-
-    let response = client.nhi_list_credentials(nhi_id).await?;
-
-    if args.json {
-        println!("{}", serde_json::to_string_pretty(&response)?);
-    } else if response.data.is_empty() {
-        println!("No credentials found for this identity.");
-    } else {
-        print_credential_table(&response.data);
-        println!();
-        println!("Total: {} credentials", response.total);
-    }
-
-    Ok(())
-}
-
-async fn execute_cred_rotate(args: CredRotateArgs) -> CliResult<()> {
-    let nhi_id = parse_uuid(&args.nhi_id)?;
-    let credential_id = parse_uuid(&args.credential_id)?;
-    let client = ApiClient::from_defaults()?;
-
-    let request = RotateCredentialRequest {
-        grace_period_hours: args.grace_period_hours,
-    };
-    let result = client
-        .nhi_rotate_credential(nhi_id, credential_id, request)
-        .await?;
-
-    if args.json {
-        println!("{}", serde_json::to_string_pretty(&result)?);
-    } else {
-        println!("Credential rotated successfully!");
-        println!();
-        print_credential_details(&result.credential);
-        if let Some(ref secret) = result.secret {
-            println!();
-            println!("New secret (save this now):");
-            println!("  {secret}");
-        }
-        if let Some(ref api_key) = result.api_key {
-            println!();
-            println!("New API key (save this now):");
-            println!("  {api_key}");
-        }
-    }
-
-    Ok(())
-}
-
-async fn execute_cred_revoke(args: CredRevokeArgs) -> CliResult<()> {
-    let nhi_id = parse_uuid(&args.nhi_id)?;
-    let credential_id = parse_uuid(&args.credential_id)?;
-    let client = ApiClient::from_defaults()?;
-
-    if !args.force {
-        if !std::io::stdin().is_terminal() {
-            return Err(CliError::Validation(
-                "Use --force in non-interactive mode.".to_string(),
-            ));
-        }
-
-        let confirm = Confirm::new()
-            .with_prompt("Revoke this credential? This action cannot be undone.")
-            .default(false)
-            .interact()
-            .map_err(|e| CliError::Io(e.to_string()))?;
-
-        if !confirm {
-            println!("Cancelled.");
-            return Ok(());
-        }
-    }
-
-    client.nhi_revoke_credential(nhi_id, credential_id).await?;
-    println!("Credential revoked: {credential_id}");
 
     Ok(())
 }
@@ -1174,48 +981,6 @@ fn print_nhi_details(nhi: &NhiIdentityResponse) {
         "Updated:         {}",
         nhi.updated_at.format("%Y-%m-%d %H:%M:%S UTC")
     );
-}
-
-fn print_credential_table(creds: &[NhiCredentialResponse]) {
-    println!(
-        "{:<38} {:<15} {:<8} {:<25} {:<25}",
-        "ID", "TYPE", "ACTIVE", "EXPIRES", "CREATED"
-    );
-    println!("{}", "-".repeat(113));
-
-    for c in creds {
-        let expires = c
-            .expires_at
-            .map(|d| d.format("%Y-%m-%d %H:%M UTC").to_string())
-            .unwrap_or_else(|| "-".to_string());
-        let created = c.created_at.format("%Y-%m-%d %H:%M UTC").to_string();
-        println!(
-            "{:<38} {:<15} {:<8} {:<25} {:<25}",
-            c.id,
-            c.credential_type,
-            if c.is_active { "Yes" } else { "No" },
-            expires,
-            created
-        );
-    }
-}
-
-fn print_credential_details(cred: &NhiCredentialResponse) {
-    println!("Credential: {}", cred.id);
-    println!("{}", "\u{2501}".repeat(50));
-    println!("Identity:    {}", cred.nhi_identity_id);
-    println!("Type:        {}", cred.credential_type);
-    println!("Active:      {}", if cred.is_active { "Yes" } else { "No" });
-    if let Some(ref exp) = cred.expires_at {
-        println!("Expires:     {}", exp.format("%Y-%m-%d %H:%M:%S UTC"));
-    }
-    println!(
-        "Created:     {}",
-        cred.created_at.format("%Y-%m-%d %H:%M:%S UTC")
-    );
-    if let Some(ref rot) = cred.rotated_at {
-        println!("Rotated:     {}", rot.format("%Y-%m-%d %H:%M:%S UTC"));
-    }
 }
 
 fn print_permission_table(perms: &[PermissionResponse]) {

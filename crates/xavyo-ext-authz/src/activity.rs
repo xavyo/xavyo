@@ -83,6 +83,20 @@ async fn flush_loop(
                             "failed to update last_activity_at"
                         );
                     }
+
+                    // Also increment the hourly activity counter
+                    if let Err(e) = xavyo_db::models::NhiActivityCounter::increment_hourly(
+                        &pool, tenant_uuid, nhi_id,
+                    )
+                    .await
+                    {
+                        tracing::warn!(
+                            tenant_id = %tenant_id,
+                            nhi_id = %nhi_id,
+                            error = %e,
+                            "failed to increment activity counter"
+                        );
+                    }
                 }
 
                 tracing::debug!(count = batch_size, "flushed activity updates");

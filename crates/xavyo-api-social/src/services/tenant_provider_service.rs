@@ -38,6 +38,13 @@ impl TenantProviderService {
         tenant_id: Uuid,
         provider: ProviderType,
     ) -> SocialResult<Option<ProviderConfig>> {
+        // SECURITY: Set RLS context for defense-in-depth (query already has tenant_id filter)
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
         let row: Option<ProviderRow> = sqlx::query_as(
             r"
             SELECT provider, enabled, client_id, client_secret_encrypted, additional_config, scopes
@@ -47,7 +54,7 @@ impl TenantProviderService {
         )
         .bind(tenant_id)
         .bind(provider.to_string())
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *conn)
         .await?;
 
         match row {
@@ -71,6 +78,13 @@ impl TenantProviderService {
 
     /// List all enabled providers for a tenant (for login page).
     pub async fn list_enabled_providers(&self, tenant_id: Uuid) -> SocialResult<Vec<ProviderType>> {
+        // SECURITY: Set RLS context for defense-in-depth (query already has tenant_id filter)
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
         let rows: Vec<(String,)> = sqlx::query_as(
             r"
             SELECT provider FROM tenant_social_providers
@@ -79,7 +93,7 @@ impl TenantProviderService {
             ",
         )
         .bind(tenant_id)
-        .fetch_all(&self.pool)
+        .fetch_all(&mut *conn)
         .await?;
 
         let mut providers = Vec::new();
@@ -97,6 +111,13 @@ impl TenantProviderService {
         &self,
         tenant_id: Uuid,
     ) -> SocialResult<Vec<TenantProviderResponse>> {
+        // SECURITY: Set RLS context for defense-in-depth (query already has tenant_id filter)
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
         let rows: Vec<AdminProviderRow> = sqlx::query_as(
             r"
             SELECT provider, enabled, client_id, scopes, created_at, updated_at
@@ -106,7 +127,7 @@ impl TenantProviderService {
             ",
         )
         .bind(tenant_id)
-        .fetch_all(&self.pool)
+        .fetch_all(&mut *conn)
         .await?;
 
         Ok(rows
@@ -137,6 +158,13 @@ impl TenantProviderService {
     ) -> SocialResult<TenantProviderResponse> {
         let client_secret_encrypted = self.encryption.encrypt_string(tenant_id, client_secret)?;
 
+        // SECURITY: Set RLS context for defense-in-depth (query already has tenant_id filter)
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
         let row: AdminProviderRow = sqlx::query_as(
             r"
             INSERT INTO tenant_social_providers (
@@ -162,7 +190,7 @@ impl TenantProviderService {
         .bind(&client_secret_encrypted)
         .bind(&additional_config)
         .bind(&scopes)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *conn)
         .await?;
 
         Ok(TenantProviderResponse {
@@ -182,6 +210,13 @@ impl TenantProviderService {
         tenant_id: Uuid,
         provider: ProviderType,
     ) -> SocialResult<bool> {
+        // SECURITY: Set RLS context for defense-in-depth (query already has tenant_id filter)
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
         let result = sqlx::query(
             r"
             UPDATE tenant_social_providers
@@ -191,7 +226,7 @@ impl TenantProviderService {
         )
         .bind(tenant_id)
         .bind(provider.to_string())
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await?;
 
         Ok(result.rows_affected() > 0)
@@ -203,12 +238,19 @@ impl TenantProviderService {
         tenant_id: Uuid,
         provider: ProviderType,
     ) -> SocialResult<bool> {
+        // SECURITY: Set RLS context for defense-in-depth (query already has tenant_id filter)
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await?;
+
         let result = sqlx::query(
             "DELETE FROM tenant_social_providers WHERE tenant_id = $1 AND provider = $2",
         )
         .bind(tenant_id)
         .bind(provider.to_string())
-        .execute(&self.pool)
+        .execute(&mut *conn)
         .await?;
 
         Ok(result.rows_affected() > 0)

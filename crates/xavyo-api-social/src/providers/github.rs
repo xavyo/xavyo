@@ -80,7 +80,13 @@ impl GithubProvider {
         if !response.status().is_success() {
             // F116: Log the error instead of silently returning None
             let status = response.status();
-            let error_body = response.text().await.unwrap_or_default();
+            let error_body: String = response
+                .text()
+                .await
+                .unwrap_or_default()
+                .chars()
+                .take(512)
+                .collect();
             warn!(
                 status = %status,
                 error = %error_body,

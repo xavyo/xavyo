@@ -158,7 +158,7 @@ pub async fn deprecate(
 
 /// POST /nhi/{id}/archive — Archive a deprecated NHI identity (terminal).
 ///
-/// This cascade-revokes all tool permissions and deactivates all credentials.
+/// This cascade-revokes all tool permissions.
 #[cfg_attr(feature = "openapi", utoipa::path(
     post,
     path = "/nhi/{id}/archive",

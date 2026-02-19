@@ -65,7 +65,16 @@ impl FederatedAuthSession {
         .await
     }
 
-    /// Find session by state parameter (and verify not expired).
+    /// Find session by state parameter (not expired, not already used).
+    ///
+    /// # Security Note
+    /// This method does not filter by tenant_id because the state parameter serves as the
+    /// tenant isolation mechanism. The state is a CSPRNG-generated unique value that inherently
+    /// prevents cross-tenant contamination - it's cryptographically infeasible for one tenant
+    /// to guess another tenant's state. The session record itself contains the tenant_id, which
+    /// is validated after retrieval. Adding a tenant_id parameter here would require encoding
+    /// the tenant_id in the state (since the caller doesn't know which tenant initiated the flow
+    /// until after the state lookup), which adds complexity without security benefit.
     pub async fn find_by_state(
         pool: &sqlx::PgPool,
         state: &str,
@@ -73,7 +82,7 @@ impl FederatedAuthSession {
         sqlx::query_as(
             r"
             SELECT * FROM federated_auth_sessions
-            WHERE state = $1 AND expires_at > NOW()
+            WHERE state = $1 AND expires_at > NOW() AND is_used = false
             ",
         )
         .bind(state)
@@ -81,30 +90,86 @@ impl FederatedAuthSession {
         .await
     }
 
-    /// Find session by ID.
-    pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM federated_auth_sessions WHERE id = $1")
+    /// Atomically consume a session by state (prevents TOCTOU race conditions).
+    ///
+    /// This method combines find_by_state and mark_used into a single atomic operation,
+    /// preventing replay attacks where an attacker tries to use the same state twice
+    /// in parallel requests. Returns the session if successfully marked as used, or None
+    /// if the session doesn't exist, is already used, or is expired.
+    pub async fn consume_by_state(
+        pool: &sqlx::PgPool,
+        state: &str,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as(
+            r"
+            UPDATE federated_auth_sessions
+            SET is_used = true
+            WHERE state = $1 AND is_used = false AND expires_at > NOW()
+            RETURNING *
+            ",
+        )
+        .bind(state)
+        .fetch_optional(pool)
+        .await
+    }
+
+    /// Find session by ID with tenant isolation.
+    pub async fn find_by_id(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as("SELECT * FROM federated_auth_sessions WHERE id = $1 AND tenant_id = $2")
             .bind(id)
+            .bind(tenant_id)
             .fetch_optional(pool)
             .await
     }
 
     /// Delete session by state (used after successful callback).
-    pub async fn delete_by_state(pool: &sqlx::PgPool, state: &str) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM federated_auth_sessions WHERE state = $1")
-            .bind(state)
-            .execute(pool)
-            .await?;
+    pub async fn delete_by_state(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        state: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let result =
+            sqlx::query("DELETE FROM federated_auth_sessions WHERE state = $1 AND tenant_id = $2")
+                .bind(state)
+                .bind(tenant_id)
+                .execute(pool)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 
-    /// Delete session by ID.
-    pub async fn delete(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM federated_auth_sessions WHERE id = $1")
-            .bind(id)
-            .execute(pool)
-            .await?;
+    /// Delete session by ID with tenant isolation.
+    pub async fn delete(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let result =
+            sqlx::query("DELETE FROM federated_auth_sessions WHERE id = $1 AND tenant_id = $2")
+                .bind(id)
+                .bind(tenant_id)
+                .execute(pool)
+                .await?;
         Ok(result.rows_affected() > 0)
+    }
+
+    /// Delete all sessions for a specific identity provider within a tenant.
+    pub async fn delete_by_idp(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        idp_id: Uuid,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            "DELETE FROM federated_auth_sessions WHERE tenant_id = $1 AND identity_provider_id = $2",
+        )
+        .bind(tenant_id)
+        .bind(idp_id)
+        .execute(pool)
+        .await?;
+        Ok(result.rows_affected())
     }
 
     /// Clean up expired sessions.

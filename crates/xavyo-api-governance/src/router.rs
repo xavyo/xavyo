@@ -203,7 +203,6 @@ use crate::services::{
     MiningService,
     // NHI Lifecycle services (F061)
     NhiCertificationService,
-    NhiCredentialService,
     NhiRequestService,
     NhiRiskService,
     NhiService,
@@ -364,7 +363,6 @@ pub struct GovernanceState {
     pub simulation_comparison_service: Arc<SimulationComparisonService>,
     // NHI Lifecycle services (F061)
     pub nhi_service: Arc<NhiService>,
-    pub nhi_credential_service: Arc<NhiCredentialService>,
     pub nhi_usage_service: Arc<NhiUsageService>,
     pub nhi_risk_service: Arc<NhiRiskService>,
     pub nhi_certification_service: Arc<NhiCertificationService>,
@@ -485,7 +483,6 @@ impl GovernanceState {
         let matching_service = Arc::new(MetaRoleMatchingService::new(pool.clone()));
         // NHI services need to be created first as NhiRequestService depends on them
         let nhi_service = Arc::new(NhiService::new(pool.clone()));
-        let nhi_credential_service = Arc::new(NhiCredentialService::new(pool.clone()));
 
         // Identity Merge service needs to be created first as BatchMergeService depends on it
         let identity_merge_service = Arc::new(IdentityMergeService::new(pool.clone()));
@@ -612,15 +609,10 @@ impl GovernanceState {
             simulation_comparison_service: Arc::new(SimulationComparisonService::new(pool.clone())),
             // NHI Lifecycle services (F061)
             nhi_service: nhi_service.clone(),
-            nhi_credential_service: nhi_credential_service.clone(),
             nhi_usage_service: Arc::new(NhiUsageService::new(pool.clone())),
             nhi_risk_service: Arc::new(NhiRiskService::new(pool.clone())),
             nhi_certification_service: Arc::new(NhiCertificationService::new(pool.clone())),
-            nhi_request_service: Arc::new(NhiRequestService::new(
-                pool.clone(),
-                nhi_service,
-                nhi_credential_service,
-            )),
+            nhi_request_service: Arc::new(NhiRequestService::new(pool.clone(), nhi_service)),
             // Identity Merge services (F062)
             duplicate_detection_service: Arc::new(DuplicateDetectionService::new(pool.clone())),
             identity_correlation_rule_service: Arc::new(IdentityCorrelationRuleService::new(
@@ -2193,20 +2185,6 @@ pub fn governance_router(pool: PgPool) -> Router {
             post(nhis::transfer_nhi_ownership),
         )
         .route("/nhis/:id/certify", post(nhis::certify_nhi))
-        // NHI Credentials (F061)
-        .route("/nhis/:id/credentials", get(nhis::list_nhi_credentials))
-        .route(
-            "/nhis/:nhi_id/credentials/:credential_id",
-            get(nhis::get_nhi_credential),
-        )
-        .route(
-            "/nhis/:id/credentials/rotate",
-            post(nhis::rotate_nhi_credentials),
-        )
-        .route(
-            "/nhis/:nhi_id/credentials/:credential_id/revoke",
-            post(nhis::revoke_nhi_credential),
-        )
         // NHI Usage Tracking (F061)
         .route("/nhis/:id/usage", post(nhis::record_nhi_usage))
         .route("/nhis/:id/usage", get(nhis::list_nhi_usage))

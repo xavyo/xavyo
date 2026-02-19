@@ -420,7 +420,10 @@ async fn test_cleanup_expired_grants() {
         .await
         .expect("cleanup should succeed");
 
-    assert!(cleaned >= 1, "should have cleaned up at least 1 expired grant");
+    assert!(
+        cleaned >= 1,
+        "should have cleaned up at least 1 expired grant"
+    );
 
     // Verify the expired grant is now marked as expired
     let expired_found = NhiDelegationGrant::find_by_id(&pool, tenant_id, expired_grant.id)
@@ -484,7 +487,10 @@ fn test_validation_depth_range() {
 #[test]
 fn test_validation_scope_length() {
     let too_long = "x".repeat(257);
-    assert!(too_long.len() > 256, "257-char scope exceeds the 256-char limit");
+    assert!(
+        too_long.len() > 256,
+        "257-char scope exceeds the 256-char limit"
+    );
 
     let max_valid = "x".repeat(256);
     assert!(max_valid.len() <= 256, "256-char scope is within limit");

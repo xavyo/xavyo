@@ -188,7 +188,9 @@ impl OAuthError {
             Self::AuthorizationPending => StatusCode::BAD_REQUEST,
             Self::SlowDown(_) => StatusCode::BAD_REQUEST,
             Self::ExpiredToken(_) => StatusCode::BAD_REQUEST,
-            Self::UserNotFound | Self::ClientNotFound => StatusCode::NOT_FOUND,
+            Self::UserNotFound => StatusCode::NOT_FOUND,
+            // SECURITY: Return 401 for ClientNotFound to prevent client enumeration (RFC 6749)
+            Self::ClientNotFound => StatusCode::UNAUTHORIZED,
             Self::Database(_) | Self::Jwt(_) | Self::Internal(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -212,14 +214,16 @@ impl OAuthError {
             Self::AuthorizationPending => OAuthErrorCode::AuthorizationPending,
             Self::SlowDown(_) => OAuthErrorCode::SlowDown,
             Self::ExpiredToken(_) => OAuthErrorCode::ExpiredToken,
-            Self::UserNotFound | Self::ClientNotFound => OAuthErrorCode::InvalidRequest,
+            Self::UserNotFound => OAuthErrorCode::InvalidRequest,
+            Self::ClientNotFound => OAuthErrorCode::InvalidClient,
             Self::Database(_) | Self::Jwt(_) | Self::Internal(_) => OAuthErrorCode::ServerError,
         }
     }
 
     /// Convert to `OAuth2` error response.
     ///
-    /// Internal errors are sanitized to prevent information leakage.
+    /// Internal errors and grant-level diagnostics are sanitized to prevent
+    /// information leakage per RFC 6749 Section 5.2.
     #[must_use]
     pub fn to_response(&self) -> OAuthErrorResponse {
         let description = match self {
@@ -235,6 +239,17 @@ impl OAuthError {
                 tracing::error!("OAuth internal error: {}", msg);
                 "An internal error occurred".to_string()
             }
+            // SECURITY: Sanitize grant errors to avoid leaking internal diagnostics
+            // (e.g., delegation depth, NHI lifecycle state, token family details).
+            Self::InvalidGrant(ref msg) => {
+                tracing::debug!("OAuth invalid_grant detail: {}", msg);
+                "The provided authorization grant is invalid".to_string()
+            }
+            Self::InvalidClient(ref msg) => {
+                tracing::debug!("OAuth invalid_client detail: {}", msg);
+                "Client authentication failed".to_string()
+            }
+            Self::ClientNotFound => "Client authentication failed".to_string(),
             _ => self.to_string(),
         };
         OAuthErrorResponse::new(self.error_code(), description)

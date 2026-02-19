@@ -196,11 +196,6 @@ pub mod models {
     pub mod session;
     pub mod tenant;
 
-    // Re-export types at models level for convenience
-    pub use agent::{
-        DryRunRotationPreview, NhiCredentialListResponse, NhiCredentialResponse,
-        PlannedRotationChanges,
-    };
     pub use api_session::{ApiSession, DeviceType, Location, RevokeResponse, SessionListResponse};
     pub use audit::{AuditEntry, AuditFilter, AuditListResponse};
     pub use session::Session;

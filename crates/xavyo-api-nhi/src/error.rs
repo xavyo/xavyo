@@ -45,6 +45,10 @@ pub enum NhiApiError {
     #[error("Validation error: {0}")]
     ValidationError(String),
 
+    /// Upstream gateway error (502).
+    #[error("Bad gateway: {0}")]
+    BadGateway(String),
+
     /// Internal server error.
     #[error("Internal error")]
     Internal(String),
@@ -77,6 +81,10 @@ impl IntoResponse for NhiApiError {
                 "validation_error",
                 msg.clone(),
             ),
+            Self::BadGateway(msg) => {
+                tracing::warn!("Bad gateway: {}", msg);
+                (StatusCode::BAD_GATEWAY, "bad_gateway", msg.clone())
+            }
             Self::Internal(msg) => {
                 tracing::error!("Internal error: {}", msg);
                 (

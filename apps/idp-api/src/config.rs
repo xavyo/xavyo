@@ -366,11 +366,14 @@ impl TrustedProxyConfig {
 
     /// Check if a given IP is from a trusted proxy.
     ///
-    /// Returns `true` if no CIDRs are configured (backward compatible: trust all).
+    /// Returns `false` if no CIDRs are configured (safe default: trust none).
     /// Returns `true` if the IP falls within one of the configured trusted CIDR ranges.
+    ///
+    /// SECURITY: Callers should check `has_trusted_proxies()` first if they need to
+    /// distinguish "no proxy config" from "IP not in trusted list".
     pub fn is_trusted(&self, ip: &std::net::IpAddr) -> bool {
         if self.cidrs.is_empty() {
-            return true; // Backward compatible: trust all when not configured
+            return false; // Safe default: trust nothing when not configured
         }
         self.cidrs.iter().any(|cidr| cidr.contains(*ip))
     }
@@ -442,6 +445,16 @@ pub struct KafkaConfig {
 
     /// Consumer group prefix for micro-certification consumers
     pub consumer_group_prefix: String,
+}
+
+/// Returns the AgentGateway MCP endpoint URL, if configured.
+///
+/// Set `AGENTGATEWAY_MCP_URL` (e.g., `http://localhost:4000/mcp`) to enable
+/// MCP tool discovery from AgentGateway.
+pub fn agentgateway_mcp_url() -> Option<String> {
+    std::env::var("AGENTGATEWAY_MCP_URL")
+        .ok()
+        .filter(|s| !s.is_empty())
 }
 
 /// Application configuration loaded from environment variables.
@@ -1596,9 +1609,7 @@ mod tests {
 
     #[test]
     fn test_trusted_proxy_empty_trusts_all() {
-        let config = TrustedProxyConfig {
-            cidrs: vec![],
-        };
+        let config = TrustedProxyConfig { cidrs: vec![] };
         let ip: std::net::IpAddr = "192.168.1.1".parse().unwrap();
         assert!(config.is_trusted(&ip), "Empty CIDRs should trust all");
     }

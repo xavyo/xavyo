@@ -324,7 +324,7 @@ fn test_certification_deadline_calculation() {
 fn test_certification_decision_effects() {
     // Test that decisions have expected effects:
     // - Certify: Updates last_certified_at, keeps NHI active
-    // - Revoke: Suspends NHI, invalidates credentials
+    // - Revoke: Suspends NHI
 
     let certify_effect = CertificationEffect::from_decision(NhiCertificationDecision::Certify);
     assert!(certify_effect.updates_certified_at);
@@ -416,19 +416,16 @@ impl TestNhi {
 fn test_revocation_triggers_suspension() {
     // When an NHI is revoked during certification:
     // 1. NHI status changes to Suspended
-    // 2. Active credentials should be invalidated
-    // 3. Suspension reason is set to CertificationRevoked
+    // 2. Suspension reason is set to CertificationRevoked
 
     let before_revocation = NhiTestState {
         status: "active".to_string(),
-        has_active_credentials: true,
         suspension_reason: None,
     };
 
     let after_revocation = simulate_revocation(before_revocation);
 
     assert_eq!(after_revocation.status, "suspended");
-    assert!(!after_revocation.has_active_credentials);
     assert_eq!(
         after_revocation.suspension_reason,
         Some("certification_revoked".to_string())
@@ -438,7 +435,6 @@ fn test_revocation_triggers_suspension() {
 /// Test helper struct for NHI state
 struct NhiTestState {
     status: String,
-    has_active_credentials: bool,
     suspension_reason: Option<String>,
 }
 
@@ -446,7 +442,6 @@ struct NhiTestState {
 fn simulate_revocation(_before: NhiTestState) -> NhiTestState {
     NhiTestState {
         status: "suspended".to_string(),
-        has_active_credentials: false,
         suspension_reason: Some("certification_revoked".to_string()),
     }
 }

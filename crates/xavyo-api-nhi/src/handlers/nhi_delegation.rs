@@ -189,19 +189,21 @@ pub async fn create_delegation_grant(
 }
 
 /// Check if the tenant allows self-service delegation.
-async fn check_self_delegation_allowed(pool: &PgPool, tenant_id: Uuid) -> Result<bool, NhiApiError> {
-    let result: Option<(bool,)> = sqlx::query_as(
-        "SELECT allow_self_delegation FROM tenants WHERE id = $1",
-    )
-    .bind(tenant_id)
-    .fetch_optional(pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to check allow_self_delegation: {}", e);
-        NhiApiError::Internal(format!("database error: {e}"))
-    })?;
+async fn check_self_delegation_allowed(
+    pool: &PgPool,
+    tenant_id: Uuid,
+) -> Result<bool, NhiApiError> {
+    let result: Option<(bool,)> =
+        sqlx::query_as("SELECT allow_self_delegation FROM tenants WHERE id = $1")
+            .bind(tenant_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to check allow_self_delegation: {}", e);
+                NhiApiError::Internal(format!("database error: {e}"))
+            })?;
 
-    Ok(result.map_or(false, |r| r.0))
+    Ok(result.is_some_and(|r| r.0))
 }
 
 /// GET /nhi/delegations -- List delegation grants with optional filters.
@@ -319,8 +321,7 @@ pub async fn revoke_delegation_grant(
     #[cfg(feature = "kafka")]
     let grant_before = NhiDelegationGrant::find_by_id(&state.pool, tenant_uuid, id).await?;
 
-    let revoked =
-        NhiDelegationGrant::revoke(&state.pool, tenant_uuid, id, caller_id).await?;
+    let revoked = NhiDelegationGrant::revoke(&state.pool, tenant_uuid, id, caller_id).await?;
 
     // Emit Kafka event (fire-and-forget)
     #[cfg(feature = "kafka")]
@@ -415,11 +416,7 @@ pub async fn list_outgoing_delegations(
 // ---------------------------------------------------------------------------
 
 #[cfg(feature = "kafka")]
-async fn emit_grant_created_event(
-    state: &NhiState,
-    tenant_id: Uuid,
-    grant: &NhiDelegationGrant,
-) {
+async fn emit_grant_created_event(state: &NhiState, tenant_id: Uuid, grant: &NhiDelegationGrant) {
     if let Some(ref producer) = state.event_producer {
         let event = xavyo_events::events::nhi_delegation::NhiDelegationGrantCreated {
             grant_id: grant.id,
@@ -472,13 +469,7 @@ pub fn nhi_delegation_routes(state: NhiState) -> Router {
         .route("/delegations", get(list_delegation_grants))
         .route("/delegations/:id", get(get_delegation_grant))
         .route("/delegations/:id/revoke", post(revoke_delegation_grant))
-        .route(
-            "/:id/delegations/incoming",
-            get(list_incoming_delegations),
-        )
-        .route(
-            "/:id/delegations/outgoing",
-            get(list_outgoing_delegations),
-        )
+        .route("/:id/delegations/incoming", get(list_incoming_delegations))
+        .route("/:id/delegations/outgoing", get(list_outgoing_delegations))
         .with_state(state)
 }

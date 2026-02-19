@@ -18,9 +18,6 @@
 //! ## Lifecycle
 //! - `POST /nhi/{id}/{suspend,reactivate,deprecate,archive,deactivate,activate}`
 //!
-//! ## Credentials
-//! - `/nhi/{id}/credentials/*` — Credential create, rotate, revoke
-//!
 //! ## Permissions
 //! - `/nhi/agents/{id}/permissions/*` — Tool permission grants
 //!

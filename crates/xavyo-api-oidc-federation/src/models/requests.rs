@@ -100,6 +100,9 @@ fn default_persistent() -> String {
     "persistent".to_string()
 }
 
+/// Maximum allowed pagination limit.
+const MAX_PAGINATION_LIMIT: i64 = 100;
+
 /// Pagination parameters.
 #[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct PaginationParams {
@@ -109,6 +112,14 @@ pub struct PaginationParams {
     pub limit: i64,
     /// Filter by enabled status.
     pub is_enabled: Option<bool>,
+}
+
+impl PaginationParams {
+    /// Clamp limit to the maximum allowed value.
+    #[must_use]
+    pub fn clamped_limit(&self) -> i64 {
+        self.limit.clamp(1, MAX_PAGINATION_LIMIT)
+    }
 }
 
 fn default_limit() -> i64 {

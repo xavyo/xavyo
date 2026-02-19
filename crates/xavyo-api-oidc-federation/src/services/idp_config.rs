@@ -8,12 +8,11 @@ use crate::services::{DiscoveryService, EncryptionService};
 use sqlx::PgPool;
 use tracing::instrument;
 use uuid::Uuid;
-use xavyo_core::TenantId;
 use xavyo_db::models::{
-    CreateDomain, CreateIdentityProvider, IdentityProviderDomain, ProviderType,
-    TenantIdentityProvider, UpdateIdentityProvider, UserIdentityLink, ValidationStatus,
+    CreateDomain, CreateIdentityProvider, FederatedAuthSession, IdentityProviderDomain,
+    ProviderType, TenantIdentityProvider, UpdateIdentityProvider, UserIdentityLink,
+    ValidationStatus,
 };
-use xavyo_db::set_tenant_context;
 
 /// Service for managing identity provider configurations.
 #[derive(Clone)]
@@ -34,15 +33,6 @@ impl IdpConfigService {
         }
     }
 
-    /// Set the tenant context on the connection pool for RLS enforcement.
-    async fn set_rls_context(&self, tenant_id: Uuid) -> FederationResult<()> {
-        let mut conn = self.pool.acquire().await?;
-        set_tenant_context(&mut *conn, TenantId::from_uuid(tenant_id))
-            .await
-            .map_err(|e| FederationError::Internal(format!("Failed to set tenant context: {e}")))?;
-        Ok(())
-    }
-
     /// List identity providers for a tenant.
     #[instrument(skip(self))]
     pub async fn list(
@@ -51,7 +41,6 @@ impl IdpConfigService {
         offset: i64,
         limit: i64,
     ) -> FederationResult<(Vec<TenantIdentityProvider>, i64)> {
-        self.set_rls_context(tenant_id).await?;
         let idps =
             TenantIdentityProvider::list_by_tenant(&self.pool, tenant_id, offset, limit).await?;
         let total = TenantIdentityProvider::count_by_tenant(&self.pool, tenant_id).await?;
@@ -65,22 +54,29 @@ impl IdpConfigService {
         tenant_id: Uuid,
         idp_id: Uuid,
     ) -> FederationResult<TenantIdentityProvider> {
-        self.set_rls_context(tenant_id).await?;
         TenantIdentityProvider::find_by_id_and_tenant(&self.pool, idp_id, tenant_id)
             .await?
             .ok_or(FederationError::IdpNotFound(idp_id))
     }
 
-    /// Get domains for an identity provider.
+    /// Get domains for an identity provider within a tenant.
     #[instrument(skip(self))]
-    pub async fn get_domains(&self, idp_id: Uuid) -> FederationResult<Vec<IdentityProviderDomain>> {
-        Ok(IdentityProviderDomain::list_by_idp(&self.pool, idp_id).await?)
+    pub async fn get_domains(
+        &self,
+        tenant_id: Uuid,
+        idp_id: Uuid,
+    ) -> FederationResult<Vec<IdentityProviderDomain>> {
+        Ok(IdentityProviderDomain::list_by_idp(&self.pool, tenant_id, idp_id).await?)
     }
 
-    /// Get linked user count for an identity provider.
+    /// Get linked user count for an identity provider within a tenant.
     #[instrument(skip(self))]
-    pub async fn get_linked_users_count(&self, idp_id: Uuid) -> FederationResult<i64> {
-        Ok(UserIdentityLink::count_by_idp(&self.pool, idp_id).await?)
+    pub async fn get_linked_users_count(
+        &self,
+        tenant_id: Uuid,
+        idp_id: Uuid,
+    ) -> FederationResult<i64> {
+        Ok(UserIdentityLink::count_by_idp(&self.pool, tenant_id, idp_id).await?)
     }
 
     /// Create a new identity provider.
@@ -90,8 +86,6 @@ impl IdpConfigService {
         tenant_id: Uuid,
         req: CreateIdentityProviderRequest,
     ) -> FederationResult<TenantIdentityProvider> {
-        self.set_rls_context(tenant_id).await?;
-
         // Parse provider type
         let provider_type: ProviderType = req
             .provider_type
@@ -141,9 +135,13 @@ impl IdpConfigService {
         let idp = TenantIdentityProvider::create(&self.pool, input).await?;
 
         // Update validation status
-        let idp =
-            TenantIdentityProvider::update_validation_status(&self.pool, idp.id, validation_status)
-                .await?;
+        let idp = TenantIdentityProvider::update_validation_status(
+            &self.pool,
+            tenant_id,
+            idp.id,
+            validation_status,
+        )
+        .await?;
 
         // Add initial domains
         for domain in req.domains {
@@ -173,8 +171,6 @@ impl IdpConfigService {
         idp_id: Uuid,
         req: UpdateIdentityProviderRequest,
     ) -> FederationResult<TenantIdentityProvider> {
-        self.set_rls_context(tenant_id).await?;
-
         // Verify IdP exists and belongs to tenant
         let _existing = self.get(tenant_id, idp_id).await?;
 
@@ -211,7 +207,7 @@ impl IdpConfigService {
             sync_on_login: req.sync_on_login,
         };
 
-        let idp = TenantIdentityProvider::update(&self.pool, idp_id, input).await?;
+        let idp = TenantIdentityProvider::update(&self.pool, tenant_id, idp_id, input).await?;
 
         // If issuer URL changed, re-validate
         if req.issuer_url.is_some() {
@@ -222,7 +218,7 @@ impl IdpConfigService {
                 ValidationStatus::Invalid
             };
             return Ok(TenantIdentityProvider::update_validation_status(
-                &self.pool, idp_id, status,
+                &self.pool, tenant_id, idp_id, status,
             )
             .await?);
         }
@@ -234,22 +230,31 @@ impl IdpConfigService {
     /// Delete an identity provider.
     #[instrument(skip(self))]
     pub async fn delete(&self, tenant_id: Uuid, idp_id: Uuid) -> FederationResult<()> {
-        self.set_rls_context(tenant_id).await?;
-
         // Verify IdP exists and belongs to tenant
         let _ = self.get(tenant_id, idp_id).await?;
 
         // Check for linked users
-        let linked_count = UserIdentityLink::count_by_idp(&self.pool, idp_id).await?;
+        let linked_count = UserIdentityLink::count_by_idp(&self.pool, tenant_id, idp_id).await?;
         if linked_count > 0 {
             return Err(FederationError::IdpHasLinkedUsers(linked_count));
+        }
+
+        // Clean up active auth sessions for this IdP
+        let sessions_deleted =
+            FederatedAuthSession::delete_by_idp(&self.pool, tenant_id, idp_id).await?;
+        if sessions_deleted > 0 {
+            tracing::info!(
+                idp_id = %idp_id,
+                sessions_deleted = sessions_deleted,
+                "Cleaned up active auth sessions for deleted IdP"
+            );
         }
 
         // Delete domains first (cascade should handle this, but be explicit)
         IdentityProviderDomain::delete_by_idp(&self.pool, tenant_id, idp_id).await?;
 
         // Delete the identity provider
-        TenantIdentityProvider::delete(&self.pool, idp_id).await?;
+        TenantIdentityProvider::delete(&self.pool, tenant_id, idp_id).await?;
 
         tracing::info!(idp_id = %idp_id, "Deleted identity provider");
         Ok(())
@@ -263,12 +268,11 @@ impl IdpConfigService {
         idp_id: Uuid,
         is_enabled: bool,
     ) -> FederationResult<TenantIdentityProvider> {
-        self.set_rls_context(tenant_id).await?;
-
         // Verify IdP exists and belongs to tenant
         let _ = self.get(tenant_id, idp_id).await?;
 
-        let idp = TenantIdentityProvider::set_enabled(&self.pool, idp_id, is_enabled).await?;
+        let idp =
+            TenantIdentityProvider::set_enabled(&self.pool, tenant_id, idp_id, is_enabled).await?;
 
         tracing::info!(idp_id = %idp_id, is_enabled = %is_enabled, "Toggled identity provider");
         Ok(idp)
@@ -292,7 +296,9 @@ impl IdpConfigService {
         }
 
         // Check if domain already exists for this IdP
-        if IdentityProviderDomain::domain_exists_for_idp(&self.pool, idp_id, &domain).await? {
+        if IdentityProviderDomain::domain_exists_for_idp(&self.pool, tenant_id, idp_id, &domain)
+            .await?
+        {
             return Err(FederationError::DomainAlreadyExists(domain));
         }
 
@@ -322,8 +328,8 @@ impl IdpConfigService {
         // Verify IdP exists and belongs to tenant
         let _ = self.get(tenant_id, idp_id).await?;
 
-        // Verify domain exists
-        let domain = IdentityProviderDomain::find_by_id(&self.pool, domain_id)
+        // Verify domain exists and belongs to tenant
+        let domain = IdentityProviderDomain::find_by_id(&self.pool, tenant_id, domain_id)
             .await?
             .ok_or(FederationError::IdpNotFound(domain_id))?;
 

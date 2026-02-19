@@ -15,6 +15,7 @@ openssl = "0.10"
 base64.workspace = true
 flate2 = "1.0"
 urlencoding = "2.1"
+url = "2.5"
 
 # XML parsing
 quick-xml = "0.37"

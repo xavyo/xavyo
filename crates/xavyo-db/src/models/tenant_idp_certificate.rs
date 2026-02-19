@@ -23,11 +23,20 @@ pub struct TenantIdpCertificate {
 }
 
 /// Request to upload a new certificate
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UploadCertificateRequest {
     pub certificate: String,
     pub private_key: String,
+}
+
+impl std::fmt::Debug for UploadCertificateRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UploadCertificateRequest")
+            .field("certificate", &self.certificate)
+            .field("private_key", &"[REDACTED]")
+            .finish()
+    }
 }
 
 /// Public certificate info (without private key)

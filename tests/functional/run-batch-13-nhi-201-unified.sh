@@ -543,16 +543,19 @@ else
   skip "TC-201-LC-005" "No lifecycle agent"
 fi
 
-# -- TC-201-LC-006: After archive, check credentials deactivated --------------
+# -- TC-201-LC-006: Verify archived agent is in terminal state -----------------
 if [[ -n "$LC_AGENT_ID" ]]; then
-  RAW=$(admin_call GET "/nhi/$LC_AGENT_ID/credentials")
+  RAW=$(admin_call GET "/nhi/$LC_AGENT_ID")
   parse_response "$RAW"
   if [[ "$CODE" == "200" ]]; then
-    # All credentials should be inactive/empty after archive
-    ACTIVE_COUNT=$(extract_json "$BODY" '[.[] | select(.is_active == true)] | length // 0')
-    pass "TC-201-LC-006" "200, credentials after archive (active_count=$ACTIVE_COUNT)"
+    STATE=$(extract_json "$BODY" '.lifecycle_state')
+    if [[ "$STATE" == "archived" ]]; then
+      pass "TC-201-LC-006" "200, agent confirmed archived (state=$STATE)"
+    else
+      fail "TC-201-LC-006" "Expected archived state, got $STATE"
+    fi
   elif [[ "$CODE" == "404" ]]; then
-    pass "TC-201-LC-006" "404, no credentials endpoint for archived NHI (acceptable)"
+    pass "TC-201-LC-006" "404, archived NHI not found (acceptable)"
   else
     fail "TC-201-LC-006" "Expected 200/404, got $CODE"
   fi

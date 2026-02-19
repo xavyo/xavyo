@@ -228,10 +228,7 @@ impl PolicyDecisionPoint {
         decision_id: Uuid,
         start: std::time::Instant,
     ) -> Option<AuthorizationDecision> {
-        let delegation = match delegation {
-            Some(d) => d,
-            None => return None, // No delegation context — allow stands.
-        };
+        let delegation = delegation?; // No delegation context — allow stands.
 
         // Check allowed_scopes (empty = all allowed).
         if !delegation.allowed_scopes.is_empty() {
@@ -255,7 +252,9 @@ impl PolicyDecisionPoint {
 
         // Check allowed_resource_types (empty = all allowed).
         if !delegation.allowed_resource_types.is_empty()
-            && !delegation.allowed_resource_types.contains(&request.resource_type)
+            && !delegation
+                .allowed_resource_types
+                .contains(&request.resource_type)
         {
             return Some(AuthorizationDecision {
                 allowed: false,
@@ -484,7 +483,10 @@ mod tests {
             Uuid::new_v4(),
             std::time::Instant::now(),
         );
-        assert!(result.is_none(), "compound scope 'read:tools' should match action=read + resource=tools");
+        assert!(
+            result.is_none(),
+            "compound scope 'read:tools' should match action=read + resource=tools"
+        );
     }
 
     #[test]
@@ -512,7 +514,10 @@ mod tests {
             Uuid::new_v4(),
             std::time::Instant::now(),
         );
-        assert!(result.is_some(), "scope 'read:tools' should not match action=write");
+        assert!(
+            result.is_some(),
+            "scope 'read:tools' should not match action=write"
+        );
     }
 
     #[test]
@@ -540,7 +545,10 @@ mod tests {
             Uuid::new_v4(),
             std::time::Instant::now(),
         );
-        assert!(result.is_none(), "wildcard 'read:*' should match any resource for read action");
+        assert!(
+            result.is_none(),
+            "wildcard 'read:*' should match any resource for read action"
+        );
     }
 
     #[test]

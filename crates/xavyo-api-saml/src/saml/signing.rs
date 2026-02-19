@@ -103,13 +103,19 @@ impl SigningCredentials {
     /// Get certificate validity start
     #[must_use]
     pub fn not_before(&self) -> chrono::DateTime<chrono::Utc> {
-        asn1_time_to_datetime(self.certificate.not_before())
+        asn1_time_to_datetime(self.certificate.not_before()).unwrap_or_else(|| {
+            tracing::warn!("Failed to parse certificate not_before, using current time");
+            chrono::Utc::now()
+        })
     }
 
     /// Get certificate validity end
     #[must_use]
     pub fn not_after(&self) -> chrono::DateTime<chrono::Utc> {
-        asn1_time_to_datetime(self.certificate.not_after())
+        asn1_time_to_datetime(self.certificate.not_after()).unwrap_or_else(|| {
+            tracing::warn!("Failed to parse certificate not_after, using current time");
+            chrono::Utc::now()
+        })
     }
 
     /// Sign data using RSA-SHA256
@@ -142,20 +148,27 @@ fn compute_certificate_thumbprint(cert: &X509) -> SamlResult<String> {
 }
 
 /// Convert OpenSSL ASN1 time to chrono `DateTime`
-fn asn1_time_to_datetime(time: &openssl::asn1::Asn1TimeRef) -> chrono::DateTime<chrono::Utc> {
+fn asn1_time_to_datetime(
+    time: &openssl::asn1::Asn1TimeRef,
+) -> Option<chrono::DateTime<chrono::Utc>> {
     // ASN1 time format is YYYYMMDDHHMMSSZ or YYMMDDHHMMSSZ
     let time_str = time.to_string();
 
-    // Try to parse as RFC2822 or fall back to now
-    chrono::DateTime::parse_from_rfc2822(&time_str)
-        .map(|dt| dt.with_timezone(&chrono::Utc))
-        .unwrap_or_else(|_| {
-            // Try common ASN1 format: "Mon DD HH:MM:SS YYYY GMT"
-            chrono::NaiveDateTime::parse_from_str(&time_str, "%b %d %H:%M:%S %Y GMT").map_or_else(
-                |_| chrono::Utc::now(),
-                |ndt| chrono::DateTime::from_naive_utc_and_offset(ndt, chrono::Utc),
-            )
-        })
+    // Try to parse as RFC2822
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc2822(&time_str) {
+        return Some(dt.with_timezone(&chrono::Utc));
+    }
+
+    // Try common ASN1 format: "Mon DD HH:MM:SS YYYY GMT"
+    if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(&time_str, "%b %d %H:%M:%S %Y GMT") {
+        return Some(chrono::DateTime::from_naive_utc_and_offset(
+            ndt,
+            chrono::Utc,
+        ));
+    }
+
+    // Parse failed - return None to allow caller to handle
+    None
 }
 
 /// Parse an SP certificate for signature validation

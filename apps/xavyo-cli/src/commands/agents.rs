@@ -7,12 +7,9 @@ use crate::interactive::{
     prompt_confirm, prompt_select, prompt_text, prompt_text_optional, require_interactive,
     AGENT_TYPE_OPTIONS,
 };
-use crate::models::agent::{
-    AgentResponse, CreateAgentRequest, NhiCredentialResponse, RevokeCredentialRequest,
-    RotateCredentialsRequest, UpdateAgentRequest,
-};
+use crate::models::agent::{AgentResponse, CreateAgentRequest, UpdateAgentRequest};
 use clap::{Args, Subcommand};
-use dialoguer::{Confirm, Input, Select};
+use dialoguer::{Input, Select};
 use uuid::Uuid;
 
 /// Agent management commands
@@ -34,9 +31,6 @@ pub enum AgentsCommands {
     Update(UpdateArgs),
     /// Delete an AI agent
     Delete(DeleteArgs),
-    /// Manage agent credentials (F110)
-    #[command(subcommand)]
-    Credentials(CredentialsCommands),
 }
 
 /// Arguments for the list command
@@ -152,89 +146,6 @@ pub struct UpdateArgs {
     pub json: bool,
 }
 
-// =============================================================================
-// Credential Commands (F110)
-// =============================================================================
-
-/// Subcommands for managing agent credentials
-#[derive(Subcommand, Debug)]
-pub enum CredentialsCommands {
-    /// List credentials for an agent
-    List(CredentialsListArgs),
-    /// Get details of a specific credential
-    Get(CredentialsGetArgs),
-    /// Rotate credentials for an agent (generates new secret)
-    Rotate(CredentialsRotateArgs),
-    /// Revoke a specific credential
-    Revoke(CredentialsRevokeArgs),
-}
-
-/// Arguments for listing credentials
-#[derive(Args, Debug)]
-pub struct CredentialsListArgs {
-    /// Agent ID (UUID)
-    pub agent_id: String,
-
-    /// Only show active credentials
-    #[arg(long)]
-    pub active_only: bool,
-
-    /// Output as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-/// Arguments for getting a specific credential
-#[derive(Args, Debug)]
-pub struct CredentialsGetArgs {
-    /// Agent ID (UUID)
-    pub agent_id: String,
-
-    /// Credential ID (UUID)
-    pub credential_id: String,
-
-    /// Output as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-/// Arguments for rotating credentials
-#[derive(Args, Debug)]
-pub struct CredentialsRotateArgs {
-    /// Agent ID (UUID)
-    pub agent_id: String,
-
-    /// Credential type: `api_key`, secret, certificate
-    #[arg(long, short = 't', default_value = "api_key")]
-    pub credential_type: String,
-
-    /// Grace period in hours for old credentials (default: 24, max: 168)
-    #[arg(long, short = 'g')]
-    pub grace_period_hours: Option<i32>,
-
-    /// Output as JSON
-    #[arg(long)]
-    pub json: bool,
-}
-
-/// Arguments for revoking a credential
-#[derive(Args, Debug)]
-pub struct CredentialsRevokeArgs {
-    /// Agent ID (UUID)
-    pub agent_id: String,
-
-    /// Credential ID (UUID)
-    pub credential_id: String,
-
-    /// Reason for revocation
-    #[arg(long, short = 'r', default_value = "Manual revocation via CLI")]
-    pub reason: String,
-
-    /// Skip confirmation prompt
-    #[arg(long, short = 'f')]
-    pub force: bool,
-}
-
 /// Execute agent commands
 pub async fn execute(args: AgentsArgs) -> CliResult<()> {
     match args.command {
@@ -243,17 +154,6 @@ pub async fn execute(args: AgentsArgs) -> CliResult<()> {
         AgentsCommands::Get(get_args) => execute_get(get_args).await,
         AgentsCommands::Update(update_args) => execute_update(update_args).await,
         AgentsCommands::Delete(delete_args) => execute_delete(delete_args).await,
-        AgentsCommands::Credentials(cred_cmd) => execute_credentials(cred_cmd).await,
-    }
-}
-
-/// Execute credential subcommands
-async fn execute_credentials(cmd: CredentialsCommands) -> CliResult<()> {
-    match cmd {
-        CredentialsCommands::List(args) => execute_credentials_list(args).await,
-        CredentialsCommands::Get(args) => execute_credentials_get(args).await,
-        CredentialsCommands::Rotate(args) => execute_credentials_rotate(args).await,
-        CredentialsCommands::Revoke(args) => execute_credentials_revoke(args).await,
     }
 }
 
@@ -650,253 +550,6 @@ async fn execute_update(args: UpdateArgs) -> CliResult<()> {
     Ok(())
 }
 
-// =============================================================================
-// Credential Command Implementations (F110)
-// =============================================================================
-
-/// Execute credentials list command
-async fn execute_credentials_list(args: CredentialsListArgs) -> CliResult<()> {
-    let agent_id = parse_agent_id(&args.agent_id)?;
-
-    let paths = ConfigPaths::new()?;
-    let config = Config::load(&paths)?;
-    let client = ApiClient::new(config, paths)?;
-
-    let response = client
-        .list_agent_credentials(agent_id, args.active_only)
-        .await?;
-
-    if args.json {
-        println!("{}", serde_json::to_string_pretty(&response)?);
-    } else if response.items.is_empty() {
-        println!("No credentials found for agent {agent_id}.");
-        println!();
-        println!("Generate credentials with: xavyo agents credentials rotate {agent_id}");
-    } else {
-        print_credentials_table(&response.items);
-        println!();
-        println!("Showing {} credential(s)", response.items.len());
-    }
-
-    Ok(())
-}
-
-/// Execute credentials get command
-async fn execute_credentials_get(args: CredentialsGetArgs) -> CliResult<()> {
-    let agent_id = parse_agent_id(&args.agent_id)?;
-    let credential_id = parse_credential_id(&args.credential_id)?;
-
-    let paths = ConfigPaths::new()?;
-    let config = Config::load(&paths)?;
-    let client = ApiClient::new(config, paths)?;
-
-    let credential = client.get_agent_credential(agent_id, credential_id).await?;
-
-    if args.json {
-        println!("{}", serde_json::to_string_pretty(&credential)?);
-    } else {
-        print_credential_details(&credential);
-    }
-
-    Ok(())
-}
-
-/// Execute credentials rotate command
-async fn execute_credentials_rotate(args: CredentialsRotateArgs) -> CliResult<()> {
-    let agent_id = parse_agent_id(&args.agent_id)?;
-
-    // Validate credential type
-    validate_credential_type(&args.credential_type)?;
-
-    let paths = ConfigPaths::new()?;
-    let config = Config::load(&paths)?;
-    let client = ApiClient::new(config, paths)?;
-
-    // Build the request
-    let mut request = RotateCredentialsRequest::new(&args.credential_type);
-    if let Some(hours) = args.grace_period_hours {
-        if !(0..=168).contains(&hours) {
-            return Err(CliError::Validation(
-                "Grace period must be between 0 and 168 hours (1 week).".to_string(),
-            ));
-        }
-        request = request.with_grace_period(hours);
-    }
-
-    // Rotate credentials
-    let response = client.rotate_agent_credentials(agent_id, request).await?;
-
-    if args.json {
-        println!("{}", serde_json::to_string_pretty(&response)?);
-    } else {
-        println!("✓ Credentials rotated successfully!");
-        println!();
-        println!("{}", "━".repeat(60));
-        println!("⚠️  IMPORTANT: Save this secret now! It cannot be retrieved later.");
-        println!("{}", "━".repeat(60));
-        println!();
-        println!("Credential ID: {}", response.credential.id);
-        println!("Type:          {}", response.credential.credential_type);
-        println!();
-        println!("Secret Value:");
-        println!("  {}", response.secret_value);
-        println!();
-        println!(
-            "Valid From:  {}",
-            response
-                .credential
-                .valid_from
-                .format("%Y-%m-%d %H:%M:%S UTC")
-        );
-        println!(
-            "Valid Until: {}",
-            response
-                .credential
-                .valid_until
-                .format("%Y-%m-%d %H:%M:%S UTC")
-        );
-        println!(
-            "Days Until Expiry: {}",
-            response.credential.days_until_expiry
-        );
-
-        if let Some(grace_ends) = response.grace_period_ends_at {
-            println!();
-            println!(
-                "Grace Period Ends: {}",
-                grace_ends.format("%Y-%m-%d %H:%M:%S UTC")
-            );
-            println!("  Old credentials will remain valid until this time.");
-        }
-
-        println!();
-        println!("{}", response.warning);
-    }
-
-    Ok(())
-}
-
-/// Execute credentials revoke command
-async fn execute_credentials_revoke(args: CredentialsRevokeArgs) -> CliResult<()> {
-    let agent_id = parse_agent_id(&args.agent_id)?;
-    let credential_id = parse_credential_id(&args.credential_id)?;
-
-    let paths = ConfigPaths::new()?;
-    let config = Config::load(&paths)?;
-    let client = ApiClient::new(config, paths)?;
-
-    // Confirm revocation unless --force is used
-    if !args.force {
-        if !crate::interactive::is_interactive_terminal() {
-            return Err(CliError::Validation(
-                "Cannot confirm revocation in non-interactive mode. Use --force to skip confirmation."
-                    .to_string(),
-            ));
-        }
-
-        let confirm = Confirm::new()
-            .with_prompt(format!(
-                "Revoke credential {credential_id}? This action cannot be undone."
-            ))
-            .default(false)
-            .interact()
-            .map_err(|e| CliError::Io(e.to_string()))?;
-
-        if !confirm {
-            println!("Cancelled.");
-            return Ok(());
-        }
-    }
-
-    // Build the request
-    let request = RevokeCredentialRequest::new(&args.reason);
-
-    // Revoke the credential
-    let response = client
-        .revoke_agent_credential(agent_id, credential_id, request)
-        .await?;
-
-    println!("✓ Credential revoked successfully!");
-    println!();
-    println!("Credential ID: {}", response.id);
-    println!(
-        "Status:        {}",
-        if response.is_active {
-            "Active"
-        } else {
-            "Revoked"
-        }
-    );
-
-    Ok(())
-}
-
-/// Validate credential type
-fn validate_credential_type(cred_type: &str) -> CliResult<()> {
-    match cred_type {
-        "api_key" | "secret" | "certificate" => Ok(()),
-        _ => Err(CliError::Validation(format!(
-            "Invalid credential type '{cred_type}'. Must be one of: api_key, secret, certificate"
-        ))),
-    }
-}
-
-/// Parse credential ID from string
-fn parse_credential_id(id_str: &str) -> CliResult<Uuid> {
-    Uuid::parse_str(id_str).map_err(|_| {
-        CliError::Validation(format!(
-            "Invalid credential ID '{id_str}'. Must be a valid UUID."
-        ))
-    })
-}
-
-/// Print credentials list as a table
-fn print_credentials_table(credentials: &[NhiCredentialResponse]) {
-    // Print header
-    println!(
-        "{:<38} {:<12} {:<8} {:<22} {:<6}",
-        "ID", "TYPE", "ACTIVE", "VALID UNTIL", "DAYS"
-    );
-    println!("{}", "-".repeat(90));
-
-    // Print each credential
-    for cred in credentials {
-        let status = if cred.is_active { "Yes" } else { "No" };
-        let valid_until = cred.valid_until.format("%Y-%m-%d %H:%M UTC").to_string();
-
-        println!(
-            "{:<38} {:<12} {:<8} {:<22} {:<6}",
-            cred.id, cred.credential_type, status, valid_until, cred.days_until_expiry
-        );
-    }
-}
-
-/// Print detailed credential information
-fn print_credential_details(cred: &NhiCredentialResponse) {
-    println!("Credential Details");
-    println!("{}", "━".repeat(50));
-    println!("ID:                {}", cred.id);
-    println!("NHI ID:            {}", cred.nhi_id);
-    println!("Type:              {}", cred.credential_type);
-    println!(
-        "Status:            {}",
-        if cred.is_active { "Active" } else { "Revoked" }
-    );
-    println!(
-        "Valid From:        {}",
-        cred.valid_from.format("%Y-%m-%d %H:%M:%S UTC")
-    );
-    println!(
-        "Valid Until:       {}",
-        cred.valid_until.format("%Y-%m-%d %H:%M:%S UTC")
-    );
-    println!("Days Until Expiry: {}", cred.days_until_expiry);
-    println!(
-        "Created At:        {}",
-        cred.created_at.format("%Y-%m-%d %H:%M:%S UTC")
-    );
-}
-
 /// Validate agent name according to spec
 fn validate_agent_name(name: &str) -> CliResult<()> {
     if name.is_empty() || name.len() > 64 {
@@ -1125,29 +778,6 @@ mod tests {
 
         let invalid_uuid = "not-a-uuid";
         assert!(parse_agent_id(invalid_uuid).is_err());
-    }
-
-    // F110: Credential command tests
-
-    #[test]
-    fn test_validate_credential_type() {
-        assert!(validate_credential_type("api_key").is_ok());
-        assert!(validate_credential_type("secret").is_ok());
-        assert!(validate_credential_type("certificate").is_ok());
-        assert!(validate_credential_type("invalid").is_err());
-        assert!(validate_credential_type("API_KEY").is_err()); // Case sensitive
-    }
-
-    #[test]
-    fn test_parse_credential_id() {
-        let valid_uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
-        assert!(parse_credential_id(valid_uuid).is_ok());
-
-        let invalid_uuid = "not-a-uuid";
-        assert!(parse_credential_id(invalid_uuid).is_err());
-
-        let empty = "";
-        assert!(parse_credential_id(empty).is_err());
     }
 
     // F-051: Agent status validation tests

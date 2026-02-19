@@ -66,6 +66,9 @@ chrono = { version = "0.4", features = ["serde"] }
 # Random for PKCE
 rand = "0.8"
 
+# In-memory cache for single-use state tokens
+moka = { version = "0.12", features = ["sync"] }
+
 # OpenAPI documentation
 utoipa = { version = "4", features = ["axum_extras", "uuid", "chrono"] }
 

@@ -44,6 +44,13 @@ argon2 = "0.5"
 rand = "0.8"
 base64.workspace = true
 
+# Vault encryption (AES-256-GCM)
+aes-gcm = "0.10"
+zeroize = { version = "1", features = ["derive"] }
+
+# Stable hashing for schema checksums
+sha2 = "0.10"
+
 # Validation
 validator = { version = "0.20", features = ["derive"] }
 

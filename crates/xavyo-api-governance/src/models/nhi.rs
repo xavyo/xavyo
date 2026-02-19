@@ -8,9 +8,9 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 use validator::Validate;
 use xavyo_db::{
-    GovNhiAuditEvent, GovNhiCredential, GovNhiRequest, GovNhiRiskScore, GovNhiUsageEvent,
-    GovServiceAccount, NhiAuditEventType, NhiCredentialType, NhiRequestStatus, NhiSuspensionReason,
-    NhiUsageOutcome, RiskLevel, ServiceAccountStatus,
+    GovNhiAuditEvent, GovNhiRequest, GovNhiRiskScore, GovNhiUsageEvent, GovServiceAccount,
+    NhiAuditEventType, NhiRequestStatus, NhiSuspensionReason, NhiUsageOutcome, RiskLevel,
+    ServiceAccountStatus,
 };
 
 // =============================================================================
@@ -328,116 +328,6 @@ pub struct NhiRiskBreakdown {
     pub medium: i64,
     pub high: i64,
     pub critical: i64,
-}
-
-// =============================================================================
-// Credential Models
-// =============================================================================
-
-/// NHI credential response (without sensitive data).
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct NhiCredentialResponse {
-    /// Credential ID.
-    pub id: Uuid,
-
-    /// The NHI this credential belongs to.
-    pub nhi_id: Uuid,
-
-    /// Type of credential.
-    pub credential_type: NhiCredentialType,
-
-    /// Whether the credential is active.
-    pub is_active: bool,
-
-    /// When the credential becomes valid.
-    pub valid_from: DateTime<Utc>,
-
-    /// When the credential expires.
-    pub valid_until: DateTime<Utc>,
-
-    /// Days until expiration.
-    pub days_until_expiry: i64,
-
-    /// Who triggered the rotation (if rotated).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub rotated_by: Option<Uuid>,
-
-    /// When the credential was created.
-    pub created_at: DateTime<Utc>,
-}
-
-impl From<GovNhiCredential> for NhiCredentialResponse {
-    fn from(cred: GovNhiCredential) -> Self {
-        Self {
-            id: cred.id,
-            nhi_id: cred.nhi_id,
-            credential_type: cred.credential_type,
-            is_active: cred.is_active,
-            valid_from: cred.valid_from,
-            valid_until: cred.valid_until,
-            days_until_expiry: cred.days_until_expiry(),
-            rotated_by: cred.rotated_by,
-            created_at: cred.created_at,
-        }
-    }
-}
-
-/// Response when creating/rotating credentials (includes sensitive data ONCE).
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct NhiCredentialCreatedResponse {
-    /// The credential details.
-    pub credential: NhiCredentialResponse,
-
-    /// The plaintext secret value (ONLY SHOWN ONCE).
-    /// This is the API key, secret, or certificate content.
-    pub secret_value: String,
-
-    /// Message warning about one-time display.
-    pub warning: String,
-
-    /// When the grace period ends (if old credentials still active).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub grace_period_ends_at: Option<DateTime<Utc>>,
-}
-
-/// Request to rotate credentials.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
-pub struct RotateCredentialsRequest {
-    /// Type of credential to create.
-    pub credential_type: NhiCredentialType,
-
-    /// Optional name for the new credential.
-    #[validate(length(min = 1, max = 100, message = "Name must be 1-100 characters"))]
-    #[serde(default)]
-    pub name: Option<String>,
-
-    /// When the new credential expires (optional).
-    #[serde(default)]
-    pub expires_at: Option<DateTime<Utc>>,
-
-    /// Grace period in hours (default: 24, max: 168).
-    #[validate(range(min = 0, max = 168, message = "Grace period must be 0-168 hours"))]
-    #[serde(default)]
-    pub grace_period_hours: Option<i32>,
-}
-
-/// Request to revoke a credential.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
-pub struct RevokeCredentialRequest {
-    /// Reason for revocation.
-    #[validate(length(min = 5, message = "Reason must be at least 5 characters"))]
-    pub reason: String,
-
-    /// Whether to revoke immediately (skip grace period).
-    #[serde(default)]
-    pub immediate: bool,
-}
-
-/// List of credentials response.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct NhiCredentialListResponse {
-    pub items: Vec<NhiCredentialResponse>,
-    pub total: i64,
 }
 
 // =============================================================================
