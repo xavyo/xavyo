@@ -62,7 +62,7 @@ pub async fn password_change_handler(
         ApiAuthError::Validation(errors.join(", "))
     })?;
 
-    // Get the current user
+    // Get the current user (SELECT * needed — password_hash for verification + password_changed_at for age check)
     let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1 AND tenant_id = $2")
         .bind(user_id.as_uuid())
         .bind(tenant_id.as_uuid())

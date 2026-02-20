@@ -434,9 +434,20 @@ impl JwtClaimsBuilder {
     /// - `exp`: 1 hour from now if not set
     /// - `iat`: Current time if not set
     /// - `jti`: New UUID v4 if not set
+    ///
+    /// # Security
+    ///
+    /// C-4: If a JTI was explicitly set to an empty string, it is replaced with a
+    /// new UUID v4. Empty JTIs would bypass revocation checks in jwt_auth middleware.
     #[must_use]
     pub fn build(self) -> JwtClaims {
         let now = Utc::now().timestamp();
+
+        // C-4: Guard against empty JTI — required for revocation tracking
+        let jti = match self.jti {
+            Some(ref j) if !j.is_empty() => j.clone(),
+            _ => Uuid::new_v4().to_string(),
+        };
 
         JwtClaims {
             sub: self.sub.unwrap_or_default(),
@@ -444,7 +455,7 @@ impl JwtClaimsBuilder {
             aud: self.aud,
             exp: self.exp.unwrap_or(now + 3600), // Default: 1 hour
             iat: self.iat.unwrap_or(now),
-            jti: self.jti.unwrap_or_else(|| Uuid::new_v4().to_string()),
+            jti,
             tid: self.tid,
             roles: self.roles,
             purpose: self.purpose,
@@ -474,6 +485,19 @@ mod tests {
         assert_eq!(claims.sub, "user-123");
         assert_eq!(claims.iss, "test-issuer");
         assert!(!claims.jti.is_empty());
+    }
+
+    #[test]
+    fn test_empty_jti_replaced_with_uuid() {
+        // C-4: Explicitly setting an empty JTI should be replaced with a UUID
+        let claims = JwtClaims::builder().subject("user-123").jwt_id("").build();
+
+        assert!(
+            !claims.jti.is_empty(),
+            "Empty JTI should be replaced with UUID"
+        );
+        // Should be a valid UUID
+        assert!(Uuid::parse_str(&claims.jti).is_ok());
     }
 
     #[test]

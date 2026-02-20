@@ -215,24 +215,54 @@ impl TokenService {
     }
 
     /// Validate a refresh token and return the associated token record.
+    ///
+    /// C-3: Accepts optional `expected_tenant_id` for defense-in-depth tenant isolation.
+    /// When provided, the query filters by tenant_id at the DB level.
+    /// When None (e.g., refresh endpoint where tenant comes from the token itself),
+    /// the lookup is by hash alone — acceptable because refresh token hashes (SHA-256
+    /// of 256-bit random tokens) have negligible collision probability.
     pub async fn validate_refresh_token(
         &self,
         opaque_token: &str,
     ) -> Result<RefreshToken, ApiAuthError> {
+        self.validate_refresh_token_with_tenant(opaque_token, None)
+            .await
+    }
+
+    /// Validate a refresh token with optional tenant_id filtering.
+    pub async fn validate_refresh_token_with_tenant(
+        &self,
+        opaque_token: &str,
+        expected_tenant_id: Option<uuid::Uuid>,
+    ) -> Result<RefreshToken, ApiAuthError> {
         let token_hash = hash_token(opaque_token);
 
-        let query = r"
-            SELECT id, user_id, tenant_id, token_hash, expires_at, revoked_at, created_at, user_agent,
-                   COALESCE(ip_address::text, '') as ip_address
-            FROM refresh_tokens
-            WHERE token_hash = $1
-        ";
-
-        let token: RefreshToken = sqlx::query_as(query)
-            .bind(&token_hash)
-            .fetch_optional(&self.pool)
-            .await?
-            .ok_or(ApiAuthError::InvalidToken)?;
+        let token: RefreshToken = if let Some(tid) = expected_tenant_id {
+            // C-3: Filter by tenant_id at DB level when available
+            let query = r"
+                SELECT id, user_id, tenant_id, token_hash, expires_at, revoked_at, created_at, user_agent,
+                       COALESCE(ip_address::text, '') as ip_address
+                FROM refresh_tokens
+                WHERE token_hash = $1 AND tenant_id = $2
+            ";
+            sqlx::query_as(query)
+                .bind(&token_hash)
+                .bind(tid)
+                .fetch_optional(&self.pool)
+                .await?
+        } else {
+            let query = r"
+                SELECT id, user_id, tenant_id, token_hash, expires_at, revoked_at, created_at, user_agent,
+                       COALESCE(ip_address::text, '') as ip_address
+                FROM refresh_tokens
+                WHERE token_hash = $1
+            ";
+            sqlx::query_as(query)
+                .bind(&token_hash)
+                .fetch_optional(&self.pool)
+                .await?
+        }
+        .ok_or(ApiAuthError::InvalidToken)?;
 
         // Check if revoked
         if token.is_revoked() {
