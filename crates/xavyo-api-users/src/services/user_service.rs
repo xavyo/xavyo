@@ -7,11 +7,158 @@ use crate::models::{
     CreateUserRequest, CustomAttributeFilter, FilterOperator, LifecycleStateInfo, ListUsersQuery,
     PaginationMeta, UpdateUserRequest, UserListResponse, UserResponse,
 };
-use crate::validation::{validate_email, validate_username};
+use crate::validation::validate_email;
 use sqlx::PgPool;
 use xavyo_auth::PasswordHasher;
 use xavyo_core::{TenantId, UserId};
-use xavyo_db::User;
+use xavyo_db::{TenantPasswordPolicy, User};
+
+/// Allowed role names that can be assigned to users.
+const ALLOWED_ROLES: &[&str] = &["user", "member", "admin", "super_admin"];
+
+/// Special characters recognised by the password policy.
+/// Kept in sync with `PasswordPolicyService::SPECIAL_CHARS` in xavyo-api-auth.
+const SPECIAL_CHARS: &str = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+
+/// Validate a password against the tenant's `TenantPasswordPolicy`.
+///
+/// Returns a list of `FieldValidationError`s (empty if valid).
+fn validate_password_against_policy(
+    password: &str,
+    policy: &TenantPasswordPolicy,
+) -> Vec<FieldValidationError> {
+    let mut errors = Vec::new();
+    let len = password.chars().count();
+
+    if len < policy.min_length as usize {
+        errors.push(FieldValidationError {
+            field: "password".to_string(),
+            code: "too_short".to_string(),
+            message: format!("Password must be at least {} characters", policy.min_length),
+            constraints: Some(serde_json::json!({"min_length": policy.min_length})),
+        });
+    }
+    if len > policy.max_length as usize {
+        errors.push(FieldValidationError {
+            field: "password".to_string(),
+            code: "too_long".to_string(),
+            message: format!("Password must not exceed {} characters", policy.max_length),
+            constraints: Some(serde_json::json!({"max_length": policy.max_length})),
+        });
+    }
+    if policy.require_uppercase && !password.chars().any(|c| c.is_ascii_uppercase()) {
+        errors.push(FieldValidationError {
+            field: "password".to_string(),
+            code: "missing_uppercase".to_string(),
+            message: "Password must contain at least one uppercase letter".to_string(),
+            constraints: None,
+        });
+    }
+    if policy.require_lowercase && !password.chars().any(|c| c.is_ascii_lowercase()) {
+        errors.push(FieldValidationError {
+            field: "password".to_string(),
+            code: "missing_lowercase".to_string(),
+            message: "Password must contain at least one lowercase letter".to_string(),
+            constraints: None,
+        });
+    }
+    if policy.require_digit && !password.chars().any(|c| c.is_ascii_digit()) {
+        errors.push(FieldValidationError {
+            field: "password".to_string(),
+            code: "missing_digit".to_string(),
+            message: "Password must contain at least one digit".to_string(),
+            constraints: None,
+        });
+    }
+    if policy.require_special && !password.chars().any(|c| SPECIAL_CHARS.contains(c)) {
+        errors.push(FieldValidationError {
+            field: "password".to_string(),
+            code: "missing_special".to_string(),
+            message: "Password must contain at least one special character".to_string(),
+            constraints: None,
+        });
+    }
+    errors
+}
+
+/// Validate a list of roles and collect errors.
+///
+/// Checks: non-empty, max 20, each role non-empty/<=50 chars, all in allowlist.
+fn validate_roles(roles: &[String]) -> Vec<FieldValidationError> {
+    let mut errors = Vec::new();
+
+    if roles.len() > 20 {
+        errors.push(FieldValidationError {
+            field: "roles".to_string(),
+            code: "too_many".to_string(),
+            message: "Cannot assign more than 20 roles".to_string(),
+            constraints: Some(serde_json::json!({"max_count": 20})),
+        });
+    }
+    if roles.is_empty() {
+        errors.push(FieldValidationError {
+            field: "roles".to_string(),
+            code: "required".to_string(),
+            message: "At least one role is required".to_string(),
+            constraints: None,
+        });
+    }
+    for (i, role) in roles.iter().enumerate() {
+        if role.is_empty() {
+            errors.push(FieldValidationError {
+                field: format!("roles[{i}]"),
+                code: "empty".to_string(),
+                message: "Role name cannot be empty".to_string(),
+                constraints: None,
+            });
+        } else if role.len() > 50 {
+            errors.push(FieldValidationError {
+                field: format!("roles[{i}]"),
+                code: "too_long".to_string(),
+                message: "Role name must not exceed 50 characters".to_string(),
+                constraints: Some(serde_json::json!({"max_length": 50})),
+            });
+        } else if !ALLOWED_ROLES.contains(&role.as_str()) {
+            errors.push(FieldValidationError {
+                field: format!("roles[{i}]"),
+                code: "invalid_role".to_string(),
+                message: format!(
+                    "Invalid role '{}'. Allowed roles: {}",
+                    role,
+                    ALLOWED_ROLES.join(", ")
+                ),
+                constraints: None,
+            });
+        }
+    }
+
+    errors
+}
+
+/// A-1: Escape ILIKE special characters (`%`, `_`, `\`) in a search pattern.
+///
+/// Returns a lowercased, escaped string suitable for use in `LOWER(col) LIKE $N`.
+fn escape_ilike(input: &str) -> String {
+    input
+        .to_lowercase()
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+/// Check whether `caller_roles` are allowed to assign `target_roles`.
+///
+/// A caller without `super_admin` cannot assign `super_admin` to anyone.
+fn check_role_assignment_privilege(
+    caller_roles: &[String],
+    target_roles: &[String],
+) -> Result<(), ApiUsersError> {
+    let caller_is_super = caller_roles.iter().any(|r| r == "super_admin");
+    if !caller_is_super && target_roles.iter().any(|r| r == "super_admin") {
+        return Err(ApiUsersError::Forbidden);
+    }
+    Ok(())
+}
 
 /// Service for user management operations.
 ///
@@ -69,6 +216,22 @@ impl UserService {
         let offset = query.offset();
         let limit = query.limit();
 
+        // M-7: Cap email filter length to prevent DoS via huge LIKE patterns (RFC 5321 max = 254)
+        if let Some(ref email) = query.email {
+            if email.len() > 254 {
+                return Err(ApiUsersError::Validation(
+                    "Email filter too long (maximum 254 characters)".to_string(),
+                ));
+            }
+        }
+
+        // A-7: Cap the number of custom attribute filters to prevent DoS via large SQL
+        if custom_attr_filters.len() > 20 {
+            return Err(ApiUsersError::Validation(
+                "Too many custom attribute filters (maximum 20)".to_string(),
+            ));
+        }
+
         // Validate custom attribute filter names to prevent SQL injection.
         // Attribute names must match the DB constraint: ^[a-z][a-z0-9_]{0,63}$
         // SECURITY: Compile regex once using LazyLock to avoid panic on every request
@@ -96,6 +259,12 @@ impl UserService {
             let mut sql = String::from("SELECT COUNT(*) FROM users WHERE tenant_id = $1");
             let mut param_idx: usize = 2;
 
+            // L3: Optional is_active filter
+            if query.is_active.is_some() {
+                sql.push_str(&format!(" AND is_active = ${param_idx}"));
+                param_idx += 1;
+            }
+
             if query.email.is_some() {
                 sql.push_str(&format!(" AND LOWER(email) LIKE ${param_idx}"));
                 param_idx += 1;
@@ -108,8 +277,12 @@ impl UserService {
 
             let mut q = sqlx::query_scalar::<_, i64>(&sql).bind(tenant_id.as_uuid());
 
+            if let Some(is_active) = query.is_active {
+                q = q.bind(is_active);
+            }
+
             if let Some(email_filter) = &query.email {
-                let pattern = format!("%{}%", email_filter.to_lowercase());
+                let pattern = format!("%{}%", escape_ilike(email_filter));
                 q = q.bind(pattern);
             }
 
@@ -124,6 +297,12 @@ impl UserService {
         let users: Vec<User> = {
             let mut sql = String::from("SELECT * FROM users WHERE tenant_id = $1");
             let mut param_idx: usize = 2;
+
+            // L3: Optional is_active filter
+            if query.is_active.is_some() {
+                sql.push_str(&format!(" AND is_active = ${param_idx}"));
+                param_idx += 1;
+            }
 
             if query.email.is_some() {
                 sql.push_str(&format!(" AND LOWER(email) LIKE ${param_idx}"));
@@ -142,8 +321,12 @@ impl UserService {
 
             let mut q = sqlx::query_as::<_, User>(&sql).bind(tenant_id.as_uuid());
 
+            if let Some(is_active) = query.is_active {
+                q = q.bind(is_active);
+            }
+
             if let Some(email_filter) = &query.email {
-                let pattern = format!("%{}%", email_filter.to_lowercase());
+                let pattern = format!("%{}%", escape_ilike(email_filter));
                 q = q.bind(pattern);
             }
 
@@ -156,19 +339,21 @@ impl UserService {
             q.fetch_all(&self.pool).await?
         };
 
-        // Fetch roles for all users in a single query to avoid N+1
+        // H-4: Fetch roles for all users with tenant JOIN for cross-tenant safety
         let user_ids: Vec<uuid::Uuid> = users.iter().map(|u| u.id).collect();
         let all_roles: Vec<(uuid::Uuid, String)> = if user_ids.is_empty() {
             Vec::new()
         } else {
             sqlx::query_as(
                 r"
-                SELECT user_id, role_name FROM user_roles
-                WHERE user_id = ANY($1)
-                ORDER BY user_id, role_name
+                SELECT ur.user_id, ur.role_name FROM user_roles ur
+                JOIN users u ON ur.user_id = u.id AND u.tenant_id = $2
+                WHERE ur.user_id = ANY($1)
+                ORDER BY ur.user_id, ur.role_name
                 ",
             )
             .bind(&user_ids)
+            .bind(tenant_id.as_uuid())
             .fetch_all(&self.pool)
             .await?
         };
@@ -180,7 +365,7 @@ impl UserService {
             roles_map.entry(user_id).or_default().push(role_name);
         }
 
-        // Fetch lifecycle states for users that have them (F052)
+        // M-6: Fetch lifecycle states with tenant_id filter for tenant isolation
         let lifecycle_state_ids: Vec<uuid::Uuid> =
             users.iter().filter_map(|u| u.lifecycle_state_id).collect();
         let lifecycle_states: Vec<(uuid::Uuid, String, bool)> = if lifecycle_state_ids.is_empty() {
@@ -190,10 +375,11 @@ impl UserService {
                 r"
                 SELECT id, name, is_terminal
                 FROM gov_lifecycle_states
-                WHERE id = ANY($1)
+                WHERE id = ANY($1) AND tenant_id = $2
                 ",
             )
             .bind(&lifecycle_state_ids)
+            .bind(tenant_id.as_uuid())
             .fetch_all(&self.pool)
             .await
             .unwrap_or_default()
@@ -264,6 +450,7 @@ impl UserService {
         &self,
         tenant_id: TenantId,
         request: &CreateUserRequest,
+        caller_roles: &[String],
     ) -> Result<UserResponse, ApiUsersError> {
         // Collect all validation errors
         let mut validation_errors = Vec::new();
@@ -274,70 +461,19 @@ impl UserService {
             validation_errors.push(FieldValidationError::from(err));
         }
 
-        // Validate username if provided
-        if let Some(ref username) = request.username {
-            if let Err(err) = validate_username(username) {
-                validation_errors.push(FieldValidationError::from(err));
-            }
-        }
+        // H2: Validate password against the tenant's password policy (length, character classes).
+        // Fetch the policy from the DB; fall back to defaults if none is configured.
+        let password_policy =
+            TenantPasswordPolicy::get_or_default(&self.pool, *tenant_id.as_uuid())
+                .await
+                .unwrap_or_else(|_| TenantPasswordPolicy::default_for_tenant(*tenant_id.as_uuid()));
+        validation_errors.extend(validate_password_against_policy(
+            &request.password,
+            &password_policy,
+        ));
 
-        // Validate password
-        if request.password.len() < 8 {
-            validation_errors.push(FieldValidationError {
-                field: "password".to_string(),
-                code: "too_short".to_string(),
-                message: "Password must be at least 8 characters".to_string(),
-                constraints: Some(
-                    serde_json::json!({"min_length": 8, "actual": request.password.len()}),
-                ),
-            });
-        } else if request.password.len() > 128 {
-            validation_errors.push(FieldValidationError {
-                field: "password".to_string(),
-                code: "too_long".to_string(),
-                message: "Password must not exceed 128 characters".to_string(),
-                constraints: Some(
-                    serde_json::json!({"max_length": 128, "actual": request.password.len()}),
-                ),
-            });
-        }
-
-        // Validate roles
-        if request.roles.len() > 20 {
-            validation_errors.push(FieldValidationError {
-                field: "roles".to_string(),
-                code: "too_many".to_string(),
-                message: "Cannot assign more than 20 roles".to_string(),
-                constraints: Some(
-                    serde_json::json!({"max_count": 20, "actual": request.roles.len()}),
-                ),
-            });
-        }
-        if request.roles.is_empty() {
-            validation_errors.push(FieldValidationError {
-                field: "roles".to_string(),
-                code: "required".to_string(),
-                message: "At least one role is required".to_string(),
-                constraints: None,
-            });
-        }
-        for (i, role) in request.roles.iter().enumerate() {
-            if role.is_empty() {
-                validation_errors.push(FieldValidationError {
-                    field: format!("roles[{i}]"),
-                    code: "empty".to_string(),
-                    message: "Role name cannot be empty".to_string(),
-                    constraints: None,
-                });
-            } else if role.len() > 50 {
-                validation_errors.push(FieldValidationError {
-                    field: format!("roles[{i}]"),
-                    code: "too_long".to_string(),
-                    message: "Role name must not exceed 50 characters".to_string(),
-                    constraints: Some(serde_json::json!({"max_length": 50, "actual": role.len()})),
-                });
-            }
-        }
+        // Validate roles (A1: shared helper; H1: allowlist enforced)
+        validation_errors.extend(validate_roles(&request.roles));
 
         // Return all validation errors at once
         if !validation_errors.is_empty() {
@@ -346,25 +482,16 @@ impl UserService {
             });
         }
 
-        // Check if email already exists in tenant
-        let exists: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND email = $2")
-                .bind(tenant_id.as_uuid())
-                .bind(&email)
-                .fetch_one(&self.pool)
-                .await?;
+        // H1: Enforce role assignment hierarchy — non-super_admin cannot assign super_admin
+        check_role_assignment_privilege(caller_roles, &request.roles)?;
 
-        if exists > 0 {
-            return Err(ApiUsersError::EmailConflict);
-        }
-
-        // Hash password
+        // Hash password before transaction to keep the lock short
         let password_hash = self
             .password_hasher
             .hash(&request.password)
             .map_err(|e| ApiUsersError::Internal(format!("Password hashing failed: {e}")))?;
 
-        // Create user in transaction
+        // L4: All DB operations in one transaction to prevent TOCTOU on email conflict
         let mut tx = self.pool.begin().await?;
 
         // Set tenant context for RLS defense-in-depth
@@ -373,21 +500,34 @@ impl UserService {
             .execute(&mut *tx)
             .await?;
 
-        let user_id = uuid::Uuid::new_v4();
+        // Check if email already exists in tenant (inside transaction for atomicity)
+        let exists: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND email = $2")
+                .bind(tenant_id.as_uuid())
+                .bind(&email)
+                .fetch_one(&mut *tx)
+                .await?;
+
+        if exists > 0 {
+            return Err(ApiUsersError::EmailConflict);
+        }
+
         let now = chrono::Utc::now();
 
-        sqlx::query(
+        // A4: Use RETURNING * to get the authoritative row from the database,
+        // capturing any DB-level defaults (e.g., generated UUID, timestamps).
+        let user: User = sqlx::query_as(
             r"
-            INSERT INTO users (id, tenant_id, email, password_hash, is_active, email_verified, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, true, false, $5, $5)
+            INSERT INTO users (tenant_id, email, password_hash, is_active, email_verified, created_at, updated_at)
+            VALUES ($1, $2, $3, true, false, $4, $4)
+            RETURNING *
             ",
         )
-        .bind(user_id)
         .bind(tenant_id.as_uuid())
         .bind(&email)
         .bind(&password_hash)
         .bind(now)
-        .execute(&mut *tx)
+        .fetch_one(&mut *tx)
         .await?;
 
         // Insert roles
@@ -399,7 +539,7 @@ impl UserService {
                 ON CONFLICT (user_id, role_name) DO NOTHING
                 ",
             )
-            .bind(user_id)
+            .bind(user.id)
             .bind(role)
             .bind(now)
             .execute(&mut *tx)
@@ -408,25 +548,29 @@ impl UserService {
 
         tx.commit().await?;
 
+        // L7: Log user_id and tenant_id at INFO; email at DEBUG to avoid PII in production logs
         tracing::info!(
-            user_id = %user_id,
+            user_id = %user.id,
             tenant_id = %tenant_id,
-            email = %email,
             roles = ?request.roles,
             "User created"
         );
 
-        Ok(UserResponse {
-            id: user_id,
-            email,
-            is_active: true,
-            email_verified: false,
-            roles: request.roles.clone(),
-            created_at: now,
-            updated_at: now,
-            lifecycle_state: None,
-            custom_attributes: serde_json::json!({}),
-        })
+        // M-3: Fetch roles from DB after insertion to avoid returning duplicates
+        // that were silently dropped by ON CONFLICT DO NOTHING.
+        let stored_roles: Vec<String> = sqlx::query_scalar(
+            r"SELECT ur.role_name FROM user_roles ur
+            JOIN users u ON ur.user_id = u.id AND u.tenant_id = $2
+            WHERE ur.user_id = $1
+            ORDER BY ur.role_name",
+        )
+        .bind(user.id)
+        .bind(tenant_id.as_uuid())
+        .fetch_all(&self.pool)
+        .await
+        .unwrap_or_else(|_| request.roles.clone());
+
+        Ok(user_to_response(&user, stored_roles, None))
     }
 
     /// Get a user by ID within a tenant.
@@ -463,28 +607,31 @@ impl UserService {
 
         let user = user.ok_or(ApiUsersError::NotFound)?;
 
-        // Fetch roles
+        // C-1: Fetch roles with tenant JOIN for cross-tenant safety
         let roles: Vec<String> = sqlx::query_scalar(
             r"
-            SELECT role_name FROM user_roles
-            WHERE user_id = $1
-            ORDER BY role_name
+            SELECT ur.role_name FROM user_roles ur
+            JOIN users u ON ur.user_id = u.id AND u.tenant_id = $2
+            WHERE ur.user_id = $1
+            ORDER BY ur.role_name
             ",
         )
         .bind(user.id)
+        .bind(tenant_id.as_uuid())
         .fetch_all(&self.pool)
         .await?;
 
-        // Fetch lifecycle state if present (F052)
+        // M-6: Fetch lifecycle state with tenant_id filter for tenant isolation
         let lifecycle_state = if let Some(state_id) = user.lifecycle_state_id {
             let state: Option<(uuid::Uuid, String, bool)> = sqlx::query_as(
                 r"
                 SELECT id, name, is_terminal
                 FROM gov_lifecycle_states
-                WHERE id = $1
+                WHERE id = $1 AND tenant_id = $2
                 ",
             )
             .bind(state_id)
+            .bind(tenant_id.as_uuid())
             .fetch_optional(&self.pool)
             .await
             .ok()
@@ -530,8 +677,18 @@ impl UserService {
         tenant_id: TenantId,
         user_id: UserId,
         request: &UpdateUserRequest,
+        caller_roles: &[String],
     ) -> Result<UserResponse, ApiUsersError> {
-        // Check user exists in tenant
+        // M2: All DB operations in one transaction to prevent TOCTOU on user state
+        let mut tx = self.pool.begin().await?;
+
+        // Set tenant context for RLS defense-in-depth
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.as_uuid().to_string())
+            .execute(&mut *tx)
+            .await?;
+
+        // Check user exists in tenant (inside transaction for consistency)
         let user: Option<User> = sqlx::query_as(
             r"
             SELECT *
@@ -541,21 +698,17 @@ impl UserService {
         )
         .bind(user_id.as_uuid())
         .bind(tenant_id.as_uuid())
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?;
 
         let mut user = user.ok_or(ApiUsersError::NotFound)?;
 
-        let mut tx = self.pool.begin().await?;
-
-        // Set tenant context for RLS defense-in-depth
-        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
-            .bind(tenant_id.as_uuid().to_string())
-            .execute(&mut *tx)
-            .await?;
-
         let now = chrono::Utc::now();
         let mut updated = false;
+        // M-1/M-2/H-5: Track identity-affecting changes for token revocation
+        let mut email_changed = false;
+        let mut roles_changed = false;
+        let mut deactivated = false;
 
         // Validate all provided fields first
         let mut validation_errors = Vec::new();
@@ -568,52 +721,9 @@ impl UserService {
             }
         }
 
-        // Validate username if provided
-        if let Some(ref username) = request.username {
-            if let Err(err) = validate_username(username) {
-                validation_errors.push(FieldValidationError::from(err));
-            }
-        }
-
-        // Validate roles if provided
+        // Validate roles if provided (A1: shared helper; H1: allowlist enforced)
         if let Some(ref new_roles) = request.roles {
-            if new_roles.len() > 20 {
-                validation_errors.push(FieldValidationError {
-                    field: "roles".to_string(),
-                    code: "too_many".to_string(),
-                    message: "Cannot assign more than 20 roles".to_string(),
-                    constraints: Some(
-                        serde_json::json!({"max_count": 20, "actual": new_roles.len()}),
-                    ),
-                });
-            }
-            if new_roles.is_empty() {
-                validation_errors.push(FieldValidationError {
-                    field: "roles".to_string(),
-                    code: "required".to_string(),
-                    message: "At least one role is required".to_string(),
-                    constraints: None,
-                });
-            }
-            for (i, role) in new_roles.iter().enumerate() {
-                if role.is_empty() {
-                    validation_errors.push(FieldValidationError {
-                        field: format!("roles[{i}]"),
-                        code: "empty".to_string(),
-                        message: "Role name cannot be empty".to_string(),
-                        constraints: None,
-                    });
-                } else if role.len() > 50 {
-                    validation_errors.push(FieldValidationError {
-                        field: format!("roles[{i}]"),
-                        code: "too_long".to_string(),
-                        message: "Role name must not exceed 50 characters".to_string(),
-                        constraints: Some(
-                            serde_json::json!({"max_length": 50, "actual": role.len()}),
-                        ),
-                    });
-                }
-            }
+            validation_errors.extend(validate_roles(new_roles));
         }
 
         // Return all validation errors at once
@@ -621,6 +731,11 @@ impl UserService {
             return Err(ApiUsersError::ValidationErrors {
                 errors: validation_errors,
             });
+        }
+
+        // H1: Enforce role assignment hierarchy
+        if let Some(ref new_roles) = request.roles {
+            check_role_assignment_privilege(caller_roles, new_roles)?;
         }
 
         // Update email if provided
@@ -642,8 +757,9 @@ impl UserService {
                     return Err(ApiUsersError::EmailConflict);
                 }
 
+                // C2: Reset email_verified when admin changes email — the new address is unverified
                 sqlx::query(
-                    "UPDATE users SET email = $1, updated_at = $2 WHERE id = $3 AND tenant_id = $4",
+                    "UPDATE users SET email = $1, email_verified = false, email_verified_at = NULL, updated_at = $2 WHERE id = $3 AND tenant_id = $4",
                 )
                 .bind(&email)
                 .bind(now)
@@ -653,7 +769,9 @@ impl UserService {
                 .await?;
 
                 user.email = email;
+                user.email_verified = false;
                 updated = true;
+                email_changed = true;
             }
         }
 
@@ -668,6 +786,10 @@ impl UserService {
                     .execute(&mut *tx)
                     .await?;
 
+                // H-5: Track deactivation for token revocation
+                if !is_active {
+                    deactivated = true;
+                }
                 user.is_active = is_active;
                 updated = true;
             }
@@ -675,11 +797,16 @@ impl UserService {
 
         // Update roles if provided (validation done upfront)
         let roles = if let Some(ref new_roles) = request.roles {
-            // Delete existing roles and insert new ones
-            sqlx::query("DELETE FROM user_roles WHERE user_id = $1")
-                .bind(user_id.as_uuid())
-                .execute(&mut *tx)
-                .await?;
+            // H-3: Delete existing roles with tenant JOIN for defense-in-depth
+            sqlx::query(
+                r"DELETE FROM user_roles ur
+                USING users u
+                WHERE ur.user_id = $1 AND u.id = ur.user_id AND u.tenant_id = $2",
+            )
+            .bind(user_id.as_uuid())
+            .bind(tenant_id.as_uuid())
+            .execute(&mut *tx)
+            .await?;
 
             for role in new_roles {
                 sqlx::query(
@@ -703,13 +830,18 @@ impl UserService {
                 .execute(&mut *tx)
                 .await?;
 
+            roles_changed = true;
             new_roles.clone()
         } else {
-            // Fetch current roles
+            // C-3: Fetch current roles with tenant JOIN for cross-tenant safety
             sqlx::query_scalar(
-                "SELECT role_name FROM user_roles WHERE user_id = $1 ORDER BY role_name",
+                r"SELECT ur.role_name FROM user_roles ur
+                JOIN users u ON ur.user_id = u.id AND u.tenant_id = $2
+                WHERE ur.user_id = $1
+                ORDER BY ur.role_name",
             )
             .bind(user_id.as_uuid())
+            .bind(tenant_id.as_uuid())
             .fetch_all(&mut *tx)
             .await?
         };
@@ -720,16 +852,53 @@ impl UserService {
             user.updated_at = now;
         }
 
-        // Fetch lifecycle state if present (F052)
+        // M-1/M-2: Revoke all refresh tokens when email or roles change.
+        // This forces re-authentication so the user's JWT reflects the new
+        // identity (email) or permissions (roles). Best-effort — don't fail
+        // the update if revocation fails.
+        if email_changed || roles_changed || deactivated {
+            let revoke_result = sqlx::query(
+                "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
+            )
+            .bind(user_id.as_uuid())
+            .bind(tenant_id.as_uuid())
+            .execute(&self.pool)
+            .await;
+
+            match revoke_result {
+                Ok(result) if result.rows_affected() > 0 => {
+                    tracing::info!(
+                        user_id = %user_id,
+                        tenant_id = %tenant_id,
+                        revoked = result.rows_affected(),
+                        email_changed,
+                        roles_changed,
+                        "Revoked refresh tokens after identity change"
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        user_id = %user_id,
+                        tenant_id = %tenant_id,
+                        error = %e,
+                        "Failed to revoke refresh tokens after identity change"
+                    );
+                }
+                _ => {}
+            }
+        }
+
+        // M-6: Fetch lifecycle state with tenant_id filter for tenant isolation
         let lifecycle_state = if let Some(state_id) = user.lifecycle_state_id {
             let state: Option<(uuid::Uuid, String, bool)> = sqlx::query_as(
                 r"
                 SELECT id, name, is_terminal
                 FROM gov_lifecycle_states
-                WHERE id = $1
+                WHERE id = $1 AND tenant_id = $2
                 ",
             )
             .bind(state_id)
+            .bind(tenant_id.as_uuid())
             .fetch_optional(&self.pool)
             .await
             .ok()
@@ -770,21 +939,112 @@ impl UserService {
         &self,
         tenant_id: TenantId,
         user_id: UserId,
+        caller_user_id: uuid::Uuid,
     ) -> Result<(), ApiUsersError> {
-        let result = sqlx::query(
-            r"
-            UPDATE users SET is_active = false, updated_at = $1
-            WHERE id = $2 AND tenant_id = $3
-            ",
+        // C4: Prevent self-deactivation
+        if *user_id.as_uuid() == caller_user_id {
+            return Err(ApiUsersError::Validation(
+                "Cannot deactivate your own account".to_string(),
+            ));
+        }
+
+        // H-2: Wrap the entire check-and-deactivate in a transaction with
+        // SELECT FOR UPDATE to prevent the TOCTOU race where two concurrent
+        // requests both pass the "last admin" check and lock out the tenant.
+        let mut tx = self.pool.begin().await?;
+
+        // Set tenant context for RLS defense-in-depth
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.as_uuid().to_string())
+            .execute(&mut *tx)
+            .await?;
+
+        // Lock the target user row to serialize concurrent deactivation attempts
+        let user: Option<(bool,)> = sqlx::query_as(
+            "SELECT is_active FROM users WHERE id = $1 AND tenant_id = $2 FOR UPDATE",
+        )
+        .bind(user_id.as_uuid())
+        .bind(tenant_id.as_uuid())
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let _user = user.ok_or(ApiUsersError::NotFound)?;
+
+        // C-2: Fetch roles with tenant JOIN for cross-tenant safety
+        let target_roles: Vec<String> = sqlx::query_scalar(
+            r"SELECT ur.role_name FROM user_roles ur
+            JOIN users u ON ur.user_id = u.id AND u.tenant_id = $2
+            WHERE ur.user_id = $1",
+        )
+        .bind(user_id.as_uuid())
+        .bind(tenant_id.as_uuid())
+        .fetch_all(&mut *tx)
+        .await?;
+
+        let is_admin = target_roles
+            .iter()
+            .any(|r| r == "admin" || r == "super_admin");
+
+        if is_admin {
+            // Count other active admins in tenant (inside the same transaction)
+            let other_admins: i64 = sqlx::query_scalar(
+                r"
+                SELECT COUNT(DISTINCT ur.user_id) FROM user_roles ur
+                JOIN users u ON ur.user_id = u.id AND u.tenant_id = $1
+                WHERE u.is_active = true
+                  AND ur.role_name IN ('admin', 'super_admin')
+                  AND ur.user_id != $2
+                ",
+            )
+            .bind(tenant_id.as_uuid())
+            .bind(user_id.as_uuid())
+            .fetch_one(&mut *tx)
+            .await?;
+
+            if other_admins == 0 {
+                return Err(ApiUsersError::Validation(
+                    "Cannot deactivate the last admin in a tenant".to_string(),
+                ));
+            }
+        }
+
+        sqlx::query(
+            "UPDATE users SET is_active = false, updated_at = $1 WHERE id = $2 AND tenant_id = $3",
         )
         .bind(chrono::Utc::now())
         .bind(user_id.as_uuid())
         .bind(tenant_id.as_uuid())
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
 
-        if result.rows_affected() == 0 {
-            return Err(ApiUsersError::NotFound);
+        tx.commit().await?;
+
+        // Revoke all refresh tokens for the deactivated user so they cannot
+        // obtain new access tokens. Best-effort — don't fail the deactivation.
+        let revoke_result = sqlx::query(
+            "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
+        )
+        .bind(user_id.as_uuid())
+        .bind(tenant_id.as_uuid())
+        .execute(&self.pool)
+        .await;
+
+        if let Err(e) = &revoke_result {
+            tracing::warn!(
+                user_id = %user_id,
+                tenant_id = %tenant_id,
+                error = %e,
+                "Failed to revoke refresh tokens on deactivation"
+            );
+        } else if let Ok(r) = &revoke_result {
+            if r.rows_affected() > 0 {
+                tracing::info!(
+                    user_id = %user_id,
+                    tenant_id = %tenant_id,
+                    revoked = r.rows_affected(),
+                    "Revoked refresh tokens on deactivation"
+                );
+            }
         }
 
         tracing::info!(
@@ -794,6 +1054,44 @@ impl UserService {
         );
 
         Ok(())
+    }
+
+    /// Record an admin audit event for user CRUD operations (A6).
+    ///
+    /// Best-effort: logs a warning and continues if the INSERT fails, so that
+    /// audit failures never block the primary operation.
+    pub async fn record_audit_event(
+        &self,
+        tenant_id: TenantId,
+        actor_id: uuid::Uuid,
+        action: &str,
+        resource_id: uuid::Uuid,
+        details: serde_json::Value,
+    ) {
+        let result = sqlx::query(
+            r"
+            INSERT INTO admin_audit_events (tenant_id, actor_id, action, resource_type, resource_id, details)
+            VALUES ($1, $2, $3, 'user', $4, $5)
+            ",
+        )
+        .bind(tenant_id.as_uuid())
+        .bind(actor_id)
+        .bind(action)
+        .bind(resource_id)
+        .bind(&details)
+        .execute(&self.pool)
+        .await;
+
+        if let Err(e) = result {
+            tracing::warn!(
+                tenant_id = %tenant_id,
+                actor_id = %actor_id,
+                action = action,
+                resource_id = %resource_id,
+                error = %e,
+                "Failed to record admin audit event"
+            );
+        }
     }
 }
 
@@ -892,6 +1190,9 @@ pub fn user_to_response(
     UserResponse {
         id: user.id,
         email: user.email.clone(),
+        display_name: user.display_name.clone(),
+        first_name: user.first_name.clone(),
+        last_name: user.last_name.clone(),
         is_active: user.is_active,
         email_verified: user.email_verified,
         roles,

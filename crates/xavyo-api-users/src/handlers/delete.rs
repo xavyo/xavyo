@@ -42,6 +42,10 @@ pub async fn delete_user_handler(
         .map_err(|_| ApiUsersError::Validation("Invalid user ID format".to_string()))?;
     let user_id = UserId::from_uuid(user_uuid);
 
+    // Parse caller ID for self-deactivation check
+    let caller_uuid = Uuid::parse_str(&claims.sub)
+        .map_err(|_| ApiUsersError::Internal("Invalid caller ID in claims".to_string()))?;
+
     tracing::info!(
         admin_id = %claims.sub,
         tenant_id = %tenant_id,
@@ -49,7 +53,20 @@ pub async fn delete_user_handler(
         "Deactivating user"
     );
 
-    user_service.deactivate_user(tenant_id, user_id).await?;
+    user_service
+        .deactivate_user(tenant_id, user_id, caller_uuid)
+        .await?;
+
+    // A6: Record durable admin audit event
+    user_service
+        .record_audit_event(
+            tenant_id,
+            caller_uuid,
+            "user.deactivated",
+            user_uuid,
+            serde_json::json!({}),
+        )
+        .await;
 
     // F085: Publish user.deleted webhook event
     if let Some(Extension(publisher)) = publisher {

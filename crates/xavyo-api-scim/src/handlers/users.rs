@@ -2,18 +2,18 @@
 
 use axum::{
     extract::{Path, Query},
-    http::{header, HeaderValue, StatusCode},
+    http::StatusCode,
     response::{IntoResponse, Response},
     Extension, Json,
 };
 use serde::Deserialize;
-use std::net::IpAddr;
 use std::sync::Arc;
 use uuid::Uuid;
 
 use xavyo_db::models::{ScimOperation, ScimResourceType};
 
 use crate::error::ScimError;
+use crate::handlers::common::{extract_client_ip, extract_user_agent, scim_response};
 use crate::middleware::auth::ScimAuthContext;
 use crate::models::{
     CreateScimUserRequest, ReplaceScimUserRequest, ScimPagination, ScimPatchRequest,
@@ -42,46 +42,6 @@ fn default_count() -> i64 {
     25
 }
 
-/// SCIM content type header.
-const SCIM_CONTENT_TYPE: &str = "application/scim+json";
-
-/// Wrap response with SCIM content type.
-fn scim_response<T: serde::Serialize>(status: StatusCode, body: T) -> Response {
-    let json = Json(body);
-    let mut response = (status, json).into_response();
-    // SECURITY: Use from_static for compile-time validated header value (no unwrap needed)
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static(SCIM_CONTENT_TYPE),
-    );
-    response
-}
-
-/// Extract client IP from request (for audit logging).
-fn extract_client_ip(headers: &axum::http::HeaderMap) -> IpAddr {
-    // Check X-Forwarded-For header
-    if let Some(xff) = headers.get("x-forwarded-for") {
-        if let Ok(xff_str) = xff.to_str() {
-            if let Some(first_ip) = xff_str.split(',').next() {
-                if let Ok(ip) = first_ip.trim().parse() {
-                    return ip;
-                }
-            }
-        }
-    }
-
-    // Default to localhost
-    "127.0.0.1".parse().unwrap()
-}
-
-/// Extract user agent from request.
-fn extract_user_agent(headers: &axum::http::HeaderMap) -> Option<String> {
-    headers
-        .get(header::USER_AGENT)
-        .and_then(|v| v.to_str().ok())
-        .map(std::string::ToString::to_string)
-}
-
 /// List users with optional filtering.
 #[utoipa::path(
     get,
@@ -101,6 +61,18 @@ pub async fn list_users(
     headers: axum::http::HeaderMap,
     Query(query): Query<ListUsersQuery>,
 ) -> Result<Response, ScimError> {
+    // Cap sortBy/sortOrder length to prevent oversized query parameters.
+    if query.sort_by.as_ref().is_some_and(|s| s.len() > 64) {
+        return Err(ScimError::BadRequest(
+            "sortBy exceeds maximum length".to_string(),
+        ));
+    }
+    if query.sort_order.as_ref().is_some_and(|s| s.len() > 64) {
+        return Err(ScimError::BadRequest(
+            "sortOrder exceeds maximum length".to_string(),
+        ));
+    }
+
     let pagination = ScimPagination::from_query(
         Some(query.start_index),
         Some(query.count),
@@ -126,6 +98,7 @@ pub async fn list_users(
                     None,
                     source_ip,
                     user_agent,
+                    200,
                 )
                 .await;
         }
@@ -187,6 +160,7 @@ pub async fn create_user(
                     user.id,
                     source_ip,
                     user_agent,
+                    201,
                 )
                 .await;
         }
@@ -264,6 +238,7 @@ pub async fn get_user(
                     Some(id),
                     source_ip,
                     user_agent,
+                    200,
                 )
                 .await;
         }
@@ -329,6 +304,7 @@ pub async fn replace_user(
                     Some(id),
                     source_ip,
                     user_agent,
+                    200,
                 )
                 .await;
         }
@@ -410,6 +386,7 @@ pub async fn update_user(
                     Some(id),
                     source_ip,
                     user_agent,
+                    200,
                 )
                 .await;
         }
@@ -488,6 +465,7 @@ pub async fn delete_user(
                     Some(id),
                     source_ip,
                     user_agent,
+                    204,
                 )
                 .await;
         }

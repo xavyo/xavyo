@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use xavyo_db::models::{Group, GroupMembership};
 
-use crate::error::{ScimError, ScimResult};
+use crate::error::{is_unique_violation, ScimError, ScimResult};
 use crate::models::{
     CreateScimGroupRequest, ReplaceScimGroupRequest, ScimGroup, ScimGroupListResponse,
     ScimGroupMember, ScimMeta, ScimPagination, ScimPatchOp, ScimPatchRequest, XavyoGroupExtension,
@@ -226,12 +226,71 @@ impl GroupService {
             .collect())
     }
 
+    /// Maximum allowed length for string fields.
+    const MAX_STRING_LEN: usize = 255;
+
+    /// Validate string field lengths.
+    fn validate_group_strings(display_name: &str, external_id: Option<&str>) -> ScimResult<()> {
+        if display_name.len() > Self::MAX_STRING_LEN {
+            return Err(ScimError::Validation(format!(
+                "displayName exceeds maximum length of {} characters",
+                Self::MAX_STRING_LEN
+            )));
+        }
+        if display_name.trim().is_empty() {
+            return Err(ScimError::Validation(
+                "displayName must not be empty".to_string(),
+            ));
+        }
+        if let Some(ext_id) = external_id {
+            if ext_id.len() > Self::MAX_STRING_LEN {
+                return Err(ScimError::Validation(format!(
+                    "externalId exceeds maximum length of {} characters",
+                    Self::MAX_STRING_LEN
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate that member UUIDs belong to the same tenant and are active.
+    ///
+    /// Prevents adding deactivated users to groups, which would be inconsistent
+    /// with SCIM semantics (DELETE deactivates, and deactivated users return 404).
+    async fn validate_members_tenant(
+        &self,
+        tenant_id: Uuid,
+        member_ids: &[Uuid],
+    ) -> ScimResult<()> {
+        if member_ids.is_empty() {
+            return Ok(());
+        }
+
+        // Count how many of the provided UUIDs exist and are active in this tenant
+        let count: (i64,) = sqlx::query_as(
+            r"SELECT COUNT(*)::bigint FROM users WHERE tenant_id = $1 AND id = ANY($2) AND is_active = true",
+        )
+        .bind(tenant_id)
+        .bind(member_ids)
+        .fetch_one(&self.pool)
+        .await?;
+
+        if count.0 != member_ids.len() as i64 {
+            return Err(ScimError::Validation(
+                "One or more member IDs do not exist or are inactive in this tenant".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Create a new group.
     pub async fn create_group(
         &self,
         tenant_id: Uuid,
         request: CreateScimGroupRequest,
     ) -> ScimResult<ScimGroup> {
+        Self::validate_group_strings(&request.display_name, request.external_id.as_deref())?;
+
         // Check for existing group with same name
         let existing = Group::find_by_name(&self.pool, tenant_id, &request.display_name).await?;
         if existing.is_some() {
@@ -277,8 +336,8 @@ impl GroupService {
             (None, None)
         };
 
-        // Create group
-        let group = Group::create(
+        // Create group — catch unique constraint violations (TOCTOU race condition)
+        let group = match Group::create(
             &self.pool,
             tenant_id,
             &request.display_name,
@@ -287,11 +346,23 @@ impl GroupService {
             parent_id,
             group_type,
         )
-        .await?;
+        .await
+        {
+            Ok(group) => group,
+            Err(ref e) if is_unique_violation(e) => {
+                return Err(ScimError::Conflict {
+                    resource_type: "group".to_string(),
+                    field: "displayName".to_string(),
+                    value: request.display_name.clone(),
+                });
+            }
+            Err(e) => return Err(e.into()),
+        };
 
-        // Add members if provided
+        // Add members if provided — validate they belong to the same tenant
         if !request.members.is_empty() {
             let member_ids: Vec<Uuid> = request.members.iter().map(|m| m.value).collect();
+            self.validate_members_tenant(tenant_id, &member_ids).await?;
             GroupMembership::set_members(&self.pool, tenant_id, group.id, &member_ids).await?;
         }
 
@@ -333,10 +404,21 @@ impl GroupService {
             params = sql_filter.params;
         }
 
-        // Apply sorting
-        base_query.push_str(" ORDER BY display_name ASC");
+        // Apply sorting (column names are from a hardcoded allowlist — quote for defense-in-depth)
+        let sort_column = match pagination.sort_by.as_deref() {
+            Some("displayName") => "display_name",
+            Some("externalId") => "external_id",
+            _ => "display_name",
+        };
+        let sort_order = match pagination.sort_order.as_deref() {
+            Some("descending") => "DESC",
+            _ => "ASC",
+        };
+        base_query.push_str(&format!(" ORDER BY \"{sort_column}\" {sort_order}"));
 
-        // Apply pagination
+        // Apply pagination.
+        // Parameter numbering: $1 = tenant_id, $2..N = filter params, $N+1 = LIMIT, $N+2 = OFFSET.
+        // Both count_query and base_query share the same $1..N params; base_query adds LIMIT/OFFSET.
         let param_offset = params.len() + 2;
         base_query.push_str(&format!(
             " LIMIT ${} OFFSET ${}",
@@ -365,11 +447,13 @@ impl GroupService {
             resources.push(self.to_scim_group(tenant_id, &group).await?);
         }
 
+        // RFC 7644 Section 3.4.2: itemsPerPage = actual number of resources returned
+        let items_per_page = resources.len() as i64;
         Ok(ScimGroupListResponse::new(
             resources,
             total_results,
             pagination.start_index,
-            pagination.count,
+            items_per_page,
         ))
     }
 
@@ -380,6 +464,8 @@ impl GroupService {
         group_id: Uuid,
         request: ReplaceScimGroupRequest,
     ) -> ScimResult<ScimGroup> {
+        Self::validate_group_strings(&request.display_name, request.external_id.as_deref())?;
+
         // Verify group exists
         let _ = self.find_group(tenant_id, group_id).await?;
 
@@ -450,8 +536,9 @@ impl GroupService {
         .await?
         .ok_or_else(|| ScimError::NotFound(format!("Group {group_id} not found")))?;
 
-        // Replace members
+        // Replace members — validate they belong to the same tenant
         let member_ids: Vec<Uuid> = request.members.iter().map(|m| m.value).collect();
+        self.validate_members_tenant(tenant_id, &member_ids).await?;
         GroupMembership::set_members(&self.pool, tenant_id, group_id, &member_ids).await?;
 
         self.to_scim_group(tenant_id, &group).await
@@ -467,12 +554,9 @@ impl GroupService {
         // Validate patch request
         request.validate().map_err(ScimError::InvalidPatchOp)?;
 
-        // Get current group
-        let original_name = {
-            let g = self.find_group(tenant_id, group_id).await?;
-            g.display_name.clone()
-        };
+        // Get current group (single fetch instead of two)
         let mut group = self.find_group(tenant_id, group_id).await?;
+        let original_name = group.display_name.clone();
 
         // Apply each operation
         for op in &request.operations {
@@ -539,7 +623,7 @@ impl GroupService {
                         group.external_id = value.as_str().map(std::string::ToString::to_string);
                     }
                     "members" => {
-                        // Replace all members
+                        // Replace all members — validate they belong to the same tenant
                         if let Some(members) = value.as_array() {
                             let member_ids: Vec<Uuid> = members
                                 .iter()
@@ -549,6 +633,7 @@ impl GroupService {
                                         .and_then(|s| s.parse().ok())
                                 })
                                 .collect();
+                            self.validate_members_tenant(tenant_id, &member_ids).await?;
                             GroupMembership::set_members(
                                 &self.pool,
                                 tenant_id,
@@ -597,7 +682,7 @@ impl GroupService {
             }
             "add" => {
                 if path.starts_with("members") || path.is_empty() {
-                    // Add members
+                    // Add members — validate they belong to the same tenant
                     if let Some(value) = &op.value {
                         let members = if let Some(arr) = value.as_array() {
                             arr.clone()
@@ -605,16 +690,54 @@ impl GroupService {
                             vec![value.clone()]
                         };
 
+                        // For empty path, verify we actually have member-like values
+                        if path.is_empty() {
+                            let has_member_values =
+                                members.iter().any(|m| m.get("value").is_some());
+                            if !has_member_values {
+                                return Err(ScimError::InvalidPatchOp(
+                                    "Add with empty path on Group requires member values with 'value' field".to_string(),
+                                ));
+                            }
+                        }
+
+                        // Collect and validate all member IDs first
+                        let member_uuids: Vec<Uuid> = members
+                            .iter()
+                            .filter_map(|m| {
+                                m.get("value")
+                                    .and_then(|v| v.as_str())
+                                    .and_then(|s| s.parse::<Uuid>().ok())
+                            })
+                            .collect();
+                        self.validate_members_tenant(tenant_id, &member_uuids)
+                            .await?;
+
                         for member in members {
                             if let Some(user_id) = member
                                 .get("value")
                                 .and_then(|v| v.as_str())
                                 .and_then(|s| s.parse::<Uuid>().ok())
                             {
-                                let _ = GroupMembership::add_member(
+                                if let Err(e) = GroupMembership::add_member(
                                     &self.pool, tenant_id, group_id, user_id,
                                 )
-                                .await;
+                                .await
+                                {
+                                    // Duplicate memberships are silently ignored (idempotent),
+                                    // but other errors (e.g. FK violation for non-existent user) propagate.
+                                    let err_str = e.to_string();
+                                    let is_duplicate = err_str
+                                        .contains("duplicate key value violates unique constraint");
+                                    if !is_duplicate {
+                                        tracing::error!(
+                                            "Failed to add member {user_id}: {err_str}"
+                                        );
+                                        return Err(ScimError::Validation(format!(
+                                            "Failed to add member {user_id}"
+                                        )));
+                                    }
+                                }
                             }
                         }
                     }
@@ -686,13 +809,9 @@ impl GroupService {
         .await?;
 
         if has_children.0 {
-            return Err(ScimError::Conflict {
-                resource_type: "group".to_string(),
-                field: "children".to_string(),
-                value: format!(
-                    "Group {group_id} has child groups. Remove or reassign children first."
-                ),
-            });
+            return Err(ScimError::Validation(format!(
+                "Group {group_id} has child groups. Remove or reassign children first."
+            )));
         }
 
         // Remove all members first

@@ -295,7 +295,7 @@ impl TokenService {
         self.revoke_token_by_hash(&token.token_hash).await?;
 
         // Fetch user roles from database
-        let roles = UserRole::get_user_roles(&self.pool, token.user_id)
+        let roles = UserRole::get_user_roles(&self.pool, token.user_id, token.tenant_id)
             .await
             .unwrap_or_else(|_| vec!["user".to_string()]);
 
@@ -335,18 +335,25 @@ impl TokenService {
         Ok(())
     }
 
-    /// Revoke all refresh tokens for a user.
-    pub async fn revoke_all_user_tokens(&self, user_id: UserId) -> Result<u64, ApiAuthError> {
-        let query = r"
+    /// Revoke all refresh tokens for a user within a tenant.
+    ///
+    /// M-7: Includes `tenant_id` filter for defense-in-depth tenant isolation.
+    pub async fn revoke_all_user_tokens(
+        &self,
+        user_id: UserId,
+        tenant_id: uuid::Uuid,
+    ) -> Result<u64, ApiAuthError> {
+        let result = sqlx::query(
+            r"
             UPDATE refresh_tokens
             SET revoked_at = NOW()
-            WHERE user_id = $1 AND revoked_at IS NULL
-        ";
-
-        let result = sqlx::query(query)
-            .bind(user_id.as_uuid())
-            .execute(&self.pool)
-            .await?;
+            WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL
+            ",
+        )
+        .bind(user_id.as_uuid())
+        .bind(tenant_id)
+        .execute(&self.pool)
+        .await?;
 
         Ok(result.rows_affected())
     }

@@ -61,6 +61,7 @@ impl AuditService {
         user_id: Option<Uuid>,
         source_ip: IpAddr,
         user_agent: Option<String>,
+        response_code: i32,
     ) {
         let _ = self
             .log(
@@ -72,7 +73,7 @@ impl AuditService {
                 source_ip,
                 user_agent,
                 None,
-                200,
+                response_code,
                 None,
             )
             .await;
@@ -109,18 +110,25 @@ impl AuditService {
     }
 
     /// Log an authentication failure.
+    ///
+    /// **Architectural note**: This method requires a `tenant_id` parameter, but
+    /// in the SCIM auth middleware the tenant is derived from the Bearer token.
+    /// When authentication fails (invalid/revoked token), the tenant is unknown.
+    /// Therefore this method cannot be called from the middleware on auth failure.
+    /// Auth failures are instead logged via `tracing::warn!` in the middleware.
+    /// This method is available for cases where the tenant is known from context
+    /// (e.g., a valid token that lacks required permissions).
     pub async fn log_auth_failure(
         &self,
         tenant_id: Uuid,
         source_ip: IpAddr,
         user_agent: Option<String>,
     ) {
-        // Use a placeholder operation for auth failures
         let _ = self
             .log(
                 tenant_id,
                 None,
-                ScimOperation::Read, // Using READ as a placeholder
+                ScimOperation::List, // Auth failures aren't tied to a specific CRUD operation
                 ScimResourceType::User,
                 None,
                 source_ip,

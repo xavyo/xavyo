@@ -705,7 +705,19 @@ async fn main() {
     // F084: Share RevocationCache with OAuth2 revocation/introspection handlers
     .with_revocation_cache(revocation_cache.clone())
     // F117: Set system tenant ID for device code email confirmations
-    .with_system_tenant_id(SYSTEM_TENANT_ID);
+    .with_system_tenant_id(SYSTEM_TENANT_ID)
+    // F117: Wire Storm-2372 risk scoring — without these, device code approvals
+    // bypass all risk assessment and email confirmation checks.
+    .with_device_risk_service(Arc::new(xavyo_api_oauth::services::DeviceRiskService::new(
+        pool.clone(),
+    )))
+    .with_device_confirmation_service(Arc::new(
+        xavyo_api_oauth::services::DeviceConfirmationService::new(
+            pool.clone(),
+            auth_state.email_sender.clone(),
+            config.issuer_url.clone(),
+        ),
+    ));
 
     // OAuth routes (token endpoint, authorize, userinfo)
     // F082-US7: Rate limit token endpoint
@@ -1846,7 +1858,7 @@ impl xavyo_api_social::AuthService for SocialAuthAdapter {
             .flatten();
 
         // Fetch actual user roles from DB (same pattern as login.rs/verify.rs/recovery.rs)
-        let roles = xavyo_db::UserRole::get_user_roles(&self.pool, user_id)
+        let roles = xavyo_db::UserRole::get_user_roles(&self.pool, user_id, tenant_id)
             .await
             .unwrap_or_else(|_| vec!["user".to_string()]);
 

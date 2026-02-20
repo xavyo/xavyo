@@ -135,8 +135,10 @@ pub fn generate_csrf_token() -> String {
 #[must_use]
 pub fn create_csrf_cookie(token: &str, secure: bool) -> String {
     let secure_flag = if secure { "; Secure" } else { "" };
+    // R9: Add HttpOnly flag — CSRF token is embedded server-side in hidden form fields,
+    // JavaScript does not need to read it.
     format!(
-        "{CSRF_COOKIE_NAME}={token}{secure_flag}; SameSite=Strict; Path=/device; Max-Age={CSRF_COOKIE_MAX_AGE}"
+        "{CSRF_COOKIE_NAME}={token}{secure_flag}; SameSite=Strict; HttpOnly; Path=/device; Max-Age={CSRF_COOKIE_MAX_AGE}"
     )
 }
 
@@ -177,6 +179,11 @@ pub fn extract_csrf_cookie(headers: &HeaderMap) -> Option<String> {
 /// True if the tokens match, false otherwise.
 #[must_use]
 pub fn validate_csrf_token(cookie_token: &str, form_token: &str) -> bool {
+    // R9: Reject empty tokens — two empty strings would otherwise match
+    if cookie_token.is_empty() {
+        return false;
+    }
+
     // Use constant-time comparison
     if cookie_token.len() != form_token.len() {
         return false;
@@ -397,8 +404,8 @@ mod tests {
         assert!(cookie.contains("Secure"));
         assert!(cookie.contains("SameSite=Strict"));
         assert!(cookie.contains("Path=/device"));
-        // CSRF cookie is NOT HttpOnly (can be read by JS if needed)
-        assert!(!cookie.contains("HttpOnly"));
+        // R9: CSRF cookie now includes HttpOnly since JS doesn't need to read it
+        assert!(cookie.contains("HttpOnly"));
     }
 
     #[test]
@@ -471,8 +478,8 @@ mod tests {
 
     #[test]
     fn test_validate_csrf_token_empty_strings() {
-        // Both empty - should match
-        assert!(validate_csrf_token("", ""));
+        // R9: Both empty should NOT match (empty tokens are rejected)
+        assert!(!validate_csrf_token("", ""));
     }
 
     #[test]

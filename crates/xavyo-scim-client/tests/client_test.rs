@@ -359,7 +359,8 @@ async fn test_oauth2_cc_fetches_token_from_endpoint() {
             scopes: vec![],
         },
         reqwest::Client::new(),
-    );
+    )
+    .with_skip_ssrf_validation();
 
     let token = auth.get_bearer_token().await.unwrap();
     assert_eq!(token, "fetched-access-token");
@@ -389,7 +390,8 @@ async fn test_oauth2_cc_caches_token() {
             scopes: vec![],
         },
         reqwest::Client::new(),
-    );
+    )
+    .with_skip_ssrf_validation();
 
     let token1 = auth.get_bearer_token().await.unwrap();
     let token2 = auth.get_bearer_token().await.unwrap();
@@ -421,7 +423,8 @@ async fn test_oauth2_cc_invalidate_cache_forces_refetch() {
             scopes: vec![],
         },
         reqwest::Client::new(),
-    );
+    )
+    .with_skip_ssrf_validation();
 
     let _token1 = auth.get_bearer_token().await.unwrap();
     auth.invalidate_cache().await;
@@ -452,7 +455,8 @@ async fn test_oauth2_cc_sends_scopes() {
             scopes: vec!["read".to_string(), "write".to_string()],
         },
         reqwest::Client::new(),
-    );
+    )
+    .with_skip_ssrf_validation();
 
     let token = auth.get_bearer_token().await.unwrap();
     assert_eq!(token, "scoped-token");
@@ -476,7 +480,8 @@ async fn test_oauth2_cc_token_endpoint_failure() {
             scopes: vec![],
         },
         reqwest::Client::new(),
-    );
+    )
+    .with_skip_ssrf_validation();
 
     let result = auth.get_bearer_token().await;
     assert!(matches!(result, Err(ScimClientError::AuthError(_))));
@@ -515,7 +520,8 @@ async fn test_oauth2_cc_token_used_in_scim_requests() {
             scopes: vec![],
         },
         reqwest::Client::new(),
-    );
+    )
+    .with_skip_ssrf_validation();
     let client = ScimClient::with_http_client(scim_server.uri(), auth, reqwest::Client::new());
 
     let config = client.discover_service_provider_config().await.unwrap();
@@ -757,7 +763,8 @@ async fn test_401_invalidates_oauth2_token_cache() {
             scopes: vec![],
         },
         reqwest::Client::new(),
-    );
+    )
+    .with_skip_ssrf_validation();
     let client = ScimClient::with_http_client(scim_server.uri(), auth, reqwest::Client::new());
 
     let result = client.get_user("trigger-401").await;

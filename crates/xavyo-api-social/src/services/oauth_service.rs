@@ -2,7 +2,7 @@
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use moka::sync::Cache;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -51,6 +51,10 @@ pub struct OAuthStateClaims {
     pub redirect_after: Option<String>,
     /// User ID for account linking (if linking existing account).
     pub user_id: Option<Uuid>,
+    /// OIDC nonce sent in the authorization URL, validated against the ID token.
+    /// `None` for non-OIDC providers (GitHub) or in-flight tokens from before this field existed.
+    #[serde(default)]
+    pub oidc_nonce: Option<String>,
     /// Expiration timestamp.
     pub exp: i64,
     /// Issued at timestamp.
@@ -144,6 +148,20 @@ impl OAuthService {
         computed_challenge == challenge
     }
 
+    /// Generate an OIDC nonce for providers that support it.
+    ///
+    /// Returns `Some` for Google, Microsoft, and Apple (OIDC providers),
+    /// `None` for GitHub (not OIDC, no ID token).
+    #[must_use]
+    pub fn generate_oidc_nonce(provider: ProviderType) -> Option<String> {
+        match provider {
+            ProviderType::Google | ProviderType::Microsoft | ProviderType::Apple => {
+                Some(Uuid::new_v4().to_string())
+            }
+            ProviderType::Github => None,
+        }
+    }
+
     /// Create a signed state parameter for an OAuth flow.
     ///
     /// The `redirect_after` value is sanitized before embedding to prevent
@@ -155,6 +173,7 @@ impl OAuthService {
         pkce_verifier: &str,
         redirect_after: Option<String>,
         user_id: Option<Uuid>,
+        oidc_nonce: Option<String>,
     ) -> SocialResult<String> {
         let now = Utc::now();
         let exp = now + Duration::minutes(STATE_LIFETIME_MINUTES);
@@ -169,6 +188,7 @@ impl OAuthService {
             pkce_verifier: pkce_verifier.to_string(),
             redirect_after: safe_redirect,
             user_id,
+            oidc_nonce,
             exp: exp.timestamp(),
             iat: now.timestamp(),
         };
@@ -188,6 +208,8 @@ impl OAuthService {
     /// The nonce is tracked in an in-memory cache with TTL matching the state lifetime.
     pub fn validate_state(&self, state: &str) -> SocialResult<OAuthStateClaims> {
         let mut validation = Validation::default();
+        // SECURITY: Explicitly pin HS256 to prevent algorithm confusion if defaults change.
+        validation.algorithms = vec![Algorithm::HS256];
         validation.validate_exp = true;
         validation.required_spec_claims.clear();
 
@@ -208,12 +230,13 @@ impl OAuthService {
             });
         }
 
-        // SECURITY: Enforce single-use atomically by inserting first, then checking.
-        // If the nonce was already present, reject as replay attack.
-        let nonce = &token_data.claims.nonce;
-        let was_already_used = self.used_nonces.get(nonce).is_some();
-        self.used_nonces.insert(nonce.clone(), ());
-        if was_already_used {
+        // SECURITY: Enforce single-use via moka's entry API for atomic check-and-insert.
+        // `entry().or_insert()` is atomic within moka — prevents TOCTOU race where
+        // two concurrent requests both see "not present" with separate get()+insert().
+        let nonce = token_data.claims.nonce.clone();
+        let entry = self.used_nonces.entry(nonce).or_insert(());
+        if !entry.is_fresh() {
+            // Nonce was already present — replay attack
             return Err(SocialError::InvalidState {
                 reason: "state token has already been used".to_string(),
             });
@@ -268,6 +291,7 @@ mod tests {
                 &pkce.verifier,
                 Some("/dashboard".to_string()),
                 None,
+                None,
             )
             .unwrap();
 
@@ -281,6 +305,7 @@ mod tests {
         assert_eq!(claims.pkce_verifier, pkce.verifier);
         assert_eq!(claims.redirect_after, Some("/dashboard".to_string()));
         assert!(claims.user_id.is_none());
+        assert!(claims.oidc_nonce.is_none());
     }
 
     #[test]
@@ -297,11 +322,46 @@ mod tests {
                 &pkce.verifier,
                 None,
                 Some(user_id),
+                None,
             )
             .unwrap();
 
         let claims = service.validate_state(&state).unwrap();
         assert_eq!(claims.user_id, Some(user_id));
+    }
+
+    #[test]
+    fn test_state_with_oidc_nonce() {
+        let service = test_service();
+        let tenant_id = Uuid::new_v4();
+        let pkce = OAuthService::generate_pkce();
+        let nonce = Uuid::new_v4().to_string();
+
+        let state = service
+            .create_state(
+                tenant_id,
+                ProviderType::Google,
+                &pkce.verifier,
+                None,
+                None,
+                Some(nonce.clone()),
+            )
+            .unwrap();
+
+        let claims = service.validate_state(&state).unwrap();
+        assert_eq!(claims.oidc_nonce, Some(nonce));
+    }
+
+    #[test]
+    fn test_generate_oidc_nonce_oidc_providers() {
+        assert!(OAuthService::generate_oidc_nonce(ProviderType::Google).is_some());
+        assert!(OAuthService::generate_oidc_nonce(ProviderType::Microsoft).is_some());
+        assert!(OAuthService::generate_oidc_nonce(ProviderType::Apple).is_some());
+    }
+
+    #[test]
+    fn test_generate_oidc_nonce_github_none() {
+        assert!(OAuthService::generate_oidc_nonce(ProviderType::Github).is_none());
     }
 
     #[test]
@@ -313,7 +373,14 @@ mod tests {
 
         // Create state with one service
         let state = service
-            .create_state(tenant_id, ProviderType::Apple, &pkce.verifier, None, None)
+            .create_state(
+                tenant_id,
+                ProviderType::Apple,
+                &pkce.verifier,
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         // Try to validate with different service
@@ -337,7 +404,14 @@ mod tests {
         let pkce = OAuthService::generate_pkce();
 
         let state = service
-            .create_state(tenant_id, ProviderType::Google, &pkce.verifier, None, None)
+            .create_state(
+                tenant_id,
+                ProviderType::Google,
+                &pkce.verifier,
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         // First use should succeed
@@ -361,12 +435,26 @@ mod tests {
 
         let pkce1 = OAuthService::generate_pkce();
         let state1 = service
-            .create_state(tenant_id, ProviderType::Google, &pkce1.verifier, None, None)
+            .create_state(
+                tenant_id,
+                ProviderType::Google,
+                &pkce1.verifier,
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         let pkce2 = OAuthService::generate_pkce();
         let state2 = service
-            .create_state(tenant_id, ProviderType::Google, &pkce2.verifier, None, None)
+            .create_state(
+                tenant_id,
+                ProviderType::Google,
+                &pkce2.verifier,
+                None,
+                None,
+                None,
+            )
             .unwrap();
 
         // Using state1 should not affect state2

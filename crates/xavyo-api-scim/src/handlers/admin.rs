@@ -37,7 +37,7 @@ pub async fn list_tokens(
     Extension(token_service): Extension<Arc<TokenService>>,
 ) -> Result<Response, ScimError> {
     if !claims.has_role("admin") {
-        return Err(ScimError::Unauthorized);
+        return Err(ScimError::Forbidden);
     }
 
     let tid = *tenant_id.as_uuid();
@@ -66,7 +66,7 @@ pub async fn create_token(
     Json(request): Json<CreateScimToken>,
 ) -> Result<Response, ScimError> {
     if !claims.has_role("admin") {
-        return Err(ScimError::Unauthorized);
+        return Err(ScimError::Forbidden);
     }
 
     let tid = *tenant_id.as_uuid();
@@ -102,7 +102,7 @@ pub async fn revoke_token(
     Path(id): Path<Uuid>,
 ) -> Result<Response, ScimError> {
     if !claims.has_role("admin") {
-        return Err(ScimError::Unauthorized);
+        return Err(ScimError::Forbidden);
     }
 
     let tid = *tenant_id.as_uuid();
@@ -129,7 +129,7 @@ pub async fn get_mappings(
     Extension(pool): Extension<sqlx::PgPool>,
 ) -> Result<Response, ScimError> {
     if !claims.has_role("admin") {
-        return Err(ScimError::Unauthorized);
+        return Err(ScimError::Forbidden);
     }
 
     let tid = *tenant_id.as_uuid();
@@ -158,7 +158,42 @@ pub async fn update_mappings(
     Json(request): Json<UpdateMappingsRequest>,
 ) -> Result<Response, ScimError> {
     if !claims.has_role("admin") {
-        return Err(ScimError::Unauthorized);
+        return Err(ScimError::Forbidden);
+    }
+
+    // Validate mapping count.
+    const MAX_MAPPINGS: usize = 50;
+    const MAX_FIELD_LEN: usize = 255;
+    const ALLOWED_TRANSFORMS: &[&str] = &["lowercase", "uppercase", "trim"];
+
+    if request.mappings.len() > MAX_MAPPINGS {
+        return Err(ScimError::Validation(format!(
+            "Too many mappings: {} (maximum {MAX_MAPPINGS})",
+            request.mappings.len()
+        )));
+    }
+
+    // Validate each mapping's fields.
+    for (i, mapping) in request.mappings.iter().enumerate() {
+        if mapping.scim_path.is_empty() || mapping.scim_path.len() > MAX_FIELD_LEN {
+            return Err(ScimError::Validation(format!(
+                "Mapping at index {i}: scim_path must be 1-{MAX_FIELD_LEN} characters"
+            )));
+        }
+        if mapping.xavyo_field.is_empty() || mapping.xavyo_field.len() > MAX_FIELD_LEN {
+            return Err(ScimError::Validation(format!(
+                "Mapping at index {i}: xavyo_field must be 1-{MAX_FIELD_LEN} characters"
+            )));
+        }
+        if let Some(ref transform) = mapping.transform {
+            if !ALLOWED_TRANSFORMS.contains(&transform.to_lowercase().as_str()) {
+                return Err(ScimError::Validation(format!(
+                    "Mapping at index {i}: invalid transform '{}'. Allowed: {}",
+                    transform,
+                    ALLOWED_TRANSFORMS.join(", ")
+                )));
+            }
+        }
     }
 
     let tid = *tenant_id.as_uuid();

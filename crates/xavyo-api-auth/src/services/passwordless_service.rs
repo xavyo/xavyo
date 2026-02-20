@@ -527,7 +527,7 @@ impl PasswordlessService {
         let tid = TenantId::from_uuid(tenant_id);
 
         // Fetch user roles
-        let roles = UserRole::get_user_roles(&self.pool, user_id)
+        let roles = UserRole::get_user_roles(&self.pool, user_id, tenant_id)
             .await
             .unwrap_or_else(|_| vec!["user".to_string()]);
 

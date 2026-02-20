@@ -101,9 +101,14 @@ impl GroupService {
             GroupValueFormat::Identifier => group.id.to_string(),
             GroupValueFormat::Dn => {
                 let base = dn_base.unwrap_or("ou=Groups,dc=example,dc=com");
+                // R9: Sanitize dn_base to prevent LDAP injection — reject control chars and NUL
+                let safe_base: String = base
+                    .chars()
+                    .filter(|c| !c.is_control() && *c != '\0')
+                    .collect();
                 // Escape special DN characters in group name
                 let escaped_name = Self::escape_dn_value(&group.display_name);
-                format!("cn={escaped_name},{base}")
+                format!("cn={escaped_name},{safe_base}")
             }
         }
     }

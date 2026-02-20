@@ -9,6 +9,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::handlers;
+use crate::providers::IdTokenVerifier;
 use crate::services::{ConnectionService, EncryptionService, OAuthService, TenantProviderService};
 
 /// Shared state for social authentication handlers.
@@ -28,6 +29,8 @@ pub struct SocialState {
     pub tenant_provider_service: TenantProviderService,
     /// Auth service for issuing tokens (interface to xavyo-auth).
     pub auth_service: Arc<dyn AuthService + Send + Sync>,
+    /// Defense-in-depth ID token verifier for OIDC providers.
+    pub id_token_verifier: IdTokenVerifier,
 }
 
 /// Interface for the authentication service.
@@ -79,6 +82,7 @@ impl SocialState {
         let oauth_service = OAuthService::new(&config.state_secret);
         let connection_service = ConnectionService::new(config.pool.clone(), encryption.clone());
         let tenant_provider_service = TenantProviderService::new(config.pool.clone(), encryption);
+        let id_token_verifier = IdTokenVerifier::new();
 
         Ok(Self {
             pool: config.pool,
@@ -88,6 +92,7 @@ impl SocialState {
             connection_service,
             tenant_provider_service,
             auth_service,
+            id_token_verifier,
         })
     }
 }

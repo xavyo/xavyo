@@ -2,6 +2,7 @@
 
 use crate::error::SamlResult;
 use crate::services::{MetadataGenerator, SpService};
+use crate::session::SessionStore;
 use axum::{
     extract::State,
     http::{header, StatusCode},
@@ -19,6 +20,8 @@ pub struct SamlState {
     pub pool: PgPool,
     pub base_url: String,
     pub encryption_key: Arc<[u8; 32]>,
+    /// Session store for AuthnRequest replay protection.
+    pub session_store: Arc<dyn SessionStore>,
 }
 
 /// Return `IdP` metadata XML

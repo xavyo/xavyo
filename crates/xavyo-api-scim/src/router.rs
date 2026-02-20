@@ -1,13 +1,14 @@
 //! SCIM 2.0 API router configuration
 
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{delete, get},
     Extension, Router,
 };
 use sqlx::PgPool;
 use std::sync::Arc;
 
-use crate::handlers::{admin, groups, users};
+use crate::handlers::{admin, discovery, groups, users};
 use crate::middleware::{auth::ScimAuthLayer, rate_limit::RateLimitLayer};
 use crate::services::{AuditService, GroupService, TokenService, UserService};
 
@@ -62,7 +63,17 @@ pub fn scim_resource_router(config: ScimConfig) -> Router {
     let group_service = Arc::new(GroupService::new(pool.clone(), base_url));
     let audit_service = Arc::new(AuditService::new(pool.clone()));
 
-    Router::new()
+    // Discovery endpoints — unauthenticated per RFC 7643 Section 4
+    let discovery_routes = Router::new()
+        .route(
+            "/ServiceProviderConfig",
+            get(discovery::service_provider_config),
+        )
+        .route("/ResourceTypes", get(discovery::resource_types))
+        .route("/Schemas", get(discovery::schemas));
+
+    // Authenticated provisioning endpoints
+    let provisioning_routes = Router::new()
         // User endpoints
         .route("/Users", get(users::list_users).post(users::create_user))
         .route(
@@ -84,25 +95,39 @@ pub fn scim_resource_router(config: ScimConfig) -> Router {
                 .patch(groups::update_group)
                 .delete(groups::delete_group),
         )
-        // Apply SCIM auth and rate limiting (innermost layers)
-        // Note: Layers are applied in reverse order - last layer is outermost (runs first)
-        .layer(ScimAuthLayer::new())
+        // Apply body size limit, SCIM auth, and rate limiting.
+        // Note: Layers are applied in reverse order — last .layer() is outermost (runs first).
+        // Auth must run before rate limiting so ScimAuthContext is available for tenant-keyed buckets.
+        // SECURITY: 1 MB body limit prevents oversized payloads on SCIM write endpoints.
+        .layer(DefaultBodyLimit::max(1024 * 1024))
         .layer(RateLimitLayer::new(
             config.rate_limit_per_sec,
             config.rate_limit_burst,
         ))
-        // Add services as extensions (outermost layers - run before auth)
+        .layer(ScimAuthLayer::new())
+        // Add services as extensions (outermost layers — run before auth)
         .layer(Extension(pool))
         .layer(Extension(audit_service))
         .layer(Extension(group_service))
         .layer(Extension(user_service))
-        .layer(Extension(token_service.clone()))
+        .layer(Extension(token_service.clone()));
+
+    // Merge: discovery (unauthenticated) + provisioning (authenticated)
+    discovery_routes.merge(provisioning_routes)
 }
 
 /// Create the SCIM admin router (for /admin/scim endpoints)
 ///
 /// This router handles SCIM token and mapping management.
 /// It requires admin JWT authentication (not SCIM token).
+///
+/// **IMPORTANT**: This router does NOT include its own JWT auth middleware.
+/// It relies on the parent application mounting it behind the global JWT auth
+/// middleware (see `apps/idp-api/src/main.rs`). All handlers perform their own
+/// `claims.has_role("admin")` checks as defense-in-depth, but the JWT extraction
+/// and validation is handled by the parent's middleware layer. If this router
+/// is mounted without JWT middleware, the `Extension<JwtClaims>` extraction
+/// will fail with a 500 error (missing extension), preventing unauthorized access.
 ///
 /// Mount at `/admin/scim`:
 /// - GET/POST /tokens

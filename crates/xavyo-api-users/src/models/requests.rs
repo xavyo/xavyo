@@ -14,10 +14,6 @@ pub struct CreateUserRequest {
 
     /// Roles to assign to the user.
     pub roles: Vec<String>,
-
-    /// Optional username (3-64 chars, alphanumeric + underscore + hyphen, starts with letter).
-    #[serde(default)]
-    pub username: Option<String>,
 }
 
 /// Request to update an existing user.
@@ -34,10 +30,6 @@ pub struct UpdateUserRequest {
     /// New active status (optional).
     #[serde(default)]
     pub is_active: Option<bool>,
-
-    /// New username (optional, 3-64 chars, alphanumeric + underscore + hyphen, starts with letter).
-    #[serde(default)]
-    pub username: Option<String>,
 }
 
 /// Query parameters for listing users.
@@ -54,6 +46,10 @@ pub struct ListUsersQuery {
     /// Filter by email (case-insensitive partial match).
     #[serde(default)]
     pub email: Option<String>,
+
+    /// Filter by active status (true = active only, false = inactive only, omit = all).
+    #[serde(default)]
+    pub is_active: Option<bool>,
 }
 
 impl ListUsersQuery {
@@ -101,6 +97,7 @@ mod tests {
             offset: None,
             limit: None,
             email: None,
+            is_active: None,
         };
         assert_eq!(query.offset(), 0);
         assert_eq!(query.limit(), 20);
@@ -112,6 +109,7 @@ mod tests {
             offset: Some(-5),
             limit: Some(500),
             email: None,
+            is_active: None,
         };
         assert_eq!(query.offset(), 0);
         assert_eq!(query.limit(), 100);

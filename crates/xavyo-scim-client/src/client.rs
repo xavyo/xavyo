@@ -9,6 +9,49 @@ use reqwest::{Client, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 use tracing::{debug, warn};
+
+/// URL-encode a SCIM resource ID for use in path segments.
+///
+/// SCIM external IDs may contain characters that are not URL-safe (e.g., `/`, `+`, `=`).
+/// Percent-encoding prevents path traversal and malformed URLs.
+///
+/// Per RFC 3986 §2.3, unreserved characters (ALPHA, DIGIT, `-`, `.`, `_`, `~`) are
+/// never encoded. Only characters that are reserved or otherwise unsafe in a path
+/// segment are percent-encoded.
+fn url_encode_id(id: &str) -> String {
+    use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+    // Encode characters unsafe in a URI path segment.
+    // Start from CONTROLS and add all reserved/special chars that must be encoded.
+    const PATH_SEGMENT_ENCODE: &AsciiSet = &CONTROLS
+        .add(b' ')
+        .add(b'"')
+        .add(b'#')
+        .add(b'%')
+        .add(b'/')
+        .add(b'<')
+        .add(b'>')
+        .add(b'?')
+        .add(b'[')
+        .add(b']')
+        .add(b'^')
+        .add(b'`')
+        .add(b'{')
+        .add(b'|')
+        .add(b'}')
+        .add(b'@')
+        .add(b'!')
+        .add(b'$')
+        .add(b'&')
+        .add(b'\'')
+        .add(b'(')
+        .add(b')')
+        .add(b'*')
+        .add(b'+')
+        .add(b',')
+        .add(b';')
+        .add(b'=');
+    utf8_percent_encode(id, PATH_SEGMENT_ENCODE).to_string()
+}
 use xavyo_api_scim::models::{
     ScimGroup, ScimGroupListResponse, ScimPatchRequest, ScimUser, ScimUserListResponse,
 };
@@ -117,6 +160,20 @@ impl ScimClient {
         timeout: Duration,
         tls_verify: bool,
     ) -> ScimClientResult<Self> {
+        if !tls_verify {
+            warn!(
+                base_url = %base_url,
+                "SCIM client created with TLS verification DISABLED — \
+                 this is insecure and should only be used for development/testing"
+            );
+        } else if !base_url.starts_with("https://") {
+            warn!(
+                base_url = %base_url,
+                "SCIM client has TLS verification enabled but base_url is not HTTPS — \
+                 credentials will be transmitted in plaintext"
+            );
+        }
+
         let http_client = Client::builder()
             .timeout(timeout)
             .danger_accept_invalid_certs(!tls_verify)
@@ -208,13 +265,13 @@ impl ScimClient {
 
     /// Get a user by their SCIM ID (GET /Users/:id).
     pub async fn get_user(&self, id: &str) -> ScimClientResult<ScimUser> {
-        let url = format!("{}/Users/{}", self.base_url, id);
+        let url = format!("{}/Users/{}", self.base_url, url_encode_id(id));
         self.get(&url).await
     }
 
     /// Replace a user (PUT /Users/:id).
     pub async fn replace_user(&self, id: &str, user: &ScimUser) -> ScimClientResult<ScimUser> {
-        let url = format!("{}/Users/{}", self.base_url, id);
+        let url = format!("{}/Users/{}", self.base_url, url_encode_id(id));
         self.put(&url, user).await
     }
 
@@ -224,17 +281,17 @@ impl ScimClient {
         id: &str,
         patch: &ScimPatchRequest,
     ) -> ScimClientResult<ScimUser> {
-        let url = format!("{}/Users/{}", self.base_url, id);
+        let url = format!("{}/Users/{}", self.base_url, url_encode_id(id));
         self.patch(&url, patch).await
     }
 
     /// Delete a user (DELETE /Users/:id).
     pub async fn delete_user(&self, id: &str) -> ScimClientResult<()> {
-        let url = format!("{}/Users/{}", self.base_url, id);
+        let url = format!("{}/Users/{}", self.base_url, url_encode_id(id));
         self.delete(&url).await
     }
 
-    /// Deactivate a user by setting active=false (PATCH /Users/:id).
+    /// Deactivate a user by setting `active=false` (PATCH /Users/:id).
     pub async fn deactivate_user(&self, id: &str) -> ScimClientResult<ScimUser> {
         let patch = ScimPatchRequest {
             schemas: vec!["urn:ietf:params:scim:api:messages:2.0:PatchOp".to_string()],
@@ -279,13 +336,13 @@ impl ScimClient {
 
     /// Get a group by SCIM ID (GET /Groups/:id).
     pub async fn get_group(&self, id: &str) -> ScimClientResult<ScimGroup> {
-        let url = format!("{}/Groups/{}", self.base_url, id);
+        let url = format!("{}/Groups/{}", self.base_url, url_encode_id(id));
         self.get(&url).await
     }
 
     /// Replace a group (PUT /Groups/:id).
     pub async fn replace_group(&self, id: &str, group: &ScimGroup) -> ScimClientResult<ScimGroup> {
-        let url = format!("{}/Groups/{}", self.base_url, id);
+        let url = format!("{}/Groups/{}", self.base_url, url_encode_id(id));
         self.put(&url, group).await
     }
 
@@ -295,13 +352,13 @@ impl ScimClient {
         id: &str,
         patch: &ScimPatchRequest,
     ) -> ScimClientResult<ScimGroup> {
-        let url = format!("{}/Groups/{}", self.base_url, id);
+        let url = format!("{}/Groups/{}", self.base_url, url_encode_id(id));
         self.patch(&url, patch).await
     }
 
     /// Delete a group (DELETE /Groups/:id).
     pub async fn delete_group(&self, id: &str) -> ScimClientResult<()> {
-        let url = format!("{}/Groups/{}", self.base_url, id);
+        let url = format!("{}/Groups/{}", self.base_url, url_encode_id(id));
         self.delete(&url).await
     }
 
@@ -351,9 +408,10 @@ impl ScimClient {
 
         if !remove_member_ids.is_empty() {
             for id in remove_member_ids {
+                let escaped_id = escape_scim_filter_value(id);
                 operations.push(xavyo_api_scim::models::ScimPatchOp {
                     op: "remove".to_string(),
-                    path: Some(format!("members[value eq \"{id}\"]")),
+                    path: Some(format!("members[value eq \"{escaped_id}\"]")),
                     value: None,
                 });
             }
@@ -368,7 +426,7 @@ impl ScimClient {
             operations,
         };
 
-        let url = format!("{}/Groups/{}", self.base_url, group_id);
+        let url = format!("{}/Groups/{}", self.base_url, url_encode_id(group_id));
         let builder = self.http_client.patch(&url);
         let builder = self.auth.apply(builder).await?;
         let response = builder
@@ -515,6 +573,18 @@ impl ScimClient {
             .text()
             .await
             .unwrap_or_else(|_| "<no body>".to_string());
+
+        // Cap the error body to prevent oversized strings in error variants/logs.
+        const MAX_ERROR_BODY: usize = 4096;
+        let body = if body.len() > MAX_ERROR_BODY {
+            format!(
+                "{}...[truncated, {} bytes total]",
+                &body[..MAX_ERROR_BODY],
+                body.len()
+            )
+        } else {
+            body
+        };
 
         match status {
             StatusCode::NOT_FOUND => Err(ScimClientError::NotFound(body)),

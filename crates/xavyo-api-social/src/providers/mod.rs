@@ -5,6 +5,7 @@
 pub mod apple;
 pub mod github;
 pub mod google;
+pub mod id_token_verifier;
 pub mod microsoft;
 
 pub use async_trait::async_trait;
@@ -13,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{ProviderType, SocialResult};
 
 /// Token response from a social provider.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TokenResponse {
     /// Access token for API calls.
     pub access_token: String,
@@ -23,6 +24,21 @@ pub struct TokenResponse {
     pub expires_in: Option<i64>,
     /// ID token (OIDC providers).
     pub id_token: Option<String>,
+}
+
+// R9: Custom Debug to prevent provider token leakage in logs
+impl std::fmt::Debug for TokenResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TokenResponse")
+            .field("access_token", &"[REDACTED]")
+            .field(
+                "refresh_token",
+                &self.refresh_token.as_ref().map(|_| "[REDACTED]"),
+            )
+            .field("expires_in", &self.expires_in)
+            .field("id_token", &self.id_token.as_ref().map(|_| "[REDACTED]"))
+            .finish()
+    }
 }
 
 /// User information from a social provider.
@@ -78,7 +94,14 @@ pub trait SocialProvider: Send + Sync {
     /// * `state` - CSRF protection state parameter
     /// * `pkce_challenge` - PKCE code challenge (S256)
     /// * `redirect_uri` - Callback URL
-    fn authorization_url(&self, state: &str, pkce_challenge: &str, redirect_uri: &str) -> String;
+    /// * `nonce` - OIDC nonce for ID token replay protection (`None` for non-OIDC providers)
+    fn authorization_url(
+        &self,
+        state: &str,
+        pkce_challenge: &str,
+        redirect_uri: &str,
+        nonce: Option<&str>,
+    ) -> String;
 
     /// Exchange an authorization code for tokens.
     ///
@@ -118,12 +141,11 @@ impl ProviderFactory {
     }
 
     /// Create a Microsoft provider.
-    #[must_use]
     pub fn microsoft(
         client_id: String,
         client_secret: String,
         azure_tenant: Option<String>,
-    ) -> microsoft::MicrosoftProvider {
+    ) -> SocialResult<microsoft::MicrosoftProvider> {
         microsoft::MicrosoftProvider::new(client_id, client_secret, azure_tenant)
     }
 
@@ -148,4 +170,5 @@ impl ProviderFactory {
 pub use apple::AppleProvider;
 pub use github::GithubProvider;
 pub use google::GoogleProvider;
+pub use id_token_verifier::IdTokenVerifier;
 pub use microsoft::MicrosoftProvider;

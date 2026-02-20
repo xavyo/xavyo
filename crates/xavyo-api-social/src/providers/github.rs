@@ -128,10 +128,18 @@ impl SocialProvider for GithubProvider {
         ProviderType::Github
     }
 
-    fn authorization_url(&self, state: &str, _pkce_challenge: &str, redirect_uri: &str) -> String {
+    fn authorization_url(
+        &self,
+        state: &str,
+        _pkce_challenge: &str,
+        redirect_uri: &str,
+        _nonce: Option<&str>,
+    ) -> String {
         let scopes = self.default_scopes().join(" ");
 
-        // Note: GitHub doesn't support PKCE, so we ignore the challenge
+        // SECURITY: GitHub doesn't support PKCE (code_challenge/code_verifier).
+        // Mitigations: signed single-use CSRF state token + server-side client_secret
+        // (confidential client flow makes PKCE less critical).
         format!(
             "{}?client_id={}&redirect_uri={}&scope={}&state={}",
             AUTHORIZATION_ENDPOINT,
@@ -249,12 +257,14 @@ mod tests {
             "state-token",
             "pkce-challenge", // Ignored for GitHub
             "https://example.com/callback",
+            Some("ignored-nonce"), // Ignored for GitHub (not OIDC)
         );
 
         assert!(url.starts_with(AUTHORIZATION_ENDPOINT));
         assert!(url.contains("client_id=client-id"));
         assert!(url.contains("state=state-token"));
         assert!(url.contains("scope=read%3Auser")); // read:user URL encoded
+        assert!(!url.contains("nonce=")); // GitHub ignores nonce
     }
 
     #[test]

@@ -1,6 +1,6 @@
-//! JWT encoding and decoding with RS256 algorithm.
+//! JWT encoding and decoding.
 //!
-//! Provides functions to encode and decode JWT tokens using RSA keys.
+//! Provides functions to encode and decode JWT tokens using RSA and EC keys.
 
 use crate::claims::JwtClaims;
 use crate::error::AuthError;
@@ -192,6 +192,58 @@ pub fn decode_token_with_config(
     }
 
     // Set audience validation if configured, otherwise disable it
+    if let Some(ref aud) = config.audience {
+        validation.set_audience(aud);
+    } else {
+        validation.validate_aud = false;
+    }
+
+    let token_data: TokenData<JwtClaims> =
+        decode(token, &key, &validation).map_err(map_jwt_error)?;
+
+    Ok(token_data.claims)
+}
+
+/// Decode and validate a JWT token with a specific algorithm.
+///
+/// Unlike `decode_token_with_config` (RS256-only for internal tokens), this
+/// function supports RS256/RS384/RS512 and ES256/ES384/ES512 — designed for
+/// verifying tokens from external IdPs that may use EC keys.
+///
+/// # Arguments
+///
+/// * `token` - The JWT token string
+/// * `public_key_pem` - PEM-encoded public key (RSA or EC)
+/// * `algorithm` - The signing algorithm to validate against
+/// * `config` - Validation configuration
+///
+/// # Returns
+///
+/// The decoded JWT claims.
+pub fn decode_token_with_algorithm(
+    token: &str,
+    public_key_pem: &[u8],
+    algorithm: Algorithm,
+    config: &ValidationConfig,
+) -> Result<JwtClaims, AuthError> {
+    let key = match algorithm {
+        Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 => {
+            DecodingKey::from_rsa_pem(public_key_pem)
+        }
+        Algorithm::ES256 | Algorithm::ES384 => DecodingKey::from_ec_pem(public_key_pem),
+        _ => return Err(AuthError::InvalidAlgorithm),
+    }
+    .map_err(|e| AuthError::InvalidKey(format!("Invalid public key: {e}")))?;
+
+    let mut validation = Validation::new(algorithm);
+    validation.algorithms = vec![algorithm];
+    validation.leeway = config.leeway;
+    validation.validate_exp = config.validate_exp;
+
+    if let Some(ref iss) = config.issuer {
+        validation.set_issuer(&[iss]);
+    }
+
     if let Some(ref aud) = config.audience {
         validation.set_audience(aud);
     } else {

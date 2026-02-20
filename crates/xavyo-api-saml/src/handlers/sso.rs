@@ -8,6 +8,7 @@ use crate::saml::UserAttributes;
 use crate::services::{
     AssertionBuilder, GroupService, RequestParser, SignatureValidator, SpService,
 };
+use crate::session::AuthnRequestSession;
 use axum::{
     extract::{Query, State},
     response::{Html, IntoResponse, Response},
@@ -163,6 +164,8 @@ async fn handle_sso<'a>(
     binding_type: BindingType<'a>,
 ) -> SamlResult<Response> {
     // Parse the AuthnRequest
+    // SECURITY (H11): For POST binding, decode base64 once and pass the XML directly
+    // to parse_xml to avoid double-decode (parse_post did a second decode).
     let (authn_request, decoded_xml) = match &binding_type {
         BindingType::Redirect(_) => {
             let req = RequestParser::parse_redirect(saml_request)?;
@@ -176,7 +179,8 @@ async fn handle_sso<'a>(
                     })?;
             let xml = String::from_utf8(decoded)
                 .map_err(|e| SamlError::InvalidAuthnRequest(format!("Invalid UTF-8: {e}")))?;
-            let req = RequestParser::parse_post(saml_request)?;
+            // Parse the already-decoded XML directly (not the base64-encoded form)
+            let req = RequestParser::parse_xml_public(&xml)?;
             (req, Some(xml))
         }
     };
@@ -188,7 +192,9 @@ async fn handle_sso<'a>(
         "SAML AuthnRequest received"
     );
 
-    // Look up the SP
+    // Look up the SP first — fail fast if unknown entity ID.
+    // This is done before storing the session to avoid orphan session rows
+    // when the SP is unknown or disabled.
     let sp_service = SpService::new(state.pool.clone());
     let sp = sp_service
         .get_sp_by_entity_id(tenant_id, &authn_request.issuer)
@@ -199,7 +205,25 @@ async fn handle_sso<'a>(
         return Err(SamlError::DisabledServiceProvider(sp.entity_id));
     }
 
-    // Validate signature if required
+    // Validate signature if required.
+    // SECURITY: If validate_signatures is disabled but a signature IS present,
+    // log a warning — the SP may have been misconfigured.
+    if !sp.validate_signatures {
+        let has_signature = match &binding_type {
+            BindingType::Redirect(sig_info) => sig_info.signature.is_some(),
+            BindingType::Post => decoded_xml
+                .as_ref()
+                .is_some_and(|xml| xml.contains("<ds:Signature") || xml.contains("<Signature")),
+        };
+        if has_signature {
+            tracing::warn!(
+                tenant_id = %tenant_id,
+                sp_entity_id = %sp.entity_id,
+                "AuthnRequest contains a signature but validate_signatures is disabled — \
+                 consider enabling signature validation for this SP"
+            );
+        }
+    }
     if sp.validate_signatures {
         let sp_cert = sp.certificate.as_ref().ok_or_else(|| {
             SamlError::SignatureValidationFailed(
@@ -243,7 +267,7 @@ async fn handle_sso<'a>(
                         "Missing decoded XML for POST binding signature validation".to_string(),
                     )
                 })?;
-                SignatureValidator::validate_post_signature(xml, sp_cert)?;
+                SignatureValidator::validate_post_signature(xml, sp_cert, Some(&authn_request.id))?;
                 tracing::debug!(
                     tenant_id = %tenant_id,
                     sp_entity_id = %sp.entity_id,
@@ -252,6 +276,25 @@ async fn handle_sso<'a>(
             }
         }
     }
+
+    // C2: Store the AuthnRequest session for replay protection AFTER validation.
+    // Only store sessions for requests from known, enabled SPs with valid signatures.
+    // If the same request ID is replayed, session store will reject it as duplicate.
+    let session = AuthnRequestSession::new(
+        tenant_id,
+        authn_request.id.clone(),
+        authn_request.issuer.clone(),
+        relay_state.map(String::from),
+    );
+    state.session_store.store(session).await.map_err(|e| {
+        tracing::warn!(
+            tenant_id = %tenant_id,
+            request_id = %authn_request.id,
+            error = %e,
+            "Failed to store AuthnRequest session (possible replay)"
+        );
+        SamlError::InvalidAuthnRequest(format!("AuthnRequest session error: {e}"))
+    })?;
 
     // SECURITY: Validate RelayState length.
     // SAML spec recommends 80 bytes but many SPs use longer values.
@@ -348,20 +391,28 @@ async fn handle_sso<'a>(
     // Build entity ID
     let idp_entity_id = format!("{}/saml/metadata?tenant={}", state.base_url, tenant_id);
 
-    // Build SAML Response
+    // Get ACS URL (prefer request, fall back to first configured).
+    // SECURITY: Reject if no ACS URL is available — an empty Destination would cause
+    // the auto-submit form to POST the assertion back to the IdP's own SSO endpoint.
+    let acs_url = authn_request
+        .assertion_consumer_service_url
+        .as_deref()
+        .or_else(|| sp.acs_urls.first().map(std::string::String::as_str))
+        .ok_or_else(|| {
+            SamlError::AssertionGenerationFailed(
+                "No ACS URL in request and none configured for SP".to_string(),
+            )
+        })?;
+
+    // Build SAML Response — pass the resolved ACS URL so Destination/Recipient match
     let builder = AssertionBuilder::new(idp_entity_id, credentials);
     let saml_response = builder.build_response(
         &sp,
         &user_attrs,
         Some(&authn_request.id),
         None, // session_id - could be user session
+        Some(acs_url),
     )?;
-
-    // Get ACS URL (prefer request, fall back to first configured)
-    let acs_url = authn_request
-        .assertion_consumer_service_url
-        .as_deref()
-        .unwrap_or_else(|| sp.acs_urls.first().map_or("", std::string::String::as_str));
 
     tracing::info!(
         tenant_id = %tenant_id,

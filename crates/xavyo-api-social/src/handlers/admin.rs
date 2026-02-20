@@ -9,7 +9,7 @@ use axum::{
 use tracing::info;
 
 use crate::error::{ProviderType, SocialError, SocialResult};
-use crate::extractors::TenantId;
+use crate::extractors::AuthenticatedUser;
 use crate::models::{TenantProviderResponse, TenantProvidersListResponse, UpdateProviderRequest};
 use crate::SocialState;
 
@@ -27,9 +27,10 @@ use crate::SocialState;
 )]
 pub async fn list_providers(
     State(state): State<SocialState>,
-    TenantId(tenant_id): TenantId,
+    user: AuthenticatedUser,
 ) -> SocialResult<Json<TenantProvidersListResponse>> {
-    // Note: Authorization check should be done by middleware
+    // R9: Use tenant_id from JWT claims (not X-Tenant-ID header) to prevent cross-tenant access
+    let tenant_id = user.tenant_id;
     let providers = state
         .tenant_provider_service
         .list_providers(tenant_id)
@@ -57,10 +58,12 @@ pub async fn list_providers(
 )]
 pub async fn update_provider(
     State(state): State<SocialState>,
-    TenantId(tenant_id): TenantId,
+    user: AuthenticatedUser,
     Path(provider): Path<String>,
     Json(request): Json<UpdateProviderRequest>,
 ) -> SocialResult<Json<TenantProviderResponse>> {
+    // R9: Use tenant_id from JWT claims (not X-Tenant-ID header) to prevent cross-tenant access
+    let tenant_id = user.tenant_id;
     let provider_type: ProviderType = provider.parse()?;
 
     info!(
@@ -121,9 +124,11 @@ pub async fn update_provider(
 )]
 pub async fn disable_provider(
     State(state): State<SocialState>,
-    TenantId(tenant_id): TenantId,
+    user: AuthenticatedUser,
     Path(provider): Path<String>,
 ) -> Result<impl IntoResponse, SocialError> {
+    // R9: Use tenant_id from JWT claims (not X-Tenant-ID header) to prevent cross-tenant access
+    let tenant_id = user.tenant_id;
     let provider_type: ProviderType = provider.parse()?;
 
     info!(

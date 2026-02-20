@@ -152,6 +152,12 @@ impl AuthFlowService {
             .redirect_uri
             .unwrap_or_else(|| format!("{}/", self.callback_base_url));
 
+        // Encrypt PKCE verifier and nonce before storing at rest
+        let encrypted_verifier = self
+            .encryption
+            .encrypt(input.tenant_id, pkce_verifier.secret())?;
+        let encrypted_nonce = self.encryption.encrypt(input.tenant_id, nonce.secret())?;
+
         // Create session record
         let session = FederatedAuthSession::create(
             &self.pool,
@@ -159,8 +165,8 @@ impl AuthFlowService {
                 tenant_id: input.tenant_id,
                 identity_provider_id: input.idp_id,
                 state: state.secret().clone(),
-                nonce: nonce.secret().clone(),
-                pkce_verifier: pkce_verifier.secret().clone(),
+                nonce: encrypted_nonce,
+                pkce_verifier: encrypted_verifier,
                 redirect_uri: final_redirect,
             },
         )
@@ -242,6 +248,12 @@ impl AuthFlowService {
             .encryption
             .decrypt(session.tenant_id, &idp.client_secret_encrypted)?;
 
+        // Decrypt PKCE verifier and nonce from encrypted at-rest storage
+        let pkce_verifier = self
+            .encryption
+            .decrypt(session.tenant_id, &session.pkce_verifier)?;
+        let nonce_value = self.encryption.decrypt(session.tenant_id, &session.nonce)?;
+
         // Build callback URL (must match what was used in initiate)
         let callback_url = format!("{}/auth/federation/callback", self.callback_base_url);
 
@@ -253,7 +265,7 @@ impl AuthFlowService {
                 &idp.client_id,
                 &client_secret,
                 &callback_url,
-                &session.pkce_verifier,
+                &pkce_verifier,
             )
             .await?;
 
@@ -270,7 +282,7 @@ impl AuthFlowService {
         let claims = self.decode_id_token_payload(&token_response.id_token)?;
 
         // C2: Validate nonce to prevent replay attacks
-        if claims.nonce.as_deref() != Some(&session.nonce) {
+        if claims.nonce.as_deref() != Some(nonce_value.as_str()) {
             tracing::warn!(
                 session_id = %session.id,
                 "Nonce mismatch in ID token — possible replay attack"
@@ -341,8 +353,14 @@ impl AuthFlowService {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             // SECURITY: Truncate IdP error response in logs to prevent log injection/bloat.
+            // R9: Use char boundary-safe truncation to prevent panic on multi-byte UTF-8.
             let truncated = if error_text.len() > 500 {
-                format!("{}... (truncated)", &error_text[..500])
+                let safe_end = error_text
+                    .char_indices()
+                    .take_while(|(i, _)| *i < 500)
+                    .last()
+                    .map_or(0, |(i, c)| i + c.len_utf8());
+                format!("{}... (truncated)", &error_text[..safe_end])
             } else {
                 error_text
             };
@@ -383,12 +401,34 @@ impl AuthFlowService {
             ));
         }
 
+        // SECURITY (H2): Guard against oversized payloads before base64 decode.
+        // Base64-encoded 64KB payload is ~87KB. Cap the encoded part to 128KB.
+        if parts[1].len() > 128 * 1024 {
+            return Err(FederationError::InvalidIdToken(
+                "ID token payload exceeds maximum size (128KB encoded)".to_string(),
+            ));
+        }
+
         let payload =
             base64::Engine::decode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, parts[1])
                 .map_err(|e| FederationError::InvalidIdToken(e.to_string()))?;
 
+        // Defense-in-depth: cap decoded payload size at 64KB
+        if payload.len() > 64 * 1024 {
+            return Err(FederationError::InvalidIdToken(
+                "ID token payload exceeds maximum size (64KB decoded)".to_string(),
+            ));
+        }
+
         let claims: IdTokenClaims = serde_json::from_slice(&payload)
             .map_err(|e| FederationError::InvalidIdToken(e.to_string()))?;
+
+        // SECURITY: Guard against unbounded additional claims from malicious IdPs.
+        if claims.additional.len() > 50 {
+            return Err(FederationError::InvalidIdToken(
+                "Too many additional claims".to_string(),
+            ));
+        }
 
         Ok(claims)
     }
@@ -417,6 +457,19 @@ impl AuthFlowService {
             && !trimmed.starts_with("/\\")
             && !trimmed.contains("://")
         {
+            // SECURITY: Block encoded path traversal patterns that could bypass the above checks
+            // after browser URL normalization (e.g., %2f → /, %5c → \, %0a → newline).
+            let lower = trimmed.to_lowercase();
+            if lower.contains("%2f")
+                || lower.contains("%5c")
+                || lower.contains("%0a")
+                || lower.contains("%0d")
+                || lower.contains("\\")
+            {
+                return Err(FederationError::InvalidCallback(
+                    "redirect_uri contains invalid encoded characters".to_string(),
+                ));
+            }
             return Ok(());
         }
         // For absolute URLs: parse both and compare scheme + host + port
@@ -450,11 +503,27 @@ impl AuthFlowService {
         Ok(())
     }
 
-    /// Clean up expired sessions.
+    /// Clean up expired sessions (all tenants — use for system maintenance only).
     pub async fn cleanup_expired_sessions(&self) -> FederationResult<u64> {
         let count = FederatedAuthSession::delete_expired(&self.pool).await?;
         if count > 0 {
             tracing::info!(count = count, "Cleaned up expired federation sessions");
+        }
+        Ok(count)
+    }
+
+    /// R9: Clean up expired sessions for a specific tenant (respects data sovereignty).
+    pub async fn cleanup_expired_sessions_for_tenant(
+        &self,
+        tenant_id: Uuid,
+    ) -> FederationResult<u64> {
+        let count = FederatedAuthSession::cleanup_expired_for_tenant(&self.pool, tenant_id).await?;
+        if count > 0 {
+            tracing::info!(
+                tenant_id = %tenant_id,
+                count = count,
+                "Cleaned up expired federation sessions for tenant"
+            );
         }
         Ok(count)
     }

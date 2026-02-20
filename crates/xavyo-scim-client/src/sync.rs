@@ -139,7 +139,8 @@ impl SyncEngine {
         // ── 3. Count total resources to provision ────────────────────────
         let user_count = count_users_for_tenant(pool, tenant_id).await?;
         let group_count = Group::count_by_tenant(pool, tenant_id).await?;
-        let total_resources = (user_count + group_count) as i32;
+        let total_resources =
+            i32::try_from(user_count.saturating_add(group_count)).unwrap_or(i32::MAX);
 
         // ── 4. Create the sync run record ────────────────────────────────
         let sync_run = ScimSyncRun::create(
@@ -524,16 +525,23 @@ async fn sync_single_group(
 // Helper: paginated user fetching
 // ---------------------------------------------------------------------------
 
-/// Count all users for a tenant.
+/// Count active users for a tenant.
+///
+/// Only counts active users because deactivated users (is_active=false)
+/// represent SCIM-deleted users that should not be provisioned outbound.
 async fn count_users_for_tenant(pool: &PgPool, tenant_id: Uuid) -> Result<i64, sqlx::Error> {
-    let result: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users WHERE tenant_id = $1")
-        .bind(tenant_id)
-        .fetch_one(pool)
-        .await?;
+    let result: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND is_active = true")
+            .bind(tenant_id)
+            .fetch_one(pool)
+            .await?;
     Ok(result.0)
 }
 
-/// Fetch a page of users for a tenant (ordered by id for deterministic pagination).
+/// Fetch a page of active users for a tenant (ordered by id for deterministic pagination).
+///
+/// Only fetches active users because deactivated users (is_active=false)
+/// represent SCIM-deleted users that should not be provisioned outbound.
 async fn fetch_users_page(
     pool: &PgPool,
     tenant_id: Uuid,
@@ -543,7 +551,7 @@ async fn fetch_users_page(
     sqlx::query_as(
         r"
         SELECT * FROM users
-        WHERE tenant_id = $1
+        WHERE tenant_id = $1 AND is_active = true
         ORDER BY id
         LIMIT $2 OFFSET $3
         ",

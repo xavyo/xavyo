@@ -94,6 +94,14 @@ pub struct CreateAdminInvitation {
     pub role: String,
 }
 
+/// Escape ILIKE special characters (`%`, `_`, `\`) to prevent pattern injection.
+fn escape_ilike(input: &str) -> String {
+    input
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
 impl UserInvitation {
     /// Create a new invitation record (F086 bulk import).
     pub async fn create(pool: &PgPool, data: &CreateInvitation) -> Result<Self, sqlx::Error> {
@@ -238,7 +246,7 @@ impl UserInvitation {
         }
 
         if let Some(email) = email_search {
-            q = q.bind(format!("%{email}%"));
+            q = q.bind(format!("%{}%", escape_ilike(email)));
         }
 
         q = q.bind(limit).bind(offset);
@@ -278,7 +286,7 @@ impl UserInvitation {
         }
 
         if let Some(email) = email_search {
-            q = q.bind(format!("%{email}%"));
+            q = q.bind(format!("%{}%", escape_ilike(email)));
         }
 
         let row = q.fetch_one(pool).await?;
@@ -493,7 +501,7 @@ impl UserInvitation {
             r"
             UPDATE user_invitations
             SET status = 'accepted', accepted_at = NOW(), ip_address = $3, user_agent = $4, updated_at = NOW()
-            WHERE id = $1 AND tenant_id = $2 AND status != 'accepted'
+            WHERE id = $1 AND tenant_id = $2 AND status IN ('pending', 'sent')
             RETURNING *
             ",
         )

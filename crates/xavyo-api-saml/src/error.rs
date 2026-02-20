@@ -249,10 +249,14 @@ impl IntoResponse for SamlError {
             SamlError::InvalidAttributeMapping(_) => {
                 "Invalid attribute mapping configuration".to_string()
             }
+            // SECURITY: Use identical message for unknown and disabled SPs to prevent
+            // enumeration of registered SP entity IDs.
+            SamlError::DisabledServiceProvider(_) => {
+                "Service Provider not found or not enabled".to_string()
+            }
             // Safe user-facing messages (contain only client-provided IDs/values)
             SamlError::SessionError(_)
             | SamlError::UnknownServiceProvider(_)
-            | SamlError::DisabledServiceProvider(_)
             | SamlError::NoActiveCertificate
             | SamlError::NotAuthenticated
             | SamlError::UnsupportedNameIdFormat(_)

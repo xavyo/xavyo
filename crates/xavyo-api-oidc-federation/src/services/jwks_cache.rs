@@ -298,9 +298,20 @@ impl JwksCache {
             )));
         }
 
-        let jwks: JwkSet = response
-            .json()
+        // SECURITY: Cap response body size to prevent OOM from malicious JWKS endpoints.
+        // 512 KB is generous — typical JWKS responses are <10 KB.
+        const MAX_JWKS_SIZE: usize = 512 * 1024;
+        let bytes = response
+            .bytes()
             .await
+            .map_err(|e| FederationError::JwksFetchFailed(format!("Read error: {e}")))?;
+        if bytes.len() > MAX_JWKS_SIZE {
+            return Err(FederationError::JwksFetchFailed(format!(
+                "JWKS response too large: {} bytes (max {MAX_JWKS_SIZE})",
+                bytes.len()
+            )));
+        }
+        let jwks: JwkSet = serde_json::from_slice(&bytes)
             .map_err(|e| FederationError::JwksFetchFailed(format!("JSON parse error: {e}")))?;
 
         if jwks.keys.is_empty() {

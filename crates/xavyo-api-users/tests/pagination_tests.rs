@@ -32,6 +32,7 @@ async fn test_list_users_default_pagination() {
         offset: None,
         limit: None,
         email: None,
+        is_active: None,
     };
 
     let result = service
@@ -65,6 +66,7 @@ async fn test_list_users_with_custom_page_size() {
         offset: None,
         limit: Some(3),
         email: None,
+        is_active: None,
     };
 
     let result = service
@@ -100,6 +102,7 @@ async fn test_list_users_with_offset() {
         offset: Some(0),
         limit: Some(3),
         email: None,
+        is_active: None,
     };
     let result1 = service
         .list_users(TenantId::from_uuid(tenant_id), &query1, &[])
@@ -111,6 +114,7 @@ async fn test_list_users_with_offset() {
         offset: Some(3),
         limit: Some(3),
         email: None,
+        is_active: None,
     };
     let result2 = service
         .list_users(TenantId::from_uuid(tenant_id), &query2, &[])
@@ -154,6 +158,7 @@ async fn test_list_users_filter_by_email() {
         offset: None,
         limit: None,
         email: Some("alice".to_string()),
+        is_active: None,
     };
 
     let result = service
@@ -192,6 +197,7 @@ async fn test_list_users_sort_by_created_at() {
         offset: None,
         limit: None,
         email: None,
+        is_active: None,
     };
 
     let result = service
@@ -222,6 +228,7 @@ async fn test_list_users_empty_results() {
         offset: None,
         limit: None,
         email: None,
+        is_active: None,
     };
 
     let result = service
@@ -256,6 +263,7 @@ async fn test_list_users_page_exceeds_available() {
         offset: Some(100),
         limit: Some(10),
         email: None,
+        is_active: None,
     };
 
     let result = service

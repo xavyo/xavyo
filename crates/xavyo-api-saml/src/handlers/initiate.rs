@@ -65,6 +65,15 @@ async fn initiate_sso_inner(
     // Require authenticated user
     let user = user.ok_or(SamlError::NotAuthenticated)?;
 
+    // R8: Validate RelayState length (same check as SP-initiated SSO in sso.rs)
+    if let Some(rs) = relay_state {
+        if rs.len() > 1024 {
+            return Err(SamlError::InvalidAuthnRequest(
+                "RelayState exceeds maximum length (1024 bytes)".to_string(),
+            ));
+        }
+    }
+
     // Look up the SP
     let sp_service = SpService::new(state.pool.clone());
     let sp = sp_service.get_sp(tenant_id, sp_id).await?;

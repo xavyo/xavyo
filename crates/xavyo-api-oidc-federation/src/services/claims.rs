@@ -111,6 +111,13 @@ impl ClaimsService {
 
     /// Validate claim mapping configuration.
     pub fn validate_mapping(&self, mapping: &ClaimMappingConfig) -> FederationResult<()> {
+        // SECURITY: Cap total number of mapping entries to prevent DoS via large configs.
+        if mapping.mappings.len() > 50 {
+            return Err(FederationError::InvalidClaimMapping(
+                "Too many claim mapping entries (max 50)".to_string(),
+            ));
+        }
+
         for entry in &mapping.mappings {
             // Validate source is not empty
             if entry.source.is_empty() {
@@ -126,6 +133,18 @@ impl ClaimsService {
                 ));
             }
 
+            // SECURITY: Bound source/target lengths to prevent DB bloat.
+            if entry.source.len() > 256 {
+                return Err(FederationError::InvalidClaimMapping(
+                    "Source claim name too long (max 256 chars)".to_string(),
+                ));
+            }
+            if entry.target.len() > 256 {
+                return Err(FederationError::InvalidClaimMapping(
+                    "Target claim name too long (max 256 chars)".to_string(),
+                ));
+            }
+
             // Reject reserved/dangerous target names
             let target_lower = entry.target.to_lowercase();
             if Self::RESERVED_TARGETS.contains(&target_lower.as_str()) {
@@ -138,6 +157,22 @@ impl ClaimsService {
             // Validate transform if specified
             if let Some(transform) = &entry.transform {
                 self.validate_transform(transform)?;
+            }
+
+            // SECURITY: Cap group_mapping entry count and key/value sizes.
+            if let Some(group_map) = &entry.group_mapping {
+                if group_map.len() > 100 {
+                    return Err(FederationError::InvalidClaimMapping(
+                        "Too many group mapping entries (max 100 per claim)".to_string(),
+                    ));
+                }
+                for (k, v) in group_map {
+                    if k.len() > 256 || v.len() > 256 {
+                        return Err(FederationError::InvalidClaimMapping(
+                            "Group mapping key/value too long (max 256 chars each)".to_string(),
+                        ));
+                    }
+                }
             }
         }
 
@@ -193,10 +228,11 @@ impl ClaimsService {
                 }
             }
             "split" => {
-                // Split string by comma
+                // Split string by comma (R8: cap at 100 elements to prevent DoS)
                 if let Some(s) = value.as_str() {
                     let parts: Vec<Value> = s
                         .split(',')
+                        .take(100)
                         .map(|p| Value::String(p.trim().to_string()))
                         .collect();
                     Ok(Value::Array(parts))

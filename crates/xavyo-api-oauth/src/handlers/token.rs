@@ -473,17 +473,18 @@ async fn handle_refresh_token_grant(
         client.id
     } else {
         // Public client - verify the client exists in this tenant
-        let client_uuid = Uuid::parse_str(client_id)
-            .map_err(|_| OAuthError::InvalidClient("Invalid client_id format".to_string()))?;
-        // Validate the client belongs to the specified tenant
-        let _client = state
+        // R8-F2: Use the looked-up client's internal ID (not the parsed client_id string).
+        // client_id is the external-facing identifier, while client.id is the internal
+        // database UUID. Using the wrong one could cause refresh token validation failures
+        // or, in edge cases, allow cross-client token refresh.
+        let client = state
             .client_service
             .get_client_by_client_id(tenant_id, client_id)
             .await
             .map_err(|_| {
                 OAuthError::InvalidClient("Client not found in specified tenant".to_string())
             })?;
-        client_uuid
+        client.id
     };
 
     // Validate and rotate the refresh token
@@ -533,10 +534,16 @@ async fn handle_token_exchange_grant(
         .subject_token
         .as_ref()
         .ok_or_else(|| OAuthError::InvalidRequest("subject_token is required".to_string()))?;
-    let _subject_token_type = request
+    // R8-F3: Validate subject_token_type per RFC 8693 §2.1
+    let subject_token_type = request
         .subject_token_type
         .as_ref()
         .ok_or_else(|| OAuthError::InvalidRequest("subject_token_type is required".to_string()))?;
+    if subject_token_type != "urn:ietf:params:oauth:token-type:access_token" {
+        return Err(OAuthError::InvalidRequest(format!(
+            "Unsupported subject_token_type. Expected 'urn:ietf:params:oauth:token-type:access_token', got '{subject_token_type}'"
+        )));
+    }
     let actor_token = request.actor_token.as_ref().ok_or_else(|| {
         OAuthError::InvalidRequest("actor_token is required for delegation".to_string())
     })?;
@@ -566,6 +573,29 @@ async fn handle_token_exchange_grant(
     // Step 1: Verify subject_token signature and extract claims
     let subject_claims = decode_token(subject_token, &state.public_key)
         .map_err(|e| OAuthError::InvalidGrant(format!("invalid subject_token: {e}")))?;
+
+    // SECURITY: Check subject_token against revocation blacklist.
+    // Without this, a revoked token (e.g., via admin revoke-user) could still be
+    // exchanged for a fresh delegated token, extending access past revocation.
+    if !subject_claims.jti.is_empty() {
+        if let Some(ref cache) = state.revocation_cache {
+            match cache.is_revoked(&subject_claims.jti).await {
+                Ok(true) => {
+                    tracing::warn!(jti = %subject_claims.jti, "Rejected revoked subject_token in token exchange");
+                    return Err(OAuthError::InvalidGrant(
+                        "subject_token has been revoked".to_string(),
+                    ));
+                }
+                Ok(false) => {} // Not revoked, proceed
+                Err(e) => {
+                    tracing::error!(jti = %subject_claims.jti, error = %e, "Revocation check failed for subject_token (fail-closed)");
+                    return Err(OAuthError::Internal(
+                        "Token verification failed".to_string(),
+                    ));
+                }
+            }
+        }
+    }
 
     let principal_id = Uuid::parse_str(&subject_claims.sub)
         .map_err(|_| OAuthError::InvalidGrant("subject_token has invalid sub claim".to_string()))?;

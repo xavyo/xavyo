@@ -36,6 +36,14 @@ impl TokenService {
         name: &str,
         created_by: Uuid,
     ) -> ScimResult<ScimTokenCreated> {
+        // Validate token name
+        let name = name.trim();
+        if name.is_empty() || name.len() > 255 {
+            return Err(ScimError::Validation(
+                "Token name must be between 1 and 255 characters".to_string(),
+            ));
+        }
+
         use rand::rngs::OsRng;
         // Generate 32 bytes of random data
         let mut random_bytes = [0u8; 32];
@@ -95,11 +103,14 @@ impl TokenService {
             return Err(ScimError::Unauthorized);
         }
 
-        // Update last used timestamp (fire and forget)
+        // Update last used timestamp (fire and forget).
+        // SECURITY: Pass tenant_id so the spawned task includes it in the WHERE clause,
+        // since the spawned task does not inherit the connection's RLS context.
         let pool = self.pool.clone();
         let token_id = token.id;
+        let token_tenant_id = token.tenant_id;
         tokio::spawn(async move {
-            let _ = ScimToken::update_last_used(&pool, token_id).await;
+            let _ = ScimToken::update_last_used(&pool, token_tenant_id, token_id).await;
         });
 
         Ok(token)

@@ -300,8 +300,13 @@ impl User {
         .await
     }
 
-    /// Update user's email address (after verification) within a specific tenant.
-    pub async fn update_email(
+    /// Confirm an email change after the new address has been verified.
+    ///
+    /// Updates the email, sets `email_verified = true`, and records `email_verified_at`.
+    /// **Only call this after the verification token for the new address has been validated.**
+    /// For unverified admin email changes, use the admin `update_user` flow instead
+    /// (which resets `email_verified` to `false`).
+    pub async fn confirm_email_change(
         pool: &sqlx::PgPool,
         tenant_id: uuid::Uuid,
         id: uuid::Uuid,

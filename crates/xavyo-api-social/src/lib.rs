@@ -10,7 +10,7 @@
 //! - **Secure token storage**: AES-256-GCM encryption with per-tenant keys
 //! - **Account linking**: Automatic detection and linking of existing accounts
 //! - **CSRF protection**: Signed JWT state parameter
-//! - **PKCE support**: Enhanced security for all providers
+//! - **PKCE support**: Enhanced security for Google, Microsoft, Apple (GitHub lacks PKCE support)
 //! - **Multi-tenant**: Per-tenant provider configuration
 //!
 //! # Example

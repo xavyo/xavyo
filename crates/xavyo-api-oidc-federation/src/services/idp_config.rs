@@ -14,6 +14,23 @@ use xavyo_db::models::{
     ValidationStatus,
 };
 
+/// Maximum length for IdP name.
+const MAX_IDP_NAME_LENGTH: usize = 256;
+/// Maximum length for issuer URLs.
+const MAX_ISSUER_URL_LENGTH: usize = 2048;
+/// Maximum length for client ID.
+const MAX_CLIENT_ID_LENGTH: usize = 512;
+/// Maximum length for client secret.
+const MAX_CLIENT_SECRET_LENGTH: usize = 4096;
+/// Maximum length for scopes string.
+const MAX_SCOPES_LENGTH: usize = 1024;
+/// Maximum length for domain string.
+const MAX_DOMAIN_LENGTH: usize = 253;
+/// Maximum number of domains per IdP.
+const MAX_DOMAINS_PER_IDP: usize = 50;
+/// Maximum number of claim mapping entries.
+const MAX_CLAIM_MAPPINGS: usize = 50;
+
 /// Service for managing identity provider configurations.
 #[derive(Clone)]
 pub struct IdpConfigService {
@@ -79,6 +96,95 @@ impl IdpConfigService {
         Ok(UserIdentityLink::count_by_idp(&self.pool, tenant_id, idp_id).await?)
     }
 
+    /// Validate input lengths for create/update requests.
+    fn validate_create_input(req: &CreateIdentityProviderRequest) -> FederationResult<()> {
+        if req.name.len() > MAX_IDP_NAME_LENGTH {
+            return Err(FederationError::InvalidConfiguration(format!(
+                "IdP name exceeds maximum length of {MAX_IDP_NAME_LENGTH} characters"
+            )));
+        }
+        if req.issuer_url.len() > MAX_ISSUER_URL_LENGTH {
+            return Err(FederationError::InvalidConfiguration(format!(
+                "Issuer URL exceeds maximum length of {MAX_ISSUER_URL_LENGTH} characters"
+            )));
+        }
+        if req.client_id.len() > MAX_CLIENT_ID_LENGTH {
+            return Err(FederationError::InvalidConfiguration(format!(
+                "Client ID exceeds maximum length of {MAX_CLIENT_ID_LENGTH} characters"
+            )));
+        }
+        if req.client_secret.len() > MAX_CLIENT_SECRET_LENGTH {
+            return Err(FederationError::InvalidConfiguration(format!(
+                "Client secret exceeds maximum length of {MAX_CLIENT_SECRET_LENGTH} characters"
+            )));
+        }
+        if req.scopes.len() > MAX_SCOPES_LENGTH {
+            return Err(FederationError::InvalidConfiguration(format!(
+                "Scopes string exceeds maximum length of {MAX_SCOPES_LENGTH} characters"
+            )));
+        }
+        if req.domains.len() > MAX_DOMAINS_PER_IDP {
+            return Err(FederationError::InvalidConfiguration(format!(
+                "Too many initial domains (max {MAX_DOMAINS_PER_IDP})"
+            )));
+        }
+        if let Some(ref cm) = req.claim_mapping {
+            if cm.mappings.len() > MAX_CLAIM_MAPPINGS {
+                return Err(FederationError::InvalidConfiguration(format!(
+                    "Too many claim mappings (max {MAX_CLAIM_MAPPINGS})"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate input lengths for update requests.
+    fn validate_update_input(req: &UpdateIdentityProviderRequest) -> FederationResult<()> {
+        if let Some(ref name) = req.name {
+            if name.len() > MAX_IDP_NAME_LENGTH {
+                return Err(FederationError::InvalidConfiguration(format!(
+                    "IdP name exceeds maximum length of {MAX_IDP_NAME_LENGTH} characters"
+                )));
+            }
+        }
+        if let Some(ref issuer_url) = req.issuer_url {
+            if issuer_url.len() > MAX_ISSUER_URL_LENGTH {
+                return Err(FederationError::InvalidConfiguration(format!(
+                    "Issuer URL exceeds maximum length of {MAX_ISSUER_URL_LENGTH} characters"
+                )));
+            }
+        }
+        if let Some(ref client_id) = req.client_id {
+            if client_id.len() > MAX_CLIENT_ID_LENGTH {
+                return Err(FederationError::InvalidConfiguration(format!(
+                    "Client ID exceeds maximum length of {MAX_CLIENT_ID_LENGTH} characters"
+                )));
+            }
+        }
+        if let Some(ref client_secret) = req.client_secret {
+            if client_secret.len() > MAX_CLIENT_SECRET_LENGTH {
+                return Err(FederationError::InvalidConfiguration(format!(
+                    "Client secret exceeds maximum length of {MAX_CLIENT_SECRET_LENGTH} characters"
+                )));
+            }
+        }
+        if let Some(ref scopes) = req.scopes {
+            if scopes.len() > MAX_SCOPES_LENGTH {
+                return Err(FederationError::InvalidConfiguration(format!(
+                    "Scopes string exceeds maximum length of {MAX_SCOPES_LENGTH} characters"
+                )));
+            }
+        }
+        if let Some(ref cm) = req.claim_mapping {
+            if cm.mappings.len() > MAX_CLAIM_MAPPINGS {
+                return Err(FederationError::InvalidConfiguration(format!(
+                    "Too many claim mappings (max {MAX_CLAIM_MAPPINGS})"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     /// Create a new identity provider.
     #[instrument(skip(self, req))]
     pub async fn create(
@@ -86,6 +192,9 @@ impl IdpConfigService {
         tenant_id: Uuid,
         req: CreateIdentityProviderRequest,
     ) -> FederationResult<TenantIdentityProvider> {
+        // Validate input lengths
+        Self::validate_create_input(&req)?;
+
         // Parse provider type
         let provider_type: ProviderType = req
             .provider_type
@@ -113,11 +222,13 @@ impl IdpConfigService {
         // Encrypt client secret
         let client_secret_encrypted = self.encryption.encrypt(tenant_id, &req.client_secret)?;
 
-        // Build claim mapping
-        let claim_mapping = req
+        // Build claim mapping — validate before persisting to reject reserved targets
+        // and oversized configurations at save time (R8: validate_mapping was dead code).
+        let claim_mapping_config = req
             .claim_mapping
-            .unwrap_or_else(ClaimMappingConfig::default_mapping)
-            .to_json();
+            .unwrap_or_else(ClaimMappingConfig::default_mapping);
+        crate::services::ClaimsService::new().validate_mapping(&claim_mapping_config)?;
+        let claim_mapping = claim_mapping_config.to_json();
 
         // Create the identity provider
         let input = CreateIdentityProvider {
@@ -171,6 +282,9 @@ impl IdpConfigService {
         idp_id: Uuid,
         req: UpdateIdentityProviderRequest,
     ) -> FederationResult<TenantIdentityProvider> {
+        // Validate input lengths
+        Self::validate_update_input(&req)?;
+
         // Verify IdP exists and belongs to tenant
         let _existing = self.get(tenant_id, idp_id).await?;
 
@@ -194,8 +308,14 @@ impl IdpConfigService {
             None => None,
         };
 
-        // Build claim mapping if provided
-        let claim_mapping = req.claim_mapping.map(|c| c.to_json());
+        // Build claim mapping if provided — validate before persisting (R8)
+        let claim_mapping = match req.claim_mapping {
+            Some(c) => {
+                crate::services::ClaimsService::new().validate_mapping(&c)?;
+                Some(c.to_json())
+            }
+            None => None,
+        };
 
         let input = UpdateIdentityProvider {
             name: req.name,
@@ -287,8 +407,23 @@ impl IdpConfigService {
         domain: String,
         priority: i32,
     ) -> FederationResult<IdentityProviderDomain> {
+        // Validate domain length
+        if domain.len() > MAX_DOMAIN_LENGTH {
+            return Err(FederationError::InvalidDomain(format!(
+                "Domain exceeds maximum length of {MAX_DOMAIN_LENGTH} characters"
+            )));
+        }
+
         // Verify IdP exists and belongs to tenant
         let _ = self.get(tenant_id, idp_id).await?;
+
+        // M2: Check domain count limit to prevent N+1 query DoS
+        let existing_domains = self.get_domains(tenant_id, idp_id).await?;
+        if existing_domains.len() >= MAX_DOMAINS_PER_IDP {
+            return Err(FederationError::InvalidConfiguration(format!(
+                "Maximum of {MAX_DOMAINS_PER_IDP} domains per identity provider"
+            )));
+        }
 
         // Validate domain format
         if !IdentityProviderDomain::validate_domain(&domain) {

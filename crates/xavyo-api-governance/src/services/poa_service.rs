@@ -542,10 +542,10 @@ impl PoaService {
 
         // SECURITY: Fetch roles for both donor and attorney, then compute intersection.
         // The attorney must NEVER gain roles they don't already possess through PoA assumption.
-        let donor_roles = UserRole::get_user_roles(&self.pool, poa.donor_id)
+        let donor_roles = UserRole::get_user_roles(&self.pool, poa.donor_id, tenant_id)
             .await
             .unwrap_or_else(|_| vec!["user".to_string()]);
-        let attorney_roles = UserRole::get_user_roles(&self.pool, attorney_id)
+        let attorney_roles = UserRole::get_user_roles(&self.pool, attorney_id, tenant_id)
             .await
             .unwrap_or_else(|_| vec!["user".to_string()]);
 

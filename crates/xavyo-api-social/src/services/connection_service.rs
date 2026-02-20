@@ -100,12 +100,14 @@ impl ConnectionService {
                 .execute(&mut *conn)
                 .await?;
 
-            let existing_user: Option<(Uuid,)> =
-                sqlx::query_as("SELECT id FROM users WHERE tenant_id = $1 AND email = $2")
-                    .bind(tenant_id)
-                    .bind(email)
-                    .fetch_optional(&mut *conn)
-                    .await?;
+            // R9: Use case-insensitive comparison to prevent collision bypass via case variants
+            let existing_user: Option<(Uuid,)> = sqlx::query_as(
+                "SELECT id FROM users WHERE tenant_id = $1 AND LOWER(email) = LOWER($2)",
+            )
+            .bind(tenant_id)
+            .bind(email)
+            .fetch_optional(&mut *conn)
+            .await?;
 
             if let Some((existing_user_id,)) = existing_user {
                 return Ok(ConnectionResult::EmailCollision {
@@ -350,21 +352,18 @@ impl ConnectionService {
     }
 
     /// Delete a social connection.
+    ///
+    /// R8: Uses an atomic DELETE with a subquery to prevent TOCTOU race conditions.
+    /// Two concurrent unlink requests could both pass the can_unlink check (seeing count>=2)
+    /// before either delete executes, resulting in both connections being deleted and the user
+    /// being locked out. The atomic query ensures the delete only succeeds if the user has
+    /// either a password or more than one remaining social connection.
     pub async fn delete_connection(
         &self,
         tenant_id: Uuid,
         user_id: Uuid,
         provider: ProviderType,
     ) -> SocialResult<bool> {
-        // First check if can unlink
-        if !self.can_unlink(tenant_id, user_id).await? {
-            return Err(SocialError::UnlinkForbidden {
-                reason:
-                    "Cannot unlink your only authentication method. Please set a password first."
-                        .to_string(),
-            });
-        }
-
         // SECURITY: Set RLS context for defense-in-depth (query already has tenant_id filter)
         let mut conn = self.pool.acquire().await?;
         sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
@@ -372,8 +371,14 @@ impl ConnectionService {
             .execute(&mut *conn)
             .await?;
 
+        // Atomic check-and-delete: only delete if user has a password OR more than 1 connection
         let result = sqlx::query(
-            "DELETE FROM social_connections WHERE tenant_id = $1 AND user_id = $2 AND provider = $3",
+            r"DELETE FROM social_connections
+              WHERE tenant_id = $1 AND user_id = $2 AND provider = $3
+              AND (
+                EXISTS (SELECT 1 FROM users WHERE id = $2 AND tenant_id = $1 AND password_hash IS NOT NULL)
+                OR (SELECT COUNT(*) FROM social_connections WHERE tenant_id = $1 AND user_id = $2) > 1
+              )",
         )
         .bind(tenant_id)
         .bind(user_id)
@@ -382,6 +387,24 @@ impl ConnectionService {
         .await?;
 
         if result.rows_affected() == 0 {
+            // Could be either: connection not found, or unlink would leave user locked out
+            // Check if the connection exists to give a better error
+            let exists: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM social_connections WHERE tenant_id = $1 AND user_id = $2 AND provider = $3)",
+            )
+            .bind(tenant_id)
+            .bind(user_id)
+            .bind(provider.to_string())
+            .fetch_one(&mut *conn)
+            .await?;
+
+            if exists {
+                return Err(SocialError::UnlinkForbidden {
+                    reason:
+                        "Cannot unlink your only authentication method. Please set a password first."
+                            .to_string(),
+                });
+            }
             return Err(SocialError::ConnectionNotFound);
         }
 

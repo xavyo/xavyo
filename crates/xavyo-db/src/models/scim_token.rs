@@ -49,14 +49,33 @@ pub struct CreateScimToken {
 }
 
 /// Response when a new token is created (includes the raw token once).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// **SECURITY**: The `token` field is intentionally serializable — it must be
+/// returned to the admin exactly once on creation. This struct should NEVER be
+/// logged, cached, or stored. It is consumed immediately by the HTTP response
+/// and discarded. The `warning` field reminds the caller to save the token.
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ScimTokenCreated {
     pub id: Uuid,
     pub name: String,
-    /// The raw token - only shown once!
+    /// The raw token — returned only once at creation time. Not stored anywhere.
     pub token: String,
     pub created_at: DateTime<Utc>,
     pub warning: String,
+}
+
+/// Custom Debug implementation that redacts the token field to prevent
+/// accidental leakage in log output (e.g., via `{:?}` formatting).
+impl std::fmt::Debug for ScimTokenCreated {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ScimTokenCreated")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("token", &"[REDACTED]")
+            .field("created_at", &self.created_at)
+            .field("warning", &self.warning)
+            .finish()
+    }
 }
 
 /// Token info for listing (without hash).
@@ -93,6 +112,15 @@ impl ScimToken {
     }
 
     /// Find a token by its hash.
+    ///
+    /// SECURITY: This query intentionally runs without RLS tenant context because
+    /// the tenant_id is derived FROM the token (bootstrap problem). This is safe
+    /// because: (1) the hash is SHA-256 (256-bit preimage resistance), (2) only
+    /// non-revoked tokens are returned, (3) the RLS policy on `scim_tokens` uses
+    /// NULLIF which permits reads when no tenant is set (permissive lookup for
+    /// token validation), and (4) the caller sets the tenant context immediately
+    /// after validating the token. After this lookup, all subsequent queries in
+    /// the request are scoped to the token's tenant_id via WHERE clauses.
     pub async fn find_by_hash(
         pool: &sqlx::PgPool,
         token_hash: &str,
@@ -169,14 +197,22 @@ impl ScimToken {
     }
 
     /// Update `last_used_at` timestamp.
-    pub async fn update_last_used(pool: &sqlx::PgPool, id: Uuid) -> Result<(), sqlx::Error> {
+    ///
+    /// SECURITY: Includes `tenant_id` filter to prevent cross-tenant updates
+    /// and to ensure RLS compatibility when called from spawned tasks.
+    pub async fn update_last_used(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query(
             r"
             UPDATE scim_tokens SET last_used_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
         Ok(())

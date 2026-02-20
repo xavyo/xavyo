@@ -84,7 +84,17 @@ impl AdminInviteService {
             ));
         }
 
-        let normalized_email = email.to_lowercase();
+        let normalized_email = email.trim().to_lowercase();
+
+        // H-7: Validate the invitation role against the allowed list
+        const ALLOWED_ROLES: &[&str] = &["user", "member", "admin", "super_admin"];
+        if !ALLOWED_ROLES.contains(&role) {
+            return Err(ApiAuthError::Validation(format!(
+                "Invalid role '{}'. Allowed roles: {}",
+                role,
+                ALLOWED_ROLES.join(", ")
+            )));
+        }
 
         // Check if user already exists in this tenant
         let existing_user = User::find_by_email(&self.pool, tenant_id, &normalized_email)
@@ -267,7 +277,10 @@ If you didn't expect this invitation, you can safely ignore this email.
             return Err(ApiAuthError::InvitationCancelled);
         }
 
-        // Check expiration
+        // H-1: Expiry check is advisory here (defense-in-depth). The authoritative
+        // guard is the atomic `WHERE status IN ('pending', 'sent')` inside the
+        // transaction below. A concurrent acceptance that passes this check will
+        // fail the transaction's status guard.
         if Utc::now() > invitation.expires_at {
             return Err(ApiAuthError::InvitationExpired);
         }
@@ -278,11 +291,48 @@ If you didn't expect this invitation, you can safely ignore this email.
             .as_ref()
             .ok_or_else(|| ApiAuthError::Internal("Invitation missing email".to_string()))?;
 
-        // Hash password
+        // Hash password before transaction to keep lock duration short
         let password_hash = xavyo_auth::hash_password(password)
             .map_err(|e| ApiAuthError::Internal(format!("Failed to hash password: {e}")))?;
 
-        // Create user account with password (direct SQL like auth_service)
+        // A3: Use a proper transaction for atomicity — user creation, invitation update,
+        // and role assignment all succeed or all fail together.
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| ApiAuthError::Internal(format!("Failed to begin transaction: {e}")))?;
+
+        // Set RLS tenant context for the transaction
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(invitation.tenant_id.to_string())
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ApiAuthError::Internal(format!("Failed to set tenant context: {e}")))?;
+
+        // H-1: Re-check expiry inside transaction for TOCTOU safety
+        let inv_check: Option<(String, chrono::DateTime<Utc>)> = sqlx::query_as(
+            "SELECT status, expires_at FROM user_invitations WHERE id = $1 AND tenant_id = $2 FOR UPDATE",
+        )
+        .bind(invitation.id)
+        .bind(invitation.tenant_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|e| ApiAuthError::Internal(e.to_string()))?;
+
+        match inv_check {
+            Some((status, expires_at)) => {
+                if status != "pending" && status != "sent" {
+                    return Err(ApiAuthError::InvitationAlreadyAccepted);
+                }
+                if Utc::now() > expires_at {
+                    return Err(ApiAuthError::InvitationExpired);
+                }
+            }
+            None => return Err(ApiAuthError::InvalidInvitationToken),
+        }
+
+        // Create user account with password
         let user_id = uuid::Uuid::new_v4();
         let now = chrono::Utc::now();
 
@@ -298,28 +348,45 @@ If you didn't expect this invitation, you can safely ignore this email.
         .bind(email)
         .bind(&password_hash)
         .bind(now)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await
         .map_err(|e| ApiAuthError::Internal(e.to_string()))?;
 
-        // Update invitation with user_id
-        UserInvitation::set_user_id(&self.pool, invitation.tenant_id, invitation.id, user.id)
-            .await
-            .map_err(|e| ApiAuthError::Internal(e.to_string()))?;
-
-        // Mark as accepted
-        let updated_invitation = UserInvitation::mark_accepted(
-            &self.pool,
-            invitation.tenant_id,
-            invitation.id,
-            ip_address.as_deref(),
-            user_agent.as_deref(),
+        // Update invitation with user_id (inside transaction)
+        sqlx::query(
+            r"
+            UPDATE user_invitations
+            SET user_id = $3, updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2
+            ",
         )
+        .bind(invitation.id)
+        .bind(invitation.tenant_id)
+        .bind(user.id)
+        .execute(&mut *tx)
         .await
-        .map_err(|e| ApiAuthError::Internal(e.to_string()))?
-        .unwrap_or(invitation.clone());
+        .map_err(|e| ApiAuthError::Internal(e.to_string()))?;
 
-        // Assign the invitation role to the new user
+        // Mark as accepted (inside transaction)
+        let updated_invitation: Option<UserInvitation> = sqlx::query_as(
+            r"
+            UPDATE user_invitations
+            SET status = 'accepted', accepted_at = NOW(), ip_address = $3, user_agent = $4, updated_at = NOW()
+            WHERE id = $1 AND tenant_id = $2 AND status IN ('pending', 'sent')
+            RETURNING *
+            ",
+        )
+        .bind(invitation.id)
+        .bind(invitation.tenant_id)
+        .bind(ip_address.as_deref())
+        .bind(user_agent.as_deref())
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|e| ApiAuthError::Internal(e.to_string()))?;
+
+        let updated_invitation = updated_invitation.unwrap_or(invitation.clone());
+
+        // Assign the invitation role to the new user (inside transaction)
         sqlx::query(
             r"
             INSERT INTO user_roles (user_id, role_name, created_at)
@@ -329,9 +396,14 @@ If you didn't expect this invitation, you can safely ignore this email.
         )
         .bind(user.id)
         .bind(&invitation.role)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| ApiAuthError::Internal(e.to_string()))?;
+
+        // Commit all changes atomically
+        tx.commit()
+            .await
+            .map_err(|e| ApiAuthError::Internal(format!("Failed to commit transaction: {e}")))?;
 
         // Assign role template if specified
         if let Some(template_id) = invitation.role_template_id {

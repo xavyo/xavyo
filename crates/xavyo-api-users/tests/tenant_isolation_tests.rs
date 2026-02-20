@@ -36,6 +36,7 @@ async fn test_list_users_returns_only_own_tenant() {
         offset: None,
         limit: None,
         email: None,
+        is_active: None,
     };
 
     // List users from tenant A
@@ -128,7 +129,6 @@ async fn test_update_user_from_other_tenant_returns_not_found() {
         email: Some(unique_email()),
         roles: None,
         is_active: None,
-        username: None,
     };
 
     let result = service
@@ -136,6 +136,7 @@ async fn test_update_user_from_other_tenant_returns_not_found() {
             TenantId::from_uuid(tenant_b),
             xavyo_core::UserId::from_uuid(user_id),
             &request,
+            &["super_admin".to_string()],
         )
         .await;
 
@@ -165,6 +166,7 @@ async fn test_delete_user_from_other_tenant_returns_not_found() {
         .deactivate_user(
             TenantId::from_uuid(tenant_b),
             xavyo_core::UserId::from_uuid(user_id),
+            Uuid::new_v4(),
         )
         .await;
 
@@ -202,12 +204,15 @@ async fn test_user_created_in_tenant_a_not_visible_to_tenant_b() {
     let request = xavyo_api_users::models::CreateUserRequest {
         email: unique_email(),
         password: "SecurePassword123!".to_string(),
-        roles: vec![],
-        username: None,
+        roles: vec!["member".to_string()],
     };
 
     let create_result = service
-        .create_user(TenantId::from_uuid(tenant_a), &request)
+        .create_user(
+            TenantId::from_uuid(tenant_a),
+            &request,
+            &["super_admin".to_string()],
+        )
         .await;
     assert!(create_result.is_ok(), "User creation should succeed");
     let created_user = create_result.unwrap();
@@ -229,6 +234,7 @@ async fn test_user_created_in_tenant_a_not_visible_to_tenant_b() {
         offset: None,
         limit: None,
         email: None,
+        is_active: None,
     };
     let list_result = service
         .list_users(TenantId::from_uuid(tenant_b), &query, &[])

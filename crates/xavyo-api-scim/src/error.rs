@@ -210,6 +210,17 @@ impl IntoResponse for ScimError {
 /// Result type alias for SCIM operations
 pub type ScimResult<T> = Result<T, ScimError>;
 
+/// Check if a SQLx error is a PostgreSQL unique constraint violation (error code 23505).
+///
+/// Used to catch TOCTOU race conditions where a pre-check passes but the
+/// INSERT/UPDATE fails due to a concurrent write.
+pub(crate) fn is_unique_violation(e: &sqlx::Error) -> bool {
+    match e {
+        sqlx::Error::Database(db_err) => db_err.code().as_deref() == Some("23505"),
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

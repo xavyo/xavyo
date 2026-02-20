@@ -47,6 +47,16 @@ pub async fn admin_guard(request: Request<Body>, next: Next) -> Result<Response,
         .get::<JwtClaims>()
         .ok_or(ApiUsersError::Unauthorized)?;
 
+    // L-5: Verify tenant_id is present — a token without a tenant context
+    // should never reach admin handlers (defense-in-depth).
+    if claims.tenant_id().is_none() {
+        tracing::warn!(
+            user_id = %claims.sub,
+            "Access denied: missing tenant_id in claims"
+        );
+        return Err(ApiUsersError::Unauthorized);
+    }
+
     // Check for admin or super_admin role
     let is_admin = claims.has_role(ADMIN_ROLE) || claims.has_role(SUPER_ADMIN_ROLE);
     if !is_admin {

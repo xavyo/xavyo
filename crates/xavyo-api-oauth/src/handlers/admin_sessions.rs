@@ -62,10 +62,15 @@ pub async fn admin_revoke_user_handler(
     let tenant_id = extract_tenant_id(&claims)?;
     let admin_id = claims.sub.parse::<Uuid>().ok();
 
-    // Set tenant context for RLS
+    // R9-F1: Acquire a dedicated connection so set_config and queries share RLS context.
+    let mut conn = state.pool.acquire().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to acquire connection");
+        OAuthError::Internal("Database connection failed".to_string())
+    })?;
+
     sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
         .bind(tenant_id.to_string())
-        .execute(&state.pool)
+        .execute(&mut *conn)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to set tenant context");
@@ -82,7 +87,7 @@ pub async fn admin_revoke_user_handler(
     )
     .bind(request.user_id)
     .bind(tenant_id)
-    .execute(&state.pool)
+    .execute(&mut *conn)
     .await
     .map_err(|e| {
         tracing::error!(error = %e, "Failed to revoke user refresh tokens");
@@ -109,7 +114,7 @@ pub async fn admin_revoke_user_handler(
         revoked_by: admin_id,
     };
 
-    if let Err(e) = RevokedToken::insert(&state.pool, input).await {
+    if let Err(e) = RevokedToken::insert(&mut *conn, input).await {
         tracing::error!(
             user_id = %request.user_id,
             error = %e,
@@ -165,10 +170,15 @@ pub async fn list_active_sessions_handler(
 ) -> Result<Json<ActiveSessionsResponse>, OAuthError> {
     let tenant_id = extract_tenant_id(&claims)?;
 
-    // Set tenant context for RLS
+    // R9-F1: Acquire a dedicated connection so set_config and queries share RLS context.
+    let mut conn = state.pool.acquire().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to acquire connection");
+        OAuthError::Internal("Database connection failed".to_string())
+    })?;
+
     sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
         .bind(tenant_id.to_string())
-        .execute(&state.pool)
+        .execute(&mut *conn)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to set tenant context");
@@ -196,7 +206,7 @@ pub async fn list_active_sessions_handler(
     )
     .bind(query.user_id)
     .bind(tenant_id)
-    .fetch_all(&state.pool)
+    .fetch_all(&mut *conn)
     .await
     .map_err(|e| {
         tracing::error!(error = %e, "Failed to list active sessions");
@@ -252,10 +262,15 @@ pub async fn delete_session_handler(
 ) -> Result<Json<SessionRevokedResponse>, OAuthError> {
     let tenant_id = extract_tenant_id(&claims)?;
 
-    // Set tenant context for RLS
+    // R9-F1: Acquire a dedicated connection so set_config and queries share RLS context.
+    let mut conn = state.pool.acquire().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to acquire connection");
+        OAuthError::Internal("Database connection failed".to_string())
+    })?;
+
     sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
         .bind(tenant_id.to_string())
-        .execute(&state.pool)
+        .execute(&mut *conn)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to set tenant context");
@@ -271,7 +286,7 @@ pub async fn delete_session_handler(
     )
     .bind(token_id)
     .bind(tenant_id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(&mut *conn)
     .await
     .map_err(|e| {
         tracing::error!(error = %e, "Failed to look up session");
@@ -302,7 +317,7 @@ pub async fn delete_session_handler(
     )
     .bind(token_id)
     .bind(tenant_id)
-    .execute(&state.pool)
+    .execute(&mut *conn)
     .await
     .map_err(|e| {
         tracing::error!(error = %e, "Failed to revoke session");

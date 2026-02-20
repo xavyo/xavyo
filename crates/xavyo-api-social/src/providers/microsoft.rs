@@ -49,18 +49,38 @@ impl MicrosoftProvider {
     ///
     /// * `client_id` - Azure AD application client ID
     /// * `client_secret` - Azure AD application client secret
-    /// * `tenant` - Azure tenant ID or "common"/"organizations"/"consumers"
-    #[must_use]
-    pub fn new(client_id: String, client_secret: String, tenant: Option<String>) -> Self {
-        Self {
+    /// * `tenant` - Azure tenant ID or `"common"`/`"organizations"`/`"consumers"`
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if `tenant` contains invalid characters (must be a UUID or known keyword).
+    pub fn new(
+        client_id: String,
+        client_secret: String,
+        tenant: Option<String>,
+    ) -> Result<Self, crate::error::SocialError> {
+        let tenant = tenant.unwrap_or_else(|| DEFAULT_TENANT.to_string());
+
+        // R9: Validate azure_tenant to prevent URL path injection
+        let valid_keywords = ["common", "organizations", "consumers"];
+        if !valid_keywords.contains(&tenant.as_str()) && uuid::Uuid::parse_str(&tenant).is_err() {
+            return Err(crate::error::SocialError::ConfigurationError {
+                message: format!(
+                    "Invalid azure_tenant '{}': must be a UUID or one of: common, organizations, consumers",
+                    tenant
+                ),
+            });
+        }
+
+        Ok(Self {
             client_id,
             client_secret,
-            tenant: tenant.unwrap_or_else(|| DEFAULT_TENANT.to_string()),
+            tenant,
             http_client: Client::builder()
                 .timeout(std::time::Duration::from_secs(10))
                 .build()
                 .unwrap_or_else(|_| Client::new()),
-        }
+        })
     }
 
     /// Get the authorization endpoint URL.
@@ -91,10 +111,16 @@ impl SocialProvider for MicrosoftProvider {
         ProviderType::Microsoft
     }
 
-    fn authorization_url(&self, state: &str, pkce_challenge: &str, redirect_uri: &str) -> String {
+    fn authorization_url(
+        &self,
+        state: &str,
+        pkce_challenge: &str,
+        redirect_uri: &str,
+        nonce: Option<&str>,
+    ) -> String {
         let scopes = self.default_scopes().join(" ");
 
-        format!(
+        let mut url = format!(
             "{}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&code_challenge={}&code_challenge_method=S256&response_mode=query",
             self.authorization_endpoint(),
             urlencoding::encode(&self.client_id),
@@ -102,7 +128,13 @@ impl SocialProvider for MicrosoftProvider {
             urlencoding::encode(&scopes),
             urlencoding::encode(state),
             urlencoding::encode(pkce_challenge),
-        )
+        );
+
+        if let Some(nonce) = nonce {
+            url.push_str(&format!("&nonce={}", urlencoding::encode(nonce)));
+        }
+
+        url
     }
 
     async fn exchange_code(
@@ -172,8 +204,12 @@ impl SocialProvider for MicrosoftProvider {
         // Use preferred_username as email fallback only with strict validation.
         // When falling back to preferred_username, always mark email_verified = false
         // because Microsoft does not guarantee it is a verified email address.
+        // SECURITY: The Graph userinfo endpoint does NOT return email_verified,
+        // so we conservatively default to false here. The callback handler will
+        // upgrade this to true when the JWKS-verified ID token contains
+        // email_verified: true (e.g., org-managed Azure AD accounts).
         let (email, email_verified) = if let Some(email) = user_info.email {
-            (Some(email), Some(true)) // Microsoft verifies primary emails
+            (Some(email), Some(false))
         } else if let Some(ref preferred) = user_info.preferred_username {
             // Validate with a basic RFC 5322-ish pattern: local@domain.tld
             // Must have exactly one @, domain must have a dot, no spaces
@@ -262,41 +298,64 @@ mod tests {
     #[test]
     fn test_authorization_url_with_default_tenant() {
         let provider =
-            MicrosoftProvider::new("client-id".to_string(), "client-secret".to_string(), None);
+            MicrosoftProvider::new("client-id".to_string(), "client-secret".to_string(), None)
+                .unwrap();
 
         let url = provider.authorization_url(
             "state-token",
             "pkce-challenge",
             "https://example.com/callback",
+            None,
         );
 
         assert!(url.contains("login.microsoftonline.com/common"));
         assert!(url.contains("client_id=client-id"));
         assert!(url.contains("state=state-token"));
         assert!(url.contains("code_challenge=pkce-challenge"));
+        assert!(!url.contains("nonce="));
     }
 
     #[test]
-    fn test_authorization_url_with_custom_tenant() {
-        let provider = MicrosoftProvider::new(
-            "client-id".to_string(),
-            "client-secret".to_string(),
-            Some("my-tenant-id".to_string()),
-        );
+    fn test_authorization_url_with_nonce() {
+        let provider =
+            MicrosoftProvider::new("client-id".to_string(), "client-secret".to_string(), None)
+                .unwrap();
 
         let url = provider.authorization_url(
             "state-token",
             "pkce-challenge",
             "https://example.com/callback",
+            Some("my-nonce-value"),
         );
 
-        assert!(url.contains("login.microsoftonline.com/my-tenant-id"));
+        assert!(url.contains("nonce=my-nonce-value"));
+    }
+
+    #[test]
+    fn test_authorization_url_with_custom_tenant() {
+        let tenant_uuid = "550e8400-e29b-41d4-a716-446655440000";
+        let provider = MicrosoftProvider::new(
+            "client-id".to_string(),
+            "client-secret".to_string(),
+            Some(tenant_uuid.to_string()),
+        )
+        .unwrap();
+
+        let url = provider.authorization_url(
+            "state-token",
+            "pkce-challenge",
+            "https://example.com/callback",
+            None,
+        );
+
+        assert!(url.contains(&format!("login.microsoftonline.com/{tenant_uuid}")));
     }
 
     #[test]
     fn test_default_scopes() {
         let provider =
-            MicrosoftProvider::new("client-id".to_string(), "client-secret".to_string(), None);
+            MicrosoftProvider::new("client-id".to_string(), "client-secret".to_string(), None)
+                .unwrap();
         let scopes = provider.default_scopes();
 
         assert!(scopes.contains(&"openid".to_string()));
@@ -308,7 +367,8 @@ mod tests {
     #[test]
     fn test_provider_type() {
         let provider =
-            MicrosoftProvider::new("client-id".to_string(), "client-secret".to_string(), None);
+            MicrosoftProvider::new("client-id".to_string(), "client-secret".to_string(), None)
+                .unwrap();
         assert_eq!(provider.provider_type(), ProviderType::Microsoft);
     }
 }

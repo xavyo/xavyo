@@ -461,7 +461,7 @@ pub async fn api_key_auth_middleware(
     // This allows API key authentication to work with existing handlers
 
     // F202-US1: Load user's actual roles instead of hardcoded ["api_key"]
-    let roles = UserRole::get_user_roles(&pool, api_key.user_id)
+    let roles = UserRole::get_user_roles(&pool, api_key.user_id, api_key.tenant_id)
         .await
         .unwrap_or_else(|e| {
             tracing::warn!(

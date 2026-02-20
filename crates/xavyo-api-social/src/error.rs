@@ -101,6 +101,21 @@ pub enum SocialError {
     #[error("JWT error: {0}")]
     JwtError(#[from] jsonwebtoken::errors::Error),
 
+    #[error("OIDC nonce mismatch for {provider}: possible ID token replay")]
+    NonceMismatch { provider: ProviderType },
+
+    #[error("ID token verification failed for {provider}: {reason}")]
+    IdTokenVerificationFailed {
+        provider: ProviderType,
+        reason: String,
+    },
+
+    #[error("JWKS fetch failed for {provider}: {reason}")]
+    JwksFetchFailed {
+        provider: ProviderType,
+        reason: String,
+    },
+
     #[error("Internal error: {message}")]
     InternalError { message: String },
 }
@@ -136,6 +151,9 @@ impl SocialError {
             SocialError::HttpError(_) => "http_error",
             SocialError::JsonError(_) => "json_error",
             SocialError::JwtError(_) => "jwt_error",
+            SocialError::NonceMismatch { .. } => "nonce_mismatch",
+            SocialError::IdTokenVerificationFailed { .. } => "id_token_verification_failed",
+            SocialError::JwksFetchFailed { .. } => "jwks_fetch_failed",
             SocialError::InternalError { .. } => "internal_error",
         }
     }
@@ -161,6 +179,9 @@ impl SocialError {
             SocialError::HttpError(_) => StatusCode::BAD_GATEWAY,
             SocialError::JsonError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             SocialError::JwtError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            SocialError::NonceMismatch { .. } => StatusCode::BAD_REQUEST,
+            SocialError::IdTokenVerificationFailed { .. } => StatusCode::BAD_REQUEST,
+            SocialError::JwksFetchFailed { .. } => StatusCode::BAD_GATEWAY,
             SocialError::InternalError { .. } => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -213,6 +234,18 @@ impl IntoResponse for SocialError {
                 );
                 // Generic message without email to prevent PII leakage
                 "An account with this email already exists. Please link your accounts.".to_string()
+            }
+            SocialError::NonceMismatch { provider } => {
+                tracing::warn!(provider = %provider, "OIDC nonce mismatch — possible replay attack");
+                "OIDC nonce validation failed".to_string()
+            }
+            SocialError::IdTokenVerificationFailed { provider, reason } => {
+                tracing::warn!(provider = %provider, reason = %reason, "ID token verification failed");
+                format!("ID token verification failed for {provider}")
+            }
+            SocialError::JwksFetchFailed { provider, reason } => {
+                tracing::warn!(provider = %provider, reason = %reason, "JWKS fetch failed");
+                format!("JWKS fetch failed for {provider}")
             }
             // SECURITY: Sanitize errors that may contain IdP-controlled or library-internal details.
             SocialError::InvalidCallback { .. } => "Invalid OAuth callback".to_string(),

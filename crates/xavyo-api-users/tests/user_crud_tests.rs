@@ -13,6 +13,11 @@ use xavyo_api_users::models::{CreateUserRequest, UpdateUserRequest};
 use xavyo_api_users::services::UserService;
 use xavyo_core::TenantId;
 
+/// Default caller roles for admin tests.
+fn admin_roles() -> Vec<String> {
+    vec!["super_admin".to_string()]
+}
+
 // =========================================================================
 // User Creation Tests
 // =========================================================================
@@ -28,12 +33,11 @@ async fn test_create_user_success() {
     let request = CreateUserRequest {
         email: unique_email(),
         password: "SecurePassword123!".to_string(),
-        roles: vec![],
-        username: None,
+        roles: vec!["member".to_string()],
     };
 
     let result = service
-        .create_user(TenantId::from_uuid(tenant_id), &request)
+        .create_user(TenantId::from_uuid(tenant_id), &request, &admin_roles())
         .await;
 
     assert!(result.is_ok(), "User creation should succeed");
@@ -56,19 +60,18 @@ async fn test_create_user_with_roles() {
     let request = CreateUserRequest {
         email: unique_email(),
         password: "SecurePassword123!".to_string(),
-        roles: vec!["admin".to_string(), "viewer".to_string()],
-        username: None,
+        roles: vec!["admin".to_string(), "member".to_string()],
     };
 
     let result = service
-        .create_user(TenantId::from_uuid(tenant_id), &request)
+        .create_user(TenantId::from_uuid(tenant_id), &request, &admin_roles())
         .await;
 
     assert!(result.is_ok(), "User creation with roles should succeed");
     let user = result.unwrap();
     assert_eq!(user.roles.len(), 2);
     assert!(user.roles.contains(&"admin".to_string()));
-    assert!(user.roles.contains(&"viewer".to_string()));
+    assert!(user.roles.contains(&"member".to_string()));
 
     cleanup_test_tenant(&pool, tenant_id).await;
 }
@@ -86,11 +89,10 @@ async fn test_create_user_duplicate_email_fails() {
     let request1 = CreateUserRequest {
         email: email.clone(),
         password: "SecurePassword123!".to_string(),
-        roles: vec![],
-        username: None,
+        roles: vec!["member".to_string()],
     };
     let _ = service
-        .create_user(TenantId::from_uuid(tenant_id), &request1)
+        .create_user(TenantId::from_uuid(tenant_id), &request1, &admin_roles())
         .await
         .unwrap();
 
@@ -98,11 +100,10 @@ async fn test_create_user_duplicate_email_fails() {
     let request2 = CreateUserRequest {
         email,
         password: "DifferentPassword456!".to_string(),
-        roles: vec![],
-        username: None,
+        roles: vec!["member".to_string()],
     };
     let result = service
-        .create_user(TenantId::from_uuid(tenant_id), &request2)
+        .create_user(TenantId::from_uuid(tenant_id), &request2, &admin_roles())
         .await;
 
     assert!(result.is_err(), "Duplicate email should fail");
@@ -122,12 +123,11 @@ async fn test_create_user_validation_errors() {
     let request = CreateUserRequest {
         email: String::new(),
         password: "SecurePassword123!".to_string(),
-        roles: vec![],
-        username: None,
+        roles: vec!["member".to_string()],
     };
 
     let result = service
-        .create_user(TenantId::from_uuid(tenant_id), &request)
+        .create_user(TenantId::from_uuid(tenant_id), &request, &admin_roles())
         .await;
 
     assert!(result.is_err(), "Empty email should fail validation");
@@ -204,7 +204,6 @@ async fn test_update_user_email() {
         email: Some(new_email.clone()),
         roles: None,
         is_active: None,
-        username: None,
     };
 
     let result = service
@@ -212,6 +211,7 @@ async fn test_update_user_email() {
             TenantId::from_uuid(tenant_id),
             xavyo_core::UserId::from_uuid(user_id),
             &request,
+            &admin_roles(),
         )
         .await;
 
@@ -234,9 +234,8 @@ async fn test_update_user_roles() {
 
     let request = UpdateUserRequest {
         email: None,
-        roles: Some(vec!["editor".to_string(), "reviewer".to_string()]),
+        roles: Some(vec!["admin".to_string(), "member".to_string()]),
         is_active: None,
-        username: None,
     };
 
     let result = service
@@ -244,14 +243,15 @@ async fn test_update_user_roles() {
             TenantId::from_uuid(tenant_id),
             xavyo_core::UserId::from_uuid(user_id),
             &request,
+            &admin_roles(),
         )
         .await;
 
     assert!(result.is_ok(), "Update user roles should succeed");
     let user = result.unwrap();
     assert_eq!(user.roles.len(), 2);
-    assert!(user.roles.contains(&"editor".to_string()));
-    assert!(user.roles.contains(&"reviewer".to_string()));
+    assert!(user.roles.contains(&"admin".to_string()));
+    assert!(user.roles.contains(&"member".to_string()));
 
     cleanup_test_tenant(&pool, tenant_id).await;
 }
@@ -271,7 +271,6 @@ async fn test_update_user_active_status() {
         email: None,
         roles: None,
         is_active: Some(false),
-        username: None,
     };
 
     let result = service
@@ -279,6 +278,7 @@ async fn test_update_user_active_status() {
             TenantId::from_uuid(tenant_id),
             xavyo_core::UserId::from_uuid(user_id),
             &request,
+            &admin_roles(),
         )
         .await;
 
@@ -291,7 +291,6 @@ async fn test_update_user_active_status() {
         email: None,
         roles: None,
         is_active: Some(true),
-        username: None,
     };
 
     let result = service
@@ -299,6 +298,7 @@ async fn test_update_user_active_status() {
             TenantId::from_uuid(tenant_id),
             xavyo_core::UserId::from_uuid(user_id),
             &request,
+            &admin_roles(),
         )
         .await;
 
@@ -323,11 +323,15 @@ async fn test_delete_user() {
 
     let service = UserService::new(pool.clone());
 
+    // Use a different caller UUID for deactivation (not self-deactivation)
+    let caller_id = Uuid::new_v4();
+
     // Delete (deactivate) user
     let result = service
         .deactivate_user(
             TenantId::from_uuid(tenant_id),
             xavyo_core::UserId::from_uuid(user_id),
+            caller_id,
         )
         .await;
 
@@ -359,11 +363,13 @@ async fn test_delete_user_not_found() {
 
     let service = UserService::new(pool.clone());
     let non_existent_id = Uuid::new_v4();
+    let caller_id = Uuid::new_v4();
 
     let result = service
         .deactivate_user(
             TenantId::from_uuid(tenant_id),
             xavyo_core::UserId::from_uuid(non_existent_id),
+            caller_id,
         )
         .await;
 
