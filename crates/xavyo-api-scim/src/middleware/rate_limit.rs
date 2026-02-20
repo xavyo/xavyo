@@ -64,6 +64,12 @@ impl TokenBucket {
 }
 
 /// Rate limiter state shared across requests.
+///
+/// **Limitation**: This is an in-memory, per-process rate limiter. In a
+/// multi-instance deployment (e.g., behind a load balancer), each instance
+/// maintains its own independent token buckets, so the effective per-tenant
+/// rate is multiplied by the number of instances. For strict global rate
+/// limiting, replace with a distributed store (e.g., Redis).
 #[derive(Clone)]
 pub struct RateLimiter {
     buckets: Arc<Mutex<HashMap<Uuid, TokenBucket>>>,
@@ -119,11 +125,32 @@ impl RateLimitLayer {
     ///
     /// - `requests_per_second`: Maximum sustained request rate per tenant.
     /// - `burst`: Maximum burst capacity per tenant.
+    ///
+    /// Spawns a background task to periodically clean up stale tenant buckets
+    /// (every 5 minutes, removes buckets idle for >10 minutes).
+    ///
+    /// The cleanup task runs for the lifetime of the server process. Since the
+    /// `RateLimitLayer` is created once during router setup and lives until
+    /// shutdown, the spawned task's `Arc` reference keeps the `HashMap` alive
+    /// for exactly the same duration. On graceful shutdown, the tokio runtime
+    /// cancels all spawned tasks, so this does not leak.
     #[must_use]
     pub fn new(requests_per_second: u32, burst: u32) -> Self {
-        Self {
-            limiter: RateLimiter::new(requests_per_second, burst),
-        }
+        let limiter = RateLimiter::new(requests_per_second, burst);
+
+        // Spawn periodic cleanup to prevent unbounded HashMap growth.
+        // This task is intentionally not tracked — it lives for the server's
+        // lifetime and is cancelled when the tokio runtime shuts down.
+        let cleanup_limiter = limiter.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(300));
+            loop {
+                interval.tick().await;
+                cleanup_limiter.cleanup(Duration::from_secs(600));
+            }
+        });
+
+        Self { limiter }
     }
 }
 

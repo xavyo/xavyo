@@ -84,16 +84,21 @@ pub fn saml_router(state: SamlState) -> Router {
         .with_state(state)
 }
 
-/// Create SAML state from configuration
+/// Create SAML state from configuration.
+///
+/// Uses `PostgresSessionStore` for AuthnRequest replay protection in production.
 #[must_use]
 pub fn create_saml_state(
     pool: sqlx::PgPool,
     base_url: String,
     encryption_key: [u8; 32],
 ) -> SamlState {
+    let session_store =
+        std::sync::Arc::new(crate::session::PostgresSessionStore::new(pool.clone()));
     SamlState {
         pool,
         base_url,
         encryption_key: std::sync::Arc::new(encryption_key),
+        session_store,
     }
 }

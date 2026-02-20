@@ -4,7 +4,9 @@
 
 use crate::error::ApiAuthError;
 use crate::models::{ResetPasswordRequest, ResetPasswordResponse};
-use crate::services::{hash_token, verify_token_hash_constant_time, PasswordPolicyService};
+use crate::services::{
+    hash_token, verify_token_hash_constant_time, PasswordPolicyService, SessionService,
+};
 use axum::{Extension, Json};
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
@@ -12,7 +14,7 @@ use std::sync::Arc;
 use validator::Validate;
 use xavyo_auth::hash_password;
 use xavyo_core::TenantId;
-use xavyo_db::set_tenant_context;
+use xavyo_db::{set_tenant_context, RevokeReason};
 
 /// Password reset token row from database query.
 type PasswordResetTokenRow = (
@@ -44,6 +46,7 @@ pub async fn reset_password_handler(
     Extension(pool): Extension<PgPool>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(password_policy_service): Extension<Arc<PasswordPolicyService>>,
+    Extension(session_service): Extension<Arc<SessionService>>,
     Json(request): Json<ResetPasswordRequest>,
 ) -> Result<Json<ResetPasswordResponse>, ApiAuthError> {
     // Validate request format
@@ -212,6 +215,12 @@ pub async fn reset_password_handler(
 
     tx.commit().await?;
 
+    // H4: Revoke all active sessions on password reset (same as password change)
+    let sessions_revoked = session_service
+        .revoke_all_user_sessions(user_id, *tenant_id.as_uuid(), RevokeReason::PasswordChange)
+        .await
+        .unwrap_or(0) as i64;
+
     // Update password timestamps (uses its own pool connection)
     password_policy_service
         .update_password_timestamps(user_id, *tenant_id.as_uuid(), policy.expiration_days)
@@ -221,6 +230,7 @@ pub async fn reset_password_handler(
         user_id = %user_id,
         tenant_id = %tenant_id,
         tokens_revoked = %revoked.rows_affected(),
+        sessions_revoked = sessions_revoked,
         "Password reset completed successfully"
     );
 

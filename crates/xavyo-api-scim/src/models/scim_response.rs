@@ -87,10 +87,21 @@ impl ScimPatchRequest {
     /// SCIM Patch Operation schema URI.
     pub const SCHEMA: &'static str = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 
+    /// Maximum number of operations in a single PATCH request.
+    pub const MAX_OPERATIONS: usize = 100;
+
     /// Validate the patch request.
     pub fn validate(&self) -> Result<(), String> {
         if !self.schemas.contains(&Self::SCHEMA.to_string()) {
             return Err("Missing PatchOp schema".to_string());
+        }
+
+        if self.operations.len() > Self::MAX_OPERATIONS {
+            return Err(format!(
+                "Too many operations: {} (maximum {})",
+                self.operations.len(),
+                Self::MAX_OPERATIONS
+            ));
         }
 
         for (i, op) in self.operations.iter().enumerate() {
@@ -104,11 +115,8 @@ impl ScimPatchRequest {
                 return Err(format!("Remove operation at index {i} requires a path"));
             }
 
-            // 'add' and 'replace' require a value (unless path specified for complex attrs)
-            if (op_lower == "add" || op_lower == "replace")
-                && op.value.is_none()
-                && op.path.is_none()
-            {
+            // 'add' and 'replace' always require a value per RFC 7644 Section 3.5.2
+            if (op_lower == "add" || op_lower == "replace") && op.value.is_none() {
                 return Err(format!(
                     "Operation '{}' at index {} requires a value",
                     op.op, i
@@ -140,7 +148,13 @@ impl ScimPagination {
     /// Maximum items per page.
     pub const MAX_COUNT: i64 = 100;
 
+    /// Maximum start index to prevent absurd database offsets.
+    pub const MAX_START_INDEX: i64 = 1_000_000;
+
     /// Create pagination from query parameters.
+    ///
+    /// `count=0` is valid per RFC 7644 Section 3.4.2.4 — returns totalResults
+    /// with an empty Resources array (used by Azure AD / Entra ID for discovery).
     #[must_use]
     pub fn from_query(
         start_index: Option<i64>,
@@ -149,10 +163,10 @@ impl ScimPagination {
         sort_order: Option<String>,
     ) -> Self {
         Self {
-            start_index: start_index.unwrap_or(1).max(1),
+            start_index: start_index.unwrap_or(1).clamp(1, Self::MAX_START_INDEX),
             count: count
                 .unwrap_or(Self::DEFAULT_COUNT)
-                .clamp(1, Self::MAX_COUNT),
+                .clamp(0, Self::MAX_COUNT),
             sort_by,
             sort_order,
         }

@@ -2,15 +2,14 @@
 
 use axum::{
     body::Body,
-    extract::State,
     http::{header, Request},
-    middleware::Next,
     response::{IntoResponse, Response},
 };
 use std::sync::Arc;
 use tower::{Layer, Service};
 use uuid::Uuid;
 
+use sqlx::PgPool;
 use xavyo_db::models::ScimToken;
 
 use crate::error::ScimError;
@@ -91,6 +90,7 @@ where
             let bearer_token = match auth_header {
                 Some(h) if h.starts_with("Bearer ") => &h[7..],
                 _ => {
+                    tracing::warn!("SCIM auth failed: missing or malformed Authorization header");
                     return Ok(ScimError::Unauthorized.into_response());
                 }
             };
@@ -109,42 +109,44 @@ where
             match token_service.validate_token(bearer_token).await {
                 Ok(token) => {
                     let tenant_id = token.tenant_id;
+
+                    // SECURITY: Set RLS tenant context (defense-in-depth).
+                    // All queries also use WHERE tenant_id = $N, but RLS provides
+                    // an additional isolation layer if a query misses the filter.
+                    //
+                    // NOTE: `true` = transaction-local scope (reset at end of transaction).
+                    // With a connection pool, each `pool.execute()` may use a different
+                    // connection, so this set_config only affects queries on the same
+                    // connection within the same transaction. Handler queries that use
+                    // `pool.fetch_*()` may get a different connection and thus not see
+                    // this setting. The primary tenant isolation is therefore the
+                    // explicit `WHERE tenant_id = $N` on every query.
+                    if let Some(pool) = req.extensions().get::<PgPool>() {
+                        if let Err(e) =
+                            sqlx::query("SELECT set_config('app.current_tenant', $1, true)")
+                                .bind(tenant_id.to_string())
+                                .execute(pool)
+                                .await
+                        {
+                            tracing::error!("Failed to set RLS tenant context: {e}");
+                            return Ok(ScimError::Internal(
+                                "Failed to initialize request context".to_string(),
+                            )
+                            .into_response());
+                        }
+                    }
+
                     let ctx = ScimAuthContext { token, tenant_id };
                     req.extensions_mut().insert(ctx);
                     inner.call(req).await
                 }
-                Err(_) => Ok(ScimError::Unauthorized.into_response()),
+                Err(_) => {
+                    tracing::warn!("SCIM auth failed: invalid or revoked bearer token");
+                    Ok(ScimError::Unauthorized.into_response())
+                }
             }
         })
     }
-}
-
-/// Middleware function for extracting and validating SCIM auth.
-pub async fn scim_auth_middleware(
-    State(token_service): State<Arc<TokenService>>,
-    mut req: Request<Body>,
-    next: Next,
-) -> Result<Response, ScimError> {
-    // Extract Bearer token
-    let auth_header = req
-        .headers()
-        .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok());
-
-    let bearer_token = match auth_header {
-        Some(h) if h.starts_with("Bearer ") => &h[7..],
-        _ => return Err(ScimError::Unauthorized),
-    };
-
-    // Validate token
-    let token = token_service.validate_token(bearer_token).await?;
-    let tenant_id = token.tenant_id;
-
-    // Add context to request
-    let ctx = ScimAuthContext { token, tenant_id };
-    req.extensions_mut().insert(ctx);
-
-    Ok(next.run(req).await)
 }
 
 /// Extract SCIM auth context from request extensions.

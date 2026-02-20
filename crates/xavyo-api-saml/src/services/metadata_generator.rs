@@ -49,7 +49,7 @@ impl MetadataGenerator {
             r#"<?xml version="1.0" encoding="UTF-8"?>
 <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
     entityID="{entity_id}">
-    <md:IDPSSODescriptor WantAuthnRequestsSigned="false"
+    <md:IDPSSODescriptor WantAuthnRequestsSigned="true"
         protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">{certificate_element}
         <md:NameIDFormat>{email_format}</md:NameIDFormat>
         <md:NameIDFormat>{persistent_format}</md:NameIDFormat>

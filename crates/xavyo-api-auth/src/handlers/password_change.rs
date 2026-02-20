@@ -137,9 +137,9 @@ pub async fn password_change_handler(
             .await?;
     }
 
-    // Update the password (include tenant_id for defense-in-depth)
+    // Update the password and clear must_change_password flag (L2)
     sqlx::query(
-        "UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3",
+        "UPDATE users SET password_hash = $1, must_change_password = false, updated_at = NOW() WHERE id = $2 AND tenant_id = $3",
     )
     .bind(&new_password_hash)
     .bind(user_id.as_uuid())

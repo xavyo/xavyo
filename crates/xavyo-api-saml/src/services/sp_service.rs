@@ -74,6 +74,9 @@ impl SpService {
         offset: i32,
         enabled: Option<bool>,
     ) -> SamlResult<(Vec<SamlServiceProvider>, i64)> {
+        // R8: Cap limit to prevent unbounded queries (OOM/DB pressure)
+        let limit = limit.clamp(1, 100);
+        let offset = offset.max(0);
         let sps = if let Some(enabled_filter) = enabled {
             sqlx::query_as::<_, SamlServiceProvider>(
                 r"
@@ -141,6 +144,18 @@ impl SpService {
         tenant_id: Uuid,
         req: CreateServiceProviderRequest,
     ) -> SamlResult<SamlServiceProvider> {
+        // SECURITY: Bound entity_id and name lengths to prevent DB bloat and large XML allocations.
+        if req.entity_id.len() > 1024 {
+            return Err(SamlError::InvalidAuthnRequest(
+                "entity_id too long (max 1024 bytes)".to_string(),
+            ));
+        }
+        if req.name.len() > 256 {
+            return Err(SamlError::InvalidAuthnRequest(
+                "name too long (max 256 bytes)".to_string(),
+            ));
+        }
+
         // Check for duplicate entity_id
         let existing: Option<Uuid> = sqlx::query_scalar(
             r"SELECT id FROM saml_service_providers WHERE tenant_id = $1 AND entity_id = $2",
@@ -161,6 +176,28 @@ impl SpService {
             ));
         }
 
+        // R9: Cap ACS URL count to prevent storage abuse
+        if req.acs_urls.len() > 20 {
+            return Err(SamlError::InvalidAuthnRequest(
+                "Too many ACS URLs (max 20)".to_string(),
+            ));
+        }
+
+        // R9: Validate metadata_url if provided
+        if let Some(ref url) = req.metadata_url {
+            if let Ok(parsed) = url::Url::parse(url) {
+                if parsed.scheme() != "https" {
+                    return Err(SamlError::InvalidAuthnRequest(
+                        "metadata_url must use HTTPS".to_string(),
+                    ));
+                }
+            } else {
+                return Err(SamlError::InvalidAuthnRequest(
+                    "Invalid metadata_url format".to_string(),
+                ));
+            }
+        }
+
         // SECURITY: Enforce HTTPS for ACS URLs to prevent assertion interception via MITM.
         for acs_url in &req.acs_urls {
             if let Ok(parsed) = url::Url::parse(acs_url) {
@@ -174,6 +211,15 @@ impl SpService {
                     "Invalid ACS URL format: {acs_url}"
                 )));
             }
+        }
+
+        // SECURITY (H10): Cap assertion_validity_seconds to prevent excessively long-lived assertions.
+        // Max 24 hours (86400s). Values <= 0 are also rejected.
+        if req.assertion_validity_seconds <= 0 || req.assertion_validity_seconds > 86400 {
+            return Err(SamlError::InvalidAuthnRequest(format!(
+                "assertion_validity_seconds must be between 1 and 86400, got {}",
+                req.assertion_validity_seconds
+            )));
         }
 
         let attribute_mapping = req.attribute_mapping.unwrap_or(serde_json::json!({}));
@@ -228,7 +274,22 @@ impl SpService {
         let existing = self.get_sp(tenant_id, sp_id).await?;
 
         let name = req.name.unwrap_or(existing.name);
+
+        // R9: Validate name length on update (same as create)
+        if name.len() > 256 {
+            return Err(SamlError::InvalidAuthnRequest(
+                "name too long (max 256 bytes)".to_string(),
+            ));
+        }
+
         let acs_urls = req.acs_urls.unwrap_or(existing.acs_urls);
+
+        // R9: Cap ACS URL count on update
+        if acs_urls.len() > 20 {
+            return Err(SamlError::InvalidAuthnRequest(
+                "Too many ACS URLs (max 20)".to_string(),
+            ));
+        }
 
         // SECURITY: Re-validate HTTPS for ACS URLs on update (same check as create_sp).
         for acs_url in &acs_urls {
@@ -254,6 +315,13 @@ impl SpService {
         let assertion_validity_seconds = req
             .assertion_validity_seconds
             .unwrap_or(existing.assertion_validity_seconds);
+        // SECURITY (H10): Cap assertion_validity_seconds on update too.
+        if assertion_validity_seconds <= 0 || assertion_validity_seconds > 86400 {
+            return Err(SamlError::InvalidAuthnRequest(format!(
+                "assertion_validity_seconds must be between 1 and 86400, got {}",
+                assertion_validity_seconds
+            )));
+        }
         let enabled = req.enabled.unwrap_or(existing.enabled);
         let metadata_url = req.metadata_url.or(existing.metadata_url);
 
@@ -455,7 +523,14 @@ impl SpService {
         tenant_id: Uuid,
         cert_id: Uuid,
     ) -> SamlResult<TenantIdpCertificate> {
-        // First fetch the certificate to check validity
+        // SECURITY: Use a transaction to atomically check validity and activate in one go,
+        // preventing TOCTOU race where a certificate could expire between the check and the update.
+        let mut tx =
+            self.pool.begin().await.map_err(|e| {
+                SamlError::InternalError(format!("Failed to start transaction: {e}"))
+            })?;
+
+        // Fetch the certificate (locked within transaction)
         let cert = sqlx::query_as::<_, TenantIdpCertificate>(
             r"
             SELECT id, tenant_id, certificate, private_key_encrypted,
@@ -463,11 +538,12 @@ impl SpService {
                    is_active, created_at
             FROM tenant_idp_certificates
             WHERE id = $1 AND tenant_id = $2
+            FOR UPDATE
             ",
         )
         .bind(cert_id)
         .bind(tenant_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(|| SamlError::CertificateNotFound(cert_id.to_string()))?;
 
@@ -479,12 +555,22 @@ impl SpService {
             )));
         }
 
-        // Atomically set is_active = TRUE for target cert, FALSE for all others
+        // R8: Split into two queries to avoid returning the wrong row.
+        // The previous single UPDATE with `SET is_active = (id = $1)` updated ALL rows
+        // and `fetch_optional` returned an arbitrary row (not necessarily the activated one).
+
+        // Step 1: Deactivate all certificates for this tenant
+        sqlx::query("UPDATE tenant_idp_certificates SET is_active = FALSE WHERE tenant_id = $1")
+            .bind(tenant_id)
+            .execute(&mut *tx)
+            .await?;
+
+        // Step 2: Activate the target certificate and return it
         let updated_cert = sqlx::query_as::<_, TenantIdpCertificate>(
             r"
             UPDATE tenant_idp_certificates
-            SET is_active = (id = $1)
-            WHERE tenant_id = $2
+            SET is_active = TRUE
+            WHERE id = $1 AND tenant_id = $2
             RETURNING id, tenant_id, certificate, private_key_encrypted,
                       key_id, subject_dn, issuer_dn, not_before, not_after,
                       is_active, created_at
@@ -492,9 +578,13 @@ impl SpService {
         )
         .bind(cert_id)
         .bind(tenant_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(|| SamlError::CertificateNotFound(cert_id.to_string()))?;
+
+        tx.commit()
+            .await
+            .map_err(|e| SamlError::InternalError(format!("Failed to commit transaction: {e}")))?;
 
         tracing::info!(
             tenant_id = %tenant_id,
@@ -519,6 +609,14 @@ impl SpService {
 fn encrypt_private_key(key_pem: &[u8], encryption_key: &[u8]) -> SamlResult<Vec<u8>> {
     use openssl::symm::{encrypt_aead, Cipher};
 
+    // SECURITY: Validate key length for AES-256-GCM (must be exactly 32 bytes).
+    if encryption_key.len() != 32 {
+        return Err(SamlError::InternalError(format!(
+            "AES-256-GCM requires 32-byte key, got {} bytes",
+            encryption_key.len()
+        )));
+    }
+
     let cipher = Cipher::aes_256_gcm();
 
     // Generate random IV
@@ -542,6 +640,14 @@ fn encrypt_private_key(key_pem: &[u8], encryption_key: &[u8]) -> SamlResult<Vec<
 /// Decrypt private key using AES-256-GCM
 fn decrypt_private_key(encrypted: &[u8], encryption_key: &[u8]) -> SamlResult<String> {
     use openssl::symm::{decrypt_aead, Cipher};
+
+    // SECURITY: Validate key length for AES-256-GCM (must be exactly 32 bytes).
+    if encryption_key.len() != 32 {
+        return Err(SamlError::PrivateKeyError(format!(
+            "AES-256-GCM requires 32-byte key, got {} bytes",
+            encryption_key.len()
+        )));
+    }
 
     if encrypted.len() < 28 {
         return Err(SamlError::PrivateKeyError(

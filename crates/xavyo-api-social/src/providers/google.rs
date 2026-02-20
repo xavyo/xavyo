@@ -64,10 +64,16 @@ impl SocialProvider for GoogleProvider {
         ProviderType::Google
     }
 
-    fn authorization_url(&self, state: &str, pkce_challenge: &str, redirect_uri: &str) -> String {
+    fn authorization_url(
+        &self,
+        state: &str,
+        pkce_challenge: &str,
+        redirect_uri: &str,
+        nonce: Option<&str>,
+    ) -> String {
         let scopes = self.default_scopes().join(" ");
 
-        format!(
+        let mut url = format!(
             "{}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&code_challenge={}&code_challenge_method=S256&access_type=offline&prompt=consent",
             AUTHORIZATION_ENDPOINT,
             urlencoding::encode(&self.client_id),
@@ -75,7 +81,13 @@ impl SocialProvider for GoogleProvider {
             urlencoding::encode(&scopes),
             urlencoding::encode(state),
             urlencoding::encode(pkce_challenge),
-        )
+        );
+
+        if let Some(nonce) = nonce {
+            url.push_str(&format!("&nonce={}", urlencoding::encode(nonce)));
+        }
+
+        url
     }
 
     async fn exchange_code(
@@ -173,6 +185,7 @@ mod tests {
             "state-token",
             "pkce-challenge",
             "https://example.com/callback",
+            None,
         );
 
         assert!(url.starts_with(AUTHORIZATION_ENDPOINT));
@@ -182,6 +195,21 @@ mod tests {
         assert!(url.contains("code_challenge_method=S256"));
         assert!(url.contains("scope=openid"));
         assert!(url.contains("access_type=offline"));
+        assert!(!url.contains("nonce="));
+    }
+
+    #[test]
+    fn test_authorization_url_with_nonce() {
+        let provider = GoogleProvider::new("client-id".to_string(), "client-secret".to_string());
+
+        let url = provider.authorization_url(
+            "state-token",
+            "pkce-challenge",
+            "https://example.com/callback",
+            Some("my-nonce-value"),
+        );
+
+        assert!(url.contains("nonce=my-nonce-value"));
     }
 
     #[test]

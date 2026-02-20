@@ -72,6 +72,21 @@ impl ProvisioningService {
                 .await?
                 .ok_or(FederationError::UserNotFound(link.user_id))?;
 
+            // SECURITY: Reject unverified emails on existing user sync path.
+            // Without this, a compromised IdP returning email_verified=false could
+            // still grant login and overwrite user display_name via sync.
+            if claims.email_verified == Some(false) {
+                tracing::warn!(
+                    tenant_id = %tenant_id,
+                    user_id = %user.id,
+                    subject = %claims.sub,
+                    "Rejecting login: IdP returned email_verified=false for existing user"
+                );
+                return Err(FederationError::ProvisioningFailed(
+                    "Email not verified by identity provider".to_string(),
+                ));
+            }
+
             if idp.sync_on_login {
                 let updated_user = self.sync_user(&idp, &user, claims).await?;
                 let updated_link = self.update_link(&link, claims).await?;
@@ -134,6 +149,17 @@ impl ProvisioningService {
                 FederationError::ProvisioningFailed("Email claim is required".to_string())
             })?;
 
+        // SECURITY: Require email_verified before linking to an existing account by email.
+        // Without this check, an attacker could register an unverified email at the IdP
+        // matching an existing user and gain access to that account.
+        let email_verified = claims.email_verified.unwrap_or(false);
+        if !email_verified {
+            return Err(FederationError::ProvisioningFailed(
+                "Email must be verified by the identity provider before account linking"
+                    .to_string(),
+            ));
+        }
+
         // Get display name (optional)
         let display_name = mapped
             .get("display_name")
@@ -149,7 +175,6 @@ impl ProvisioningService {
             tracing::info!(
                 tenant_id = %tenant_id,
                 user_id = %user.id,
-                email = %email,
                 "Linking IdP to existing user"
             );
             user
@@ -162,7 +187,6 @@ impl ProvisioningService {
             tracing::info!(
                 tenant_id = %tenant_id,
                 user_id = %new_user.id,
-                email = %email,
                 "Created new federated user"
             );
 

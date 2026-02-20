@@ -9,11 +9,13 @@ use xavyo_db::models::{IdentityProviderDomain, TenantIdentityProvider};
 use super::requests::ClaimMappingConfig;
 
 /// Response for realm discovery.
+///
+/// Only returns the authentication method (federated vs standard).
+/// IdP details are intentionally omitted to prevent information leakage
+/// on this unauthenticated endpoint.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct DiscoverResponse {
     pub authentication_method: AuthenticationMethod,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub identity_provider: Option<IdentityProviderSummary>,
 }
 
 /// Authentication method.
@@ -22,14 +24,6 @@ pub struct DiscoverResponse {
 pub enum AuthenticationMethod {
     Federated,
     Standard,
-}
-
-/// Summary of an identity provider for discovery.
-#[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct IdentityProviderSummary {
-    pub id: Uuid,
-    pub name: String,
-    pub provider_type: String,
 }
 
 /// Full identity provider response.

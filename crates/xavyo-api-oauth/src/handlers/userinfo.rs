@@ -8,6 +8,7 @@ use axum::{
     http::{header, HeaderMap},
     Json,
 };
+use sqlx;
 use uuid::Uuid;
 use xavyo_auth::decode_token;
 
@@ -64,6 +65,46 @@ pub async fn userinfo_handler(
             );
             return Err(OAuthError::Internal(
                 "Token verification unavailable".to_string(),
+            ));
+        }
+    }
+
+    // H16: Check for revoke-all sentinel in DB (mirrors introspection.rs pattern).
+    // The revocation cache only checks individual JTI; the sentinel pattern revokes
+    // ALL tokens for a user issued before the sentinel timestamp.
+    // R8-F5: Skip sentinel check if tid is None — token will be rejected at line 118 anyway.
+    // Using unwrap_or_default() would query with nil UUID, which is always a no-op.
+    if let (false, Some(tenant_id_for_sentinel)) = (claims.jti.is_empty(), claims.tid) {
+        let sentinel_revoked: bool = if let Ok(mut conn) = state.pool.acquire().await {
+            let _ = sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+                .bind(tenant_id_for_sentinel.to_string())
+                .execute(&mut *conn)
+                .await;
+            sqlx::query_scalar(
+                r"
+                SELECT EXISTS(
+                    SELECT 1 FROM revoked_tokens
+                    WHERE jti LIKE 'revoke-all:' || $1 || ':%'
+                      AND tenant_id = $3
+                      AND created_at > to_timestamp($2)
+                )
+                ",
+            )
+            .bind(&claims.sub)
+            .bind(claims.iat as f64)
+            .bind(tenant_id_for_sentinel)
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap_or(false)
+        } else {
+            // Fail-closed: treat connection errors as revoked
+            true
+        };
+
+        if sentinel_revoked {
+            tracing::warn!(jti = %claims.jti, sub = %claims.sub, "Rejected token via revoke-all sentinel in userinfo");
+            return Err(OAuthError::InvalidToken(
+                "Token has been revoked".to_string(),
             ));
         }
     }

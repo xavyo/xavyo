@@ -8,6 +8,8 @@ use axum::{
 use tracing::instrument;
 use xavyo_core::TenantId;
 
+use uuid::Uuid;
+
 use crate::error::{FederationError, FederationResult};
 use crate::models::{
     AuthorizeParams, CallbackParams, DiscoverRequest, DiscoverResponse, FederationTokenResponse,
@@ -51,18 +53,11 @@ pub async fn discover_realm(
     // Use HRD service to find IdP for email domain
     let result = state.hrd.discover(tenant_id, &req.email).await?;
 
-    let response = match result {
-        Some(hrd_result) => DiscoverResponse {
-            authentication_method: crate::models::AuthenticationMethod::Federated,
-            identity_provider: Some(crate::models::IdentityProviderSummary {
-                id: hrd_result.idp_id,
-                name: hrd_result.idp_name,
-                provider_type: "oidc".to_string(), // Default for OIDC federation
-            }),
-        },
-        None => DiscoverResponse {
-            authentication_method: crate::models::AuthenticationMethod::Standard,
-            identity_provider: None,
+    let response = DiscoverResponse {
+        authentication_method: if result.is_some() {
+            crate::models::AuthenticationMethod::Federated
+        } else {
+            crate::models::AuthenticationMethod::Standard
         },
     };
 
@@ -91,9 +86,36 @@ pub async fn authorize(
 ) -> FederationResult<impl IntoResponse> {
     let tenant_id = *tid.as_uuid();
 
+    // SECURITY (M1): Validate redirect_uri length to prevent abuse
+    if let Some(ref redirect_uri) = params.redirect_uri {
+        if redirect_uri.len() > 2048 {
+            return Err(FederationError::InvalidConfiguration(
+                "Redirect URI exceeds maximum length of 2048 characters".to_string(),
+            ));
+        }
+    }
+
+    // Resolve IdP ID from either direct parameter or HRD lookup via login_hint
+    let idp_id = match (params.idp_id, params.login_hint.as_deref()) {
+        (Some(id), _) => id,
+        (None, Some(email)) => {
+            let hrd_result = state
+                .hrd
+                .discover(tenant_id, email)
+                .await?
+                .ok_or(FederationError::IdpNotFound(Uuid::nil()))?;
+            hrd_result.idp_id
+        }
+        (None, None) => {
+            return Err(FederationError::InvalidConfiguration(
+                "Either idp_id or login_hint is required".to_string(),
+            ));
+        }
+    };
+
     tracing::info!(
         tenant_id = %tenant_id,
-        idp_id = %params.idp_id,
+        idp_id = %idp_id,
         "Initiating federated authorization"
     );
 
@@ -101,16 +123,16 @@ pub async fn authorize(
         .auth_flow
         .initiate(InitiateAuthInput {
             tenant_id,
-            idp_id: params.idp_id,
+            idp_id,
             redirect_uri: params.redirect_uri,
-            email: None, // Could be passed as login_hint
+            email: params.login_hint,
         })
         .await?;
 
     // Audit log
     tracing::info!(
         tenant_id = %tenant_id,
-        idp_id = %params.idp_id,
+        idp_id = %idp_id,
         session_id = %auth_url.session_id,
         "Federation auth initiated"
     );
@@ -200,12 +222,13 @@ pub async fn callback(
         .await?;
 
     // Generate Xavyo JWT for the user
-    let roles = xavyo_db::UserRole::get_user_roles(&state.pool, user.id)
-        .await
-        .map_err(|e| {
-            tracing::error!(user_id = %user.id, error = %e, "Failed to fetch user roles");
-            FederationError::Internal("Failed to fetch user roles".to_string())
-        })?;
+    let roles =
+        xavyo_db::UserRole::get_user_roles(&state.pool, user.id, token_result.session.tenant_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(user_id = %user.id, error = %e, "Failed to fetch user roles");
+                FederationError::Internal("Failed to fetch user roles".to_string())
+            })?;
     let xavyo_tokens = state
         .token_issuer
         .issue_tokens(user.id, token_result.session.tenant_id, roles, None)
@@ -251,9 +274,12 @@ pub async fn callback(
             })));
         }
         // Redirect with token as fragment (safer than query params)
+        // R9: URL-encode the access token per RFC 6749 Section 4.2.2
+        let encoded_token: String =
+            url::form_urlencoded::byte_serialize(xavyo_tokens.access_token.as_bytes()).collect();
         let redirect_url = format!(
-            "{}#access_token={}&token_type=Bearer&expires_in={}",
-            redirect_uri, xavyo_tokens.access_token, xavyo_tokens.expires_in
+            "{}#access_token={encoded_token}&token_type=Bearer&expires_in={}",
+            redirect_uri, xavyo_tokens.expires_in
         );
         Ok(CallbackResponse::Redirect(Redirect::temporary(
             &redirect_url,
@@ -301,10 +327,13 @@ pub async fn logout(
 ) -> FederationResult<impl IntoResponse> {
     let tenant_id = *tid.as_uuid();
 
-    // Clean up any pending sessions for this tenant
+    // R9: Use tenant-scoped cleanup to respect data sovereignty
     // Note: Actual logout should be handled by the main auth system
     // This is for cleaning up any orphaned federation sessions
-    let cleaned = state.auth_flow.cleanup_expired_sessions().await?;
+    let cleaned = state
+        .auth_flow
+        .cleanup_expired_sessions_for_tenant(tenant_id)
+        .await?;
 
     tracing::info!(
         tenant_id = %tenant_id,

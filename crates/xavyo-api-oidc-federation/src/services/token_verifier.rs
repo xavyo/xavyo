@@ -6,7 +6,7 @@
 use crate::error::{FederationError, FederationResult};
 use crate::services::jwks_cache::JwksCache;
 use tracing::{debug, info, instrument, warn};
-use xavyo_auth::{decode_token_with_config, JwtClaims, ValidationConfig};
+use xavyo_auth::{decode_token_with_algorithm, JwtClaims, ValidationConfig};
 
 /// Configuration for token verification.
 #[derive(Clone)]
@@ -128,20 +128,38 @@ impl TokenVerifierService {
 
         debug!(kid = ?kid, jwks_uri = %jwks_uri, "Verifying token");
 
-        // Find the signing key
-        let jwk = self
+        // Find the signing key, with force-refresh retry on miss (handles IdP key rotation)
+        let jwk = match self
             .jwks_cache
             .find_signing_key(jwks_uri, kid.as_deref())
             .await?
-            .ok_or_else(|| {
-                FederationError::JwksKeyNotFound(
-                    kid.clone().unwrap_or_else(|| "no kid".to_string()),
-                )
-            })?;
+        {
+            Some(key) => key,
+            None => {
+                // Key not found — IdP may have rotated keys. Force-refresh and retry once.
+                info!(
+                    kid = ?kid,
+                    jwks_uri = %jwks_uri,
+                    "Signing key not found in cached JWKS, force-refreshing"
+                );
+                self.jwks_cache.get_keys_force_refresh(jwks_uri).await?;
+                self.jwks_cache
+                    .find_signing_key(jwks_uri, kid.as_deref())
+                    .await?
+                    .ok_or_else(|| {
+                        FederationError::JwksKeyNotFound(
+                            kid.clone().unwrap_or_else(|| "no kid".to_string()),
+                        )
+                    })?
+            }
+        };
 
-        // Convert JWK to PEM
-        let public_key_pem = jwk.to_pem().ok_or_else(|| {
-            FederationError::TokenVerificationFailed("Failed to convert JWK to PEM".to_string())
+        // Extract PEM and algorithm from JWK
+        let info = jwk.decoding_info().ok_or_else(|| {
+            FederationError::TokenVerificationFailed(format!(
+                "Unsupported key type: kty={}, crv={:?}",
+                jwk.kty, jwk.crv
+            ))
         })?;
 
         // Build validation config
@@ -160,8 +178,8 @@ impl TokenVerifierService {
         }
 
         // Verify the token
-        let claims =
-            decode_token_with_config(token, &public_key_pem, &validation).map_err(|e| match e {
+        let claims = decode_token_with_algorithm(token, &info.pem, info.algorithm, &validation)
+            .map_err(|e| match e {
                 xavyo_auth::AuthError::TokenExpired => FederationError::TokenExpired,
                 xavyo_auth::AuthError::InvalidSignature => {
                     FederationError::TokenVerificationFailed("Invalid signature".to_string())
@@ -212,20 +230,37 @@ impl TokenVerifierService {
         let kid = xavyo_auth::extract_kid(token)
             .map_err(|e| FederationError::TokenVerificationFailed(e.to_string()))?;
 
-        // Find the signing key
-        let jwk = self
+        // Find the signing key, with force-refresh retry on miss (handles IdP key rotation)
+        let jwk = match self
             .jwks_cache
             .find_signing_key(jwks_uri, kid.as_deref())
             .await?
-            .ok_or_else(|| {
-                FederationError::JwksKeyNotFound(
-                    kid.clone().unwrap_or_else(|| "no kid".to_string()),
-                )
-            })?;
+        {
+            Some(key) => key,
+            None => {
+                info!(
+                    kid = ?kid,
+                    jwks_uri = %jwks_uri,
+                    "Signing key not found in cached JWKS, force-refreshing"
+                );
+                self.jwks_cache.get_keys_force_refresh(jwks_uri).await?;
+                self.jwks_cache
+                    .find_signing_key(jwks_uri, kid.as_deref())
+                    .await?
+                    .ok_or_else(|| {
+                        FederationError::JwksKeyNotFound(
+                            kid.clone().unwrap_or_else(|| "no kid".to_string()),
+                        )
+                    })?
+            }
+        };
 
-        // Convert JWK to PEM
-        let public_key_pem = jwk.to_pem().ok_or_else(|| {
-            FederationError::TokenVerificationFailed("Failed to convert JWK to PEM".to_string())
+        // Extract PEM and algorithm from JWK
+        let info = jwk.decoding_info().ok_or_else(|| {
+            FederationError::TokenVerificationFailed(format!(
+                "Unsupported key type: kty={}, crv={:?}",
+                jwk.kty, jwk.crv
+            ))
         })?;
 
         // Build validation config with the specific issuer
@@ -233,8 +268,8 @@ impl TokenVerifierService {
             ValidationConfig::with_leeway(self.config.clock_skew_tolerance).issuer(expected_issuer);
 
         // Verify the token
-        let claims =
-            decode_token_with_config(token, &public_key_pem, &validation).map_err(|e| match e {
+        let claims = decode_token_with_algorithm(token, &info.pem, info.algorithm, &validation)
+            .map_err(|e| match e {
                 xavyo_auth::AuthError::TokenExpired => FederationError::TokenExpired,
                 xavyo_auth::AuthError::InvalidSignature => {
                     FederationError::TokenVerificationFailed("Invalid signature".to_string())
@@ -479,6 +514,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
         Mock::given(method("GET"))
             .and(path("/.well-known/jwks.json"))
             .respond_with(ResponseTemplate::new(200).set_body_string(different_jwks))
+            .expect(2) // Initial fetch + force-refresh retry
             .mount(&mock_server)
             .await;
 
@@ -493,5 +529,50 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
             result.unwrap_err(),
             FederationError::JwksKeyNotFound(_)
         ));
+    }
+
+    #[tokio::test]
+    async fn test_verify_key_rotation_retry() {
+        let mock_server = MockServer::start().await;
+
+        // JWKS with old key (no match for token's kid "test-key-1")
+        let old_jwks = r#"{
+            "keys": [
+                {
+                    "kty": "RSA",
+                    "use": "sig",
+                    "kid": "old-key",
+                    "alg": "RS256",
+                    "n": "test",
+                    "e": "AQAB"
+                }
+            ]
+        }"#;
+
+        // First request returns old JWKS (cache miss → fetch)
+        Mock::given(method("GET"))
+            .and(path("/.well-known/jwks.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(old_jwks))
+            .up_to_n_times(1)
+            .mount(&mock_server)
+            .await;
+
+        // Second request (force-refresh) returns JWKS with the correct key
+        Mock::given(method("GET"))
+            .and(path("/.well-known/jwks.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(test_jwks_json()))
+            .mount(&mock_server)
+            .await;
+
+        let jwks_uri = format!("{}/.well-known/jwks.json", mock_server.uri());
+        let token = create_test_token(3600, "https://idp.example.com");
+
+        let verifier = test_verifier(VerificationConfig::default());
+        let result = verifier.verify_token(&token, &jwks_uri).await;
+
+        assert!(result.is_ok());
+        let verified = result.unwrap();
+        assert_eq!(verified.claims.sub, "user-123");
+        assert_eq!(verified.kid, Some("test-key-1".to_string()));
     }
 }

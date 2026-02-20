@@ -192,7 +192,7 @@ pub async fn login_handler(
                             user_id: None,
                             email: request.email.clone(),
                             success: false,
-                            failure_reason: Some("unknown_email".to_string()),
+                            failure_reason: Some("invalid_credentials".to_string()),
                             auth_method: AuthMethod::Password,
                             ip_address: ip_str.clone(),
                             user_agent: user_agent.clone(),
@@ -321,10 +321,8 @@ pub async fn login_handler(
         return Err(ApiAuthError::AccountLocked);
     }
 
-    // Check if email is verified
-    if !user.email_verified {
-        return Err(ApiAuthError::EmailNotVerified);
-    }
+    // Note: email_verified is already checked in auth_service.login()
+    // which returns ApiAuthError::EmailNotVerified before we reach here.
 
     // Check if password is expired
     if user.needs_password_change() {
@@ -533,9 +531,15 @@ pub async fn login_handler(
 
     // MFA not enabled - issue full tokens
     // Fetch user roles from database
-    let roles = UserRole::get_user_roles(&pool, *user_id.as_uuid())
+    // L-9: Fail the login if role fetch fails rather than silently issuing
+    // a downgraded token with only ["user"]. An admin whose role query fails
+    // would otherwise get a non-admin JWT — operationally confusing.
+    let roles = UserRole::get_user_roles(&pool, *user_id.as_uuid(), *tenant_id_val.as_uuid())
         .await
-        .unwrap_or_else(|_| vec!["user".to_string()]);
+        .map_err(|e| {
+            tracing::error!(user_id = %user_id.as_uuid(), error = %e, "Failed to fetch user roles during login");
+            ApiAuthError::Internal("Failed to fetch user roles".to_string())
+        })?;
 
     let (access_token, refresh_token, expires_in) = token_service
         .create_tokens(

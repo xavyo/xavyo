@@ -10,6 +10,7 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use moka::sync::Cache;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::{SocialProvider, SocialUserInfo, TokenResponse};
@@ -29,8 +30,10 @@ const APPLE_JWKS_URL: &str = "https://appleid.apple.com/auth/keys";
 /// Apple issuer for token validation.
 const APPLE_ISSUER: &str = "https://appleid.apple.com";
 
-/// Maximum client secret lifetime (6 months in seconds).
-const CLIENT_SECRET_LIFETIME: u64 = 86400 * 180;
+/// Client secret lifetime (1 day in seconds).
+/// SECURITY: Use a short-lived client secret to limit exposure window if leaked.
+/// Apple allows up to 6 months, but shorter lifetime reduces risk.
+const CLIENT_SECRET_LIFETIME: u64 = 86400;
 
 /// Apple client secret JWT claims.
 #[derive(Debug, Serialize)]
@@ -60,6 +63,10 @@ struct AppleIdTokenClaims {
     email: Option<String>,
     email_verified: Option<String>,
     is_private_email: Option<String>,
+    /// OIDC nonce — deserialized for future use but validation is centralized in the callback handler.
+    #[serde(default)]
+    #[allow(dead_code)]
+    nonce: Option<String>,
 }
 
 /// Apple JWKS response structure.
@@ -72,12 +79,34 @@ struct AppleJwkSet {
 #[derive(Debug, Clone, Deserialize)]
 struct AppleJwk {
     kid: String,
-    #[allow(dead_code)]
     kty: String,
-    #[allow(dead_code)]
     alg: Option<String>,
-    n: String,
-    e: String,
+    /// RSA modulus (base64url encoded). Present for RSA keys.
+    n: Option<String>,
+    /// RSA exponent (base64url encoded). Present for RSA keys.
+    e: Option<String>,
+    /// EC curve name (e.g., "P-256"). Present for EC keys.
+    #[allow(dead_code)]
+    crv: Option<String>,
+    /// EC X coordinate (base64url encoded). Present for EC keys.
+    x: Option<String>,
+    /// EC Y coordinate (base64url encoded). Present for EC keys.
+    y: Option<String>,
+}
+
+/// Global JWKS cache shared across all AppleProvider instances.
+///
+/// SECURITY: AppleProvider is constructed per-request (via ProviderFactory), so a
+/// per-instance cache would be recreated on every request and never hit.
+/// Using a process-global static ensures the cache actually persists across requests.
+fn apple_jwks_cache() -> &'static Cache<String, AppleJwkSet> {
+    static CACHE: OnceLock<Cache<String, AppleJwkSet>> = OnceLock::new();
+    CACHE.get_or_init(|| {
+        Cache::builder()
+            .max_capacity(1)
+            .time_to_live(Duration::from_secs(JWKS_CACHE_TTL_SECS))
+            .build()
+    })
 }
 
 /// Apple Sign In provider.
@@ -88,8 +117,6 @@ pub struct AppleProvider {
     key_id: String,
     private_key: EncodingKey,
     http_client: Client,
-    /// Cached JWKS to avoid fetching on every authentication.
-    jwks_cache: Cache<String, AppleJwkSet>,
 }
 
 impl AppleProvider {
@@ -113,11 +140,6 @@ impl AppleProvider {
             }
         })?;
 
-        let jwks_cache = Cache::builder()
-            .max_capacity(1)
-            .time_to_live(Duration::from_secs(JWKS_CACHE_TTL_SECS))
-            .build();
-
         Ok(Self {
             client_id,
             team_id,
@@ -127,7 +149,6 @@ impl AppleProvider {
                 .timeout(Duration::from_secs(10))
                 .build()
                 .unwrap_or_else(|_| Client::new()),
-            jwks_cache,
         })
     }
 
@@ -154,6 +175,40 @@ impl AppleProvider {
         encode(&header, &claims, &self.private_key).map_err(SocialError::from)
     }
 
+    /// Fetch Apple JWKS with response size cap to prevent OOM from malicious responses.
+    async fn fetch_jwks_with_size_limit(&self) -> SocialResult<AppleJwkSet> {
+        const MAX_JWKS_SIZE: usize = 512 * 1024; // 512 KB
+
+        let response = self
+            .http_client
+            .get(APPLE_JWKS_URL)
+            .send()
+            .await
+            .map_err(|e| SocialError::InternalError {
+                message: format!("Failed to fetch Apple JWKS: {e}"),
+            })?;
+
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| SocialError::InternalError {
+                message: format!("Failed to read Apple JWKS response: {e}"),
+            })?;
+
+        if bytes.len() > MAX_JWKS_SIZE {
+            return Err(SocialError::InternalError {
+                message: format!(
+                    "Apple JWKS response too large: {} bytes (max {MAX_JWKS_SIZE})",
+                    bytes.len()
+                ),
+            });
+        }
+
+        serde_json::from_slice(&bytes).map_err(|e| SocialError::InternalError {
+            message: format!("Failed to parse Apple JWKS: {e}"),
+        })
+    }
+
     /// Verify and decode the Apple ID token using Apple's JWKS public keys.
     ///
     /// Fetches Apple's public keys from their JWKS endpoint, finds the key
@@ -174,24 +229,11 @@ impl AppleProvider {
         })?;
 
         // Check cache first; on miss, fetch from Apple and cache with TTL
-        let jwks = if let Some(cached) = self.jwks_cache.get(APPLE_JWKS_CACHE_KEY) {
+        let jwks = if let Some(cached) = apple_jwks_cache().get(APPLE_JWKS_CACHE_KEY) {
             cached
         } else {
-            let fetched: AppleJwkSet = self
-                .http_client
-                .get(APPLE_JWKS_URL)
-                .send()
-                .await
-                .map_err(|e| SocialError::InternalError {
-                    message: format!("Failed to fetch Apple JWKS: {e}"),
-                })?
-                .json()
-                .await
-                .map_err(|e| SocialError::InternalError {
-                    message: format!("Failed to parse Apple JWKS: {e}"),
-                })?;
-            self.jwks_cache
-                .insert(APPLE_JWKS_CACHE_KEY.to_string(), fetched.clone());
+            let fetched: AppleJwkSet = self.fetch_jwks_with_size_limit().await?;
+            apple_jwks_cache().insert(APPLE_JWKS_CACHE_KEY.to_string(), fetched.clone());
             fetched
         };
 
@@ -206,22 +248,10 @@ impl AppleProvider {
                 kid = %kid,
                 "Apple JWKS kid not found in cache — refreshing JWKS and retrying"
             );
-            self.jwks_cache.invalidate(APPLE_JWKS_CACHE_KEY);
+            apple_jwks_cache().invalidate(APPLE_JWKS_CACHE_KEY);
 
             // Re-fetch JWKS from Apple
-            let refreshed: AppleJwkSet = self
-                .http_client
-                .get(APPLE_JWKS_URL)
-                .send()
-                .await
-                .map_err(|e| SocialError::InternalError {
-                    message: format!("Failed to refresh Apple JWKS: {e}"),
-                })?
-                .json()
-                .await
-                .map_err(|e| SocialError::InternalError {
-                    message: format!("Failed to parse refreshed Apple JWKS: {e}"),
-                })?;
+            let refreshed: AppleJwkSet = self.fetch_jwks_with_size_limit().await?;
 
             // Retry finding the key in refreshed JWKS
             let key = refreshed.keys.iter().find(|k| k.kid == kid).ok_or_else(|| {
@@ -231,21 +261,59 @@ impl AppleProvider {
             })?.clone();
 
             // Cache the refreshed JWKS for future requests
-            self.jwks_cache
-                .insert(APPLE_JWKS_CACHE_KEY.to_string(), refreshed);
+            apple_jwks_cache().insert(APPLE_JWKS_CACHE_KEY.to_string(), refreshed);
 
             key
         };
 
-        // Build the RSA decoding key from JWK components
-        let decoding_key = DecodingKey::from_rsa_components(&jwk.n, &jwk.e).map_err(|e| {
-            SocialError::InternalError {
-                message: format!("Failed to build RSA decoding key from Apple JWK: {e}"),
+        // Build decoding key and determine algorithm based on key type
+        let (decoding_key, algorithm) = match jwk.kty.as_str() {
+            "RSA" => {
+                let n = jwk.n.as_ref().ok_or_else(|| SocialError::InternalError {
+                    message: "Apple RSA JWK missing 'n' field".to_string(),
+                })?;
+                let e = jwk.e.as_ref().ok_or_else(|| SocialError::InternalError {
+                    message: "Apple RSA JWK missing 'e' field".to_string(),
+                })?;
+                let key = DecodingKey::from_rsa_components(n, e).map_err(|e| {
+                    SocialError::InternalError {
+                        message: format!("Failed to build RSA decoding key from Apple JWK: {e}"),
+                    }
+                })?;
+                let alg = match jwk.alg.as_deref() {
+                    Some("RS384") => Algorithm::RS384,
+                    Some("RS512") => Algorithm::RS512,
+                    _ => Algorithm::RS256,
+                };
+                (key, alg)
             }
-        })?;
+            "EC" => {
+                let x = jwk.x.as_ref().ok_or_else(|| SocialError::InternalError {
+                    message: "Apple EC JWK missing 'x' field".to_string(),
+                })?;
+                let y = jwk.y.as_ref().ok_or_else(|| SocialError::InternalError {
+                    message: "Apple EC JWK missing 'y' field".to_string(),
+                })?;
+                let key = DecodingKey::from_ec_components(x, y).map_err(|e| {
+                    SocialError::InternalError {
+                        message: format!("Failed to build EC decoding key from Apple JWK: {e}"),
+                    }
+                })?;
+                let alg = match jwk.alg.as_deref() {
+                    Some("ES384") => Algorithm::ES384,
+                    _ => Algorithm::ES256,
+                };
+                (key, alg)
+            }
+            other => {
+                return Err(SocialError::InternalError {
+                    message: format!("Unsupported Apple JWK key type: {other}"),
+                });
+            }
+        };
 
-        // Configure validation: RS256 algorithm, check issuer and audience
-        let mut validation = Validation::new(Algorithm::RS256);
+        // Configure validation with detected algorithm, check issuer and audience
+        let mut validation = Validation::new(algorithm);
         validation.set_audience(&[&self.client_id]);
         validation.set_issuer(&[APPLE_ISSUER]);
 
@@ -265,11 +333,17 @@ impl SocialProvider for AppleProvider {
         ProviderType::Apple
     }
 
-    fn authorization_url(&self, state: &str, pkce_challenge: &str, redirect_uri: &str) -> String {
+    fn authorization_url(
+        &self,
+        state: &str,
+        pkce_challenge: &str,
+        redirect_uri: &str,
+        nonce: Option<&str>,
+    ) -> String {
         let scopes = self.default_scopes().join(" ");
 
         // Apple uses form_post response mode
-        format!(
+        let mut url = format!(
             "{}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&code_challenge={}&code_challenge_method=S256&response_mode=form_post",
             AUTHORIZATION_ENDPOINT,
             urlencoding::encode(&self.client_id),
@@ -277,7 +351,13 @@ impl SocialProvider for AppleProvider {
             urlencoding::encode(&scopes),
             urlencoding::encode(state),
             urlencoding::encode(pkce_challenge),
-        )
+        );
+
+        if let Some(nonce) = nonce {
+            url.push_str(&format!("&nonce={}", urlencoding::encode(nonce)));
+        }
+
+        url
     }
 
     async fn exchange_code(
@@ -395,6 +475,7 @@ OF/2NxApJCzGCEDdfSp6VQO30hyhRANCAAQRWz+jn65BtOMvdyHKcvjBeBSDZH2r
             "state-token",
             "pkce-challenge",
             "https://example.com/callback",
+            None,
         );
 
         assert!(url.starts_with(AUTHORIZATION_ENDPOINT));
@@ -402,6 +483,21 @@ OF/2NxApJCzGCEDdfSp6VQO30hyhRANCAAQRWz+jn65BtOMvdyHKcvjBeBSDZH2r
         assert!(url.contains("state=state-token"));
         assert!(url.contains("code_challenge=pkce-challenge"));
         assert!(url.contains("response_mode=form_post"));
+        assert!(!url.contains("nonce="));
+    }
+
+    #[test]
+    fn test_authorization_url_with_nonce() {
+        let provider = test_provider();
+
+        let url = provider.authorization_url(
+            "state-token",
+            "pkce-challenge",
+            "https://example.com/callback",
+            Some("my-nonce-value"),
+        );
+
+        assert!(url.contains("nonce=my-nonce-value"));
     }
 
     #[test]

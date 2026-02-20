@@ -15,9 +15,10 @@ pub struct FederatedAuthSession {
     pub tenant_id: Uuid,
     pub identity_provider_id: Uuid,
     pub state: String,
-    pub nonce: String,
-    /// PKCE verifier stored as plain text (session is short-lived, 10 min).
-    pub pkce_verifier: String,
+    /// Nonce, encrypted at rest (AES-256-GCM, per-tenant key).
+    pub nonce: Vec<u8>,
+    /// PKCE verifier, encrypted at rest (AES-256-GCM, per-tenant key).
+    pub pkce_verifier: Vec<u8>,
     pub redirect_uri: String,
     pub is_used: bool,
     pub created_at: DateTime<Utc>,
@@ -30,9 +31,10 @@ pub struct CreateFederatedAuthSession {
     pub tenant_id: Uuid,
     pub identity_provider_id: Uuid,
     pub state: String,
-    pub nonce: String,
-    /// PKCE verifier - stored as plain text since session is short-lived
-    pub pkce_verifier: String,
+    /// Nonce, encrypted (AES-256-GCM, per-tenant key).
+    pub nonce: Vec<u8>,
+    /// PKCE verifier, encrypted (AES-256-GCM, per-tenant key).
+    pub pkce_verifier: Vec<u8>,
     pub redirect_uri: String,
 }
 
@@ -172,11 +174,26 @@ impl FederatedAuthSession {
         Ok(result.rows_affected())
     }
 
-    /// Clean up expired sessions.
+    /// Clean up expired sessions (all tenants — use for system maintenance only).
     pub async fn cleanup_expired(pool: &sqlx::PgPool) -> Result<u64, sqlx::Error> {
         let result = sqlx::query("DELETE FROM federated_auth_sessions WHERE expires_at < NOW()")
             .execute(pool)
             .await?;
+        Ok(result.rows_affected())
+    }
+
+    /// Clean up expired sessions for a specific tenant.
+    /// R9: Tenant-scoped cleanup to respect data sovereignty.
+    pub async fn cleanup_expired_for_tenant(
+        pool: &sqlx::PgPool,
+        tenant_id: uuid::Uuid,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            "DELETE FROM federated_auth_sessions WHERE tenant_id = $1 AND expires_at < NOW()",
+        )
+        .bind(tenant_id)
+        .execute(pool)
+        .await?;
         Ok(result.rows_affected())
     }
 

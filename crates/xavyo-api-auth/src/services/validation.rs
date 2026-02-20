@@ -227,9 +227,10 @@ pub fn validate_email(email: &str) -> EmailValidationResult {
 /// Normalize an email address (lowercase).
 ///
 /// Per FR-002, emails should be stored in lowercase for case-insensitive comparison.
+/// Trims whitespace as defense-in-depth against copy-paste artifacts.
 #[must_use]
 pub fn normalize_email(email: &str) -> String {
-    email.to_lowercase()
+    email.trim().to_lowercase()
 }
 
 #[cfg(test)]

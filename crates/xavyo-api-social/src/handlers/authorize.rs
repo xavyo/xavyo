@@ -57,6 +57,9 @@ pub async fn authorize(
     // Generate PKCE challenge
     let pkce = OAuthService::generate_pkce();
 
+    // Generate OIDC nonce for providers that support it (defense-in-depth against ID token replay)
+    let oidc_nonce = OAuthService::generate_oidc_nonce(provider_type);
+
     // Create signed state
     let state_token = state.oauth_service.create_state(
         tenant_id,
@@ -64,6 +67,7 @@ pub async fn authorize(
         &pkce.verifier,
         query.redirect_after,
         None, // No user_id for initial login
+        oidc_nonce.clone(),
     )?;
 
     // Build redirect URI
@@ -73,10 +77,11 @@ pub async fn authorize(
     );
 
     // Create provider instance and get authorization URL
+    let nonce_ref = oidc_nonce.as_deref();
     let auth_url = match provider_type {
         ProviderType::Google => {
             let p = ProviderFactory::google(config.client_id, config.client_secret);
-            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri)
+            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
         ProviderType::Microsoft => {
             let azure_tenant = config
@@ -86,8 +91,8 @@ pub async fn authorize(
                 .and_then(|v| v.as_str())
                 .map(String::from);
             let p =
-                ProviderFactory::microsoft(config.client_id, config.client_secret, azure_tenant);
-            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri)
+                ProviderFactory::microsoft(config.client_id, config.client_secret, azure_tenant)?;
+            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
         ProviderType::Apple => {
             let additional = config
@@ -119,11 +124,11 @@ pub async fn authorize(
                 .to_string();
 
             let p = ProviderFactory::apple(config.client_id, team_id, key_id, private_key)?;
-            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri)
+            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
         ProviderType::Github => {
             let p = ProviderFactory::github(config.client_id, config.client_secret);
-            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri)
+            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
     };
 

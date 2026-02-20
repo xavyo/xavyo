@@ -122,6 +122,10 @@ pub enum ApiUsersError {
     #[error("Group not found")]
     GroupNotFound,
 
+    /// Group member not found (user not a member of the specified group).
+    #[error("Member not found in group")]
+    GroupMemberNotFound,
+
     /// Parent group not found.
     #[error("Parent group not found")]
     ParentNotFound,
@@ -356,6 +360,16 @@ impl IntoResponse for ApiUsersError {
                     title: "Group Not Found".to_string(),
                     status: 404,
                     detail: Some("The specified group was not found".to_string()),
+                    errors: None,
+                },
+            ),
+            ApiUsersError::GroupMemberNotFound => (
+                StatusCode::NOT_FOUND,
+                ProblemDetails {
+                    problem_type: "https://xavyo.net/problems/group-member-not-found".to_string(),
+                    title: "Member Not Found".to_string(),
+                    status: 404,
+                    detail: Some("The specified user is not a member of this group".to_string()),
                     errors: None,
                 },
             ),

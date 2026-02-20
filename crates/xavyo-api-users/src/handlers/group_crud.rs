@@ -245,6 +245,28 @@ pub async fn add_group_members_handler(
         ));
     }
 
+    // H-3: Cap member_ids to prevent DoS via unbounded loop
+    if request.member_ids.len() > 500 {
+        return Err(ApiUsersError::Validation(
+            "Cannot add more than 500 members in a single request".to_string(),
+        ));
+    }
+
+    // C-1: Verify ALL member_ids belong to the caller's tenant before inserting.
+    // A single batch query is used to avoid N+1 round-trips.
+    let valid_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE id = ANY($1) AND tenant_id = $2")
+            .bind(&request.member_ids)
+            .bind(tenant_id)
+            .fetch_one(&pool)
+            .await?;
+
+    if valid_count != request.member_ids.len() as i64 {
+        return Err(ApiUsersError::Validation(
+            "One or more member_ids do not belong to this tenant".to_string(),
+        ));
+    }
+
     tracing::info!(
         admin_id = %claims.sub,
         tenant_id = %tenant_id,
@@ -307,7 +329,7 @@ pub async fn remove_group_member_handler(
 
     let removed = GroupMembership::remove_member(&pool, tenant_id, group_id, user_id).await?;
     if !removed {
-        return Err(ApiUsersError::NotFound);
+        return Err(ApiUsersError::GroupMemberNotFound);
     }
 
     Ok(axum::http::StatusCode::NO_CONTENT)

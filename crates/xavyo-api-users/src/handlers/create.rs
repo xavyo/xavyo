@@ -37,12 +37,29 @@ pub async fn create_user_handler(
     tracing::info!(
         admin_id = %claims.sub,
         tenant_id = %tenant_id,
-        email = %request.email,
-        roles = ?request.roles,
         "Creating user"
     );
+    tracing::debug!(roles = ?request.roles, "Create user role assignment");
 
-    let response = user_service.create_user(tenant_id, &request).await?;
+    let response = user_service
+        .create_user(tenant_id, &request, &claims.roles)
+        .await?;
+
+    // A6: Record durable admin audit event
+    if let Ok(actor_id) = uuid::Uuid::parse_str(&claims.sub) {
+        user_service
+            .record_audit_event(
+                tenant_id,
+                actor_id,
+                "user.created",
+                response.id,
+                serde_json::json!({
+                    "email": response.email,
+                    "roles": response.roles,
+                }),
+            )
+            .await;
+    }
 
     // F085: Publish user.created webhook event
     if let Some(Extension(publisher)) = publisher {

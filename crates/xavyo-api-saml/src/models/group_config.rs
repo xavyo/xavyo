@@ -150,17 +150,34 @@ impl GroupFilter {
             return text.starts_with(prefix) && text.ends_with(suffix);
         }
 
-        // For more complex patterns, do a simple check
-        // This handles patterns like a*b*c by checking prefix and suffix
-        let first = parts.first().unwrap_or(&"");
-        let last = parts.last().unwrap_or(&"");
-
-        if !first.is_empty() && !text.starts_with(*first) {
-            return false;
-        }
-
-        if !last.is_empty() && !text.ends_with(*last) {
-            return false;
+        // Multi-segment wildcard: verify all parts appear in order within the text.
+        // For pattern "a*b*c", parts = ["a", "b", "c"] — each must appear
+        // sequentially in the text.
+        let mut remaining = text;
+        for (i, part) in parts.iter().enumerate() {
+            if part.is_empty() {
+                continue;
+            }
+            if i == 0 {
+                // First segment must be a prefix
+                if !remaining.starts_with(*part) {
+                    return false;
+                }
+                remaining = &remaining[part.len()..];
+            } else if i == parts.len() - 1 {
+                // Last segment must be a suffix of the remaining text
+                if !remaining.ends_with(*part) {
+                    return false;
+                }
+            } else {
+                // Middle segments must appear somewhere in the remaining text
+                match remaining.find(*part) {
+                    Some(pos) => {
+                        remaining = &remaining[pos + part.len()..];
+                    }
+                    None => return false,
+                }
+            }
         }
 
         true

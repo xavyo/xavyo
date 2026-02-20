@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use xavyo_db::models::{GroupMembership, ScimAttributeMapping, User};
 
-use crate::error::{ScimError, ScimResult};
+use crate::error::{is_unique_violation, ScimError, ScimResult};
 use crate::models::{
     CreateScimUserRequest, ReplaceScimUserRequest, ScimPagination, ScimPatchOp, ScimPatchRequest,
     ScimUser, ScimUserGroup, ScimUserListResponse,
@@ -55,6 +55,52 @@ impl UserService {
             .collect())
     }
 
+    /// Maximum allowed length for string fields.
+    const MAX_STRING_LEN: usize = 255;
+
+    /// Validate string field lengths to prevent oversized values.
+    fn validate_string_lengths(data: &ExtractedUserData) -> ScimResult<()> {
+        if data.email.len() > Self::MAX_STRING_LEN {
+            return Err(ScimError::Validation(format!(
+                "userName exceeds maximum length of {} characters",
+                Self::MAX_STRING_LEN
+            )));
+        }
+        if let Some(ref name) = data.display_name {
+            if name.len() > Self::MAX_STRING_LEN {
+                return Err(ScimError::Validation(format!(
+                    "displayName exceeds maximum length of {} characters",
+                    Self::MAX_STRING_LEN
+                )));
+            }
+        }
+        if let Some(ref ext_id) = data.external_id {
+            if ext_id.len() > Self::MAX_STRING_LEN {
+                return Err(ScimError::Validation(format!(
+                    "externalId exceeds maximum length of {} characters",
+                    Self::MAX_STRING_LEN
+                )));
+            }
+        }
+        if let Some(ref first) = data.first_name {
+            if first.len() > Self::MAX_STRING_LEN {
+                return Err(ScimError::Validation(format!(
+                    "name.givenName exceeds maximum length of {} characters",
+                    Self::MAX_STRING_LEN
+                )));
+            }
+        }
+        if let Some(ref last) = data.last_name {
+            if last.len() > Self::MAX_STRING_LEN {
+                return Err(ScimError::Validation(format!(
+                    "name.familyName exceeds maximum length of {} characters",
+                    Self::MAX_STRING_LEN
+                )));
+            }
+        }
+        Ok(())
+    }
+
     /// Create a new user.
     pub async fn create_user(
         &self,
@@ -63,6 +109,7 @@ impl UserService {
     ) -> ScimResult<ScimUser> {
         let mapper = self.get_mapper(tenant_id).await?;
         let data = mapper.extract_user_data(&request)?;
+        Self::validate_string_lengths(&data)?;
 
         // Check for existing user with same email
         let existing = User::find_by_email(&self.pool, tenant_id, &data.email).await?;
@@ -74,8 +121,18 @@ impl UserService {
             });
         }
 
-        // Create user
-        let user = self.insert_user(tenant_id, &data).await?;
+        // Create user — catch unique constraint violations (TOCTOU race condition)
+        let user = match self.insert_user(tenant_id, &data).await {
+            Ok(user) => user,
+            Err(ScimError::Database(ref e)) if is_unique_violation(e) => {
+                return Err(ScimError::Conflict {
+                    resource_type: "user".to_string(),
+                    field: "userName".to_string(),
+                    value: data.email.clone(),
+                });
+            }
+            Err(e) => return Err(e),
+        };
 
         // Get groups and convert to SCIM
         let groups = self.get_user_groups(tenant_id, user.id).await?;
@@ -120,12 +177,15 @@ impl UserService {
         Ok(mapper.to_scim_user(&user, groups, &self.base_url))
     }
 
-    /// Find a user by ID, returning error if not found.
+    /// Find an active user by ID, returning error if not found or deactivated.
+    ///
+    /// SCIM DELETE deactivates users (sets is_active=false). Per RFC 7644 Section 3.6,
+    /// subsequent GET on a deleted resource should return 404.
     async fn find_user(&self, tenant_id: Uuid, user_id: Uuid) -> ScimResult<User> {
         let user: Option<User> = sqlx::query_as(
             r"
             SELECT * FROM users
-            WHERE id = $1 AND tenant_id = $2
+            WHERE id = $1 AND tenant_id = $2 AND is_active = true
             ",
         )
         .bind(user_id)
@@ -146,9 +206,11 @@ impl UserService {
         let mapper = self.get_mapper(tenant_id).await?;
         let filter_mapper = AttributeMapper::for_users();
 
-        // Build query
-        let mut base_query = String::from("SELECT * FROM users WHERE tenant_id = $1");
-        let mut count_query = String::from("SELECT COUNT(*) FROM users WHERE tenant_id = $1");
+        // Build query — only return active users (SCIM DELETE deactivates, per RFC 7644 Section 3.6)
+        let mut base_query =
+            String::from("SELECT * FROM users WHERE tenant_id = $1 AND is_active = true");
+        let mut count_query =
+            String::from("SELECT COUNT(*) FROM users WHERE tenant_id = $1 AND is_active = true");
         let mut params: Vec<String> = vec![];
 
         // Apply filter
@@ -159,7 +221,7 @@ impl UserService {
             params = sql_filter.params;
         }
 
-        // Apply sorting
+        // Apply sorting (column names are from a hardcoded allowlist — quote for defense-in-depth)
         let sort_column = match pagination.sort_by.as_deref() {
             Some("userName") => "email",
             Some("displayName") => "display_name",
@@ -171,9 +233,11 @@ impl UserService {
             Some("descending") => "DESC",
             _ => "ASC",
         };
-        base_query.push_str(&format!(" ORDER BY {sort_column} {sort_order}"));
+        base_query.push_str(&format!(" ORDER BY \"{sort_column}\" {sort_order}"));
 
-        // Apply pagination
+        // Apply pagination.
+        // Parameter numbering: $1 = tenant_id, $2..N = filter params, $N+1 = LIMIT, $N+2 = OFFSET.
+        // Both count_query and base_query share the same $1..N params; base_query adds LIMIT/OFFSET.
         let param_offset = params.len() + 2;
         base_query.push_str(&format!(
             " LIMIT ${} OFFSET ${}",
@@ -198,11 +262,13 @@ impl UserService {
             resources.push(mapper.to_scim_user(&user, groups, &self.base_url));
         }
 
+        // RFC 7644 Section 3.4.2: itemsPerPage = actual number of resources returned
+        let items_per_page = resources.len() as i64;
         Ok(ScimUserListResponse::new(
             resources,
             total_results,
             pagination.start_index,
-            pagination.count,
+            items_per_page,
         ))
     }
 
@@ -249,6 +315,7 @@ impl UserService {
 
         let mapper = self.get_mapper(tenant_id).await?;
         let data = mapper.extract_user_data(&request)?;
+        Self::validate_string_lengths(&data)?;
 
         // Check for email conflicts with other users
         let existing = User::find_by_email(&self.pool, tenant_id, &data.email).await?;
@@ -265,8 +332,8 @@ impl UserService {
         // Build custom_attributes JSONB from extracted SCIM extension data (F070)
         let custom_attrs = serde_json::Value::Object(data.custom_attributes.clone());
 
-        // Update user
-        let user: User = sqlx::query_as(
+        // Update user — catch unique constraint violations (TOCTOU race condition)
+        let user: User = match sqlx::query_as(
             r"
             UPDATE users SET
                 email = $3,
@@ -292,7 +359,18 @@ impl UserService {
         .bind(&data.last_name)
         .bind(&custom_attrs)
         .fetch_one(&self.pool)
-        .await?;
+        .await
+        {
+            Ok(user) => user,
+            Err(ref e) if is_unique_violation(e) => {
+                return Err(ScimError::Conflict {
+                    resource_type: "user".to_string(),
+                    field: "userName".to_string(),
+                    value: data.email.clone(),
+                });
+            }
+            Err(e) => return Err(e.into()),
+        };
 
         let groups = self.get_user_groups(tenant_id, user.id).await?;
         Ok(mapper.to_scim_user(&user, groups, &self.base_url))
@@ -310,14 +388,30 @@ impl UserService {
 
         // Get current user
         let mut user = self.find_user(tenant_id, user_id).await?;
+        let original_email = user.email.clone();
 
         // Apply each operation
         for op in &request.operations {
             self.apply_patch_op(&mut user, op)?;
         }
 
+        // Check for email conflicts if userName was changed
+        if user.email != original_email {
+            let existing = User::find_by_email(&self.pool, tenant_id, &user.email).await?;
+            if let Some(ex) = existing {
+                if ex.id != user_id {
+                    return Err(ScimError::Conflict {
+                        resource_type: "user".to_string(),
+                        field: "userName".to_string(),
+                        value: user.email.clone(),
+                    });
+                }
+            }
+        }
+
         // Update in database (includes custom_attributes for enterprise extension patches — F081)
-        let updated: User = sqlx::query_as(
+        // Catch unique constraint violations (TOCTOU race condition)
+        let updated: User = match sqlx::query_as(
             r"
             UPDATE users SET
                 email = $3,
@@ -343,7 +437,18 @@ impl UserService {
         .bind(&user.last_name)
         .bind(&user.custom_attributes)
         .fetch_one(&self.pool)
-        .await?;
+        .await
+        {
+            Ok(user) => user,
+            Err(ref e) if is_unique_violation(e) => {
+                return Err(ScimError::Conflict {
+                    resource_type: "user".to_string(),
+                    field: "userName".to_string(),
+                    value: user.email.clone(),
+                });
+            }
+            Err(e) => return Err(e.into()),
+        };
 
         let mapper = self.get_mapper(tenant_id).await?;
         let groups = self.get_user_groups(tenant_id, updated.id).await?;
@@ -366,7 +471,9 @@ impl UserService {
                         user.display_name = value.as_str().map(std::string::ToString::to_string);
                     }
                     "active" => {
-                        user.is_active = value.as_bool().unwrap_or(true);
+                        user.is_active = value.as_bool().ok_or_else(|| {
+                            ScimError::Validation("active must be a boolean value".to_string())
+                        })?;
                     }
                     "externalId" | "externalid" => {
                         user.external_id = value.as_str().map(std::string::ToString::to_string);
@@ -379,6 +486,12 @@ impl UserService {
                     }
                     "userName" | "username" => {
                         if let Some(email) = value.as_str() {
+                            // Basic email format validation
+                            if !email.contains('@') || !email.contains('.') {
+                                return Err(ScimError::Validation(
+                                    "userName must be a valid email address".to_string(),
+                                ));
+                            }
                             user.email = email.to_string();
                         }
                     }
@@ -386,7 +499,11 @@ impl UserService {
                         // No path means the value is an object with multiple attributes
                         if let Some(obj) = value.as_object() {
                             if let Some(active) = obj.get("active") {
-                                user.is_active = active.as_bool().unwrap_or(true);
+                                user.is_active = active.as_bool().ok_or_else(|| {
+                                    ScimError::Validation(
+                                        "active must be a boolean value".to_string(),
+                                    )
+                                })?;
                             }
                             if let Some(display_name) = obj.get("displayName") {
                                 user.display_name =
@@ -499,6 +616,9 @@ impl UserService {
     }
 
     /// Delete (deactivate) a user.
+    ///
+    /// Only deactivates active users. Returns 404 if the user is already
+    /// deactivated or doesn't exist (idempotent per RFC 7644 Section 3.6).
     pub async fn delete_user(&self, tenant_id: Uuid, user_id: Uuid) -> ScimResult<()> {
         let result = sqlx::query(
             r"
@@ -506,7 +626,7 @@ impl UserService {
                 is_active = false,
                 scim_last_sync = NOW(),
                 updated_at = NOW()
-            WHERE id = $1 AND tenant_id = $2
+            WHERE id = $1 AND tenant_id = $2 AND is_active = true
             ",
         )
         .bind(user_id)
@@ -547,6 +667,16 @@ mod tests {
                     }
                     "externalId" | "externalid" => {
                         user.external_id = value.as_str().map(|s| s.to_string());
+                    }
+                    "userName" | "username" => {
+                        if let Some(email) = value.as_str() {
+                            if !email.contains('@') || !email.contains('.') {
+                                return Err(ScimError::Validation(
+                                    "userName must be a valid email address".to_string(),
+                                ));
+                            }
+                            user.email = email.to_string();
+                        }
                     }
                     "name.givenName" | "name.givenname" => {
                         user.first_name = value.as_str().map(|s| s.to_string());

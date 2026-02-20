@@ -27,13 +27,17 @@ impl AssertionBuilder {
         }
     }
 
-    /// Build a SAML Response for SP-initiated SSO
+    /// Build a SAML Response for SP-initiated SSO.
+    ///
+    /// `target_acs_url` should be the resolved ACS URL to use as the Destination/Recipient.
+    /// If `None`, falls back to the first configured ACS URL for the SP.
     pub fn build_response(
         &self,
         sp: &SamlServiceProvider,
         user: &UserAttributes,
         in_response_to: Option<&str>,
         session_id: Option<&str>,
+        target_acs_url: Option<&str>,
     ) -> SamlResult<String> {
         let response_id = format!("_resp_{}", Uuid::new_v4());
         let assertion_id = format!("_assert_{}", Uuid::new_v4());
@@ -53,9 +57,11 @@ impl AssertionBuilder {
             resolve_attributes(user, &attr_mapping)
         };
 
-        let acs_url = sp.acs_urls.first().ok_or_else(|| {
+        // Use explicitly provided ACS URL, falling back to first configured URL.
+        let fallback_acs = sp.acs_urls.first().ok_or_else(|| {
             SamlError::AssertionGenerationFailed("No ACS URL configured".to_string())
         })?;
+        let acs_url = target_acs_url.unwrap_or(fallback_acs);
 
         let response_xml = self.build_response_xml(
             &response_id,
@@ -88,7 +94,7 @@ impl AssertionBuilder {
         user: &UserAttributes,
         session_id: Option<&str>,
     ) -> SamlResult<String> {
-        self.build_response(sp, user, None, session_id)
+        self.build_response(sp, user, None, session_id, None)
     }
 
     #[allow(clippy::too_many_arguments)]

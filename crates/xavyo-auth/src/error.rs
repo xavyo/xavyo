@@ -23,8 +23,8 @@ pub enum AuthError {
     #[error("Invalid token: {0}")]
     InvalidToken(String),
 
-    /// Token uses an unsupported algorithm (only RS256 is allowed).
-    #[error("Unsupported algorithm: only RS256 is allowed")]
+    /// Token uses an unsupported algorithm.
+    #[error("Unsupported algorithm")]
     InvalidAlgorithm,
 
     /// Required claim is missing from token.

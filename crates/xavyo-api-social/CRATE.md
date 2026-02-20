@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Implements social authentication flows for consumer identity scenarios. Supports Google, Microsoft (Azure AD), Apple Sign In, and GitHub via OAuth2/OIDC. Includes account linking, CSRF protection with signed JWT state, PKCE support, and encrypted token storage.
+Implements social authentication flows for consumer identity scenarios. Supports Google, Microsoft (Azure AD), Apple Sign In, and GitHub via OAuth2/OIDC. Includes account linking, CSRF protection with signed JWT state, PKCE support (Google, Microsoft, Apple — GitHub does not support PKCE), and encrypted token storage.
 
 ## Layer
 

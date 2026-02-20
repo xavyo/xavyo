@@ -15,6 +15,19 @@ const MAX_REQUEST_AGE_SECS: i64 = 300;
 /// Maximum decompressed size for deflate decoding (64 KB) to prevent deflate bomb DoS
 const MAX_DECOMPRESSED_SIZE: u64 = 64 * 1024;
 
+/// Maximum encoded size for SAMLRequest in HTTP-Redirect binding (128 KB)
+/// Prevents memory exhaustion from oversized base64 input before decoding.
+const MAX_ENCODED_SIZE_REDIRECT: usize = 128 * 1024;
+
+/// Maximum encoded size for SAMLRequest in HTTP-POST binding (512 KB)
+const MAX_ENCODED_SIZE_POST: usize = 512 * 1024;
+
+/// Maximum length for the AuthnRequest ID attribute
+const MAX_REQUEST_ID_LENGTH: usize = 256;
+
+/// Maximum length for the Issuer element value
+const MAX_ISSUER_LENGTH: usize = 1024;
+
 /// Parsed SAML `AuthnRequest`
 #[derive(Debug, Clone)]
 pub struct ParsedAuthnRequest {
@@ -33,6 +46,14 @@ pub struct RequestParser;
 impl RequestParser {
     /// Parse an `AuthnRequest` from HTTP-Redirect binding (deflate + base64)
     pub fn parse_redirect(encoded_request: &str) -> SamlResult<ParsedAuthnRequest> {
+        // SECURITY (H9): Reject oversized input before base64 decode to prevent OOM.
+        if encoded_request.len() > MAX_ENCODED_SIZE_REDIRECT {
+            return Err(SamlError::InvalidAuthnRequest(format!(
+                "Encoded SAMLRequest exceeds maximum size ({} > {} bytes)",
+                encoded_request.len(),
+                MAX_ENCODED_SIZE_REDIRECT
+            )));
+        }
         // Decode base64
         let decoded = STANDARD
             .decode(encoded_request)
@@ -58,6 +79,14 @@ impl RequestParser {
 
     /// Parse an `AuthnRequest` from HTTP-POST binding (base64 only)
     pub fn parse_post(encoded_request: &str) -> SamlResult<ParsedAuthnRequest> {
+        // SECURITY (H9): Reject oversized input before base64 decode.
+        if encoded_request.len() > MAX_ENCODED_SIZE_POST {
+            return Err(SamlError::InvalidAuthnRequest(format!(
+                "Encoded SAMLRequest exceeds maximum size ({} > {} bytes)",
+                encoded_request.len(),
+                MAX_ENCODED_SIZE_POST
+            )));
+        }
         // Decode base64
         let decoded = STANDARD
             .decode(encoded_request)
@@ -69,7 +98,15 @@ impl RequestParser {
         Self::parse_xml(&xml)
     }
 
-    /// Parse `AuthnRequest` XML
+    /// Parse `AuthnRequest` XML.
+    ///
+    /// Public entry point for callers that have already decoded the XML
+    /// (e.g. HTTP-POST binding where the handler decodes base64 once).
+    pub fn parse_xml_public(xml: &str) -> SamlResult<ParsedAuthnRequest> {
+        Self::parse_xml(xml)
+    }
+
+    /// Parse `AuthnRequest` XML (internal)
     fn parse_xml(xml: &str) -> SamlResult<ParsedAuthnRequest> {
         use quick_xml::events::Event;
         use quick_xml::Reader;
@@ -152,8 +189,22 @@ impl RequestParser {
         let id =
             id.ok_or_else(|| SamlError::InvalidAuthnRequest("Missing ID attribute".to_string()))?;
 
+        // SECURITY (M4): Validate request_id length to prevent abuse
+        if id.len() > MAX_REQUEST_ID_LENGTH {
+            return Err(SamlError::InvalidAuthnRequest(format!(
+                "ID attribute exceeds maximum length of {MAX_REQUEST_ID_LENGTH} characters"
+            )));
+        }
+
         let issuer = issuer
             .ok_or_else(|| SamlError::InvalidAuthnRequest("Missing Issuer element".to_string()))?;
+
+        // SECURITY (M4): Validate issuer length to prevent abuse
+        if issuer.len() > MAX_ISSUER_LENGTH {
+            return Err(SamlError::InvalidAuthnRequest(format!(
+                "Issuer exceeds maximum length of {MAX_ISSUER_LENGTH} characters"
+            )));
+        }
 
         // Validate IssueInstant
         let issue_instant_str = issue_instant_raw.ok_or_else(|| {

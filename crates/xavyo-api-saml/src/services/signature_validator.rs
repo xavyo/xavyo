@@ -110,7 +110,12 @@ impl SignatureValidator {
     /// # Arguments
     /// * `xml` - The decoded `AuthnRequest` XML
     /// * `sp_certificate_pem` - SP's X.509 certificate in PEM format
-    pub fn validate_post_signature(xml: &str, sp_certificate_pem: &str) -> SamlResult<()> {
+    /// * `authn_request_id` - Optional ID of the AuthnRequest to verify reference URI
+    pub fn validate_post_signature(
+        xml: &str,
+        sp_certificate_pem: &str,
+        authn_request_id: Option<&str>,
+    ) -> SamlResult<()> {
         // Parse certificate
         let cert = parse_certificate(sp_certificate_pem)?;
         let public_key = cert.public_key().map_err(|e| {
@@ -119,6 +124,22 @@ impl SignatureValidator {
 
         // Extract signature components from XML
         let sig_info = extract_signature_info(xml)?;
+
+        // SECURITY: Verify that the signature Reference URI points to the AuthnRequest
+        // root element (or the entire document). This prevents XSW attacks where an attacker
+        // signs an arbitrary sub-element while leaving the AuthnRequest fields unsigned.
+        if let Some(req_id) = authn_request_id {
+            let ref_uri = &sig_info.reference_uri;
+            if !ref_uri.is_empty() {
+                let expected_ref = format!("#{req_id}");
+                if ref_uri != &expected_ref {
+                    return Err(SamlError::SignatureValidationFailed(
+                        "Signature reference URI does not match AuthnRequest ID".to_string(),
+                    ));
+                }
+            }
+            // Empty URI = entire document, which is acceptable
+        }
 
         // Verify the digest first
         verify_reference_digest(xml, &sig_info)?;
@@ -172,7 +193,7 @@ struct SignatureInfo {
     digest_algorithm: Option<String>,
 }
 
-/// Parse X.509 certificate from PEM format
+/// Parse X.509 certificate from PEM format and validate it is not expired.
 fn parse_certificate(pem: &str) -> SamlResult<X509> {
     // Handle both with and without PEM headers
     let pem_data = if pem.contains("-----BEGIN CERTIFICATE-----") {
@@ -184,8 +205,28 @@ fn parse_certificate(pem: &str) -> SamlResult<X509> {
         )
     };
 
-    X509::from_pem(pem_data.as_bytes())
-        .map_err(|e| SamlError::SignatureValidationFailed(format!("Invalid certificate: {e}")))
+    let cert = X509::from_pem(pem_data.as_bytes())
+        .map_err(|e| SamlError::SignatureValidationFailed(format!("Invalid certificate: {e}")))?;
+
+    // SECURITY: Reject expired certificates. Accepting expired certs could allow
+    // using compromised keys after the CA has rotated them.
+    let now = openssl::asn1::Asn1Time::days_from_now(0)
+        .map_err(|e| SamlError::SignatureValidationFailed(format!("Time error: {e}")))?;
+
+    if cert.not_after() < now {
+        return Err(SamlError::SignatureValidationFailed(
+            "SP certificate has expired".to_string(),
+        ));
+    }
+
+    // Also check not-yet-valid certificates
+    if cert.not_before() > now {
+        return Err(SamlError::SignatureValidationFailed(
+            "SP certificate is not yet valid".to_string(),
+        ));
+    }
+
+    Ok(cert)
 }
 
 /// Resolve the MessageDigest from a SignatureMethod Algorithm URI.
@@ -257,6 +298,12 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
     let mut signature_algorithm: Option<String> = None;
     let mut digest_algorithm: Option<String> = None;
 
+    // Track namespace declarations from ancestor elements so they can be injected
+    // into the extracted SignedInfo fragment. Without this, SignedInfo elements that
+    // use prefixes declared on ancestors (e.g., `ds:` declared on `<Signature>`)
+    // produce different C14N output than the signer computed.
+    let mut ancestor_namespaces: Vec<(String, String)> = Vec::new(); // (prefix, uri)
+
     loop {
         match reader.read_event() {
             Ok(Event::Start(e)) => {
@@ -265,17 +312,37 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
 
                 if name == "SignedInfo" {
                     in_signed_info = true;
-                    // Capture the start tag with all attributes and namespaces
+                    // Capture the start tag, injecting any missing ancestor xmlns decls
                     let full_tag = std::str::from_utf8(&e).unwrap_or("");
                     signed_info_content.push('<');
                     signed_info_content.push_str(full_tag);
+                    // Inject ancestor namespace declarations not already on SignedInfo
+                    for (prefix, uri) in &ancestor_namespaces {
+                        let decl = format!("xmlns:{prefix}");
+                        if !full_tag.contains(&decl) {
+                            signed_info_content.push_str(&format!(" xmlns:{prefix}=\"{uri}\""));
+                        }
+                    }
                     signed_info_content.push('>');
                 } else if in_signed_info {
                     let full_tag = std::str::from_utf8(&e).unwrap_or("");
                     signed_info_content.push('<');
                     signed_info_content.push_str(full_tag);
                     signed_info_content.push('>');
-                } else if name == "SignatureValue" {
+                } else {
+                    // Collect xmlns:* declarations from ancestor elements
+                    for attr in e.attributes().flatten() {
+                        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                        if let Some(prefix) = key.strip_prefix("xmlns:") {
+                            let value = attr.unescape_value().unwrap_or_default().to_string();
+                            // Keep only the latest declaration per prefix
+                            ancestor_namespaces.retain(|(p, _)| p != prefix);
+                            ancestor_namespaces.push((prefix.to_string(), value));
+                        }
+                    }
+                }
+
+                if name == "SignatureValue" {
                     in_signature_value = true;
                 } else if name == "DigestValue" {
                     in_digest_value = true;
@@ -465,7 +532,10 @@ fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
                 if !capturing {
                     for attr in e.attributes().flatten() {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                        if key.eq_ignore_ascii_case("id") {
+                        // SECURITY: Use case-sensitive "ID" match per SAML 2.0 spec (XML ID type).
+                        // Case-insensitive matching would find non-SAML elements with lowercase
+                        // "id" attributes, enabling an XSW variant attack.
+                        if key == "ID" {
                             let val = attr.unescape_value().unwrap_or_default();
                             if val.as_ref() == element_id {
                                 capturing = true;
@@ -485,7 +555,16 @@ fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
                     if depth == 0 {
                         let end_offset = reader.buffer_position() as usize;
                         if let Some(start) = capture_start_offset {
-                            result = xml[start..end_offset].to_string();
+                            // SECURITY: Use .get() to prevent panic on non-ASCII UTF-8 boundary misalignment.
+                            result = xml
+                                .get(start..end_offset)
+                                .ok_or_else(|| {
+                                    SamlError::SignatureValidationFailed(
+                                        "XML byte offset misaligned with UTF-8 character boundary"
+                                            .to_string(),
+                                    )
+                                })?
+                                .to_string();
                         }
                         return Ok(result);
                     }
@@ -495,11 +574,15 @@ fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
                 if !capturing {
                     for attr in e.attributes().flatten() {
                         let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                        if key.eq_ignore_ascii_case("id") {
+                        if key == "ID" {
                             let val = attr.unescape_value().unwrap_or_default();
                             if val.as_ref() == element_id {
                                 let end_offset = reader.buffer_position() as usize;
-                                return Ok(xml[event_offset..end_offset].to_string());
+                                return Ok(xml.get(event_offset..end_offset)
+                                    .ok_or_else(|| SamlError::SignatureValidationFailed(
+                                        "XML byte offset misaligned with UTF-8 character boundary".to_string(),
+                                    ))?
+                                    .to_string());
                             }
                         }
                     }

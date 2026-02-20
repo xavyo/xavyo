@@ -167,6 +167,14 @@ fn asn1_time_to_datetime(
         ));
     }
 
+    // Try GeneralizedTime format: "YYYYMMDDHHMMSSZ" (used by some OpenSSL versions)
+    if let Ok(ndt) = chrono::NaiveDateTime::parse_from_str(&time_str, "%Y%m%d%H%M%SZ") {
+        return Some(chrono::DateTime::from_naive_utc_and_offset(
+            ndt,
+            chrono::Utc,
+        ));
+    }
+
     // Parse failed - return None to allow caller to handle
     None
 }
@@ -178,16 +186,55 @@ pub fn parse_sp_certificate(cert_pem: &str) -> SamlResult<X509> {
     })
 }
 
-/// Verify a signature using an SP's certificate
+/// Resolve a `SignatureMethod` Algorithm URI to an OpenSSL `MessageDigest`.
+///
+/// Rejects SHA-1 as cryptographically broken.
+/// Defaults to SHA-256 when no algorithm is specified.
+fn resolve_signature_digest(algorithm_uri: Option<&str>) -> SamlResult<MessageDigest> {
+    match algorithm_uri {
+        Some("http://www.w3.org/2001/04/xmldsig-more#rsa-sha256")
+        | Some("http://www.w3.org/2001/04/xmldsig-more#rsa-sha256-mgf1")
+        | None => Ok(MessageDigest::sha256()),
+        Some("http://www.w3.org/2001/04/xmldsig-more#rsa-sha384") => Ok(MessageDigest::sha384()),
+        Some("http://www.w3.org/2001/04/xmldsig-more#rsa-sha512") => Ok(MessageDigest::sha512()),
+        Some("http://www.w3.org/2000/09/xmldsig#rsa-sha1") => {
+            Err(SamlError::SignatureValidationFailed(
+                "SHA-1 signature algorithm is rejected: cryptographically broken".to_string(),
+            ))
+        }
+        Some(other) => Err(SamlError::SignatureValidationFailed(format!(
+            "Unsupported signature algorithm: {other}"
+        ))),
+    }
+}
+
+/// Verify a signature using an SP's certificate.
+///
+/// Uses SHA-256 by default. For algorithm-aware verification, use
+/// [`verify_signature_with_algorithm`] instead.
 pub fn verify_signature(cert: &X509, signature: &[u8], data: &[u8]) -> SamlResult<bool> {
+    verify_signature_with_algorithm(cert, signature, data, None)
+}
+
+/// Verify a signature using an SP's certificate and a specific algorithm URI.
+///
+/// If `algorithm_uri` is `None`, defaults to RSA-SHA256.
+/// Rejects SHA-1 as cryptographically broken.
+pub fn verify_signature_with_algorithm(
+    cert: &X509,
+    signature: &[u8],
+    data: &[u8],
+    algorithm_uri: Option<&str>,
+) -> SamlResult<bool> {
+    let digest = resolve_signature_digest(algorithm_uri)?;
+
     let public_key = cert
         .public_key()
         .map_err(|e| SamlError::InvalidSpCertificate(format!("Failed to get public key: {e}")))?;
 
-    let mut verifier =
-        openssl::sign::Verifier::new(MessageDigest::sha256(), &public_key).map_err(|e| {
-            SamlError::SignatureValidationFailed(format!("Failed to create verifier: {e}"))
-        })?;
+    let mut verifier = openssl::sign::Verifier::new(digest, &public_key).map_err(|e| {
+        SamlError::SignatureValidationFailed(format!("Failed to create verifier: {e}"))
+    })?;
 
     verifier.update(data).map_err(|e| {
         SamlError::SignatureValidationFailed(format!("Failed to update verifier: {e}"))

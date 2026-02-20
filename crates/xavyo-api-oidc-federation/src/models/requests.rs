@@ -127,9 +127,15 @@ fn default_limit() -> i64 {
 }
 
 /// Query parameters for federation authorization.
+///
+/// At least one of `idp_id` or `login_hint` must be provided.
+/// When `login_hint` is given (an email address), the server performs
+/// HRD lookup internally to resolve the IdP — avoiding the need to
+/// expose IdP UUIDs to unauthenticated callers.
 #[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct AuthorizeParams {
-    pub idp_id: Uuid,
+    pub idp_id: Option<Uuid>,
+    pub login_hint: Option<String>,
     pub redirect_uri: Option<String>,
 }
 

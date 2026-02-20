@@ -49,6 +49,18 @@ pub async fn link_account(
         "Linking social account"
     );
 
+    // SECURITY: Validate input lengths before processing (consistent with callback handler).
+    if request.state.len() > 2048 {
+        return Err(SocialError::InvalidState {
+            reason: "State parameter too long".to_string(),
+        });
+    }
+    if request.code.len() > 512 {
+        return Err(SocialError::InvalidCallback {
+            reason: "Authorization code too long".to_string(),
+        });
+    }
+
     // Validate state
     let claims = state.oauth_service.validate_state(&request.state)?;
 
@@ -61,6 +73,12 @@ pub async fn link_account(
     if claims.tenant_id != tenant_id {
         return Err(SocialError::InvalidState {
             reason: "State was not created for this tenant".to_string(),
+        });
+    }
+    // SECURITY: Verify provider in state matches URL path provider to prevent cross-provider attacks.
+    if claims.provider != provider_type.to_string() {
+        return Err(SocialError::InvalidState {
+            reason: "Provider mismatch".to_string(),
         });
     }
 
@@ -103,7 +121,7 @@ pub async fn link_account(
                 config.client_id,
                 config.client_secret,
                 azure_tenant,
-            );
+            )?;
             let tokens = p
                 .exchange_code(&request.code, &claims.pkce_verifier, &redirect_uri)
                 .await?;
@@ -190,10 +208,17 @@ pub async fn link_account(
 
     // Return connection info
     let display_name = user_info.display_name();
+    // SECURITY: Do not expose Apple private relay email addresses in the response.
+    // These are opaque relay addresses meant to hide the user's real email.
+    let response_email = if user_info.is_private_email {
+        None
+    } else {
+        user_info.email
+    };
     Ok(Json(SocialConnectionResponse {
         id: connection_id,
         provider: provider_type.to_string(),
-        email: user_info.email,
+        email: response_email,
         display_name: Some(display_name),
         is_private_email: user_info.is_private_email,
         created_at: chrono::Utc::now(),
@@ -244,6 +269,9 @@ pub async fn initiate_link(
     // Generate PKCE
     let pkce = OAuthService::generate_pkce();
 
+    // Generate OIDC nonce for providers that support it (defense-in-depth against ID token replay)
+    let oidc_nonce = OAuthService::generate_oidc_nonce(provider_type);
+
     // Create state with user_id for linking
     let state_token = state.oauth_service.create_state(
         tenant_id,
@@ -251,6 +279,7 @@ pub async fn initiate_link(
         &pkce.verifier,
         Some("/settings".to_string()), // Redirect back to settings after linking
         Some(user_id),
+        oidc_nonce.clone(),
     )?;
 
     // Build redirect URI
@@ -260,11 +289,12 @@ pub async fn initiate_link(
     );
 
     // Get authorization URL
+    let nonce_ref = oidc_nonce.as_deref();
     let auth_url = match provider_type {
         ProviderType::Google => {
             let p =
                 crate::providers::ProviderFactory::google(config.client_id, config.client_secret);
-            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri)
+            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
         ProviderType::Microsoft => {
             let azure_tenant = config
@@ -277,8 +307,8 @@ pub async fn initiate_link(
                 config.client_id,
                 config.client_secret,
                 azure_tenant,
-            );
-            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri)
+            )?;
+            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
         ProviderType::Apple => {
             let additional = config
@@ -314,12 +344,12 @@ pub async fn initiate_link(
                 key_id,
                 private_key,
             )?;
-            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri)
+            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
         ProviderType::Github => {
             let p =
                 crate::providers::ProviderFactory::github(config.client_id, config.client_secret);
-            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri)
+            p.authorization_url(&state_token, &pkce.challenge, &redirect_uri, nonce_ref)
         }
     };
 

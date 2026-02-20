@@ -627,17 +627,30 @@ pub async fn device_authorize_handler(
                                             .into_response();
                                     }
                                     None => {
-                                        // No confirmation exists yet, need to create one
-                                        // TODO: Look up user email and create confirmation
+                                        // SECURITY (H13): Block approval when email confirmation
+                                        // is required but no confirmation exists yet.
+                                        // Never silently degrade to allowing the approval.
                                         tracing::warn!(
                                             tenant_id = %tenant_id,
                                             user_id = %user_id,
                                             risk_score = assessment.score,
-                                            "Email confirmation required but user email lookup not implemented yet"
+                                            "Medium-risk approval blocked: email confirmation required but not yet created"
                                         );
-                                        // For now, log and proceed (degraded mode)
+                                        return Html(render_result_page(
+                                            false,
+                                            "Additional verification required. Please check your email for a confirmation link.",
+                                        ))
+                                        .into_response();
                                     }
                                 }
+                            } else {
+                                // SECURITY: Confirmation service not configured — block rather than silently approve
+                                tracing::error!("Email confirmation required but DeviceConfirmationService not configured");
+                                return Html(render_result_page(
+                                    false,
+                                    "Additional verification is required but not available. Please contact your administrator.",
+                                ))
+                                .into_response();
                             }
                         }
                         RiskAction::RequireMfaAndNotify => {
@@ -693,13 +706,29 @@ pub async fn device_authorize_handler(
                                             .into_response();
                                     }
                                     None => {
+                                        // SECURITY (H13): Block high-risk approval when no
+                                        // email confirmation exists. Never fall through.
                                         tracing::warn!(
                                             tenant_id = %tenant_id,
                                             user_id = %user_id,
-                                            "High-risk approval but confirmation service not available"
+                                            risk_score = assessment.score,
+                                            "High-risk approval BLOCKED: no email confirmation available"
                                         );
+                                        return Html(render_result_page(
+                                            false,
+                                            "This authorization request has been flagged as high risk. Additional verification is required. Please check your email.",
+                                        ))
+                                        .into_response();
                                     }
                                 }
+                            } else {
+                                // SECURITY: MFA/confirmation service not configured — block rather than silently approve
+                                tracing::error!("High-risk approval requires verification but DeviceConfirmationService not configured");
+                                return Html(render_result_page(
+                                    false,
+                                    "This authorization request requires additional verification that is not currently available. Please contact your administrator.",
+                                ))
+                                .into_response();
                             }
                         }
                     }
@@ -1463,15 +1492,15 @@ pub async fn device_resend_confirmation_handler(
     let cookie_token = extract_csrf_cookie(&headers);
     let form_token = request.csrf_token.as_deref();
 
+    // SECURITY: Treat missing CSRF tokens the same as mismatched — reject the request.
+    // Previously this soft-failed on missing tokens, defeating CSRF protection entirely
+    // for cross-origin requests that don't carry the CSRF cookie.
     match (cookie_token.as_deref(), form_token) {
         (Some(ct), Some(ft)) if validate_csrf_token(ct, ft) => {
             // CSRF valid, continue
         }
-        (None, _) | (_, None) => {
-            // Missing tokens - allow for now but log warning
-            tracing::warn!("Missing CSRF token in resend confirmation request");
-        }
         _ => {
+            tracing::warn!("CSRF validation failed for resend confirmation request");
             return Html(render_confirmation_result_page(
                 false,
                 "Invalid form submission. Please try again.",

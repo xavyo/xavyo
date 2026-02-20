@@ -81,18 +81,27 @@ impl CompareOp {
                 format!("{quoted_col} <> {param_ref}"),
                 Some(value.to_string()),
             ),
-            CompareOp::Co => (
-                format!("{quoted_col} ILIKE {param_ref}"),
-                Some(format!("%{value}%")),
-            ),
-            CompareOp::Sw => (
-                format!("{quoted_col} ILIKE {param_ref}"),
-                Some(format!("{value}%")),
-            ),
-            CompareOp::Ew => (
-                format!("{quoted_col} ILIKE {param_ref}"),
-                Some(format!("%{value}")),
-            ),
+            CompareOp::Co => {
+                let escaped = escape_ilike_wildcards(value);
+                (
+                    format!("{quoted_col} ILIKE {param_ref}"),
+                    Some(format!("%{escaped}%")),
+                )
+            }
+            CompareOp::Sw => {
+                let escaped = escape_ilike_wildcards(value);
+                (
+                    format!("{quoted_col} ILIKE {param_ref}"),
+                    Some(format!("{escaped}%")),
+                )
+            }
+            CompareOp::Ew => {
+                let escaped = escape_ilike_wildcards(value);
+                (
+                    format!("{quoted_col} ILIKE {param_ref}"),
+                    Some(format!("%{escaped}")),
+                )
+            }
             CompareOp::Pr => (format!("{quoted_col} IS NOT NULL"), None),
             CompareOp::Gt => (
                 format!("{quoted_col} > {param_ref}"),
@@ -112,6 +121,18 @@ impl CompareOp {
             ),
         }
     }
+}
+
+/// Escape ILIKE wildcard characters in a value to prevent wildcard injection.
+///
+/// SECURITY: Without escaping, user-supplied filter values like `%` or `_`
+/// would be interpreted as PostgreSQL ILIKE wildcards, allowing broader
+/// matches than intended (e.g., `userName co "%"` would match everything).
+fn escape_ilike_wildcards(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
 }
 
 /// Logical operators.
@@ -142,17 +163,40 @@ pub enum FilterExpr {
     Group(Box<FilterExpr>),
 }
 
+/// Maximum recursion depth for filter parsing (prevents stack overflow on malicious input).
+const MAX_FILTER_DEPTH: usize = 20;
+
 /// SCIM filter parser.
 pub struct FilterParser<'a> {
     input: &'a str,
     pos: usize,
+    depth: usize,
 }
 
 impl<'a> FilterParser<'a> {
     /// Create a new parser.
     #[must_use]
     pub fn new(input: &'a str) -> Self {
-        Self { input, pos: 0 }
+        Self {
+            input,
+            pos: 0,
+            depth: 0,
+        }
+    }
+
+    /// Track recursion depth, returning error if max exceeded.
+    fn enter_depth(&mut self) -> ScimResult<()> {
+        self.depth += 1;
+        if self.depth > MAX_FILTER_DEPTH {
+            return Err(ScimError::InvalidFilter(
+                "Filter expression exceeds maximum nesting depth".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn exit_depth(&mut self) {
+        self.depth = self.depth.saturating_sub(1);
     }
 
     /// Parse the filter expression.
@@ -216,8 +260,10 @@ impl<'a> FilterParser<'a> {
         self.skip_whitespace();
 
         if self.try_consume_keyword("not") {
+            self.enter_depth()?;
             self.skip_whitespace();
             if !self.try_consume_char('(') {
+                self.exit_depth();
                 return Err(ScimError::InvalidFilter(
                     "Expected '(' after 'not'".to_string(),
                 ));
@@ -225,10 +271,12 @@ impl<'a> FilterParser<'a> {
             let expr = self.parse_or()?;
             self.skip_whitespace();
             if !self.try_consume_char(')') {
+                self.exit_depth();
                 return Err(ScimError::InvalidFilter(
                     "Expected ')' to close 'not' expression".to_string(),
                 ));
             }
+            self.exit_depth();
             return Ok(FilterExpr::Not(Box::new(expr)));
         }
 
@@ -240,13 +288,16 @@ impl<'a> FilterParser<'a> {
 
         // Grouped expression
         if self.try_consume_char('(') {
+            self.enter_depth()?;
             let expr = self.parse_or()?;
             self.skip_whitespace();
             if !self.try_consume_char(')') {
+                self.exit_depth();
                 return Err(ScimError::InvalidFilter(
                     "Expected ')' to close grouped expression".to_string(),
                 ));
             }
+            self.exit_depth();
             return Ok(FilterExpr::Group(Box::new(expr)));
         }
 
@@ -325,16 +376,18 @@ impl<'a> FilterParser<'a> {
         self.skip_whitespace();
 
         if self.try_consume_char('"') {
-            // Quoted string
-            let start = self.pos;
+            // Quoted string — collect characters, handling escape sequences
+            let mut value = String::new();
             while self.pos < self.input.len() && self.current_char() != '"' {
                 if self.current_char() == '\\' && self.pos + 1 < self.input.len() {
-                    self.pos += 2; // Skip escaped character
+                    self.pos += 1; // Skip backslash
+                    value.push(self.current_char()); // Push the escaped character
+                    self.pos += 1;
                 } else {
+                    value.push(self.current_char());
                     self.pos += 1;
                 }
             }
-            let value = self.input[start..self.pos].to_string();
             if !self.try_consume_char('"') {
                 return Err(ScimError::InvalidFilter("Unterminated string".to_string()));
             }
@@ -380,13 +433,14 @@ impl<'a> FilterParser<'a> {
         let remaining = &self.input[self.pos..];
         if remaining.to_lowercase().starts_with(keyword) {
             let after = self.pos + keyword.len();
-            if after >= self.input.len()
-                || !self.input[after..]
-                    .chars()
-                    .next()
-                    .unwrap()
-                    .is_alphanumeric()
-            {
+            if after >= self.input.len() {
+                self.pos = after;
+                return true;
+            }
+            let next_char = self.input[after..].chars().next().unwrap();
+            // Keyword must be followed by a non-identifier character.
+            // SCIM attribute names can contain alphanumeric, '.', and '_'.
+            if !next_char.is_alphanumeric() && next_char != '_' {
                 self.pos = after;
                 return true;
             }
@@ -522,12 +576,23 @@ impl SqlFilter {
     }
 }
 
+/// Maximum allowed filter string length (bytes).
+///
+/// Prevents DoS via excessively long filter strings that could consume
+/// CPU in parsing and generate oversized SQL queries.
+const MAX_FILTER_LEN: usize = 512;
+
 /// Parse a SCIM filter string and convert to SQL.
 pub fn parse_filter(
     filter: &str,
     mapper: &AttributeMapper,
     start_param: usize,
 ) -> ScimResult<SqlFilter> {
+    if filter.len() > MAX_FILTER_LEN {
+        return Err(ScimError::InvalidFilter(format!(
+            "Filter exceeds maximum length of {MAX_FILTER_LEN} characters"
+        )));
+    }
     let mut parser = FilterParser::new(filter);
     let expr = parser.parse()?;
     SqlFilter::from_expr(&expr, mapper, start_param)
@@ -563,6 +628,43 @@ mod tests {
 
         assert_eq!(result.clause, "\"email\" ILIKE $1");
         assert_eq!(result.params, vec!["john%"]);
+    }
+
+    #[test]
+    fn test_ilike_wildcards_escaped() {
+        let mapper = AttributeMapper::for_users();
+        // A filter value containing ILIKE wildcards should be escaped
+        let result = parse_filter(r#"userName co "100%_done""#, &mapper, 1).unwrap();
+        assert_eq!(result.clause, "\"email\" ILIKE $1");
+        assert_eq!(result.params, vec!["%100\\%\\_done%"]);
+    }
+
+    #[test]
+    fn test_escaped_quotes_in_value() {
+        let mapper = AttributeMapper::for_users();
+        // A filter value with escaped quotes: userName eq "O\"Brien"
+        let result = parse_filter(r#"userName eq "O\"Brien""#, &mapper, 1).unwrap();
+        assert_eq!(result.clause, "\"email\" = $1");
+        assert_eq!(result.params, vec!["O\"Brien"]);
+    }
+
+    #[test]
+    fn test_max_depth_exceeded() {
+        let mapper = AttributeMapper::for_users();
+        // Build deeply nested parenthesized expression
+        let mut filter = String::new();
+        for _ in 0..25 {
+            filter.push('(');
+        }
+        filter.push_str(r#"userName eq "test""#);
+        for _ in 0..25 {
+            filter.push(')');
+        }
+        let result = parse_filter(&filter, &mapper, 1);
+        assert!(result.is_err());
+        if let Err(ScimError::InvalidFilter(msg)) = result {
+            assert!(msg.contains("nesting depth"));
+        }
     }
 
     #[test]
@@ -625,6 +727,7 @@ mod tests {
         .unwrap();
 
         // The grouped expression gets wrapped in extra parens - this is valid SQL
+        // ILIKE values have no wildcards in "john"/"jane" so escaping is a no-op
         assert_eq!(
             result.clause,
             "(((\"email\" ILIKE $1 OR \"email\" ILIKE $2)) AND \"is_active\" = $3::boolean)"
@@ -667,6 +770,29 @@ mod tests {
 
         assert_eq!(result.clause, "\"display_name\" = $1");
         assert_eq!(result.params, vec!["Engineering"]);
+    }
+
+    #[test]
+    fn test_filter_length_cap() {
+        let mapper = AttributeMapper::for_users();
+        // Build a filter string that exceeds MAX_FILTER_LEN (512)
+        let long_filter = format!(r#"userName eq "{}""#, "x".repeat(600));
+        let result = parse_filter(&long_filter, &mapper, 1);
+        assert!(result.is_err());
+        if let Err(ScimError::InvalidFilter(msg)) = result {
+            assert!(msg.contains("maximum length"));
+        }
+    }
+
+    #[test]
+    fn test_keyword_boundary_with_underscore() {
+        let mapper = AttributeMapper::for_users();
+        // "or_field" should NOT be parsed as "or" + "_field"
+        // This would fail with "Unknown attribute: _field" which confirms
+        // the keyword was not consumed
+        let result = parse_filter(r#"userName eq "test" or_extra eq "val""#, &mapper, 1);
+        // Should get "Unexpected characters" because "or_extra" is not consumed as "or"
+        assert!(result.is_err());
     }
 
     #[test]

@@ -21,6 +21,13 @@ use xavyo_webhooks::EventPublisher;
 /// Page size used when fetching all resources from the SCIM target.
 const FETCH_PAGE_SIZE: i64 = 100;
 
+/// Maximum number of remote resources to fetch per resource type (Users/Groups).
+///
+/// Prevents unbounded memory growth when reconciling against large SCIM targets.
+/// If a target exceeds this limit, the reconciliation will stop fetching and
+/// report what was fetched so far.
+const MAX_REMOTE_RESOURCES: usize = 50_000;
+
 /// Maximum number of local provisioning state records to load.
 const MAX_LOCAL_STATES: i64 = 50_000;
 
@@ -269,7 +276,8 @@ impl ReconciliationEngine {
             "Fetched groups from SCIM target"
         );
 
-        let total_target_resources = (remote_users.len() + remote_groups.len()) as i32;
+        let total_target_resources =
+            i32::try_from(remote_users.len() + remote_groups.len()).unwrap_or(i32::MAX);
 
         // 5. Load all local provisioning states for this target.
         let (local_states, _total_count) = ScimProvisioningState::list_by_target(
@@ -333,6 +341,8 @@ impl ReconciliationEngine {
     }
 
     /// Fetch all users from the SCIM target using paginated requests.
+    ///
+    /// Stops after `MAX_REMOTE_RESOURCES` to prevent unbounded memory growth.
     async fn fetch_all_users(
         client: &ScimClient,
     ) -> Result<Vec<ScimUser>, Box<dyn Error + Send + Sync>> {
@@ -347,6 +357,16 @@ impl ReconciliationEngine {
             let fetched_count = response.resources.len() as i64;
             all_users.extend(response.resources);
 
+            // Safety cap: stop if we've fetched too many resources.
+            if all_users.len() >= MAX_REMOTE_RESOURCES {
+                warn!(
+                    fetched = all_users.len(),
+                    total_results = response.total_results,
+                    "Reached MAX_REMOTE_RESOURCES limit for users, stopping fetch"
+                );
+                break;
+            }
+
             // Check if we have fetched all resources.
             if fetched_count < FETCH_PAGE_SIZE || all_users.len() as i64 >= response.total_results {
                 break;
@@ -359,6 +379,8 @@ impl ReconciliationEngine {
     }
 
     /// Fetch all groups from the SCIM target using paginated requests.
+    ///
+    /// Stops after `MAX_REMOTE_RESOURCES` to prevent unbounded memory growth.
     async fn fetch_all_groups(
         client: &ScimClient,
     ) -> Result<Vec<ScimGroup>, Box<dyn Error + Send + Sync>> {
@@ -372,6 +394,16 @@ impl ReconciliationEngine {
 
             let fetched_count = response.resources.len() as i64;
             all_groups.extend(response.resources);
+
+            // Safety cap: stop if we've fetched too many resources.
+            if all_groups.len() >= MAX_REMOTE_RESOURCES {
+                warn!(
+                    fetched = all_groups.len(),
+                    total_results = response.total_results,
+                    "Reached MAX_REMOTE_RESOURCES limit for groups, stopping fetch"
+                );
+                break;
+            }
 
             // Check if we have fetched all resources.
             if fetched_count < FETCH_PAGE_SIZE || all_groups.len() as i64 >= response.total_results

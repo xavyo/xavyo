@@ -4,14 +4,15 @@
 
 use crate::error::ApiAuthError;
 use crate::models::{EmailChangeCompletedResponse, EmailChangeInitiatedResponse};
-use crate::services::{hash_token, verify_token_hash_constant_time, EmailSender};
+use crate::services::{hash_token, verify_token_hash_constant_time, EmailSender, SessionService};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
+use std::sync::Arc;
 use tracing::{info, warn};
 use uuid::Uuid;
 use xavyo_auth::verify_password;
-use xavyo_db::{set_tenant_context, EmailChangeRequest, User};
+use xavyo_db::{set_tenant_context, EmailChangeRequest, RevokeReason, User};
 
 /// Token validity in hours for email change requests.
 pub const EMAIL_CHANGE_TOKEN_VALIDITY_HOURS: i64 = 24;
@@ -24,6 +25,7 @@ const TOKEN_BYTES: usize = 32;
 pub struct EmailChangeService {
     pool: PgPool,
     frontend_base_url: String,
+    session_service: Option<Arc<SessionService>>,
 }
 
 impl EmailChangeService {
@@ -33,7 +35,15 @@ impl EmailChangeService {
         Self {
             pool,
             frontend_base_url,
+            session_service: None,
         }
+    }
+
+    /// Set session service for session revocation on email change.
+    #[must_use]
+    pub fn with_session_service(mut self, session_service: Arc<SessionService>) -> Self {
+        self.session_service = Some(session_service);
+        self
     }
 
     /// Generate a secure random token.
@@ -238,21 +248,35 @@ impl EmailChangeService {
         }
 
         // Update the user's email with tenant isolation
-        let _updated_user = User::update_email(&self.pool, tenant_id, user_id, &request.new_email)
-            .await
-            .map_err(ApiAuthError::Database)?
-            .ok_or(ApiAuthError::UserNotFound)?;
+        let _updated_user =
+            User::confirm_email_change(&self.pool, tenant_id, user_id, &request.new_email)
+                .await
+                .map_err(ApiAuthError::Database)?
+                .ok_or(ApiAuthError::UserNotFound)?;
 
         // Mark the request as verified
         EmailChangeRequest::mark_verified(&self.pool, request.id)
             .await
             .map_err(ApiAuthError::Database)?;
 
+        // H5: Revoke all sessions after email change to force re-authentication
+        if let Some(ref session_service) = self.session_service {
+            if let Err(e) = session_service
+                .revoke_all_user_sessions(user_id, tenant_id, RevokeReason::Security)
+                .await
+            {
+                warn!(
+                    user_id = %user_id,
+                    error = %e,
+                    "Failed to revoke sessions after email change"
+                );
+            }
+        }
+
         info!(
             user_id = %user_id,
             tenant_id = %tenant_id,
-            new_email = %request.new_email,
-            "Email change completed"
+            "Email change completed, sessions revoked"
         );
 
         Ok(EmailChangeCompletedResponse {

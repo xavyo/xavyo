@@ -213,11 +213,15 @@ impl IntoResponse for FederationError {
 
             // 403 Forbidden
             FederationError::Forbidden(msg) => (StatusCode::FORBIDDEN, "forbidden", msg.clone()),
-            FederationError::IdpDisabled(id) => (
-                StatusCode::FORBIDDEN,
-                "idp_disabled",
-                format!("Identity provider {id} is disabled"),
-            ),
+            FederationError::IdpDisabled(_id) => {
+                // R9: Don't leak IdP UUID to unauthenticated callers
+                tracing::debug!(idp_id = %_id, "IdP is disabled");
+                (
+                    StatusCode::FORBIDDEN,
+                    "idp_disabled",
+                    "Identity provider is disabled".to_string(),
+                )
+            }
 
             // 404 Not Found
             FederationError::IdpNotFound(id) => (
@@ -305,20 +309,24 @@ impl IntoResponse for FederationError {
                 "missing_required_claim",
                 format!("Missing required claim: {claim}"),
             ),
-            FederationError::InvalidEmail(email) => (
-                StatusCode::BAD_REQUEST,
-                "invalid_email",
-                format!("Invalid email address: {email}"),
-            ),
+            FederationError::InvalidEmail(email) => {
+                // SECURITY: Do not reflect user-supplied email in error response (content injection risk).
+                tracing::debug!(email_input = ?email, "Invalid email address submitted");
+                (
+                    StatusCode::BAD_REQUEST,
+                    "invalid_email",
+                    "Invalid email address format".to_string(),
+                )
+            }
             FederationError::InvalidCallback(msg) => {
                 (StatusCode::BAD_REQUEST, "invalid_callback", msg.clone())
             }
             FederationError::IdpError { error, description } => {
                 // SECURITY: Never reflect IdP-controlled error/description in response body.
-                // An attacker controlling the IdP could inject arbitrary content.
+                // Use Debug format (?), not Display (%), to prevent log injection via ANSI codes/newlines.
                 tracing::warn!(
-                    idp_error = %error,
-                    idp_description = %description,
+                    idp_error = ?error,
+                    idp_description = ?description,
                     "IdP returned error (not reflected to client)"
                 );
                 (
@@ -363,11 +371,15 @@ impl IntoResponse for FederationError {
                 "token_expired",
                 "Token has expired".to_string(),
             ),
-            FederationError::InvalidIssuer(iss) => (
-                StatusCode::UNAUTHORIZED,
-                "invalid_issuer",
-                format!("Invalid or untrusted issuer: {iss}"),
-            ),
+            FederationError::InvalidIssuer(iss) => {
+                // SECURITY: Do not echo attacker-controlled issuer string in response.
+                tracing::warn!(issuer = ?iss, "Invalid or untrusted issuer");
+                (
+                    StatusCode::UNAUTHORIZED,
+                    "invalid_issuer",
+                    "Invalid or untrusted issuer".to_string(),
+                )
+            }
             FederationError::JwksFetchFailed(msg) => {
                 tracing::error!("JWKS fetch failed: {}", msg);
                 (
@@ -376,11 +388,15 @@ impl IntoResponse for FederationError {
                     "Failed to fetch identity provider keys".to_string(),
                 )
             }
-            FederationError::JwksKeyNotFound(kid) => (
-                StatusCode::UNAUTHORIZED,
-                "jwks_key_not_found",
-                format!("Signing key not found: {kid}"),
-            ),
+            FederationError::JwksKeyNotFound(kid) => {
+                // SECURITY: Do not echo attacker-controlled kid value in response.
+                tracing::warn!(kid = ?kid, "JWKS signing key not found");
+                (
+                    StatusCode::UNAUTHORIZED,
+                    "jwks_key_not_found",
+                    "Signing key not found".to_string(),
+                )
+            }
 
             // 500 Internal Server Error
             FederationError::Database(e) => {

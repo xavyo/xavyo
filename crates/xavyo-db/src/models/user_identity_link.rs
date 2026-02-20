@@ -63,21 +63,6 @@ impl UserIdentityLink {
         .await
     }
 
-    /// Find by ID.
-    ///
-    /// **SECURITY WARNING**: This method does NOT filter by `tenant_id`.
-    /// Use `find_by_id_and_tenant()` for tenant-isolated queries.
-    #[deprecated(
-        since = "0.1.0",
-        note = "Use find_by_id_and_tenant() for tenant-isolated queries"
-    )]
-    pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
-        sqlx::query_as("SELECT * FROM user_identity_links WHERE id = $1")
-            .bind(id)
-            .fetch_optional(pool)
-            .await
-    }
-
     /// Find by ID with tenant isolation.
     ///
     /// SECURITY: This method ensures tenant isolation by requiring `tenant_id`.

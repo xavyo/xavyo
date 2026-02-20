@@ -140,7 +140,11 @@ pub fn get_nameid_for_format(
     match format {
         NAMEID_FORMAT_EMAIL => Some(user.email.clone()),
         NAMEID_FORMAT_PERSISTENT => Some(user.user_id.clone()),
-        NAMEID_FORMAT_TRANSIENT => session_id.map(String::from),
+        NAMEID_FORMAT_TRANSIENT => Some(
+            session_id
+                .map(String::from)
+                .unwrap_or_else(|| format!("_transient_{}", uuid::Uuid::new_v4())),
+        ),
         _ => Some(user.email.clone()), // Default to email
     }
 }

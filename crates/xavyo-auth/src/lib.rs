@@ -43,9 +43,10 @@ mod password;
 // Re-export public API
 pub use claims::{ActorClaim, JwtClaims, JwtClaimsBuilder};
 pub use error::AuthError;
+pub use jsonwebtoken::Algorithm;
 pub use jwks::{JwkSet, JwksClient};
 pub use jwt::{
-    decode_token, decode_token_with_config, encode_token, encode_token_with_kid, extract_kid,
-    ValidationConfig,
+    decode_token, decode_token_with_algorithm, decode_token_with_config, encode_token,
+    encode_token_with_kid, extract_kid, ValidationConfig,
 };
 pub use password::{hash_password, verify_password, PasswordHasher};

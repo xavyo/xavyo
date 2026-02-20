@@ -141,18 +141,10 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
         return false; // No JTI to blacklist
     }
 
-    // Extract user_id from subject — reject if not a valid UUID
-    let user_id = if let Ok(uid) = claims.sub.parse::<Uuid>() {
-        uid
-    } else {
-        tracing::warn!(
-            target: "token_lifecycle",
-            jti = %jti,
-            sub = %claims.sub,
-            "Cannot revoke access token: subject is not a valid UUID"
-        );
-        return false;
-    };
+    // Extract user_id from subject.
+    // For NHI tokens, the subject may be a non-UUID identifier (e.g., NHI name).
+    // Use a nil UUID for revocation record so the JTI blacklist still works.
+    let user_id = claims.sub.parse::<Uuid>().unwrap_or(Uuid::nil());
 
     // SECURITY: Acquire dedicated connection for RLS to prevent pool race condition
     let mut conn = match state.pool.acquire().await {

@@ -1136,6 +1136,10 @@ fn looks_like_remote_environment(database_url: &str) -> bool {
         && host != "::1"
         && host != "postgres" // docker-compose service name
         && host != "xavyo-postgres" // docker container name
+        && host != "db" // common docker-compose service name
+        && host != "database" // common docker-compose service name
+        && host != "pg" // common docker-compose service name
+        && host != "postgresql" // common docker-compose service name
 }
 
 /// Parse hex-encoded 32-byte encryption key
@@ -1608,10 +1612,13 @@ mod tests {
     // ── TrustedProxyConfig tests ─────────────────────────────────────
 
     #[test]
-    fn test_trusted_proxy_empty_trusts_all() {
+    fn test_trusted_proxy_empty_trusts_none() {
         let config = TrustedProxyConfig { cidrs: vec![] };
         let ip: std::net::IpAddr = "192.168.1.1".parse().unwrap();
-        assert!(config.is_trusted(&ip), "Empty CIDRs should trust all");
+        assert!(
+            !config.is_trusted(&ip),
+            "Empty CIDRs should trust none (safe default)"
+        );
     }
 
     #[test]

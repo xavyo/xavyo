@@ -57,8 +57,31 @@ pub async fn update_user_handler(
     );
 
     let response = user_service
-        .update_user(tenant_id, user_id, &request)
+        .update_user(tenant_id, user_id, &request, &claims.roles)
         .await?;
+
+    // A6: Record durable admin audit event
+    if let Ok(actor_id) = Uuid::parse_str(&claims.sub) {
+        let action = match request.is_active {
+            Some(false) => "user.disabled",
+            Some(true) => "user.enabled",
+            None => "user.updated",
+        };
+        // M-6: Use normalized response values in audit log (not raw request values)
+        user_service
+            .record_audit_event(
+                tenant_id,
+                actor_id,
+                action,
+                user_uuid,
+                serde_json::json!({
+                    "email": response.email,
+                    "roles": response.roles,
+                    "is_active": response.is_active,
+                }),
+            )
+            .await;
+    }
 
     // F085: Publish user.updated (or user.disabled/user.enabled) webhook event
     if let Some(Extension(publisher)) = publisher {

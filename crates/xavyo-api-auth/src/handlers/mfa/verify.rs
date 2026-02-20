@@ -70,7 +70,7 @@ pub async fn verify_totp(
         .ok_or(ApiAuthError::InvalidCredentials)?;
 
     // Generate full tokens using the shared token_service
-    let roles = xavyo_db::UserRole::get_user_roles(&state.pool, user_id)
+    let roles = xavyo_db::UserRole::get_user_roles(&state.pool, user_id, tenant_id)
         .await
         .unwrap_or_else(|_| vec!["user".to_string()]);
     let tokens = state
