@@ -202,19 +202,26 @@ pub async fn jwt_auth_middleware(
     // token is revoked with cascade, a sentinel `revoke-all:{user_id}:{timestamp}` is
     // inserted. We must check this sentinel to reject access tokens issued before the
     // cascade, otherwise they remain valid until natural expiry (up to 15 minutes).
+    //
+    // C-5: Validate claims.sub as UUID before using in LIKE query to prevent
+    // SQL wildcard injection (% or _ in sub could match unintended sentinels).
     if !claims.jti.is_empty() && !claims.sub.is_empty() {
         if let Some(tid) = claims.tid {
+            // C-5: Only run sentinel check if sub is a valid UUID (prevents LIKE injection)
+            let sub_is_valid_uuid = uuid::Uuid::parse_str(&claims.sub).is_ok();
             let sentinel_pool = request.extensions().get::<PgPool>().cloned();
-            if let Some(pool) = sentinel_pool {
-                let sentinel_revoked: bool = match pool.acquire().await {
-                    Ok(mut conn) => {
-                        let _ =
-                            sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
-                                .bind(tid.to_string())
-                                .execute(&mut *conn)
-                                .await;
-                        sqlx::query_scalar(
-                            r"
+            if sub_is_valid_uuid {
+                if let Some(pool) = sentinel_pool {
+                    let sentinel_revoked: bool = match pool.acquire().await {
+                        Ok(mut conn) => {
+                            let _ = sqlx::query(
+                                "SELECT set_config('app.current_tenant', $1::text, true)",
+                            )
+                            .bind(tid.to_string())
+                            .execute(&mut *conn)
+                            .await;
+                            sqlx::query_scalar(
+                                r"
                             SELECT EXISTS(
                                 SELECT 1 FROM revoked_tokens
                                 WHERE jti LIKE 'revoke-all:' || $1 || ':%'
@@ -222,33 +229,37 @@ pub async fn jwt_auth_middleware(
                                   AND created_at > to_timestamp($2)
                             )
                             ",
-                        )
-                        .bind(&claims.sub)
-                        .bind(claims.iat as f64)
-                        .bind(tid)
-                        .fetch_one(&mut *conn)
-                        .await
-                        .unwrap_or(false)
+                            )
+                            .bind(&claims.sub)
+                            .bind(claims.iat as f64)
+                            .bind(tid)
+                            .fetch_one(&mut *conn)
+                            .await
+                            .unwrap_or(false)
+                        }
+                        Err(e) => {
+                            // Fail-closed: treat connection errors as revoked
+                            tracing::error!(error = %e, "Sentinel check connection failed (fail-closed)");
+                            true
+                        }
+                    };
+                    if sentinel_revoked {
+                        tracing::warn!(jti = %claims.jti, sub = %claims.sub, "Rejected token via revoke-all sentinel");
+                        return Err(
+                            (StatusCode::UNAUTHORIZED, "Token has been revoked").into_response()
+                        );
                     }
-                    Err(e) => {
-                        // Fail-closed: treat connection errors as revoked
-                        tracing::error!(error = %e, "Sentinel check connection failed (fail-closed)");
-                        true
-                    }
-                };
-                if sentinel_revoked {
-                    tracing::warn!(jti = %claims.jti, sub = %claims.sub, "Rejected token via revoke-all sentinel");
-                    return Err(
-                        (StatusCode::UNAUTHORIZED, "Token has been revoked").into_response()
-                    );
                 }
-            }
-            // SECURITY: If PgPool is absent, sentinel check cannot run. The individual
-            // JTI check above (lines 136-189) already provides fail-closed behavior,
-            // so cascade revocations are the only gap. In practice, PgPool is always
-            // present when RevocationCache is configured. Do NOT change this to
-            // fail-open (e.g., unwrap_or(false)) — that would allow cascade-revoked
-            // tokens to bypass revocation for their remaining lifetime.
+                // SECURITY: If PgPool is absent, sentinel check cannot run. The individual
+                // JTI check above (lines 136-189) already provides fail-closed behavior,
+                // so cascade revocations are the only gap. In practice, PgPool is always
+                // present when RevocationCache is configured. Do NOT change this to
+                // fail-open (e.g., unwrap_or(false)) — that would allow cascade-revoked
+                // tokens to bypass revocation for their remaining lifetime.
+            } // end if sub_is_valid_uuid
+              // C-5: For non-UUID sub (e.g. client_credentials tokens), sentinel check
+              // is skipped — these tokens use client_id as sub, not user UUIDs, and
+              // revoke-all sentinels are keyed by user_id.
         }
     }
 

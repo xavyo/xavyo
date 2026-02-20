@@ -139,23 +139,29 @@ impl AuthService {
         let normalized_email = normalize_email(email);
 
         // Find user by email and tenant
-        let user: Option<User> = sqlx::query_as(
-            r"
-            SELECT *
-            FROM users
-            WHERE email = $1 AND tenant_id = $2
-            ",
-        )
-        .bind(&normalized_email)
-        .bind(tenant_id.as_uuid())
-        .fetch_optional(&self.pool)
-        .await?;
+        // Note: SELECT * is intentional here — login needs password_hash for verification,
+        // plus is_active, email_verified, and password expiration fields.
+        let user: Option<User> =
+            sqlx::query_as("SELECT * FROM users WHERE email = $1 AND tenant_id = $2")
+                .bind(&normalized_email)
+                .bind(tenant_id.as_uuid())
+                .fetch_optional(&self.pool)
+                .await?;
 
-        let user = user.ok_or_else(|| {
-            // Use generic error to prevent email enumeration
-            tracing::debug!("Login attempt for non-existent user");
-            ApiAuthError::InvalidCredentials
-        })?;
+        let user = match user {
+            Some(u) => u,
+            None => {
+                // M-1: Perform a dummy password hash verification to prevent timing oracle.
+                // Without this, "user not found" returns faster than "wrong password" because
+                // no Argon2 computation occurs, allowing email enumeration via response timing.
+                let _ = self.password_hasher.verify(
+                    password,
+                    "$argon2id$v=19$m=19456,t=2,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                );
+                tracing::debug!("Login attempt for non-existent user");
+                return Err(ApiAuthError::InvalidCredentials);
+            }
+        };
 
         // Check if account is active
         if !user.is_active {
@@ -206,17 +212,12 @@ impl AuthService {
         tenant_id: uuid::Uuid,
         user_id: UserId,
     ) -> Result<Option<User>, ApiAuthError> {
-        let user: Option<User> = sqlx::query_as(
-            r"
-            SELECT *
-            FROM users
-            WHERE id = $1 AND tenant_id = $2
-            ",
-        )
-        .bind(user_id.as_uuid())
-        .bind(tenant_id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let user: Option<User> =
+            sqlx::query_as("SELECT * FROM users WHERE id = $1 AND tenant_id = $2")
+                .bind(user_id.as_uuid())
+                .bind(tenant_id)
+                .fetch_optional(&self.pool)
+                .await?;
 
         Ok(user)
     }
@@ -232,17 +233,12 @@ impl AuthService {
     ) -> Result<Option<User>, ApiAuthError> {
         let normalized_email = normalize_email(email);
 
-        let user: Option<User> = sqlx::query_as(
-            r"
-            SELECT *
-            FROM users
-            WHERE email = $1 AND tenant_id = $2
-            ",
-        )
-        .bind(&normalized_email)
-        .bind(tenant_id.as_uuid())
-        .fetch_optional(&self.pool)
-        .await?;
+        let user: Option<User> =
+            sqlx::query_as("SELECT * FROM users WHERE email = $1 AND tenant_id = $2")
+                .bind(&normalized_email)
+                .bind(tenant_id.as_uuid())
+                .fetch_optional(&self.pool)
+                .await?;
 
         Ok(user)
     }

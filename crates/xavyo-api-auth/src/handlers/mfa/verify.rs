@@ -70,9 +70,15 @@ pub async fn verify_totp(
         .ok_or(ApiAuthError::InvalidCredentials)?;
 
     // Generate full tokens using the shared token_service
+    // SECURITY: Fail the MFA completion if role fetch fails rather than silently
+    // issuing a downgraded token with only ["user"]. An admin whose role query
+    // fails would otherwise get a non-admin JWT.
     let roles = xavyo_db::UserRole::get_user_roles(&state.pool, user_id, tenant_id)
         .await
-        .unwrap_or_else(|_| vec!["user".to_string()]);
+        .map_err(|e| {
+            tracing::error!(user_id = %user_id, error = %e, "Failed to fetch user roles during MFA verification");
+            ApiAuthError::Internal("Failed to fetch user roles".to_string())
+        })?;
     let tokens = state
         .token_service
         .create_tokens(

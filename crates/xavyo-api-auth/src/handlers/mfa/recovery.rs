@@ -71,9 +71,14 @@ pub async fn verify_recovery_code(
         .ok_or(ApiAuthError::InvalidCredentials)?;
 
     // Generate full tokens using the shared token_service
+    // SECURITY: Fail the recovery code verification if role fetch fails rather than
+    // silently issuing a downgraded token with only ["user"].
     let roles = xavyo_db::UserRole::get_user_roles(&state.pool, user_id, tenant_id)
         .await
-        .unwrap_or_else(|_| vec!["user".to_string()]);
+        .map_err(|e| {
+            tracing::error!(user_id = %user_id, error = %e, "Failed to fetch user roles during recovery code verification");
+            ApiAuthError::Internal("Failed to fetch user roles".to_string())
+        })?;
     let tokens = state
         .token_service
         .create_tokens(

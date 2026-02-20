@@ -174,6 +174,12 @@ fn is_api_key(token: &str) -> bool {
 }
 
 /// Compute the SHA-256 hash of an API key for database lookup.
+///
+/// H-1: Plain SHA-256 (without salt/HMAC) is acceptable here because API keys
+/// are high-entropy random strings (256 bits via `generate_secure_token()`).
+/// Unlike passwords, pre-computation attacks (rainbow tables) are infeasible
+/// against 256-bit random inputs. Salt is unnecessary when the input space
+/// is large enough to make brute-force impractical.
 fn compute_key_hash(api_key: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(api_key.as_bytes());
@@ -184,13 +190,32 @@ fn compute_key_hash(api_key: &str) -> String {
 ///
 /// Returns all possible path prefixes for a scope. Some resources are served
 /// at multiple paths (e.g., users at both `/admin/users` and `/users/me`).
+///
+/// H-5: Comprehensive mapping covering all API resource types.
 fn scope_prefix_to_paths(prefix: &str) -> &'static [&'static str] {
     match prefix {
         "nhi" => &["/nhi"],
         "agents" => &["/agents"],
         "users" => &["/admin/users", "/users"],
-        "groups" => &["/admin/groups"],
+        "groups" => &["/admin/groups", "/groups"],
         "audit" => &["/audit"],
+        "tenants" => &["/admin/tenants", "/tenants"],
+        "policies" => &["/admin/policies", "/policies"],
+        "sessions" => &["/admin/sessions", "/sessions"],
+        "governance" => &["/governance"],
+        "connectors" => &["/connectors"],
+        "webhooks" => &["/webhooks"],
+        "operations" => &["/operations"],
+        "scim" => &["/scim", "/admin/scim-targets"],
+        "oauth" => &["/oauth"],
+        "oidc" => &["/oidc"],
+        "saml" => &["/saml"],
+        "social" => &["/social"],
+        "invitations" => &["/invitations"],
+        "api-keys" => &["/admin/api-keys"],
+        "gdpr" => &["/gdpr"],
+        "import" => &["/import"],
+        "export" => &["/export"],
         _ => &[],
     }
 }

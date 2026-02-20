@@ -81,33 +81,24 @@ pub async fn reset_password_handler(
     // Hash the provided token to look up in database
     let token_hash = hash_token(&request.token);
 
-    // Look up the token
+    // Look up the token (C-1: include tenant_id in WHERE clause for tenant isolation at DB level)
     let token_row: Option<PasswordResetTokenRow> = sqlx::query_as(
         r"
         SELECT id, tenant_id, user_id, token_hash, expires_at, used_at
         FROM password_reset_tokens
-        WHERE token_hash = $1
+        WHERE token_hash = $1 AND tenant_id = $2
         ",
     )
     .bind(&token_hash)
+    .bind(tenant_id.as_uuid())
     .fetch_optional(&pool)
     .await?;
 
-    let (token_id, token_tenant_id, user_id, stored_hash, expires_at, used_at) =
+    let (token_id, _token_tenant_id, user_id, stored_hash, expires_at, used_at) =
         token_row.ok_or(ApiAuthError::InvalidToken)?;
 
     // Verify token hash with constant-time comparison
     if !verify_token_hash_constant_time(&request.token, &stored_hash) {
-        return Err(ApiAuthError::InvalidToken);
-    }
-
-    // Check tenant isolation
-    if token_tenant_id != *tenant_id.as_uuid() {
-        tracing::warn!(
-            token_tenant = %token_tenant_id,
-            request_tenant = %tenant_id,
-            "Token tenant mismatch"
-        );
         return Err(ApiAuthError::InvalidToken);
     }
 
