@@ -60,27 +60,25 @@ pub async fn update_user_handler(
         .update_user(tenant_id, user_id, &request, &claims.roles)
         .await?;
 
-    // A6: Record durable admin audit event
+    // M-1/L-6: Fire audit event in background task to avoid blocking the response
     if let Ok(actor_id) = Uuid::parse_str(&claims.sub) {
         let action = match request.is_active {
             Some(false) => "user.disabled",
             Some(true) => "user.enabled",
             None => "user.updated",
         };
-        // M-6: Use normalized response values in audit log (not raw request values)
-        user_service
-            .record_audit_event(
-                tenant_id,
-                actor_id,
-                action,
-                user_uuid,
-                serde_json::json!({
-                    "email": response.email,
-                    "roles": response.roles,
-                    "is_active": response.is_active,
-                }),
-            )
-            .await;
+        let svc = user_service.clone();
+        let tid = tenant_id;
+        let details = serde_json::json!({
+            "email": response.email,
+            "roles": response.roles,
+            "is_active": response.is_active,
+        });
+        let action = action.to_string();
+        tokio::spawn(async move {
+            svc.record_audit_event(tid, actor_id, &action, user_uuid, details)
+                .await;
+        });
     }
 
     // F085: Publish user.updated (or user.disabled/user.enabled) webhook event
@@ -102,6 +100,8 @@ pub async fn update_user_handler(
                 "enabled": response.is_active,
             }),
         });
+    } else {
+        tracing::debug!("Webhook publisher not configured — user.updated event not emitted");
     }
 
     Ok(Json(response))

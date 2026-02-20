@@ -254,6 +254,15 @@ impl UserService {
         // to interpolate. Values are bound as parameters.
         let custom_attr_clauses = build_custom_attr_filter_clauses(custom_attr_filters);
 
+        // H-3: Acquire a connection and set tenant context for RLS defense-in-depth.
+        // Pool-level queries without tenant context rely solely on the WHERE clause;
+        // setting the RLS context adds a second layer of isolation.
+        let mut conn = self.pool.acquire().await?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.as_uuid().to_string())
+            .execute(&mut *conn)
+            .await?;
+
         // Build count query dynamically
         let total_count: i64 = {
             let mut sql = String::from("SELECT COUNT(*) FROM users WHERE tenant_id = $1");
@@ -290,12 +299,21 @@ impl UserService {
                 q = clause.bind_value(q);
             }
 
-            q.fetch_one(&self.pool).await?
+            q.fetch_one(&mut *conn).await?
         };
 
         // Build data query dynamically
+        // M-7: Use explicit column list instead of SELECT * to avoid fetching password_hash
         let users: Vec<User> = {
-            let mut sql = String::from("SELECT * FROM users WHERE tenant_id = $1");
+            let mut sql = String::from(
+                "SELECT id, tenant_id, email, password_hash, display_name, is_active, \
+                 email_verified, email_verified_at, created_at, updated_at, external_id, \
+                 first_name, last_name, scim_provisioned, scim_last_sync, \
+                 failed_login_count, last_failed_login_at, locked_at, locked_until, lockout_reason, \
+                 password_changed_at, password_expires_at, must_change_password, avatar_url, \
+                 lifecycle_state_id, manager_id, custom_attributes, archetype_id, archetype_custom_attrs \
+                 FROM users WHERE tenant_id = $1",
+            );
             let mut param_idx: usize = 2;
 
             // L3: Optional is_active filter
@@ -336,7 +354,7 @@ impl UserService {
 
             q = q.bind(limit).bind(offset);
 
-            q.fetch_all(&self.pool).await?
+            q.fetch_all(&mut *conn).await?
         };
 
         // H-4: Fetch roles for all users with tenant JOIN for cross-tenant safety
@@ -354,24 +372,25 @@ impl UserService {
             )
             .bind(&user_ids)
             .bind(tenant_id.as_uuid())
-            .fetch_all(&self.pool)
+            .fetch_all(&mut *conn)
             .await?
         };
 
-        // Group roles by user_id
+        // H-4: Group roles by user_id using a non-mutating lookup
         let mut roles_map: std::collections::HashMap<uuid::Uuid, Vec<String>> =
             std::collections::HashMap::new();
         for (user_id, role_name) in all_roles {
             roles_map.entry(user_id).or_default().push(role_name);
         }
 
-        // M-6: Fetch lifecycle states with tenant_id filter for tenant isolation
+        // Fetch lifecycle states with tenant_id filter for tenant isolation
         let lifecycle_state_ids: Vec<uuid::Uuid> =
             users.iter().filter_map(|u| u.lifecycle_state_id).collect();
         let lifecycle_states: Vec<(uuid::Uuid, String, bool)> = if lifecycle_state_ids.is_empty() {
             Vec::new()
         } else {
-            sqlx::query_as(
+            // M-3: Log errors instead of silently swallowing via unwrap_or_default
+            match sqlx::query_as(
                 r"
                 SELECT id, name, is_terminal
                 FROM gov_lifecycle_states
@@ -380,10 +399,23 @@ impl UserService {
             )
             .bind(&lifecycle_state_ids)
             .bind(tenant_id.as_uuid())
-            .fetch_all(&self.pool)
+            .fetch_all(&mut *conn)
             .await
-            .unwrap_or_default()
+            {
+                Ok(states) => states,
+                Err(e) => {
+                    tracing::warn!(
+                        tenant_id = %tenant_id,
+                        error = %e,
+                        "Failed to fetch lifecycle states for user list — returning users without lifecycle info"
+                    );
+                    Vec::new()
+                }
+            }
         };
+
+        // Release the connection back to the pool
+        drop(conn);
 
         // Build lifecycle state map
         let lifecycle_map: std::collections::HashMap<uuid::Uuid, LifecycleStateInfo> =
@@ -405,7 +437,7 @@ impl UserService {
         let user_responses: Vec<UserResponse> = users
             .iter()
             .map(|user| {
-                let roles = roles_map.remove(&user.id).unwrap_or_default();
+                let roles = roles_map.get(&user.id).cloned().unwrap_or_default();
                 let lifecycle_state = user
                     .lifecycle_state_id
                     .and_then(|id| lifecycle_map.get(&id).cloned());
@@ -475,8 +507,15 @@ impl UserService {
         // Validate roles (A1: shared helper; H1: allowlist enforced)
         validation_errors.extend(validate_roles(&request.roles));
 
-        // Return all validation errors at once
+        // M-8: Log privilege escalation attempts even when validation fails
         if !validation_errors.is_empty() {
+            let caller_is_super = caller_roles.iter().any(|r| r == "super_admin");
+            if !caller_is_super && request.roles.iter().any(|r| r == "super_admin") {
+                tracing::warn!(
+                    tenant_id = %tenant_id,
+                    "Privilege escalation attempt: non-super_admin tried to assign super_admin role (blocked by validation)"
+                );
+            }
             return Err(ApiUsersError::ValidationErrors {
                 errors: validation_errors,
             });
@@ -516,7 +555,8 @@ impl UserService {
 
         // A4: Use RETURNING * to get the authoritative row from the database,
         // capturing any DB-level defaults (e.g., generated UUID, timestamps).
-        let user: User = sqlx::query_as(
+        // M-4: Catch unique constraint violation (concurrent create race) and map to EmailConflict.
+        let user: User = match sqlx::query_as(
             r"
             INSERT INTO users (tenant_id, email, password_hash, is_active, email_verified, created_at, updated_at)
             VALUES ($1, $2, $3, true, false, $4, $4)
@@ -528,7 +568,17 @@ impl UserService {
         .bind(&password_hash)
         .bind(now)
         .fetch_one(&mut *tx)
-        .await?;
+        .await
+        {
+            Ok(user) => user,
+            Err(sqlx::Error::Database(ref e))
+                if e.constraint()
+                    .is_some_and(|c| c.contains("email")) =>
+            {
+                return Err(ApiUsersError::EmailConflict);
+            }
+            Err(e) => return Err(e.into()),
+        };
 
         // Insert roles
         for role in &request.roles {
@@ -621,9 +671,10 @@ impl UserService {
         .fetch_all(&self.pool)
         .await?;
 
-        // M-6: Fetch lifecycle state with tenant_id filter for tenant isolation
+        // Fetch lifecycle state with tenant_id filter for tenant isolation
+        // M-3: Log errors instead of silently swallowing
         let lifecycle_state = if let Some(state_id) = user.lifecycle_state_id {
-            let state: Option<(uuid::Uuid, String, bool)> = sqlx::query_as(
+            match sqlx::query_as::<_, (uuid::Uuid, String, bool)>(
                 r"
                 SELECT id, name, is_terminal
                 FROM gov_lifecycle_states
@@ -634,13 +685,22 @@ impl UserService {
             .bind(tenant_id.as_uuid())
             .fetch_optional(&self.pool)
             .await
-            .ok()
-            .flatten();
-            state.map(|(id, name, is_terminal)| LifecycleStateInfo {
-                id,
-                name,
-                is_terminal,
-            })
+            {
+                Ok(state) => state.map(|(id, name, is_terminal)| LifecycleStateInfo {
+                    id,
+                    name,
+                    is_terminal,
+                }),
+                Err(e) => {
+                    tracing::warn!(
+                        user_id = %user_id,
+                        tenant_id = %tenant_id,
+                        error = %e,
+                        "Failed to fetch lifecycle state for user"
+                    );
+                    None
+                }
+            }
         } else {
             None
         };
@@ -679,6 +739,13 @@ impl UserService {
         request: &UpdateUserRequest,
         caller_roles: &[String],
     ) -> Result<UserResponse, ApiUsersError> {
+        // L-1: Reject empty updates — at least one field must be provided
+        if request.email.is_none() && request.roles.is_none() && request.is_active.is_none() {
+            return Err(ApiUsersError::Validation(
+                "At least one field must be provided for update".to_string(),
+            ));
+        }
+
         // M2: All DB operations in one transaction to prevent TOCTOU on user state
         let mut tx = self.pool.begin().await?;
 
@@ -736,6 +803,26 @@ impl UserService {
         // H1: Enforce role assignment hierarchy
         if let Some(ref new_roles) = request.roles {
             check_role_assignment_privilege(caller_roles, new_roles)?;
+
+            // H-5: Prevent non-super_admin from demoting a super_admin.
+            // Fetch the target user's current roles inside the transaction to check.
+            let current_roles: Vec<String> = sqlx::query_scalar(
+                r"SELECT ur.role_name FROM user_roles ur
+                JOIN users u ON ur.user_id = u.id AND u.tenant_id = $2
+                WHERE ur.user_id = $1",
+            )
+            .bind(user_id.as_uuid())
+            .bind(tenant_id.as_uuid())
+            .fetch_all(&mut *tx)
+            .await?;
+
+            let target_is_super = current_roles.iter().any(|r| r == "super_admin");
+            let caller_is_super = caller_roles.iter().any(|r| r == "super_admin");
+            let new_has_super = new_roles.iter().any(|r| r == "super_admin");
+
+            if target_is_super && !new_has_super && !caller_is_super {
+                return Err(ApiUsersError::Forbidden);
+            }
         }
 
         // Update email if provided
@@ -846,23 +933,16 @@ impl UserService {
             .await?
         };
 
-        tx.commit().await?;
-
-        if updated || request.roles.is_some() {
-            user.updated_at = now;
-        }
-
-        // M-1/M-2: Revoke all refresh tokens when email or roles change.
-        // This forces re-authentication so the user's JWT reflects the new
-        // identity (email) or permissions (roles). Best-effort — don't fail
-        // the update if revocation fails.
+        // C-2: Revoke refresh tokens INSIDE the transaction (before commit) to close
+        // the race window where a concurrent token refresh could issue a new access
+        // token with stale email/roles between commit and revocation.
         if email_changed || roles_changed || deactivated {
             let revoke_result = sqlx::query(
                 "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
             )
             .bind(user_id.as_uuid())
             .bind(tenant_id.as_uuid())
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await;
 
             match revoke_result {
@@ -873,7 +953,8 @@ impl UserService {
                         revoked = result.rows_affected(),
                         email_changed,
                         roles_changed,
-                        "Revoked refresh tokens after identity change"
+                        deactivated,
+                        "Revoking refresh tokens (pre-commit) after identity change"
                     );
                 }
                 Err(e) => {
@@ -886,6 +967,12 @@ impl UserService {
                 }
                 _ => {}
             }
+        }
+
+        tx.commit().await?;
+
+        if updated || request.roles.is_some() {
+            user.updated_at = now;
         }
 
         // M-6: Fetch lifecycle state with tenant_id filter for tenant isolation
@@ -1017,16 +1104,14 @@ impl UserService {
         .execute(&mut *tx)
         .await?;
 
-        tx.commit().await?;
-
-        // Revoke all refresh tokens for the deactivated user so they cannot
-        // obtain new access tokens. Best-effort — don't fail the deactivation.
+        // H-1: Revoke refresh tokens INSIDE the transaction (before commit) to close
+        // the race window where a deactivated user could refresh their token.
         let revoke_result = sqlx::query(
             "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
         )
         .bind(user_id.as_uuid())
         .bind(tenant_id.as_uuid())
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await;
 
         if let Err(e) = &revoke_result {
@@ -1042,10 +1127,12 @@ impl UserService {
                     user_id = %user_id,
                     tenant_id = %tenant_id,
                     revoked = r.rows_affected(),
-                    "Revoked refresh tokens on deactivation"
+                    "Revoking refresh tokens (pre-commit) on deactivation"
                 );
             }
         }
+
+        tx.commit().await?;
 
         tracing::info!(
             user_id = %user_id,

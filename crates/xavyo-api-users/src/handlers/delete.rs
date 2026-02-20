@@ -57,16 +57,21 @@ pub async fn delete_user_handler(
         .deactivate_user(tenant_id, user_id, caller_uuid)
         .await?;
 
-    // A6: Record durable admin audit event
-    user_service
-        .record_audit_event(
-            tenant_id,
-            caller_uuid,
-            "user.deactivated",
-            user_uuid,
-            serde_json::json!({}),
-        )
-        .await;
+    // M-1/L-6: Fire audit event in background task to avoid blocking the response
+    {
+        let svc = user_service.clone();
+        let tid = tenant_id;
+        tokio::spawn(async move {
+            svc.record_audit_event(
+                tid,
+                caller_uuid,
+                "user.deactivated",
+                user_uuid,
+                serde_json::json!({}),
+            )
+            .await;
+        });
+    }
 
     // F085: Publish user.deleted webhook event
     if let Some(Extension(publisher)) = publisher {
@@ -80,6 +85,8 @@ pub async fn delete_user_handler(
                 "user_id": user_uuid,
             }),
         });
+    } else {
+        tracing::debug!("Webhook publisher not configured — user.deleted event not emitted");
     }
 
     Ok(StatusCode::NO_CONTENT)

@@ -10,7 +10,7 @@ use xavyo_core::{TenantId, UserId};
 /// A user account in the system.
 ///
 /// Users are scoped to a tenant and have tenant-isolated email uniqueness.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Clone, FromRow)]
 pub struct User {
     /// Unique identifier for the user.
     pub id: uuid::Uuid,
@@ -108,6 +108,23 @@ pub struct User {
     /// Custom attribute values for this user based on their archetype schema extensions.
     #[sqlx(default)]
     pub archetype_custom_attrs: serde_json::Value,
+}
+
+// L-7: Custom Debug that redacts password_hash to prevent leaking Argon2 hashes in logs.
+impl std::fmt::Debug for User {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("User")
+            .field("id", &self.id)
+            .field("tenant_id", &self.tenant_id)
+            .field("email", &self.email)
+            .field("password_hash", &"[REDACTED]")
+            .field("display_name", &self.display_name)
+            .field("is_active", &self.is_active)
+            .field("email_verified", &self.email_verified)
+            .field("created_at", &self.created_at)
+            .field("updated_at", &self.updated_at)
+            .finish_non_exhaustive()
+    }
 }
 
 impl User {

@@ -131,9 +131,17 @@ pub async fn jwt_auth_middleware(
         (StatusCode::UNAUTHORIZED, "Invalid or expired token").into_response()
     })?;
 
+    // H-2: Reject tokens with empty JTI — all valid tokens must have a JTI for
+    // revocation tracking. An empty JTI would bypass both the per-token and
+    // cascade revocation checks below.
+    if claims.jti.is_empty() {
+        tracing::warn!(sub = %claims.sub, "Rejected token with empty JTI");
+        return Err((StatusCode::UNAUTHORIZED, "Token missing required JTI claim").into_response());
+    }
+
     // Check if the token has been revoked (F069-S4, F082-US4: cache-first)
     // SECURITY: Fail-closed - if revocation check cannot be performed, reject the token.
-    if !claims.jti.is_empty() {
+    {
         // F082-US4: Prefer RevocationCache (cache-first, DB-fallback) over direct DB call
         if let Some(cache) = request.extensions().get::<RevocationCache>() {
             match cache.is_revoked(&claims.jti).await {
