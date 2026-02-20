@@ -45,23 +45,23 @@ pub async fn create_user_handler(
         .create_user(tenant_id, &request, &claims.roles)
         .await?;
 
-    // A6: Record durable admin audit event
+    // M-1/L-6: Fire audit event in background task to avoid blocking the response
     if let Ok(actor_id) = uuid::Uuid::parse_str(&claims.sub) {
-        user_service
-            .record_audit_event(
-                tenant_id,
-                actor_id,
-                "user.created",
-                response.id,
-                serde_json::json!({
-                    "email": response.email,
-                    "roles": response.roles,
-                }),
-            )
-            .await;
+        let svc = user_service.clone();
+        let tid = tenant_id;
+        let rid = response.id;
+        let details = serde_json::json!({
+            "email": response.email,
+            "roles": response.roles,
+        });
+        tokio::spawn(async move {
+            svc.record_audit_event(tid, actor_id, "user.created", rid, details)
+                .await;
+        });
     }
 
     // F085: Publish user.created webhook event
+    // L-8: Log when publisher is not configured
     if let Some(Extension(publisher)) = publisher {
         publisher.publish(WebhookEvent {
             event_id: uuid::Uuid::new_v4(),
@@ -75,6 +75,8 @@ pub async fn create_user_handler(
                 "enabled": response.is_active,
             }),
         });
+    } else {
+        tracing::debug!("Webhook publisher not configured — user.created event not emitted");
     }
 
     Ok((StatusCode::CREATED, Json(response)))
