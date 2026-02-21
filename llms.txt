@@ -16,7 +16,7 @@
 
 The `docs-site/` contains a full Docusaurus documentation site:
 
-- **Getting Started**: [What is xavyo](docs-site/docs/getting-started/what-is-xavyo.md), [Key Concepts](docs-site/docs/getting-started/key-concepts.md), [Quick Tour](docs-site/docs/getting-started/quick-tour.md)
+- **Getting Started**: [Installation](docs-site/docs/getting-started/installation.md), [What is xavyo](docs-site/docs/getting-started/what-is-xavyo.md), [Key Concepts](docs-site/docs/getting-started/key-concepts.md), [Quick Tour](docs-site/docs/getting-started/quick-tour.md)
 - **Admin Guides**: [Tenant Setup](docs-site/docs/guides/admin/tenant-setup.md), [Users](docs-site/docs/guides/admin/user-management.md), [Authentication](docs-site/docs/guides/admin/authentication.md), [Authorization](docs-site/docs/guides/admin/authorization.md), [Connectors](docs-site/docs/guides/admin/connectors.md), [Governance](docs-site/docs/guides/admin/governance.md), [Security](docs-site/docs/guides/admin/security-hardening.md), [NHI](docs-site/docs/guides/admin/nhi-management.md)
 - **Developer Guides**: [API Overview](docs-site/docs/guides/developer/api-overview.md), [Auth Flows](docs-site/docs/guides/developer/authentication-flows.md), [SCIM](docs-site/docs/guides/developer/scim-integration.md), [Webhooks](docs-site/docs/guides/developer/webhooks.md), [NHI](docs-site/docs/guides/developer/nhi-machine-identities.md)
 - **End User Guides**: [Self-Service](docs-site/docs/guides/end-user/self-service.md), [MFA Setup](docs-site/docs/guides/end-user/mfa-setup.md), [Access Requests](docs-site/docs/guides/end-user/access-requests.md)

@@ -6,6 +6,9 @@
 #   Stop:   docker compose down
 #   Logs:   docker compose logs -f
 #   Reset:  docker compose down -v && docker compose up -d
+#
+# Override frontend path (default: ../../xavyo-web):
+#   XAVYO_WEB_PATH=/absolute/path docker compose up -d
 
 services:
   # ===========================================================================
@@ -42,6 +45,13 @@ services:
       - '${KAFKA_PORT:-9094}:9094'
     volumes:
       - kafka_data:/var/lib/kafka/data
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: '1.0'
+        reservations:
+          memory: 512m
     healthcheck:
       test:
         [
@@ -53,7 +63,7 @@ services:
       retries: 10
       start_period: 30s
     networks:
-      - xavyo-network
+      - xavyo-internal
 
   # ===========================================================================
   # Mailpit - Email Testing (catches all outbound emails)
@@ -69,14 +79,17 @@ services:
       - '${MAILPIT_SMTP_PORT:-1025}:1025'
       - '${MAILPIT_UI_PORT:-8025}:8025'
     environment:
-      # Max stored messages (0 = unlimited)
       MP_MAX_MESSAGES: 500
-      # Database path for persistence
       MP_DATABASE: /data/mailpit.db
     volumes:
       - mailpit_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
     networks:
-      - xavyo-network
+      - xavyo-internal
 
   # ===========================================================================
   # PostgreSQL Database
@@ -89,16 +102,21 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-xavyo_test}
       POSTGRES_USER: ${POSTGRES_USER:-xavyo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-xavyo_test_password}
-      # Performance tuning for development
       POSTGRES_INITDB_ARGS: '--encoding=UTF8'
     ports:
       - '${POSTGRES_PORT:-5434}:5432'
     volumes:
-      # Persist data between restarts
       - postgres_data:/var/lib/postgresql/data
-      # Initialization scripts (run on first start only)
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./postgres/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    shm_size: 256m
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: '1.0'
+        reservations:
+          memory: 256m
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-xavyo} -d ${POSTGRES_DB:-xavyo_test}']
       interval: 5s
@@ -106,7 +124,7 @@ services:
       retries: 10
       start_period: 10s
     networks:
-      - xavyo-network
+      - xavyo-internal
 
   # ===========================================================================
   # OpenLDAP - Directory Server for Connector Testing
@@ -134,6 +152,11 @@ services:
     volumes:
       - openldap_data:/var/lib/ldap
       - openldap_config:/etc/ldap/slapd.d
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '0.5'
     healthcheck:
       test: ['CMD-SHELL', 'ldapsearch -x -H ldap://localhost -b dc=xavyo,dc=dev -D cn=admin,dc=xavyo,dc=dev -w $${LDAP_ADMIN_PASSWORD:-admin_password}']
       interval: 10s
@@ -141,7 +164,7 @@ services:
       retries: 10
       start_period: 15s
     networks:
-      - xavyo-network
+      - xavyo-internal
 
   # ===========================================================================
   # xavyo IDP API Server
@@ -186,7 +209,6 @@ services:
       RATE_LIMIT_LOGIN_ACCOUNT: ${RATE_LIMIT_LOGIN_ACCOUNT:-500}
       RATE_LIMIT_TOKEN: ${RATE_LIMIT_TOKEN:-500}
       RATE_LIMIT_REGISTRATION: ${RATE_LIMIT_REGISTRATION:-500}
-      # Ticketing credentials encryption key
       XAVYO_TICKETING_ENCRYPTION_KEY: ${XAVYO_TICKETING_ENCRYPTION_KEY:-zxDtnpmuQkkoKKupjsjDjgdx/OGnAaS4O65YpGHNY+M=}
       XAVYO_SIEM_ENCRYPTION_KEY: ${XAVYO_SIEM_ENCRYPTION_KEY:-zxDtnpmuQkkoKKupjsjDjgdx/OGnAaS4O65YpGHNY+M=}
       AGENTGATEWAY_MCP_URL: ${AGENTGATEWAY_MCP_URL:-http://172.18.0.1:4000/mcp}
@@ -195,6 +217,18 @@ services:
       - '${API_PORT:-8080}:8080'
     volumes:
       - ./keys:/app/keys:ro
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '2.0'
+        reservations:
+          memory: 128m
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8080/readyz']
       interval: 10s
@@ -202,13 +236,53 @@ services:
       retries: 10
       start_period: 30s
     networks:
-      - xavyo-network
+      - xavyo-internal
+
+  # ===========================================================================
+  # xavyo Web Frontend (SvelteKit)
+  # ===========================================================================
+  web:
+    build:
+      context: ${XAVYO_WEB_PATH:-../../xavyo-web}
+      dockerfile: Dockerfile
+    container_name: xavyo-web
+    restart: unless-stopped
+    depends_on:
+      idp-api:
+        condition: service_healthy
+    environment:
+      API_BASE_URL: http://idp-api:8080
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: '1.0'
+        reservations:
+          memory: 64m
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - xavyo-internal
 
 # =============================================================================
 # Networks
 # =============================================================================
 networks:
-  xavyo-network:
+  xavyo-internal:
     driver: bridge
     name: xavyo-network
 

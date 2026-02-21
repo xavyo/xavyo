@@ -52,12 +52,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 ca-certificates curl tini \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd -r -u 1000 -m xavyo \
+    && useradd -r -u 1000 -m -s /usr/sbin/nologin xavyo \
     && find / -perm /6000 -type f -exec chmod a-s {} + 2>/dev/null || true
 
 WORKDIR /app
-COPY --from=builder /app/target/release/idp-api /app/idp-api
-RUN mkdir -p /app/keys && chown -R xavyo:xavyo /app
+COPY --from=builder --chown=xavyo:xavyo /app/target/release/idp-api /app/idp-api
+RUN mkdir -p /app/keys && chown -R xavyo:xavyo /app \
+    && chmod 500 /app/idp-api
 
 EXPOSE 8080
 

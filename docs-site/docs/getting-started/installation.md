@@ -6,9 +6,166 @@ sidebar_position: 1
 
 # Installation
 
-This guide walks you through setting up the complete xavyo platform for local development: the **backend API** (Rust/Axum) and the **web frontend** (SvelteKit).
+This guide walks you through setting up the complete xavyo platform: the **backend API** (Rust/Axum) and the **web frontend** (SvelteKit).
 
-## Prerequisites
+There are two ways to run xavyo:
+
+- **[Docker Compose](#docker-compose-quick-start)** — everything in containers, no Rust/Node.js required
+- **[Local development](#local-development)** — build from source with hot reload
+
+---
+
+## Docker Compose Quick Start
+
+Run the entire platform (backend + frontend + infrastructure) with Docker Compose. No Rust or Node.js installation required.
+
+### Prerequisites
+
+| Tool | Version |
+|------|---------|
+| [Docker](https://docs.docker.com/get-docker/) + Compose | 20.10+ |
+| [OpenSSL](https://www.openssl.org/) | any |
+| [Git](https://git-scm.com/) | any |
+
+### 1. Clone the Repositories
+
+```bash
+git clone https://github.com/xavyo/xavyo-idp.git
+cd xavyo-idp
+
+git clone https://github.com/xavyo/xavyo-web.git ../xavyo-web
+```
+
+### 2. Generate JWT Keys
+
+```bash
+bash docker/generate-keys.sh
+```
+
+### 3. Start Everything
+
+```bash
+docker compose -f docker/docker-compose.yml up -d
+```
+
+This starts:
+
+| Service | Port | Description |
+|---------|------|-------------|
+| **xavyo-web** | [localhost:3000](http://localhost:3000) | Web frontend |
+| **idp-api** | [localhost:8080](http://localhost:8080) | Backend API |
+| **PostgreSQL** | `5434` | Database |
+| **Kafka** | `9094` | Event streaming |
+| **Mailpit** | [localhost:8025](http://localhost:8025) | Dev email UI |
+
+Wait for all services to be healthy:
+
+```bash
+docker compose -f docker/docker-compose.yml ps
+```
+
+### 4. Verify
+
+```bash
+# Backend health
+curl http://localhost:8080/readyz
+
+# Frontend
+open http://localhost:3000
+```
+
+### 5. Create Your First User
+
+```bash
+TENANT_ID="00000000-0000-0000-0000-000000000001"
+
+curl -X POST http://localhost:8080/auth/signup \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{
+    "email": "admin@example.com",
+    "password": "MyP@ssw0rd_2026",
+    "first_name": "Admin",
+    "last_name": "User"
+  }'
+```
+
+Verify the email at http://localhost:8025, then log in at http://localhost:3000.
+
+### Docker Security Features
+
+Both the development and production Docker configurations include hardening:
+
+- **Read-only root filesystem** — containers cannot modify their own binaries
+- **`no-new-privileges`** — prevents privilege escalation inside containers
+- **Non-root users** — API runs as `xavyo` (UID 1000), web as `xavyo` (UID 1001)
+- **Resource limits** — memory and CPU caps prevent runaway processes
+- **`tini` init** — proper signal handling and zombie reaping
+- **Stripped binaries** — smaller attack surface, no debug symbols
+
+### Docker Compose Configuration
+
+The `web` service expects the xavyo-web source at `../../xavyo-web` relative to the `docker/` directory. Override with:
+
+```bash
+XAVYO_WEB_PATH=/path/to/xavyo-web docker compose -f docker/docker-compose.yml up -d
+```
+
+#### Production Deployment (Pre-built Images)
+
+For production, use `docker-compose.dist.yml` with pre-built images. This configuration includes:
+
+- **Network isolation**: Database on an internal-only network, unreachable from outside
+- **Read-only filesystems**: All containers run with read-only root filesystems
+- **No privilege escalation**: `no-new-privileges` security option on all services
+- **Resource limits**: Memory and CPU constraints prevent runaway containers
+- **Structured logging**: JSON file driver with rotation (max 50MB for API, 10MB for others)
+- **Required secrets**: Compose refuses to start if critical passwords/keys are missing
+
+```bash
+# 1. Generate JWT keys
+mkdir -p keys
+openssl genpkey -algorithm RSA -out keys/jwt_private.pem -pkeyopt rsa_keygen_bits:2048
+openssl rsa -pubout -in keys/jwt_private.pem -out keys/jwt_public.pem
+chmod 600 keys/jwt_private.pem
+
+# 2. Configure — copy and fill ALL required fields
+cp docker/.env.dist.example .env
+# Edit .env: set POSTGRES_PASSWORD, ISSUER_URL, CORS_ORIGINS, SMTP, etc.
+
+# 3. Start
+docker compose -f docker/docker-compose.dist.yml up -d
+```
+
+:::warning
+The production compose file **will not start** if required variables are missing. This is intentional — it prevents accidental deployment with default credentials.
+:::
+
+### Managing Containers
+
+```bash
+# View logs
+docker compose -f docker/docker-compose.yml logs -f idp-api
+docker compose -f docker/docker-compose.yml logs -f web
+
+# Restart a service
+docker compose -f docker/docker-compose.yml restart web
+
+# Stop everything
+docker compose -f docker/docker-compose.yml down
+
+# Reset database (destroys all data)
+docker compose -f docker/docker-compose.yml down -v
+docker compose -f docker/docker-compose.yml up -d
+```
+
+---
+
+## Local Development
+
+Build from source with hot reload for active development.
+
+### Prerequisites
 
 | Tool | Version | Purpose |
 |------|---------|---------|
