@@ -11,6 +11,19 @@ use uuid::Uuid;
 use xavyo_db::models::SamlServiceProvider;
 use xml_canonicalization::Canonicalizer;
 
+/// Output from building a SAML Response, containing the encoded response
+/// and session metadata needed for SP session tracking.
+pub struct SamlResponseOutput {
+    /// Base64-encoded SAML Response
+    pub encoded_response: String,
+    /// SessionIndex from the AuthnStatement
+    pub session_index: String,
+    /// NameID sent in the assertion
+    pub name_id: String,
+    /// NameID format
+    pub name_id_format: String,
+}
+
 /// Builder for SAML assertions and responses
 pub struct AssertionBuilder {
     idp_entity_id: String,
@@ -38,7 +51,7 @@ impl AssertionBuilder {
         in_response_to: Option<&str>,
         session_id: Option<&str>,
         target_acs_url: Option<&str>,
-    ) -> SamlResult<String> {
+    ) -> SamlResult<SamlResponseOutput> {
         let response_id = format!("_resp_{}", Uuid::new_v4());
         let assertion_id = format!("_assert_{}", Uuid::new_v4());
         let now = Utc::now();
@@ -63,6 +76,9 @@ impl AssertionBuilder {
         })?;
         let acs_url = target_acs_url.unwrap_or(fallback_acs);
 
+        // Generate session index for SP session tracking
+        let session_index = format!("_session_{}", Uuid::new_v4());
+
         let response_xml = self.build_response_xml(
             &response_id,
             &assertion_id,
@@ -75,7 +91,7 @@ impl AssertionBuilder {
             not_before,
             not_on_or_after,
             in_response_to,
-            session_id,
+            Some(&session_index),
         )?;
 
         let final_response = if sp.sign_assertions {
@@ -84,7 +100,12 @@ impl AssertionBuilder {
             response_xml
         };
 
-        Ok(STANDARD.encode(final_response.as_bytes()))
+        Ok(SamlResponseOutput {
+            encoded_response: STANDARD.encode(final_response.as_bytes()),
+            session_index,
+            name_id: name_id_value,
+            name_id_format: sp.name_id_format.clone(),
+        })
     }
 
     /// Build a SAML Response for IdP-initiated SSO (unsolicited)
@@ -93,7 +114,7 @@ impl AssertionBuilder {
         sp: &SamlServiceProvider,
         user: &UserAttributes,
         session_id: Option<&str>,
-    ) -> SamlResult<String> {
+    ) -> SamlResult<SamlResponseOutput> {
         self.build_response(sp, user, None, session_id, None)
     }
 
@@ -126,8 +147,8 @@ impl AssertionBuilder {
             })
             .unwrap_or_default();
 
-        let default_session = format!("_session_{}", Uuid::new_v4());
-        let session_index_str = session_index.unwrap_or(&default_session);
+        let fallback_session = format!("_session_{}", Uuid::new_v4());
+        let session_index_str = session_index.unwrap_or(&fallback_session);
         let attributes_xml = self.build_attributes_xml(attributes);
         let _certificate_base64 = self.credentials.certificate_base64_der()?;
 

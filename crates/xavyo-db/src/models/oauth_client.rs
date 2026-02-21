@@ -85,6 +85,9 @@ pub struct OAuth2Client {
 
     /// When the client was last updated.
     pub updated_at: DateTime<Utc>,
+
+    /// Allowed post-logout redirect URIs (OIDC RP-Initiated Logout).
+    pub post_logout_redirect_uris: Vec<String>,
 }
 
 impl OAuth2Client {

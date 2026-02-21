@@ -2,7 +2,7 @@
 
 use crate::error::SamlResult;
 use crate::services::{MetadataGenerator, SpService};
-use crate::session::SessionStore;
+use crate::session::{SessionStore, SpSessionStore};
 use axum::{
     extract::State,
     http::{header, StatusCode},
@@ -22,6 +22,8 @@ pub struct SamlState {
     pub encryption_key: Arc<[u8; 32]>,
     /// Session store for AuthnRequest replay protection.
     pub session_store: Arc<dyn SessionStore>,
+    /// SP session store for tracking active SP sessions (SLO).
+    pub sp_session_store: Arc<dyn SpSessionStore>,
 }
 
 /// Return `IdP` metadata XML
@@ -69,7 +71,8 @@ async fn get_metadata_inner(state: &SamlState, tenant_id: Uuid) -> SamlResult<St
         Err(_) => None, // No certificate is OK for metadata, just won't include KeyInfo
     };
 
-    let generator = MetadataGenerator::new(entity_id, sso_url, credentials);
+    let slo_url = format!("{}/saml/slo", state.base_url);
+    let generator = MetadataGenerator::new(entity_id, sso_url, credentials, Some(slo_url));
     let xml = generator.generate()?;
 
     tracing::info!(

@@ -406,13 +406,40 @@ async fn handle_sso<'a>(
 
     // Build SAML Response — pass the resolved ACS URL so Destination/Recipient match
     let builder = AssertionBuilder::new(idp_entity_id, credentials);
-    let saml_response = builder.build_response(
+    let output = builder.build_response(
         &sp,
         &user_attrs,
         Some(&authn_request.id),
         None, // session_id - could be user session
         Some(acs_url),
     )?;
+
+    // Record SP session for SLO tracking
+    let sp_session = crate::session::SpSession {
+        id: Uuid::new_v4(),
+        tenant_id,
+        user_id: user.id,
+        sp_id: sp.id,
+        session_index: output.session_index.clone(),
+        name_id: output.name_id.clone(),
+        name_id_format: output.name_id_format.clone(),
+        created_at: chrono::Utc::now(),
+        // SP session lasts longer than the assertion — the assertion validity is how
+        // long the SAML response is valid, but the user's SP session typically persists
+        // for hours. Use the larger of 8 hours or assertion_validity_seconds.
+        expires_at: chrono::Utc::now()
+            + chrono::Duration::seconds(i64::from(sp.assertion_validity_seconds).max(28800)),
+        revoked_at: None,
+    };
+    if let Err(e) = state.sp_session_store.record(sp_session).await {
+        tracing::warn!(
+            tenant_id = %tenant_id,
+            user_id = %user.id,
+            sp_id = %sp.id,
+            error = %e,
+            "Failed to record SP session for SLO (non-fatal)"
+        );
+    }
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -423,7 +450,7 @@ async fn handle_sso<'a>(
     );
 
     // Return auto-submit form
-    let html = generate_auto_submit_form(acs_url, &saml_response, relay_state);
+    let html = generate_auto_submit_form(acs_url, &output.encoded_response, relay_state);
 
     Ok(Html(html).into_response())
 }

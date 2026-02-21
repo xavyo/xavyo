@@ -32,6 +32,7 @@ struct DbOAuth2Client {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub nhi_id: Option<Uuid>,
+    pub post_logout_redirect_uris: Vec<String>,
 }
 
 /// Service for managing `OAuth2` clients.
@@ -83,6 +84,15 @@ impl OAuth2ClientService {
                 OAuthError::Internal("Failed to set tenant context".to_string())
             })?;
 
+        // SECURITY: Validate post_logout_redirect_uris (same rules as redirect_uris)
+        for uri in &request.post_logout_redirect_uris {
+            if Self::normalize_redirect_uri(uri).is_none() {
+                return Err(OAuthError::InvalidRequest(format!(
+                    "Invalid post_logout_redirect_uri: must be a valid HTTPS URL (HTTP only for localhost): {uri}"
+                )));
+            }
+        }
+
         // Generate unique client_id
         let client_id = self.generate_client_id();
 
@@ -111,8 +121,8 @@ impl OAuth2ClientService {
             INSERT INTO oauth_clients (
                 id, tenant_id, client_id, client_secret_hash, name, client_type,
                 redirect_uris, grant_types, scopes, is_active, logo_url, description,
-                created_at, updated_at, nhi_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $12, $13)
+                created_at, updated_at, nhi_id, post_logout_redirect_uris
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $12, $13, $14)
             ",
         )
         .bind(id)
@@ -128,6 +138,7 @@ impl OAuth2ClientService {
         .bind(&request.description)
         .bind(now)
         .bind(request.nhi_id)
+        .bind(&request.post_logout_redirect_uris)
         .execute(&mut *conn)
         .await
         .map_err(|e| {
@@ -147,6 +158,7 @@ impl OAuth2ClientService {
             logo_url: request.logo_url,
             description: request.description,
             nhi_id: request.nhi_id,
+            post_logout_redirect_uris: request.post_logout_redirect_uris,
             created_at: now,
             updated_at: now,
         };
@@ -199,7 +211,7 @@ impl OAuth2ClientService {
         let client: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
             FROM oauth_clients
             WHERE client_id = $1 AND tenant_id = $2
             ",
@@ -242,7 +254,7 @@ impl OAuth2ClientService {
         let client: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -283,7 +295,7 @@ impl OAuth2ClientService {
         let clients: Vec<DbOAuth2Client> = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
             FROM oauth_clients
             WHERE tenant_id = $1
             ORDER BY created_at DESC
@@ -333,7 +345,7 @@ impl OAuth2ClientService {
         let existing: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -348,6 +360,17 @@ impl OAuth2ClientService {
         })?
         .ok_or(OAuthError::ClientNotFound)?;
 
+        // SECURITY: Validate post_logout_redirect_uris if provided
+        if let Some(ref uris) = request.post_logout_redirect_uris {
+            for uri in uris {
+                if Self::normalize_redirect_uri(uri).is_none() {
+                    return Err(OAuthError::InvalidRequest(format!(
+                        "Invalid post_logout_redirect_uri: must be a valid HTTPS URL (HTTP only for localhost): {uri}"
+                    )));
+                }
+            }
+        }
+
         // Build update with provided fields (or keep existing)
         let name = request.name.unwrap_or(existing.name);
         let redirect_uris = request.redirect_uris.unwrap_or(existing.redirect_uris);
@@ -356,13 +379,17 @@ impl OAuth2ClientService {
         let is_active = request.is_active.unwrap_or(existing.is_active);
         let logo_url = request.logo_url.or(existing.logo_url);
         let description = request.description.or(existing.description);
+        let post_logout_redirect_uris = request
+            .post_logout_redirect_uris
+            .unwrap_or(existing.post_logout_redirect_uris);
         let now = chrono::Utc::now();
 
         sqlx::query(
             r"
             UPDATE oauth_clients
             SET name = $1, redirect_uris = $2, grant_types = $3, scopes = $4,
-                is_active = $5, logo_url = $6, description = $7, updated_at = $8
+                is_active = $5, logo_url = $6, description = $7, updated_at = $8,
+                post_logout_redirect_uris = $11
             WHERE id = $9 AND tenant_id = $10
             ",
         )
@@ -376,6 +403,7 @@ impl OAuth2ClientService {
         .bind(now)
         .bind(id)
         .bind(tenant_id)
+        .bind(&post_logout_redirect_uris)
         .execute(&mut *conn)
         .await
         .map_err(|e| {
@@ -401,6 +429,7 @@ impl OAuth2ClientService {
             logo_url,
             description,
             nhi_id: existing.nhi_id,
+            post_logout_redirect_uris,
             created_at: existing.created_at,
             updated_at: now,
         })
@@ -557,7 +586,7 @@ impl OAuth2ClientService {
         let client: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -678,7 +707,7 @@ impl OAuth2ClientService {
         let client: Option<DbOAuth2Client> = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
             FROM oauth_clients
             WHERE client_id = $1 AND tenant_id = $2
             ",
@@ -768,6 +797,7 @@ impl OAuth2ClientService {
             logo_url: client.logo_url,
             description: client.description,
             nhi_id: client.nhi_id,
+            post_logout_redirect_uris: client.post_logout_redirect_uris,
             created_at: client.created_at,
             updated_at: client.updated_at,
         }
@@ -975,6 +1005,7 @@ mod tests {
             logo_url: None,
             description: None,
             nhi_id: None,
+            post_logout_redirect_uris: vec![],
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -1014,6 +1045,7 @@ mod tests {
             logo_url: None,
             description: None,
             nhi_id: None,
+            post_logout_redirect_uris: vec![],
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
@@ -1210,6 +1242,7 @@ mod tests {
             logo_url: None,
             description: None,
             nhi_id: None,
+            post_logout_redirect_uris: vec![],
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

@@ -8515,6 +8515,7 @@ dependencies = [
  "flate2",
  "openssl",
  "quick-xml",
+ "reqwest",
  "serde",
  "serde_json",
  "sqlx",

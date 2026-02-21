@@ -33,9 +33,13 @@
 //! // Use session.request_id as InResponseTo in SAMLResponse
 //! ```
 
+pub mod sp_session;
 mod store;
 mod types;
 
+pub use sp_session::{
+    InMemorySpSessionStore, PostgresSpSessionStore, SpSession, SpSessionError, SpSessionStore,
+};
 pub use store::{InMemorySessionStore, PostgresSessionStore, SessionStore};
 pub use types::{
     AuthnRequestSession, SessionError, CLOCK_SKEW_GRACE_SECONDS, DEFAULT_SESSION_TTL_SECONDS,

@@ -35,6 +35,9 @@ pub struct OpenIdConfiguration {
     pub code_challenge_methods_supported: Vec<String>,
     /// Supported claims.
     pub claims_supported: Vec<String>,
+    /// End session endpoint (OIDC RP-Initiated Logout).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_session_endpoint: Option<String>,
 }
 
 use super::token::DEVICE_CODE_GRANT_TYPE;
@@ -90,6 +93,7 @@ impl OpenIdConfiguration {
                 "family_name".to_string(),
                 "act".to_string(),
             ],
+            end_session_endpoint: Some(format!("{issuer}/oauth/logout")),
         }
     }
 }
