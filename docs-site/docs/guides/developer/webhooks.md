@@ -44,7 +44,7 @@ curl -X POST https://idp.example.com/webhooks/subscriptions \
 ### Update a Subscription
 
 ```bash
-curl -X PUT https://idp.example.com/webhooks/subscriptions/{id} \
+curl -X PATCH https://idp.example.com/webhooks/subscriptions/{id} \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
