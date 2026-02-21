@@ -229,7 +229,15 @@ impl Modify for SecurityAddon {
         (name = "Governance - NHI Certification", description = "Governance NHI certification campaigns, items, and decisions"),
         (name = "Governance - NHI Requests", description = "Governance NHI access request workflow"),
         (name = "Governance - NHI Risk", description = "Governance NHI risk scoring and batch calculation"),
-        (name = "Governance - NHI Usage", description = "Governance NHI usage tracking and summary")
+        (name = "Governance - NHI Usage", description = "Governance NHI usage tracking and summary"),
+        // GDPR Data Protection (F200)
+        (name = "Governance - GDPR", description = "GDPR data protection compliance reporting and per-user data protection summaries"),
+        // Role Inducements (F196)
+        (name = "Governance - Role Inducements", description = "Role inducement management — automatic role grants when a parent role is assigned"),
+        // SAML Single Logout (SLO)
+        (name = "SAML SLO", description = "SAML Single Logout — SP-initiated and IdP-initiated SLO"),
+        // OIDC End Session
+        (name = "OIDC", description = "OpenID Connect RP-Initiated Logout (end session)")
     ),
     paths(
         // Health
@@ -321,6 +329,8 @@ impl Modify for SecurityAddon {
         xavyo_api_oauth::handlers::discovery::discovery_handler,
         xavyo_api_oauth::handlers::discovery::jwks_handler,
         xavyo_api_oauth::handlers::userinfo::userinfo_handler,
+        // OIDC End Session (RP-Initiated Logout)
+        xavyo_api_oauth::handlers::logout::end_session_handler,
         // OAuth2 Device Code (RFC 8628)
         xavyo_api_oauth::handlers::device::device_authorization_handler,
         // OAuth2 Admin
@@ -373,6 +383,9 @@ impl Modify for SecurityAddon {
         xavyo_api_saml::handlers::admin::certificates::list_certificates,
         xavyo_api_saml::handlers::admin::certificates::upload_certificate,
         xavyo_api_saml::handlers::admin::certificates::activate_certificate,
+        // SAML SLO
+        xavyo_api_saml::handlers::slo::slo_post,
+        xavyo_api_saml::handlers::slo::slo_initiate,
         // SCIM
         xavyo_api_scim::handlers::users::list_users,
         xavyo_api_scim::handlers::users::create_user,
@@ -407,6 +420,9 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::handlers::entitlements::create_entitlement,
         xavyo_api_governance::handlers::entitlements::update_entitlement,
         xavyo_api_governance::handlers::entitlements::delete_entitlement,
+        // Governance - GDPR Data Protection (F200)
+        xavyo_api_governance::handlers::entitlements::gdpr_report,
+        xavyo_api_governance::handlers::entitlements::user_data_protection,
         // Governance - Assignments (F033)
         xavyo_api_governance::handlers::assignments::list_assignments,
         xavyo_api_governance::handlers::assignments::get_assignment,
@@ -555,6 +571,14 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::handlers::role_inheritance_blocks::list_inheritance_blocks,
         xavyo_api_governance::handlers::role_inheritance_blocks::add_inheritance_block,
         xavyo_api_governance::handlers::role_inheritance_blocks::remove_inheritance_block,
+        // Governance - Role Inducements (F196)
+        xavyo_api_governance::handlers::role_inducements::list_role_inducements,
+        xavyo_api_governance::handlers::role_inducements::get_role_inducement,
+        xavyo_api_governance::handlers::role_inducements::create_role_inducement,
+        xavyo_api_governance::handlers::role_inducements::delete_role_inducement,
+        xavyo_api_governance::handlers::role_inducements::enable_role_inducement,
+        xavyo_api_governance::handlers::role_inducements::disable_role_inducement,
+        xavyo_api_governance::handlers::role_inducements::get_induced_roles,
         // Governance - Lifecycle Events (F037)
         xavyo_api_governance::handlers::lifecycle_events::list_events,
         xavyo_api_governance::handlers::lifecycle_events::get_event,
@@ -1572,6 +1596,10 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::models::EntitlementListResponse,
         xavyo_api_governance::models::CreateEntitlementRequest,
         xavyo_api_governance::models::UpdateEntitlementRequest,
+        // GDPR Data Protection schemas
+        xavyo_api_governance::models::GdprReport,
+        xavyo_api_governance::models::ClassifiedEntitlementDetail,
+        xavyo_api_governance::models::UserDataProtectionSummary,
         xavyo_api_governance::models::SetOwnerRequest,
         xavyo_api_governance::models::AssignmentResponse,
         xavyo_api_governance::models::AssignmentListResponse,
@@ -2525,6 +2553,11 @@ impl Modify for SecurityAddon {
         xavyo_api_governance::handlers::role_inheritance_blocks::AddInheritanceBlockRequest,
         xavyo_api_governance::handlers::role_inheritance_blocks::InheritanceBlockDetailsResponse,
         xavyo_api_governance::handlers::role_inheritance_blocks::InheritanceBlockResponse,
+        // Role Inducement schemas
+        xavyo_api_governance::models::role_inducement::CreateInducementRequest,
+        xavyo_api_governance::models::role_inducement::InducementResponse,
+        xavyo_api_governance::models::role_inducement::InducementListResponse,
+        xavyo_api_governance::models::role_inducement::InducedRoleInfoResponse,
         xavyo_api_governance::handlers::script_testing::RawDryRunRequest,
         xavyo_api_governance::handlers::ticketing_webhook::SingleTicketSyncResponse,
         xavyo_api_governance::handlers::ticketing_webhook::TicketSyncResponse,

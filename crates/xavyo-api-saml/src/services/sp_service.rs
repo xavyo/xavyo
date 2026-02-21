@@ -29,7 +29,8 @@ impl SpService {
                    validate_signatures, assertion_validity_seconds, enabled,
                    metadata_url, created_at, updated_at,
                    group_attribute_name, group_value_format, group_filter,
-                   include_groups, omit_empty_groups, group_dn_base
+                   include_groups, omit_empty_groups, group_dn_base,
+                   slo_url, slo_binding
             FROM saml_service_providers
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -54,7 +55,8 @@ impl SpService {
                    validate_signatures, assertion_validity_seconds, enabled,
                    metadata_url, created_at, updated_at,
                    group_attribute_name, group_value_format, group_filter,
-                   include_groups, omit_empty_groups, group_dn_base
+                   include_groups, omit_empty_groups, group_dn_base,
+                   slo_url, slo_binding
             FROM saml_service_providers
             WHERE entity_id = $1 AND tenant_id = $2
             ",
@@ -85,7 +87,8 @@ impl SpService {
                        validate_signatures, assertion_validity_seconds, enabled,
                        metadata_url, created_at, updated_at,
                        group_attribute_name, group_value_format, group_filter,
-                       include_groups, omit_empty_groups, group_dn_base
+                       include_groups, omit_empty_groups, group_dn_base,
+                       slo_url, slo_binding
                 FROM saml_service_providers
                 WHERE tenant_id = $1 AND enabled = $2
                 ORDER BY name ASC
@@ -106,7 +109,8 @@ impl SpService {
                        validate_signatures, assertion_validity_seconds, enabled,
                        metadata_url, created_at, updated_at,
                        group_attribute_name, group_value_format, group_filter,
-                       include_groups, omit_empty_groups, group_dn_base
+                       include_groups, omit_empty_groups, group_dn_base,
+                       slo_url, slo_binding
                 FROM saml_service_providers
                 WHERE tenant_id = $1
                 ORDER BY name ASC
@@ -213,6 +217,34 @@ impl SpService {
             }
         }
 
+        // SECURITY: Validate SLO URL if provided (must be HTTPS or localhost)
+        if let Some(ref slo_url) = req.slo_url {
+            if !slo_url.is_empty() {
+                if let Ok(parsed) = url::Url::parse(slo_url) {
+                    let scheme = parsed.scheme();
+                    let host = parsed.host_str().unwrap_or("");
+                    if scheme == "http"
+                        && host != "localhost"
+                        && host != "127.0.0.1"
+                        && host != "[::1]"
+                    {
+                        return Err(SamlError::InvalidAuthnRequest(
+                            "SLO URL must use HTTPS (HTTP only for localhost)".to_string(),
+                        ));
+                    }
+                    if scheme != "http" && scheme != "https" {
+                        return Err(SamlError::InvalidAuthnRequest(format!(
+                            "SLO URL must use HTTPS, got scheme: {scheme}"
+                        )));
+                    }
+                } else {
+                    return Err(SamlError::InvalidAuthnRequest(
+                        "Invalid SLO URL format".to_string(),
+                    ));
+                }
+            }
+        }
+
         // SECURITY (H10): Cap assertion_validity_seconds to prevent excessively long-lived assertions.
         // Max 24 hours (86400s). Values <= 0 are also rejected.
         if req.assertion_validity_seconds <= 0 || req.assertion_validity_seconds > 86400 {
@@ -229,14 +261,15 @@ impl SpService {
             INSERT INTO saml_service_providers
                 (tenant_id, entity_id, name, acs_urls, certificate, attribute_mapping,
                  name_id_format, sign_assertions, validate_signatures,
-                 assertion_validity_seconds, metadata_url)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                 assertion_validity_seconds, metadata_url, slo_url, slo_binding)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING id, tenant_id, entity_id, name, acs_urls, certificate,
                       attribute_mapping, name_id_format, sign_assertions,
                       validate_signatures, assertion_validity_seconds, enabled,
                       metadata_url, created_at, updated_at,
                       group_attribute_name, group_value_format, group_filter,
-                      include_groups, omit_empty_groups, group_dn_base
+                      include_groups, omit_empty_groups, group_dn_base,
+                      slo_url, slo_binding
             ",
         )
         .bind(tenant_id)
@@ -250,6 +283,8 @@ impl SpService {
         .bind(req.validate_signatures)
         .bind(req.assertion_validity_seconds)
         .bind(&req.metadata_url)
+        .bind(&req.slo_url)
+        .bind(&req.slo_binding)
         .fetch_one(&self.pool)
         .await?;
 
@@ -325,19 +360,52 @@ impl SpService {
         let enabled = req.enabled.unwrap_or(existing.enabled);
         let metadata_url = req.metadata_url.or(existing.metadata_url);
 
+        // SECURITY: Validate SLO URL if provided (must be HTTPS or localhost)
+        if let Some(ref slo_url) = req.slo_url {
+            if !slo_url.is_empty() {
+                if let Ok(parsed) = url::Url::parse(slo_url) {
+                    let scheme = parsed.scheme();
+                    let host = parsed.host_str().unwrap_or("");
+                    if scheme == "http"
+                        && host != "localhost"
+                        && host != "127.0.0.1"
+                        && host != "[::1]"
+                    {
+                        return Err(SamlError::InvalidAuthnRequest(
+                            "SLO URL must use HTTPS (HTTP only for localhost)".to_string(),
+                        ));
+                    }
+                    if scheme != "http" && scheme != "https" {
+                        return Err(SamlError::InvalidAuthnRequest(format!(
+                            "SLO URL must use HTTPS, got scheme: {scheme}"
+                        )));
+                    }
+                } else {
+                    return Err(SamlError::InvalidAuthnRequest(
+                        "Invalid SLO URL format".to_string(),
+                    ));
+                }
+            }
+        }
+
+        let slo_url = req.slo_url.or(existing.slo_url);
+        let slo_binding = req.slo_binding.unwrap_or(existing.slo_binding);
+
         let sp = sqlx::query_as::<_, SamlServiceProvider>(
             r"
             UPDATE saml_service_providers
             SET name = $3, acs_urls = $4, certificate = $5, attribute_mapping = $6,
                 name_id_format = $7, sign_assertions = $8, validate_signatures = $9,
-                assertion_validity_seconds = $10, enabled = $11, metadata_url = $12
+                assertion_validity_seconds = $10, enabled = $11, metadata_url = $12,
+                slo_url = $13, slo_binding = $14
             WHERE id = $1 AND tenant_id = $2
             RETURNING id, tenant_id, entity_id, name, acs_urls, certificate,
                       attribute_mapping, name_id_format, sign_assertions,
                       validate_signatures, assertion_validity_seconds, enabled,
                       metadata_url, created_at, updated_at,
                       group_attribute_name, group_value_format, group_filter,
-                      include_groups, omit_empty_groups, group_dn_base
+                      include_groups, omit_empty_groups, group_dn_base,
+                      slo_url, slo_binding
             ",
         )
         .bind(sp_id)
@@ -352,6 +420,8 @@ impl SpService {
         .bind(assertion_validity_seconds)
         .bind(enabled)
         .bind(&metadata_url)
+        .bind(&slo_url)
+        .bind(&slo_binding)
         .fetch_one(&self.pool)
         .await?;
 

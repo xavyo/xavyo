@@ -42,6 +42,12 @@ pub struct SamlServiceProvider {
     /// Base DN for DN format
     #[serde(default)]
     pub group_dn_base: Option<String>,
+    /// Single Logout URL for this SP
+    #[serde(default)]
+    pub slo_url: Option<String>,
+    /// Single Logout binding (default: HTTP-POST)
+    #[serde(default = "default_slo_binding")]
+    pub slo_binding: String,
 }
 
 /// Request to create a new Service Provider
@@ -65,6 +71,10 @@ pub struct CreateServiceProviderRequest {
     pub assertion_validity_seconds: i32,
     #[serde(default)]
     pub metadata_url: Option<String>,
+    #[serde(default)]
+    pub slo_url: Option<String>,
+    #[serde(default = "default_slo_binding")]
+    pub slo_binding: String,
 }
 
 /// Request to update a Service Provider
@@ -81,6 +91,8 @@ pub struct UpdateServiceProviderRequest {
     pub assertion_validity_seconds: Option<i32>,
     pub enabled: Option<bool>,
     pub metadata_url: Option<String>,
+    pub slo_url: Option<String>,
+    pub slo_binding: Option<String>,
 }
 
 /// Attribute mapping configuration
@@ -119,6 +131,10 @@ fn default_true() -> bool {
 
 fn default_assertion_validity() -> i32 {
     300
+}
+
+fn default_slo_binding() -> String {
+    "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST".to_string()
 }
 
 fn default_name_id_source() -> String {

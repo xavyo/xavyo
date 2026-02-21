@@ -57,6 +57,9 @@ pub struct CreateClientRequest {
     /// When set, client_credentials tokens use this NHI ID as the JWT subject.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nhi_id: Option<Uuid>,
+    /// Allowed post-logout redirect URIs (OIDC RP-Initiated Logout).
+    #[serde(default)]
+    pub post_logout_redirect_uris: Vec<String>,
 }
 
 /// Request to update an `OAuth2` client.
@@ -76,6 +79,8 @@ pub struct UpdateClientRequest {
     pub logo_url: Option<String>,
     /// Client description (shown on consent page).
     pub description: Option<String>,
+    /// Allowed post-logout redirect URIs (OIDC RP-Initiated Logout).
+    pub post_logout_redirect_uris: Option<Vec<String>>,
 }
 
 /// `OAuth2` client response.
@@ -104,6 +109,8 @@ pub struct ClientResponse {
     /// Bound NHI identity (if any).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nhi_id: Option<Uuid>,
+    /// Allowed post-logout redirect URIs (OIDC RP-Initiated Logout).
+    pub post_logout_redirect_uris: Vec<String>,
     /// Creation timestamp.
     pub created_at: DateTime<Utc>,
     /// Last update timestamp.

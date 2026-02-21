@@ -18,6 +18,12 @@ pub mod session;
 
 pub use error::{SamlError, SamlResult};
 pub use handlers::metadata::SamlState;
+pub use handlers::slo::{slo_initiate, slo_post};
 #[allow(deprecated)]
 pub use router::{create_saml_state, saml_admin_router, saml_public_router, saml_router};
-pub use session::{AuthnRequestSession, InMemorySessionStore, PostgresSessionStore, SessionStore};
+pub use services::assertion_builder::SamlResponseOutput;
+pub use services::slo_builder::SloBuilder;
+pub use session::{
+    AuthnRequestSession, InMemorySessionStore, InMemorySpSessionStore, PostgresSessionStore,
+    PostgresSpSessionStore, SessionStore, SpSession, SpSessionStore,
+};

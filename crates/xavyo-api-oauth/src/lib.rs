@@ -52,6 +52,7 @@ pub mod services;
 pub mod utils;
 
 pub use error::OAuthError;
+pub use handlers::end_session_handler;
 pub use middleware::{
     clear_session_cookie, create_session_cookie, extract_session_cookie, set_session_cookie,
     SESSION_COOKIE_MAX_AGE, SESSION_COOKIE_NAME,

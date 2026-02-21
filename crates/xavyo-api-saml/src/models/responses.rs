@@ -56,6 +56,8 @@ pub struct ServiceProviderResponse {
     pub assertion_validity_seconds: i32,
     pub enabled: bool,
     pub metadata_url: Option<String>,
+    pub slo_url: Option<String>,
+    pub slo_binding: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -75,6 +77,8 @@ impl From<xavyo_db::models::SamlServiceProvider> for ServiceProviderResponse {
             assertion_validity_seconds: sp.assertion_validity_seconds,
             enabled: sp.enabled,
             metadata_url: sp.metadata_url,
+            slo_url: sp.slo_url,
+            slo_binding: sp.slo_binding,
             created_at: sp.created_at,
             updated_at: sp.updated_at,
         }

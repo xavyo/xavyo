@@ -9,6 +9,7 @@ pub mod device;
 pub mod device_login;
 pub mod discovery;
 pub mod introspection;
+pub mod logout;
 pub mod revocation;
 pub mod token;
 pub mod userinfo;
@@ -39,6 +40,7 @@ pub use device_login::{
 };
 pub use discovery::{discovery_handler, jwks_handler};
 pub use introspection::introspect_token_handler;
+pub use logout::end_session_handler;
 pub use revocation::revoke_token_handler;
 pub use token::token_handler;
 pub use userinfo::userinfo_handler;

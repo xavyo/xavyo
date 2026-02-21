@@ -837,6 +837,11 @@ async fn main() {
             axum::routing::get(xavyo_api_saml::handlers::sso::sso_redirect)
                 .post(xavyo_api_saml::handlers::sso::sso_post),
         )
+        // SAML SLO endpoint (SP-initiated logout — no auth required)
+        .route(
+            "/saml/slo",
+            axum::routing::post(xavyo_api_saml::handlers::slo::slo_post),
+        )
         .with_state(saml_state.clone())
         .layer(axum::Extension(None::<xavyo_db::models::User>))
         .layer(TenantLayer::with_config(
@@ -845,11 +850,15 @@ async fn main() {
                 .build(),
         ));
 
-    // SAML authenticated route (initiate SSO) - requires authenticated user
+    // SAML authenticated routes (initiate SSO + IdP-initiated SLO) - require authenticated user
     let saml_authenticated_routes = Router::new()
         .route(
             "/saml/initiate/:sp_id",
             axum::routing::post(xavyo_api_saml::handlers::initiate_sso),
+        )
+        .route(
+            "/saml/slo/initiate",
+            axum::routing::post(xavyo_api_saml::handlers::slo::slo_initiate),
         )
         .with_state(saml_state.clone())
         .layer(axum::middleware::from_fn(jwt_auth_middleware))

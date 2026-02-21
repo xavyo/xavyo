@@ -101,6 +101,18 @@ pub enum SamlError {
     /// Internal error
     #[error("Internal error: {0}")]
     InternalError(String),
+
+    /// Invalid or malformed `LogoutRequest`
+    #[error("Invalid LogoutRequest: {0}")]
+    InvalidLogoutRequest(String),
+
+    /// SLO delivery failed to one or more SPs
+    #[error("SLO delivery failed: {0}")]
+    SloDeliveryFailed(String),
+
+    /// SP session tracking error
+    #[error("SP session error: {0}")]
+    SpSessionError(String),
 }
 
 /// Error response body
@@ -204,6 +216,19 @@ impl IntoResponse for SamlError {
             SamlError::InvalidAttributeMapping(_) => {
                 (StatusCode::BAD_REQUEST, "invalid_attribute_mapping", None)
             }
+            SamlError::InvalidLogoutRequest(_) => (
+                StatusCode::BAD_REQUEST,
+                "invalid_logout_request",
+                Some("urn:oasis:names:tc:SAML:2.0:status:Requester"),
+            ),
+            SamlError::SloDeliveryFailed(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "slo_delivery_failed",
+                Some("urn:oasis:names:tc:SAML:2.0:status:Responder"),
+            ),
+            SamlError::SpSessionError(_) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "sp_session_error", None)
+            }
             SamlError::DatabaseError(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "database_error", None)
             }
@@ -263,7 +288,16 @@ impl IntoResponse for SamlError {
             | SamlError::EntityIdConflict(_)
             | SamlError::ServiceProviderNotFound(_)
             | SamlError::CertificateNotFound(_)
-            | SamlError::InvalidCertificate(_) => self.to_string(),
+            | SamlError::InvalidCertificate(_)
+            | SamlError::InvalidLogoutRequest(_) => self.to_string(),
+            SamlError::SloDeliveryFailed(msg) => {
+                tracing::error!("SLO delivery failed: {}", msg);
+                "SLO delivery failed".to_string()
+            }
+            SamlError::SpSessionError(msg) => {
+                tracing::error!("SP session error: {}", msg);
+                "SP session error occurred".to_string()
+            }
         };
 
         let body = ErrorResponse {

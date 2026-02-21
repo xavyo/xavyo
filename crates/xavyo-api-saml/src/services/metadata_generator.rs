@@ -10,6 +10,7 @@ pub struct MetadataGenerator {
     entity_id: String,
     sso_url: String,
     credentials: Option<SigningCredentials>,
+    slo_url: Option<String>,
 }
 
 impl MetadataGenerator {
@@ -19,11 +20,13 @@ impl MetadataGenerator {
         entity_id: String,
         sso_url: String,
         credentials: Option<SigningCredentials>,
+        slo_url: Option<String>,
     ) -> Self {
         Self {
             entity_id,
             sso_url,
             credentials,
+            slo_url,
         }
     }
 
@@ -57,7 +60,7 @@ impl MetadataGenerator {
         <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
             Location="{sso_url}"/>
         <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
-            Location="{sso_url}"/>
+            Location="{sso_url}"/>{slo_element}
     </md:IDPSSODescriptor>
 </md:EntityDescriptor>"#,
             entity_id = xml_escape(&self.entity_id),
@@ -66,6 +69,10 @@ impl MetadataGenerator {
             persistent_format = NAMEID_FORMAT_PERSISTENT,
             transient_format = NAMEID_FORMAT_TRANSIENT,
             sso_url = xml_escape(&self.sso_url),
+            slo_element = self.slo_url.as_ref().map(|url| format!(
+                "\n        <md:SingleLogoutService Binding=\"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST\"\n            Location=\"{}\"/>",
+                xml_escape(url)
+            )).unwrap_or_default(),
         );
 
         Ok(xml)
@@ -91,6 +98,7 @@ mod tests {
             "https://idp.example.com".to_string(),
             "https://idp.example.com/saml/sso".to_string(),
             None,
+            Some("https://idp.example.com/saml/slo".to_string()),
         );
 
         let xml = generator.generate().unwrap();

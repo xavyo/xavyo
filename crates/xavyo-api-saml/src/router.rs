@@ -7,7 +7,7 @@ use crate::handlers::{
         get_service_provider, list_certificates, list_service_providers, update_service_provider,
         upload_certificate,
     },
-    get_metadata, initiate_sso, sso_post, sso_redirect,
+    get_metadata, initiate_sso, slo_initiate, slo_post, sso_post, sso_redirect,
 };
 use axum::{
     routing::{get, post},
@@ -21,8 +21,12 @@ pub fn saml_public_router(state: SamlState) -> Router {
         // Public SAML endpoints
         .route("/saml/metadata", get(get_metadata))
         .route("/saml/sso", get(sso_redirect).post(sso_post))
+        // SLO endpoint (SP-initiated logout)
+        .route("/saml/slo", post(slo_post))
         // IdP-initiated SSO (requires auth - handled by calling code)
         .route("/saml/initiate/:sp_id", post(initiate_sso))
+        // IdP-initiated SLO (requires auth - handled by calling code)
+        .route("/saml/slo/initiate", post(slo_initiate))
         .with_state(state)
 }
 
@@ -95,10 +99,13 @@ pub fn create_saml_state(
 ) -> SamlState {
     let session_store =
         std::sync::Arc::new(crate::session::PostgresSessionStore::new(pool.clone()));
+    let sp_session_store =
+        std::sync::Arc::new(crate::session::PostgresSpSessionStore::new(pool.clone()));
     SamlState {
         pool,
         base_url,
         encryption_key: std::sync::Arc::new(encryption_key),
         session_store,
+        sp_session_store,
     }
 }

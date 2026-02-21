@@ -18,9 +18,10 @@ use crate::handlers::{
     device_authorization_handler, device_authorize_handler, device_confirm_handler,
     device_login_handler, device_login_page_handler, device_mfa_handler, device_mfa_page_handler,
     device_resend_confirmation_handler, device_verification_page_handler,
-    device_verify_code_handler, discovery_handler, get_client_handler, introspect_token_handler,
-    jwks_handler, list_active_sessions_handler, list_clients_handler, regenerate_secret_handler,
-    revoke_token_handler, token_handler, update_client_handler, userinfo_handler,
+    device_verify_code_handler, discovery_handler, end_session_handler, get_client_handler,
+    introspect_token_handler, jwks_handler, list_active_sessions_handler, list_clients_handler,
+    regenerate_secret_handler, revoke_token_handler, token_handler, update_client_handler,
+    userinfo_handler,
 };
 use crate::services::{
     AuthorizationService, DeviceConfirmationService, DeviceRiskService, OAuth2ClientService,
@@ -307,6 +308,11 @@ pub fn oauth_router(state: OAuthState) -> Router {
         .route("/introspect", post(introspect_token_handler))
         // F096: RFC 8628 Device Authorization endpoint
         .route("/device/code", post(device_authorization_handler))
+        // OIDC RP-Initiated Logout 1.0
+        .route(
+            "/logout",
+            get(end_session_handler).post(end_session_handler),
+        )
         .with_state(state)
 }
 

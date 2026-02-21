@@ -230,7 +230,7 @@ pub async fn create_cli_oauth_client(pool: &PgPool) -> Result<bool, BootstrapErr
             NOW(),
             NOW()
         )
-        ON CONFLICT (client_id) DO NOTHING
+        ON CONFLICT (tenant_id, client_id) DO NOTHING
         ",
     )
     .bind(CLI_OAUTH_CLIENT_UUID)

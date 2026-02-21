@@ -75,6 +75,10 @@ pub struct IdTokenClaims {
     /// Access token hash (for hybrid flows).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub at_hash: Option<String>,
+
+    /// Session ID (OIDC RP-Initiated Logout).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sid: Option<String>,
 }
 
 impl IdTokenClaims {
@@ -97,6 +101,7 @@ pub struct IdTokenClaimsBuilder {
     nonce: Option<String>,
     tid: Option<Uuid>,
     at_hash: Option<String>,
+    sid: Option<String>,
 }
 
 impl IdTokenClaimsBuilder {
@@ -156,6 +161,13 @@ impl IdTokenClaimsBuilder {
         self
     }
 
+    /// Set the session ID (OIDC RP-Initiated Logout).
+    #[must_use]
+    pub fn sid(mut self, sid: impl Into<String>) -> Self {
+        self.sid = Some(sid.into());
+        self
+    }
+
     /// Build the ID token claims.
     #[must_use]
     pub fn build(self) -> IdTokenClaims {
@@ -171,6 +183,7 @@ impl IdTokenClaimsBuilder {
             nonce: self.nonce,
             tid: self.tid,
             at_hash: self.at_hash,
+            sid: self.sid,
         }
     }
 }

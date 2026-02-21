@@ -395,6 +395,7 @@ pub async fn provision_agent(
                 request.name
             )),
             nhi_id: Some(nhi_id),
+            post_logout_redirect_uris: vec![],
         };
 
         match state

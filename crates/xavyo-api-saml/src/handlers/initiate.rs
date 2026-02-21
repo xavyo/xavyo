@@ -150,13 +150,39 @@ async fn initiate_sso_inner(
 
     // Build unsolicited SAML Response
     let builder = AssertionBuilder::new(idp_entity_id, credentials);
-    let saml_response = builder.build_unsolicited_response(&sp, &user_attrs, None)?;
+    let output = builder.build_unsolicited_response(&sp, &user_attrs, None)?;
 
     // Get ACS URL (use first configured)
     let acs_url = sp
         .acs_urls
         .first()
         .ok_or_else(|| SamlError::AssertionGenerationFailed("No ACS URL configured".to_string()))?;
+
+    // Record SP session for SLO tracking
+    let sp_session = crate::session::SpSession {
+        id: uuid::Uuid::new_v4(),
+        tenant_id,
+        user_id: user.id,
+        sp_id: sp.id,
+        session_index: output.session_index.clone(),
+        name_id: output.name_id.clone(),
+        name_id_format: output.name_id_format.clone(),
+        created_at: chrono::Utc::now(),
+        // SP session lasts longer than the assertion — use the larger of 8 hours
+        // or assertion_validity_seconds to ensure SLO can reach the session.
+        expires_at: chrono::Utc::now()
+            + chrono::Duration::seconds(i64::from(sp.assertion_validity_seconds).max(28800)),
+        revoked_at: None,
+    };
+    if let Err(e) = state.sp_session_store.record(sp_session).await {
+        tracing::warn!(
+            tenant_id = %tenant_id,
+            user_id = %user.id,
+            sp_id = %sp.id,
+            error = %e,
+            "Failed to record SP session for SLO (non-fatal)"
+        );
+    }
 
     tracing::info!(
         tenant_id = %tenant_id,
@@ -167,7 +193,7 @@ async fn initiate_sso_inner(
     );
 
     // Return auto-submit form
-    let html = generate_auto_submit_form(acs_url, &saml_response, relay_state);
+    let html = generate_auto_submit_form(acs_url, &output.encoded_response, relay_state);
 
     Ok(Html(html).into_response())
 }
