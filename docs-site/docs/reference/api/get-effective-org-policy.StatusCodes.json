@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Effective policy retrieved","content":{"application/json":{"schema":{"type":"object","properties":{"config":{"type":"object"},"source":{"type":"object"}},"required":["config","source"],"title":"EffectiveOrgPolicyResponse"}}}},"401":{"description":"Unauthorized"},"404":{"description":"Organization not found"}}}

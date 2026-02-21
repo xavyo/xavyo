@@ -34,11 +34,49 @@ Traditional identity governance tools have no framework for managing identities 
 
 ## xavyo's NHI Model
 
+### Unified Data Model
+
+xavyo uses a unified data model for all NHI types. The `nhi_identities` base table stores common attributes (name, description, type, lifecycle state, owner, risk level), while type-specific extension tables (`nhi_agents`, `nhi_tools`, `nhi_service_accounts`) store attributes unique to each type.
+
+```mermaid
+erDiagram
+    nhi_identities ||--o| nhi_agents : "extends"
+    nhi_identities ||--o| nhi_tools : "extends"
+    nhi_identities ||--o| nhi_service_accounts : "extends"
+    nhi_identities {
+        uuid id PK
+        uuid tenant_id
+        text nhi_type
+        text name
+        text description
+        text lifecycle_state
+        uuid owner_id FK
+        uuid backup_owner_id FK
+        text risk_level
+    }
+    nhi_agents {
+        uuid nhi_id FK
+        text agent_type
+    }
+    nhi_tools {
+        uuid nhi_id FK
+        text mcp_server_url
+    }
+    nhi_service_accounts {
+        uuid nhi_id FK
+        text purpose
+    }
+```
+
+This model enables unified operations (list all NHIs, search across types, apply lifecycle transitions) while preserving type-specific attributes.
+
+### NHI Types
+
 xavyo organizes NHIs into three categories, each with tailored management capabilities:
 
-### Agents
+#### Agents
 
-An **agent** is an AI system or automated process with autonomous decision-making capabilities. Agents are registered with:
+An **agent** is an AI system or automated process with autonomous decision-making capabilities:
 
 ```bash
 curl -s -X POST "$API/nhi/agents" \
@@ -59,9 +97,10 @@ Agent attributes:
 - **Agent type** -- classification of the agent's operational model (autonomous, supervised, tool-calling)
 - **Risk level** -- low, medium, high, or critical -- determines the governance rigor applied
 - **Owner** -- a human user accountable for the agent's behavior
+- **Backup owner** -- a secondary owner for continuity (must differ from primary owner)
 - **Description** -- purpose and scope documentation
 
-### Service Accounts
+#### Service Accounts
 
 A **service account** is a machine identity used for predictable, application-to-application communication:
 
@@ -73,13 +112,14 @@ curl -s -X POST "$API/nhi/service-accounts" \
   -d '{
     "name": "billing-service-prod",
     "description": "Production billing microservice",
+    "purpose": "Process monthly billing invoices",
     "owner_id": "human-owner-user-id"
   }'
 ```
 
-Service accounts carry the same lifecycle states as human users (active, suspended, deactivated) but with workflows tailored to machine identity patterns.
+Service accounts carry dedicated lifecycle states with workflows tailored to machine identity patterns.
 
-### Tools
+#### Tools
 
 A **tool** is a capability or API endpoint that agents can be authorized to invoke:
 
@@ -95,7 +135,76 @@ curl -s -X POST "$API/nhi/tools" \
   }'
 ```
 
-Tool permissions are explicitly granted to agents, creating an auditable record of what capabilities each agent has.
+Tool permissions are explicitly granted to agents, creating an auditable record of what capabilities each agent has. Tools can also be discovered and imported automatically through MCP Discovery (see below).
+
+### Unified Operations
+
+All NHI types can be managed through a unified API alongside the type-specific endpoints:
+
+```bash
+# List all NHIs across types
+curl -s "$API/nhi" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Get any NHI by ID (regardless of type)
+curl -s "$API/nhi/$NHI_ID" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+```
+
+## NHI Lifecycle States
+
+Every NHI follows a lifecycle state machine with five states:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Active : Create
+    Active --> Suspended : Suspend
+    Suspended --> Active : Reactivate
+    Active --> Deprecated : Deprecate
+    Deprecated --> Archived : Archive
+    Deprecated --> Active : Reactivate
+    Active --> Inactive : Deactivate
+    Inactive --> Active : Activate
+    Inactive --> Archived : Archive
+    Suspended --> Archived : Archive
+    Archived --> [*] : Delete
+```
+
+| State | Description | Authentication |
+|---|---|---|
+| **Active** | Operational, can authenticate and perform actions | Allowed |
+| **Inactive** | Disabled, not currently in use | Blocked |
+| **Suspended** | Temporarily disabled pending investigation or review | Blocked |
+| **Deprecated** | Scheduled for retirement, still functional but flagged | Allowed (with warnings) |
+| **Archived** | Retained for audit compliance, no operational function | Blocked |
+
+Lifecycle transitions are managed through dedicated endpoints:
+
+```bash
+# Suspend an NHI
+curl -s -X POST "$API/nhi/$NHI_ID/suspend" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Reactivate a suspended NHI
+curl -s -X POST "$API/nhi/$NHI_ID/reactivate" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Deprecate an NHI (signal intent to retire)
+curl -s -X POST "$API/nhi/$NHI_ID/deprecate" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Archive an NHI (retain for audit, no operation)
+curl -s -X POST "$API/nhi/$NHI_ID/archive" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+```
+
+Lifecycle transitions require appropriate permissions -- non-admin users need explicit `manage` or `admin` permissions on the NHI (see User-to-NHI Permissions below).
 
 ## Credential Lifecycle
 
@@ -106,113 +215,75 @@ xavyo supports multiple credential types for NHIs:
 - **Client credentials** -- OAuth2 client ID and secret pairs
 - **Certificates** -- X.509 certificates for mTLS authentication
 
-### Credential Rotation
+### Secret Management (Vault)
 
-Credentials can be rotated manually or on a configurable schedule:
+Secrets for NHIs are managed through the built-in vault, which provides encrypted storage, lease-based access, and rotation:
 
 ```bash
-curl -s -X POST "$API/nhi/agents/$AGENT_ID/credentials/rotate" \
+# Store a secret for an NHI
+curl -s -X POST "$API/nhi/$NHI_ID/vault/secrets" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT" \
   -d '{
-    "credential_type": "api_key",
     "name": "deploy-key-v3",
-    "grace_period_hours": 24
+    "secret_type": "api_key",
+    "secret_value": "your-secret-value"
   }'
+
+# Rotate a secret
+curl -s -X POST "$API/nhi/$NHI_ID/vault/secrets/$SECRET_ID/rotate" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{"new_value": "rotated-secret-value"}'
+
+# Delete a secret
+curl -s -X DELETE "$API/nhi/$NHI_ID/vault/secrets/$SECRET_ID" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
 ```
 
-The rotation process:
+The vault also supports time-limited **leases** for secret access, ensuring that consumers only have access for the duration they need.
 
-```mermaid
-sequenceDiagram
-    participant Admin
-    participant xavyo
-    participant NHI as Agent / Service
+## Inactivity Detection
 
-    Admin->>xavyo: Rotate credentials (grace_period=24h)
-    xavyo->>xavyo: Generate new credential
-    xavyo->>Admin: Return new credential value
-    Note over xavyo: Both old and new credentials valid for 24h
-    Admin->>NHI: Deploy new credential to agent
-    Note over xavyo: After 24h grace period
-    xavyo->>xavyo: Invalidate old credential
-```
-
-The grace period ensures that credential rotation does not cause service disruption. During the grace period, both the old and new credentials are valid, giving operations teams time to deploy the new credential.
-
-### Credential Revocation
-
-When a credential is compromised, it can be revoked immediately:
+xavyo detects NHIs that may no longer be needed:
 
 ```bash
-curl -s -X POST "$API/nhi/agents/$AGENT_ID/credentials/$CRED_ID/revoke" \
+# Detect inactive NHIs
+curl -s -X POST "$API/nhi/inactivity/detect" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Auto-suspend inactive NHIs
+curl -s -X POST "$API/nhi/inactivity/auto-suspend" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Detect orphaned NHIs (owner deactivated)
+curl -s -X POST "$API/nhi/orphans/detect" \
+  -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT"
 ```
 
-Revocation is immediate -- no grace period. The credential is invalidated and cannot be used for authentication.
-
-### Credential Validation
-
-NHI owners can validate that their credentials are still functional:
-
-```bash
-curl -s -X POST "$API/nhi/agents/$AGENT_ID/credentials/validate" \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT"
-```
-
-## Usage Tracking
-
-xavyo tracks how NHIs are used -- which endpoints they access, how frequently, and from which sources:
-
-```bash
-# View usage for a specific NHI
-curl -s "$API/nhi/agents/$AGENT_ID/usage" \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT"
-
-# View usage summary
-curl -s "$API/nhi/agents/$AGENT_ID/usage/summary" \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT"
-```
-
-Usage data feeds into:
-- **Staleness detection** -- identifying NHIs that have not been used recently
-- **Risk scoring** -- anomalous usage patterns increase the risk score
-- **Certification reviews** -- reviewers see usage data when certifying NHI access
-
-## Staleness Detection
-
-The staleness report identifies NHIs that may no longer be needed:
-
-```bash
-curl -s "$API/nhi/staleness-report" \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT"
-```
-
-The report flags:
-- NHIs that have not authenticated in a configurable period (e.g., 90 days)
-- NHIs with credentials that have not been rotated within the rotation policy
-- NHIs with no active usage in their most recent credential lifetime
-
-Stale NHIs are candidates for suspension or decommissioning. Staleness is also a factor in risk score computation.
+Inactive NHIs are candidates for suspension or decommissioning. Inactivity is also a factor in risk score computation.
 
 ## NHI Risk Scoring
 
 Each NHI receives a risk score based on multiple factors:
 
 ```bash
-# View risk score
-curl -s "$API/nhi/agents/$AGENT_ID/risk" \
+# View risk score for any NHI
+curl -s "$API/nhi/$NHI_ID/risk" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT"
 
-# Trigger risk recalculation
-curl -s -X POST "$API/nhi/agents/$AGENT_ID/risk/calculate" \
+# View risk summary across all NHIs
+curl -s "$API/nhi/risk-summary" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT"
 ```
@@ -231,58 +302,40 @@ Risk scores can trigger enforcement policies:
 
 ## Agent-Specific Capabilities
 
-### Behavioral Baselines
-
-xavyo learns a behavioral baseline for each agent -- the normal pattern of tool invocations, access frequencies, and resource usage:
-
-```bash
-curl -s "$API/nhi/agents/$AGENT_ID/baseline" \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT"
-```
-
-### Anomaly Detection
-
-When an agent's behavior deviates from its baseline, anomalies are recorded:
-
-```bash
-curl -s "$API/nhi/agents/$AGENT_ID/anomalies" \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT"
-```
-
-Anomalies can trigger:
-- Security alerts to the agent's owner
-- Automatic threshold-based responses (warning, suspension)
-- Micro-certifications for immediate review
-
 ### Tool Permissions
 
-Agent access to tools is explicitly managed:
+Agent access to tools is explicitly managed through grant/revoke endpoints:
 
 ```bash
-# Grant tool access
-curl -s -X POST "$API/nhi/agents/$AGENT_ID/permissions" \
+# Grant tool access to an agent
+curl -s -X POST "$API/nhi/agents/$AGENT_ID/tools/$TOOL_ID/grant" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT" \
-  -d '{
-    "tool_id": "tool-github-review",
-    "granted_by": "admin-user-id"
-  }'
+  -H "X-Tenant-ID: $TENANT"
 
-# List agent permissions
-curl -s "$API/nhi/agents/$AGENT_ID/permissions" \
+# List tools granted to an agent
+curl -s "$API/nhi/agents/$AGENT_ID/tools" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Revoke tool access from an agent
+curl -s -X POST "$API/nhi/agents/$AGENT_ID/tools/$TOOL_ID/revoke" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT"
 ```
 
-### Security Assessments
+### Risk Assessment
 
-Periodic security assessments evaluate an agent's overall risk posture:
+Each NHI has a risk score based on multiple factors:
 
 ```bash
-curl -s "$API/nhi/agents/$AGENT_ID/security-assessment" \
+# View risk score for an NHI
+curl -s "$API/nhi/$NHI_ID/risk" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# View aggregated risk summary across all NHIs
+curl -s "$API/nhi/risk-summary" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT"
 ```
@@ -318,39 +371,208 @@ NHIs that are not certified can be automatically suspended.
 
 ## NHI Governance Workflows
 
-### Service Account Requests
+### Service Account Management
 
-Users can request new service accounts through a formal workflow:
-
-```bash
-curl -s -X POST "$API/nhi/service-accounts/requests" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $USER_JWT" \
-  -H "X-Tenant-ID: $TENANT" \
-  -d '{
-    "name": "data-pipeline-staging",
-    "justification": "ETL pipeline for staging environment",
-    "requested_permissions": ["read-database", "write-s3"]
-  }'
-```
-
-Requests flow through approval workflows with the same rigor as human access requests.
-
-### Ownership Transfer
-
-When an NHI owner leaves the organization, ownership must be transferred:
+Service accounts are created directly by administrators:
 
 ```bash
-curl -s -X POST "$API/nhi/service-accounts/$SA_ID/transfer-ownership" \
+curl -s -X POST "$API/nhi/service-accounts" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT" \
   -d '{
-    "new_owner_id": "new-owner-user-id"
+    "name": "data-pipeline-staging",
+    "description": "ETL pipeline for staging environment",
+    "purpose": "Data processing",
+    "owner_id": "owner-user-id"
   }'
 ```
 
-Orphaned NHIs (those whose owner has been deactivated without ownership transfer) are flagged in staleness reports and risk scoring.
+Every service account must have an assigned owner -- a human user accountable for the identity's lifecycle. Orphaned NHIs (those whose owner has been deactivated) are flagged by the orphan detection endpoint.
+
+## User-to-NHI Permissions
+
+xavyo implements a permission model that controls which human users can interact with which NHIs. Permissions follow a hierarchy:
+
+| Permission Level | Capabilities |
+|---|---|
+| **use** | Invoke the NHI, view its status |
+| **manage** | Everything in `use`, plus lifecycle transitions, credential rotation |
+| **admin** | Everything in `manage`, plus delete, permission grants, ownership transfer |
+
+Administrators and super administrators bypass permission checks entirely for backward compatibility.
+
+```bash
+# Grant a user permission to manage an NHI
+curl -s -X POST "$API/nhi/$NHI_ID/users/$USER_ID/grant" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{"permission_level": "manage"}'
+
+# List users with permissions on an NHI
+curl -s "$API/nhi/$NHI_ID/users" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# List NHIs accessible to a user
+curl -s "$API/nhi/users/$USER_ID/accessible" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+```
+
+When a non-admin user lists NHIs, the response is filtered to show only NHIs they have explicit permissions for. This ensures that users see only what they are authorized to access.
+
+## NHI-to-NHI Permissions
+
+NHIs can be authorized to call other NHIs, enabling controlled agent-to-agent and service-to-service communication:
+
+```bash
+# Grant Agent A permission to call Agent B
+curl -s -X POST "$API/nhi/$SOURCE_ID/call/$TARGET_ID/grant" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{"permission_type": "call"}'
+
+# List NHIs that can call a specific NHI
+curl -s "$API/nhi/$NHI_ID/callers" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# List NHIs that a specific NHI can call
+curl -s "$API/nhi/$NHI_ID/callees" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+```
+
+NHI-to-NHI permissions support both `call` and `delegate` types, where delegation allows the target to act on behalf of the source.
+
+## MCP Discovery
+
+The Model Context Protocol (MCP) is a standard for AI agents to discover and invoke tools. xavyo integrates with AgentGateway to provide MCP-based tool discovery and import:
+
+```bash
+# List configured gateways for the tenant
+curl -s "$API/nhi/mcp-discovery/gateways" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Discover available MCP tools from gateways
+curl -s "$API/nhi/mcp-discovery/tools" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Import discovered tools as NHI records
+curl -s -X POST "$API/nhi/mcp-discovery/import" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{"tool_names": ["github-pr-review", "slack-post-message"]}'
+```
+
+MCP Discovery bridges the gap between runtime tool availability and governance -- tools discovered through MCP are automatically registered in xavyo's NHI system, bringing them under lifecycle management, permission control, and certification.
+
+## A2A Protocol
+
+The Agent-to-Agent (A2A) protocol enables asynchronous task management between agents. xavyo implements A2A task endpoints that allow agents to create, monitor, and cancel tasks:
+
+```bash
+# Create an A2A task
+curl -s -X POST "$API/a2a/tasks" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $AGENT_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{
+    "target_agent_id": "target-agent-id",
+    "task_type": "code_review",
+    "input": {"repo": "my-project", "pr_number": 42}
+  }'
+
+# Check task status
+curl -s "$API/a2a/tasks/$TASK_ID" \
+  -H "Authorization: Bearer $AGENT_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Cancel a task
+curl -s -X POST "$API/a2a/tasks/$TASK_ID/cancel" \
+  -H "Authorization: Bearer $AGENT_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+```
+
+A2A tasks are subject to NHI-to-NHI permission checks -- the source agent must have `call` permission on the target agent to create tasks.
+
+## NHI Vault
+
+xavyo includes a built-in secrets vault for NHI credential management. The vault provides encrypted storage, lease-based access, and automatic rotation:
+
+```bash
+# Store a secret for an NHI
+curl -s -X POST "$API/nhi/$NHI_ID/vault/secrets" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{
+    "name": "database-password",
+    "secret_type": "password",
+    "value": "the-secret-value",
+    "rotation_interval_days": 30,
+    "max_lease_duration_secs": 3600,
+    "max_concurrent_leases": 5
+  }'
+
+# Acquire a lease (time-limited access to the secret)
+curl -s -X POST "$API/nhi/$NHI_ID/vault/secrets/$SECRET_ID/lease" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Rotate a secret
+curl -s -X POST "$API/nhi/$NHI_ID/vault/secrets/$SECRET_ID/rotate" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{"value": "new-secret-value"}'
+```
+
+Vault features:
+- **Lease-based access** -- secrets are accessed through time-limited leases, not permanent grants
+- **Concurrent lease limits** -- configurable maximum number of simultaneous leases
+- **Rotation tracking** -- automatic reminders when credentials are due for rotation
+- **Injection metadata** -- specify how secrets should be injected into the NHI's runtime (environment variable, file, header)
+
+## NHI Separation of Duties
+
+SoD rules can be defined for NHI tool permissions, preventing agents from holding dangerous tool combinations:
+
+```bash
+# Create an NHI SoD rule
+curl -s -X POST "$API/nhi/sod/rules" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{
+    "tool_id_a": "tool-create-payment",
+    "tool_id_b": "tool-approve-payment",
+    "enforcement": "prevent",
+    "description": "Agent must not create and approve payments"
+  }'
+
+# Check if a tool grant would violate SoD rules
+curl -s -X POST "$API/nhi/sod/check" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{
+    "agent_id": "agent-id",
+    "tool_id": "tool-approve-payment"
+  }'
+```
+
+NHI SoD supports two enforcement levels:
+- **Prevent** -- block the tool permission grant entirely
+- **Warn** -- allow the grant but return a warning to the administrator
+
+See [Separation of Duties](./separation-of-duties.md) for more on how SoD applies to both human and non-human identities.
 
 ## Why NHI Governance Matters
 

@@ -1,0 +1,73 @@
+---
+id: device-verify-code-handler
+title: "Verify user code and redirect to approval page."
+description: "POST /device/verify"
+sidebar_label: "Verify user code and redirect to approval page."
+hide_title: true
+hide_table_of_contents: true
+api: eJzlVMFu2zgQ/RViTl1AluycCt3atMFmkbZB7XYPjhHQ0thiQ5HqcCRHMPTvxVDareIc9gP2Ysic4eObmffmDKyPAfItfHnXcnWlPmBnClTXvkTYJVBiKMg0bLyDHO6/rDcqK2NK1iGZQ//gHtx3bU2pGYPiClUbkFThS1TalQoNV0gqVP40hnXTkO+0VY0+ovKktFNI5Cl9cDer1VWuPvuTKiosnoLSLVfo2BRaGKjAmtsQcUdA64/GqYOnWpmDcp7nN7BM59yu119vFPsndIq9agg7dKwK8iEsgmFUhD9bDCxwR6Q+hQR8gxSfvi0hh7Hwx7HwRynxsdKutEiQwHT7vS97yM8XjYMECu8YHUtMN42dSsqeF6fTaSEVLFqy6AS1lKRQVFhr+eK+QcjB739gwZBAQ0KLDQaJSrsjl1lqYDLuCEMCRaDDYyz6dTgB11qr9xYhZ2pxGMYqDAmD7Qx5lwAbljwY9fE9tuDrWDIML29GLDkIjXdhZHm1XL7uSkT5Z7aEobU8quLNn5tPd3+AwNbIlZfmNz7E4jVXkMNLEUICAalDEiWfoSULOVTMTZ5l1hfaVj5w/nb5dgmXkv6AHVrf1KKFEQOGZA4R8iwzZZM+6673qUN+BXFPvmyLUaATwk4IFS0Z7tcyx7EJe9SEJD6bDUPeEP4xDfIpCZLp48ZTrRly+OvvTWyIcQcfr08DibzUu/vbV7xuSzEC9+qefGdKJMkSdat4Z9KkLqImna5/o21Q16Ieawp0AWfx9+u7xSpdQXLRoaPhqt2nha+zCDH97q3fZ7UOjJTd3V5//Lz+KLgyqZHjMl2lSzmS8dbazZ4aNXaxTghLQ1iwWPjFJkkvyz//dtz/b29N2mJ85qyx2jhpcZzYeXLQdtpmEKchHtolIDaR0Pm81wG/kR0GOf7ZIvWQb3cJdJrMuDG2uyGBCnWJFE33hD3kcD32fLERApJuWyHy3xtPLPOv12Ve4oBpl9Zxu8EsO5n/ESrD8AtxGGJc
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Verify user code and redirect to approval page."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/device/verify"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+POST /device/verify
+
+Validates the user code and either shows the approval page or an error.
+F112: Now checks authentication status and shows login form if not authenticated.
+Validates CSRF token to prevent cross-site request forgery.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./device-verify-code-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./device-verify-code-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

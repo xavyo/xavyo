@@ -8,6 +8,9 @@ sidebar_position: 3
 
 ## A
 
+### A2A (Agent-to-Agent) Protocol
+A protocol for asynchronous task management between AI agents. xavyo implements A2A task endpoints for creating, monitoring, and cancelling tasks between registered agents. See [NHI Guide](/docs/guides/developer/nhi-machine-identities).
+
 ### Access Request
 A formal request by a user to obtain a role, entitlement, or resource. Access requests go through an approval workflow before access is provisioned. See [Access Requests Guide](/docs/guides/end-user/access-requests).
 
@@ -35,7 +38,7 @@ An immutable record of administrative and security-relevant actions. Used for co
 A profile of normal behavior patterns for an AI agent, established through observation. Deviations from the baseline trigger anomaly alerts.
 
 ### Bulk Action
-An operation that applies a change to multiple resources simultaneously (e.g., bulk role assignment, bulk certification decisions).
+An operation that applies a change to multiple resources simultaneously (e.g., bulk role assignment, bulk certification decisions). Supports expression-based targeting, preview before execution, and per-item tracking.
 
 ## C
 
@@ -58,6 +61,9 @@ An OAuth 2.0 grant type for machine-to-machine authentication where the applicat
 An integration component that connects xavyo to external systems (HR systems, directories, SaaS applications) for provisioning and reconciliation.
 
 ## D
+
+### Data Protection Classification
+A GDPR-aligned categorization applied to entitlements indicating the sensitivity of personal data they process. Levels: `none`, `personal`, `sensitive`, `special_category`. Drives governance rigor and feeds into GDPR compliance reports. See [Compliance & GDPR](/docs/concepts/compliance-gdpr).
 
 ### Dead Letter Queue (DLQ)
 A storage area for webhook deliveries that have failed all retry attempts. DLQ entries can be inspected and replayed through the admin API.
@@ -95,7 +101,7 @@ The set of policies, processes, and controls for managing identity lifecycle, ac
 ## H
 
 ### HITL (Human-in-the-Loop)
-A control pattern where high-risk AI agent actions require explicit human approval before execution. See [NHI Guide](/docs/guides/developer/nhi-machine-identities#human-in-the-loop-hitl-approvals).
+A control pattern where high-risk AI agent actions require explicit human approval before execution. See [NHI Guide](/docs/guides/developer/nhi-machine-identities#human-in-the-loop-hitl-configuration).
 
 ### HMAC-SHA256
 Hash-based Message Authentication Code using SHA-256. Used to sign webhook payloads for authenticity verification.
@@ -107,6 +113,9 @@ A template that defines the default attributes, lifecycle policies, and governan
 
 ### Identity Provider (IdP)
 A system that authenticates users and provides identity information. xavyo acts as an IdP (issuing tokens) and can also federate with external IdPs via SAML and OIDC.
+
+### Induced Role
+A role that is automatically granted to a user when they are assigned an inducing role. See [Role Inducement](#role-inducement).
 
 ### Inducement
 A mechanism that automatically grants or revokes entitlements or roles based on conditions (e.g., group membership, identity archetype).
@@ -125,6 +134,9 @@ A set of public keys published at `/.well-known/jwks.json` that clients use to v
 The stages an identity goes through from creation to deletion: onboarding, active, suspended, offboarding, deleted. Managed through lifecycle configurations and state machines.
 
 ## M
+
+### MCP (Model Context Protocol)
+A standard protocol for AI agents to discover and invoke tools. xavyo integrates with AgentGateway to provide MCP-based tool discovery and import into the NHI system. See [Non-Human Identities](/docs/concepts/non-human-identities).
 
 ### MFA (Multi-Factor Authentication)
 Authentication requiring two or more verification factors. xavyo supports TOTP (authenticator apps) and WebAuthn (security keys / biometrics). See [MFA Setup Guide](/docs/guides/end-user/mfa-setup).
@@ -156,6 +168,9 @@ A short-lived JWT (5 minutes) issued after successful password authentication wh
 ### Password Policy
 Tenant-configurable rules for password strength, history, expiration, and minimum age. Enforced during signup, registration, and password change.
 
+### post_logout_redirect_uri
+An OIDC parameter specifying the URL where the user should be redirected after RP-Initiated Logout completes. Must be registered with the OAuth client for security. See [RP-Initiated Logout](#rp-initiated-logout).
+
 ### PKCE (Proof Key for Code Exchange)
 An OAuth 2.0 extension (RFC 7636) that prevents authorization code interception attacks. Required for public clients (SPAs, mobile apps).
 
@@ -185,6 +200,12 @@ A PostgreSQL feature that enforces tenant data isolation at the database level. 
 ### Role
 A named set of permissions that can be assigned to users. Roles are stored in the `user_roles` table. Common roles include `user`, `admin`, and `super_admin`.
 
+### Role Inducement
+A configuration that automatically grants an induced role or entitlement when a user is assigned the inducing role. When the inducing role is removed, the induced access is revoked. See [Identity Governance](/docs/concepts/identity-governance).
+
+### RP-Initiated Logout
+An OIDC logout flow initiated by the Relying Party (client application). The RP redirects the user to the IdP's end_session_endpoint with an `id_token_hint` and optional `post_logout_redirect_uri`. See [SLO](#slo-single-logout).
+
 ## S
 
 ### SAML (Security Assertion Markup Language)
@@ -199,8 +220,14 @@ A non-human identity used by automated processes (CI/CD pipelines, background jo
 ### Service Catalog
 A curated list of roles, entitlements, and resources that users can browse and request through the self-service access request system.
 
+### SLO (Single Logout)
+A protocol mechanism that propagates a logout event to all session participants. In SAML, SLO uses LogoutRequest/LogoutResponse messages. In OIDC, SLO is achieved through RP-Initiated Logout with the end_session_endpoint. See also [RP-Initiated Logout](#rp-initiated-logout).
+
+### SLO Binding
+The transport mechanism used for SAML Single Logout messages. Common bindings include HTTP-Redirect (for small messages via URL query parameters) and HTTP-POST (for larger messages via form submission).
+
 ### SoD (Separation of Duties)
-A governance control that prevents a single user from holding conflicting permissions (e.g., both "create purchase order" and "approve purchase order").
+A governance control that prevents a single user or NHI from holding conflicting permissions (e.g., both "create purchase order" and "approve purchase order"). xavyo supports SoD for both human identities (entitlement-based) and NHIs (tool permission-based).
 
 ### Storm-2372
 A device code phishing attack technique. xavyo implements mitigations including origin IP comparison, stale request detection, and risk scoring.

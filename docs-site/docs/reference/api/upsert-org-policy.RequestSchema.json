@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","properties":{"config":{"type":"object"},"is_active":{"type":"boolean","nullable":true}},"required":["config"],"title":"UpdateOrgSecurityPolicyRequest"}}},"required":true}}

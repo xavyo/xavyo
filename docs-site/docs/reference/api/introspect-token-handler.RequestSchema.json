@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","properties":{"token":{"type":"string"},"token_type_hint":{"type":"string","nullable":true},"client_id":{"type":"string","nullable":true},"client_secret":{"type":"string","nullable":true}},"required":["token"],"title":"IntrospectionRequest"}}},"required":true}}

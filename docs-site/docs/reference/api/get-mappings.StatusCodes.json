@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"List of attribute mappings"},"401":{"description":"Not authenticated"},"403":{"description":"Not authorized"}}}

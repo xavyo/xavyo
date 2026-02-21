@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","properties":{"permission_type":{"type":"string"}},"required":["permission_type"],"title":"RevokeUserPermissionRequest"}}},"required":true}}

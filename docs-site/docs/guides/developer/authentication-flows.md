@@ -131,7 +131,7 @@ When MFA is enabled, the login response indicates available methods:
 Complete MFA verification with a TOTP code:
 
 ```bash
-curl -X POST https://idp.example.com/auth/mfa/verify \
+curl -X POST https://idp.example.com/auth/mfa/totp/verify \
   -H "Content-Type: application/json" \
   -H "X-Tenant-ID: 550e8400-e29b-41d4-a716-446655440000" \
   -d '{
@@ -153,7 +153,7 @@ After 5 consecutive failed login attempts, the account is temporarily locked. Th
   "type": "https://xavyo.net/errors/account-locked",
   "title": "Account Locked",
   "status": 401,
-  "detail": "Your account has been locked until 2026-02-07T16:00:00Z."
+  "detail": "Account locked until 2026-02-07T16:00:00Z"
 }
 ```
 
@@ -363,15 +363,17 @@ curl https://idp.example.com/.well-known/openid-configuration
   "userinfo_endpoint": "https://idp.example.com/oauth/userinfo",
   "jwks_uri": "https://idp.example.com/.well-known/jwks.json",
   "device_authorization_endpoint": "https://idp.example.com/oauth/device/code",
+  "end_session_endpoint": "https://idp.example.com/oauth/logout",
   "response_types_supported": ["code"],
   "grant_types_supported": [
     "authorization_code", "client_credentials", "refresh_token",
-    "urn:ietf:params:oauth:grant-type:device_code"
+    "urn:ietf:params:oauth:grant-type:device_code",
+    "urn:ietf:params:oauth:grant-type:token-exchange"
   ],
   "scopes_supported": ["openid", "profile", "email", "offline_access"],
   "id_token_signing_alg_values_supported": ["RS256"],
   "code_challenge_methods_supported": ["S256"],
-  "claims_supported": ["sub", "iss", "aud", "exp", "iat", "name", "email", "email_verified"]
+  "claims_supported": ["sub", "iss", "aud", "exp", "iat", "auth_time", "nonce", "name", "given_name", "family_name", "email", "email_verified", "act"]
 }
 ```
 
@@ -437,6 +439,172 @@ sequenceDiagram
     User->>SP: POST /acs with SAMLResponse
     SP->>SP: Validate assertion
 ```
+
+## SAML Single Logout (SLO)
+
+xavyo supports both SP-initiated and IdP-initiated SAML Single Logout. When a user logs out, xavyo can notify all active SAML Service Providers to terminate their sessions.
+
+### SP-Initiated SLO
+
+An SP sends a `LogoutRequest` to xavyo (IdP) to log the user out. xavyo terminates the user's sessions and returns a `LogoutResponse`.
+
+```mermaid
+sequenceDiagram
+    participant SP as Service Provider
+    participant IdP as xavyo (IdP)
+
+    SP->>IdP: POST /saml/slo (SAMLRequest)
+    IdP->>IdP: Validate LogoutRequest signature
+    IdP->>IdP: Look up SP sessions for user
+    IdP->>IdP: Revoke user sessions
+    IdP-->>SP: SAMLResponse (success/failure)
+```
+
+The SP sends a POST to `/saml/slo` with a base64-encoded `SAMLRequest` in form data:
+
+```bash
+curl -X POST http://localhost:8080/saml/slo \
+  -H "X-Tenant-ID: 550e8400-e29b-41d4-a716-446655440000" \
+  -d 'SAMLRequest=PHNhbWxwOkxvZ291dFJlcXVlc3Q...' \
+  -d 'RelayState=optional-relay-state'
+```
+
+The response body is `application/x-www-form-urlencoded` containing the base64-encoded `SAMLResponse`.
+
+:::info
+If the SP has `validate_signatures: true`, xavyo verifies the LogoutRequest XML signature using the SP's registered certificate before processing.
+:::
+
+### IdP-Initiated SLO
+
+An authenticated user (or admin) triggers a logout that fans out `LogoutRequest` messages to all SPs that have active sessions for that user.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant IdP as xavyo (IdP)
+    participant SP1 as SP 1
+    participant SP2 as SP 2
+
+    User->>IdP: POST /saml/slo/initiate (JWT auth)
+    IdP->>IdP: Find all SP sessions for user
+    IdP->>SP1: POST LogoutRequest to SLO URL
+    IdP->>SP2: POST LogoutRequest to SLO URL
+    SP1-->>IdP: LogoutResponse
+    SP2-->>IdP: LogoutResponse
+    IdP-->>User: 200 { total, succeeded, failed, no_slo_url }
+```
+
+```bash
+curl -X POST http://localhost:8080/saml/slo/initiate \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "total": 3,
+  "succeeded": 2,
+  "failed": 0,
+  "no_slo_url": 1
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `total` | Number of SPs with active sessions for the user |
+| `succeeded` | SPs that accepted the LogoutRequest |
+| `failed` | SPs where logout notification failed |
+| `no_slo_url` | SPs with no SLO endpoint configured (skipped) |
+
+:::warning
+SPs that do not have a Single Logout URL configured in their xavyo service provider registration will be counted under `no_slo_url` and their sessions will not be terminated remotely. Configure the SLO URL in the admin API under `/admin/saml/service-providers`.
+:::
+
+## OIDC RP-Initiated Logout
+
+xavyo implements [OIDC RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html). Relying Parties can redirect users to xavyo's end session endpoint to log them out.
+
+```mermaid
+sequenceDiagram
+    participant RP as Relying Party
+    participant Browser
+    participant IdP as xavyo (IdP)
+
+    RP->>Browser: Redirect to /oauth/logout
+    Browser->>IdP: GET /oauth/logout?id_token_hint=...&post_logout_redirect_uri=...&state=...
+    IdP->>IdP: Validate id_token_hint (signature, issuer)
+    IdP->>IdP: Validate post_logout_redirect_uri against client
+    IdP->>IdP: Revoke all user sessions and refresh tokens
+    alt post_logout_redirect_uri is valid
+        IdP->>Browser: 303 Redirect to post_logout_redirect_uri?state=...
+        Browser->>RP: Callback with state
+    else No redirect URI
+        IdP-->>Browser: 200 { message: "Logged out successfully" }
+    end
+```
+
+### Endpoint
+
+`GET` or `POST /oauth/logout`
+
+### Parameters
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `id_token_hint` | Recommended | Previously issued ID token (may be expired). Used to identify the user. |
+| `post_logout_redirect_uri` | Optional | URI to redirect to after logout. Must be registered on the OAuth client. |
+| `state` | Optional | Opaque value passed back to the RP in the redirect. |
+| `client_id` | Optional | OAuth2 client identifier. Required if `id_token_hint` is not provided. |
+
+### Example
+
+```bash
+# Via GET (browser redirect)
+curl "http://localhost:8080/oauth/logout?\
+id_token_hint=eyJhbGciOiJSUzI1NiIs...&\
+post_logout_redirect_uri=https://app.example.com/logged-out&\
+state=random-state-value" \
+  -H "X-Tenant-ID: 550e8400-e29b-41d4-a716-446655440000"
+
+# Via POST (form body)
+curl -X POST http://localhost:8080/oauth/logout \
+  -H "X-Tenant-ID: 550e8400-e29b-41d4-a716-446655440000" \
+  -d 'id_token_hint=eyJhbGciOiJSUzI1NiIs...' \
+  -d 'post_logout_redirect_uri=https://app.example.com/logged-out' \
+  -d 'state=random-state-value'
+```
+
+### Registering Post-Logout Redirect URIs
+
+When creating or updating an OAuth client, include `post_logout_redirect_uris` to register allowed redirect destinations after logout:
+
+```bash
+curl -X POST http://localhost:8080/admin/oauth/clients \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "client_id": "my-app",
+    "name": "My Application",
+    "client_type": "public",
+    "redirect_uris": ["https://app.example.com/callback"],
+    "post_logout_redirect_uris": [
+      "https://app.example.com/logged-out",
+      "https://app.example.com/goodbye"
+    ],
+    "grant_types": ["authorization_code"],
+    "scopes": ["openid", "profile", "email"]
+  }'
+```
+
+:::tip
+The `end_session_endpoint` is published in the OIDC Discovery document at `/.well-known/openid-configuration`. OIDC client libraries that support RP-Initiated Logout will use this endpoint automatically.
+:::
+
+:::warning
+If the `id_token_hint` is invalid (bad signature, wrong issuer), xavyo proceeds without identifying the user -- no sessions are revoked, and no redirect occurs. If `post_logout_redirect_uri` is not in the client's registered list, the redirect is silently ignored and a JSON response is returned instead.
+:::
 
 ## Token Lifecycle
 

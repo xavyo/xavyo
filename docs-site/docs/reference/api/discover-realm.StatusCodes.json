@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Realm discovery result","content":{"application/json":{"schema":{"type":"object","properties":{"authentication_method":{"type":"object"}},"required":["authentication_method"],"title":"DiscoverResponse"}}}},"400":{"description":"Invalid request"}}}

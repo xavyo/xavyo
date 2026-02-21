@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Mappings updated"},"401":{"description":"Not authenticated"},"403":{"description":"Not authorized"}}}

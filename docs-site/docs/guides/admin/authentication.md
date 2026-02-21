@@ -290,6 +290,8 @@ curl -X POST https://your-domain.com/admin/saml/service-providers \
 | IdP metadata | GET | `/saml/metadata` |
 | SSO endpoint | POST | `/saml/sso` |
 | Initiate SSO | GET | `/saml/initiate/{sp_id}` |
+| SP-initiated SLO | POST | `/saml/slo` |
+| IdP-initiated SLO | POST | `/saml/slo/initiate` |
 
 ### Certificate Management
 
@@ -420,6 +422,146 @@ curl -X POST https://your-domain.com/auth/logout \
   -H "X-Tenant-ID: $TENANT_ID"
 ```
 
+## SAML Single Logout (SLO)
+
+xavyo-idp supports SAML 2.0 Single Logout for both SP-initiated and IdP-initiated flows. Per-SP session tracking enables the IdP to send LogoutRequests to all Service Providers that have active sessions for a user.
+
+### SP-Initiated SLO
+
+When a Service Provider initiates logout, it sends a signed `LogoutRequest` to the IdP. The IdP validates the request, revokes the user's sessions (honoring `SessionIndex` if provided), and returns a signed `LogoutResponse`.
+
+```bash
+# SP sends a LogoutRequest (base64-encoded SAML XML) to the IdP
+curl -X POST https://your-domain.com/saml/slo \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d "SAMLRequest=$(base64-encoded-logout-request)&RelayState=optional-state"
+```
+
+The response is a form-encoded `SAMLResponse` containing the signed `LogoutResponse` XML.
+
+### IdP-Initiated SLO
+
+An authenticated user (or admin) can trigger logout across all SPs with active sessions. The IdP sends back-channel LogoutRequests to each SP's configured SLO URL and revokes all SP sessions regardless of SP responses.
+
+```bash
+curl -X POST https://your-domain.com/saml/slo/initiate \
+  -H "Authorization: Bearer $USER_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+**Response (200):**
+```json
+{
+  "total": 3,
+  "succeeded": 2,
+  "failed": 0,
+  "no_slo_url": 1
+}
+```
+
+### Per-SP Session Tracking
+
+When the IdP issues a SAML assertion, it records a session entry (`saml_sp_sessions`) containing the SP ID, user ID, session index, NameID, and expiry. This enables:
+
+- **Targeted logout**: SP-initiated SLO can revoke only the specific session identified by `SessionIndex`
+- **Broadcast logout**: IdP-initiated SLO can enumerate all active SP sessions and notify each SP
+- **Session cleanup**: Expired and revoked sessions are automatically cleaned up
+
+### Configuring SLO for a Service Provider
+
+Set the `slo_url` and `slo_binding` when creating or updating a Service Provider:
+
+```bash
+curl -X POST https://your-domain.com/admin/saml/service-providers \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{
+    "name": "Corporate SSO",
+    "entity_id": "https://sp.example.com/saml/metadata",
+    "acs_url": "https://sp.example.com/saml/acs",
+    "sign_assertions": true,
+    "slo_url": "https://sp.example.com/saml/slo",
+    "slo_binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+  }'
+```
+
+SPs without an `slo_url` configured are skipped during IdP-initiated SLO (reported in the `no_slo_url` count).
+
+### SLO Endpoints
+
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| SP-initiated SLO | POST | `/saml/slo` |
+| IdP-initiated SLO | POST | `/saml/slo/initiate` |
+
+## OIDC RP-Initiated Logout
+
+xavyo-idp implements [OIDC RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html) via the `end_session_endpoint` published in the OIDC discovery document.
+
+### Initiating Logout
+
+The endpoint accepts both GET (query params) and POST (form body):
+
+```bash
+# GET with query parameters
+curl -G "https://your-domain.com/oauth/logout" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  --data-urlencode "id_token_hint=$ID_TOKEN" \
+  --data-urlencode "post_logout_redirect_uri=https://app.example.com/logged-out" \
+  --data-urlencode "state=abc123" \
+  --data-urlencode "client_id=my-client"
+```
+
+### Parameters
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `id_token_hint` | Recommended | Previously issued ID token (may be expired). Used to identify the user and client. |
+| `post_logout_redirect_uri` | Optional | URI to redirect the user after logout. Must be registered on the OAuth client. |
+| `client_id` | Optional | OAuth2 client identifier. Must match the `id_token_hint` audience if both are provided. |
+| `state` | Optional | Opaque value passed through to the redirect URI as a query parameter. |
+
+### Behavior
+
+1. **Validates `id_token_hint`**: Verifies the JWT signature (expired tokens accepted per spec), validates the issuer, and extracts the user identity.
+2. **Validates `post_logout_redirect_uri`**: Checks that the URI is registered in the client's `post_logout_redirect_uris` list.
+3. **Revokes sessions**: Deletes all user sessions and revokes all OAuth2 refresh tokens.
+4. **Redirects or returns JSON**: If a valid `post_logout_redirect_uri` is provided, responds with `303 See Other`. Otherwise returns `200` with a JSON success message.
+
+### Registering Post-Logout Redirect URIs
+
+When creating or updating an OAuth client, include the `post_logout_redirect_uris` field:
+
+```bash
+curl -X POST https://your-domain.com/oauth/clients \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{
+    "client_id": "my-app",
+    "name": "My Application",
+    "client_type": "confidential",
+    "redirect_uris": ["https://app.example.com/callback"],
+    "post_logout_redirect_uris": [
+      "https://app.example.com/logged-out",
+      "https://app.example.com/goodbye"
+    ],
+    "grant_types": ["authorization_code"],
+    "scopes": ["openid", "profile", "email"]
+  }'
+```
+
+:::warning
+If `post_logout_redirect_uri` is provided but not registered on the client, the redirect is silently ignored per the OIDC specification. The user is still logged out, but no redirect occurs.
+:::
+
+### OIDC Logout Endpoints
+
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| End session | GET/POST | `/oauth/logout` |
+
 ## OIDC Discovery
 
 xavyo-idp publishes standard OpenID Connect discovery documents:
@@ -434,7 +576,11 @@ xavyo-idp publishes standard OpenID Connect discovery documents:
 - **Login enumeration prevention**: Invalid credentials and inactive accounts return the same generic error to prevent email enumeration.
 - **Rate limiting**: Authentication endpoints enforce 5 attempts per 60 seconds per IP/email to prevent brute-force attacks.
 - **OIDC ID token verification**: ID tokens are verified using JWKS (RS256) with nonce validation to prevent replay attacks.
-- **SAML decompression protection**: A 1 MB limit is enforced on SAML response decompression to prevent decompression bombs.
+- **OIDC logout `id_token_hint` validation**: The `id_token_hint` JWT signature is verified using JWKS key matching by `kid`. Expired tokens are accepted per spec, but unknown key IDs are rejected (no fallback to active key).
+- **OIDC `post_logout_redirect_uri` validation**: Redirect URIs are validated against the client's registered `post_logout_redirect_uris` using URL-parsed comparison (case-insensitive host, port normalization). Invalid URIs are silently ignored.
+- **SAML SLO signature validation**: SP-initiated LogoutRequests are validated against the SP's certificate when `validate_signatures` is enabled.
+- **SAML SLO URL validation**: IdP-initiated SLO only sends LogoutRequests to HTTPS URLs (HTTP allowed for localhost in development). Private IP ranges are blocked to prevent SSRF.
+- **SAML decompression protection**: A 1 MB limit is enforced on SAML response decompression to prevent decompression bombs. LogoutRequest size is limited to 512 KB.
 - **Social login redirect protection**: Callback redirect URIs are validated to allow only relative paths, preventing open redirect attacks.
 - **Token security**: All security tokens (reset, verification, MFA) use cryptographically secure random generation (CSPRNG via `OsRng`).
 - **Session isolation**: Sessions include `tenant_id` in all database queries to prevent cross-tenant session hijacking.

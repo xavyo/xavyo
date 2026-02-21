@@ -152,3 +152,171 @@ xavyo implements governance through several interconnected subsystems:
 - **[Compliance and GDPR](./compliance-gdpr.md)** -- meet data protection requirements
 - **[Zero Trust Architecture](./zero-trust.md)** -- continuously verify identity and access context
 - **[Multi-Tenancy](./multi-tenancy.md)** -- isolate governance data across organizational boundaries
+
+### Role Inducements
+
+Role inducements automate the granting and revocation of entitlements and roles when a user is assigned to an inducing role. When a user receives a role that has inducements configured, the induced entitlements are automatically provisioned. When the role assignment is removed, the induced entitlements are revoked.
+
+```bash
+# Create a role inducement
+curl -s -X POST "$API/governance/roles/$ROLE_ID/inducements" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{
+    "induced_role_id": "role-to-grant-id",
+    "description": "Engineers automatically receive CI/CD access"
+  }'
+```
+
+Inducements provide a declarative way to define role hierarchies and automatic entitlement bundling. Unlike birthright policies that match on user attributes, inducements are triggered by role assignments. This enables composable access models where assigning a single high-level role cascades into the appropriate set of lower-level roles and entitlements.
+
+### Identity Archetypes
+
+An identity archetype is a template that defines the default attributes, lifecycle policies, and governance rules for a category of identities. Common archetypes include employee, contractor, vendor, and service account:
+
+```bash
+# Create an archetype
+curl -s -X POST "$API/governance/archetypes" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{
+    "name": "contractor",
+    "description": "External contractors with time-limited access",
+    "default_lifecycle_config_id": "config-id",
+    "default_attributes": {
+      "access_expiry_days": 90,
+      "mfa_required": true
+    }
+  }'
+```
+
+Archetypes simplify onboarding by pre-configuring governance policies. When a new identity is created with an archetype, its lifecycle configuration, default attributes, and governance rules are automatically applied.
+
+### Bulk Actions
+
+The bulk action engine enables administrators to apply changes to multiple identities simultaneously. Bulk actions support preview, validation, and asynchronous execution:
+
+```bash
+# Create a bulk action
+curl -s -X POST "$API/admin/bulk-actions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{
+    "action_type": "assign_role",
+    "target_expression": "department == '\''Engineering'\''",
+    "parameters": {"role_id": "role-id"}
+  }'
+
+# Preview the impact before executing
+curl -s "$API/admin/bulk-actions/$ACTION_ID/preview" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Execute the bulk action
+curl -s -X POST "$API/admin/bulk-actions/$ACTION_ID/execute" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+```
+
+Bulk actions use expression-based targeting with support for validation before execution. Individual items within a bulk action are tracked separately, so partial failures do not block the entire batch.
+
+### Power of Attorney
+
+Power of Attorney (PoA) enables a user to temporarily delegate their identity to another user. The attorney can act on behalf of the donor for a time-limited period with an auditable trail:
+
+```bash
+# Grant Power of Attorney
+curl -s -X POST "$API/governance/power-of-attorney" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $DONOR_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{
+    "attorney_id": "attorney-user-id",
+    "scope": ["users:read", "users:write"],
+    "duration_hours": 24,
+    "justification": "Covering while on leave"
+  }'
+
+# Assume the donor's identity (as the attorney)
+curl -s -X POST "$API/governance/power-of-attorney/$POA_ID/assume" \
+  -H "Authorization: Bearer $ATTORNEY_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Drop the assumed identity
+curl -s -X POST "$API/governance/power-of-attorney/$POA_ID/drop" \
+  -H "Authorization: Bearer $ATTORNEY_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+```
+
+PoA features:
+- **Scoped permissions** -- the attorney receives only the permissions explicitly listed in the scope
+- **Time-limited** -- every PoA grant has a maximum duration and expires automatically
+- **Audit trail** -- all actions taken under PoA are logged with both the attorney and donor identities
+- **Revocable** -- the donor or an administrator can revoke the PoA at any time
+
+### Self-Service Request Catalog
+
+The request catalog provides a curated, browsable list of roles, entitlements, and resources that users can request through a structured workflow:
+
+```bash
+# Browse catalog categories
+curl -s "$API/governance/catalog/categories" \
+  -H "Authorization: Bearer $USER_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Search catalog items
+curl -s "$API/governance/catalog/items?search=database" \
+  -H "Authorization: Bearer $USER_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# Add an item to the request cart
+curl -s -X POST "$API/governance/catalog/cart" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $USER_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{"catalog_item_id": "item-id", "justification": "Need database access for Q1 project"}'
+
+# Validate and submit the cart
+curl -s -X POST "$API/governance/catalog/cart/submit" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $USER_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{"justification": "Q1 project access bundle"}'
+```
+
+The catalog uses a shopping cart model -- users add items to their cart, validate the cart (checking for SoD violations and approval requirements), and submit. Submitted requests flow through the standard approval workflow.
+
+### Policy Simulation
+
+Policy simulation allows administrators to evaluate the impact of governance policy changes before applying them. Simulations can model changes to birthright policies, SoD rules, role assignments, and lifecycle configurations:
+
+```bash
+# Create a policy simulation
+curl -s -X POST "$API/governance/simulations/policy" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{
+    "name": "New SoD rule impact",
+    "simulation_type": "sod_rule",
+    "parameters": {
+      "left_entitlement_id": "ent-a",
+      "right_entitlement_id": "ent-b"
+    }
+  }'
+
+# Execute the simulation
+curl -s -X POST "$API/governance/simulations/policy/$SIM_ID/execute" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+
+# View simulation results
+curl -s "$API/governance/simulations/policy/$SIM_ID/results" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+```
+
+Simulations provide a safe way to understand the blast radius of policy changes -- how many users would be affected, which violations would be created, and what remediation would be needed.

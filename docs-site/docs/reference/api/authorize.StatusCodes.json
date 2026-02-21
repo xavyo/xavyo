@@ -1,0 +1,1 @@
+{"responses":{"307":{"description":"Redirect to external IdP authorization endpoint"},"400":{"description":"Invalid request"},"404":{"description":"Identity provider not found"}}}

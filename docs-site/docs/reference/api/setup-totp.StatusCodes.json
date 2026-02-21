@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"TOTP setup initiated","content":{"application/json":{"schema":{"type":"object","properties":{"secret":{"type":"string"},"otpauth_uri":{"type":"string"},"qr_code":{"type":"string"}},"required":["secret","otpauth_uri","qr_code"],"title":"TotpSetupResponse"}}}},"400":{"description":"MFA disabled by policy"},"401":{"description":"Unauthorized"}}}

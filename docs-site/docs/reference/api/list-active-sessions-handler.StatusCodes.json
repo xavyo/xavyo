@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"List of active sessions","content":{"application/json":{"schema":{"type":"object","properties":{"sessions":{"type":"array","items":{"type":"object"}},"total":{"type":"integer","format":"int64"}},"required":["sessions","total"],"title":"ActiveSessionsResponse"}}}},"400":{"description":"Invalid request"},"401":{"description":"Unauthorized"}}}

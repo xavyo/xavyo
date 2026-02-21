@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","properties":{"user_id":{"type":"string","format":"uuid"},"reason":{"type":"string","nullable":true}},"required":["user_id"],"title":"AdminRevokeUserRequest"}}},"required":true}}

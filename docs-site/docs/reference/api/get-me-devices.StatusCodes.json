@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Devices list returned","content":{"application/json":{"schema":{"type":"object","properties":{"items":{"type":"array","items":{"type":"object"}},"total":{"type":"integer","format":"int64"}},"required":["items","total"],"title":"DeviceListResponse"}}}},"401":{"description":"Not authenticated"}}}

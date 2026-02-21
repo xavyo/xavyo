@@ -1,0 +1,1 @@
+{"parameters":[{"name":"user_id","in":"path","description":"User ID to invite","required":true,"schema":{"type":"string","format":"uuid"}}]}

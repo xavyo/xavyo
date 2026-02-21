@@ -1,0 +1,77 @@
+---
+id: device-confirm-handler
+title: "GET /device/confirm/{token} - Validate email confirmation token (F117)."
+description: "This endpoint is called when users click the confirmation link in their email."
+sidebar_label: "GET /device/confirm/{token} - Validate email confirmation token (F117)."
+hide_title: true
+hide_table_of_contents: true
+api: eJztVcGO2zYQ/ZXB9LILcCV7e0igW7pxUhfb1si6zWFtBLQ0tghTpDIcOTEM/XtBSht412kPPRa92BJn5vHN4/DphKJ3AYtH/P1NJ/UtvKWDKQnufEW4VlhRKNm0YrzDApe1CUCuar1xAiZAqa2lCr7U5KALxAFKa8o9SE1Qerc13OhYC9a4PRgXA4aBGm1stnJzgYO2ptJCIdWI35NT0Gjeh0sQHaD0TWtJSIF2FTBJxy6AhtCVJYWwcp6BmD1Dq3eUrdzK/QAP4rm5uf3x1S18oIYqk+Bi7KKhVrOA36a9E8vnDLbWf4GtZwhdaE1pfBegGhQrfUUrp9uW/UHbkMHHKIpOsoAWoaaVAOJhSCHQ55WwZd+AdjBfgNRaoDLbLXFYuRSIdDybnXFajNvBfKHi2hGaLsgTRTgYPZLe0NYzpbInRtCyL4mqkKFC3xKnjuYVFjjw+DTCfKq1qywxKmw164aEOE7ICZ1uCAtMh4QKTRyJVkuNL+dkdqlcKoJvzTyLJc6okOlzZ5gqLIQ7UhjKmhqNxQnl2Madg7BxO+z7dUwOrXeBQozfTibx7zmLu/M9mEJnJU0FXP28/PX+GvteYUNS+6jBjiQ1LDUWmA+K5CPL/JTY96gwEB+e5OjYYoG1SFvkufWltrUPUryevJ5cKPKWDmR925ATGDCwV+cQochzU7XZV304+swlNs8hFuyrrkzNPCGsI6GyYyPHh6jVIMaGNBPH63wmXdwDR0nj+5CEanx456NQWOAvH5dJGOO2PpUbsTE/8YI3i/kFr3lFTowcYcH+YCrimJUuSapBhaV3okuJcOMIDWhL0g32Cq0pyQU6i//0cH8zzaaoXii0M1J3m6z0TZ4gxt+N9Zu80UGI8/v53ey3h1nEjSc1cJxk02wSl1ofpNHubKv3syX8zXnDDfw52tP3zGAY6at30+mr6+ylLKfUNTn53zb/O7Y53iWhr5K3VhsXRypN6Gm0jsfRTIepj/CosBgcc60wGkRMOp02OtAfbPs+Ln/uiI9YPK4VHjQbvYlX7vGElQnxucJiq22gfxixqw+jd17DvzTf7/Y2Lmp3xEjNdvENFe7p+O1D0K/PffT9LPrHX+UM8TI=
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"GET /device/confirm/{token} - Validate email confirmation token (F117)."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/device/confirm/{token}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+This endpoint is called when users click the confirmation link in their email.
+It validates the token, marks the confirmation as complete, and returns a success
+or error page.
+
+# Storm-2372 Remediation
+
+This endpoint is part of the email confirmation flow for suspicious device code
+approvals. When a user attempts to approve a device code from an IP that differs
+from the originating IP, they must confirm via email before the approval proceeds.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./device-confirm-handler.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./device-confirm-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./device-confirm-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

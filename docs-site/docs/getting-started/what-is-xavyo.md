@@ -6,7 +6,7 @@ sidebar_position: 1
 
 # What is xavyo?
 
-xavyo is a unified Identity Governance and Administration (IGA) platform built to manage the full lifecycle of every identity in your organization -- human users, service accounts, and AI agents alike. It is written in Rust, exposes a pure REST API surface with over 700 endpoints, and enforces tenant isolation at the database level through PostgreSQL Row-Level Security.
+xavyo is a unified Identity Governance and Administration (IGA) platform built to manage the full lifecycle of every identity in your organization -- human users, service accounts, and AI agents alike. It is written in Rust across 32 crates, exposes a pure REST API surface with 736 endpoints, and enforces tenant isolation at the database level through PostgreSQL Row-Level Security.
 
 ## The Identity Challenge
 
@@ -35,11 +35,11 @@ xavyo collapses the traditional IAM / IGA / PAM boundaries into a single platfor
 
 | Capability | Traditional Approach | xavyo Approach |
 |---|---|---|
-| Authentication | Separate IAM product | Built-in: OAuth2/OIDC, SAML 2.0, social login, passwordless, WebAuthn, MFA |
-| Access Governance | Separate IGA product | Built-in: entitlements, roles, SoD rules, certifications, access requests, lifecycle workflows |
+| Authentication | Separate IAM product | Built-in: OAuth2/OIDC (with RP-Initiated Logout), SAML 2.0 (with SLO), social login, passwordless, WebAuthn, MFA |
+| Access Governance | Separate IGA product | Built-in: entitlements, roles, role inducements, SoD rules, certifications, access requests, GDPR compliance, lifecycle workflows, bulk actions, power of attorney |
 | Privileged Access | Separate PAM product | Built-in: credential rotation, risk-based access, escalation policies |
-| Non-Human Identities | Unmanaged or ad-hoc | First-class: agents, service accounts, tools, credential lifecycle, NHI certifications |
-| Provisioning | Connectors bolted on | Built-in: LDAP/AD, Microsoft Entra ID, REST, database connectors with reconciliation |
+| Non-Human Identities | Unmanaged or ad-hoc | First-class: unified model for agents, tools, and service accounts with lifecycle management, NHI-to-NHI permissions, MCP discovery, A2A protocol, certifications |
+| Provisioning | Connectors bolted on | Built-in: LDAP/AD, Microsoft Entra ID, REST, database connectors with reconciliation, SCIM 2.0 inbound and outbound |
 
 ## Key Differentiators
 
@@ -49,11 +49,11 @@ xavyo is a pure backend platform. Every capability is exposed through a REST API
 
 - **Build your own experience.** Embed identity governance into your existing admin portal, build a custom access request UI, or integrate with your internal tooling. You are not locked into a vendor's UX decisions.
 - **Automate everything.** Every operation that a human can perform through a UI can be performed programmatically. Terraform providers, CLI tools, and CI/CD pipelines can manage identity at the same fidelity as a governance administrator.
-- **933 API operations** across 700 paths cover authentication, user management, group hierarchy, OAuth2/OIDC, SAML, SCIM 2.0, governance, connectors, webhooks, and more.
+- **736 API endpoints** covering authentication, user management, group hierarchy, OAuth2/OIDC (with RP-Initiated Logout), SAML 2.0 (with Single Logout), SCIM 2.0, governance (roles, entitlements, inducements, certifications, SoD, GDPR, access requests, bulk actions, power of attorney, archetypes), NHI (unified model for agents/tools/service-accounts with lifecycle, permissions, MCP, A2A), provisioning (connectors, SCIM), webhooks, and more.
 
 ### Rust Performance and Safety
 
-xavyo is built entirely in Rust across 32 crates organized in four layers. This is not a cosmetic choice -- it delivers concrete benefits:
+xavyo is built entirely in Rust across 32 crates with 665K lines of code, 198 SQL migrations, and 7,400+ tests (5,576 unit/integration + 1,907 functional). This is not a cosmetic choice -- it delivers concrete benefits:
 
 - **Memory safety without garbage collection.** No null pointer exceptions, no data races, no GC pauses. The type system catches entire categories of bugs at compile time.
 - **Predictable latency.** No stop-the-world pauses means consistent response times under load, which matters for authentication endpoints that sit in the critical path of every user session.

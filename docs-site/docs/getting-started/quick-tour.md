@@ -139,7 +139,7 @@ curl -s "$API/users?limit=10&offset=0" \
 Groups organize users for access management. xavyo supports hierarchical groups:
 
 ```bash
-curl -s -X POST "$API/scim/v2/Users" \
+curl -s -X POST "$API/scim/v2/Groups" \
   -H "Content-Type: application/scim+json" \
   -H "X-Tenant-ID: $TENANT" \
   -H "Authorization: Bearer $SCIM_TOKEN" \
@@ -399,22 +399,21 @@ curl -s -X POST "$API/nhi/agents" \
     \"name\": \"deployment-bot\",
     \"agent_type\": \"autonomous\",
     \"description\": \"Automated deployment pipeline agent\",
-    \"risk_level\": \"medium\",
     \"owner_id\": \"$ADMIN_USER_ID\"
   }"
 ```
 
-### Rotate Agent Credentials
+### Store a Vault Secret for an Agent
 
 ```bash
-curl -s -X POST "$API/nhi/agents/$AGENT_ID/credentials/rotate" \
+curl -s -X POST "$API/nhi/$AGENT_ID/vault/secrets" \
   -H "Content-Type: application/json" \
   -H "X-Tenant-ID: $TENANT" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -d '{
-    "credential_type": "api_key",
     "name": "deploy-key-v2",
-    "grace_period_hours": 24
+    "secret_type": "api_key",
+    "secret_value": "your-secret-value"
   }'
 ```
 
@@ -432,29 +431,99 @@ curl -s -X POST "$API/nhi/service-accounts" \
   }"
 ```
 
-### Check NHI Staleness
+### Detect Inactive NHIs
 
 Identify service accounts and agents that have not been used recently:
 
 ```bash
-curl -s "$API/nhi/staleness-report" \
+curl -s -X POST "$API/nhi/inactivity/detect" \
+  -H "Content-Type: application/json" \
   -H "X-Tenant-ID: $TENANT" \
   -H "Authorization: Bearer $ADMIN_JWT"
 ```
 
-## 8. Explore Additional Capabilities
+## 8. Role Inducements
 
-### GDPR Data Subject Report
+Role inducements automate cascading role grants. When a parent role is assigned, its induced roles are automatically granted.
 
-Generate a report of all data held about a specific user:
+### Configure an Inducement
 
 ```bash
-curl -s -X POST "$API/governance/gdpr/report" \
+curl -s -X POST "$API/governance/roles/$ROLE_ID/inducements" \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: $TENANT" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -d "{
+    \"induced_role_id\": \"$BASE_ROLE_ID\",
+    \"description\": \"Automatically grant Developer role when Senior Developer is assigned\"
+  }"
+```
+
+### List Inducements for a Role
+
+```bash
+curl -s "$API/governance/roles/$ROLE_ID/inducements" \
+  -H "X-Tenant-ID: $TENANT" \
+  -H "Authorization: Bearer $ADMIN_JWT"
+```
+
+## 9. GDPR and Compliance
+
+### GDPR Data Protection Report
+
+Generate a GDPR compliance report showing data protection exposure across entitlements:
+
+```bash
+curl -s "$API/governance/gdpr/report" \
+  -H "X-Tenant-ID: $TENANT" \
+  -H "Authorization: Bearer $ADMIN_JWT"
+```
+
+### Per-User Data Protection Summary
+
+See which entitlements a specific user holds that involve personal data:
+
+```bash
+curl -s "$API/governance/gdpr/users/$USER_ID/data-protection" \
+  -H "X-Tenant-ID: $TENANT" \
+  -H "Authorization: Bearer $ADMIN_JWT"
+```
+
+## 10. SAML Single Logout
+
+### Initiate SP-Initiated SLO
+
+Trigger logout across all Service Providers that have active SAML sessions for the user:
+
+```bash
+curl -s -X POST "$API/saml/slo/initiate" \
   -H "Content-Type: application/json" \
   -H "X-Tenant-ID: $TENANT" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -d "{\"user_id\": \"$USER_ID\"}"
 ```
+
+### SAML Metadata (with SLO endpoints)
+
+The SAML metadata now includes Single Logout Service endpoints:
+
+```bash
+curl -s "$API/saml/metadata"
+```
+
+## 11. OIDC RP-Initiated Logout
+
+### End Session
+
+Terminate a user's OIDC session with a browser redirect flow:
+
+```bash
+curl -s "$API/oauth/logout?id_token_hint=$ID_TOKEN&post_logout_redirect_uri=https://app.example.com/logged-out&client_id=$CLIENT_ID"
+```
+
+This endpoint validates the `id_token_hint`, terminates the session, and redirects the user to the `post_logout_redirect_uri`.
+
+## 12. Explore Additional Capabilities
 
 ### Webhook Subscriptions
 
@@ -480,12 +549,21 @@ xavyo acts as a standards-compliant OIDC provider:
 curl -s "$API/.well-known/openid-configuration"
 ```
 
-### SAML Metadata
+### Bulk Actions
 
-For SAML federation:
+Perform batch operations on multiple identities at once:
 
 ```bash
-curl -s "$API/saml/metadata"
+curl -s -X POST "$API/admin/bulk-actions" \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: $TENANT" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -d '{
+    "action": "assign_entitlement",
+    "entitlement_id": "'"$ENT_ID"'",
+    "target_ids": ["'"$USER_ID_1"'", "'"$USER_ID_2"'"],
+    "target_type": "user"
+  }'
 ```
 
 ## What's Next
@@ -495,4 +573,4 @@ This tour covered the core workflows. For deeper exploration:
 - **[Identity Governance](../concepts/identity-governance.md)** -- Understand the regulatory drivers behind access governance.
 - **[Lifecycle Management](../concepts/lifecycle-management.md)** -- Learn about automated Joiner/Mover/Leaver workflows.
 - **[Non-Human Identities](../concepts/non-human-identities.md)** -- Explore comprehensive NHI lifecycle management.
-- **[API Reference](/docs/reference/api/xavyo-api)** -- Browse the full OpenAPI specification with 933 operations.
+- **[API Reference](/docs/reference/api/xavyo-api)** -- Browse the full OpenAPI specification with 736 endpoints.

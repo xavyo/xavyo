@@ -1,0 +1,1 @@
+{"parameters":[{"name":"start_date","in":"query","description":"Start date for statistics (required).","required":true,"schema":{"type":"string","format":"date-time"}},{"name":"end_date","in":"query","description":"End date for statistics (required).","required":true,"schema":{"type":"string","format":"date-time"}}]}

@@ -1,0 +1,77 @@
+---
+id: list-jobs
+title: "List jobs with filtering and pagination."
+description: "GET /jobs"
+sidebar_label: "List jobs with filtering and pagination."
+hide_title: true
+hide_table_of_contents: true
+api: eJztVsFu20YQ/ZXFnFKAEaU2LQLe3MQOHBiFWzvoQRbsJXcorbvcZXaHrhWB/17MkqIUy5aVxMdeLJN8O+9x5s1wVkByHiCbwjtnLRbkvPjo8gCzBBSGwuuatLOQwYfjS5Heujxc2Sv7Z4N+Kc6llxUS+pBd2dfipliHuNbqJhMn2hB6kS/F8ECcvmdkIElN2EZ0d8SrGq3Sdp6IG22va+/mHkO4SUThqtogoUpEKbXh3xuFUl0bJELPCGkLNAbVT8xQelcN8Vm1KDxKQiVkybdooYMgXSGDyT0OzbF0Hr/GGl1pysS5nKMI+guKVwpL2RgSv44TUcl7MRmPowRXlgHX0O4CEnA1eskpPVWQgdGBrpkTEqiHbEI2XYGVFUIG2zmFBDSX4jNnHx4W6PF0QwIePzfao4KslCZgAqFYYCUhWwEtayYJ5LWdQwKl85UkyKBpIp1tjJG5QcjIN9i2yaCrK9ihigb0N2h5mpuLexDzvsK/lBhy3y7lobFeSks05345zxj3ICXaEs7Rb/tFW/rtzV5tQwc8J24AvqiQGccLtbMBA0f4eTzmn6/5efIJ7klk8xfOElpimKxro4vYt+ltYOxqV43Lb7Fg4bXnLifdMcX23qCk95LfXBNWYfd02yZAjqQ55DXbpC/5Ydg+s4eA2+30T6EfUZ2wZPBZH3CWAGniXHMGz3Sgv/pUQ9tyqDfjyW6yP1nZ0MJ5/QUVRNAvu6AT53OtFNooqUJaOJ6b82iQWtICMkiHeRfSXmhAf7cepI03kMGCqM7S1LhCmoULlL0dvx3vGPA93qFxdYWWRBcD2MKbECFLU63q0b28W7qRjTIeeNg71RR8MUSYsaCi8ZqWF2yazhc5So/+qOF3GCrCHNA7na87ECT9PyfrMn38+zJmRNvSxeN9/qMucXR+uqPrVKElTUtx7t2dVugZJUrnRTzT+10W0R99z3bRLlFWndUK5Jpunv9+cfZ6MppA8iBDc02LJh8VrkpjiP5vblyeVjIQ+vTs9N3xHxfHHJcr1WkcjyajMd+qXaBK2i0qdlU3RP/VtBBlnKrazoW0StRyrm3sztHD915t2vj/FeZlVpjeqoT3lNZGassViwZY9S053awt3I23/ULJfccPV6tcBvzkTdvy7e5bwK2qdOCZvZn4T5byyWXnUXH/4HJ3lbqTpmFo7PDvYR6Wmj2cA+bH2J5ZZPYI6HelF6R/ZHnZwx/Xo+9kf35X2UO8/kb9CPd+y3c8A2ZDNOMLr7v1YzprE1igVOijx7tTR0WB9fapnQ2Dowzfuw/HPO7/A5her1g=
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"List jobs with filtering and pagination."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/connectors/jobs"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+GET /jobs
+
+Query Parameters:
+- `connector_id`: Filter by connector ID
+- status: Filter by status (pending, `in_progress`, completed, failed, `dead_letter`, cancelled)
+- from: Filter jobs created after this time
+- to: Filter jobs created before this time
+- limit: Page size (default 50, max 100)
+- offset: Page offset
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./list-jobs.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./list-jobs.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./list-jobs.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

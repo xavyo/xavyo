@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"MFA disabled","content":{"application/json":{"schema":{"type":"object","properties":{"message":{"type":"string"}},"required":["message"],"title":"MfaDisableResponse"}}}},"400":{"description":"Cannot disable MFA when policy requires it"},"401":{"description":"Invalid credentials"}}}

@@ -260,9 +260,56 @@ curl -s -X POST "$API/governance/lifecycle/bulk-operations" \
 
 Bulk operations are processed asynchronously, tracked through the operations API, and generate individual lifecycle events for each affected user.
 
+## NHI Lifecycle States
+
+Non-Human Identities follow a lifecycle model with five states, tailored to the operational patterns of machine identities:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Active : Create
+    Active --> Suspended : Suspend
+    Suspended --> Active : Reactivate
+    Active --> Deprecated : Deprecate
+    Deprecated --> Archived : Archive
+    Deprecated --> Active : Reactivate
+    Active --> Inactive : Deactivate
+    Inactive --> Active : Activate
+    Inactive --> Archived : Archive
+    Suspended --> Archived : Archive
+    Archived --> [*] : Delete
+```
+
+### NHI vs. User Lifecycle States
+
+| State | User Meaning | NHI Meaning |
+|---|---|---|
+| **Active** | Employee is working | NHI is operational and can authenticate |
+| **Suspended** | Leave of absence, investigation | Temporarily disabled pending review |
+| **Inactive** | -- | Disabled, not currently in use |
+| **Deprecated** | -- | Scheduled for retirement, still functional but flagged |
+| **Deactivated** | Employee has left | -- |
+| **Archived** | Retained for audit | Retained for audit compliance |
+
+The NHI lifecycle adds **Inactive** and **Deprecated** states that are specific to machine identity patterns. Deprecation signals intent to retire an NHI, giving dependent systems time to migrate. Inactive provides a softer disable than suspension -- the NHI is simply not in use rather than under investigation.
+
+### NHI Lifecycle Transitions
+
+Lifecycle transitions are managed through dedicated endpoints under `/nhi/{id}/{action}`:
+
+| Transition | Endpoint | Description |
+|---|---|---|
+| Suspend | `POST /nhi/{id}/suspend` | Temporarily block authentication |
+| Reactivate | `POST /nhi/{id}/reactivate` | Restore from suspended or deprecated state |
+| Deprecate | `POST /nhi/{id}/deprecate` | Signal intent to retire |
+| Archive | `POST /nhi/{id}/archive` | Move to audit-only retention |
+| Deactivate | `POST /nhi/{id}/deactivate` | Disable the NHI |
+| Activate | `POST /nhi/{id}/activate` | Re-enable from inactive state |
+
+Lifecycle transitions enforce permission checks -- non-admin users require `manage` or `admin` level user-to-NHI permissions. Staleness detection (inactivity monitoring) and orphan detection (NHIs whose owner has been deactivated) can trigger automatic lifecycle transitions.
+
 ## Related Concepts
 
 - **[Identity Governance](./identity-governance.md)** -- the regulatory context for lifecycle management
 - **[Separation of Duties](./separation-of-duties.md)** -- how SoD rules interact with birthright provisioning
-- **[Non-Human Identities](./non-human-identities.md)** -- lifecycle management for machine identities
+- **[Non-Human Identities](./non-human-identities.md)** -- full NHI governance capabilities
 - **[Key Concepts](../getting-started/key-concepts.md)** -- overview of all xavyo concepts

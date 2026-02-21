@@ -1,0 +1,84 @@
+---
+id: verify-email-change
+title: "Handle POST /me/email/verify request."
+description: "Verifies the email change using the token sent to the new email address."
+sidebar_label: "Handle POST /me/email/verify request."
+hide_title: true
+hide_table_of_contents: true
+api: eJztVU1z2zYQ/SuY7ZUmKdftJLjZqjtVm0k8sd0eLE0MASsRCQgwACib1ei/dxagYkWO20uO9UEGF/v59u1iC1GsA/A7uA3o2ZV3K20QFgUoDNLrLmpngcOf6PVKY2CxQYat0IbJRtg1sj5ou07i6D6hZQFtZNElicWHUVko5TGEcm7n9gf2Hj/3GCK7cGogyf39/cfg7Nxu53YOyc8cOJuDWMrJ6Y8KV2c//VyW5RzmdpfU935C52xA+jphp3XN3v3B2eVBeoqFXkoMYdUbM5DWWV2zC6H2OXA2sxthtGLOM3zstEeVK8nKE3ZrRR8b5/XfqDh76yKjb7RRSxFRZbXXbOrsymgZ9/GjIDRU7wmeTYJPioRmAa5Dn84zBRzS5fAhAfUhpw0F+JwfQQR8C9LZiDbSUXSdGX1VBBvJgmywFXSKQ4fAwS0/ooxQQOcpWtQY0i1VdqAWIuUHu10OSNUTGbLaooCooyG9VFMiwTBNGY7wwe5r0+h7TILcmBTztK7p39eEerlJUHyvYlsMQazxG+UWYPEhI/7fYOzdHBodQ5NBmbq2MxhR7YlJ8OwKOPsWAi/xDpLB5LnBM+plzdcvgfsyAymnFmPjiH6dCwk6ERvgULVYpRKrTEsoIKDfoKclsYXeG+DQxNjxqjJOCtO4EPmr+lUNxzvjF9ygcV1LCyH7gF1x6CLwqtKqKx/FZnClxfjMxZV3qpf08cXDghKSvddxuCYe5FYvUXj05z3V8KWfFIPyT2rARyUoxsOvzrciAoff/7pJkBC/3j+N3eWjoHYejM0Bf7RduXQzsiDVwM6vZs9qmClqWBxouW60Qk9abOU8SzYj3YVMdLeiffJ2g6KlWEZLJDI93V9cvzmZlBMojtBc69j0y1K6tkouxt+lccuqFSGir97Mppdvry/JL3U151iXk7ImEZGhFfYg1G/CKoPs6t31DTsmBxuXVHlc9MG++v/p+K5Px0jtiI+x6ozQaV0kEmzHEaaFBQXkPVWMrwstLJpUut5ulyLgrTe7HYk/9+gH4HeLAjbCa7EkPt8tdgU0KBT6NPefcAAO09zUkxtKgtRNT8k829E05tniXErs4r/qLg52EbGM5nN89FqnyMaLB3oQxQNwSK8nWaexT7ItGGHXfdr0kH3S3z9GKRGJ
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Handle POST /me/email/verify request."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/me/email/verify"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Verifies the email change using the token sent to the new email address.
+
+# Request Body
+
+```json
+{
+"token": "abc123def456..."
+}
+```
+
+# Response
+
+- 200 OK: Email changed successfully
+- 400 Bad Request: Invalid or expired token
+- 401 Unauthorized: Not authenticated
+- 409 Conflict: Email taken during verification
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./verify-email-change.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./verify-email-change.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

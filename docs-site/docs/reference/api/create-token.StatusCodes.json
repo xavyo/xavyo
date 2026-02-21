@@ -1,0 +1,1 @@
+{"responses":{"201":{"description":"Token created"},"401":{"description":"Not authenticated"},"403":{"description":"Not authorized"}}}

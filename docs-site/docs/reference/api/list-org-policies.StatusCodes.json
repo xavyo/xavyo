@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Policies listed","content":{"application/json":{"schema":{"type":"object","properties":{"items":{"type":"array","items":{"type":"object"}},"total":{"type":"integer","format":"int64"}},"required":["items","total"],"title":"OrgSecurityPolicyListResponse"}}}},"401":{"description":"Unauthorized"},"404":{"description":"Organization not found"}}}

@@ -107,6 +107,26 @@ A **session** represents an authenticated user's active connection to xavyo. Ses
 
 Sessions can be revoked individually, in bulk (all sessions for a user), or by policy (maximum concurrent sessions, idle timeout, absolute timeout).
 
+### SAML Single Logout (SLO)
+
+**SAML Single Logout** extends the SAML 2.0 SSO flow with session termination across all participating Service Providers. xavyo supports both directions:
+
+- **SP-initiated SLO** -- a Service Provider requests logout, and xavyo (as the IdP) propagates logout requests to all other SPs that have active sessions for the user
+- **IdP-initiated SLO** -- xavyo initiates logout and sends `LogoutRequest` messages to all SPs with active sessions
+
+SLO relies on per-SP session tracking. When a user authenticates via SAML SSO to a Service Provider, xavyo records a session for that SP. During SLO, xavyo iterates through all active SP sessions and sends signed `LogoutRequest` messages using the HTTP-Redirect binding.
+
+### OIDC RP-Initiated Logout
+
+**RP-Initiated Logout** (defined in the OpenID Connect RP-Initiated Logout specification) allows an OAuth2/OIDC Relying Party to request that xavyo terminate the user's session. The `GET /oauth/logout` endpoint accepts:
+
+- `id_token_hint` -- the ID token previously issued to the client, used to identify the session
+- `post_logout_redirect_uri` -- where to redirect the user after logout
+- `client_id` -- identifies the requesting client
+- `state` -- opaque value returned to the client after logout
+
+This complements the existing OAuth2 token revocation endpoint by providing a browser-based logout flow that can clear cookies and redirect the user.
+
 ## Access Model
 
 ### Application
@@ -123,6 +143,7 @@ Each entitlement has:
 - **Risk level** -- low, medium, high, or critical, determining the governance rigor applied
 - **Owner** -- the person accountable for certifying and reviewing this access right
 - **Application** -- the system this entitlement belongs to
+- **GDPR data protection classification** -- optional classification indicating whether the entitlement grants access to personal data. This feeds into GDPR compliance reports that summarize data protection exposure per user, showing which entitlements touch personal data and their associated risk levels
 
 Entitlements can be assigned directly to users, to groups (inherited by all members), or bundled into roles.
 
@@ -139,6 +160,7 @@ xavyo supports several role concepts:
 - **Meta-roles** -- dynamic roles with criteria-based membership (e.g., "all users in Engineering with manager title")
 - **Parameterized roles** -- roles with parameters that customize the entitlements (e.g., "Database Admin" with a `database_name` parameter)
 - **Role mining** -- an analytics feature that examines existing access patterns and suggests optimal role definitions
+- **Role inducements** -- automatic role grants triggered when a parent role is assigned. When a user receives a role that has inducements configured, the induced roles are automatically granted without a separate request or approval. This reduces administrative overhead for roles that logically depend on one another (e.g., assigning "Senior Developer" automatically induces the "Developer" base role)
 
 ### Permission
 
@@ -261,6 +283,24 @@ Service accounts carry the same lifecycle management as human users -- ownership
 ### Tool
 
 A **tool** is a capability or API endpoint that agents can be authorized to invoke. Tools are registered with permission requirements, and agent access to tools is explicitly granted and auditable.
+
+### NHI-to-NHI Permissions
+
+xavyo supports explicit **NHI-to-NHI calling permissions** that control which non-human identities can invoke other non-human identities. This is essential for AI agent architectures where agents orchestrate other agents or call tools on behalf of users:
+
+- **Calling permissions** -- grant or revoke the ability for one NHI to call another (`POST /nhi/:source_id/call/:target_id/grant`)
+- **Caller/callee discovery** -- list which NHIs can call a given NHI, and which NHIs a given NHI can call
+- **Permission hierarchy** -- use, manage, and admin levels for user-to-NHI grants
+
+### MCP Discovery
+
+The **Model Context Protocol (MCP)** discovery endpoint allows AI agents to discover available tools and their parameters. xavyo exposes an MCP-compatible endpoint that returns tool definitions with JSON Schema parameter validation, enabling agents to self-discover what capabilities are available to them.
+
+### A2A Protocol
+
+The **Agent-to-Agent (A2A) protocol** enables structured communication between AI agents. xavyo supports:
+- **Agent card discovery** -- agents can publish and discover capability cards describing their functions
+- **Webhook delivery** -- A2A messages are delivered through xavyo's webhook infrastructure with circuit breaker protection and dead-letter queue
 
 See: [Non-Human Identities](../concepts/non-human-identities.md)
 

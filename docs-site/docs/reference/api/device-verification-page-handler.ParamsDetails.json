@@ -1,0 +1,1 @@
+{"parameters":[{"name":"code","in":"query","description":"Pre-filled user code from verification_uri_complete","required":false,"schema":{"type":"string","nullable":true}}]}

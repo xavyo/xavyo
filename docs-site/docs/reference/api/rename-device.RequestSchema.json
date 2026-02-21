@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","properties":{"device_name":{"type":"string"}},"required":["device_name"],"title":"RenameDeviceRequest"}}},"required":true}}

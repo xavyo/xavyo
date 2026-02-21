@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Logged out successfully (no redirect URI)","content":{"application/json":{"schema":{"type":"object","properties":{"message":{"type":"string"}},"required":["message"],"title":"LogoutResponse"}}}},"303":{"description":"Redirect to post-logout URI"},"400":{"description":"Invalid request"}}}

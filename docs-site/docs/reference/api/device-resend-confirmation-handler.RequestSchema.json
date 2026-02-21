@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","properties":{"device_code_id":{"type":"string"},"csrf_token":{"type":"string","nullable":true}},"required":["device_code_id"],"title":"ResendConfirmationRequest"}}},"required":true}}

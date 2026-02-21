@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Resend result page (HTML)"},"400":{"description":"Invalid request or CSRF validation failed"},"429":{"description":"Rate limit exceeded - wait before requesting another resend"}}}

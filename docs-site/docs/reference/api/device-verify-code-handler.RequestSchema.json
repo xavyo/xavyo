@@ -1,0 +1,1 @@
+{"title":"Body","body":{"description":"","content":{"application/x-www-form-urlencoded":{"schema":{"type":"object","properties":{"user_code":{"type":"string"},"csrf_token":{"type":"string","nullable":true}},"required":["user_code"],"title":"DeviceVerifyRequest"}}},"required":true}}
