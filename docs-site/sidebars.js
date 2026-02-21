@@ -8,6 +8,7 @@ const sidebars = {
       label: 'Getting Started',
       collapsed: false,
       items: [
+        'getting-started/installation',
         'getting-started/what-is-xavyo',
         'getting-started/key-concepts',
         'getting-started/quick-tour',

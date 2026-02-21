@@ -286,7 +286,7 @@ The raw API key value is returned only once. Store it securely.
 Suspending a tenant prevents all authentication and API access for that tenant's users while preserving data.
 
 ```bash
-curl -X POST https://your-domain.com/admin/tenants/{tenant_id}/suspend \
+curl -X POST https://your-domain.com/system/tenants/{tenant_id}/suspend \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $SYSTEM_TENANT_ID"
 ```
@@ -294,7 +294,7 @@ curl -X POST https://your-domain.com/admin/tenants/{tenant_id}/suspend \
 ### Reactivating a Tenant
 
 ```bash
-curl -X POST https://your-domain.com/admin/tenants/{tenant_id}/reactivate \
+curl -X POST https://your-domain.com/system/tenants/{tenant_id}/reactivate \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $SYSTEM_TENANT_ID"
 ```

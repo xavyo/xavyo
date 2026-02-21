@@ -32,9 +32,12 @@ curl -X POST https://your-domain.com/auth/signup \
 **Response (201 Created):**
 ```json
 {
-  "user_id": "uuid",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "user@example.com",
+  "email_verified": false,
   "access_token": "eyJ...",
-  "email_verified": false
+  "token_type": "Bearer",
+  "expires_in": 900
 }
 ```
 

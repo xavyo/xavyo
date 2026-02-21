@@ -10,7 +10,7 @@ sidebar_position: 6
 
 xavyo-idp provides a comprehensive Identity Governance and Administration (IGA) framework that covers the full lifecycle of identity and access management. This includes lifecycle state machines, certification campaigns for periodic access reviews, role mining for discovering optimal role structures, a self-service access request catalog, multi-level approval workflows with escalation, risk scoring for access decisions, and GDPR data protection reporting.
 
-All governance features are tenant-isolated and managed through the governance API under the `/governance` prefix.
+All governance features are tenant-isolated. Most endpoints are under the `/governance` prefix, with bulk actions under `/admin/bulk-actions`.
 
 ## Lifecycle Management
 
@@ -557,7 +557,7 @@ Execute governance operations in bulk with expression-based targeting, preview, 
 ### Creating a Bulk Action
 
 ```bash
-curl -X POST https://your-domain.com/governance/admin/bulk-actions \
+curl -X POST https://your-domain.com/admin/bulk-actions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID" \
@@ -577,24 +577,24 @@ curl -X POST https://your-domain.com/governance/admin/bulk-actions \
 
 ```bash
 # Validate a targeting expression
-curl -X POST https://your-domain.com/governance/admin/bulk-actions/validate-expression \
+curl -X POST https://your-domain.com/admin/bulk-actions/validate-expression \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID" \
   -d '{"expression": "role == \"contractor\" AND department == \"engineering\""}'
 
 # Preview the bulk action (see affected targets)
-curl -X POST https://your-domain.com/governance/admin/bulk-actions/{id}/preview \
+curl -X POST https://your-domain.com/admin/bulk-actions/{id}/preview \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID"
 
 # Execute the bulk action
-curl -X POST https://your-domain.com/governance/admin/bulk-actions/{id}/execute \
+curl -X POST https://your-domain.com/admin/bulk-actions/{id}/execute \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID"
 
 # Cancel an in-progress bulk action
-curl -X POST https://your-domain.com/governance/admin/bulk-actions/{id}/cancel \
+curl -X POST https://your-domain.com/admin/bulk-actions/{id}/cancel \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID"
 ```
@@ -603,14 +603,14 @@ curl -X POST https://your-domain.com/governance/admin/bulk-actions/{id}/cancel \
 
 | Operation | Method | Endpoint |
 |-----------|--------|----------|
-| Create bulk action | POST | `/governance/admin/bulk-actions` |
-| List bulk actions | GET | `/governance/admin/bulk-actions` |
-| Get bulk action | GET | `/governance/admin/bulk-actions/{id}` |
-| Delete bulk action | DELETE | `/governance/admin/bulk-actions/{id}` |
-| Validate expression | POST | `/governance/admin/bulk-actions/validate-expression` |
-| Preview bulk action | POST | `/governance/admin/bulk-actions/{id}/preview` |
-| Execute bulk action | POST | `/governance/admin/bulk-actions/{id}/execute` |
-| Cancel bulk action | POST | `/governance/admin/bulk-actions/{id}/cancel` |
+| Create bulk action | POST | `/admin/bulk-actions` |
+| List bulk actions | GET | `/admin/bulk-actions` |
+| Get bulk action | GET | `/admin/bulk-actions/{id}` |
+| Delete bulk action | DELETE | `/admin/bulk-actions/{id}` |
+| Validate expression | POST | `/admin/bulk-actions/validate-expression` |
+| Preview bulk action | POST | `/admin/bulk-actions/{id}/preview` |
+| Execute bulk action | POST | `/admin/bulk-actions/{id}/execute` |
+| Cancel bulk action | POST | `/admin/bulk-actions/{id}/cancel` |
 
 ## Object Templates
 
