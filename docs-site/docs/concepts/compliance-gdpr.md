@@ -30,24 +30,37 @@ GDPR grants individuals specific rights regarding their personal data. xavyo sup
 
 ### Right of Access (Article 15)
 
-Data subjects have the right to receive a copy of their personal data. xavyo provides a GDPR report endpoint that generates a comprehensive summary:
+Data subjects have the right to receive a copy of their personal data. xavyo provides two GDPR endpoints for this purpose.
+
+**Tenant-wide GDPR compliance report** -- generates a comprehensive summary of all classified entitlements across the tenant:
 
 ```bash
-curl -s -X POST "$API/governance/gdpr/report" \
-  -H "Content-Type: application/json" \
+curl -s "$API/governance/gdpr/report" \
   -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT" \
-  -d '{"user_id": "subject-user-id"}'
+  -H "X-Tenant-ID: $TENANT"
 ```
 
-The GDPR report includes:
-- **Personal data** -- name, email, profile attributes
-- **Authentication history** -- login events, MFA registrations, devices
-- **Access rights** -- current entitlement assignments, role memberships, group memberships
-- **Governance history** -- access requests, certification decisions, lifecycle events
-- **Sessions** -- active and historical session data
+The GDPR compliance report includes:
+- **Total and classified entitlement counts** -- how many entitlements process personal data
+- **Classification summary** -- breakdown by classification level (personal, sensitive, special_category)
+- **Legal basis summary** -- breakdown by legal basis (consent, contract, etc.)
+- **Classified entitlement details** -- each classified entitlement with its application, classification, legal basis, retention period, data controller, data processor, purposes, and active assignment count
+- **Retention inventory** -- all entitlements with retention periods set
 
-This report satisfies the Data Subject Access Request (DSAR) requirement by providing a complete view of the personal data held within the identity platform.
+**Per-user data protection summary** -- shows which classified entitlements a specific user has access to:
+
+```bash
+curl -s "$API/governance/gdpr/users/$USER_ID/data-protection" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT"
+```
+
+The per-user summary includes:
+- All classified entitlements assigned to the user (with full GDPR metadata)
+- Total count of classified entitlements
+- Classification breakdown (how many personal, sensitive, and special_category entitlements the user holds)
+
+Together, these endpoints satisfy the Data Subject Access Request (DSAR) requirement by providing a complete view of data protection exposure at both the organizational and individual level.
 
 ### Right to Rectification (Article 16)
 
@@ -77,39 +90,79 @@ Data subjects can request that processing of their data be restricted. In xavyo,
 
 ## Data Protection Classification
 
-xavyo supports data protection classification at the application and entitlement level, enabling organizations to track which systems process personal data and at what sensitivity level:
+xavyo supports data protection classification at the entitlement level, enabling organizations to track which access rights involve personal data and at what sensitivity level. This classification drives governance rigor and feeds into GDPR compliance reporting.
 
 ### Classification Levels
 
-| Level | Description | Example |
-|---|---|---|
-| **None** | No personal data processed | Internal documentation system |
-| **Personal** | Standard personal data (Article 6) | Employee directory, email system |
-| **Sensitive** | Sensitive personal data (Article 9) | HR system with health records |
-| **Special Category** | Special categories of data | Biometric authentication, health data, political opinions |
+| Level | Description | GDPR Reference | Example |
+|---|---|---|---|
+| **none** | No personal data involved | -- | Internal documentation system |
+| **personal** | Standard personal data | Article 4, Article 6 | Employee directory, email system |
+| **sensitive** | Sensitive personal data | Article 9 | HR system with health records |
+| **special_category** | Special categories requiring explicit consent | Article 9(1) | Biometric authentication, health data, political opinions |
 
-Classifications are assigned when registering applications:
+### Classifying Entitlements
+
+Classifications are assigned when creating or updating entitlements. Along with the classification, you can specify the legal basis, retention period, data controller and processor, and processing purposes:
 
 ```bash
-curl -s -X POST "$API/governance/applications" \
+curl -s -X POST "$API/governance/entitlements" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT" \
   -d '{
-    "name": "HR System",
-    "app_type": "internal",
-    "description": "Human resources management",
-    "data_protection_classification": "sensitive"
+    "name": "View Employee Records",
+    "description": "Access to employee personal data",
+    "application_id": "app-hr-system-id",
+    "risk_level": "high",
+    "data_protection_classification": "sensitive",
+    "legal_basis": "contract",
+    "retention_period_days": 365,
+    "data_controller": "Acme Corp",
+    "data_processor": "HR Cloud Provider",
+    "purposes": ["employment_management", "payroll_processing"]
   }'
 ```
+
+### Legal Basis Tracking
+
+xavyo supports all six GDPR Article 6(1) legal bases for processing personal data:
+
+| Legal Basis | GDPR Article | Description |
+|---|---|---|
+| `consent` | Art. 6(1)(a) | Data subject has given consent |
+| `contract` | Art. 6(1)(b) | Necessary for contract performance |
+| `legal_obligation` | Art. 6(1)(c) | Required by law |
+| `vital_interest` | Art. 6(1)(d) | Necessary to protect vital interests |
+| `public_task` | Art. 6(1)(e) | Necessary for public interest |
+| `legitimate_interest` | Art. 6(1)(f) | Necessary for legitimate interests |
+
+Legal basis requires a classification other than `none` -- if you set a legal basis, you must also classify the entitlement.
+
+### Retention Period Management
+
+Entitlements that process personal data can have a retention period set in days. This documents the maximum period for which data processed through the entitlement should be retained:
+
+```bash
+curl -s -X PATCH "$API/governance/entitlements/$ENT_ID" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{
+    "retention_period_days": 90,
+    "legal_basis": "legitimate_interest"
+  }'
+```
+
+The GDPR compliance report includes a dedicated section for entitlements with retention periods, making it easy to audit data retention across the organization.
 
 ### Classification Impact
 
 Data protection classification affects governance rigor:
-- **Sensitive and special category** applications require higher approval levels for access requests
-- Entitlements in classified applications receive higher risk weights in risk scoring
-- Certification campaigns for classified applications receive increased scrutiny
-- Access to classified applications is highlighted in GDPR reports
+- **Sensitive and special category** entitlements require higher approval levels for access requests
+- Classified entitlements receive higher risk weights in risk scoring
+- Certification campaigns highlight classified entitlements for increased scrutiny
+- Access to classified entitlements is surfaced in GDPR compliance reports and per-user data protection summaries
 
 ## Audit Trail
 
@@ -185,13 +238,16 @@ GDPR Article 33 requires notification of data breaches to supervisory authoritie
 
 ## Consent and Lawful Basis
 
-GDPR requires that organizations document the lawful basis for processing personal data. In the identity management context:
+GDPR requires that organizations document the lawful basis for processing personal data. xavyo tracks the legal basis at the entitlement level, supporting all six Article 6(1) bases. In the identity management context, the most common bases are:
 
 - **Contract** (Article 6(1)(b)) -- processing is necessary for employment or service contracts
 - **Legal obligation** (Article 6(1)(c)) -- processing is required by law (e.g., financial regulatory identity verification)
 - **Legitimate interest** (Article 6(1)(f)) -- processing is necessary for security purposes (authentication, access control)
+- **Consent** (Article 6(1)(a)) -- the data subject has given explicit consent
 
-xavyo's entitlement model supports purpose documentation -- each entitlement can include a description of why the access is needed, and access requests require business justification. This creates an auditable record linking access grants to business purposes.
+Each entitlement can also document processing purposes (as a list of strings), the data controller organization, and the data processor. This creates an auditable record linking access grants to their lawful basis and business purpose.
+
+The GDPR compliance report aggregates legal basis usage across the tenant, showing how many entitlements rely on each basis. Access requests require business justification, further strengthening the link between access grants and documented purposes.
 
 ## Per-Tenant GDPR Compliance
 

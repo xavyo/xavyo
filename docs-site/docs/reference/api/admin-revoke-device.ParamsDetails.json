@@ -1,0 +1,1 @@
+{"parameters":[{"name":"user_id","in":"path","description":"User ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"device_id","in":"path","description":"Device ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

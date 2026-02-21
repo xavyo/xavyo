@@ -1,0 +1,1 @@
+{"parameters":[{"name":"code","in":"query","required":false,"schema":{"type":"string","nullable":true}},{"name":"state","in":"query","required":true,"schema":{"type":"string"}},{"name":"error","in":"query","required":false,"schema":{"type":"string","nullable":true}},{"name":"error_description","in":"query","required":false,"schema":{"type":"string","nullable":true}}]}

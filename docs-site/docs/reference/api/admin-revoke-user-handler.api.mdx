@@ -1,0 +1,71 @@
+---
+id: admin-revoke-user-handler
+title: "POST /admin/oauth/revoke-user — revoke all tokens for a user."
+description: "Revokes all refresh tokens and blacklists all access tokens"
+sidebar_label: "POST /admin/oauth/revoke-user — revoke all tokens for a user."
+hide_title: true
+hide_table_of_contents: true
+api: eJzVVdtu4zYQ/RVinlpAtuxcvKnevNsU8GLRDRIH+5A1DIocWdxQpEJSTlzDQD+iX9gvKYaUEydp8lrUD7ZMnZk55Dkz3ELgKw/FDXyddqE+YlPZKAOLDCR64VQblDVQwCWu7S16xrVmDiuHvmbB3qLxjBvJSs3FrVY+JAQXAr3vAd9NZR0LNTLfolCVQsk6j27ILvGuU46yUlH2+duc8S7UaIISnAp/Nz8hRQuUrNzEHAnqbBfQsUZJqfGeO/x5CBnYFl2Mm0koICKXLhJfUsFlzY3U6CADh3cd+vDRyg0UWxDWBDSBHnnb6r56/sPT3rfgRY0Np6ewaREKsOUPFAEyaB3VDAo9vY1FlDwA+uCUWUEGlXUND1BA1ykJO2LA++wvoabTmpcaoQiuw90usVUOJcm0r7HIIKhAKIiSJYGuPbrLtDfYPQ+NyWjBt9b4RPhoNKKf51JPtd5Lmw5PMhKQCkP23xxV9NsykeoVPQxVJuAqsnuMVSZMTig4WXEf++jTZ/GltRq5SbVi8iUP71KTPOAgqAbhLX3epP0epWf131M4aUgS7zI4+TcVZ2bNtZLM7d1AuPFr3LWhlrNO/YEybqbBUFvqn9b6qBsPNRSQx3bKLaHzxHLQW8KjW6OjIbKFzmkooA6hLfJcW8F1bX0ozkZnI3g5U37FNWrbNmgCSzlglx2m8EWeK9kOH/h6Y4cGw6sUF87KTtCfxwwLIiQ6p8LmisyY/FYid+hoxB3oSjWIf4SRDyIIsv7ht73an7/N49GQyS+fJsf5A29a0ufAznBc8bPTanIyOP0w/jA4OZ0cDcrjSgyOxC+T42oy4RWfwFP77721y0CZykZyvehx12x6MXu165mkERk27MLZtZLoCBWbNMb0XcpF9LDhzVO2OfKGamklkAz09P7j1ZfBeDiG7MX5r1Sou3IobJPHFP13qW2ZN9wHdPmX2afz36/OKS/5IHEcDcfDES2RjRpuDkpdfL2as7f8xP7+869+7sSrpJ9EtDmero2Xx3Ewvv8f11TvvoAPIW81V3HwxFPf9t12ky4vutKo0uNcSB23yICaimDbbck9Xju929HyXYduA8XNIoM1dyrdIjeLXQY1cokutugtbqCAT+nMBnMiQ3DdEalXM506MkVMhcA2vItdHIwPUplaqb9iGyspxvF72g2/hwLijU3RsUPj2hY0N6uOrwibctLnH0EDBT0=
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"POST /admin/oauth/revoke-user — revoke all tokens for a user."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/admin/oauth/revoke-user"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Revokes all refresh tokens and blacklists all access tokens
+for the specified user. Requires admin JWT authentication
+(enforced by the admin router middleware).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./admin-revoke-user-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./admin-revoke-user-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

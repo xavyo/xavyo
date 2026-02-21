@@ -1,0 +1,74 @@
+---
+id: device-verification-page-handler
+title: "Device verification page (HTML)."
+description: "GET /device"
+sidebar_label: "Device verification page (HTML)."
+hide_title: true
+hide_table_of_contents: true
+api: eJzlVE1P20AQ/SurORXJ2IET8o1CoKloi0iqHkiUbOxxvGK9a3bHLlHk/17N2oUQiir12os/Zmdn3nvzsQOSGw/pPXw7b6g8FZfYqgzFhc0RFhHk6DOnalLWQArX45lI8uAxN3NzhyZH54U04tPsy42o5QbFzxIdCipRNB6dyKQRaAgdm5QbjDbHeG4mhVjx50o8Nui2opZOVsi+yova2VblmIsPhbOVWLXoVKEyyVCWjVPLzFa1RsLVUTQ3nI9D9TfxuFBaYy6UCUgK66p4bqZIXkhxMb27EmQf0IjM2gcVzoMPJyXMOEUMEdgaXcg3ySGFnvfyFQ5mvCylyTU6iOCZACu6AyMrhBQYF0SgWMFAFA51vX1B/KyPCLTfZQ0ROHxslMMc0kJqjxH4rMRKQroD2tac2ZNTZgMRmEZrudYIKbkGu27Bt31tjUfP/qejEb9eoxpaYR9CX+IPXO0j6LoIKqTSsjobpCAAlZDC0CMQgUfX/pajcRpSKInqNEm0zaQuraf0bHQ2eqPIJbaobV2hIdHHgC7aD+HTJFF5HT/JdmtjE7IfimrzJtTyOcKCAWWNU7SdslY9+TVKh47bf086zgGDpPzfO0E0fFxZV0mCFD7/mAUhlClsuK6IZYaAS5zfTt7gmuRoSNFW3PYd7tgrtGC4AxFk1pDMiMMNLdRHm6GsoItAqwyNx73zj9Ob45P4BKIDhTaKymYdZ7ZKQojhudZ2nVTSE7rkZnIx/jodc1yuVI9xFJ/EIzbV1lMlzV6qv3RFfMh3F+igof9vfwytRPhESa2lMqxoKNBumJT7YavwquVhYMtut5YevzvddWzuNwbPT648z/DLvL+r87/tkz/CfcDtywprpW7YJUxSK53qd8r9Yn8TXI95In4BI6M18A==
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Device verification page (HTML)."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/device"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+GET /device
+
+Renders an HTML page where the user can enter their user code.
+If `code` query parameter is provided (from `verification_uri_complete`),
+the code is pre-filled in the form.
+Sets a CSRF token cookie for form protection.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./device-verification-page-handler.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./device-verification-page-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./device-verification-page-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

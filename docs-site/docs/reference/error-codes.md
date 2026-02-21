@@ -37,12 +37,12 @@ Errors related to login, signup, and credential management.
 |------------|--------|-------|-------------|
 | `invalid-credentials` | 401 | Invalid Credentials | Email or password is incorrect. Intentionally generic to prevent email enumeration. |
 | `email-in-use` | 409 | Email Already in Use | The email address is already registered in this tenant. |
-| `weak-password` | 400 | Weak Password | Password does not meet the tenant's password policy. The `detail` field lists specific failures. |
-| `invalid-email` | 400 | Invalid Email Format | The email address format is invalid. |
+| `weak-password` | 422 | Weak Password | Password does not meet the tenant's password policy. The `detail` field lists specific failures. |
+| `invalid-email` | 422 | Invalid Email Format | The email address format is invalid. |
 | `email-not-verified` | 403 | Email Not Verified | Login denied because the account's email has not been verified. |
 | `account-inactive` | 401 | Invalid Credentials | Account is disabled or suspended. Returns generic error to prevent enumeration. |
-| `account-locked` | 423 | Account Locked | Account is temporarily locked due to too many failed login attempts. |
-| `account-locked-until` | 423 | Account Locked | Account is locked with a specific unlock time provided in `detail`. |
+| `account-locked` | 401 | Account Locked | Account is temporarily locked due to too many failed login attempts. |
+| `account-locked-until` | 401 | Account Locked | Account is locked with a specific unlock time provided in `detail`. |
 | `password-expired` | 403 | Password Expired | Password has expired per the tenant's password policy. Must be changed before login. |
 | `unauthorized` | 401 | Unauthorized | Missing, malformed, or expired authentication credentials. |
 
@@ -168,6 +168,31 @@ Errors related to multi-factor authentication setup and verification.
 |------------|--------|-------|-------------|
 | `validation-error` | 400 | Validation Error | Request body failed validation. The `detail` field lists specific field errors. |
 | `user-not-found` | 404 | User Not Found | The specified user does not exist in this tenant. |
+
+## Governance Errors
+
+Errors from governance endpoints (access requests, SoD, lifecycle, catalog, power of attorney).
+
+| Error Type | Status | Title | Description |
+|------------|--------|-------|-------------|
+| `sod-violation` | 409 | SoD Violation | The requested entitlement assignment would violate a Separation of Duties rule. The `detail` field identifies the conflicting entitlements and rule. |
+| `unprocessable_entity` | 422 | Request Cart Empty | The request cart is empty and cannot be submitted. Add items before submitting. |
+| `unprocessable_entity` | 422 | Request Cart Not Found | No active request cart exists for this user. |
+| `not-found` | 404 | Resource Not Found | A governance resource (archetype, inducement, catalog item, PoA grant, simulation) was not found. |
+| `forbidden` | 403 | Access Denied | The user lacks the required governance role or permission for this operation. |
+| `conflict` | 409 | Conflict | A governance resource with the same identifier already exists (e.g., duplicate SoD rule, duplicate archetype name). |
+
+## NHI Errors
+
+Errors from NHI endpoints (lifecycle, permissions, vault, SoD, MCP discovery, A2A).
+
+| Error Type | Status | Title | Description |
+|------------|--------|-------|-------------|
+| `bad-request` | 400 | Bad Request | Invalid NHI request (e.g., missing required fields, invalid lifecycle transition). |
+| `not-found` | 404 | Not Found | The specified NHI identity, secret, or permission was not found. |
+| `conflict` | 409 | Conflict | An NHI resource with the same identifier already exists or an SoD rule prevents the operation. |
+| `forbidden` | 403 | Forbidden | The user lacks the required NHI permission level (use/manage/admin) for this operation. |
+| `bad-gateway` | 502 | Bad Gateway | An MCP protocol error occurred when communicating with AgentGateway. |
 
 ## General Errors
 

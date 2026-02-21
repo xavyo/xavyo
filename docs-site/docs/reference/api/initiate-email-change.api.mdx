@@ -1,0 +1,86 @@
+---
+id: initiate-email-change
+title: "Handle POST /me/email/change request."
+description: "Initiates an email change request by sending a verification email"
+sidebar_label: "Handle POST /me/email/change request."
+hide_title: true
+hide_table_of_contents: true
+api: eJztVsFy2zYQ/RV0e6VFys0h4am2607VZhpNZKcHS2OviJWIlAQYAJTMaPTvnQVJSxbVTA899FAdJBLYt3i7+7CrHXhcO0gf4N6RFVNrVqogWEQgyWVWVV4ZDSlMtPIKPTmBWlCJqhBZjnpNwtKXmpwXy0Y40lLptUCxIatWKkNGt+Zz7Y3wOQlNW4FSWnJuNNdz/b342Hm4NrLhlaenp8/O6LnezfUcNG0fWw+QivAa3n6kZyyrgkaZKecQsWVWW0vaP1bo3NZY2QJmlNWWpujc+PKH7+Yw1/twRH+2q4x2xG8X4jJJxIffUvFpQJ9j82zyJknENcqedCo+YaFkZ2mtscJY4bCkPmyGjMW9xtrnxqqvJFMx0RtGiZ4pY7Txgm1Iez6ZZAt9J26MXhUq86m4DUywsISyEUqL2hFEYCqygcBEQgqqq1SbtMe2ShBBVydOMqQ7yIz2pD0/YlUVXbAxJ57XXJZTifzkm4ogBbP8TJmHCCrL53lFjndfqnNk6rxVeg37aFCRM0b7lpmyJFmFB39n0IsIvPIFw0MqbkJsXSVg/9qXtzWFhbbAge1lkvDPa2n/TbGZwL+To5KcwzWdzRA9V8qSe0Q/3I5gZWzJOyDR04VXJQ0S1jt/5ep8ovo7LHvRc8r2Ebw5m5VvyhoCbDyE/SNlt+h3Q/RZgTPFknxuWN2VcSHB6HNIIS4pDnziF5k7shuy3NF2UNsCUsi9r9I4LkyGRW6cT98mbxM4bXA/0YYKU5WkvWh9wD46duHSOFayGj3jpjEjTX7gYmqNrLOQst7DgglltVW+mbFaWkEsCS3Zq5pjeCk6n8H8gxmknRFE3cPPvRR+/eMupIRV+PFwp2/bdnhyJw9SGl7FIxUqvTKBSieaEKO4mk4GMU4kV9E3PCk2SpJlK7EyVgRMd2kwC3LWWB683RGWfFahMmLtHfavZ+8vxqMxRCfZXiuf10tu8HFw0X0vC7OMS3SebPx+cnP7++yW/XLVW47JaDxKeInFUqI+OuoX1LIgMf0wuxOn4ukn2eg06KNm+f8c/A/Pwe4ieXr2cVWg0qyBIKld1zC4XXKn7AdM2zQWEXBf4O3dbomO7m2x3/Pyl5psA+nDIoINWoVLvh0Pi30EOaEkG7rMn9RACjetRC7umASbFzWTGcwNbiot4irLqPLftF0cdT7WLHeDbn6XRjLG4pZnO24hhfBXgNGhyYS1HRSo13WYPtD65M9fXRF65Q==
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Handle POST /me/email/change request."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/me/email/change"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Initiates an email change request by sending a verification email
+to the new address.
+
+# Request Body
+
+```json
+{
+"new_email": "newemail@example.com",
+"current_password": "SecurePass123!"
+}
+```
+
+# Response
+
+- 200 OK: Verification email sent
+- 400 Bad Request: Validation error or same email
+- 401 Unauthorized: Invalid password or not authenticated
+- 409 Conflict: Email already in use
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./initiate-email-change.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./initiate-email-change.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

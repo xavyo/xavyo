@@ -1,0 +1,1 @@
+{"responses":{"204":{"description":"Token revoked"},"401":{"description":"Not authenticated"},"403":{"description":"Not authorized"},"404":{"description":"Token not found"}}}

@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"MFA policy updated","content":{"application/json":{"schema":{"type":"object","properties":{"tenant_id":{"type":"string","format":"uuid"},"mfa_policy":{"type":"object"}},"required":["tenant_id","mfa_policy"],"title":"MfaPolicyResponse"}}}},"401":{"description":"Unauthorized"},"403":{"description":"Admin role required"}}}

@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","properties":{"new_email":{"type":"string"},"current_password":{"type":"string"}},"required":["new_email","current_password"],"title":"EmailChangeRequest"}}},"required":true}}

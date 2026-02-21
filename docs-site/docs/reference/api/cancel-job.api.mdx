@@ -1,0 +1,71 @@
+---
+id: cancel-job
+title: "Cancel a job."
+description: "POST /jobs/{id}/cancel"
+sidebar_label: "Cancel a job."
+hide_title: true
+hide_table_of_contents: true
+api: eJy1VE1v2zgQ/SvEnFqAsZxtDq1uadoCDoo2aBL04BoFRY5teiWSJUdGXUH/vRhRcYwoW+ylF1sk5+PNvDfTAalNgnIJV9451OSjuPZVgpUEg0lHG8h6ByXcfL69E8XOV6norOkLrZzG+pv75q6GrySUCOiMdRvho7DuLES/iZiS2PlqJq6Uc55EdhPaN6FGQsOPaQYSfMCoONfCQAnZ7PvOVyAhqKgaJIwMtAOnGoQSrAEJlqEFRVt4ivfaV2LxDiRE/NHaiAZKii1KSHqLjYKyAzoEDpQoWrcBCWsfG0VQQttaA32/YucUvEuY2P6f+Zz/pnky2hoZkfaO0BEbqhBqq4eiil1i626a3Vc71MRVRm4B2ZzLmv+BUEIiRW2amvYSjqC+K/pjLKMIz8g2yF4NpqQ2+JyDa+taVTXmRvb9aWuXmY4RzpPkKwlkiR0ha+XaV1/GxkLfc6SL+fm0tfdOtbT10f7CodiL+aup0QcfK2sMumxx8TxDLL21b90Y581/8siGFZ4w2g9Noa1nWQafBqpYcCUU+mFm0mQwuBkY9w+abWMNJWyJQlkUtdeq3vpE5ev56/lEue9wj7UPDToSOQb08jREKovCmjD7qfYHP3NIkxA30ZtW8+EYYcWAdBstHW5Zg1lmFaqI8bLleo6Mcw4YB4XP2Qjk+PHhQTjXX++G9li39oP7SPKAS1zeLCa4FgYdWTqIm+j31mBkK7H2UQw+4/goPQh2nPMc7Q5Vw9zVViPL5vH97e3Hs/PZOcgnHdpY2rbVTPumGEKMv1Xtq6JRiTAWHxdX7z/dvue4zFTGOJ+dz+Z8xWQ3yp2kyuoVathoT4vrHkf/ry/LkSjCn1SEWtlB/EP53SjOJTyKEySwI0gohykdFbqSwCJk266rVML7WPc9X/9oMR6gXK4k7FW0eeiXHRib+NtAuVZ1wj804MWXcTW8FMdF/Czo8VK5A3CyuuUTSPgXD3nH96tewhaVwThgyA+XWmOgE5fJrmXBH+eW+YC+/w3n11wP
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Cancel a job."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/connectors/jobs/{id}/cancel"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+POST /jobs/\{id\}/cancel
+
+Cancels a pending or in-progress job. Cannot cancel completed jobs.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./cancel-job.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./cancel-job.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./cancel-job.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

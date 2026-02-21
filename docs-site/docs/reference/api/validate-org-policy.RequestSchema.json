@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","properties":{"policy_type":{"type":"object"},"config":{"type":"object"}},"required":["policy_type","config"],"title":"ValidatePolicyRequest"}}},"required":true}}

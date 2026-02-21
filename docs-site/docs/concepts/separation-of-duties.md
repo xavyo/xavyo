@@ -238,9 +238,63 @@ SoD rules are not limited to a single application. A rule can reference entitlem
 
 Cross-application SoD is enforced through the same mechanisms -- preventive checks at assignment time and detective scans across the entire entitlement landscape.
 
+## NHI Separation of Duties
+
+SoD is not limited to human identities. AI agents and service accounts that hold tool permissions are subject to the same principle -- an agent that can both create and approve financial transactions presents the same risk as a human user with that combination.
+
+xavyo provides dedicated NHI SoD rules that operate on tool permissions rather than entitlements:
+
+```bash
+# Create an NHI SoD rule
+curl -s -X POST "$API/nhi/sod/rules" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{
+    "tool_id_a": "tool-create-payment",
+    "tool_id_b": "tool-approve-payment",
+    "enforcement": "prevent",
+    "description": "Agent must not create and approve payments"
+  }'
+
+# Check a proposed tool grant against SoD rules
+curl -s -X POST "$API/nhi/sod/check" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT" \
+  -d '{
+    "agent_id": "agent-id",
+    "tool_id": "tool-approve-payment"
+  }'
+```
+
+### NHI SoD Enforcement Levels
+
+NHI SoD rules support two enforcement levels:
+
+| Level | Behavior |
+|---|---|
+| **Prevent** | Block the tool permission grant entirely -- the agent cannot hold both tools |
+| **Warn** | Allow the grant but return a warning to the administrator |
+
+The `warn` level is useful during initial SoD rollout, enabling organizations to discover existing violations before switching to preventive enforcement.
+
+### NHI vs. User SoD
+
+| Aspect | User SoD | NHI SoD |
+|---|---|---|
+| **Target** | Entitlement assignments to users | Tool permission grants to agents |
+| **API** | `/governance/sod-rules` | `/nhi/sod/rules` |
+| **Check** | `/governance/sod-check` | `/nhi/sod/check` |
+| **Enforcement** | Block assignment | Prevent or warn on grant |
+| **Exemptions** | Time-limited exemptions with justification | Not yet supported |
+
+Both systems serve the same governance objective -- preventing a single identity from holding conflicting access rights -- but they operate on different permission models appropriate to their identity types.
+
 ## Related Concepts
 
 - **[Identity Governance](./identity-governance.md)** -- the regulatory context for SoD controls
 - **[Lifecycle Management](./lifecycle-management.md)** -- how birthright provisioning interacts with SoD rules
+- **[Non-Human Identities](./non-human-identities.md)** -- NHI lifecycle and tool permission governance
 - **[Zero Trust Architecture](./zero-trust.md)** -- risk-based enforcement triggered by SoD violations
 - **[Key Concepts](../getting-started/key-concepts.md)** -- entitlements, roles, and the access model

@@ -1,0 +1,70 @@
+---
+id: verify-totp
+title: "POST /auth/mfa/totp/verify"
+description: "Verify TOTP code during login to complete MFA authentication."
+sidebar_label: "POST /auth/mfa/totp/verify"
+hide_title: true
+hide_table_of_contents: true
+api: eJzFVsFu2zgQ/RViTi2gWs6iWBS6OW2ycNFuDce7PSSGTUsjiw1FKuTIiWvo3xdDKrFdJ9tiL5uDLTDDeTNv3jx5ByTXHrJr+Hw5gnkCBfrcqYaUNZDB3+hUuRWzL7OJyG2BomidMmuh7VoZQVbktm40EorPlyMhW6rQkMolXx/cmCnetcqhF1IsG+lISb0ge4tmKUpna0EVCmUUn/cpHfrGGo8DSMA26EKmcQEZbEIpC7LUQAIO71r0dG6LLWQ7yK0hNMSPsml0X0H6zXMXO/B5hbXkJ9o2CBnY1TfMCRJoHKOQQh/TFHgQ5Ymbha6LeMphwUyFqHkCpEhz2MxSE4maxqqgO75CrsVwEHsLUL8Nh/x1TDeTGPrsGxC+zXP0vmx1IgJxXijvWywg+e89H2POOO0T76K0Tky+XM1EanmcaUAdwDEDMlQVRwkJhO9FgEkAHxoe+UIZ5uiY36N7Jzz/WNkoRMe+xauPX2evB9AdAexTKEO4RgcJlNbVkuLR729faFerEknVrD7hMbem8CG3Kn61uPGHx8KYsSVzZZ36HmawYIUsxb2iStgGjSqEz22Dr5lH02otVyycJ1mUDn31q8DTGP6IbiwJZXLdFliE4S1zrdDQIndY8DJK7ZfPA4eafg74h5OGsG/BP5vpQAA/TRcHwDHildT3cuvFDZyjdOhugCfcHW7WLZppL03eqi6Bt88tzthspFbF3qggRJ69HGmdiEIqRO9MkdGAXyNVlk2nsT64hKQKMkjDRtSlTNmF0uhIkIBHt0HHLrqD1mnIoCJqsjTVNpe6sp6yd8N3wxMqPuAGtW1qNCRiDuiSwxQ+S1NVNIMHudnagcHT7Z04W7R59Io+w5wLylunaHvFHhBXbxUYHrXcyNOIGIPrD2GQ9UGQ9A+Xj6v08ess8MLeMt0778WDZPffO+eTYyagTGkDUj/K0IIYTcanmxRkSlsxcXajCnQcFaQc7vROJ/PgdEbW+2wzlDVjaZUjC2T///OrT2/OBmeQ/EDmWlHVrga5rdOQov9cabtKa+kJXfpp/P7iz6sLzstDjTUOB2eDIR+xIGppDqCiWb6gjKNOD15T/++LtZ8+4QOljZbKcGeBqF0v9WtgSEigLmUw+KCTvq15AqxpjtrtVtLjX053HR/ftei2kF3PE9hIp6JHXM+7BCqUBbqwIbe4hQzeRyrezOJbYyN1yzWdvMl4IeINfh009K+x84PV5bmwkvtfCHUUqJP3/C6T95BB+InBt8OChLMdaGnWrVxzbMzJf/8AMVIu5A==
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"POST /auth/mfa/totp/verify"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/auth/mfa/totp/verify"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Verify TOTP code during login to complete MFA authentication.
+Requires a `partial_token` from the initial login response.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./verify-totp.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./verify-totp.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

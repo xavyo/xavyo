@@ -36,8 +36,10 @@ curl -X POST https://your-domain.com/nhi/agents \
     "name": "Data Pipeline Agent",
     "agent_type": "autonomous",
     "description": "Processes ETL pipelines for analytics",
-    "risk_level": "medium",
-    "owner_id": "owner-user-uuid"
+    "owner_id": "owner-user-uuid",
+    "model_provider": "anthropic",
+    "model_name": "claude-opus-4-6",
+    "requires_human_approval": false
   }'
 ```
 
@@ -47,29 +49,21 @@ curl -X POST https://your-domain.com/nhi/agents \
   "id": "agent-uuid",
   "name": "Data Pipeline Agent",
   "agent_type": "autonomous",
-  "risk_level": "medium",
   "owner_id": "owner-user-uuid",
-  "status": "active",
+  "lifecycle_state": "active",
   "created_at": "2026-02-07T12:00:00Z"
 }
 ```
 
 ### Agent Types
 
+The `agent_type` field is a free-form string. Common values include:
+
 | Type | Description |
 |------|-------------|
 | `autonomous` | Operates independently without human intervention |
-| `semi_autonomous` | Requires human approval for certain actions |
-| `supervised` | All actions require human oversight |
-
-### Risk Levels
-
-| Level | Description |
-|-------|-------------|
-| `low` | Limited access, read-only operations |
-| `medium` | Standard operational access |
-| `high` | Access to sensitive data or critical systems |
-| `critical` | Full administrative or infrastructure access |
+| `supervised` | Actions require human oversight |
+| `copilot` | Works alongside human operators |
 
 ### Agent Endpoints
 
@@ -102,100 +96,94 @@ curl "https://your-domain.com/nhi/agents?status=active" \
   -H "X-Tenant-ID: $TENANT_ID"
 ```
 
-## Credential Management
+## Vault (Secret Management)
 
-### Rotating Credentials
+xavyo includes a built-in encrypted vault for managing NHI secrets. Secrets are encrypted at rest using AES-256-GCM.
 
-Credential rotation generates a new credential for an agent while optionally maintaining a grace period during which the old credential remains valid:
+### Storing a Secret
 
 ```bash
-curl -X POST https://your-domain.com/nhi/agents/{agent_id}/credentials/rotate \
+curl -X POST https://your-domain.com/nhi/{nhi_id}/vault/secrets \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID" \
   -d '{
-    "credential_type": "api_key",
-    "name": "Pipeline API Key v2",
-    "grace_period_hours": 24
+    "name": "Pipeline API Key",
+    "secret_type": "api_key",
+    "secret_value": "your-secret-value"
   }'
 ```
 
-**Response (201 Created):**
-```json
-{
-  "credential": {
-    "id": "cred-uuid",
-    "name": "Pipeline API Key v2",
-    "credential_type": "api_key",
-    "status": "active",
-    "valid_from": "2026-02-07T12:00:00Z"
-  },
-  "secret_value": "xavyo_nhi_sk_..."
-}
+### Listing Secrets
+
+```bash
+curl https://your-domain.com/nhi/{nhi_id}/vault/secrets \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
 ```
 
 :::warning
-The `secret_value` is returned only once during credential rotation. Store it immediately in a secure vault. Subsequent GET requests will not include the secret.
+Secret values are not returned in list responses. The plaintext is only available at creation time.
 :::
 
-### Listing Credentials
+### Rotating a Secret
 
 ```bash
-# List all credentials for an agent
-curl https://your-domain.com/nhi/agents/{agent_id}/credentials \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT_ID"
-
-# Filter active credentials only
-curl "https://your-domain.com/nhi/agents/{agent_id}/credentials?status=active" \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT_ID"
-```
-
-### Revoking Credentials
-
-```bash
-curl -X POST https://your-domain.com/nhi/agents/{agent_id}/credentials/{credential_id}/revoke \
+curl -X POST https://your-domain.com/nhi/{nhi_id}/vault/secrets/{secret_id}/rotate \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID" \
-  -d '{
-    "reason": "Credential compromised"
-  }'
+  -d '{"new_value": "rotated-secret-value"}'
 ```
 
-### Validating Credentials
-
-Check whether a credential is currently valid:
+### Deleting a Secret
 
 ```bash
-curl -X POST https://your-domain.com/nhi/agents/{agent_id}/credentials/validate \
+curl -X DELETE https://your-domain.com/nhi/{nhi_id}/vault/secrets/{secret_id} \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+### Lease Management
+
+Leases provide time-limited access to secrets:
+
+```bash
+# Create a lease
+curl -X POST https://your-domain.com/nhi/{nhi_id}/vault/leases \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID" \
-  -d '{
-    "credential": "xavyo_nhi_sk_..."
-  }'
+  -d '{"secret_id": "secret-uuid", "ttl_seconds": 3600}'
+
+# List active leases
+curl https://your-domain.com/nhi/{nhi_id}/vault/leases \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# Renew a lease
+curl -X POST https://your-domain.com/nhi/{nhi_id}/vault/leases/{lease_id}/renew \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# Revoke a lease
+curl -X DELETE https://your-domain.com/nhi/{nhi_id}/vault/leases/{lease_id} \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
 ```
 
-**Response:**
-```json
-{
-  "valid": true,
-  "credential_id": "cred-uuid",
-  "expires_at": "2027-02-07T12:00:00Z"
-}
-```
-
-### Credential Endpoints
+### Vault Endpoints
 
 | Operation | Method | Endpoint |
 |-----------|--------|----------|
-| Rotate credentials | POST | `/nhi/agents/{id}/credentials/rotate` |
-| List credentials | GET | `/nhi/agents/{id}/credentials` |
-| Get credential | GET | `/nhi/agents/{id}/credentials/{cred_id}` |
-| Revoke credential | POST | `/nhi/agents/{id}/credentials/{cred_id}/revoke` |
-| Validate credential | POST | `/nhi/agents/{id}/credentials/validate` |
+| Store secret | POST | `/nhi/{id}/vault/secrets` |
+| List secrets | GET | `/nhi/{id}/vault/secrets` |
+| Delete secret | DELETE | `/nhi/{id}/vault/secrets/{secret_id}` |
+| Rotate secret | POST | `/nhi/{id}/vault/secrets/{secret_id}/rotate` |
+| Create lease | POST | `/nhi/{id}/vault/leases` |
+| List leases | GET | `/nhi/{id}/vault/leases` |
+| Renew lease | POST | `/nhi/{id}/vault/leases/{lease_id}/renew` |
+| Revoke lease | DELETE | `/nhi/{id}/vault/leases/{lease_id}` |
 
 ## Tool Management
 
@@ -249,115 +237,99 @@ curl "https://your-domain.com/nhi/tools?risk_level=high" \
   -H "X-Tenant-ID: $TENANT_ID"
 ```
 
-## Agent Permissions
+## Agent Tool Permissions
 
 Grant or revoke tool access for specific agents:
 
 ```bash
 # Grant tool permission to an agent
-curl -X POST https://your-domain.com/nhi/agents/{agent_id}/permissions \
+curl -X POST https://your-domain.com/nhi/agents/{agent_id}/tools/{tool_id}/grant \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT_ID" \
-  -d '{
-    "tool_id": "tool-uuid"
-  }'
-
-# List agent permissions
-curl https://your-domain.com/nhi/agents/{agent_id}/permissions \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID"
 
-# Revoke tool permission
-curl -X DELETE https://your-domain.com/nhi/agents/{agent_id}/permissions/{tool_id} \
+# List tools granted to an agent
+curl https://your-domain.com/nhi/agents/{agent_id}/tools \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# List agents granted to a tool
+curl https://your-domain.com/nhi/tools/{tool_id}/agents \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# Revoke tool permission from an agent
+curl -X POST https://your-domain.com/nhi/agents/{agent_id}/tools/{tool_id}/revoke \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID"
 ```
 
-### Permission Endpoints
+### Tool Permission Endpoints
 
 | Operation | Method | Endpoint |
 |-----------|--------|----------|
-| Grant permission | POST | `/nhi/agents/{id}/permissions` |
-| List permissions | GET | `/nhi/agents/{id}/permissions` |
-| Revoke permission | DELETE | `/nhi/agents/{id}/permissions/{tool_id}` |
+| Grant tool to agent | POST | `/nhi/agents/{id}/tools/{tool_id}/grant` |
+| Revoke tool from agent | POST | `/nhi/agents/{id}/tools/{tool_id}/revoke` |
+| List agent's tools | GET | `/nhi/agents/{id}/tools` |
+| List tool's agents | GET | `/nhi/tools/{tool_id}/agents` |
 
 ## Service Account Management
 
-Service accounts are machine identities for system-to-system communication. Unlike agents, service accounts follow a request-and-approval workflow before creation.
+Service accounts are machine identities for system-to-system communication.
 
-### Requesting a Service Account
+### Creating a Service Account
 
 ```bash
-curl -X POST https://your-domain.com/nhi/service-accounts/requests \
+curl -X POST https://your-domain.com/nhi/service-accounts \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID" \
   -d '{
     "name": "CI/CD Pipeline Account",
-    "purpose": "Automated deployment pipeline for production services",
-    "owner_id": "owner-user-uuid",
-    "risk_level": "medium"
+    "description": "Automated deployment pipeline for production services",
+    "purpose": "Continuous deployment",
+    "owner_id": "owner-user-uuid"
   }'
 ```
 
-### Approval Workflow
+### Listing Service Accounts
 
 ```bash
-# List pending requests
-curl https://your-domain.com/nhi/service-accounts/requests?status=pending \
+curl https://your-domain.com/nhi/service-accounts \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+### Get, Update, Delete
+
+```bash
+# Get a service account
+curl https://your-domain.com/nhi/service-accounts/{id} \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID"
 
-# View my pending approvals
-curl https://your-domain.com/nhi/service-accounts/requests/my-pending \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT_ID"
-
-# Approve a request
-curl -X POST https://your-domain.com/nhi/service-accounts/requests/{request_id}/approve \
+# Update a service account
+curl -X PATCH https://your-domain.com/nhi/service-accounts/{id} \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID" \
-  -d '{
-    "comment": "Approved for production deployment use case"
-  }'
+  -d '{"description": "Updated description"}'
 
-# Reject a request
-curl -X POST https://your-domain.com/nhi/service-accounts/requests/{request_id}/reject \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT_ID" \
-  -d '{
-    "comment": "Use existing shared service account instead"
-  }'
-
-# Cancel a request (by the requester)
-curl -X POST https://your-domain.com/nhi/service-accounts/requests/{request_id}/cancel \
+# Delete a service account
+curl -X DELETE https://your-domain.com/nhi/service-accounts/{id} \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID"
 ```
 
-### Request Summary
-
-```bash
-curl https://your-domain.com/nhi/service-accounts/requests/summary \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT_ID"
-```
-
-### Service Account Request Endpoints
+### Service Account Endpoints
 
 | Operation | Method | Endpoint |
 |-----------|--------|----------|
-| Submit request | POST | `/nhi/service-accounts/requests` |
-| List requests | GET | `/nhi/service-accounts/requests` |
-| Get request | GET | `/nhi/service-accounts/requests/{id}` |
-| Approve request | POST | `/nhi/service-accounts/requests/{id}/approve` |
-| Reject request | POST | `/nhi/service-accounts/requests/{id}/reject` |
-| Cancel request | POST | `/nhi/service-accounts/requests/{id}/cancel` |
-| My pending | GET | `/nhi/service-accounts/requests/my-pending` |
-| Summary | GET | `/nhi/service-accounts/requests/summary` |
+| Create | POST | `/nhi/service-accounts` |
+| List | GET | `/nhi/service-accounts` |
+| Get | GET | `/nhi/service-accounts/{id}` |
+| Update | PATCH | `/nhi/service-accounts/{id}` |
+| Delete | DELETE | `/nhi/service-accounts/{id}` |
 
 ## NHI Certification Campaigns
 
@@ -379,58 +351,274 @@ curl -X POST https://your-domain.com/nhi/certifications/campaigns \
   }'
 ```
 
-### Campaign Lifecycle
+### Campaign Operations
 
 ```bash
-# Launch the campaign (generates review items)
-curl -X POST https://your-domain.com/nhi/certifications/campaigns/{id}/launch \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT_ID"
-
-# View campaign summary
-curl https://your-domain.com/nhi/certifications/campaigns/{id}/summary \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT_ID"
-
-# List review items
-curl https://your-domain.com/nhi/certifications/campaigns/{id}/items \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT_ID"
-
-# Decide on an item (certify or revoke)
-curl -X POST https://your-domain.com/nhi/certifications/items/{item_id}/decide \
+# Certify an NHI in a campaign
+curl -X POST https://your-domain.com/nhi/certifications/{campaign_id}/certify/{nhi_id} \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID" \
   -d '{
-    "decision": "certify",
     "comment": "Agent still needed for daily data processing"
   }'
 
-# View my pending certification items
-curl https://your-domain.com/nhi/certifications/my-pending \
+# Revoke an NHI in a campaign
+curl -X POST https://your-domain.com/nhi/certifications/{campaign_id}/revoke/{nhi_id} \
+  -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT_ID"
-
-# Cancel a campaign
-curl -X POST https://your-domain.com/nhi/certifications/campaigns/{id}/cancel \
-  -H "Authorization: Bearer $ADMIN_JWT" \
-  -H "X-Tenant-ID: $TENANT_ID"
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{
+    "comment": "No longer needed"
+  }'
 ```
 
 ### Certification Endpoints
 
 | Operation | Method | Endpoint |
 |-----------|--------|----------|
-| Create campaign | POST | `/nhi/certifications/campaigns` |
-| List campaigns | GET | `/nhi/certifications/campaigns` |
-| Get campaign | GET | `/nhi/certifications/campaigns/{id}` |
-| Launch campaign | POST | `/nhi/certifications/campaigns/{id}/launch` |
-| Get summary | GET | `/nhi/certifications/campaigns/{id}/summary` |
-| List items | GET | `/nhi/certifications/campaigns/{id}/items` |
-| Decide on item | POST | `/nhi/certifications/items/{id}/decide` |
-| Cancel campaign | POST | `/nhi/certifications/campaigns/{id}/cancel` |
-| My pending items | GET | `/nhi/certifications/my-pending` |
+| Create campaign | POST | `/nhi/certifications` |
+| List campaigns | GET | `/nhi/certifications` |
+| Certify NHI | POST | `/nhi/certifications/{campaign_id}/certify/{nhi_id}` |
+| Revoke NHI | POST | `/nhi/certifications/{campaign_id}/revoke/{nhi_id}` |
+
+## NHI Permission Model
+
+Beyond tool-level permissions, xavyo-idp provides a fine-grained permission model for controlling who can interact with NHI identities and how NHIs can interact with each other.
+
+### User-to-NHI Permissions
+
+Control which users can access specific NHI identities. Permission types follow a hierarchy: `use` (invoke the NHI), `manage` (configure and modify), and `admin` (full control including permission grants).
+
+```bash
+# Grant a user permission to use an NHI
+curl -X POST https://your-domain.com/nhi/{nhi_id}/users/{user_id}/grant \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{
+    "permission_type": "use",
+    "expires_at": "2026-06-30T00:00:00Z"
+  }'
+
+# Revoke a user's permission
+curl -X POST https://your-domain.com/nhi/{nhi_id}/users/{user_id}/revoke \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{"permission_type": "use"}'
+
+# List users with access to an NHI
+curl https://your-domain.com/nhi/{nhi_id}/users \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# List NHIs accessible by a user
+curl https://your-domain.com/nhi/users/{user_id}/accessible \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+Non-admin users can only view their own accessible NHIs via the `/nhi/users/{user_id}/accessible` endpoint.
+
+### NHI-to-NHI Calling Permissions
+
+Control which NHIs can invoke or delegate to other NHIs. Supports rate limiting (`max_calls_per_hour`), allowed action filtering, and expiry.
+
+```bash
+# Grant NHI calling permission (source can call target)
+curl -X POST https://your-domain.com/nhi/{source_id}/call/{target_id}/grant \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{
+    "permission_type": "call",
+    "allowed_actions": ["read", "query"],
+    "max_calls_per_hour": 100,
+    "expires_at": "2026-12-31T00:00:00Z"
+  }'
+
+# Revoke NHI calling permission
+curl -X POST https://your-domain.com/nhi/{source_id}/call/{target_id}/revoke \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{"permission_type": "call"}'
+
+# List NHIs that can call this NHI (callers)
+curl https://your-domain.com/nhi/{nhi_id}/callers \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# List NHIs this NHI can call (callees)
+curl https://your-domain.com/nhi/{nhi_id}/callees \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+### NHI Permission Endpoints
+
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| Grant user permission | POST | `/nhi/{id}/users/{user_id}/grant` |
+| Revoke user permission | POST | `/nhi/{id}/users/{user_id}/revoke` |
+| List NHI users | GET | `/nhi/{id}/users` |
+| List user's NHIs | GET | `/nhi/users/{user_id}/accessible` |
+| Grant NHI calling | POST | `/nhi/{id}/call/{target_id}/grant` |
+| Revoke NHI calling | POST | `/nhi/{id}/call/{target_id}/revoke` |
+| List callers | GET | `/nhi/{id}/callers` |
+| List callees | GET | `/nhi/{id}/callees` |
+
+:::info
+Admin and super_admin users bypass NHI permission checks. Non-admin users can only access NHIs they have explicit permissions for. The `list_nhis` endpoint filters results based on the caller's permissions.
+:::
+
+## NHI Segregation of Duties (SoD)
+
+Define segregation of duties rules for NHI identities to prevent conflicting permissions:
+
+```bash
+# Create an SoD rule
+curl -X POST https://your-domain.com/nhi/sod/rules \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{
+    "name": "Production Write Separation",
+    "nhi_ids": ["agent-uuid-1", "agent-uuid-2"],
+    "description": "These agents must not both have write access to production"
+  }'
+
+# Check for SoD violations
+curl -X POST https://your-domain.com/nhi/sod/check \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{"nhi_id": "agent-uuid"}'
+
+# List all SoD rules
+curl https://your-domain.com/nhi/sod/rules \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# Delete an SoD rule
+curl -X DELETE https://your-domain.com/nhi/sod/rules/{rule_id} \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+### SoD Endpoints
+
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| Create SoD rule | POST | `/nhi/sod/rules` |
+| List SoD rules | GET | `/nhi/sod/rules` |
+| Delete SoD rule | DELETE | `/nhi/sod/rules/{id}` |
+| Check violations | POST | `/nhi/sod/check` |
+
+## MCP Tool Discovery
+
+xavyo-idp integrates with AgentGateway to discover and import MCP (Model Context Protocol) tools as NHI tool records. This enables centralized governance of AI agent capabilities.
+
+### Discovering Tools
+
+```bash
+# List configured gateways
+curl https://your-domain.com/nhi/mcp-discovery/gateways \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# Discover available MCP tools from all gateways
+curl https://your-domain.com/nhi/mcp-discovery/tools \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# Filter by specific gateway
+curl "https://your-domain.com/nhi/mcp-discovery/tools?gateway_name=production" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+### Importing Tools
+
+Import discovered tools as NHI tool records for governance:
+
+```bash
+curl -X POST https://your-domain.com/nhi/mcp-discovery/import \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{
+    "tools": [
+      {"name": "database-query", "description": "Execute SQL queries", "gateway_name": "production"},
+      {"name": "file-reader", "description": "Read files from storage", "gateway_name": "production"}
+    ]
+  }'
+```
+
+### Sync Check
+
+Compare live gateway tools against stored NHI records to detect drift:
+
+```bash
+curl "https://your-domain.com/nhi/mcp-discovery/sync-check?gateway_name=production" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+### MCP Discovery Endpoints
+
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| List gateways | GET | `/nhi/mcp-discovery/gateways` |
+| Discover tools | GET | `/nhi/mcp-discovery/tools` |
+| Import tools | POST | `/nhi/mcp-discovery/import` |
+| Sync check | GET | `/nhi/mcp-discovery/sync-check` |
+
+## A2A Agent Discovery
+
+xavyo-idp implements the A2A (Agent-to-Agent) Protocol v0.3 for agent card discovery. This allows AI agents to discover each other's capabilities through a standardized format.
+
+### Agent Card Endpoint
+
+The agent card is publicly accessible (no authentication required) and returns the agent's capabilities, skills, and authentication requirements:
+
+```bash
+curl https://your-domain.com/.well-known/agents/{agent_id}
+```
+
+**Response (200):**
+```json
+{
+  "name": "Data Pipeline Agent",
+  "description": "Processes ETL pipelines for analytics",
+  "url": "https://api.xavyo.net/agents/data-pipeline",
+  "version": "1.0.0",
+  "protocol_version": "0.3",
+  "capabilities": {
+    "streaming": false,
+    "push_notifications": false
+  },
+  "authentication": {
+    "schemes": ["bearer"]
+  },
+  "skills": [
+    {
+      "id": "database_query",
+      "name": "DATABASE QUERY",
+      "description": "Execute read-only SQL queries"
+    }
+  ]
+}
+```
+
+Only active agents are returned. Inactive or suspended agents return `404`.
+
+### A2A Discovery Endpoints
+
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| Get agent card | GET | `/.well-known/agents/{id}` |
 
 ## CA Integration
 

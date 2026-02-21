@@ -1,0 +1,1 @@
+{"parameters":[{"name":"token_id","in":"path","description":"Token ID of the session to revoke","required":true,"schema":{"type":"string","format":"uuid"}}]}

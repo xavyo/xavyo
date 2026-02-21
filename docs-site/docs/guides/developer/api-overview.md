@@ -208,6 +208,76 @@ X-Frame-Options: DENY
 Strict-Transport-Security: max-age=31536000; includeSubDomains
 ```
 
+## Endpoint Groups
+
+xavyo exposes **736 API paths** across **141 OpenAPI tags**. The major groups are listed below. See the [API Reference](/docs/reference/api/xavyo-api) for complete per-endpoint documentation.
+
+### Identity and Access
+
+| Group | Base Path | Description |
+|-------|-----------|-------------|
+| Users | `/admin/users` | CRUD, search, disable/enable |
+| Groups | `/admin/groups` | CRUD, membership management |
+| Roles | `/admin/roles` | Role assignment and management |
+| Sessions | `/me/sessions` | Active session listing and revocation |
+| Invitations | `/admin/invitations` | User invitation lifecycle |
+
+### Authentication
+
+| Group | Base Path | Description |
+|-------|-----------|-------------|
+| Auth | `/auth` | Signup, login, password reset, MFA |
+| OAuth 2.0 | `/oauth` | Authorize, token, userinfo, revoke, introspect |
+| OIDC Discovery | `/.well-known` | OpenID configuration, JWKS |
+| OIDC End Session | `/oauth/logout` | RP-Initiated Logout (GET/POST) |
+| Device Code | `/oauth/device` | RFC 8628 device authorization flow |
+| SAML | `/saml` | SSO, metadata, IdP-initiated |
+| SAML SLO | `/saml/slo` | Single Logout (SP-initiated and IdP-initiated) |
+| Social Login | `/auth/social` | Google, Microsoft, Apple, GitHub federation |
+
+### Governance
+
+| Group | Base Path | Description |
+|-------|-----------|-------------|
+| Archetypes | `/governance/archetypes` | Identity archetype management |
+| Lifecycle | `/governance/lifecycle` | Lifecycle state machine configuration |
+| Roles | `/governance/roles` | Governance role definitions |
+| Role Inducements | `/governance/roles/{id}/inducements` | Automatic role cascading rules |
+| Request Catalog | `/governance/request-catalog` | Self-service access request catalog |
+| Certifications | `/governance/certifications` | Access certification campaigns |
+| GDPR | `/governance/gdpr` | Data protection reports and user data export |
+| Power of Attorney | `/governance/poa` | Delegated authority management |
+| Org Policies | `/governance/org-policies` | Organization security policy enforcement |
+
+### Non-Human Identities (NHI)
+
+| Group | Base Path | Description |
+|-------|-----------|-------------|
+| Unified NHI | `/nhi` | Cross-type list, get, lifecycle transitions |
+| Agents | `/nhi/agents` | AI agent registration and governance |
+| Tools | `/nhi/tools` | Tool registration and discovery |
+| Service Accounts | `/nhi/service-accounts` | Machine identity management |
+| Permissions | `/nhi/{id}/users`, `/nhi/{id}/call` | User-to-NHI and NHI-to-NHI permissions |
+| Vault | `/nhi/{id}/vault` | Encrypted secret and lease management |
+| MCP Discovery | `/nhi/mcp-discovery` | AgentGateway tool discovery and import |
+| MCP Protocol | `/mcp` | Model Context Protocol tool listing and invocation |
+| A2A Protocol | `/a2a` | Agent-to-Agent task management |
+| SoD | `/nhi/sod` | Separation of duties rules and checks |
+| Risk | `/nhi/risk-summary` | Risk scoring and inactivity detection |
+| Certifications | `/nhi/certifications` | NHI access certification campaigns |
+
+### Provisioning and Integration
+
+| Group | Base Path | Description |
+|-------|-----------|-------------|
+| SCIM Server | `/scim/v2` | RFC 7644 user and group provisioning |
+| SCIM Targets | `/admin/scim-targets` | Outbound SCIM sync configuration |
+| Connectors | `/connectors` | Connector and job management |
+| Webhooks | `/webhooks` | Event subscriptions, DLQ, circuit breakers |
+| Import/Export | `/admin/import`, `/admin/export` | Bulk data operations |
+| Operations | `/operations` | Provisioning operation tracking |
+| API Keys | `/admin/api-keys` | API key creation, introspection, usage stats |
+
 ## SCIM Endpoints
 
 SCIM endpoints use `application/scim+json` as the content type per RFC 7644. See the [SCIM Integration Guide](./scim-integration.md) for details.
@@ -218,6 +288,8 @@ xavyo publishes OpenID Connect discovery documents at:
 
 - **Discovery**: `GET /.well-known/openid-configuration`
 - **JWKS**: `GET /.well-known/jwks.json`
+- **End Session**: `GET/POST /oauth/logout` (OIDC RP-Initiated Logout 1.0)
+- **Agent Cards**: `GET /.well-known/agents/:id` (A2A Protocol discovery)
 
 These endpoints do not require authentication. See [Authentication Flows](./authentication-flows.md) for usage details.
 

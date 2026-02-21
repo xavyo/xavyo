@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","properties":{"mfa_policy":{"type":"object"}},"required":["mfa_policy"],"title":"UpdateMfaPolicyRequest"}}},"required":true}}

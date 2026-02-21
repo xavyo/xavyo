@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","properties":{"allow_trusted_device_mfa_bypass":{"type":"boolean","nullable":true},"trusted_device_duration_days":{"type":"integer","format":"int32","nullable":true}},"title":"UpdateDevicePolicyRequest"}}},"required":true}}

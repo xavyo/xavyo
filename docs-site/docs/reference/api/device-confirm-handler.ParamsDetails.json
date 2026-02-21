@@ -1,0 +1,1 @@
+{"parameters":[{"name":"token","in":"path","description":"Email confirmation token from the confirmation email","required":true,"schema":{"type":"string"}}]}

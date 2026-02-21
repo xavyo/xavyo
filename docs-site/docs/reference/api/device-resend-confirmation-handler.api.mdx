@@ -1,0 +1,77 @@
+---
+id: device-resend-confirmation-handler
+title: "POST /device/resend-confirmation - Resend confirmation email (F117)."
+description: "Allows users to request a new confirmation email if they didn't receive the"
+sidebar_label: "POST /device/resend-confirmation - Resend confirmation email (F117)."
+hide_title: true
+hide_table_of_contents: true
+api: eJztVk1v4zYQ/SuD6aEJIFt2WmC3umWzCepi2w1sFz0kRkCLY4sbiuSSlD9g+L8XQymJEgcFei3qgyGQozdvhm8edcAo1gGLO/x62cTqAj7TRpUEV1YSLjKUFEqvXFTWYIGXWtttgCaQDxAtePreUIggwNAWSmtWyteCg4FqoTSoFcSK9iCVND9G8FSS2hCv3Rvr1VoZocF6UBFo55QnOYSpiARa1SqS5CTO04ZMBLFsAsFZLXYwBk+BjARHHmplmkjnw3tzb36AWbS+Hlz89OECplSTVIkO780rFYCMdFYx2r8tZVuRYeLwxPvedBsigLHPxUmuh+NeYWhlHl9KTFRUACd8BLtq+xGobLyKe1hpu4VYiZhIKU+ho/AKcWU9yPawSisJhHPeboQOsPK2vjehCU6VyjYBJrcgpPQUAoUhZmgd+QQykVhgC/LQdvShn+OhEkZq8phh155PVu6xOGBpTSQT+VE4p1WZ4vNvgWVywFBWVAt+intHWKBdfqMyYobOc/KoKPBul5r5PyjZiw/RK7PGY4Zl8KuHaB/JnG5naBqtxVITFtE3dDy2RLnJLOk38IsMo4ocjNNU7FWv1mlbIB5fgyRYXgjOmtCyvhiNWvL90WgRWZeNjuDEmuDs1/nvX865iJ/fe2NiNkIr+aw86+FqNr2BtNqdsVCaZEK4+OWdnM+TArQriSRJGMBWqAhLWllPT9jKrEEYGyvy3eQgl1lTrCxLwNmQDkfECgvM277lbeSgrwjMMJDfkGfLOGDjNRZYxeiKPNe2FLqyIRYfRx9H+NY7PtOGtHU1j3KLgcesDxGKPFfSDXdis7dDQ/EE4tZb2ZSpM08ICybUzs2MRdee0JKEJ8+G1hMN52D+KQyLLgiz7uHGco1Y4G9/zVN3WMzTF9lf70TtWDynsn3RY1+tPRErs7KJSSe/VCJc3k5OSpxIMpFN4NbbjZLkOSrNenqHU1gTRZlGz4j6BW1OouZcWpVkAvX2P82+DMbDMWZvmr1WsWqWw9LWeYLo/pfaLvNahEg+/zK5uv5jds24fOgtx9FwPBzxEsumFqaX6vbrbA7/oB8YQDco7zjs2c14/OF8+LYnPbf5/wL6b1xA3URG2sXcaaEMqymJ89CZ0JN5p6vn1IYWGbLTcNzhsBSB/vT6eOTl7w35PRZ3iww3wqv2crhbHDOsSEjyybceaY8FXrWyGsyZDYfrhlmdXGhsMs9WyQpnz+guwpq/kwr0YstMxRYLTBcsv52sKK0dUAuzbsSaY1tM/v0Nf3JdVA==
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"POST /device/resend-confirmation - Resend confirmation email (F117)."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/device/resend-confirmation"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Allows users to request a new confirmation email if they didn't receive the
+original or it expired. Rate limited to prevent abuse (max 1 resend per minute).
+
+# Storm-2372 Remediation
+
+This endpoint allows users to request a new confirmation email when the original
+email was not received or the confirmation link expired. This is part of the
+security flow that requires email confirmation for device code approvals from
+suspicious IP addresses.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./device-resend-confirmation-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./device-resend-confirmation-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

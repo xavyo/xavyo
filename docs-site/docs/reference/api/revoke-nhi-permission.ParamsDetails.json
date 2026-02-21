@@ -1,0 +1,1 @@
+{"parameters":[{"name":"id","in":"path","description":"Source NHI identity ID","required":true,"schema":{"type":"string","format":"uuid"}},{"name":"target_id","in":"path","description":"Target NHI identity ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

@@ -1,0 +1,1 @@
+{"parameters":[{"name":"job_id","in":"path","description":"Import job ID","required":true,"schema":{"type":"string","format":"uuid"}}]}

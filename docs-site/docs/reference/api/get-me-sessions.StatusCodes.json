@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"Sessions list returned","content":{"application/json":{"schema":{"type":"object","properties":{"sessions":{"type":"array","items":{"type":"object"}},"total":{"type":"integer","format":"int64"}},"required":["sessions","total"],"title":"SessionListResponse"}}}},"401":{"description":"Not authenticated"}}}

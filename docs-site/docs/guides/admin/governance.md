@@ -431,9 +431,130 @@ curl "https://your-domain.com/governance/risk/high-risk?threshold=80&limit=20" \
   -H "X-Tenant-ID: $TENANT_ID"
 ```
 
+## Role Inducements
+
+Role inducements define automatic role grants: when a parent role is assigned to a user, all induced child roles are automatically granted as well. Inducements support recursive traversal, enable/disable per inducement, and cycle detection.
+
+### Creating a Role Inducement
+
+```bash
+curl -X POST https://your-domain.com/governance/roles/{role_id}/inducements \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{
+    "induced_role_id": "child-role-uuid",
+    "description": "Automatically grants read access when engineering role is assigned"
+  }'
+```
+
+### Managing Inducements
+
+Individual inducements can be enabled or disabled without deleting them:
+
+```bash
+# Disable an inducement (stops automatic granting)
+curl -X POST https://your-domain.com/governance/roles/{role_id}/inducements/{inducement_id}/disable \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# Re-enable an inducement
+curl -X POST https://your-domain.com/governance/roles/{role_id}/inducements/{inducement_id}/enable \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+### Viewing Induced Roles (Recursive)
+
+Get the full tree of induced roles for a given role, including transitively induced roles:
+
+```bash
+curl https://your-domain.com/governance/roles/{role_id}/induced-roles \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+### Role Inducement Endpoints
+
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| List inducements | GET | `/governance/roles/{role_id}/inducements` |
+| Get inducement | GET | `/governance/roles/{role_id}/inducements/{id}` |
+| Create inducement | POST | `/governance/roles/{role_id}/inducements` |
+| Delete inducement | DELETE | `/governance/roles/{role_id}/inducements/{id}` |
+| Enable inducement | POST | `/governance/roles/{role_id}/inducements/{id}/enable` |
+| Disable inducement | POST | `/governance/roles/{role_id}/inducements/{id}/disable` |
+| Get induced roles | GET | `/governance/roles/{role_id}/induced-roles` |
+
+:::info
+Cycle detection prevents creating inducements that would form circular dependencies (e.g., Role A induces Role B which induces Role A). The API returns `400 Bad Request` if a cycle is detected.
+:::
+
+## Power of Attorney
+
+Power of Attorney (PoA) enables delegated administration where a user (donor) grants another user (attorney) the ability to act on their behalf for a defined scope and duration.
+
+### Granting a Power of Attorney
+
+```bash
+curl -X POST https://your-domain.com/governance/power-of-attorney \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $USER_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{
+    "attorney_id": "attorney-user-uuid",
+    "scope": ["users:read", "users:write"],
+    "duration_hours": 24,
+    "reason": "Covering during vacation"
+  }'
+```
+
+### Assuming and Dropping Identity
+
+The attorney can assume the donor's identity to perform actions within the granted scope:
+
+```bash
+# Assume the donor's identity
+curl -X POST https://your-domain.com/governance/power-of-attorney/{id}/assume \
+  -H "Authorization: Bearer $ATTORNEY_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# Check current assumption
+curl https://your-domain.com/governance/power-of-attorney/current-assumption \
+  -H "Authorization: Bearer $ATTORNEY_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# Drop the assumed identity
+curl -X POST https://your-domain.com/governance/power-of-attorney/drop \
+  -H "Authorization: Bearer $ATTORNEY_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+### Power of Attorney Endpoints
+
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| Grant PoA | POST | `/governance/power-of-attorney` |
+| List my PoAs | GET | `/governance/power-of-attorney` |
+| Get PoA | GET | `/governance/power-of-attorney/{id}` |
+| Revoke PoA | POST | `/governance/power-of-attorney/{id}/revoke` |
+| Extend PoA | POST | `/governance/power-of-attorney/{id}/extend` |
+| Assume identity | POST | `/governance/power-of-attorney/{id}/assume` |
+| Drop identity | POST | `/governance/power-of-attorney/drop` |
+| Current assumption | GET | `/governance/power-of-attorney/current-assumption` |
+| PoA audit trail | GET | `/governance/power-of-attorney/{id}/audit` |
+| Admin list all PoAs | GET | `/governance/admin/power-of-attorney` |
+| Admin revoke PoA | POST | `/governance/admin/power-of-attorney/{id}/revoke` |
+
+:::warning
+Users cannot grant a PoA to themselves. All PoA actions are recorded in the audit trail for compliance.
+:::
+
 ## Bulk Actions
 
-Execute governance operations in bulk:
+Execute governance operations in bulk with expression-based targeting, preview, and cancellation:
+
+### Creating a Bulk Action
 
 ```bash
 curl -X POST https://your-domain.com/governance/admin/bulk-actions \
@@ -446,6 +567,50 @@ curl -X POST https://your-domain.com/governance/admin/bulk-actions \
     "justification": "Quarterly cleanup"
   }'
 ```
+
+### Bulk Action Workflow
+
+1. **Create** the bulk action with target IDs and justification
+2. **Preview** the impact before execution
+3. **Execute** the action (processes targets in batch)
+4. **Monitor** progress or cancel if needed
+
+```bash
+# Validate a targeting expression
+curl -X POST https://your-domain.com/governance/admin/bulk-actions/validate-expression \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{"expression": "role == \"contractor\" AND department == \"engineering\""}'
+
+# Preview the bulk action (see affected targets)
+curl -X POST https://your-domain.com/governance/admin/bulk-actions/{id}/preview \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# Execute the bulk action
+curl -X POST https://your-domain.com/governance/admin/bulk-actions/{id}/execute \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+
+# Cancel an in-progress bulk action
+curl -X POST https://your-domain.com/governance/admin/bulk-actions/{id}/cancel \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+### Bulk Action Endpoints
+
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| Create bulk action | POST | `/governance/admin/bulk-actions` |
+| List bulk actions | GET | `/governance/admin/bulk-actions` |
+| Get bulk action | GET | `/governance/admin/bulk-actions/{id}` |
+| Delete bulk action | DELETE | `/governance/admin/bulk-actions/{id}` |
+| Validate expression | POST | `/governance/admin/bulk-actions/validate-expression` |
+| Preview bulk action | POST | `/governance/admin/bulk-actions/{id}/preview` |
+| Execute bulk action | POST | `/governance/admin/bulk-actions/{id}/execute` |
+| Cancel bulk action | POST | `/governance/admin/bulk-actions/{id}/cancel` |
 
 ## Object Templates
 
@@ -479,7 +644,7 @@ curl -X POST https://your-domain.com/governance/object-templates \
 
 ### Data Protection Classification
 
-Entitlements and applications can be classified with data protection levels:
+Entitlements can be classified with data protection levels to support GDPR compliance tracking:
 
 | Classification | Description |
 |---------------|-------------|
@@ -488,22 +653,71 @@ Entitlements and applications can be classified with data protection levels:
 | `sensitive` | Contains sensitive personal data |
 | `special_category` | Contains special category data (health, biometric, etc.) |
 
-### GDPR Data Subject Report
-
-Generate a comprehensive report of all data held about a specific user:
+When creating or updating entitlements, you can set the GDPR metadata:
 
 ```bash
-curl -X POST https://your-domain.com/governance/gdpr/report \
+curl -X POST https://your-domain.com/governance/entitlements \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "X-Tenant-ID: $TENANT_ID" \
   -d '{
-    "user_id": "user-uuid",
-    "report_type": "full"
+    "name": "customer-data:read",
+    "description": "Read access to customer records",
+    "application_id": "app-uuid",
+    "risk_level": "high",
+    "data_protection_classification": "sensitive",
+    "legal_basis": "legitimate_interest",
+    "retention_period_days": 365,
+    "data_controller": "Acme Corp",
+    "data_processor": "Cloud Analytics Inc",
+    "purposes": ["analytics", "customer_support"]
   }'
 ```
 
-The report includes all user attributes, role assignments, entitlements, group memberships, audit log entries, and consent records associated with the specified user.
+### Legal Basis Types
+
+| Legal Basis | Description |
+|-------------|-------------|
+| `consent` | Data subject has given consent |
+| `contract` | Processing necessary for contract performance |
+| `legal_obligation` | Processing necessary for legal compliance |
+| `vital_interest` | Processing necessary to protect vital interests |
+| `public_interest` | Processing necessary for public interest tasks |
+| `legitimate_interest` | Processing necessary for legitimate interests |
+
+### GDPR Compliance Report
+
+Generate a tenant-wide GDPR compliance report summarizing classification coverage, legal basis distribution, and detailed entitlement breakdowns:
+
+```bash
+curl https://your-domain.com/governance/gdpr/report \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+The report includes:
+- Total entitlement count and classification coverage percentage
+- Breakdown by classification level and legal basis
+- Detailed list of classified entitlements with retention periods, data controllers/processors, and active assignment counts
+
+### Per-User Data Protection Summary
+
+Get a per-user summary showing what classified data a specific user has access to:
+
+```bash
+curl https://your-domain.com/governance/gdpr/users/{user_id}/data-protection \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID"
+```
+
+This returns all entitlements assigned to the user that have a data protection classification, along with the legal basis and retention period for each.
+
+### GDPR Endpoints
+
+| Operation | Method | Endpoint |
+|-----------|--------|----------|
+| Compliance report | GET | `/governance/gdpr/report` |
+| User data protection | GET | `/governance/gdpr/users/{user_id}/data-protection` |
 
 ## Applications & Entitlements
 

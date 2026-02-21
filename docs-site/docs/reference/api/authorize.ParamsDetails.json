@@ -1,0 +1,1 @@
+{"parameters":[{"name":"idp_id","in":"query","required":false,"schema":{"type":"string","format":"uuid","nullable":true}},{"name":"login_hint","in":"query","required":false,"schema":{"type":"string","nullable":true}},{"name":"redirect_uri","in":"query","required":false,"schema":{"type":"string","nullable":true}}]}

@@ -1,0 +1,71 @@
+---
+id: create-task
+title: "POST /a2a/tasks - Create a new asynchronous task."
+description: "If the caller is an admin/super_admin user (not an NHI agent), they can"
+sidebar_label: "POST /a2a/tasks - Create a new asynchronous task."
+hide_title: true
+hide_table_of_contents: true
+api: eJzlVktv2zgQ/ivEnFpAthynTbu6pS+si6INEhc9JIE7kkYWG4pUScqOYfi/F0PKsRsnbXext/XBEMh5fDPzzXDW4HHuILuE0/GpmKK7cXCdQEmusLL10mjIYFIJX5MoUCmyQjqBWmDZSJ26riU7C9+ic2TFE208X3/8eyJwTto/TVh3JQrUV9q1VMhqJb4609mCZkFiJsuvQurgwtL3jpwXuSlXwhtRWEJPwjMuYbTIqUZVXWlTBQysPhQ9vPdfpsJ1+TcqfI+RQciStJd+lQgZjjtHpUAXNCKKISRgWrLI0U5KyCB6nbFXSKDH9MqUK8jWUBjtSXv+xLZVsgh66TfHqVqDK2pqkL/8qiXIwAREcD+n5/uRVsaKs08XU5HiGNMY7WAbPApNy5CCYY9GWiq5ZB7tnPxdFiEBlpoFxwlI3Xaei9laDs9LcgE/KpVjcTPrrNqD6byVen4A81P4QCWWlNfG3IjP5x8C3MI0rSK+FNp4WfV5YIi6UwpzRZB529FmiyRb37PNbBPhTrRosSFP1g1hk8A9ejwEszK2QQ8ZdF2I/BHY0VJkipi8GYovNek7/kbOxjw7gSHJj9BsR2OxZfGylkXdm5Y/MYopaRrpPZXJlX6AnIcs/ImsD2bxfrX/cVKmwcBdLoSv0YulVErQLRUd91lNPdE2+1z6LUtCJVkkdTdsL8ZRSbJD2LAp6TkQeB0yfTpGVug7ADYssaN1H60l1xrtImfHo6NH6BNrx7H+Z30Z/T7Sk37P6WE7upvYhs6j7xyDipIzfKgRd3e/KmWJngZeNvRw1oMV7kIWcR6bNnZQRPDbyk209BJVjCsqiSeolrhy4gpa0qXU8yt4umPEv2HeZy2/d5Faf8qNWAUmxyaBZ6PRYf0neoFKlts3A4Lc8aHcO2NzWZakg7uGfG14yLfGcfVb9DVksCsyl4/sgiy/imsIUxJq79ssTZUpUNXG+ezl6OXoIMw3tCBl2ob7K9qATbJvwmVpKst2eIuLlRlqOqTfmTVlV4SCbi1cM6Cis9KvLpjEkT05oSV72jH6u3KwD8YfxCDrhSDpP95ti/T+yzQkg5vjfPe8vb1FHuqHr8SuzgeTGY4rfPm8Onk2eP7i6MXg2fOT8SA/rorBuPjr5Lg6OcEKT+CB6fXnindjaAsjPCmVCYH37AkZFadnk0OG9zNVnFmzkCVZlgrdHXT6yYFF6EKNzc7alLBhX0oWxFzc3b+6+DA4Gh5Bcq+2c+nrLh8WpkmDif4/VyZPG3SebPph8vrtx4u3bJc5FjGOhkfDER8xKRvUe64OR9Dr/bUA3UoXtTXadO5uR/gpAXsby/9gkeuJ4unWp61CqTmr/aYTW/0ScIw9r8Kuy/3Mx+t1jo4+W7XZ8PH3juwKssvrBBZoZXyKL683CdSEJdkwHW5oxaMrJngwjYvXAlXHIA6eIR4GUeO0KKj1v5S93ptVTALu4n4FbUzJOhaX/ALhEjIIOyxrh+EQztagUM87nLNstMm/HwBYHYc=
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"POST /a2a/tasks - Create a new asynchronous task."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/a2a/tasks"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+If the caller is an admin/super_admin user (not an NHI agent), they can
+specify `source_agent_id` in the request body to create tasks on behalf
+of an agent. If the JWT subject is an NHI identity, it is used as the source.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  parameters={undefined}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./create-task.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./create-task.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

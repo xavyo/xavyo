@@ -1,0 +1,74 @@
+---
+id: end-session-handler
+title: "OIDC RP-Initiated Logout 1.0 endpoint."
+description: "Accepts both GET (query params) and POST (form body). The handler:"
+sidebar_label: "OIDC RP-Initiated Logout 1.0 endpoint."
+hide_title: true
+hide_table_of_contents: true
+api: eJztVktv2zgQ/iuDuWwCyLKT9FDo1ke2cBE0huPsHhLDpcWxxYYiVZJyYxj+78VQSuw87GS7xZ72IogSZ+ab+ea1wiDmHrMrPO9//IDjBCX53KkqKGsww3d5TlXwMLWhgE+nIzj4XpNbQiWcKP0hCCNhcH4xgoOZdSVMrVwepjAqCAphpCaXXZtrc5TCX0IrKQJ5+KrkJNgbMpNCmfAV1AwqZxdKkoQDr+ZGhNoRLMipmcoFA0lAeV+Tg7yg/OYwvTbHDzRW1oeJtnNbh4kjqRzlYVI79RXEXCjjA4SCINeKTPjDg6O58oEcSbgc9n16bU5SGNLC3pAHoTXUnhx48l5Z4xkgi8ePyoOSZIKaKZLptXnDgo1BD8Hug3Jw0js5BOvAUaid8XDc68Hni/MvKSZoK3LR1b7EDMnISWt+0sYRE4wxp0CO+VqhESVhhg+iiQkqpi2ShI/JHDhaKFt7vWziKaH/EaIwHJRiCVMCuq2UI3mICTr6XvM7ZjOhPSXo84JKgdkKw7Ji0z44ZeaYoKm1FlNNmAVX03qd3KPbFY79QC+HfQ7mnQCIWSAHjZrfhcwHEWg/jPNKfK8J4k1YCF0TzKyLyTAc/C4cTVZOlHwBy7s6FMdtDm9y0P07GONGmnx4b+WSJR5axQRzawKZwP9EVem2Iru3nR8/fnS46Du102RyKxnBasu40Pp8FlO1hWGn3yhnAivH+R4Ueb73MINfRp3szqrXCDfEv+bmhprXMIpBBT7iqZEXTfEOYpdEDvPj6+snvMUvvrLGN2E57vWeEnJm53OSYOsAvs5z8n5Wa72EA7NVLpfD/uFu5r551rR6miU76CnJezF/JmIPfbi6vzjehOIscjRs3cJ19Pukd/LUsbsuynXP9HYaetkXXCf45rlg9M2CZwC0KRwBlRQKyz10TtEVEQrMsGtFHYrufQfx5BZ3fbR2GjMsQqiyblfbXOjC+pC97b3tPanCj7QgbauSa7DRgVzKGxU+63aVrNJbsVja1EQMj5uwlXXOh3sNYwaU106F5QWT0sR9SsKR47LfCj3bwLbC+dxcwqR9+dO6UgTM8PPfoxgOZWY2ireERFzwbtB/gqsfW0pYwqAZxo5vxX4XZdp8EnnMp7Z3NdpGJErmSKucmOXN//cXZ52j9AiTRxGaq1DU0zS3ZTeqaJ9TbafdUvBo7p71P5x+uThlvcxUg7GXHqU9bBtAKcyWKV5fYDjo9I0KSgSS0OQeHKU9ICMrq0xIH3u92hTJ/6vOf7TqtJkc6DZ0Ky2UYUJjfqzacr3CWK6YYFuw4wS5JvnPajUVni6dXq/5czMsuYyl8txfN1NwJ9H/bA16Fu4NLZ9ZveKKwFOTe8Lr8byw7ewBsGe7+kUsL608e8DcLVS/ann3grPH6Pb2tDE85oNTzby9Gq8TLEhIcjFRGsEPjeHOiHVvZF9ecdirRkXTMHYIxynLQO4H0qfTEffpds8qrWSRLcXJ9oFRr9c/AXSFvvc=
+sidebar_class_name: "get api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"OIDC RP-Initiated Logout 1.0 endpoint."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/oauth/logout"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Accepts both GET (query params) and POST (form body). The handler:
+
+1. Validates `id_token_hint` if provided (signature verification, issuer check).
+2. Validates `post_logout_redirect_uri` against the client's registered URIs.
+3. Revokes all user sessions if the user is identified.
+4. Redirects to `post_logout_redirect_uri` (303) or returns 200 JSON.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./end-session-handler.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./end-session-handler.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./end-session-handler.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

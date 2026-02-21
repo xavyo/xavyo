@@ -1,0 +1,71 @@
+---
+id: replay-dlq-entry
+title: "Replay a single DLQ entry."
+description: "POST /dlq/{id}/replay"
+sidebar_label: "Replay a single DLQ entry."
+hide_title: true
+hide_table_of_contents: true
+api: eJytVU1v2zgQ/SvCnLoAYzm7ORS6pWkKuAh2s06KHlyjoMSxzS5FyuTQjSvovxdDKolrp8Ue6oMsUfPx5s2bUQ8k1wGqBVw5a7Eh54v3rg6wFKAwNF53pJ2FCm7/ubsvSmW2Za/VUHrsjNx/sp/sHM+2ESOGQhYKpSoMEqEv0JLfFyvni867BkPQdj0BAa5DLznoTEEFOc5nZbafkwMI6KSXLRJ6xtWDlS1CBVqBAM1IOkkbOIb39ubfMePsLQjwuI3ao4KKfEQBodlgK6HqgfYdhwvktV2DgJXzrSSoIEatYBiW2RkDvXFqzx6Ns4SW+FZ2ndFNQl9+CZy4Pw3t6i/YEBfiuVbSGPjtyvkGD8xq5wxKC8NwCHcx2i0FkCbDhvNE0TyDguFHey4vHYTO2ZAz/Tmd8t+PBF0ncjLdyFz+prK0+h+sCggkKYZT00FAiyHINb4UxkZjZM0spDqPmEqSGAO/wFdmhAkbBFxMz085+WBlpI3z+hsmkBfTv06N3jlfa6XQZouLn1FrHRUrF61KHW2RNo4F3rmQSGPRVlA2j2MWjmeJa0G/e5R99AYq2BB1VVka10izcYGq19PX01Px4w6N61q0VOQYMIjDEKEqS626yYPc7d3EIp2EuPVOxYYfniIsGVATvab9HYsh97tG6dFfRi7nqWGcA8YpS9pORiDGm3ePanj/8T6xwyKbP0/Z9YNsO4MHUzLKWtuVS2nG1ib8xeXt7AT/TKElTfvi1rudVujZKm2f5DPqXTZJ7+NKydHuUbbcWqMbZL08v39zd3N2PjkHccTkWtMm1pPGtWUKMV5r4+qylYHQlzezq+u/7645Lnc0Y5xOzidTPmJNtNIepMqaLWTBW9Jg8bTOJseVHuyj37eTxzYSPlDZGamT1lPR/ajcBTwrlyGZLQio0gSO8l0KYIWyad/XMuAHb4aBj7cR/R6qxVLATnqdB3rRg9KB7xVUK2kC/qLQV/Nx7P8ojhb9i8jHQ2l5qHbSRH4CAf/hPn9JhuUgYINSoU9I8ournO/snt2fHU+2I89W9rhsGuzol7bLg13A/eKhGD8srVPs4+VXZlF+zSBdqj/NWjrrwUi7jmlDQo7Jv+/deqai
+sidebar_class_name: "post api-method"
+info_path: docs/reference/api/xavyo-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Replay a single DLQ entry."}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/connectors/dlq/{id}/replay"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+POST /dlq/\{id\}/replay
+
+Re-queues a dead letter entry for processing.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./replay-dlq-entry.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./replay-dlq-entry.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./replay-dlq-entry.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

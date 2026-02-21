@@ -1,0 +1,1 @@
+{"title":"Body","body":{"content":{"application/json":{"schema":{"type":"object","properties":{"saml_request":{"type":"string","nullable":true},"relay_state":{"type":"string","nullable":true}},"title":"SloPostForm"}}},"required":true}}

@@ -1,0 +1,1 @@
+{"responses":{"200":{"description":"All other sessions revoked","content":{"application/json":{"schema":{"type":"object","properties":{"revoked_count":{"type":"integer","format":"int64"},"message":{"type":"string"}},"required":["revoked_count","message"],"title":"RevokeAllSessionsResponse"}}}},"401":{"description":"Not authenticated"}}}

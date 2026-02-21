@@ -388,8 +388,8 @@ xavyo-idp employs multiple layers of security controls:
 - **CORS**: Configurable origin restrictions
 - **Security headers**: `Cache-Control`, `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`
 - **Rate limiting**: 5 login attempts per 60 seconds per IP/email combination
-- **HTTP client timeouts**: 10-second timeout on all outbound HTTP requests
-- **SSRF protection**: URL validation against private IP ranges for webhook and connector endpoints
+- **HTTP client timeouts**: 10-second timeout on all outbound HTTP requests (including SAML SLO back-channel requests)
+- **SSRF protection**: URL validation against private IP ranges for webhook endpoints, connector endpoints, and SAML SLO URLs
 
 ### Error Handling
 - **No sensitive data in errors**: All error responses are sanitized to prevent information leakage
@@ -416,6 +416,42 @@ curl https://your-domain.com/governance/licenses/allocations \
   -H "X-Tenant-ID: $TENANT_ID"
 ```
 
+## Logout Configuration Hardening
+
+### OIDC Post-Logout Redirect URIs
+
+Register `post_logout_redirect_uris` on each OAuth client to control where users are redirected after OIDC RP-Initiated Logout. Only registered URIs are accepted; unregistered URIs are silently ignored (the user is still logged out, but no redirect occurs).
+
+```bash
+curl -X PUT https://your-domain.com/oauth/clients/{client_id} \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{
+    "post_logout_redirect_uris": [
+      "https://app.example.com/logged-out",
+      "https://app.example.com/goodbye"
+    ]
+  }'
+```
+
+### SAML SLO URL and Binding
+
+Configure the SLO URL and binding on each SAML Service Provider to enable Single Logout. SLO URLs must use HTTPS (HTTP is only allowed for localhost in development). Private IP ranges are blocked to prevent SSRF.
+
+```bash
+curl -X PUT https://your-domain.com/admin/saml/service-providers/{sp_id} \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "X-Tenant-ID: $TENANT_ID" \
+  -d '{
+    "slo_url": "https://sp.example.com/saml/slo",
+    "slo_binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+  }'
+```
+
+The default SLO binding is `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST`. SPs without an `slo_url` are skipped during IdP-initiated SLO.
+
 ## Security Considerations
 
 - **Super admin separation**: Branding, delegation, and certain sensitive operations require `super_admin` rather than `admin` to enforce separation of duties between operational and security administration.
@@ -423,6 +459,8 @@ curl https://your-domain.com/governance/licenses/allocations \
 - **IP restriction testing**: Always validate your IP rules before switching to whitelist mode. Use the `/admin/ip-restrictions/validate` endpoint to verify.
 - **Email template validation**: Template preview uses sample data to verify Handlebars syntax. Always preview templates before activating them.
 - **Audit log retention**: Audit logs are tenant-isolated and should be exported to a SIEM system for long-term retention and correlation.
+- **Logout URI validation**: Always register `post_logout_redirect_uris` explicitly on OAuth clients. Unrestricted redirect after logout is a common open-redirect vector.
+- **SLO URL security**: SAML SLO URLs undergo SSRF validation. Only HTTPS URLs to public hosts are accepted in production.
 
 ## Related
 
