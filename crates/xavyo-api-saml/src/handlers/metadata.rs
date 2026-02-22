@@ -19,6 +19,7 @@ use xavyo_core::TenantId;
 pub struct SamlState {
     pub pool: PgPool,
     pub base_url: String,
+    pub frontend_url: String,
     pub encryption_key: Arc<[u8; 32]>,
     /// Session store for AuthnRequest replay protection.
     pub session_store: Arc<dyn SessionStore>,
@@ -56,7 +57,7 @@ async fn get_metadata_inner(state: &SamlState, tenant_id: Uuid) -> SamlResult<St
 
     // Build entity ID and SSO URL from base URL and tenant
     let entity_id = format!("{}/saml/metadata?tenant={}", state.base_url, tenant_id);
-    let sso_url = format!("{}/saml/sso", state.base_url);
+    let sso_url = format!("{}/saml/sso?tenant={}", state.base_url, tenant_id);
 
     // Try to get active certificate for signing info
     let credentials = match sp_service.get_active_certificate(tenant_id).await {
@@ -71,7 +72,7 @@ async fn get_metadata_inner(state: &SamlState, tenant_id: Uuid) -> SamlResult<St
         Err(_) => None, // No certificate is OK for metadata, just won't include KeyInfo
     };
 
-    let slo_url = format!("{}/saml/slo", state.base_url);
+    let slo_url = format!("{}/saml/slo?tenant={}", state.base_url, tenant_id);
     let generator = MetadataGenerator::new(entity_id, sso_url, credentials, Some(slo_url));
     let xml = generator.generate()?;
 

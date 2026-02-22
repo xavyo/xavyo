@@ -11,11 +11,10 @@ use crate::services::{
 use crate::session::AuthnRequestSession;
 use axum::{
     extract::{Query, State},
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     Extension, Form,
 };
 use uuid::Uuid;
-use xavyo_core::TenantId;
 use xavyo_db::models::User;
 
 /// Signature information for HTTP-Redirect binding
@@ -41,10 +40,13 @@ pub struct RedirectSignatureInfo<'a> {
 )]
 pub async fn sso_redirect(
     State(state): State<SamlState>,
-    Extension(tenant_id): Extension<TenantId>,
     Extension(user): Extension<Option<User>>,
     Query(query): Query<SsoRedirectQuery>,
 ) -> Response {
+    let tenant_id = match parse_tenant_param(query.tenant.as_deref()) {
+        Ok(id) => id,
+        Err(e) => return e.into_response(),
+    };
     let sig_info = RedirectSignatureInfo {
         saml_request: &query.saml_request,
         relay_state: query.relay_state.as_deref(),
@@ -53,7 +55,7 @@ pub async fn sso_redirect(
     };
     match handle_sso(
         &state,
-        *tenant_id.as_uuid(),
+        tenant_id,
         user,
         &query.saml_request,
         query.relay_state.as_deref(),
@@ -84,13 +86,17 @@ pub async fn sso_redirect(
 )]
 pub async fn sso_post(
     State(state): State<SamlState>,
-    Extension(tenant_id): Extension<TenantId>,
     Extension(user): Extension<Option<User>>,
+    Query(query_params): Query<SsoPostTenantQuery>,
     Form(form): Form<SsoPostForm>,
 ) -> Response {
+    let tenant_id = match parse_tenant_param(query_params.tenant.as_deref()) {
+        Ok(id) => id,
+        Err(e) => return e.into_response(),
+    };
     match handle_sso(
         &state,
-        *tenant_id.as_uuid(),
+        tenant_id,
         user,
         &form.saml_request,
         form.relay_state.as_deref(),
@@ -104,6 +110,21 @@ pub async fn sso_post(
             e.into_response()
         }
     }
+}
+
+/// Query params for SSO POST (tenant is in URL, form data is the SAML request)
+#[derive(Debug, serde::Deserialize)]
+pub struct SsoPostTenantQuery {
+    pub tenant: Option<String>,
+}
+
+/// Parse and validate the tenant query parameter
+pub(crate) fn parse_tenant_param(tenant: Option<&str>) -> SamlResult<Uuid> {
+    let tenant_str = tenant.ok_or_else(|| {
+        SamlError::InvalidAuthnRequest("Missing required 'tenant' query parameter".to_string())
+    })?;
+    Uuid::parse_str(tenant_str)
+        .map_err(|e| SamlError::InvalidAuthnRequest(format!("Invalid tenant ID: {e}")))
 }
 
 /// SAML binding type with signature info
@@ -280,12 +301,15 @@ async fn handle_sso<'a>(
     // C2: Store the AuthnRequest session for replay protection AFTER validation.
     // Only store sessions for requests from known, enabled SPs with valid signatures.
     // If the same request ID is replayed, session store will reject it as duplicate.
-    let session = AuthnRequestSession::new(
+    // Use 10-minute TTL for SP-initiated SSO to allow time for user login.
+    let session = AuthnRequestSession::with_ttl(
         tenant_id,
         authn_request.id.clone(),
         authn_request.issuer.clone(),
         relay_state.map(String::from),
+        600, // 10 minutes to allow time for login
     );
+    let session_id = session.id;
     state.session_store.store(session).await.map_err(|e| {
         tracing::warn!(
             tenant_id = %tenant_id,
@@ -322,16 +346,20 @@ async fn handle_sso<'a>(
     let user = if let Some(u) = user {
         u
     } else {
-        // User not authenticated - would redirect to login
-        // For now, return unauthorized
-        // TODO: In a full implementation, store the AuthnRequest in session
-        // and redirect to login, then resume SSO after authentication
+        // User not authenticated — redirect to frontend SAML callback page,
+        // which will handle login and then call POST /saml/continue to complete SSO.
         tracing::info!(
             tenant_id = %tenant_id,
             sp_entity_id = %sp.entity_id,
-            "User not authenticated, SSO requires login"
+            session_id = %session_id,
+            "User not authenticated, redirecting to frontend for login"
         );
-        return Err(SamlError::NotAuthenticated);
+        let redirect_url = format!(
+            "{}/saml/callback?session_id={}",
+            state.frontend_url.trim_end_matches('/'),
+            session_id,
+        );
+        return Ok(Redirect::temporary(&redirect_url).into_response());
     };
 
     // Build user attributes

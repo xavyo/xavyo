@@ -1013,6 +1013,17 @@ pub async fn rls_tenant_middleware(req: axum::extract::Request, next: Next) -> R
                 .get("X-Tenant-ID")
                 .and_then(|v| v.to_str().ok())
                 .and_then(|s| s.trim().parse::<uuid::Uuid>().ok())
+        })
+        // Fall back to ?tenant= query parameter (used by SAML SSO/SLO browser redirects
+        // which cannot set custom headers)
+        .or_else(|| {
+            req.uri()
+                .query()
+                .and_then(|q| {
+                    q.split('&')
+                        .find_map(|pair| pair.strip_prefix("tenant="))
+                })
+                .and_then(|s| s.trim().parse::<uuid::Uuid>().ok())
         });
 
     match tenant_id {

@@ -7,7 +7,7 @@ use crate::services::signature_validator::SignatureValidator;
 use crate::services::slo_service::{SloResult, SloService};
 use crate::services::SpService;
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     Extension, Form, Json,
@@ -17,6 +17,12 @@ use serde::Deserialize;
 use uuid::Uuid;
 use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
+
+/// Query params for SLO POST (tenant is in URL, form data is the SAML request)
+#[derive(Debug, Deserialize)]
+pub struct SloTenantQuery {
+    pub tenant: Option<String>,
+}
 
 /// Form data for incoming SLO POST
 #[derive(Debug, Deserialize)]
@@ -44,10 +50,14 @@ pub struct SloPostForm {
 )]
 pub async fn slo_post(
     State(state): State<SamlState>,
-    Extension(tenant_id): Extension<TenantId>,
+    Query(query_params): Query<SloTenantQuery>,
     Form(form): Form<SloPostForm>,
 ) -> Response {
-    match handle_slo_post(&state, *tenant_id.as_uuid(), form).await {
+    let tenant_id = match super::sso::parse_tenant_param(query_params.tenant.as_deref()) {
+        Ok(id) => id,
+        Err(e) => return e.into_response(),
+    };
+    match handle_slo_post(&state, tenant_id, form).await {
         Ok(response) => response,
         Err(e) => {
             tracing::error!(error = %e, "SLO POST failed");

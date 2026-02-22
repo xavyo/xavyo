@@ -95,6 +95,7 @@ pub fn saml_router(state: SamlState) -> Router {
 pub fn create_saml_state(
     pool: sqlx::PgPool,
     base_url: String,
+    frontend_url: String,
     encryption_key: [u8; 32],
 ) -> SamlState {
     let session_store =
@@ -104,6 +105,7 @@ pub fn create_saml_state(
     SamlState {
         pool,
         base_url,
+        frontend_url,
         encryption_key: std::sync::Arc::new(encryption_key),
         session_store,
         sp_session_store,

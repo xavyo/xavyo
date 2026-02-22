@@ -822,25 +822,31 @@ async fn main() {
     let saml_state = create_saml_state(
         pool.clone(),
         config.issuer_url.clone(),
+        config.frontend_url.clone(),
         config.saml_encryption_key,
     );
 
-    // F-4: HIGH - Split SAML routes - initiate requires auth, metadata/SSO do not
-    // SAML public routes (metadata, SSO) - require tenant but not auth
-    let saml_public_routes = Router::new()
-        .route(
-            "/saml/metadata",
-            axum::routing::get(xavyo_api_saml::handlers::metadata::get_metadata),
-        )
+    // F-4: HIGH - Split SAML routes - initiate requires auth, metadata/SSO/SLO do not
+    // SAML SSO + SLO routes — NO TenantLayer (tenant comes from ?tenant= query param)
+    // These are hit by browser redirects from SPs which cannot set X-Tenant-ID headers.
+    let saml_sso_routes: Router = Router::new()
         .route(
             "/saml/sso",
             axum::routing::get(xavyo_api_saml::handlers::sso::sso_redirect)
                 .post(xavyo_api_saml::handlers::sso::sso_post),
         )
-        // SAML SLO endpoint (SP-initiated logout — no auth required)
         .route(
             "/saml/slo",
             axum::routing::post(xavyo_api_saml::handlers::slo::slo_post),
+        )
+        .with_state(saml_state.clone())
+        .layer(axum::Extension(None::<xavyo_db::models::User>));
+
+    // SAML public routes (metadata) - require tenant header but not auth
+    let saml_public_routes = Router::new()
+        .route(
+            "/saml/metadata",
+            axum::routing::get(xavyo_api_saml::handlers::metadata::get_metadata),
         )
         .with_state(saml_state.clone())
         .layer(axum::Extension(None::<xavyo_db::models::User>))
@@ -850,11 +856,15 @@ async fn main() {
                 .build(),
         ));
 
-    // SAML authenticated routes (initiate SSO + IdP-initiated SLO) - require authenticated user
+    // SAML authenticated routes (initiate SSO, continue SSO, IdP-initiated SLO)
     let saml_authenticated_routes = Router::new()
         .route(
             "/saml/initiate/:sp_id",
             axum::routing::post(xavyo_api_saml::handlers::initiate_sso),
+        )
+        .route(
+            "/saml/continue",
+            axum::routing::post(xavyo_api_saml::handlers::continue_sso),
         )
         .route(
             "/saml/slo/initiate",
@@ -1299,9 +1309,11 @@ async fn main() {
         .nest("/auth/social", social_authenticated_routes)
         // Social login admin routes (requires admin role)
         .nest("/admin/social-providers", social_admin_routes)
-        // SAML IdP public routes (metadata, SSO)
+        // SAML SSO routes (no TenantLayer — tenant from query param)
+        .merge(saml_sso_routes)
+        // SAML IdP public routes (metadata — requires tenant header)
         .merge(saml_public_routes)
-        // SAML authenticated routes (initiate SSO)
+        // SAML authenticated routes (initiate SSO, continue SSO)
         .merge(saml_authenticated_routes)
         // SAML admin routes (SP/cert management)
         .nest("/admin/saml", saml_admin_routes)

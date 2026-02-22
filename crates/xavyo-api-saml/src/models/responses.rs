@@ -15,6 +15,8 @@ pub struct SsoRedirectQuery {
     pub sig_alg: Option<String>,
     #[serde(rename = "Signature")]
     pub signature: Option<String>,
+    /// Tenant ID (required for SP-initiated SSO via browser redirect)
+    pub tenant: Option<String>,
 }
 
 /// SSO POST form data

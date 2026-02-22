@@ -1,11 +1,13 @@
 //! HTTP handlers for SAML endpoints
 
 pub mod admin;
+pub mod continue_sso;
 pub mod initiate;
 pub mod metadata;
 pub mod slo;
 pub mod sso;
 
+pub use continue_sso::continue_sso;
 pub use initiate::initiate_sso;
 pub use metadata::get_metadata;
 pub use slo::{slo_initiate, slo_post};

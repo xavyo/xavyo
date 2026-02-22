@@ -25,6 +25,9 @@ pub trait SessionStore: Send + Sync {
         request_id: &str,
     ) -> Result<Option<AuthnRequestSession>, SessionError>;
 
+    /// Look up a session by its unique ID (UUID)
+    async fn get_by_id(&self, id: Uuid) -> Result<Option<AuthnRequestSession>, SessionError>;
+
     /// Validate and consume a session atomically
     ///
     /// This method looks up the session, validates it, marks it as consumed,
@@ -33,6 +36,14 @@ pub trait SessionStore: Send + Sync {
         &self,
         tenant_id: Uuid,
         request_id: &str,
+    ) -> Result<AuthnRequestSession, SessionError>;
+
+    /// Validate and consume a session by its unique ID (UUID) atomically.
+    /// Requires `tenant_id` for tenant isolation — prevents cross-tenant session consumption.
+    async fn consume_by_id(
+        &self,
+        tenant_id: Uuid,
+        id: Uuid,
     ) -> Result<AuthnRequestSession, SessionError>;
 
     /// Clean up expired sessions
@@ -77,6 +88,11 @@ impl SessionStore for InMemorySessionStore {
         Ok(sessions.get(&(tenant_id, request_id.to_string())).cloned())
     }
 
+    async fn get_by_id(&self, id: Uuid) -> Result<Option<AuthnRequestSession>, SessionError> {
+        let sessions = self.sessions.read().await;
+        Ok(sessions.values().find(|s| s.id == id).cloned())
+    }
+
     async fn validate_and_consume(
         &self,
         tenant_id: Uuid,
@@ -105,6 +121,25 @@ impl SessionStore for InMemorySessionStore {
         );
 
         Ok(consumed_session)
+    }
+
+    async fn consume_by_id(
+        &self,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<AuthnRequestSession, SessionError> {
+        let mut sessions = self.sessions.write().await;
+        let key = sessions
+            .iter()
+            .find(|(_, s)| s.id == id && s.tenant_id == tenant_id)
+            .map(|(k, _)| k.clone());
+        let key = key.ok_or_else(|| SessionError::NotFound(format!("session id {id}")))?;
+        let session = sessions.get_mut(&key).unwrap();
+        session.validate()?;
+        session.consume();
+        let consumed = session.clone();
+        tracing::info!(session_id = %id, "SAML AuthnRequest session consumed by ID");
+        Ok(consumed)
     }
 
     async fn cleanup_expired(&self) -> Result<u64, SessionError> {
@@ -137,6 +172,97 @@ impl PostgresSessionStore {
 
 #[async_trait]
 impl SessionStore for PostgresSessionStore {
+    async fn get_by_id(&self, id: Uuid) -> Result<Option<AuthnRequestSession>, SessionError> {
+        let row = sqlx::query(
+            r"
+            SELECT id, tenant_id, request_id, sp_entity_id, created_at, expires_at, consumed_at, relay_state
+            FROM saml_authn_request_sessions
+            WHERE id = $1
+            ",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| SessionError::StorageError(e.to_string()))?;
+
+        Ok(row.map(|r| AuthnRequestSession {
+            id: r.get("id"),
+            tenant_id: r.get("tenant_id"),
+            request_id: r.get("request_id"),
+            sp_entity_id: r.get("sp_entity_id"),
+            created_at: r.get("created_at"),
+            expires_at: r.get("expires_at"),
+            consumed_at: r.get("consumed_at"),
+            relay_state: r.get("relay_state"),
+        }))
+    }
+
+    async fn consume_by_id(
+        &self,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<AuthnRequestSession, SessionError> {
+        let now = Utc::now();
+
+        // SECURITY: Filter by both id AND tenant_id to prevent cross-tenant session consumption
+        let row = sqlx::query(
+            r"
+            UPDATE saml_authn_request_sessions
+            SET consumed_at = $3
+            WHERE id = $1
+              AND tenant_id = $2
+              AND consumed_at IS NULL
+              AND expires_at > ($3 - INTERVAL '30 seconds')
+            RETURNING id, tenant_id, request_id, sp_entity_id, created_at, expires_at, consumed_at, relay_state
+            ",
+        )
+        .bind(id)
+        .bind(tenant_id)
+        .bind(now)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| SessionError::StorageError(e.to_string()))?;
+
+        if let Some(r) = row {
+            let session = AuthnRequestSession {
+                id: r.get("id"),
+                tenant_id: r.get("tenant_id"),
+                request_id: r.get("request_id"),
+                sp_entity_id: r.get("sp_entity_id"),
+                created_at: r.get("created_at"),
+                expires_at: r.get("expires_at"),
+                consumed_at: r.get("consumed_at"),
+                relay_state: r.get("relay_state"),
+            };
+            tracing::info!(session_id = %id, "SAML AuthnRequest session consumed by ID");
+            Ok(session)
+        } else {
+            // Determine why the update didn't match — look up without tenant filter
+            // to provide the right error (not found vs consumed vs expired)
+            let existing = self.get_by_id(id).await?;
+            match existing {
+                None => Err(SessionError::NotFound(format!("session id {id}"))),
+                Some(session) if session.tenant_id != tenant_id => {
+                    // Session exists but belongs to different tenant — report as not found
+                    Err(SessionError::NotFound(format!("session id {id}")))
+                }
+                Some(session) => {
+                    if session.is_consumed() {
+                        Err(SessionError::AlreadyConsumed {
+                            request_id: session.request_id,
+                            consumed_at: session.consumed_at.unwrap(),
+                        })
+                    } else {
+                        Err(SessionError::Expired {
+                            request_id: session.request_id,
+                            expired_at: session.expires_at,
+                        })
+                    }
+                }
+            }
+        }
+    }
+
     async fn store(&self, session: AuthnRequestSession) -> Result<(), SessionError> {
         // SECURITY: Detect duplicate request IDs (replay attack prevention).
         // Use RETURNING to distinguish insert-success from conflict-silenced.
@@ -418,6 +544,86 @@ mod tests {
         // Tenant B's consume should fail
         let result = store.validate_and_consume(tenant_b, "req-123").await;
         assert!(matches!(result, Err(SessionError::NotFound(_))));
+    }
+
+    #[tokio::test]
+    async fn test_consume_by_id_success() {
+        let store = InMemorySessionStore::new();
+        let tenant_id = Uuid::new_v4();
+        let session = AuthnRequestSession::new(
+            tenant_id,
+            "req-by-id".to_string(),
+            "https://sp.example.com".to_string(),
+            Some("relay".to_string()),
+        );
+        let session_id = session.id;
+
+        store.store(session).await.unwrap();
+
+        let consumed = store.consume_by_id(tenant_id, session_id).await.unwrap();
+        assert!(consumed.consumed_at.is_some());
+        assert_eq!(consumed.request_id, "req-by-id");
+        assert_eq!(consumed.relay_state, Some("relay".to_string()));
+
+        // Second consume should fail (replay)
+        let result = store.consume_by_id(tenant_id, session_id).await;
+        assert!(matches!(result, Err(SessionError::AlreadyConsumed { .. })));
+    }
+
+    #[tokio::test]
+    async fn test_consume_by_id_tenant_isolation() {
+        let store = InMemorySessionStore::new();
+        let tenant_a = Uuid::new_v4();
+        let tenant_b = Uuid::new_v4();
+
+        let session = AuthnRequestSession::new(
+            tenant_a,
+            "req-cross".to_string(),
+            "https://sp.example.com".to_string(),
+            None,
+        );
+        let session_id = session.id;
+
+        store.store(session).await.unwrap();
+
+        // Tenant B should not be able to consume tenant A's session
+        let result = store.consume_by_id(tenant_b, session_id).await;
+        assert!(matches!(result, Err(SessionError::NotFound(_))));
+
+        // Tenant A should still be able to consume it
+        let consumed = store.consume_by_id(tenant_a, session_id).await.unwrap();
+        assert!(consumed.consumed_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_consume_by_id_not_found() {
+        let store = InMemorySessionStore::new();
+        let result = store.consume_by_id(Uuid::new_v4(), Uuid::new_v4()).await;
+        assert!(matches!(result, Err(SessionError::NotFound(_))));
+    }
+
+    #[tokio::test]
+    async fn test_get_by_id() {
+        let store = InMemorySessionStore::new();
+        let tenant_id = Uuid::new_v4();
+        let session = AuthnRequestSession::new(
+            tenant_id,
+            "req-get-id".to_string(),
+            "https://sp.example.com".to_string(),
+            None,
+        );
+        let session_id = session.id;
+
+        store.store(session).await.unwrap();
+
+        // Should find by ID
+        let found = store.get_by_id(session_id).await.unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().request_id, "req-get-id");
+
+        // Non-existent ID should return None
+        let not_found = store.get_by_id(Uuid::new_v4()).await.unwrap();
+        assert!(not_found.is_none());
     }
 
     #[tokio::test]
