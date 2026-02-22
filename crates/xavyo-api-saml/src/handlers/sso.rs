@@ -145,21 +145,25 @@ async fn resolve_tenant(
         }
     }
 
-    // No tenant param — resolve from SAMLRequest issuer
-    let authn_request = if is_redirect {
-        RequestParser::parse_redirect(saml_request)?
+    // No tenant param — extract Issuer from SAMLRequest (lightweight, no validation)
+    let issuer = if is_redirect {
+        RequestParser::extract_issuer_redirect(saml_request)
     } else {
-        RequestParser::parse_post(saml_request)?
-    };
+        RequestParser::extract_issuer_post(saml_request)
+    }
+    .map_err(|e| {
+        tracing::warn!(error = %e, "Failed to extract Issuer from SAMLRequest for tenant resolution");
+        e
+    })?;
 
     tracing::info!(
-        sp_entity_id = %authn_request.issuer,
+        sp_entity_id = %issuer,
         "No tenant param — resolving tenant from SAMLRequest Issuer"
     );
 
     let sp_service = SpService::new(state.pool.clone());
     let sp = sp_service
-        .get_sp_by_entity_id_any_tenant(&authn_request.issuer)
+        .get_sp_by_entity_id_any_tenant(&issuer)
         .await?;
 
     Ok(sp.tenant_id)

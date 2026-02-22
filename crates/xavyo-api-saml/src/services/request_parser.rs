@@ -23,7 +23,8 @@ const MAX_ENCODED_SIZE_REDIRECT: usize = 128 * 1024;
 const MAX_ENCODED_SIZE_POST: usize = 512 * 1024;
 
 /// Maximum length for the AuthnRequest ID attribute
-const MAX_REQUEST_ID_LENGTH: usize = 256;
+/// Salesforce uses IDs up to ~300 chars; 1024 provides ample headroom.
+const MAX_REQUEST_ID_LENGTH: usize = 1024;
 
 /// Maximum length for the Issuer element value
 const MAX_ISSUER_LENGTH: usize = 1024;
@@ -44,6 +45,82 @@ pub struct ParsedAuthnRequest {
 pub struct RequestParser;
 
 impl RequestParser {
+    /// Extract only the Issuer from a SAMLRequest (redirect binding: deflate + base64).
+    /// This is a lightweight parse for tenant resolution — no validation of IssueInstant, ID, etc.
+    pub fn extract_issuer_redirect(encoded_request: &str) -> SamlResult<String> {
+        if encoded_request.len() > MAX_ENCODED_SIZE_REDIRECT {
+            return Err(SamlError::InvalidAuthnRequest(
+                "Encoded SAMLRequest exceeds maximum size".to_string(),
+            ));
+        }
+        let decoded = STANDARD
+            .decode(encoded_request)
+            .map_err(|e| SamlError::InvalidAuthnRequest(format!("Base64 decode failed: {e}")))?;
+        let decoder = DeflateDecoder::new(&decoded[..]);
+        let mut xml = String::new();
+        decoder
+            .take(MAX_DECOMPRESSED_SIZE)
+            .read_to_string(&mut xml)
+            .map_err(|e| SamlError::InvalidAuthnRequest(format!("Deflate decode failed: {e}")))?;
+        Self::extract_issuer_from_xml(&xml)
+    }
+
+    /// Extract only the Issuer from a SAMLRequest (POST binding: base64 only).
+    pub fn extract_issuer_post(encoded_request: &str) -> SamlResult<String> {
+        if encoded_request.len() > MAX_ENCODED_SIZE_POST {
+            return Err(SamlError::InvalidAuthnRequest(
+                "Encoded SAMLRequest exceeds maximum size".to_string(),
+            ));
+        }
+        let decoded = base64::Engine::decode(&STANDARD, encoded_request)
+            .map_err(|e| SamlError::InvalidAuthnRequest(format!("Base64 decode failed: {e}")))?;
+        let xml = String::from_utf8(decoded)
+            .map_err(|e| SamlError::InvalidAuthnRequest(format!("Invalid UTF-8: {e}")))?;
+        Self::extract_issuer_from_xml(&xml)
+    }
+
+    /// Extract Issuer element from SAML XML without full validation.
+    fn extract_issuer_from_xml(xml: &str) -> SamlResult<String> {
+        use quick_xml::events::Event;
+        use quick_xml::Reader;
+
+        let mut reader = Reader::from_str(xml);
+        reader.config_mut().trim_text(true);
+        let mut in_issuer = false;
+
+        loop {
+            match reader.read_event() {
+                Ok(Event::Start(e)) => {
+                    let local = e.local_name();
+                    let name = std::str::from_utf8(local.as_ref()).unwrap_or("");
+                    if name == "Issuer" {
+                        in_issuer = true;
+                    }
+                }
+                Ok(Event::Text(e)) if in_issuer => {
+                    let issuer = e.unescape().unwrap_or_default().to_string();
+                    if issuer.len() > MAX_ISSUER_LENGTH {
+                        return Err(SamlError::InvalidAuthnRequest(
+                            "Issuer exceeds maximum length".to_string(),
+                        ));
+                    }
+                    return Ok(issuer);
+                }
+                Ok(Event::Eof) => break,
+                Err(e) => {
+                    return Err(SamlError::InvalidAuthnRequest(format!(
+                        "XML parse error: {e}"
+                    )));
+                }
+                _ => {}
+            }
+        }
+
+        Err(SamlError::InvalidAuthnRequest(
+            "Missing Issuer element".to_string(),
+        ))
+    }
+
     /// Parse an `AuthnRequest` from HTTP-Redirect binding (deflate + base64)
     pub fn parse_redirect(encoded_request: &str) -> SamlResult<ParsedAuthnRequest> {
         // SECURITY (H9): Reject oversized input before base64 decode to prevent OOM.
