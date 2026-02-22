@@ -495,10 +495,10 @@ fn test_validation_scope_length() {
     let max_valid = "x".repeat(256);
     assert!(max_valid.len() <= 256, "256-char scope is within limit");
 
-    let empty = "";
+    let empty = String::new();
     assert!(empty.is_empty(), "empty scope is invalid (min 1 char)");
 
-    let min_valid = "a";
+    let min_valid = String::from("a");
     assert!(
         !min_valid.is_empty() && min_valid.len() <= 256,
         "1-char scope is valid"

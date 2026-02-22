@@ -56,4 +56,5 @@ jobs:
             -v "${{ secrets.GITHUB_TOKEN }}"
           koyeb services update xavyo-api/idp-api \
             --docker "ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}" \
-            --docker-private-registry-secret ghcr-registry
+            --docker-private-registry-secret ghcr-registry \
+            --min-scale 1

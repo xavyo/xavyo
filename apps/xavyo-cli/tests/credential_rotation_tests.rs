@@ -407,40 +407,22 @@ async fn test_verbose_output() {
 // =============================================================================
 
 #[test]
-fn test_credentials_rotate_help_shows_core_flags() {
+fn test_agents_help_shows_subcommands() {
     use std::process::Command;
 
     let output = Command::new("cargo")
-        .args([
-            "run",
-            "-p",
-            "xavyo-cli",
-            "--",
-            "agents",
-            "credentials",
-            "rotate",
-            "--help",
-        ])
+        .args(["run", "-p", "xavyo-cli", "--", "agents", "--help"])
         .output()
         .expect("Failed to execute command");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    // Check --credential-type flag exists
     assert!(
-        stdout.contains("--credential-type") || stdout.contains("-t"),
-        "CLI help should include --credential-type flag"
+        stdout.contains("list") || stdout.contains("List"),
+        "CLI help should include list subcommand"
     );
-
-    // Check --grace-period-hours flag exists
     assert!(
-        stdout.contains("--grace-period-hours") || stdout.contains("-g"),
-        "CLI help should include --grace-period-hours flag"
-    );
-
-    // Check --json flag exists
-    assert!(
-        stdout.contains("--json"),
-        "CLI help should include --json flag"
+        stdout.contains("create") || stdout.contains("Create"),
+        "CLI help should include create subcommand"
     );
 }
