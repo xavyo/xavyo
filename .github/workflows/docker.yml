@@ -45,4 +45,5 @@ jobs:
           KOYEB_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
         run: |
           curl -fsSL https://raw.githubusercontent.com/koyeb/koyeb-cli/master/install.sh | sh
+          export PATH="$HOME/.koyeb/bin:$PATH"
           koyeb services update xavyo-api/idp-api --docker "ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}"
