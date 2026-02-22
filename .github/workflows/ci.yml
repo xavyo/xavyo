@@ -29,7 +29,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev
+      - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev protobuf-compiler protobuf-compiler
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --workspace --all-targets -- -D warnings
 
@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev
+      - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev protobuf-compiler
       - uses: Swatinem/rust-cache@v2
       - name: Free disk space
         run: |
@@ -72,7 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev
+      - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev protobuf-compiler
       - uses: Swatinem/rust-cache@v2
       - name: Free disk space
         run: |

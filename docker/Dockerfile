@@ -23,7 +23,7 @@ FROM rust:1.88-slim-bookworm AS builder
 RUN cargo install cargo-chef --locked
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libssl-dev pkg-config curl \
+    libssl-dev pkg-config curl protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
