@@ -60,6 +60,9 @@ COPY --from=builder --chown=xavyo:xavyo /app/target/release/idp-api /app/idp-api
 RUN mkdir -p /app/keys && chown -R xavyo:xavyo /app \
     && chmod 500 /app/idp-api
 
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
+
 EXPOSE 8080
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=30s \

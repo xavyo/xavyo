@@ -58,7 +58,7 @@ pub struct AppState {
     /// Service startup time for uptime calculation
     pub startup_time: Arc<Instant>,
 
-    /// Application version from Cargo.toml
+    /// Application version (APP_VERSION env var, or Cargo.toml fallback)
     pub version: &'static str,
 
     /// Whether initial startup is complete (F074 — startup probe)
@@ -99,7 +99,12 @@ impl AppState {
             auth,
             metrics,
             startup_time: Arc::new(Instant::now()),
-            version: env!("CARGO_PKG_VERSION"),
+            version: match std::env::var("APP_VERSION") {
+                Ok(v) if !v.is_empty() && v != "dev" => {
+                    Box::leak(v.into_boxed_str())
+                }
+                _ => env!("CARGO_PKG_VERSION"),
+            },
             startup_complete: Arc::new(AtomicBool::new(false)),
             shutting_down: Arc::new(AtomicBool::new(false)),
             health_config,

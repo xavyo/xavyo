@@ -34,6 +34,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
+          build-args: APP_VERSION=${{ steps.version.outputs.version }}
           tags: |
             ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
             ghcr.io/${{ env.IMAGE_NAME }}:latest
