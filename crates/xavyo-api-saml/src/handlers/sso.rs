@@ -43,7 +43,7 @@ pub async fn sso_redirect(
     Extension(user): Extension<Option<User>>,
     Query(query): Query<SsoRedirectQuery>,
 ) -> Response {
-    let tenant_id = match parse_tenant_param(query.tenant.as_deref()) {
+    let tenant_id = match resolve_tenant(&state, query.tenant.as_deref(), &query.saml_request, true).await {
         Ok(id) => id,
         Err(e) => return e.into_response(),
     };
@@ -90,7 +90,7 @@ pub async fn sso_post(
     Query(query_params): Query<SsoPostTenantQuery>,
     Form(form): Form<SsoPostForm>,
 ) -> Response {
-    let tenant_id = match parse_tenant_param(query_params.tenant.as_deref()) {
+    let tenant_id = match resolve_tenant(&state, query_params.tenant.as_deref(), &form.saml_request, false).await {
         Ok(id) => id,
         Err(e) => return e.into_response(),
     };
@@ -125,6 +125,44 @@ pub(crate) fn parse_tenant_param(tenant: Option<&str>) -> SamlResult<Uuid> {
     })?;
     Uuid::parse_str(tenant_str)
         .map_err(|e| SamlError::InvalidAuthnRequest(format!("Invalid tenant ID: {e}")))
+}
+
+/// Resolve tenant ID from query param or by looking up the SP entity_id from the SAMLRequest.
+/// When `?tenant=` is provided, use it directly. Otherwise, parse the SAMLRequest to extract
+/// the Issuer (SP entity_id) and look up the SP to find its tenant.
+/// `is_redirect` determines the SAMLRequest parsing mode (deflate+base64 vs base64-only).
+async fn resolve_tenant(
+    state: &SamlState,
+    tenant_param: Option<&str>,
+    saml_request: &str,
+    is_redirect: bool,
+) -> SamlResult<Uuid> {
+    // If tenant is explicitly provided, use it
+    if let Some(t) = tenant_param {
+        if !t.is_empty() {
+            return Uuid::parse_str(t)
+                .map_err(|e| SamlError::InvalidAuthnRequest(format!("Invalid tenant ID: {e}")));
+        }
+    }
+
+    // No tenant param — resolve from SAMLRequest issuer
+    let authn_request = if is_redirect {
+        RequestParser::parse_redirect(saml_request)?
+    } else {
+        RequestParser::parse_post(saml_request)?
+    };
+
+    tracing::info!(
+        sp_entity_id = %authn_request.issuer,
+        "No tenant param — resolving tenant from SAMLRequest Issuer"
+    );
+
+    let sp_service = SpService::new(state.pool.clone());
+    let sp = sp_service
+        .get_sp_by_entity_id_any_tenant(&authn_request.issuer)
+        .await?;
+
+    Ok(sp.tenant_id)
 }
 
 /// SAML binding type with signature info

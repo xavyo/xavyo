@@ -42,6 +42,32 @@ impl SpService {
         .ok_or_else(|| SamlError::ServiceProviderNotFound(sp_id.to_string()))
     }
 
+    /// Look up SP by entity ID across all tenants (for SP-initiated SSO when tenant is unknown).
+    /// Returns the SP including its `tenant_id` so the caller can derive tenant context.
+    pub async fn get_sp_by_entity_id_any_tenant(
+        &self,
+        entity_id: &str,
+    ) -> SamlResult<SamlServiceProvider> {
+        sqlx::query_as::<_, SamlServiceProvider>(
+            r"
+            SELECT id, tenant_id, entity_id, name, acs_urls, certificate,
+                   attribute_mapping, name_id_format, sign_assertions,
+                   validate_signatures, assertion_validity_seconds, enabled,
+                   metadata_url, created_at, updated_at,
+                   group_attribute_name, group_value_format, group_filter,
+                   include_groups, omit_empty_groups, group_dn_base,
+                   slo_url, slo_binding
+            FROM saml_service_providers
+            WHERE entity_id = $1
+            LIMIT 1
+            ",
+        )
+        .bind(entity_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| SamlError::UnknownServiceProvider(entity_id.to_string()))
+    }
+
     /// Get SP by entity ID
     pub async fn get_sp_by_entity_id(
         &self,
