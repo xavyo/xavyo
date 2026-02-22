@@ -59,7 +59,7 @@ pub struct EmailConfig {
     pub password_reset_path: String,
     /// Path for email verification page (e.g., "/auth/verify-email").
     pub email_verify_path: String,
-    /// Path for magic link verification page (e.g., "/auth/passwordless/verify").
+    /// Path for magic link verification page (e.g., "/passwordless/magic-link/verify").
     pub magic_link_path: String,
 }
 
@@ -105,7 +105,7 @@ impl EmailConfig {
             email_verify_path: std::env::var("EMAIL_VERIFY_PATH")
                 .unwrap_or_else(|_| "/auth/verify-email".to_string()),
             magic_link_path: std::env::var("MAGIC_LINK_PATH")
-                .unwrap_or_else(|_| "/auth/passwordless/verify".to_string()),
+                .unwrap_or_else(|_| "/passwordless/magic-link/verify".to_string()),
         })
     }
 
@@ -773,7 +773,7 @@ mod tests {
             frontend_base_url: "https://app.xavyo.com".to_string(),
             password_reset_path: "/auth/reset-password".to_string(),
             email_verify_path: "/auth/verify-email".to_string(),
-            magic_link_path: "/auth/passwordless/verify".to_string(),
+            magic_link_path: "/passwordless/magic-link/verify".to_string(),
         };
 
         let reset_url = config.password_reset_url("abc123");
@@ -791,7 +791,7 @@ mod tests {
         let magic_url = config.magic_link_url("ml_token");
         assert_eq!(
             magic_url,
-            "https://app.xavyo.com/auth/passwordless/verify?token=ml_token"
+            "https://app.xavyo.com/passwordless/magic-link/verify?token=ml_token"
         );
     }
 

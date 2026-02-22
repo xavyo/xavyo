@@ -55,7 +55,7 @@ impl SesEmailConfig {
             email_verify_path: std::env::var("EMAIL_VERIFY_PATH")
                 .unwrap_or_else(|_| "/auth/verify-email".to_string()),
             magic_link_path: std::env::var("MAGIC_LINK_PATH")
-                .unwrap_or_else(|_| "/auth/passwordless/verify".to_string()),
+                .unwrap_or_else(|_| "/passwordless/magic-link/verify".to_string()),
         };
 
         Ok(Self {
