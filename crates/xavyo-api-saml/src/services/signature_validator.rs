@@ -7,7 +7,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use openssl::hash::MessageDigest;
 use openssl::sign::Verifier;
 use openssl::x509::X509;
-use xml_canonicalization::Canonicalizer;
+
 
 /// Service for validating SAML message signatures
 pub struct SignatureValidator;
@@ -266,18 +266,9 @@ fn resolve_digest_method(algorithm_uri: Option<&str>) -> SamlResult<MessageDiges
     }
 }
 
-/// Apply Exclusive XML Canonicalization (C14N)
+/// Apply Exclusive XML Canonicalization (C14N) — delegates to shared implementation
 fn canonicalize_xml(xml: &str) -> SamlResult<String> {
-    let mut output = Vec::new();
-    Canonicalizer::read_from_str(xml)
-        .write_to_writer(&mut output)
-        .canonicalize(false) // Exclusive C14N without comments
-        .map_err(|e| {
-            SamlError::SignatureValidationFailed(format!("Canonicalization failed: {e}"))
-        })?;
-
-    String::from_utf8(output)
-        .map_err(|e| SamlError::SignatureValidationFailed(format!("Invalid UTF-8: {e}")))
+    super::assertion_builder::canonicalize_xml(xml)
 }
 
 /// Extract signature information from XML using quick-xml

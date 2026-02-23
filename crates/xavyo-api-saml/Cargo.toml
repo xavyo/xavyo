@@ -56,7 +56,6 @@ xavyo-core = { path = "../xavyo-core" }
 xavyo-db = { path = "../xavyo-db" }
 xavyo-auth = { path = "../xavyo-auth" }
 xavyo-tenant = { path = "../xavyo-tenant" }
-xml-canonicalization = "0.1.0"
 reqwest = { version = "0.12", features = ["json"] }
 
 [dev-dependencies]

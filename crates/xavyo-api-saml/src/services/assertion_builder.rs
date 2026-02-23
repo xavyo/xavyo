@@ -1,4 +1,4 @@
-//! SAML Assertion and Response builder with proper XML canonicalization
+//! SAML Assertion and Response builder with Exclusive XML Canonicalization
 
 use crate::error::{SamlError, SamlResult};
 use crate::saml::{
@@ -7,9 +7,10 @@ use crate::saml::{
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
 use chrono::{Duration, Utc};
+use quick_xml::events::Event;
+use quick_xml::reader::Reader;
 use uuid::Uuid;
 use xavyo_db::models::SamlServiceProvider;
-use xml_canonicalization::Canonicalizer;
 
 /// Output from building a SAML Response, containing the encoded response
 /// and session metadata needed for SP session tracking.
@@ -289,39 +290,14 @@ impl AssertionBuilder {
         .map_err(|e| SamlError::AssertionGenerationFailed(format!("Digest failed: {e}")))?;
         let digest_b64 = STANDARD.encode(digest);
 
-        // Build SignedInfo - must be canonicalized before signing
-        let mut signed_info = String::new();
-        signed_info.push_str("<ds:SignedInfo xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">");
-        signed_info.push_str(
-            "<ds:CanonicalizationMethod Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/>",
-        );
-        signed_info.push_str(
-            "<ds:SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\"/>",
-        );
-        signed_info.push_str("<ds:Reference URI=\"#");
-        signed_info.push_str(assertion_id);
-        signed_info.push_str("\">");
-        signed_info.push_str("<ds:Transforms>");
-        signed_info.push_str(
-            "<ds:Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/>",
-        );
-        signed_info
-            .push_str("<ds:Transform Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/>");
-        signed_info.push_str("</ds:Transforms>");
-        signed_info
-            .push_str("<ds:DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"/>");
-        signed_info.push_str("<ds:DigestValue>");
-        signed_info.push_str(&digest_b64);
-        signed_info.push_str("</ds:DigestValue>");
-        signed_info.push_str("</ds:Reference>");
-        signed_info.push_str("</ds:SignedInfo>");
+        // Build SignedInfo — already in canonical form (no self-closing tags,
+        // no extra whitespace, namespace declared on root element)
+        let signed_info = build_canonical_signed_info(assertion_id, &digest_b64);
 
-        // Canonicalize SignedInfo before signing (as per XML-Sig spec)
-        let canonicalized_signed_info = canonicalize_xml(&signed_info)?;
-
+        // Sign the canonical SignedInfo directly (no further canonicalization needed)
         let signature = self
             .credentials
-            .sign_sha256(canonicalized_signed_info.as_bytes())?;
+            .sign_sha256(signed_info.as_bytes())?;
         let signature_b64 = STANDARD.encode(&signature);
 
         // Build Signature element with proper formatting
@@ -343,39 +319,195 @@ impl AssertionBuilder {
     }
 }
 
-/// Apply Exclusive XML Canonicalization (C14N) to XML content.
-/// This is required for SAML signature generation and verification.
-fn canonicalize_xml(xml: &str) -> SamlResult<String> {
-    // The xml-canonicalization crate can panic on certain XML structures
-    // (e.g. unwrap() on None in grammars/start.rs). Catch the panic
-    // and convert it to a proper error instead of crashing the server.
-    let xml_owned = xml.to_string();
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let mut output = Vec::new();
-        Canonicalizer::read_from_str(&xml_owned)
-            .write_to_writer(&mut output)
-            .canonicalize(false) // false = exclude comments (Exclusive C14N without comments)
-            .map_err(|e| {
-                SamlError::AssertionGenerationFailed(format!("XML canonicalization failed: {e}"))
-            })?;
+/// Build SignedInfo in Exclusive C14N canonical form.
+///
+/// The output is already canonical: no self-closing tags, no extra whitespace,
+/// namespace declared on the root element, attributes in document order.
+/// This avoids the need for a separate canonicalization pass.
+fn build_canonical_signed_info(assertion_id: &str, digest_b64: &str) -> String {
+    let mut s = String::new();
+    s.push_str("<ds:SignedInfo xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">");
+    s.push_str("<ds:CanonicalizationMethod Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"></ds:CanonicalizationMethod>");
+    s.push_str("<ds:SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\"></ds:SignatureMethod>");
+    s.push_str("<ds:Reference URI=\"#");
+    s.push_str(assertion_id);
+    s.push_str("\">");
+    s.push_str("<ds:Transforms>");
+    s.push_str("<ds:Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"></ds:Transform>");
+    s.push_str("<ds:Transform Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"></ds:Transform>");
+    s.push_str("</ds:Transforms>");
+    s.push_str("<ds:DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"></ds:DigestMethod>");
+    s.push_str("<ds:DigestValue>");
+    s.push_str(digest_b64);
+    s.push_str("</ds:DigestValue>");
+    s.push_str("</ds:Reference>");
+    s.push_str("</ds:SignedInfo>");
+    s
+}
 
-        String::from_utf8(output).map_err(|e| {
+/// Extract element name as an owned String
+fn element_name_str(e: &quick_xml::events::BytesStart<'_>) -> SamlResult<String> {
+    String::from_utf8(e.name().as_ref().to_vec()).map_err(|err| {
+        SamlError::AssertionGenerationFailed(format!("Invalid UTF-8 in element name: {err}"))
+    })
+}
+
+/// Apply Exclusive XML Canonicalization (exc-c14n) without comments.
+///
+/// Uses `quick-xml` to parse and re-emit XML in canonical form:
+/// - No XML declaration
+/// - Empty elements expanded to start+end tags
+/// - Attributes sorted: namespace declarations (by prefix), then regular attributes (by name)
+/// - Proper C14N character escaping
+pub(crate) fn canonicalize_xml(xml: &str) -> SamlResult<String> {
+    let mut reader = Reader::from_str(xml);
+    // Preserve whitespace in text nodes — C14N keeps inter-element whitespace
+    reader.config_mut().trim_text(false);
+
+    let mut output = String::with_capacity(xml.len());
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref e)) => {
+                write_c14n_start_tag(&mut output, e)?;
+            }
+            Ok(Event::Empty(ref e)) => {
+                // C14N: empty elements become explicit open+close tags
+                let name = element_name_str(e)?;
+                write_c14n_start_tag(&mut output, e)?;
+                output.push_str("</");
+                output.push_str(&name);
+                output.push('>');
+            }
+            Ok(Event::End(ref e)) => {
+                let name = String::from_utf8(e.name().as_ref().to_vec()).map_err(|err| {
+                    SamlError::AssertionGenerationFailed(format!(
+                        "Invalid UTF-8 in element name: {err}"
+                    ))
+                })?;
+                output.push_str("</");
+                output.push_str(&name);
+                output.push('>');
+            }
+            Ok(Event::Text(ref e)) => {
+                let text = e.unescape().map_err(|err| {
+                    SamlError::AssertionGenerationFailed(format!("XML unescape error: {err}"))
+                })?;
+                c14n_escape_text(&mut output, &text);
+            }
+            Ok(Event::Decl(_) | Event::Comment(_) | Event::PI(_)) => {
+                // Strip XML declaration, comments, and processing instructions
+            }
+            Ok(Event::Eof) => break,
+            Ok(_) => {}
+            Err(e) => {
+                return Err(SamlError::AssertionGenerationFailed(format!(
+                    "XML parse error during canonicalization: {e}"
+                )));
+            }
+        }
+        buf.clear();
+    }
+
+    Ok(output)
+}
+
+/// Write an element's start tag in C14N canonical form.
+///
+/// Attributes are sorted: namespace declarations first (sorted by prefix),
+/// then regular attributes (sorted by local name).
+fn write_c14n_start_tag(
+    output: &mut String,
+    e: &quick_xml::events::BytesStart<'_>,
+) -> SamlResult<()> {
+    let name = element_name_str(e)?;
+
+    output.push('<');
+    output.push_str(&name);
+
+    // Separate namespace declarations from regular attributes
+    let mut ns_attrs: Vec<(String, String)> = Vec::new();
+    let mut regular_attrs: Vec<(String, String)> = Vec::new();
+
+    for attr_result in e.attributes() {
+        let attr = attr_result.map_err(|err| {
+            SamlError::AssertionGenerationFailed(format!("XML attribute parse error: {err}"))
+        })?;
+        let key = std::str::from_utf8(attr.key.as_ref()).map_err(|err| {
             SamlError::AssertionGenerationFailed(format!(
-                "Canonicalized XML is not valid UTF-8: {e}"
+                "Invalid UTF-8 in attribute name: {err}"
             ))
-        })
-    }));
+        })?;
+        let value = attr.unescape_value().map_err(|err| {
+            SamlError::AssertionGenerationFailed(format!(
+                "XML attribute unescape error: {err}"
+            ))
+        })?;
 
-    match result {
-        Ok(inner) => inner,
-        Err(_) => Err(SamlError::AssertionGenerationFailed(
-            "XML canonicalization panicked — input may contain unsupported XML structures"
-                .to_string(),
-        )),
+        if key == "xmlns" || key.starts_with("xmlns:") {
+            ns_attrs.push((key.to_string(), value.to_string()));
+        } else {
+            regular_attrs.push((key.to_string(), value.to_string()));
+        }
+    }
+
+    // Sort namespace declarations: default namespace first, then by prefix
+    ns_attrs.sort_by(|a, b| {
+        if a.0 == "xmlns" {
+            return std::cmp::Ordering::Less;
+        }
+        if b.0 == "xmlns" {
+            return std::cmp::Ordering::Greater;
+        }
+        a.0.cmp(&b.0)
+    });
+
+    // Sort regular attributes by name
+    regular_attrs.sort_by(|a, b| a.0.cmp(&b.0));
+
+    // Write namespace declarations first, then regular attributes
+    for (key, value) in ns_attrs.iter().chain(regular_attrs.iter()) {
+        output.push(' ');
+        output.push_str(key);
+        output.push_str("=\"");
+        c14n_escape_attr(output, value);
+        output.push('"');
+    }
+
+    output.push('>');
+    Ok(())
+}
+
+/// C14N text node escaping: & < > and CR
+fn c14n_escape_text(output: &mut String, text: &str) {
+    for c in text.chars() {
+        match c {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '\r' => output.push_str("&#xD;"),
+            _ => output.push(c),
+        }
     }
 }
 
-/// XML escape special characters
+/// C14N attribute value escaping: & < " TAB LF CR
+fn c14n_escape_attr(output: &mut String, text: &str) {
+    for c in text.chars() {
+        match c {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '"' => output.push_str("&quot;"),
+            '\t' => output.push_str("&#x9;"),
+            '\n' => output.push_str("&#xA;"),
+            '\r' => output.push_str("&#xD;"),
+            _ => output.push(c),
+        }
+    }
+}
+
+/// XML escape special characters for building XML strings
 fn xml_escape(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     for c in s.chars() {
@@ -383,8 +515,8 @@ fn xml_escape(s: &str) -> String {
             '&' => result.push_str("&amp;"),
             '<' => result.push_str("&lt;"),
             '>' => result.push_str("&gt;"),
-            _ if c == '"' => result.push_str("&quot;"),
-            _ if c == '\'' => result.push_str("&apos;"),
+            '"' => result.push_str("&quot;"),
+            '\'' => result.push_str("&apos;"),
             _ => result.push(c),
         }
     }
@@ -393,7 +525,7 @@ fn xml_escape(s: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{canonicalize_xml, xml_escape};
+    use super::{build_canonical_signed_info, canonicalize_xml, xml_escape};
 
     #[test]
     fn test_xml_escape_basic() {
@@ -402,61 +534,86 @@ mod tests {
     }
 
     #[test]
-    fn test_canonicalize_xml_removes_whitespace() {
-        // C14N normalizes whitespace and attribute ordering
-        let input = r#"<root  attr1="a"   attr2="b" >
-            <child/>
-        </root>"#;
-        let result = canonicalize_xml(input).expect("canonicalization should succeed");
-        // C14N removes extra whitespace between attributes
-        assert!(result.contains("<root"));
-        assert!(result.contains("</root>"));
+    fn test_canonicalize_xml_removes_declaration() {
+        let input = "<?xml version=\"1.0\"?><root><child>text</child></root>";
+        let result = canonicalize_xml(input).unwrap();
+        assert_eq!(result, "<root><child>text</child></root>");
+    }
+
+    #[test]
+    fn test_canonicalize_xml_expands_empty_elements() {
+        let input = "<root><empty/></root>";
+        let result = canonicalize_xml(input).unwrap();
+        assert_eq!(result, "<root><empty></empty></root>");
+    }
+
+    #[test]
+    fn test_canonicalize_xml_sorts_attributes() {
+        let input = r#"<root z="3" a="1" m="2"></root>"#;
+        let result = canonicalize_xml(input).unwrap();
+        assert_eq!(result, r#"<root a="1" m="2" z="3"></root>"#);
+    }
+
+    #[test]
+    fn test_canonicalize_xml_ns_decls_first() {
+        let input = r#"<saml:Assertion ID="test" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" Version="2.0"></saml:Assertion>"#;
+        let result = canonicalize_xml(input).unwrap();
+        // xmlns:saml should come before ID and Version
+        assert_eq!(
+            result,
+            r#"<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="test" Version="2.0"></saml:Assertion>"#
+        );
     }
 
     #[test]
     fn test_canonicalize_full_assertion() {
-        // Reproduce the exact XML structure generated by build_response_xml
-        let xml = r#"<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-        ID="_assert_test123"
-        Version="2.0"
-        IssueInstant="2026-02-23T07:00:00Z">
-        <saml:Issuer>https://api.xavyo.net/saml/metadata?tenant=test</saml:Issuer>
-        <saml:Subject>
-            <saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">user@example.com</saml:NameID>
-            <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
-                <saml:SubjectConfirmationData
-                    NotOnOrAfter="2026-02-23T07:05:00Z"
-                    Recipient="https://sp.example.com/acs"/>
-            </saml:SubjectConfirmation>
-        </saml:Subject>
-        <saml:Conditions NotBefore="2026-02-23T06:58:00Z" NotOnOrAfter="2026-02-23T07:05:00Z">
-            <saml:AudienceRestriction>
-                <saml:Audience>https://sp.example.com</saml:Audience>
-            </saml:AudienceRestriction>
-        </saml:Conditions>
-        <saml:AuthnStatement AuthnInstant="2026-02-23T07:00:00Z" SessionIndex="_session_test456">
-            <saml:AuthnContext>
-                <saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef>
-            </saml:AuthnContext>
-        </saml:AuthnStatement>
-    </saml:Assertion>"#;
+        let xml = "<saml:Assertion xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:assertion\"\n        ID=\"_assert_test123\"\n        Version=\"2.0\"\n        IssueInstant=\"2026-02-23T07:00:00Z\">\n        <saml:Issuer>https://api.xavyo.net/saml/metadata?tenant=test</saml:Issuer>\n        <saml:Subject>\n            <saml:NameID Format=\"urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress\">user@example.com</saml:NameID>\n            <saml:SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\">\n                <saml:SubjectConfirmationData\n                    NotOnOrAfter=\"2026-02-23T07:05:00Z\"\n                    Recipient=\"https://sp.example.com/acs\"/>\n            </saml:SubjectConfirmation>\n        </saml:Subject>\n        <saml:Conditions NotBefore=\"2026-02-23T06:58:00Z\" NotOnOrAfter=\"2026-02-23T07:05:00Z\">\n            <saml:AudienceRestriction>\n                <saml:Audience>https://sp.example.com</saml:Audience>\n            </saml:AudienceRestriction>\n        </saml:Conditions>\n        <saml:AuthnStatement AuthnInstant=\"2026-02-23T07:00:00Z\" SessionIndex=\"_session_test456\">\n            <saml:AuthnContext>\n                <saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef>\n            </saml:AuthnContext>\n        </saml:AuthnStatement>\n    </saml:Assertion>";
         let result = canonicalize_xml(xml);
-        assert!(result.is_ok(), "Canonicalization of full assertion should succeed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Canonicalization of full assertion should succeed: {:?}",
+            result.err()
+        );
+        let canonical = result.unwrap();
+        // Self-closing SubjectConfirmationData should be expanded
+        assert!(canonical.contains("</saml:SubjectConfirmationData>"));
+        // Namespace should be present
+        assert!(canonical.contains("xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:assertion\""));
+        // Attributes on SubjectConfirmationData should be sorted
+        assert!(canonical.contains("NotOnOrAfter=\"2026-02-23T07:05:00Z\" Recipient=\"https://sp.example.com/acs\""));
     }
 
     #[test]
     fn test_canonicalize_signed_info() {
-        // Reproduce the exact SignedInfo XML built by sign_response
-        let xml = r##"<ds:SignedInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/><ds:Reference URI="#_assert_test123"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><ds:DigestValue>dGVzdA==</ds:DigestValue></ds:Reference></ds:SignedInfo>"##;
+        let xml = "<ds:SignedInfo xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\"><ds:CanonicalizationMethod Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/><ds:SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\"/><ds:Reference URI=\"#_assert_test123\"><ds:Transforms><ds:Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/><ds:Transform Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/></ds:Transforms><ds:DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"/><ds:DigestValue>dGVzdA==</ds:DigestValue></ds:Reference></ds:SignedInfo>";
         let result = canonicalize_xml(xml);
-        assert!(result.is_ok(), "Canonicalization of SignedInfo should succeed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Canonicalization of SignedInfo should succeed: {:?}",
+            result.err()
+        );
+        let canonical = result.unwrap();
+        // All self-closing tags should be expanded
+        assert!(canonical.contains("</ds:CanonicalizationMethod>"));
+        assert!(canonical.contains("</ds:SignatureMethod>"));
+        assert!(canonical.contains("</ds:DigestMethod>"));
+    }
+
+    #[test]
+    fn test_canonical_signed_info_builder() {
+        let result = build_canonical_signed_info("_assert_abc", "dGVzdA==");
+        // Should already be in canonical form (no self-closing tags)
+        assert!(result.contains("</ds:CanonicalizationMethod>"));
+        assert!(result.contains("</ds:SignatureMethod>"));
+        assert!(result.contains("</ds:DigestMethod>"));
+        assert!(result.contains("</ds:Transform>"));
+        assert!(result.contains("URI=\"#_assert_abc\""));
+        assert!(result.contains("<ds:DigestValue>dGVzdA==</ds:DigestValue>"));
     }
 
     #[test]
     fn test_canonicalize_xml_preserves_namespaces() {
-        let input = r#"<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="test">
-            <saml:Issuer>https://idp.example.com</saml:Issuer>
-        </saml:Assertion>"#;
+        let input = "<saml:Assertion xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:assertion\" ID=\"test\">\n            <saml:Issuer>https://idp.example.com</saml:Issuer>\n        </saml:Assertion>";
         let result = canonicalize_xml(input).expect("canonicalization should succeed");
         assert!(result.contains("xmlns:saml"));
         assert!(result.contains("urn:oasis:names:tc:SAML:2.0:assertion"));

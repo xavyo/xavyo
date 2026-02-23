@@ -4,7 +4,7 @@ use crate::error::{SamlError, SamlResult};
 use crate::saml::SigningCredentials;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use uuid::Uuid;
-use xml_canonicalization::Canonicalizer;
+use super::assertion_builder::canonicalize_xml;
 
 /// Builder for SAML LogoutRequest and LogoutResponse messages
 pub struct SloBuilder {
@@ -175,16 +175,6 @@ impl SloBuilder {
     }
 }
 
-fn canonicalize_xml(xml: &str) -> SamlResult<String> {
-    let mut output = Vec::new();
-    Canonicalizer::read_from_str(xml)
-        .write_to_writer(&mut output)
-        .canonicalize(false)
-        .map_err(|e| SamlError::InternalError(format!("XML canonicalization failed: {e}")))?;
-
-    String::from_utf8(output)
-        .map_err(|e| SamlError::InternalError(format!("Canonicalized XML is not valid UTF-8: {e}")))
-}
 
 fn xml_escape(s: &str) -> String {
     let mut result = String::with_capacity(s.len());

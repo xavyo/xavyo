@@ -8533,7 +8533,6 @@ dependencies = [
  "xavyo-core",
  "xavyo-db",
  "xavyo-tenant",
- "xml-canonicalization",
 ]
 
 [[package]]
@@ -9105,19 +9104,6 @@ dependencies = [
  "xavyo-core",
  "xavyo-db",
  "xavyo-tenant",
-]
-
-[[package]]
-name = "xml-canonicalization"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9a3101284404fdfe80cc80be42e4c1b5642ac76aae9ef10dae2eaf7884f66e1"
-dependencies = [
- "pest",
- "pest_derive",
- "quick-xml",
- "regex",
- "tracing",
 ]
 
 [[package]]
