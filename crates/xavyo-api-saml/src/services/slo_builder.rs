@@ -155,16 +155,15 @@ impl SloBuilder {
 
         let certificate_base64 = self.credentials.certificate_base64_der()?;
 
+        // No leading whitespace — see assertion_builder.rs sign_response() for explanation
         let mut sig_xml = String::new();
-        sig_xml.push_str(
-            "\n    <ds:Signature xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">\n        ",
-        );
+        sig_xml.push_str("<ds:Signature xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">");
         sig_xml.push_str(&signed_info);
-        sig_xml.push_str("\n        <ds:SignatureValue>");
+        sig_xml.push_str("<ds:SignatureValue>");
         sig_xml.push_str(&signature_b64);
-        sig_xml.push_str("</ds:SignatureValue>\n        <ds:KeyInfo>\n            <ds:X509Data>\n                <ds:X509Certificate>");
+        sig_xml.push_str("</ds:SignatureValue><ds:KeyInfo><ds:X509Data><ds:X509Certificate>");
         sig_xml.push_str(&certificate_base64);
-        sig_xml.push_str("</ds:X509Certificate>\n            </ds:X509Data>\n        </ds:KeyInfo>\n    </ds:Signature>");
+        sig_xml.push_str("</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature>");
 
         let mut result = String::with_capacity(xml.len() + sig_xml.len());
         result.push_str(&xml[..after_issuer]);

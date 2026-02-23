@@ -33,6 +33,8 @@ pub struct AuthnRequestSession {
     pub consumed_at: Option<DateTime<Utc>>,
     /// `RelayState` to preserve across the SSO flow
     pub relay_state: Option<String>,
+    /// `AssertionConsumerServiceURL` from the original AuthnRequest
+    pub acs_url: Option<String>,
 }
 
 impl AuthnRequestSession {
@@ -72,7 +74,15 @@ impl AuthnRequestSession {
             expires_at: now + Duration::seconds(ttl_seconds),
             consumed_at: None,
             relay_state,
+            acs_url: None,
         }
+    }
+
+    /// Set the ACS URL from the AuthnRequest
+    #[must_use]
+    pub fn with_acs_url(mut self, acs_url: Option<String>) -> Self {
+        self.acs_url = acs_url;
+        self
     }
 
     /// Check if this session has expired (with grace period for clock skew)

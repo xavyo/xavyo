@@ -300,15 +300,19 @@ impl AssertionBuilder {
             .sign_sha256(signed_info.as_bytes())?;
         let signature_b64 = STANDARD.encode(&signature);
 
-        // Build Signature element with proper formatting
+        // Build Signature element.
+        // IMPORTANT: No leading whitespace before <ds:Signature> — when the SP
+        // validates the signature, it removes the Signature element from the DOM
+        // (enveloped-signature transform). Leading whitespace would leave extra
+        // text nodes that change the canonical form and break the digest.
         let mut signature_xml = String::new();
-        signature_xml.push_str("\n        <ds:Signature xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">\n            ");
+        signature_xml.push_str("<ds:Signature xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">");
         signature_xml.push_str(&signed_info);
-        signature_xml.push_str("\n            <ds:SignatureValue>");
+        signature_xml.push_str("<ds:SignatureValue>");
         signature_xml.push_str(&signature_b64);
-        signature_xml.push_str("</ds:SignatureValue>\n            <ds:KeyInfo>\n                <ds:X509Data>\n                    <ds:X509Certificate>");
+        signature_xml.push_str("</ds:SignatureValue><ds:KeyInfo><ds:X509Data><ds:X509Certificate>");
         signature_xml.push_str(&certificate_base64);
-        signature_xml.push_str("</ds:X509Certificate>\n                </ds:X509Data>\n            </ds:KeyInfo>\n        </ds:Signature>");
+        signature_xml.push_str("</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature>");
 
         let mut result = String::with_capacity(response_xml.len() + signature_xml.len());
         result.push_str(&response_xml[..after_issuer]);

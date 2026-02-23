@@ -194,6 +194,7 @@ impl SessionStore for PostgresSessionStore {
             expires_at: r.get("expires_at"),
             consumed_at: r.get("consumed_at"),
             relay_state: r.get("relay_state"),
+            acs_url: None,
         }))
     }
 
@@ -233,6 +234,7 @@ impl SessionStore for PostgresSessionStore {
                 expires_at: r.get("expires_at"),
                 consumed_at: r.get("consumed_at"),
                 relay_state: r.get("relay_state"),
+                acs_url: None,
             };
             tracing::info!(session_id = %id, "SAML AuthnRequest session consumed by ID");
             Ok(session)
@@ -332,6 +334,7 @@ impl SessionStore for PostgresSessionStore {
             expires_at: r.get("expires_at"),
             consumed_at: r.get("consumed_at"),
             relay_state: r.get("relay_state"),
+            acs_url: None,
         }))
     }
 
@@ -373,6 +376,7 @@ impl SessionStore for PostgresSessionStore {
                 expires_at: r.get("expires_at"),
                 consumed_at: r.get("consumed_at"),
                 relay_state: r.get("relay_state"),
+                acs_url: None,
             };
 
             tracing::info!(
