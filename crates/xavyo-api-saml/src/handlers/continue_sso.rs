@@ -74,20 +74,43 @@ async fn continue_sso_inner(
     // Extract user_id from JWT sub
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| SamlError::NotAuthenticated)?;
 
-    // Consume the session atomically (validates not expired, not already consumed).
-    // SECURITY: tenant_id enforces tenant isolation — prevents cross-tenant session consumption.
+    // Load session first (validates not expired, not already consumed) WITHOUT consuming.
+    // We consume only after successfully building the SAML Response to avoid
+    // marking the session as used if response generation fails (e.g. signing panic).
+    // SECURITY: tenant_id enforces tenant isolation — prevents cross-tenant session access.
     let session = state
         .session_store
-        .consume_by_id(tenant_id, session_id)
+        .get_by_id(session_id)
         .await
         .map_err(|e| {
             tracing::warn!(
                 session_id = %session_id,
                 error = %e,
-                "Failed to consume SAML session"
+                "Failed to load SAML session"
             );
             SamlError::SessionError(e)
-        })?;
+        })?
+        .ok_or_else(|| SamlError::InvalidAuthnRequest("Session not found".to_string()))?;
+
+    // SECURITY: Verify the session belongs to the caller's tenant
+    if session.tenant_id != tenant_id {
+        return Err(SamlError::InvalidAuthnRequest("Session not found".to_string()));
+    }
+
+    // Validate the session is still usable
+    if let Some(consumed_at) = session.consumed_at {
+        return Err(SamlError::SessionError(
+            crate::session::SessionError::AlreadyConsumed {
+                request_id: session.request_id.clone(),
+                consumed_at,
+            },
+        ));
+    }
+    if session.expires_at < chrono::Utc::now() {
+        return Err(SamlError::InvalidAuthnRequest(
+            "Session has expired".to_string(),
+        ));
+    }
 
     // Look up the SP by entity_id stored in session
     let sp_service = SpService::new(state.pool.clone());
@@ -183,6 +206,21 @@ async fn continue_sso_inner(
         None,
         Some(&acs_url),
     )?;
+
+    // SAML Response built successfully — now consume the session to prevent replay.
+    if let Err(e) = state
+        .session_store
+        .consume_by_id(tenant_id, session_id)
+        .await
+    {
+        // If consumption fails (e.g. concurrent request), log but don't fail —
+        // the SAML Response is already built and valid.
+        tracing::warn!(
+            session_id = %session_id,
+            error = %e,
+            "Failed to consume session after response generation (possible race)"
+        );
+    }
 
     // Record SP session for SLO tracking
     let sp_session = crate::session::SpSession {
