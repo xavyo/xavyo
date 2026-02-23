@@ -1,18 +1,18 @@
 //! SAML Metadata handler
 
-use crate::error::SamlResult;
+use crate::error::{SamlError, SamlResult};
 use crate::services::{MetadataGenerator, SpService};
 use crate::session::{SessionStore, SpSessionStore};
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::{header, StatusCode},
     response::{IntoResponse, Response},
-    Extension,
 };
+use serde::Deserialize;
 use sqlx::PgPool;
 use std::sync::Arc;
+use utoipa::IntoParams;
 use uuid::Uuid;
-use xavyo_core::TenantId;
 
 /// Application state for SAML handlers
 #[derive(Clone)]
@@ -27,21 +27,45 @@ pub struct SamlState {
     pub sp_session_store: Arc<dyn SpSessionStore>,
 }
 
+/// Query parameters for metadata endpoint
+#[derive(Debug, Deserialize, IntoParams)]
+pub struct MetadataQuery {
+    pub tenant: Option<String>,
+}
+
 /// Return `IdP` metadata XML
 #[utoipa::path(
     get,
     path = "/saml/metadata",
+    params(MetadataQuery),
     responses(
         (status = 200, description = "IdP metadata XML"),
+        (status = 400, description = "Missing or invalid tenant parameter"),
         (status = 500, description = "Failed to generate metadata"),
     ),
     tag = "SAML"
 )]
 pub async fn get_metadata(
     State(state): State<SamlState>,
-    Extension(tenant_id): Extension<TenantId>,
+    Query(query): Query<MetadataQuery>,
 ) -> Response {
-    match get_metadata_inner(&state, *tenant_id.as_uuid()).await {
+    let tenant_id = match query.tenant.as_deref() {
+        Some(t) if !t.is_empty() => match Uuid::parse_str(t) {
+            Ok(id) => id,
+            Err(_) => {
+                return SamlError::InvalidAuthnRequest(format!("Invalid tenant ID: {t}"))
+                    .into_response()
+            }
+        },
+        _ => {
+            return SamlError::InvalidAuthnRequest(
+                "Missing required 'tenant' query parameter".to_string(),
+            )
+            .into_response()
+        }
+    };
+
+    match get_metadata_inner(&state, tenant_id).await {
         Ok(xml) => (
             StatusCode::OK,
             [(header::CONTENT_TYPE, "application/xml; charset=utf-8")],
