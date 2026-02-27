@@ -39,7 +39,7 @@ type EmailVerificationTokenRow = (
 )]
 pub async fn verify_email_handler(
     Extension(pool): Extension<PgPool>,
-    Extension(tenant_id): Extension<TenantId>,
+    Extension(_tenant_id): Extension<TenantId>,
     Json(request): Json<VerifyEmailRequest>,
 ) -> Result<Json<VerifyEmailResponse>, ApiAuthError> {
     // Validate request format
@@ -79,15 +79,10 @@ pub async fn verify_email_handler(
         return Err(ApiAuthError::InvalidToken);
     }
 
-    // Check tenant isolation
-    if token_tenant_id != *tenant_id.as_uuid() {
-        tracing::warn!(
-            token_tenant = %token_tenant_id,
-            request_tenant = %tenant_id,
-            "Token tenant mismatch"
-        );
-        return Err(ApiAuthError::InvalidToken);
-    }
+    // Use the tenant from the token row for all subsequent operations.
+    // The frontend may not know the user's tenant (e.g., sends system tenant),
+    // so we derive it from the token which was created for the correct tenant.
+    let tenant_id = TenantId::from_uuid(token_tenant_id);
 
     // Check if user is already verified (include tenant_id for defense-in-depth)
     let (is_active, email_verified): (bool, bool) = sqlx::query_as(

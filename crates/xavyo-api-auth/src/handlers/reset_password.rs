@@ -44,7 +44,7 @@ type PasswordResetTokenRow = (
 )]
 pub async fn reset_password_handler(
     Extension(pool): Extension<PgPool>,
-    Extension(tenant_id): Extension<TenantId>,
+    Extension(_request_tenant_id): Extension<TenantId>,
     Extension(password_policy_service): Extension<Arc<PasswordPolicyService>>,
     Extension(session_service): Extension<Arc<SessionService>>,
     Json(request): Json<ResetPasswordRequest>,
@@ -63,6 +63,29 @@ pub async fn reset_password_handler(
         ApiAuthError::Validation(errors.join(", "))
     })?;
 
+    // Hash the provided token to look up in database
+    let token_hash = hash_token(&request.token);
+
+    // Look up the token by hash only — the token itself is the proof of identity.
+    // The tenant_id is extracted from the token row and used for all subsequent operations.
+    // This allows the frontend to call reset-password without knowing the user's tenant.
+    let token_row: Option<PasswordResetTokenRow> = sqlx::query_as(
+        r"
+        SELECT id, tenant_id, user_id, token_hash, expires_at, used_at
+        FROM password_reset_tokens
+        WHERE token_hash = $1
+        ",
+    )
+    .bind(&token_hash)
+    .fetch_optional(&pool)
+    .await?;
+
+    let (token_id, token_tenant_id, user_id, stored_hash, expires_at, used_at) =
+        token_row.ok_or(ApiAuthError::InvalidToken)?;
+
+    // Use the tenant from the token row for all subsequent operations
+    let tenant_id = TenantId::from_uuid(token_tenant_id);
+
     // Get tenant's password policy and validate password against it
     let policy = password_policy_service
         .get_password_policy(*tenant_id.as_uuid())
@@ -77,25 +100,6 @@ pub async fn reset_password_handler(
             .collect();
         return Err(ApiAuthError::WeakPassword(errors));
     }
-
-    // Hash the provided token to look up in database
-    let token_hash = hash_token(&request.token);
-
-    // Look up the token (C-1: include tenant_id in WHERE clause for tenant isolation at DB level)
-    let token_row: Option<PasswordResetTokenRow> = sqlx::query_as(
-        r"
-        SELECT id, tenant_id, user_id, token_hash, expires_at, used_at
-        FROM password_reset_tokens
-        WHERE token_hash = $1 AND tenant_id = $2
-        ",
-    )
-    .bind(&token_hash)
-    .bind(tenant_id.as_uuid())
-    .fetch_optional(&pool)
-    .await?;
-
-    let (token_id, _token_tenant_id, user_id, stored_hash, expires_at, used_at) =
-        token_row.ok_or(ApiAuthError::InvalidToken)?;
 
     // Verify token hash with constant-time comparison
     if !verify_token_hash_constant_time(&request.token, &stored_hash) {
