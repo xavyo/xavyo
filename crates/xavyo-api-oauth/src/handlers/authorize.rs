@@ -44,9 +44,8 @@ pub async fn authorize_handler(
     // SECURITY: Extract tenant context and validate redirect_uri.
     // The tenant can be derived from:
     // 1. X-Tenant-ID header (set by reverse proxy based on domain)
-    // 2. A tenant subdomain (extracted by middleware)
-    // 3. A tenant cookie (for single-domain multi-tenant deployments)
-    let tenant_id = extract_tenant_from_request(&headers)?;
+    // 2. A ?tenant= query parameter (for browser-redirect OAuth flows)
+    let tenant_id = extract_tenant_from_request(&headers, request.tenant.as_deref())?;
 
     // SECURITY: Look up the client and validate redirect_uri BEFORE proceeding.
     // This prevents authorization code theft via open redirect attacks.
@@ -82,8 +81,12 @@ pub async fn authorize_handler(
     let (csrf_token, csrf_sig) = csrf::generate_csrf_token(csrf_secret);
 
     // Build the consent/login URL with all parameters preserved, including CSRF
+    let frontend_base = state
+        .frontend_url
+        .as_deref()
+        .unwrap_or("");
     let consent_url = format!(
-        "/oauth/consent?client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method={}{}&csrf_token={}&csrf_sig={}",
+        "{frontend_base}/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method={}{}&csrf_token={}&csrf_sig={}",
         urlencoding::encode(&request.client_id),
         urlencoding::encode(&request.redirect_uri),
         urlencoding::encode(&request.scope),
@@ -237,19 +240,26 @@ pub async fn consent_handler(
 ///
 /// In a production deployment, this header should ONLY be trusted from
 /// the internal network (i.e., set by the reverse proxy, not by clients).
-fn extract_tenant_from_request(headers: &axum::http::HeaderMap) -> Result<Uuid, OAuthError> {
-    let tenant_header = headers
+fn extract_tenant_from_request(
+    headers: &axum::http::HeaderMap,
+    query_tenant: Option<&str>,
+) -> Result<Uuid, OAuthError> {
+    // Try X-Tenant-ID header first, then fall back to ?tenant= query parameter
+    // (browser redirects cannot set custom headers)
+    let tenant_str = headers
         .get("X-Tenant-ID")
         .and_then(|v| v.to_str().ok())
+        .or(query_tenant)
         .ok_or_else(|| {
-            tracing::warn!("Missing X-Tenant-ID header in authorize request");
+            tracing::warn!("Missing tenant context in authorize request");
             OAuthError::InvalidRequest(
-                "Tenant context required. Ensure X-Tenant-ID header is set.".to_string(),
+                "Tenant context required. Set X-Tenant-ID header or pass ?tenant= query parameter."
+                    .to_string(),
             )
         })?;
 
-    Uuid::parse_str(tenant_header).map_err(|_| {
-        tracing::warn!(tenant_header = %tenant_header, "Invalid X-Tenant-ID format");
+    Uuid::parse_str(tenant_str).map_err(|_| {
+        tracing::warn!(tenant_str = %tenant_str, "Invalid tenant ID format");
         OAuthError::InvalidRequest("Invalid tenant ID format".to_string())
     })
 }

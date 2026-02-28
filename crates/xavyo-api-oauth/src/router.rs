@@ -86,6 +86,8 @@ pub struct OAuthState {
     /// Kafka event producer for delegation lifecycle events.
     #[cfg(feature = "kafka")]
     pub event_producer: Option<std::sync::Arc<xavyo_events::EventProducer>>,
+    /// Frontend URL for OAuth consent/login page redirects.
+    pub frontend_url: Option<String>,
 }
 
 impl OAuthState {
@@ -174,6 +176,7 @@ impl OAuthState {
             system_tenant_id: SYSTEM_TENANT_ID, // Safe default; overridable via with_system_tenant_id
             #[cfg(feature = "kafka")]
             event_producer: None,
+            frontend_url: None,
         }
     }
 
@@ -215,6 +218,13 @@ impl OAuthState {
     #[must_use]
     pub fn with_system_tenant_id(mut self, tenant_id: uuid::Uuid) -> Self {
         self.system_tenant_id = tenant_id;
+        self
+    }
+
+    /// Set the frontend URL for OAuth consent/login page redirects.
+    #[must_use]
+    pub fn with_frontend_url(mut self, url: String) -> Self {
+        self.frontend_url = Some(url);
         self
     }
 

@@ -420,6 +420,7 @@ mod tests {
             code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM".to_string(),
             code_challenge_method: "S256".to_string(),
             nonce: None,
+            tenant: None,
         }
     }
 

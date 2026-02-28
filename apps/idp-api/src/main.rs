@@ -717,7 +717,8 @@ async fn main() {
             auth_state.email_sender.clone(),
             config.issuer_url.clone(),
         ),
-    ));
+    ))
+    .with_frontend_url(config.frontend_url.clone());
 
     // OAuth routes (token endpoint, authorize, userinfo)
     // F082-US7: Rate limit token endpoint

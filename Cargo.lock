@@ -2193,7 +2193,7 @@ dependencies = [
 
 [[package]]
 name = "ext-authz"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dotenvy",
  "sqlx",
@@ -3164,7 +3164,7 @@ dependencies = [
 
 [[package]]
 name = "idp-api"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -8604,7 +8604,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-api-connectors"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -8723,7 +8723,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-api-nhi"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -8962,7 +8962,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-api-users"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "axum",
  "axum-test",
@@ -9068,7 +9068,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-connector"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -9091,7 +9091,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-connector-database"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9131,7 +9131,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-connector-ldap"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -9149,7 +9149,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-connector-rest"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -9169,7 +9169,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -9221,7 +9221,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-ext-authz"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.22.1",
  "moka",
@@ -9263,7 +9263,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-nhi"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9278,7 +9278,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-provisioning"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9305,7 +9305,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-scim-client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -9331,7 +9331,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-secrets"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "aws-config",
@@ -9351,7 +9351,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-siem"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -9403,7 +9403,7 @@ dependencies = [
 
 [[package]]
 name = "xavyo-webhooks"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes-gcm",
  "async-trait",

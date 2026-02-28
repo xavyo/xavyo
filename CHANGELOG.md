@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-28
+
 ### Added
 
 - **Agent Blueprints** (`nhi_agent_blueprint`): reusable agent configuration templates that pre-define `agent_type`, `model_provider`, `model_name`, `max_token_lifetime_secs`, `requires_human_approval`, `default_entitlements`, and `default_delegation`. Pass `blueprint_id` to `POST /nhi/provision-agent` to apply blueprint defaults (explicit request fields take precedence). CRUD API at `/nhi/blueprints`. 5 unit tests.
@@ -16,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cedar policy engine integration** (`xavyo-authorization`): `cedar` feature flag enables `CedarPolicyEngine` for fine-grained policy evaluation. `PolicyDecisionPoint::with_cedar()` wires Cedar evaluation after native policies. Cedar deny overrides; Cedar allow supplements native authorization (defense-in-depth). `DecisionSource::Cedar` variant for audit. 35 Cedar tests.
 - **RFC 9728 Protected Resource Metadata** (`/.well-known/oauth-protected-resource`): MCP clients discover which authorization server to use. Advertises supported scopes (`crm:read`, `crm:write`, `tools:execute`), bearer methods, signing algorithms, JWKS URI, introspection endpoint.
 - **MCP Client Metadata** (`/.well-known/mcp-client-metadata`): zero-registration MCP client discovery. Advertises client capabilities (PKCE, grant types, redirect URIs, scopes) for MCP authorization servers. 4 new discovery tests.
+- `OAuthState::with_frontend_url()` for configurable OAuth consent/login page redirects.
 
 ### Changed
 
@@ -25,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TokenExchangeRequest` gains optional `resource` field (RFC 8707).
 - `DecisionSource` enum gains `Cedar` variant.
 - Token exchange handler validates `actor_token_type` per RFC 8693 §2.1 (was previously unchecked).
+- OAuth authorize endpoint accepts `?tenant=` query parameter as fallback when `X-Tenant-ID` header is absent (browser-redirect flows cannot set custom headers).
+- OAuth consent redirect uses configurable `frontend_url` base and `/oauth/authorize` path.
 
 ## [0.1.1] - 2026-02-06
 

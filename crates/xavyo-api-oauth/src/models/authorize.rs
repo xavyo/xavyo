@@ -22,6 +22,8 @@ pub struct AuthorizationRequest {
     pub code_challenge_method: String,
     /// OIDC nonce (echoed in ID token).
     pub nonce: Option<String>,
+    /// Tenant ID (optional, for browser-redirect flows that cannot set X-Tenant-ID header).
+    pub tenant: Option<String>,
 }
 
 /// Authorization response (redirect parameters).
