@@ -1111,6 +1111,7 @@ pub use api_key_usage::{
 // Unified NHI Models (201-tool-nhi-promotion)
 pub mod nhi_activity_counter;
 pub mod nhi_agent;
+pub mod nhi_agent_blueprint;
 pub mod nhi_certification_campaign;
 pub mod nhi_delegation_grant;
 pub mod nhi_identity;
@@ -1119,6 +1120,11 @@ pub mod nhi_service_account;
 pub mod nhi_tool;
 pub mod nhi_tool_permission;
 pub mod nhi_user_permission;
+pub mod nhi_vault_external_token;
+
+// Cedar policy storage (0202)
+pub mod cedar_policy;
+pub use cedar_policy::{CedarPolicy, CreateCedarPolicy, UpdateCedarPolicy};
 
 // Old NHI view/impl models (F108) — deleted, superseded by 201-tool-nhi-promotion unified models
 
@@ -1126,6 +1132,9 @@ pub mod nhi_user_permission;
 pub use nhi_activity_counter::{NhiActivityCounter, NhiActivitySummary};
 pub use nhi_agent::{
     CreateNhiAgent, NhiAgent, NhiAgentFilter, NhiAgentWithIdentity, UpdateNhiAgent,
+};
+pub use nhi_agent_blueprint::{
+    CreateNhiAgentBlueprint, NhiAgentBlueprint, NhiAgentBlueprintFilter, UpdateNhiAgentBlueprint,
 };
 pub use nhi_certification_campaign::{CreateNhiCertificationCampaign, NhiCertificationCampaign};
 pub use nhi_delegation_grant::{CreateNhiDelegationGrant, NhiDelegationGrant};
@@ -1138,6 +1147,9 @@ pub use nhi_service_account::{
 pub use nhi_tool::{CreateNhiTool, NhiTool, NhiToolFilter, NhiToolWithIdentity, UpdateNhiTool};
 pub use nhi_tool_permission::{CreateNhiToolPermission, NhiToolPermission};
 pub use nhi_user_permission::{CreateNhiUserPermission, NhiUserPermission};
+pub use nhi_vault_external_token::{
+    CreateExternalToken, ExternalTokenMetadata, NhiVaultExternalToken,
+};
 
 // Tenant Usage Tracking models (F-USAGE-TRACK)
 pub mod usage;

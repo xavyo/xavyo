@@ -38,7 +38,9 @@ pub use device_login::{
     device_login_handler, device_login_page_handler, device_mfa_handler, device_mfa_page_handler,
     get_user_from_session,
 };
-pub use discovery::{discovery_handler, jwks_handler};
+pub use discovery::{
+    discovery_handler, jwks_handler, mcp_client_metadata_handler, protected_resource_handler,
+};
 pub use introspection::introspect_token_handler;
 pub use logout::end_session_handler;
 pub use revocation::revoke_token_handler;

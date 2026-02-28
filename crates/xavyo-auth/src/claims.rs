@@ -51,6 +51,24 @@ impl ActorClaim {
     }
 }
 
+/// RFC 8693 §4.4 `may_act` claim — pre-authorization constraint.
+///
+/// When present in a subject token, restricts which actors can exchange
+/// this token for a delegated token. The actor's `sub` must match one of
+/// the allowed subjects.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MayActClaim {
+    /// Allowed actor subjects (NHI IDs that may act on behalf of the subject).
+    pub sub: Vec<String>,
+}
+
+impl MayActClaim {
+    /// Check if a given actor subject is allowed by this constraint.
+    pub fn is_actor_allowed(&self, actor_sub: &str) -> bool {
+        self.sub.is_empty() || self.sub.iter().any(|s| s == actor_sub)
+    }
+}
+
 /// JWT claims containing standard and custom claims.
 ///
 /// # Standard Claims (RFC 7519)
@@ -151,6 +169,12 @@ pub struct JwtClaims {
     /// Current delegation depth (1 = direct, 2+ = chained).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delegation_depth: Option<i32>,
+
+    /// Pre-authorization constraint (RFC 8693 §4.4): which actors MAY act on
+    /// behalf of this subject. If present, token exchange must verify the actor
+    /// matches one of the `may_act` entries.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub may_act: Option<MayActClaim>,
 }
 
 impl JwtClaims {
@@ -265,6 +289,7 @@ pub struct JwtClaimsBuilder {
     act: Option<ActorClaim>,
     delegation_id: Option<Uuid>,
     delegation_depth: Option<i32>,
+    may_act: Option<MayActClaim>,
 }
 
 impl JwtClaimsBuilder {
@@ -424,6 +449,13 @@ impl JwtClaimsBuilder {
         self
     }
 
+    /// Set the `may_act` pre-authorization constraint (RFC 8693 §4.4).
+    #[must_use]
+    pub fn may_act(mut self, may_act: MayActClaim) -> Self {
+        self.may_act = Some(may_act);
+        self
+    }
+
     /// Build the JWT claims.
     ///
     /// # Defaults
@@ -467,6 +499,7 @@ impl JwtClaimsBuilder {
             act: self.act,
             delegation_id: self.delegation_id,
             delegation_depth: self.delegation_depth,
+            may_act: self.may_act,
         }
     }
 }
@@ -702,6 +735,41 @@ mod tests {
         assert!(!json.contains("\"act\""));
         assert!(!json.contains("delegation_id"));
         assert!(!json.contains("delegation_depth"));
+        assert!(!json.contains("may_act"));
+    }
+
+    #[test]
+    fn test_may_act_claim_allows_listed_actor() {
+        let may_act = MayActClaim {
+            sub: vec!["agent-001".into(), "agent-002".into()],
+        };
+        assert!(may_act.is_actor_allowed("agent-001"));
+        assert!(may_act.is_actor_allowed("agent-002"));
+        assert!(!may_act.is_actor_allowed("agent-003"));
+    }
+
+    #[test]
+    fn test_may_act_claim_empty_allows_all() {
+        let may_act = MayActClaim { sub: vec![] };
+        assert!(may_act.is_actor_allowed("any-agent"));
+    }
+
+    #[test]
+    fn test_may_act_claim_serialization() {
+        let claims = JwtClaims::builder()
+            .subject("user-123")
+            .may_act(MayActClaim {
+                sub: vec!["agent-001".into()],
+            })
+            .build();
+
+        let json = serde_json::to_string(&claims).unwrap();
+        assert!(json.contains("may_act"));
+        assert!(json.contains("agent-001"));
+
+        let parsed: JwtClaims = serde_json::from_str(&json).unwrap();
+        assert!(parsed.may_act.is_some());
+        assert!(parsed.may_act.unwrap().is_actor_allowed("agent-001"));
     }
 
     #[test]

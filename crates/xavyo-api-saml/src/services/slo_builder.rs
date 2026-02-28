@@ -1,10 +1,10 @@
 //! SAML LogoutRequest and LogoutResponse builder
 
+use super::assertion_builder::canonicalize_xml;
 use crate::error::{SamlError, SamlResult};
 use crate::saml::SigningCredentials;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use uuid::Uuid;
-use super::assertion_builder::canonicalize_xml;
 
 /// Builder for SAML LogoutRequest and LogoutResponse messages
 pub struct SloBuilder {
@@ -173,7 +173,6 @@ impl SloBuilder {
         Ok(result)
     }
 }
-
 
 fn xml_escape(s: &str) -> String {
     let mut result = String::with_capacity(s.len());

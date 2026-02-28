@@ -295,9 +295,7 @@ impl AssertionBuilder {
         let signed_info = build_canonical_signed_info(assertion_id, &digest_b64);
 
         // Sign the canonical SignedInfo directly (no further canonicalization needed)
-        let signature = self
-            .credentials
-            .sign_sha256(signed_info.as_bytes())?;
+        let signature = self.credentials.sign_sha256(signed_info.as_bytes())?;
         let signature_b64 = STANDARD.encode(&signature);
 
         // Build Signature element.
@@ -338,9 +336,13 @@ fn build_canonical_signed_info(assertion_id: &str, digest_b64: &str) -> String {
     s.push_str("\">");
     s.push_str("<ds:Transforms>");
     s.push_str("<ds:Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"></ds:Transform>");
-    s.push_str("<ds:Transform Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"></ds:Transform>");
+    s.push_str(
+        "<ds:Transform Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"></ds:Transform>",
+    );
     s.push_str("</ds:Transforms>");
-    s.push_str("<ds:DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"></ds:DigestMethod>");
+    s.push_str(
+        "<ds:DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"></ds:DigestMethod>",
+    );
     s.push_str("<ds:DigestValue>");
     s.push_str(digest_b64);
     s.push_str("</ds:DigestValue>");
@@ -439,14 +441,10 @@ fn write_c14n_start_tag(
             SamlError::AssertionGenerationFailed(format!("XML attribute parse error: {err}"))
         })?;
         let key = std::str::from_utf8(attr.key.as_ref()).map_err(|err| {
-            SamlError::AssertionGenerationFailed(format!(
-                "Invalid UTF-8 in attribute name: {err}"
-            ))
+            SamlError::AssertionGenerationFailed(format!("Invalid UTF-8 in attribute name: {err}"))
         })?;
         let value = attr.unescape_value().map_err(|err| {
-            SamlError::AssertionGenerationFailed(format!(
-                "XML attribute unescape error: {err}"
-            ))
+            SamlError::AssertionGenerationFailed(format!("XML attribute unescape error: {err}"))
         })?;
 
         if key == "xmlns" || key.starts_with("xmlns:") {
@@ -584,7 +582,9 @@ mod tests {
         // Namespace should be present
         assert!(canonical.contains("xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:assertion\""));
         // Attributes on SubjectConfirmationData should be sorted
-        assert!(canonical.contains("NotOnOrAfter=\"2026-02-23T07:05:00Z\" Recipient=\"https://sp.example.com/acs\""));
+        assert!(canonical.contains(
+            "NotOnOrAfter=\"2026-02-23T07:05:00Z\" Recipient=\"https://sp.example.com/acs\""
+        ));
     }
 
     #[test]

@@ -104,6 +104,8 @@ pub enum DecisionSource {
     Policy,
     /// Decision came from an entitlement-to-action mapping.
     Entitlement,
+    /// Decision came from a Cedar policy evaluation.
+    Cedar,
     /// No policy or entitlement matched; default deny.
     DefaultDeny,
 }
@@ -113,6 +115,7 @@ impl fmt::Display for DecisionSource {
         match self {
             DecisionSource::Policy => write!(f, "policy"),
             DecisionSource::Entitlement => write!(f, "entitlement"),
+            DecisionSource::Cedar => write!(f, "cedar"),
             DecisionSource::DefaultDeny => write!(f, "default_deny"),
         }
     }
@@ -306,6 +309,7 @@ mod tests {
     fn test_decision_source_display() {
         assert_eq!(DecisionSource::Policy.to_string(), "policy");
         assert_eq!(DecisionSource::Entitlement.to_string(), "entitlement");
+        assert_eq!(DecisionSource::Cedar.to_string(), "cedar");
         assert_eq!(DecisionSource::DefaultDeny.to_string(), "default_deny");
     }
 

@@ -143,3 +143,178 @@ impl Default for JwkSet {
         Self::new()
     }
 }
+
+/// RFC 9728: OAuth 2.0 Protected Resource Metadata.
+///
+/// Describes a protected resource server's capabilities, supported
+/// authorization servers, and authentication requirements.
+/// MCP servers use this to advertise which authorization server to use.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ProtectedResourceMetadata {
+    /// The resource server's identifier (its base URL).
+    pub resource: String,
+
+    /// Authorization servers that can issue tokens accepted by this resource.
+    pub authorization_servers: Vec<String>,
+
+    /// OAuth 2.0 scopes recognized by this resource.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scopes_supported: Option<Vec<String>>,
+
+    /// Token types accepted by this resource (e.g., "Bearer").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bearer_methods_supported: Option<Vec<String>>,
+
+    /// Resource signing algorithms supported.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_signing_alg_values_supported: Option<Vec<String>>,
+
+    /// Human-readable name of the resource.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_name: Option<String>,
+
+    /// Documentation URL.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_documentation: Option<String>,
+
+    /// Policy URL.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_policy_uri: Option<String>,
+
+    /// Terms of service URL.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_tos_uri: Option<String>,
+
+    /// JWKS URI for resource-specific keys.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jwks_uri: Option<String>,
+
+    /// Introspection endpoint for this resource.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub introspection_endpoint: Option<String>,
+}
+
+impl ProtectedResourceMetadata {
+    /// Create protected resource metadata for xavyo-idp as a resource server.
+    #[must_use]
+    pub fn new(resource_url: &str, authorization_server_url: &str) -> Self {
+        Self {
+            resource: resource_url.to_string(),
+            authorization_servers: vec![authorization_server_url.to_string()],
+            scopes_supported: Some(vec![
+                "openid".to_string(),
+                "profile".to_string(),
+                "email".to_string(),
+                "offline_access".to_string(),
+                "crm:read".to_string(),
+                "crm:write".to_string(),
+                "tools:execute".to_string(),
+            ]),
+            bearer_methods_supported: Some(vec!["header".to_string(), "body".to_string()]),
+            resource_signing_alg_values_supported: Some(vec!["RS256".to_string()]),
+            resource_name: Some("xavyo Identity Platform".to_string()),
+            resource_documentation: None,
+            resource_policy_uri: None,
+            resource_tos_uri: None,
+            jwks_uri: Some(format!("{authorization_server_url}/.well-known/jwks.json")),
+            introspection_endpoint: Some(format!("{authorization_server_url}/oauth/introspect")),
+        }
+    }
+}
+
+/// MCP Client Metadata Document for zero-registration MCP clients.
+///
+/// Follows the MCP Authorization Spec (Draft) for client discovery.
+/// An MCP server can GET this document from a client to learn about
+/// the client's capabilities without pre-registration.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct McpClientMetadata {
+    /// Client identifier (the MCP tool server's base URL or registered client_id).
+    pub client_id: String,
+
+    /// Human-readable name of the MCP client.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_name: Option<String>,
+
+    /// Redirect URIs for authorization code flow.
+    pub redirect_uris: Vec<String>,
+
+    /// Grant types the client supports.
+    pub grant_types: Vec<String>,
+
+    /// Token endpoint auth method.
+    pub token_endpoint_auth_method: String,
+
+    /// Response types supported.
+    pub response_types: Vec<String>,
+
+    /// Requested scopes (space-separated).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+
+    /// PKCE code challenge methods supported by the client.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code_challenge_methods_supported: Option<Vec<String>>,
+
+    /// Client homepage URL.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_uri: Option<String>,
+}
+
+impl McpClientMetadata {
+    /// Create default MCP client metadata for a given client.
+    #[must_use]
+    pub fn new(client_id: &str, redirect_uris: Vec<String>) -> Self {
+        Self {
+            client_id: client_id.to_string(),
+            client_name: None,
+            redirect_uris,
+            grant_types: vec![
+                "authorization_code".to_string(),
+                "refresh_token".to_string(),
+            ],
+            token_endpoint_auth_method: "none".to_string(), // Public client (MCP default)
+            response_types: vec!["code".to_string()],
+            scope: None,
+            code_challenge_methods_supported: Some(vec!["S256".to_string()]),
+            client_uri: None,
+        }
+    }
+}
+
+/// Step-up authorization error response.
+///
+/// Returned as 403 with `WWW-Authenticate: Bearer` header when the
+/// client's token lacks required scopes (RFC 6750 §3.1).
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct StepUpAuthError {
+    /// Error code.
+    pub error: String,
+
+    /// Human-readable error description.
+    pub error_description: String,
+
+    /// Required scopes that were missing.
+    pub required_scope: String,
+}
+
+impl StepUpAuthError {
+    /// Create a step-up auth error for insufficient scope.
+    #[must_use]
+    pub fn insufficient_scope(required_scope: &str, description: &str) -> Self {
+        Self {
+            error: "insufficient_scope".to_string(),
+            error_description: description.to_string(),
+            required_scope: required_scope.to_string(),
+        }
+    }
+
+    /// Generate the `WWW-Authenticate` header value for this error.
+    #[must_use]
+    pub fn www_authenticate_header(&self, realm: &str) -> String {
+        format!(
+            r#"Bearer realm="{realm}", error="insufficient_scope", error_description="{}", scope="{}"#,
+            self.error_description, self.required_scope
+        )
+    }
+}

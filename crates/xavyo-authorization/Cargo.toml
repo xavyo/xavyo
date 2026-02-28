@@ -38,6 +38,9 @@ tracing = "0.1"
 # In-memory cache
 moka = { version = "0.12", features = ["future"] }
 
+# Cedar policy engine (optional)
+cedar-policy = { version = "4.9", optional = true }
+
 [dev-dependencies]
 tokio = { version = "1.35", features = ["full", "test-util"] }
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -49,3 +52,4 @@ harness = false
 [features]
 default = []
 integration = []
+cedar = ["dep:cedar-policy"]

@@ -1,6 +1,8 @@
 pub mod abac;
 pub mod audit;
 pub mod cache;
+#[cfg(feature = "cedar")]
+pub mod cedar;
 pub mod entitlement_resolver;
 pub mod error;
 pub mod obligations;
@@ -13,6 +15,8 @@ pub mod versioning;
 
 pub use audit::{PolicyAction, PolicyAuditEvent, PolicyAuditService};
 pub use cache::{MappingCache, PolicyCache};
+#[cfg(feature = "cedar")]
+pub use cedar::CedarPolicyEngine;
 pub use entitlement_resolver::EntitlementResolver;
 pub use error::AuthorizationError;
 pub use obligations::{ObligationHandler, ObligationRegistry, PolicyObligation};

@@ -519,6 +519,7 @@ pub async fn api_key_auth_middleware(
         act: None,
         delegation_id: None,
         delegation_depth: None,
+        may_act: None,
     };
 
     request.extensions_mut().insert(synthetic_claims);

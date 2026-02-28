@@ -20,8 +20,8 @@ use crate::handlers::{
     device_resend_confirmation_handler, device_verification_page_handler,
     device_verify_code_handler, discovery_handler, end_session_handler, get_client_handler,
     introspect_token_handler, jwks_handler, list_active_sessions_handler, list_clients_handler,
-    regenerate_secret_handler, revoke_token_handler, token_handler, update_client_handler,
-    userinfo_handler,
+    mcp_client_metadata_handler, protected_resource_handler, regenerate_secret_handler,
+    revoke_token_handler, token_handler, update_client_handler, userinfo_handler,
 };
 use crate::services::{
     AuthorizationService, DeviceConfirmationService, DeviceRiskService, OAuth2ClientService,
@@ -323,6 +323,10 @@ pub fn well_known_router(state: OAuthState) -> Router {
     Router::new()
         .route("/openid-configuration", get(discovery_handler))
         .route("/jwks.json", get(jwks_handler))
+        // RFC 9728: Protected Resource Metadata (MCP Authorization)
+        .route("/oauth-protected-resource", get(protected_resource_handler))
+        // MCP Client Metadata Document (zero-registration)
+        .route("/mcp-client-metadata", get(mcp_client_metadata_handler))
         .with_state(state)
 }
 

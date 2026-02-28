@@ -110,6 +110,10 @@ pub struct ProvisionAgentRequest {
 
     /// Delegation configuration. Defaults to disabled.
     pub delegation: Option<ProvisionDelegation>,
+
+    /// Optional blueprint ID. When provided, the blueprint's default values
+    /// are used for fields not explicitly set in this request.
+    pub blueprint_id: Option<Uuid>,
 }
 
 fn default_nhi_type() -> String {
@@ -184,7 +188,7 @@ pub async fn provision_agent(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
     Extension(claims): Extension<JwtClaims>,
-    Json(request): Json<ProvisionAgentRequest>,
+    Json(mut request): Json<ProvisionAgentRequest>,
 ) -> Result<impl IntoResponse, NhiApiError> {
     if !claims.has_role("admin") {
         return Err(NhiApiError::Forbidden);
@@ -194,6 +198,54 @@ pub async fn provision_agent(
     let tenant_uuid = *tenant_id.as_uuid();
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| NhiApiError::BadRequest("Invalid user ID".into()))?;
+
+    // Apply blueprint defaults if blueprint_id is provided.
+    // Blueprint values fill in gaps — explicit request fields take precedence.
+    if let Some(blueprint_id) = request.blueprint_id {
+        use xavyo_db::models::nhi_agent_blueprint::NhiAgentBlueprint;
+        let blueprint = NhiAgentBlueprint::find_by_id(&state.pool, tenant_uuid, blueprint_id)
+            .await?
+            .ok_or_else(|| {
+                NhiApiError::BadRequest(format!("Blueprint {blueprint_id} not found"))
+            })?;
+
+        // Only override fields that still have their serde defaults.
+        // agent_type: default is "autonomous" — override if blueprint differs
+        if request.agent_type == "autonomous" {
+            request.agent_type = blueprint.agent_type;
+        }
+        if request.model_provider.is_none() {
+            request.model_provider = blueprint.model_provider;
+        }
+        if request.model_name.is_none() {
+            request.model_name = blueprint.model_name;
+        }
+        if request.max_token_lifetime_secs == 900 {
+            request.max_token_lifetime_secs = blueprint.max_token_lifetime_secs;
+        }
+        if !request.requires_human_approval {
+            request.requires_human_approval = blueprint.requires_human_approval;
+        }
+        // Merge entitlements: request entitlements + blueprint defaults (deduped later)
+        if request.entitlements.is_empty() {
+            request.entitlements = blueprint.default_entitlements;
+        }
+        // Apply default delegation if not explicitly set
+        if request.delegation.is_none() {
+            if let Some(ref deleg) = blueprint.default_delegation {
+                // Parse delegation from blueprint JSONB
+                if let Ok(delegation) = serde_json::from_value::<ProvisionDelegation>(deleg.clone())
+                {
+                    request.delegation = Some(delegation);
+                }
+            }
+        }
+        tracing::info!(
+            blueprint_id = %blueprint_id,
+            blueprint_name = %blueprint.name,
+            "applied blueprint defaults to provision request"
+        );
+    }
 
     // Resolve NHI type from string
     let nhi_type = match request.nhi_type.as_str() {

@@ -310,6 +310,26 @@ Then open http://localhost:4000. The site includes:
 - 837 auto-generated API reference pages from the OpenAPI spec
 - Error code reference, rate limits, and glossary
 
+### Optional: Cedar Policies
+
+To enable the Cedar policy engine for fine-grained authorization:
+
+```bash
+cargo build -p xavyo-authorization --features cedar
+```
+
+When enabled, the `PolicyDecisionPoint` can be configured with `CedarPolicyEngine` for Cedar policy evaluation alongside native policies.
+
+### Optional: Token Vault Encryption Key
+
+If using the NHI Token Vault (external OAuth token storage), generate an encryption key:
+
+```bash
+echo "TOKEN_VAULT_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> .env
+```
+
+The Token Vault uses AES-GCM encryption at rest for access tokens and refresh tokens.
+
 ## Development Workflow
 
 ### Build

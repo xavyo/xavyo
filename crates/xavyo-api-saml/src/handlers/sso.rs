@@ -43,10 +43,11 @@ pub async fn sso_redirect(
     Extension(user): Extension<Option<User>>,
     Query(query): Query<SsoRedirectQuery>,
 ) -> Response {
-    let tenant_id = match resolve_tenant(&state, query.tenant.as_deref(), &query.saml_request, true).await {
-        Ok(id) => id,
-        Err(e) => return e.into_response(),
-    };
+    let tenant_id =
+        match resolve_tenant(&state, query.tenant.as_deref(), &query.saml_request, true).await {
+            Ok(id) => id,
+            Err(e) => return e.into_response(),
+        };
     let sig_info = RedirectSignatureInfo {
         saml_request: &query.saml_request,
         relay_state: query.relay_state.as_deref(),
@@ -90,7 +91,14 @@ pub async fn sso_post(
     Query(query_params): Query<SsoPostTenantQuery>,
     Form(form): Form<SsoPostForm>,
 ) -> Response {
-    let tenant_id = match resolve_tenant(&state, query_params.tenant.as_deref(), &form.saml_request, false).await {
+    let tenant_id = match resolve_tenant(
+        &state,
+        query_params.tenant.as_deref(),
+        &form.saml_request,
+        false,
+    )
+    .await
+    {
         Ok(id) => id,
         Err(e) => return e.into_response(),
     };
@@ -162,9 +170,7 @@ async fn resolve_tenant(
     );
 
     let sp_service = SpService::new(state.pool.clone());
-    let sp = sp_service
-        .get_sp_by_entity_id_any_tenant(&issuer)
-        .await?;
+    let sp = sp_service.get_sp_by_entity_id_any_tenant(&issuer).await?;
 
     Ok(sp.tenant_id)
 }

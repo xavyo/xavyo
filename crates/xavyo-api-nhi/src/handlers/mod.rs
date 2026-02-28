@@ -18,6 +18,7 @@
 pub mod a2a;
 pub mod activity;
 pub mod agents;
+pub mod blueprints;
 pub mod certification;
 pub mod discovery;
 pub mod inactivity;
@@ -31,6 +32,7 @@ pub mod provision;
 pub mod risk;
 pub mod service_accounts;
 pub mod sod;
+pub mod token_vault;
 pub mod tools;
 pub mod unified;
 pub mod user_permissions;

@@ -5,6 +5,27 @@ All notable changes to xavyo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Agent Blueprints** (`nhi_agent_blueprint`): reusable agent configuration templates that pre-define `agent_type`, `model_provider`, `model_name`, `max_token_lifetime_secs`, `requires_human_approval`, `default_entitlements`, and `default_delegation`. Pass `blueprint_id` to `POST /nhi/provision-agent` to apply blueprint defaults (explicit request fields take precedence). CRUD API at `/nhi/blueprints`. 5 unit tests.
+- **Token Vault — external OAuth tokens** (`token_vault_service`): secure storage and exchange of external provider tokens for NHI identities. AES-GCM encryption at rest, auto-refresh when expired, Zeroize pattern for sensitive data. Endpoints: `POST/GET /nhi/:id/vault/external-tokens`, `DELETE /nhi/:id/vault/external-tokens/:token_id`, `POST /nhi/:id/vault/token-exchange`. 6 unit tests.
+- **RFC 8693 Token Exchange enhancements**: `may_act` pre-authorization constraint (§4.4) on `JwtClaims` — restricts which actors can exchange a subject token. `actor_token_type` validation (§2.1) — rejects unsupported token types. Resource parameter validation against grant's `allowed_resource_types` (RFC 8707). Audience/resource propagation to issued tokens. 3 new `may_act` tests + existing tests updated.
+- **`MayActClaim` struct** (`claims.rs`): `sub: Vec<String>` with `is_actor_allowed()` method. Serialized as `may_act` claim in JWT. Builder support via `.may_act()`.
+- **Cedar policy engine integration** (`xavyo-authorization`): `cedar` feature flag enables `CedarPolicyEngine` for fine-grained policy evaluation. `PolicyDecisionPoint::with_cedar()` wires Cedar evaluation after native policies. Cedar deny overrides; Cedar allow supplements native authorization (defense-in-depth). `DecisionSource::Cedar` variant for audit. 35 Cedar tests.
+- **RFC 9728 Protected Resource Metadata** (`/.well-known/oauth-protected-resource`): MCP clients discover which authorization server to use. Advertises supported scopes (`crm:read`, `crm:write`, `tools:execute`), bearer methods, signing algorithms, JWKS URI, introspection endpoint.
+- **MCP Client Metadata** (`/.well-known/mcp-client-metadata`): zero-registration MCP client discovery. Advertises client capabilities (PKCE, grant types, redirect URIs, scopes) for MCP authorization servers. 4 new discovery tests.
+
+### Changed
+
+- `ProvisionAgentRequest` gains optional `blueprint_id` field for blueprint-based provisioning.
+- `JwtClaims` gains optional `may_act: Option<MayActClaim>` field.
+- `JwtClaimsBuilder` gains `.may_act()` builder method.
+- `TokenExchangeRequest` gains optional `resource` field (RFC 8707).
+- `DecisionSource` enum gains `Cedar` variant.
+- Token exchange handler validates `actor_token_type` per RFC 8693 §2.1 (was previously unchecked).
+
 ## [0.1.1] - 2026-02-06
 
 ### Added

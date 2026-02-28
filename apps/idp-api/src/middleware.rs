@@ -1019,10 +1019,7 @@ pub async fn rls_tenant_middleware(req: axum::extract::Request, next: Next) -> R
         .or_else(|| {
             req.uri()
                 .query()
-                .and_then(|q| {
-                    q.split('&')
-                        .find_map(|pair| pair.strip_prefix("tenant="))
-                })
+                .and_then(|q| q.split('&').find_map(|pair| pair.strip_prefix("tenant=")))
                 .and_then(|s| s.trim().parse::<uuid::Uuid>().ok())
         });
 

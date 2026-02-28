@@ -35,8 +35,12 @@ pub struct TokenRequest {
     pub actor_token: Option<String>,
     /// Actor token type (for token_exchange grant).
     pub actor_token_type: Option<String>,
-    /// Target audience (for token_exchange grant).
+    /// Target audience (for token_exchange grant, RFC 8693 §2.1).
+    /// Restricts the issued token's audience to this value.
     pub audience: Option<String>,
+    /// Target resource URI (for token_exchange grant, RFC 8707).
+    /// Restricts the token to a specific resource server.
+    pub resource: Option<String>,
 }
 
 /// Token response for POST /oauth/token.

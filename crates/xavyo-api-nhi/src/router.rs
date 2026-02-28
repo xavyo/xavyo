@@ -14,6 +14,7 @@
 //! - Discovery router: `/.well-known/agents/:id`
 
 use crate::handlers::agents::agent_routes;
+use crate::handlers::blueprints::blueprint_routes;
 use crate::handlers::certification::certification_routes;
 use crate::handlers::inactivity::inactivity_routes;
 use crate::handlers::lifecycle::lifecycle_routes;
@@ -54,6 +55,8 @@ pub fn nhi_router(state: NhiState) -> Router {
         .merge(tool_routes(state.clone()))
         .merge(agent_routes(state.clone()))
         .merge(service_account_routes(state.clone()))
+        // Agent Blueprints: reusable agent configuration templates
+        .merge(blueprint_routes(state.clone()))
         // Phase 4: Lifecycle transitions
         .merge(lifecycle_routes(state.clone()))
         // Phase 7: Permissions
@@ -124,6 +127,24 @@ pub fn nhi_router(state: NhiState) -> Router {
                 .route(
                     "/:nhi_id/vault/leases/:lease_id",
                     delete(vault::revoke_lease_handler),
+                )
+                .with_state(state.clone()),
+        )
+        // Token Vault: external OAuth provider token management
+        .merge(
+            Router::new()
+                .route(
+                    "/:nhi_id/vault/external-tokens",
+                    post(crate::handlers::token_vault::store_external_token_handler)
+                        .get(crate::handlers::token_vault::list_external_tokens_handler),
+                )
+                .route(
+                    "/:nhi_id/vault/external-tokens/:token_id",
+                    delete(crate::handlers::token_vault::delete_external_token_handler),
+                )
+                .route(
+                    "/:nhi_id/vault/token-exchange",
+                    post(crate::handlers::token_vault::token_exchange_handler),
                 )
                 .with_state(state),
         )

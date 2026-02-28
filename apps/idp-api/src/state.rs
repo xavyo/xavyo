@@ -100,9 +100,7 @@ impl AppState {
             metrics,
             startup_time: Arc::new(Instant::now()),
             version: match std::env::var("APP_VERSION") {
-                Ok(v) if !v.is_empty() && v != "dev" => {
-                    Box::leak(v.into_boxed_str())
-                }
+                Ok(v) if !v.is_empty() && v != "dev" => Box::leak(v.into_boxed_str()),
                 _ => env!("CARGO_PKG_VERSION"),
             },
             startup_complete: Arc::new(AtomicBool::new(false)),

@@ -88,7 +88,10 @@ Traditional IAM solutions weren't built for this. They focus on humans, not mach
 | **Risk Scoring** | Per-NHI risk assessment with inactivity detection and orphan account discovery |
 | **Certifications** | Certification campaigns for periodic NHI review and attestation |
 | **SoD Rules** | Segregation of Duties enforcement for NHI identities |
+| **Agent Blueprints** | Reusable agent configuration templates — pre-define model, permissions, delegation, and lifetime |
+| **Token Vault** | Secure external OAuth token storage with AES-GCM encryption, auto-refresh, and Zeroize cleanup |
 | **MCP Discovery** | Model Context Protocol tool discovery endpoint for AI agent integration |
+| **MCP Authorization** | RFC 9728 Protected Resource Metadata + MCP Client Metadata for zero-registration auth flows |
 | **A2A Protocol** | Agent-to-Agent communication with agent card discovery and webhook delivery |
 | **Workload Identity** | Cloud-native identity federation (AWS, Azure, GCP) |
 | **PKI Certificates** | X.509 certificate issuance for agent mTLS authentication |
@@ -137,7 +140,8 @@ Traditional IAM solutions weren't built for this. They focus on humans, not mach
 | **SIEM Integration** | Structured audit events for security monitoring |
 | **Audit Logging** | Comprehensive audit trail for all operations |
 | **Correlation Engine** | Cross-system identity correlation and matching |
-| **Token Delegation** | OAuth2 token exchange for on-behalf-of and delegation flows |
+| **Token Delegation** | OAuth2 token exchange (RFC 8693) with `may_act` constraints, actor chain depth limits, and resource validation (RFC 8707) |
+| **Cedar Policies** | Fine-grained authorization via AWS Cedar policy language (feature-gated `cedar`). Deny-overrides, defense-in-depth with native policies |
 | **Ext-AuthZ Gateway** | External authorization service for API gateway integration |
 
 ### OIDC Federation
@@ -272,7 +276,7 @@ xavyo exposes a comprehensive REST API with full OpenAPI/Swagger documentation.
 | **SAML 2.0** | `/saml/*` | SSO, SLO, metadata, certificate management, SP configuration |
 | **Users & Groups** | `/users/*`, `/groups/*` | CRUD, role assignments, group memberships, password management |
 | **Sessions** | `/sessions/*` | Active session listing, revocation, concurrent limits |
-| **NHI (Non-Human)** | `/nhi/*` | Unified CRUD, lifecycle transitions, permissions, risk, certifications |
+| **NHI (Non-Human)** | `/nhi/*` | Unified CRUD, lifecycle, permissions, risk, certifications, blueprints, token vault |
 | **Governance** | `/governance/*` | Roles, entitlements, access requests, SoD, certifications, GDPR |
 | **Connectors** | `/connectors/*` | Configuration, reconciliation, provisioning jobs, DLQ |
 | **SCIM 2.0** | `/scim/*` | Users, groups, service provider config, schemas |
@@ -282,7 +286,8 @@ xavyo exposes a comprehensive REST API with full OpenAPI/Swagger documentation.
 | **Tenants** | `/tenants/*` | Multi-tenant management, settings, invitations |
 | **Import** | `/import/*` | Bulk CSV import with validation |
 | **API Keys** | `/api-keys/*` | Scoped key management, usage stats, introspection |
-| **Authorization** | `/authorization/*` | Policy evaluation, external authz |
+| **Authorization** | `/authorization/*` | Policy evaluation, Cedar policies, external authz |
+| **MCP Auth** | `/.well-known/oauth-protected-resource`, `/.well-known/mcp-client-metadata` | RFC 9728 resource metadata + MCP client discovery |
 | **Audit** | `/audit/*` | Event log querying |
 | **Security Policies** | `/policies/*` | Password, session, MFA, lockout configuration |
 | **Operations** | `/operations/*` | Provisioning operation tracking |
@@ -339,7 +344,7 @@ xavyo/
 │   │
 │   ├── Services
 │   │   ├── xavyo-governance/       # Governance business logic
-│   │   ├── xavyo-authorization/    # Authorization engine
+│   │   ├── xavyo-authorization/    # Authorization engine + Cedar policies
 │   │   ├── xavyo-nhi/              # NHI domain logic
 │   │   ├── xavyo-provisioning/     # Provisioning orchestration
 │   │   ├── xavyo-webhooks/         # Webhook delivery + DLQ

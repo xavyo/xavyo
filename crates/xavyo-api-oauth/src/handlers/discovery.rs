@@ -1,6 +1,8 @@
-//! OIDC Discovery endpoint handlers.
+//! OIDC Discovery and MCP Authorization metadata endpoint handlers.
 
-use crate::models::{Jwk, JwkSet, OpenIdConfiguration};
+use crate::models::{
+    Jwk, JwkSet, McpClientMetadata, OpenIdConfiguration, ProtectedResourceMetadata,
+};
 use crate::router::OAuthState;
 use axum::{extract::State, Json};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
@@ -58,6 +60,53 @@ pub async fn jwks_handler(State(state): State<OAuthState>) -> Json<JwkSet> {
     }
 
     Json(jwk_set)
+}
+
+/// Returns RFC 9728 Protected Resource Metadata.
+///
+/// MCP clients use this endpoint to discover which authorization server
+/// to use for obtaining tokens accepted by this resource server.
+#[utoipa::path(
+    get,
+    path = "/.well-known/oauth-protected-resource",
+    responses(
+        (status = 200, description = "Protected Resource Metadata (RFC 9728)", body = ProtectedResourceMetadata),
+    ),
+    tag = "MCP Authorization"
+)]
+pub async fn protected_resource_handler(
+    State(state): State<OAuthState>,
+) -> Json<ProtectedResourceMetadata> {
+    let metadata = ProtectedResourceMetadata::new(&state.issuer, &state.issuer);
+    Json(metadata)
+}
+
+/// Returns MCP Client Metadata for a dynamically registered client.
+///
+/// MCP authorization servers can use this to learn about client capabilities
+/// without pre-registration (zero-registration MCP pattern).
+#[utoipa::path(
+    get,
+    path = "/.well-known/mcp-client-metadata",
+    responses(
+        (status = 200, description = "MCP Client Metadata Document", body = McpClientMetadata),
+    ),
+    tag = "MCP Authorization"
+)]
+pub async fn mcp_client_metadata_handler(
+    State(state): State<OAuthState>,
+) -> Json<McpClientMetadata> {
+    let client_id = format!("{}/mcp", state.issuer);
+    let redirect_uris = vec![
+        format!("{}/oauth/callback", state.issuer),
+        "http://localhost:8080/callback".to_string(), // Local MCP clients
+    ];
+
+    let mut metadata = McpClientMetadata::new(&client_id, redirect_uris);
+    metadata.client_name = Some("xavyo MCP Client".to_string());
+    metadata.scope = Some("openid profile email crm:read crm:write tools:execute".to_string());
+    metadata.client_uri = Some(state.issuer.clone());
+    Json(metadata)
 }
 
 /// Create a JWK from a PEM-encoded RSA public key.
@@ -184,6 +233,122 @@ mod tests {
         assert!(config
             .claims_supported
             .contains(&"email_verified".to_string()));
+    }
+
+    #[test]
+    fn test_protected_resource_metadata() {
+        let metadata =
+            ProtectedResourceMetadata::new("https://api.example.com", "https://idp.example.com");
+
+        assert_eq!(metadata.resource, "https://api.example.com");
+        assert_eq!(metadata.authorization_servers.len(), 1);
+        assert_eq!(metadata.authorization_servers[0], "https://idp.example.com");
+        assert!(metadata
+            .scopes_supported
+            .as_ref()
+            .unwrap()
+            .contains(&"openid".to_string()));
+        assert!(metadata
+            .scopes_supported
+            .as_ref()
+            .unwrap()
+            .contains(&"crm:read".to_string()));
+        assert!(metadata
+            .scopes_supported
+            .as_ref()
+            .unwrap()
+            .contains(&"tools:execute".to_string()));
+        assert_eq!(
+            metadata.jwks_uri,
+            Some("https://idp.example.com/.well-known/jwks.json".to_string())
+        );
+        assert_eq!(
+            metadata.introspection_endpoint,
+            Some("https://idp.example.com/oauth/introspect".to_string())
+        );
+        assert_eq!(
+            metadata.resource_name,
+            Some("xavyo Identity Platform".to_string())
+        );
+    }
+
+    #[test]
+    fn test_protected_resource_metadata_serialization() {
+        let metadata =
+            ProtectedResourceMetadata::new("https://api.example.com", "https://idp.example.com");
+
+        let json = serde_json::to_string(&metadata).unwrap();
+        assert!(!json.contains("oauth-protected-resource"));
+        assert!(json.contains("\"resource\":\"https://api.example.com\""));
+        assert!(json.contains("authorization_servers"));
+        assert!(json.contains("bearer_methods_supported"));
+
+        // Roundtrip
+        let deserialized: ProtectedResourceMetadata = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.resource, "https://api.example.com");
+    }
+
+    #[test]
+    fn test_mcp_client_metadata() {
+        let redirects = vec!["http://localhost:8080/callback".to_string()];
+        let metadata = McpClientMetadata::new("test-client", redirects);
+
+        assert_eq!(metadata.client_id, "test-client");
+        assert_eq!(metadata.redirect_uris.len(), 1);
+        assert!(metadata
+            .grant_types
+            .contains(&"authorization_code".to_string()));
+        assert!(metadata.grant_types.contains(&"refresh_token".to_string()));
+        assert_eq!(metadata.token_endpoint_auth_method, "none"); // Public client
+        assert!(metadata.response_types.contains(&"code".to_string()));
+        assert!(metadata
+            .code_challenge_methods_supported
+            .as_ref()
+            .unwrap()
+            .contains(&"S256".to_string()));
+    }
+
+    #[test]
+    fn test_mcp_client_metadata_serialization() {
+        let redirects = vec!["http://localhost:8080/callback".to_string()];
+        let mut metadata = McpClientMetadata::new("test-client", redirects);
+        metadata.client_name = Some("Test MCP".to_string());
+        metadata.scope = Some("openid crm:read".to_string());
+
+        let json = serde_json::to_string(&metadata).unwrap();
+        assert!(json.contains("test-client"));
+        assert!(json.contains("Test MCP"));
+        assert!(json.contains("S256"));
+
+        let deserialized: McpClientMetadata = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.client_name, Some("Test MCP".to_string()));
+    }
+
+    #[test]
+    fn test_step_up_auth_error() {
+        use crate::models::StepUpAuthError;
+
+        let err = StepUpAuthError::insufficient_scope("crm:write", "Write access to CRM required");
+        assert_eq!(err.error, "insufficient_scope");
+        assert_eq!(err.required_scope, "crm:write");
+
+        let header = err.www_authenticate_header("xavyo");
+        assert!(header.contains("Bearer realm=\"xavyo\""));
+        assert!(header.contains("insufficient_scope"));
+        assert!(header.contains("crm:write"));
+    }
+
+    #[test]
+    fn test_step_up_auth_serialization() {
+        use crate::models::StepUpAuthError;
+
+        let err = StepUpAuthError::insufficient_scope("tools:execute", "Tool execution required");
+        let json = serde_json::to_string(&err).unwrap();
+        assert!(json.contains("insufficient_scope"));
+        assert!(json.contains("tools:execute"));
+
+        let deserialized: StepUpAuthError = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.required_scope, "tools:execute");
     }
 
     // Note: Testing create_jwk_from_pem requires a valid RSA key pair.

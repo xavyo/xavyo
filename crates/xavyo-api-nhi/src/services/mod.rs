@@ -17,5 +17,6 @@ pub mod nhi_nhi_permission_service;
 pub mod nhi_permission_service;
 pub mod nhi_risk_service;
 pub mod nhi_user_permission_service;
+pub mod token_vault_service;
 pub mod vault_crypto;
 pub mod vault_service;

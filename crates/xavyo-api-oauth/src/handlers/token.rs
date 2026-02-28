@@ -547,6 +547,16 @@ async fn handle_token_exchange_grant(
     let actor_token = request.actor_token.as_ref().ok_or_else(|| {
         OAuthError::InvalidRequest("actor_token is required for delegation".to_string())
     })?;
+    // Validate actor_token_type per RFC 8693 §2.1
+    let actor_token_type = request
+        .actor_token_type
+        .as_ref()
+        .ok_or_else(|| OAuthError::InvalidRequest("actor_token_type is required".to_string()))?;
+    if actor_token_type != "urn:ietf:params:oauth:token-type:access_token" {
+        return Err(OAuthError::InvalidRequest(format!(
+            "Unsupported actor_token_type. Expected 'urn:ietf:params:oauth:token-type:access_token', got '{actor_token_type}'"
+        )));
+    }
 
     // S13: Reject self-referential exchange (same token as both subject and actor)
     if subject_token == actor_token {
@@ -646,6 +656,25 @@ async fn handle_token_exchange_grant(
             )
         })?;
 
+    // Step 3a: Validate `may_act` pre-authorization constraint (RFC 8693 §4.4).
+    // If the subject token has a `may_act` claim, the actor MUST be in the allowed list.
+    if let Some(ref may_act) = subject_claims.may_act {
+        if !may_act.is_actor_allowed(&actor_nhi_id.to_string()) {
+            return Err(OAuthError::InvalidGrant(
+                "actor is not permitted by subject's may_act constraint".to_string(),
+            ));
+        }
+    }
+
+    // Step 3b: Validate resource parameter against grant's allowed_resource_types (RFC 8707).
+    if let Some(ref resource) = request.resource {
+        if !grant.is_resource_type_allowed(resource) {
+            return Err(OAuthError::InvalidGrant(format!(
+                "resource '{resource}' not permitted by delegation grant"
+            )));
+        }
+    }
+
     // Step 4: Validate requested scopes against grant
     let requested_scope = request.scope.clone().unwrap_or_default();
     if !requested_scope.is_empty() {
@@ -693,14 +722,23 @@ async fn handle_token_exchange_grant(
         ));
     }
 
-    // Step 7: Mint delegated token with `act` claim
+    // Step 7: Mint delegated token with `act` claim.
+    // If audience or resource is specified, include in the issued token's audience.
+    let token_audience = if let Some(ref aud) = request.audience {
+        vec![aud.clone()]
+    } else if let Some(ref resource) = request.resource {
+        vec![resource.clone()]
+    } else {
+        vec![client_id.to_string()]
+    };
+
     let token_response = state
         .token_service
         .issue_token_exchange_tokens(
             principal_id,
             actor_nhi_id,
             &grant,
-            client_id,
+            &token_audience,
             tenant_id,
             &requested_scope,
             new_depth,
@@ -765,6 +803,7 @@ mod tests {
             actor_token: None,
             actor_token_type: None,
             audience: None,
+            resource: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -792,6 +831,7 @@ mod tests {
             actor_token: None,
             actor_token_type: None,
             audience: None,
+            resource: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -819,6 +859,7 @@ mod tests {
             actor_token: None,
             actor_token_type: None,
             audience: None,
+            resource: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -846,6 +887,7 @@ mod tests {
             actor_token: None,
             actor_token_type: None,
             audience: None,
+            resource: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -905,6 +947,7 @@ mod tests {
             actor_token: None,
             actor_token_type: None,
             audience: None,
+            resource: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -935,6 +978,7 @@ mod tests {
             actor_token: None,
             actor_token_type: None,
             audience: None,
+            resource: None,
         };
 
         let result = extract_client_credentials(&headers, &request);

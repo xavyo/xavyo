@@ -94,7 +94,9 @@ async fn continue_sso_inner(
 
     // SECURITY: Verify the session belongs to the caller's tenant
     if session.tenant_id != tenant_id {
-        return Err(SamlError::InvalidAuthnRequest("Session not found".to_string()));
+        return Err(SamlError::InvalidAuthnRequest(
+            "Session not found".to_string(),
+        ));
     }
 
     // Validate the session is still usable

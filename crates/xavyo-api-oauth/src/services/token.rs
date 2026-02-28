@@ -850,7 +850,7 @@ impl TokenService {
         principal_id: Uuid,
         actor_nhi_id: Uuid,
         grant: &xavyo_db::models::NhiDelegationGrant,
-        client_id: &str,
+        audience: &[String],
         tenant_id: Uuid,
         scope: &str,
         delegation_depth: i32,
@@ -868,10 +868,11 @@ impl TokenService {
         // Build claims with delegation context
         // Scopes are NOT placed in roles — roles are authorization entitlements,
         // scopes are OAuth2 permission boundaries.
+        // Audience is set to the requested audience (or client_id by default).
         let mut builder = JwtClaims::builder()
             .subject(principal_id.to_string())
             .issuer(&self.issuer)
-            .audience(vec![client_id.to_string()])
+            .audience(audience.to_vec())
             .tenant_uuid(tenant_id)
             .expires_in_secs(ACCESS_TOKEN_EXPIRY_SECS)
             .act(actor_claim)

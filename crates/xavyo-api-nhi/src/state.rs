@@ -1,6 +1,7 @@
 //! Application state for the unified NHI API.
 
 use crate::services::mcp_discovery_service::McpDiscoveryService;
+use crate::services::token_vault_service::TokenVaultService;
 use crate::services::vault_service::VaultService;
 use sqlx::PgPool;
 #[cfg(feature = "kafka")]
@@ -24,6 +25,8 @@ pub struct NhiState {
     pub mcp_discovery_service: McpDiscoveryService,
     /// Vault service for encrypted secret management (None if VAULT_MASTER_KEY not set).
     pub vault_service: Option<VaultService>,
+    /// Token vault service for external OAuth provider tokens (None if vault not configured).
+    pub token_vault_service: Option<TokenVaultService>,
 }
 
 impl NhiState {
@@ -38,6 +41,7 @@ impl NhiState {
             event_producer: None,
             mcp_discovery_service: McpDiscoveryService::new(None),
             vault_service: None,
+            token_vault_service: None,
         }
     }
 
@@ -52,6 +56,7 @@ impl NhiState {
             event_producer: Some(producer),
             mcp_discovery_service: McpDiscoveryService::new(None),
             vault_service: None,
+            token_vault_service: None,
         }
     }
 
@@ -66,6 +71,13 @@ impl NhiState {
     #[must_use]
     pub fn with_vault(mut self, vault_service: VaultService) -> Self {
         self.vault_service = Some(vault_service);
+        self
+    }
+
+    /// Sets the token vault service for external provider token management.
+    #[must_use]
+    pub fn with_token_vault(mut self, token_vault_service: TokenVaultService) -> Self {
+        self.token_vault_service = Some(token_vault_service);
         self
     }
 }

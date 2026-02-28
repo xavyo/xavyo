@@ -48,7 +48,7 @@ The `docs-site/` contains a full Docusaurus documentation site:
 - [xavyo-connector](crates/xavyo-connector/CRATE.md): 🟢 Connector framework
 - [xavyo-provisioning](crates/xavyo-provisioning/CRATE.md): 🟡 Sync engine
 - [xavyo-governance](crates/xavyo-governance/CRATE.md): 🟢 IGA logic
-- [xavyo-authorization](crates/xavyo-authorization/CRATE.md): 🟡 Policy engine
+- [xavyo-authorization](crates/xavyo-authorization/CRATE.md): 🟡 Policy engine + Cedar (feature: `cedar`)
 - [xavyo-webhooks](crates/xavyo-webhooks/CRATE.md): 🟡 Event delivery
 - [xavyo-siem](crates/xavyo-siem/CRATE.md): 🟡 Audit export
 - [xavyo-secrets](crates/xavyo-secrets/CRATE.md): 🟢 Secret providers
@@ -77,6 +77,28 @@ The `docs-site/` contains a full Docusaurus documentation site:
 - [xavyo-api-oidc-federation](crates/xavyo-api-oidc-federation/CRATE.md): 🟡 OIDC federation
 - [xavyo-api-nhi](crates/xavyo-api-nhi/CRATE.md): 🟢 Non-human identity API
 
+## CRM Digital Twin Features (New)
+
+### Agent Blueprints
+Reusable agent configuration templates at `/nhi/blueprints`. Pass `blueprint_id` to `POST /nhi/provision-agent` to apply defaults.
+Fields: `agent_type`, `model_provider`, `model_name`, `max_token_lifetime_secs`, `requires_human_approval`, `default_entitlements`, `default_delegation`.
+
+### Token Vault (External OAuth Tokens)
+Secure storage and exchange of external provider tokens at `/nhi/:id/vault/external-tokens`.
+AES-GCM encryption at rest, auto-refresh, Zeroize cleanup. Token exchange: `POST /nhi/:id/vault/token-exchange`.
+
+### RFC 8693 Token Exchange
+Enhanced delegation with `may_act` pre-authorization constraint (§4.4), `actor_token_type` validation (§2.1), and resource parameter validation (RFC 8707). Actor chain depth limit: 10.
+
+### Cedar Policy Engine
+Feature-gated `cedar` on `xavyo-authorization`. `CedarPolicyEngine` evaluates fine-grained policies after native authorization.
+Cedar deny overrides; Cedar allow supplements (defense-in-depth). `DecisionSource::Cedar` for audit trail.
+
+### MCP Authorization
+- `GET /.well-known/oauth-protected-resource` — RFC 9728 Protected Resource Metadata
+- `GET /.well-known/mcp-client-metadata` — MCP Client Metadata for zero-registration auth
+- Scopes: `crm:read`, `crm:write`, `tools:execute`
+
 ## Quick Reference
 
 ### Multi-Tenancy Pattern
@@ -103,5 +125,6 @@ SELECT * FROM resources WHERE tenant_id = $1 AND id = $2;
 ### Feature Flags
 Common flags across crates:
 - `kafka` - Enable Kafka event streaming
+- `cedar` - Enable Cedar policy engine (xavyo-authorization)
 - `openapi` - Generate OpenAPI/utoipa documentation
 - `test-utils` - Include test helpers

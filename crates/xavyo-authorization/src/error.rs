@@ -32,6 +32,10 @@ pub enum AuthorizationError {
     /// A generic resource was not found.
     #[error("Not found: {0}")]
     NotFound(String),
+
+    /// A Cedar policy error.
+    #[error("Cedar policy error: {0}")]
+    CedarError(String),
 }
 
 /// Convenience Result type for the authorization engine.

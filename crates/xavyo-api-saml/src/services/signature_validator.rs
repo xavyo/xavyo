@@ -8,7 +8,6 @@ use openssl::hash::MessageDigest;
 use openssl::sign::Verifier;
 use openssl::x509::X509;
 
-
 /// Service for validating SAML message signatures
 pub struct SignatureValidator;
 

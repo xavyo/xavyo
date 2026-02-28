@@ -1182,9 +1182,16 @@ async fn main() {
     match xavyo_api_nhi::services::vault_crypto::VaultCrypto::from_env() {
         Ok(crypto) => {
             info!("NHI Vault enabled (VAULT_MASTER_KEY configured)");
-            nhi_state = nhi_state.with_vault(
-                xavyo_api_nhi::services::vault_service::VaultService::new(crypto),
-            );
+            let token_vault_crypto = crypto.clone();
+            nhi_state = nhi_state
+                .with_vault(xavyo_api_nhi::services::vault_service::VaultService::new(
+                    crypto,
+                ))
+                .with_token_vault(
+                    xavyo_api_nhi::services::token_vault_service::TokenVaultService::new(
+                        token_vault_crypto,
+                    ),
+                );
         }
         Err(_) => {
             info!("NHI Vault disabled (VAULT_MASTER_KEY not set)");

@@ -24,6 +24,8 @@ use crate::types::{
 pub struct PolicyDecisionPoint {
     policy_cache: Arc<PolicyCache>,
     mapping_cache: Arc<MappingCache>,
+    #[cfg(feature = "cedar")]
+    cedar_engine: Option<Arc<crate::cedar::CedarPolicyEngine>>,
 }
 
 impl PolicyDecisionPoint {
@@ -33,7 +35,20 @@ impl PolicyDecisionPoint {
         Self {
             policy_cache,
             mapping_cache,
+            #[cfg(feature = "cedar")]
+            cedar_engine: None,
         }
+    }
+
+    /// Set a Cedar policy engine for additional policy evaluation.
+    ///
+    /// When set, Cedar policies are evaluated after native policy evaluation.
+    /// A Cedar deny always overrides. A Cedar allow supplements native authorization.
+    #[cfg(feature = "cedar")]
+    #[must_use]
+    pub fn with_cedar(mut self, engine: Arc<crate::cedar::CedarPolicyEngine>) -> Self {
+        self.cedar_engine = Some(engine);
+        self
     }
 
     /// Main evaluation method.
@@ -121,6 +136,30 @@ impl PolicyDecisionPoint {
                 decision_id,
                 latency_ms: start.elapsed().as_secs_f64() * 1000.0,
             };
+        }
+
+        // Step 2b: Cedar policy evaluation (if enabled)
+        #[cfg(feature = "cedar")]
+        if let Some(ref cedar) = self.cedar_engine {
+            let cedar_decision = cedar.evaluate(&request, user_roles, user_attributes, None);
+            if !cedar_decision.allowed {
+                // Cedar deny overrides everything
+                return AuthorizationDecision {
+                    allowed: false,
+                    reason: cedar_decision.reason,
+                    source: DecisionSource::Cedar,
+                    policy_id: None,
+                    decision_id,
+                    latency_ms: start.elapsed().as_secs_f64() * 1000.0,
+                };
+            }
+            // Cedar allow — continue to entitlement checks for defense-in-depth,
+            // but record that Cedar approved.
+            tracing::debug!(
+                target: "authorization",
+                decision_id = %decision_id,
+                "Cedar policy approved, continuing to entitlement checks"
+            );
         }
 
         // Step 3 (already resolved above): Check if user has any entitlements
