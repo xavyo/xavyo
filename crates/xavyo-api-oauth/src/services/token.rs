@@ -240,6 +240,50 @@ impl TokenService {
         hex::encode(hash)
     }
 
+    /// Look up user email and display name from the database.
+    /// Returns (email, name) — both optional. Failures are logged and ignored
+    /// so token issuance is never blocked by a profile lookup failure.
+    async fn lookup_user_profile(
+        &self,
+        user_id: Uuid,
+        tenant_id: Uuid,
+    ) -> (Option<String>, Option<String>) {
+        let result = sqlx::query_as::<_, (String, Option<String>)>(
+            "SELECT email, display_name FROM users WHERE id = $1 AND tenant_id = $2",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map(|opt| opt.unwrap_or_default());
+
+        match result {
+            Ok((email, name)) => (
+                if email.is_empty() { None } else { Some(email) },
+                name,
+            ),
+            Err(e) => {
+                tracing::warn!("Failed to look up user profile for token claims: {e}");
+                (None, None)
+            }
+        }
+    }
+
+    /// Fetch the user's actual roles from the database.
+    ///
+    /// Returns a list of role names (e.g., `["super_admin"]`).
+    /// Failures are logged and return an empty list so token issuance
+    /// is never blocked by a role lookup failure.
+    async fn lookup_user_roles(&self, user_id: Uuid, tenant_id: Uuid) -> Vec<String> {
+        match xavyo_db::UserRole::get_user_roles(&self.pool, user_id, tenant_id).await {
+            Ok(roles) => roles,
+            Err(e) => {
+                tracing::warn!("Failed to look up user roles for token claims: {e}");
+                vec![]
+            }
+        }
+    }
+
     /// Generate an access token (JWT with RS256).
     ///
     /// # Arguments
@@ -249,6 +293,7 @@ impl TokenService {
     /// * `tenant_id` - The tenant ID
     /// * `scope` - The granted scopes
     /// * `expires_in_secs` - Token expiration in seconds
+    /// * `roles` - The user's actual roles (from `user_roles` table)
     ///
     /// # Returns
     ///
@@ -260,6 +305,9 @@ impl TokenService {
         tenant_id: Uuid,
         scope: &str,
         expires_in_secs: i64,
+        user_email: Option<&str>,
+        user_name: Option<&str>,
+        roles: Vec<String>,
     ) -> Result<String, OAuthError> {
         // Build claims for access token
         let mut claims_builder = JwtClaims::builder()
@@ -276,10 +324,25 @@ impl TokenService {
             claims_builder = claims_builder.subject(client_id);
         }
 
-        // Add scope as a custom claim by parsing roles from scope
-        // Convert space-separated scopes to roles
-        let scopes: Vec<String> = scope.split_whitespace().map(String::from).collect();
-        claims_builder = claims_builder.roles(scopes);
+        // Set the user's actual roles (not OAuth scopes)
+        claims_builder = claims_builder.roles(roles);
+
+        // Set the granted scopes as a space-delimited `scope` claim (RFC 9068 §2.2.2)
+        if !scope.is_empty() {
+            claims_builder = claims_builder.scope(scope);
+        }
+
+        // Include user profile claims when corresponding scopes are granted
+        if let Some(email) = user_email {
+            if scope.split_whitespace().any(|s| s == "email") {
+                claims_builder = claims_builder.email(email);
+            }
+        }
+        if let Some(name) = user_name {
+            if scope.split_whitespace().any(|s| s == "profile") {
+                claims_builder = claims_builder.name(name);
+            }
+        }
 
         let claims = claims_builder.build();
 
@@ -653,6 +716,12 @@ impl TokenService {
         let auth_time = Utc::now().timestamp();
         let scopes: Vec<&str> = scope.split_whitespace().collect();
 
+        // Look up user profile and roles for token claims
+        let ((user_email, user_name), roles) = tokio::join!(
+            self.lookup_user_profile(user_id, tenant_id),
+            self.lookup_user_roles(user_id, tenant_id),
+        );
+
         // Generate access token
         let access_token = self.generate_access_token(
             Some(user_id),
@@ -660,6 +729,9 @@ impl TokenService {
             tenant_id,
             scope,
             ACCESS_TOKEN_EXPIRY_SECS,
+            user_email.as_deref(),
+            user_name.as_deref(),
+            roles,
         )?;
 
         // Generate ID token if openid scope is present
@@ -778,6 +850,9 @@ impl TokenService {
             tenant_id,
             scope,
             ACCESS_TOKEN_EXPIRY_SECS,
+            None, // No user email for client credentials
+            None, // No user name for client credentials
+            vec![], // No user roles for client credentials
         )?;
 
         Ok(TokenResponse {
@@ -817,6 +892,12 @@ impl TokenService {
         scope: &str,
         new_refresh_token: &str,
     ) -> Result<TokenResponse, OAuthError> {
+        // Look up user profile and roles for token claims
+        let ((user_email, user_name), roles) = tokio::join!(
+            self.lookup_user_profile(user_id, tenant_id),
+            self.lookup_user_roles(user_id, tenant_id),
+        );
+
         // Generate new access token
         let access_token = self.generate_access_token(
             Some(user_id),
@@ -824,6 +905,9 @@ impl TokenService {
             tenant_id,
             scope,
             ACCESS_TOKEN_EXPIRY_SECS,
+            user_email.as_deref(),
+            user_name.as_deref(),
+            roles,
         )?;
 
         Ok(TokenResponse {
@@ -939,6 +1023,12 @@ impl TokenService {
         let auth_time = Utc::now().timestamp();
         let scopes: Vec<&str> = scope.split_whitespace().collect();
 
+        // Look up user profile and roles for token claims
+        let ((user_email, user_name), roles) = tokio::join!(
+            self.lookup_user_profile(user_id, tenant_id),
+            self.lookup_user_roles(user_id, tenant_id),
+        );
+
         // Generate access token
         let access_token = self.generate_access_token(
             Some(user_id),
@@ -946,6 +1036,9 @@ impl TokenService {
             tenant_id,
             scope,
             ACCESS_TOKEN_EXPIRY_SECS,
+            user_email.as_deref(),
+            user_name.as_deref(),
+            roles,
         )?;
 
         // Generate ID token if openid scope is present
@@ -1034,8 +1127,9 @@ xxU7T7aU32bKZLygCDtwsN8=
             user_id: Option<Uuid>,
             client_id: &str,
             tenant_id: Uuid,
-            scope: &str,
+            _scope: &str,
             expires_in_secs: i64,
+            roles: Vec<String>,
         ) -> Result<String, OAuthError> {
             let mut claims_builder = JwtClaims::builder()
                 .issuer(&self.issuer)
@@ -1049,8 +1143,7 @@ xxU7T7aU32bKZLygCDtwsN8=
                 claims_builder = claims_builder.subject(client_id);
             }
 
-            let scopes: Vec<String> = scope.split_whitespace().map(String::from).collect();
-            claims_builder = claims_builder.roles(scopes);
+            claims_builder = claims_builder.roles(roles);
 
             let claims = claims_builder.build();
 
@@ -1099,6 +1192,7 @@ xxU7T7aU32bKZLygCDtwsN8=
             tenant_id,
             "openid profile",
             900,
+            vec!["admin".to_string()],
         );
 
         assert!(result.is_ok());
@@ -1118,6 +1212,7 @@ xxU7T7aU32bKZLygCDtwsN8=
             tenant_id,
             "api:read api:write",
             900,
+            vec![],
         );
 
         assert!(result.is_ok());
@@ -1258,6 +1353,7 @@ xxU7T7aU32bKZLygCDtwsN8=
             tenant_id,
             "api:read api:write",
             900,
+            vec![], // Client credentials have no user roles
         );
 
         assert!(result.is_ok());
@@ -1277,12 +1373,11 @@ xxU7T7aU32bKZLygCDtwsN8=
         // Verify subject is the client_id
         assert_eq!(payload["sub"].as_str().unwrap(), client_id);
 
-        // Verify roles contain the scopes
+        // Verify roles are empty for client credentials (no user roles)
         let roles = payload["roles"]
             .as_array()
             .expect("roles should be an array");
-        assert!(roles.iter().any(|r| r.as_str() == Some("api:read")));
-        assert!(roles.iter().any(|r| r.as_str() == Some("api:write")));
+        assert!(roles.is_empty());
     }
 
     #[test]
@@ -1297,6 +1392,7 @@ xxU7T7aU32bKZLygCDtwsN8=
             tenant_id,
             "openid profile",
             900,
+            vec!["super_admin".to_string()],
         );
 
         assert!(result.is_ok());
@@ -1312,5 +1408,12 @@ xxU7T7aU32bKZLygCDtwsN8=
 
         // Verify subject is the user_id
         assert_eq!(payload["sub"].as_str().unwrap(), user_id.to_string());
+
+        // Verify roles contain the actual user roles (not scopes)
+        let roles = payload["roles"]
+            .as_array()
+            .expect("roles should be an array");
+        assert!(roles.iter().any(|r| r.as_str() == Some("super_admin")));
+        assert!(!roles.iter().any(|r| r.as_str() == Some("openid")));
     }
 }

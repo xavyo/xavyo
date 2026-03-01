@@ -100,6 +100,12 @@ impl RoleHierarchyService {
         // Compute effective entitlements for the new role
         GovRoleEffectiveEntitlement::compute_for_role(&self.pool, tenant_id, role.id).await?;
 
+        // If the new role has a parent, recompute ancestors (they now inherit from this role)
+        if role.parent_role_id.is_some() {
+            GovRoleEffectiveEntitlement::recompute_for_ancestors(&self.pool, tenant_id, role.id)
+                .await?;
+        }
+
         // Audit log: role created (T064)
         let _ = self
             .log_audit(
@@ -151,6 +157,9 @@ impl RoleHierarchyService {
             }
         }
 
+        // Capture whether parent is being changed before input is consumed
+        let parent_changed = input.parent_role_id.is_some();
+
         let role = GovRole::update(&self.pool, tenant_id, role_id, input, self.max_depth)
             .await
             .map_err(|e| {
@@ -167,9 +176,16 @@ impl RoleHierarchyService {
             })?
             .ok_or(GovernanceError::GovRoleNotFound(role_id))?;
 
-        // Recompute effective entitlements for the role and its descendants
-        GovRoleEffectiveEntitlement::recompute_for_descendants(&self.pool, tenant_id, role_id)
-            .await?;
+        // Recompute effective entitlements for the role, its descendants, and ancestors
+        self.recompute_hierarchy(tenant_id, role_id).await?;
+
+        // If the parent changed, also recompute the old parent's ancestor chain
+        if parent_changed {
+            if let Some(old_parent_id) = old_role.parent_role_id {
+                self.recompute_parent_chain(tenant_id, old_parent_id)
+                    .await?;
+            }
+        }
 
         // Audit log: role updated (T064)
         let _ = self
@@ -232,9 +248,14 @@ impl RoleHierarchyService {
         }
 
         // Recompute effective entitlements for orphaned children (now root roles)
-        for child in children {
+        for child in &children {
             GovRoleEffectiveEntitlement::recompute_for_descendants(&self.pool, tenant_id, child.id)
                 .await?;
+        }
+
+        // Recompute old parent's ancestor chain (lost a child subtree's entitlements)
+        if let Some(parent_id) = role.parent_role_id {
+            self.recompute_parent_chain(tenant_id, parent_id).await?;
         }
 
         // Audit log: role deleted (T064)
@@ -348,9 +369,13 @@ impl RoleHierarchyService {
             }
         })?;
 
-        // Recompute effective entitlements for moved role and descendants
-        GovRoleEffectiveEntitlement::recompute_for_descendants(&self.pool, tenant_id, role_id)
-            .await?;
+        // Recompute effective entitlements for moved role, its descendants, and new ancestors
+        self.recompute_hierarchy(tenant_id, role_id).await?;
+
+        // Recompute old parent's ancestor chain (lost this subtree's entitlements)
+        if let Some(old_pid) = old_parent_id {
+            self.recompute_parent_chain(tenant_id, old_pid).await?;
+        }
 
         // Trigger SoD re-check for affected users (F088/T063)
         let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;
@@ -379,6 +404,32 @@ impl RoleHierarchyService {
             affected_roles_count: affected_count,
             recomputed: true,
         })
+    }
+
+    // =========================================================================
+    // Entitlement Recomputation Helpers
+    // =========================================================================
+
+    /// Recompute effective entitlements for a role, its descendants, and its ancestors.
+    async fn recompute_hierarchy(&self, tenant_id: Uuid, role_id: Uuid) -> Result<()> {
+        GovRoleEffectiveEntitlement::recompute_for_descendants(&self.pool, tenant_id, role_id)
+            .await
+            .map_err(GovernanceError::Database)?;
+        GovRoleEffectiveEntitlement::recompute_for_ancestors(&self.pool, tenant_id, role_id)
+            .await
+            .map_err(GovernanceError::Database)?;
+        Ok(())
+    }
+
+    /// Recompute effective entitlements for a parent and its ancestor chain.
+    async fn recompute_parent_chain(&self, tenant_id: Uuid, parent_id: Uuid) -> Result<()> {
+        GovRoleEffectiveEntitlement::compute_for_role(&self.pool, tenant_id, parent_id)
+            .await
+            .map_err(GovernanceError::Database)?;
+        GovRoleEffectiveEntitlement::recompute_for_ancestors(&self.pool, tenant_id, parent_id)
+            .await
+            .map_err(GovernanceError::Database)?;
+        Ok(())
     }
 
     // =========================================================================
@@ -586,9 +637,10 @@ impl RoleHierarchyService {
         // Verify role exists
         let _role = self.get_role(tenant_id, role_id).await?;
 
-        GovRoleEffectiveEntitlement::recompute_for_descendants(&self.pool, tenant_id, role_id)
-            .await
-            .map_err(GovernanceError::Database)
+        self.recompute_hierarchy(tenant_id, role_id).await?;
+        let count =
+            GovRoleEffectiveEntitlement::count_for_role(&self.pool, tenant_id, role_id).await?;
+        Ok(count)
     }
 
     // =========================================================================
@@ -641,9 +693,8 @@ impl RoleHierarchyService {
         )
         .await?;
 
-        // Recompute effective entitlements for the role and its descendants
-        GovRoleEffectiveEntitlement::recompute_for_descendants(&self.pool, tenant_id, role_id)
-            .await?;
+        // Recompute effective entitlements for the role, its descendants, and ancestors
+        self.recompute_hierarchy(tenant_id, role_id).await?;
 
         // Trigger SoD re-check for affected users (F088/T063)
         let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;
@@ -690,9 +741,8 @@ impl RoleHierarchyService {
 
         GovRoleInheritanceBlock::delete(&self.pool, tenant_id, block_id).await?;
 
-        // Recompute effective entitlements for the role and its descendants
-        GovRoleEffectiveEntitlement::recompute_for_descendants(&self.pool, tenant_id, role_id)
-            .await?;
+        // Recompute effective entitlements for the role, its descendants, and ancestors
+        self.recompute_hierarchy(tenant_id, role_id).await?;
 
         // Trigger SoD re-check for affected users (F088/T063)
         let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;
@@ -755,9 +805,8 @@ impl RoleHierarchyService {
         )
         .await?;
 
-        // Recompute effective entitlements for the role and its descendants
-        GovRoleEffectiveEntitlement::recompute_for_descendants(&self.pool, tenant_id, role_id)
-            .await?;
+        // Recompute effective entitlements for the role, its descendants, and ancestors
+        self.recompute_hierarchy(tenant_id, role_id).await?;
 
         // Trigger SoD re-check for affected users (F088/T063)
         let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;
@@ -787,9 +836,8 @@ impl RoleHierarchyService {
             return Err(GovernanceError::RoleEntitlementNotFound(Uuid::nil()));
         }
 
-        // Recompute effective entitlements for the role and its descendants
-        GovRoleEffectiveEntitlement::recompute_for_descendants(&self.pool, tenant_id, role_id)
-            .await?;
+        // Recompute effective entitlements for the role, its descendants, and ancestors
+        self.recompute_hierarchy(tenant_id, role_id).await?;
 
         // Trigger SoD re-check for affected users (F088/T063)
         let _ = self.trigger_sod_recheck_for_role(tenant_id, role_id).await;

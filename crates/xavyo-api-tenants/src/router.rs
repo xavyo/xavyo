@@ -49,16 +49,18 @@ pub struct TenantAppState {
 ///
 /// The provisioning endpoint is protected by rate limiting to prevent abuse.
 /// Each IP address is limited to 10 provisioning requests per hour.
-pub fn tenant_router(pool: PgPool, token_config: TokenConfig) -> Router {
+pub fn tenant_router(pool: PgPool, admin_pool: PgPool, token_config: TokenConfig) -> Router {
     let slug_service = Arc::new(SlugService::new(pool.clone()));
     let api_key_service = Arc::new(ApiKeyService::new());
     let provisioning_service = Arc::new(ProvisioningService::new(
-        pool.clone(),
+        admin_pool.clone(),
         slug_service,
         api_key_service,
     ));
     let plan_service = Arc::new(PlanService::new(pool.clone()));
-    let token_service = Arc::new(TokenService::new(token_config, pool.clone()));
+    // TokenService needs admin_pool because provisioning creates tokens for a brand-new tenant
+    // whose tenant_id isn't yet visible through the RLS-enforced app pool.
+    let token_service = Arc::new(TokenService::new(token_config, admin_pool));
 
     // Create rate limiter for provisioning endpoint
     let rate_limiter = Arc::new(provision_rate_limiter());

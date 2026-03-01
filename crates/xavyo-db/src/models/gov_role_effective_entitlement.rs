@@ -27,7 +27,7 @@ pub struct GovRoleEffectiveEntitlement {
     /// The role that originally grants this entitlement.
     pub source_role_id: Uuid,
 
-    /// True if inherited from an ancestor, false if directly assigned.
+    /// True if inherited from a subordinate role, false if directly assigned.
     pub is_inherited: bool,
 
     /// When the cache entry was created.
@@ -125,13 +125,13 @@ impl GovRoleEffectiveEntitlement {
     }
 
     /// Compute and cache effective entitlements for a role.
-    /// This aggregates direct entitlements + inherited entitlements from ancestors,
-    /// minus any blocked entitlements.
+    /// This aggregates direct entitlements + inherited entitlements from subordinate roles
+    /// (NIST RBAC: senior roles inherit from junior roles), minus any blocked entitlements.
     pub async fn compute_for_role(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         role_id: Uuid,
-    ) -> Result<Vec<Self>, sqlx::Error> {
+    ) -> Result<(), sqlx::Error> {
         // Clear existing cache for this role
         sqlx::query(
             r"
@@ -171,83 +171,49 @@ impl GovRoleEffectiveEntitlement {
         .execute(pool)
         .await?;
 
-        // Get ancestors and their direct entitlements (inherited)
-        // Using recursive CTE to walk up the hierarchy
-        if blocked.is_empty() {
-            sqlx::query(
-                r"
-                WITH RECURSIVE ancestors AS (
-                    -- Base case: direct parent
-                    SELECT r.id, r.parent_role_id
-                    FROM gov_roles r
-                    WHERE r.id = (SELECT parent_role_id FROM gov_roles WHERE id = $1 AND tenant_id = $2)
-                      AND r.tenant_id = $2
+        // Get descendants and their direct entitlements (inherited from subordinate roles).
+        // NIST RBAC: senior roles inherit permissions from junior roles, so we walk DOWN.
+        // Blocked entitlements are filtered out via WHERE clause (no-op when array is empty).
+        sqlx::query(
+            r"
+            WITH RECURSIVE descendants AS (
+                SELECT r.id
+                FROM gov_roles r
+                WHERE r.parent_role_id = $1 AND r.tenant_id = $2
 
-                    UNION ALL
+                UNION ALL
 
-                    -- Recursive case
-                    SELECT r.id, r.parent_role_id
-                    FROM gov_roles r
-                    INNER JOIN ancestors a ON r.id = a.parent_role_id
-                    WHERE r.tenant_id = $2
-                )
-                INSERT INTO gov_role_effective_entitlements (tenant_id, role_id, entitlement_id, source_role_id, is_inherited)
-                SELECT $2, $1, re.entitlement_id, re.role_id, true
-                FROM ancestors a
-                JOIN gov_role_entitlements re ON re.role_id = a.id AND re.tenant_id = $2
-                ON CONFLICT (role_id, entitlement_id) DO NOTHING
-                ",
+                SELECT r.id
+                FROM gov_roles r
+                INNER JOIN descendants d ON r.parent_role_id = d.id
+                WHERE r.tenant_id = $2
             )
-            .bind(role_id)
-            .bind(tenant_id)
-            .execute(pool)
-            .await?;
-        } else {
-            // Exclude blocked entitlements
-            sqlx::query(
-                r"
-                WITH RECURSIVE ancestors AS (
-                    SELECT r.id, r.parent_role_id
-                    FROM gov_roles r
-                    WHERE r.id = (SELECT parent_role_id FROM gov_roles WHERE id = $1 AND tenant_id = $2)
-                      AND r.tenant_id = $2
+            INSERT INTO gov_role_effective_entitlements (tenant_id, role_id, entitlement_id, source_role_id, is_inherited)
+            SELECT $2, $1, re.entitlement_id, re.role_id, true
+            FROM descendants d
+            JOIN gov_role_entitlements re ON re.role_id = d.id AND re.tenant_id = $2
+            WHERE ($3::uuid[] IS NULL OR cardinality($3::uuid[]) = 0 OR re.entitlement_id != ALL($3))
+            ON CONFLICT (role_id, entitlement_id) DO NOTHING
+            ",
+        )
+        .bind(role_id)
+        .bind(tenant_id)
+        .bind(&blocked)
+        .execute(pool)
+        .await?;
 
-                    UNION ALL
-
-                    SELECT r.id, r.parent_role_id
-                    FROM gov_roles r
-                    INNER JOIN ancestors a ON r.id = a.parent_role_id
-                    WHERE r.tenant_id = $2
-                )
-                INSERT INTO gov_role_effective_entitlements (tenant_id, role_id, entitlement_id, source_role_id, is_inherited)
-                SELECT $2, $1, re.entitlement_id, re.role_id, true
-                FROM ancestors a
-                JOIN gov_role_entitlements re ON re.role_id = a.id AND re.tenant_id = $2
-                WHERE re.entitlement_id != ALL($3)
-                ON CONFLICT (role_id, entitlement_id) DO NOTHING
-                ",
-            )
-            .bind(role_id)
-            .bind(tenant_id)
-            .bind(&blocked)
-            .execute(pool)
-            .await?;
-        }
-
-        // Return the computed effective entitlements
-        Self::get_for_role(pool, tenant_id, role_id).await
+        Ok(())
     }
 
     /// Recompute effective entitlements for a role and all its descendants.
+    /// Since inheritance flows UP (parents inherit from children), we process
+    /// deepest children first so parents pick up correct inherited entitlements.
     pub async fn recompute_for_descendants(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
         role_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
-        // First recompute for the role itself
-        Self::compute_for_role(pool, tenant_id, role_id).await?;
-
-        // Get all descendants
+        // Get all descendants ordered deepest-first (children before parents)
         let descendants: Vec<Uuid> = sqlx::query_scalar(
             r"
             WITH RECURSIVE descendants AS (
@@ -260,7 +226,7 @@ impl GovRoleEffectiveEntitlement {
                 WHERE r.tenant_id = $2
             )
             SELECT id FROM descendants
-            ORDER BY (SELECT hierarchy_depth FROM gov_roles WHERE id = descendants.id)
+            ORDER BY (SELECT hierarchy_depth FROM gov_roles WHERE id = descendants.id) DESC
             ",
         )
         .bind(role_id)
@@ -268,12 +234,54 @@ impl GovRoleEffectiveEntitlement {
         .fetch_all(pool)
         .await?;
 
-        // Recompute for each descendant in order (parents before children)
+        // Recompute deepest descendants first (leaves before parents)
         for desc_id in &descendants {
             Self::compute_for_role(pool, tenant_id, *desc_id).await?;
         }
 
+        // Finally recompute for the role itself (picks up all descendant entitlements)
+        Self::compute_for_role(pool, tenant_id, role_id).await?;
+
         Ok((descendants.len() + 1) as i64)
+    }
+
+    /// Recompute effective entitlements for all ancestors of a role.
+    /// Called after a child role's entitlements change, since parents inherit from children.
+    pub async fn recompute_for_ancestors(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        role_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        // Walk UP the parent chain and collect ancestors (nearest parent first)
+        let ancestors: Vec<Uuid> = sqlx::query_scalar(
+            r"
+            WITH RECURSIVE ancestors AS (
+                SELECT r.id, r.parent_role_id
+                FROM gov_roles r
+                WHERE r.id = (SELECT parent_role_id FROM gov_roles WHERE id = $1 AND tenant_id = $2)
+                  AND r.tenant_id = $2
+
+                UNION ALL
+
+                SELECT r.id, r.parent_role_id
+                FROM gov_roles r
+                INNER JOIN ancestors a ON r.id = a.parent_role_id
+                WHERE r.tenant_id = $2
+            )
+            SELECT id FROM ancestors
+            ",
+        )
+        .bind(role_id)
+        .bind(tenant_id)
+        .fetch_all(pool)
+        .await?;
+
+        // Recompute each ancestor (nearest parent first, then grandparent, etc.)
+        for ancestor_id in &ancestors {
+            Self::compute_for_role(pool, tenant_id, *ancestor_id).await?;
+        }
+
+        Ok(ancestors.len() as i64)
     }
 
     /// Count effective entitlements for a role.

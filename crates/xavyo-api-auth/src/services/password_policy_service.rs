@@ -37,6 +37,8 @@ pub enum PasswordPolicyError {
     RecentlyUsed,
     /// Password changed too recently (min age not met).
     TooSoonToChange { min_hours: i32 },
+    /// Password has appeared in a known data breach (HIBP).
+    Breached,
 }
 
 impl std::fmt::Display for PasswordPolicyError {
@@ -74,6 +76,12 @@ impl std::fmt::Display for PasswordPolicyError {
                 write!(
                     f,
                     "Password can only be changed after {min_hours} hours from the last change"
+                )
+            }
+            Self::Breached => {
+                write!(
+                    f,
+                    "This password has appeared in a data breach. Please choose a different password"
                 )
             }
         }
@@ -179,6 +187,33 @@ impl PasswordPolicyService {
         PasswordValidationResult::with_errors(errors)
     }
 
+    /// Check a password against the HIBP breached password database.
+    ///
+    /// Should be called after `validate_password` passes. If the policy has
+    /// `check_breached_passwords` enabled, queries the HIBP k-anonymity API.
+    /// Fails open: if the HIBP API is unreachable, the password is allowed through.
+    pub async fn check_breached(
+        password: &str,
+        policy: &TenantPasswordPolicy,
+    ) -> Result<(), PasswordPolicyError> {
+        if !policy.check_breached_passwords {
+            return Ok(());
+        }
+
+        match crate::services::hibp::check_password_breached(password).await {
+            Ok(true) => {
+                warn!("Password rejected: found in HIBP breached password database");
+                Err(PasswordPolicyError::Breached)
+            }
+            Ok(false) => Ok(()),
+            Err(()) => {
+                // Fail open -- don't block the user if HIBP is down
+                warn!("HIBP check failed, allowing password through (fail-open)");
+                Ok(())
+            }
+        }
+    }
+
     /// Get the password policy for a tenant.
     pub async fn get_password_policy(
         &self,
@@ -240,6 +275,7 @@ impl PasswordPolicyService {
                         expiration_days: org_config.expiration_days,
                         history_count: org_config.history_count,
                         min_age_hours: org_config.min_age_hours,
+                        check_breached_passwords: org_config.check_breached_passwords,
                         created_at: Utc::now(),
                         updated_at: Utc::now(),
                     })

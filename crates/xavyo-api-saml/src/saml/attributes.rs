@@ -55,7 +55,9 @@ fn resolve_single_attribute(
     attr_map: &AttributeMap,
     user: &UserAttributes,
 ) -> Option<ResolvedAttribute> {
-    let values = if attr_map.source == "groups" {
+    let values = if let Some(ref static_val) = attr_map.static_value {
+        vec![static_val.clone()]
+    } else if attr_map.source == "groups" {
         // Handle groups as multi-value attribute
         if user.groups.is_empty() {
             return None;
@@ -190,6 +192,26 @@ mod tests {
         assert!(attrs
             .iter()
             .any(|a| a.values.contains(&"admin".to_string())));
+    }
+
+    #[test]
+    fn test_static_value_attribute() {
+        let user = test_user();
+        let mapping = AttributeMapping {
+            name_id_source: "email".to_string(),
+            attributes: vec![AttributeMap {
+                source: "unused".to_string(),
+                target_name: "https://aws.amazon.com/SAML/Attributes/Role".to_string(),
+                target_friendly_name: None,
+                format: None,
+                multi_value: false,
+                static_value: Some("arn:aws:iam::123:role/R,arn:aws:iam::123:saml-provider/P".to_string()),
+            }],
+        };
+        let attrs = resolve_attributes(&user, &mapping);
+        assert_eq!(attrs.len(), 1);
+        assert_eq!(attrs[0].name, "https://aws.amazon.com/SAML/Attributes/Role");
+        assert_eq!(attrs[0].values, vec!["arn:aws:iam::123:role/R,arn:aws:iam::123:saml-provider/P"]);
     }
 
     #[test]

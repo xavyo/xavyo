@@ -778,6 +778,67 @@ impl OAuth2ClientService {
         Ok(self.db_client_to_response(client))
     }
 
+    /// Verify a public client by client_id only (no secret).
+    ///
+    /// Used for RFC 7009 token revocation where public clients authenticate
+    /// with just their client_id.
+    pub async fn verify_public_client(
+        &self,
+        tenant_id: Uuid,
+        client_id: &str,
+    ) -> Result<ClientResponse, OAuthError> {
+        const GENERIC_AUTH_ERROR: &str = "Client authentication failed";
+
+        let mut conn = self.pool.acquire().await.map_err(|e| {
+            tracing::error!("Failed to acquire connection: {}", e);
+            OAuthError::Internal("Database error".to_string())
+        })?;
+
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to set tenant context: {}", e);
+                OAuthError::Internal("Failed to set tenant context".to_string())
+            })?;
+
+        let client: Option<DbOAuth2Client> = sqlx::query_as(
+            r"
+            SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
+            FROM oauth_clients
+            WHERE client_id = $1 AND tenant_id = $2
+            ",
+        )
+        .bind(client_id)
+        .bind(tenant_id)
+        .fetch_optional(conn.as_mut())
+        .await
+        .map_err(|e| {
+            tracing::error!("Database error looking up client: {}", e);
+            OAuthError::Internal("Database error".to_string())
+        })?;
+
+        let client = client.ok_or_else(|| {
+            OAuthError::InvalidClient(GENERIC_AUTH_ERROR.to_string())
+        })?;
+
+        if !client.is_active {
+            return Err(OAuthError::InvalidClient(GENERIC_AUTH_ERROR.to_string()));
+        }
+
+        if client.client_type != "public" {
+            tracing::warn!(
+                client_id = %client_id,
+                "Confidential client attempted auth without secret"
+            );
+            return Err(OAuthError::InvalidClient(GENERIC_AUTH_ERROR.to_string()));
+        }
+
+        Ok(self.db_client_to_response(client))
+    }
+
     /// Convert database client to response type.
     fn db_client_to_response(&self, client: DbOAuth2Client) -> ClientResponse {
         let client_type = match client.client_type.as_str() {

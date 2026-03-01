@@ -15,8 +15,13 @@ use crate::services::{MappingService, PolicyService};
 /// Shared state for all authorization API handlers.
 #[derive(Clone)]
 pub struct AuthorizationState {
-    /// Database connection pool.
+    /// Database connection pool (RLS-enabled, for admin management endpoints).
     pub pool: PgPool,
+
+    /// Database connection pool for PDP evaluation (superuser, bypasses RLS).
+    /// The PDP needs unrestricted read access to resolve entitlements, policies,
+    /// and action mappings across tenants without requiring `app.current_tenant`.
+    pub pdp_pool: PgPool,
 
     /// The Policy Decision Point (PDP) engine.
     pub pdp: Arc<PolicyDecisionPoint>,
@@ -66,6 +71,7 @@ pub struct AuthorizationState {
 /// - `GET    /admin/authorization/explain-nhi`   - Dry-run NHI authorization pipeline
 pub fn authorization_router(
     pool: PgPool,
+    pdp_pool: PgPool,
     audit_verbosity: String,
     risk_score_deny_threshold: i32,
 ) -> Router {
@@ -81,6 +87,7 @@ pub fn authorization_router(
 
     let state = AuthorizationState {
         pool,
+        pdp_pool,
         pdp,
         policy_cache,
         mapping_cache,

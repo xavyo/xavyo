@@ -740,7 +740,7 @@ impl UserService {
         caller_roles: &[String],
     ) -> Result<UserResponse, ApiUsersError> {
         // L-1: Reject empty updates — at least one field must be provided
-        if request.email.is_none() && request.roles.is_none() && request.is_active.is_none() {
+        if request.email.is_none() && request.roles.is_none() && request.is_active.is_none() && request.email_verified.is_none() {
             return Err(ApiUsersError::Validation(
                 "At least one field must be provided for update".to_string(),
             ));
@@ -878,6 +878,24 @@ impl UserService {
                     deactivated = true;
                 }
                 user.is_active = is_active;
+                updated = true;
+            }
+        }
+
+        // Update email_verified if provided (admin override)
+        if let Some(email_verified) = request.email_verified {
+            if email_verified != user.email_verified {
+                let verified_at = if email_verified { Some(now) } else { None };
+                sqlx::query("UPDATE users SET email_verified = $1, email_verified_at = $2, updated_at = $3 WHERE id = $4 AND tenant_id = $5")
+                    .bind(email_verified)
+                    .bind(verified_at)
+                    .bind(now)
+                    .bind(user_id.as_uuid())
+                    .bind(tenant_id.as_uuid())
+                    .execute(&mut *tx)
+                    .await?;
+
+                user.email_verified = email_verified;
                 updated = true;
             }
         }

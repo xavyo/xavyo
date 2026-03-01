@@ -83,15 +83,21 @@ pub async fn authenticate_client(
     client_id: &str,
     client_secret: Option<&str>,
 ) -> Result<Uuid, OAuthError> {
-    let secret = client_secret.ok_or_else(|| {
-        OAuthError::InvalidClient("client_secret is required for confidential clients".to_string())
-    })?;
-
-    let client = client_service
-        .verify_client_credentials(tenant_id, client_id, secret)
-        .await?;
-
-    Ok(client.id)
+    match client_secret {
+        Some(secret) => {
+            let client = client_service
+                .verify_client_credentials(tenant_id, client_id, secret)
+                .await?;
+            Ok(client.id)
+        }
+        None => {
+            // Public clients authenticate with client_id only (RFC 7009 Section 2.1)
+            let client = client_service
+                .verify_public_client(tenant_id, client_id)
+                .await?;
+            Ok(client.id)
+        }
+    }
 }
 
 #[cfg(test)]

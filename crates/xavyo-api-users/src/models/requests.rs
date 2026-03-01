@@ -30,6 +30,10 @@ pub struct UpdateUserRequest {
     /// New active status (optional).
     #[serde(default)]
     pub is_active: Option<bool>,
+
+    /// Admin override for email verification status (optional).
+    #[serde(default)]
+    pub email_verified: Option<bool>,
 }
 
 /// Query parameters for listing users.

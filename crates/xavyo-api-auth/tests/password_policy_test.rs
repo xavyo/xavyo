@@ -39,6 +39,7 @@ fn test_upsert_password_policy() {
         expiration_days: Some(90),
         history_count: Some(5),
         min_age_hours: Some(24),
+        check_breached_passwords: Some(true),
     };
 
     assert_eq!(upsert.min_length, Some(12));
@@ -50,6 +51,7 @@ fn test_upsert_password_policy() {
     assert_eq!(upsert.expiration_days, Some(90));
     assert_eq!(upsert.history_count, Some(5));
     assert_eq!(upsert.min_age_hours, Some(24));
+    assert_eq!(upsert.check_breached_passwords, Some(true));
 }
 
 /// Test partial upsert with None values.
@@ -65,6 +67,7 @@ fn test_partial_upsert_password_policy() {
         expiration_days: None,
         history_count: None,
         min_age_hours: None,
+        check_breached_passwords: None,
     };
 
     assert_eq!(upsert.min_length, Some(10));

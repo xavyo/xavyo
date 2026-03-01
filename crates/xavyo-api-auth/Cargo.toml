@@ -61,6 +61,10 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 sha2 = "0.10"
 hex = "0.4"
 
+# HIBP breached password check (NIST 800-63B)
+sha1 = "0.10"
+reqwest = { workspace = true }
+
 # Base64 for refresh token encoding
 base64 = "0.22"
 

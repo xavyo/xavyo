@@ -3,6 +3,7 @@
 pub mod admin_invite_service;
 pub mod alert_service;
 pub mod asset_service;
+pub mod hibp;
 pub mod asset_storage;
 pub mod audit_service;
 pub mod auth_service;

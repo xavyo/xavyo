@@ -103,6 +103,11 @@ pub async fn password_change_handler(
         return Err(ApiAuthError::WeakPassword(errors));
     }
 
+    // Check against HIBP breached password database (NIST 800-63B)
+    if let Err(e) = PasswordPolicyService::check_breached(&request.new_password, &policy).await {
+        return Err(ApiAuthError::WeakPassword(vec![e.to_string()]));
+    }
+
     // Check password history
     if policy.history_count > 0 {
         let in_history = password_policy_service

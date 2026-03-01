@@ -12,8 +12,7 @@ use axum::{
     Extension, Form,
 };
 use uuid::Uuid;
-use xavyo_core::TenantId;
-use xavyo_db::models::User;
+use xavyo_auth::JwtClaims;
 
 /// IdP-initiated SSO
 #[utoipa::path(
@@ -33,20 +32,24 @@ use xavyo_db::models::User;
 )]
 pub async fn initiate_sso(
     State(state): State<SamlState>,
-    Extension(tenant_id): Extension<TenantId>,
-    Extension(user): Extension<Option<User>>,
+    Extension(claims): Extension<JwtClaims>,
     Path(sp_id): Path<Uuid>,
     Form(req): Form<InitiateSsoRequest>,
 ) -> Response {
-    match initiate_sso_inner(
-        &state,
-        *tenant_id.as_uuid(),
-        user,
-        sp_id,
-        req.relay_state.as_deref(),
-    )
-    .await
-    {
+    let tenant_id = match claims.tenant_id().map(|t| *t.as_uuid()) {
+        Some(tid) => tid,
+        None => {
+            return SamlError::NotAuthenticated.into_response();
+        }
+    };
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(uid) => uid,
+        Err(_) => {
+            return SamlError::NotAuthenticated.into_response();
+        }
+    };
+
+    match initiate_sso_inner(&state, tenant_id, user_id, sp_id, req.relay_state.as_deref()).await {
         Ok(response) => response,
         Err(e) => {
             tracing::error!(error = %e, sp_id = %sp_id, "IdP-initiated SSO failed");
@@ -58,12 +61,20 @@ pub async fn initiate_sso(
 async fn initiate_sso_inner(
     state: &SamlState,
     tenant_id: Uuid,
-    user: Option<User>,
+    user_id: Uuid,
     sp_id: Uuid,
     relay_state: Option<&str>,
 ) -> SamlResult<Response> {
-    // Require authenticated user
-    let user = user.ok_or(SamlError::NotAuthenticated)?;
+    // Load user from DB
+    let user = sqlx::query_as::<_, xavyo_db::models::User>(
+        "SELECT * FROM users WHERE id = $1 AND tenant_id = $2",
+    )
+    .bind(user_id)
+    .bind(tenant_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| SamlError::InternalError(format!("Failed to load user: {e}")))?
+    .ok_or(SamlError::NotAuthenticated)?;
 
     // R8: Validate RelayState length (same check as SP-initiated SSO in sso.rs)
     if let Some(rs) = relay_state {

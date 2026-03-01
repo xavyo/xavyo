@@ -57,7 +57,7 @@ pub async fn can_i_handler(
 
     let decision = state
         .pdp
-        .evaluate(&state.pool, request.clone(), &claims.roles, None)
+        .evaluate(&state.pdp_pool, request.clone(), &claims.roles, None)
         .await;
 
     // Emit audit event
@@ -109,7 +109,7 @@ pub async fn admin_check_handler(
     // are resolved from the entitlement system, not from the admin's JWT.
     let decision = state
         .pdp
-        .evaluate(&state.pool, request.clone(), &[], None)
+        .evaluate(&state.pdp_pool, request.clone(), &[], None)
         .await;
 
     AuthorizationAudit::emit_decision(&decision, &request, &state.audit_verbosity);
@@ -183,7 +183,7 @@ pub async fn bulk_check_handler(
 
         let decision = state
             .pdp
-            .evaluate(&state.pool, auth_request.clone(), &roles, None)
+            .evaluate(&state.pdp_pool, auth_request.clone(), &roles, None)
             .await;
 
         AuthorizationAudit::emit_decision(&decision, &auth_request, &state.audit_verbosity);

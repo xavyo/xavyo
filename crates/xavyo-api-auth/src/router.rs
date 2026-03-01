@@ -192,6 +192,7 @@ use crate::handlers::{
     start_webauthn_authentication,
     start_webauthn_registration,
     trust_device,
+    admin_reset_password,
     unlock_user,
     untrust_device,
     update_branding,
@@ -642,6 +643,7 @@ pub fn admin_router(state: AuthState) -> Router {
             get(get_device_policy).put(update_device_policy),
         )
         .route("/users/:id/unlock", post(unlock_user))
+        .route("/users/:id/reset-password", post(admin_reset_password))
         // Admin MFA status endpoint (F022)
         .route("/users/:user_id/mfa/status", get(get_user_mfa_status))
         // Admin device management endpoints (F026)

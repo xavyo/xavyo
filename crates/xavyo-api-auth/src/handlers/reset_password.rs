@@ -101,6 +101,11 @@ pub async fn reset_password_handler(
         return Err(ApiAuthError::WeakPassword(errors));
     }
 
+    // Check against HIBP breached password database (NIST 800-63B)
+    if let Err(e) = PasswordPolicyService::check_breached(&request.new_password, &policy).await {
+        return Err(ApiAuthError::WeakPassword(vec![e.to_string()]));
+    }
+
     // Verify token hash with constant-time comparison
     if !verify_token_hash_constant_time(&request.token, &stored_hash) {
         return Err(ApiAuthError::InvalidToken);

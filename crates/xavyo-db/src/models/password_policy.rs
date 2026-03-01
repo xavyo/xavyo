@@ -43,6 +43,10 @@ pub struct TenantPasswordPolicy {
     /// Minimum hours before password can be changed (0 = immediate).
     pub min_age_hours: i32,
 
+    /// Whether to check passwords against the HIBP breached password database.
+    /// NIST 800-63B requires screening against known compromised credentials.
+    pub check_breached_passwords: bool,
+
     /// When the policy was created.
     pub created_at: DateTime<Utc>,
 
@@ -63,6 +67,7 @@ impl Default for TenantPasswordPolicy {
             expiration_days: 0,
             history_count: 0,
             min_age_hours: 0,
+            check_breached_passwords: true,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
@@ -119,9 +124,10 @@ impl TenantPasswordPolicy {
             r"
             INSERT INTO tenant_password_policies (
                 tenant_id, min_length, max_length, require_uppercase, require_lowercase,
-                require_digit, require_special, expiration_days, history_count, min_age_hours
+                require_digit, require_special, expiration_days, history_count, min_age_hours,
+                check_breached_passwords
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *
             ",
         )
@@ -135,6 +141,7 @@ impl TenantPasswordPolicy {
         .bind(0i32) // No expiration (NIST recommendation)
         .bind(0i32) // No history check
         .bind(0i32) // No minimum age
+        .bind(true) // NIST 800-63B: check breached passwords
         .fetch_one(executor)
         .await
     }
@@ -152,9 +159,10 @@ impl TenantPasswordPolicy {
             r"
             INSERT INTO tenant_password_policies (
                 tenant_id, min_length, max_length, require_uppercase, require_lowercase,
-                require_digit, require_special, expiration_days, history_count, min_age_hours
+                require_digit, require_special, expiration_days, history_count, min_age_hours,
+                check_breached_passwords
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             ON CONFLICT (tenant_id) DO UPDATE SET
                 min_length = EXCLUDED.min_length,
                 max_length = EXCLUDED.max_length,
@@ -165,6 +173,7 @@ impl TenantPasswordPolicy {
                 expiration_days = EXCLUDED.expiration_days,
                 history_count = EXCLUDED.history_count,
                 min_age_hours = EXCLUDED.min_age_hours,
+                check_breached_passwords = EXCLUDED.check_breached_passwords,
                 updated_at = now()
             RETURNING *
             ",
@@ -179,6 +188,7 @@ impl TenantPasswordPolicy {
         .bind(data.expiration_days.unwrap_or(0))
         .bind(data.history_count.unwrap_or(0))
         .bind(data.min_age_hours.unwrap_or(0))
+        .bind(data.check_breached_passwords.unwrap_or(true))
         .fetch_one(executor)
         .await
     }
@@ -223,6 +233,7 @@ pub struct UpsertPasswordPolicy {
     pub expiration_days: Option<i32>,
     pub history_count: Option<i32>,
     pub min_age_hours: Option<i32>,
+    pub check_breached_passwords: Option<bool>,
 }
 
 #[cfg(test)]

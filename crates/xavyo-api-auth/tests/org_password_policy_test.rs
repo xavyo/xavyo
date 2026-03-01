@@ -20,6 +20,7 @@ fn config_to_tenant_policy(config: &PasswordPolicyConfig) -> TenantPasswordPolic
         expiration_days: config.expiration_days,
         history_count: config.history_count,
         min_age_hours: config.min_age_hours,
+        check_breached_passwords: config.check_breached_passwords,
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
     }
@@ -37,6 +38,7 @@ fn test_org_password_config_to_tenant_policy_conversion() {
         expiration_days: 90,
         history_count: 5,
         min_age_hours: 24,
+        check_breached_passwords: true,
     };
 
     let policy = config_to_tenant_policy(&config);
@@ -50,6 +52,7 @@ fn test_org_password_config_to_tenant_policy_conversion() {
     assert_eq!(policy.expiration_days, 90);
     assert_eq!(policy.history_count, 5);
     assert_eq!(policy.min_age_hours, 24);
+    assert!(policy.check_breached_passwords);
 }
 
 #[test]
@@ -105,6 +108,7 @@ fn test_org_password_policy_most_restrictive_combination() {
         expiration_days: 0,
         history_count: 0,
         min_age_hours: 0,
+        check_breached_passwords: true,
     };
 
     let org_config = PasswordPolicyConfig {
@@ -222,6 +226,7 @@ fn test_org_password_policy_serialization_roundtrip() {
         expiration_days: 60,
         history_count: 10,
         min_age_hours: 12,
+        check_breached_passwords: true,
     };
 
     let json = serde_json::to_value(&config).unwrap();
@@ -236,6 +241,7 @@ fn test_org_password_policy_serialization_roundtrip() {
     assert_eq!(roundtrip.expiration_days, config.expiration_days);
     assert_eq!(roundtrip.history_count, config.history_count);
     assert_eq!(roundtrip.min_age_hours, config.min_age_hours);
+    assert_eq!(roundtrip.check_breached_passwords, config.check_breached_passwords);
 }
 
 #[test]

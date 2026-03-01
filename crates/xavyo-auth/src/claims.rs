@@ -135,9 +135,13 @@ pub struct JwtClaims {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub purpose: Option<String>,
 
-    /// User email address (optional, included in user tokens).
+    /// User email address (optional, included when email scope is granted).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
+
+    /// User display name (optional, included when profile scope is granted).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
 
     // Power of Attorney claims (F-061)
     /// PoA grant ID when acting on behalf of another user.
@@ -279,6 +283,7 @@ pub struct JwtClaimsBuilder {
     roles: Vec<String>,
     purpose: Option<String>,
     email: Option<String>,
+    name: Option<String>,
     // Power of Attorney fields (F-061)
     acting_as_poa_id: Option<Uuid>,
     acting_as_user_id: Option<Uuid>,
@@ -391,6 +396,13 @@ impl JwtClaimsBuilder {
         self
     }
 
+    /// Set the user's display name.
+    #[must_use]
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
     /// Set the Power of Attorney grant ID for identity assumption (F-061).
     #[must_use]
     pub fn acting_as_poa_id(mut self, poa_id: Uuid) -> Self {
@@ -492,6 +504,7 @@ impl JwtClaimsBuilder {
             roles: self.roles,
             purpose: self.purpose,
             email: self.email,
+            name: self.name,
             scope: self.scope,
             acting_as_poa_id: self.acting_as_poa_id,
             acting_as_user_id: self.acting_as_user_id,

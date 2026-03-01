@@ -65,6 +65,7 @@ pub use admin::{
     get_user_mfa_status,
     get_webauthn_policy,
     list_org_policies,
+    admin_reset_password,
     unlock_user,
     update_lockout_policy,
     update_mfa_policy,

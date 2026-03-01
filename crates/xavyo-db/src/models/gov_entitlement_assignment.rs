@@ -389,6 +389,8 @@ impl GovEntitlementAssignment {
     }
 
     /// List all entitlement IDs assigned to a user (directly).
+    // Temporal validity: filter out entitlements outside their active window.
+    // Same clause used in list_group_entitlement_ids and list_nhi_entitlement_ids.
     pub async fn list_user_entitlement_ids(
         pool: &sqlx::PgPool,
         tenant_id: Uuid,
@@ -398,6 +400,8 @@ impl GovEntitlementAssignment {
             r"
             SELECT entitlement_id FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND target_type = 'user' AND target_id = $2 AND status = 'active'
+              AND (valid_from IS NULL OR valid_from <= NOW())
+              AND (valid_to IS NULL OR valid_to > NOW())
             ",
         )
         .bind(tenant_id)
@@ -416,6 +420,8 @@ impl GovEntitlementAssignment {
             r"
             SELECT entitlement_id FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND target_type = 'group' AND target_id = $2 AND status = 'active'
+              AND (valid_from IS NULL OR valid_from <= NOW())
+              AND (valid_to IS NULL OR valid_to > NOW())
             ",
         )
         .bind(tenant_id)
@@ -434,6 +440,8 @@ impl GovEntitlementAssignment {
             r"
             SELECT entitlement_id FROM gov_entitlement_assignments
             WHERE tenant_id = $1 AND target_type = 'nhi' AND target_id = $2 AND status = 'active'
+              AND (valid_from IS NULL OR valid_from <= NOW())
+              AND (valid_to IS NULL OR valid_to > NOW())
             ",
         )
         .bind(tenant_id)

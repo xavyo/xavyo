@@ -115,6 +115,10 @@ pub struct AttributeMap {
     pub format: Option<String>,
     #[serde(default)]
     pub multi_value: bool,
+    /// Static value to emit instead of resolving from user fields.
+    /// When set, `source` is ignored and this value is used directly.
+    #[serde(default)]
+    pub static_value: Option<String>,
 }
 
 fn default_name_id_format() -> String {
@@ -154,6 +158,7 @@ impl Default for AttributeMapping {
                     target_friendly_name: Some("email".to_string()),
                     format: Some("urn:oasis:names:tc:SAML:2.0:attrname-format:uri".to_string()),
                     multi_value: false,
+                    static_value: None,
                 },
                 AttributeMap {
                     source: "display_name".to_string(),
@@ -162,6 +167,7 @@ impl Default for AttributeMapping {
                     target_friendly_name: Some("name".to_string()),
                     format: Some("urn:oasis:names:tc:SAML:2.0:attrname-format:uri".to_string()),
                     multi_value: false,
+                    static_value: None,
                 },
             ],
         }

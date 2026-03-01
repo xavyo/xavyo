@@ -86,7 +86,7 @@ pub async fn authorize_handler(
         .as_deref()
         .unwrap_or("");
     let consent_url = format!(
-        "{frontend_base}/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method={}{}&csrf_token={}&csrf_sig={}",
+        "{frontend_base}/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method={}{}&csrf_token={}&csrf_sig={}&tenant={}",
         urlencoding::encode(&request.client_id),
         urlencoding::encode(&request.redirect_uri),
         urlencoding::encode(&request.scope),
@@ -96,6 +96,7 @@ pub async fn authorize_handler(
         request.nonce.as_ref().map_or(String::new(), |n| format!("&nonce={}", urlencoding::encode(n))),
         urlencoding::encode(&csrf_token),
         urlencoding::encode(&csrf_sig),
+        tenant_id,
     );
 
     // F082-US6: Set CSRF token as HttpOnly cookie (double-submit cookie pattern)

@@ -76,6 +76,11 @@ pub async fn register_handler(
         return Err(ApiAuthError::WeakPassword(errors));
     }
 
+    // Check against HIBP breached password database (NIST 800-63B)
+    if let Err(e) = PasswordPolicyService::check_breached(&request.password, &policy).await {
+        return Err(ApiAuthError::WeakPassword(vec![e.to_string()]));
+    }
+
     // Register user
     let (user_id, email, created_at) = auth_service
         .register(tenant_id, &request.email, &request.password)

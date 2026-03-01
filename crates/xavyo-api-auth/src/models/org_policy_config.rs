@@ -43,6 +43,14 @@ pub struct PasswordPolicyConfig {
     /// Minimum hours before password can be changed again.
     #[serde(default)]
     pub min_age_hours: i32,
+
+    /// Whether to check passwords against the HIBP breached password database.
+    #[serde(default = "default_check_breached")]
+    pub check_breached_passwords: bool,
+}
+
+fn default_check_breached() -> bool {
+    true
 }
 
 fn default_min_length() -> i32 {
@@ -65,6 +73,7 @@ impl Default for PasswordPolicyConfig {
             expiration_days: 0,
             history_count: 0,
             min_age_hours: 0,
+            check_breached_passwords: true,
         }
     }
 }
@@ -127,6 +136,8 @@ impl PasswordPolicyConfig {
             },
             history_count: self.history_count.max(other.history_count),
             min_age_hours: self.min_age_hours.max(other.min_age_hours),
+            check_breached_passwords: self.check_breached_passwords
+                || other.check_breached_passwords,
         }
     }
 }

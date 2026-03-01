@@ -59,7 +59,7 @@ pub async fn explain_nhi_handler(
     // -----------------------------------------------------------------------
     // Step 1: NHI identity lookup (decisive)
     // -----------------------------------------------------------------------
-    let identity = match NhiIdentity::find_by_id(&state.pool, tenant_id, nhi_id).await {
+    let identity = match NhiIdentity::find_by_id(&state.pdp_pool, tenant_id, nhi_id).await {
         Ok(Some(id)) => {
             checks.push(ExplainCheckStep {
                 step: ExplainStep::NhiIdentity,
@@ -119,15 +119,15 @@ pub async fn explain_nhi_handler(
         // Step 3: Agent details (informational)
         async {
             if is_agent {
-                Some(NhiAgent::find_by_nhi_id(&state.pool, tenant_id, nhi_id).await)
+                Some(NhiAgent::find_by_nhi_id(&state.pdp_pool, tenant_id, nhi_id).await)
             } else {
                 None // Not an agent — skip entirely
             }
         },
         // Step 4: Risk score (decisive)
-        GovNhiRiskScore::find_by_nhi(&state.pool, tenant_id, nhi_id),
+        GovNhiRiskScore::find_by_nhi(&state.pdp_pool, tenant_id, nhi_id),
         // Step 5: Delegation grants (informational)
-        NhiDelegationGrant::list_by_actor(&state.pool, tenant_id, nhi_id, 100, 0),
+        NhiDelegationGrant::list_by_actor(&state.pdp_pool, tenant_id, nhi_id, 100, 0),
     );
 
     // --- Process step 3: Agent details (informational — never affects would_allow) ---
@@ -255,7 +255,7 @@ pub async fn explain_nhi_handler(
 
         let decision = state
             .pdp
-            .evaluate(&state.pool, authz_request, &[], None)
+            .evaluate(&state.pdp_pool, authz_request, &[], None)
             .await;
 
         checks.push(ExplainCheckStep {

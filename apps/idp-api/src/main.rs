@@ -139,9 +139,9 @@ async fn main() {
         }
     }
 
-    // Create admin database connection pool (superuser — for bootstrap/migrations only)
+    // Create admin database connection pool (superuser — for bootstrap, migrations, and PDP)
     let admin_pool = match PgPoolOptions::new()
-        .max_connections(2)
+        .max_connections(3)
         .acquire_timeout(Duration::from_secs(5))
         .connect(&config.database_url)
         .await
@@ -225,9 +225,8 @@ async fn main() {
         }
     }
 
-    // Close admin pool — no longer needed after bootstrap
-    admin_pool.close().await;
-    drop(admin_pool);
+    // Keep admin pool alive for tenant provisioning (needs superuser to bypass RLS)
+    let admin_pool_shared = admin_pool;
 
     // F082-US4: Create revocation cache (moka LRU, 10K entries, 30s TTL)
     let revocation_cache = RevocationCache::new(pool.clone());
@@ -977,16 +976,17 @@ async fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(75);
     let authorization_routes =
-        authorization_router(pool.clone(), "all".to_string(), risk_score_deny_threshold)
-            .layer(axum::middleware::from_fn(jwt_auth_middleware))
-            .layer(axum::middleware::from_fn(api_key_auth_middleware))
-            .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
-            .layer(axum::Extension(pool.clone()))
+        authorization_router(pool.clone(), admin_pool_shared.clone(), "all".to_string(), risk_score_deny_threshold)
+            // TenantLayer runs last (innermost) — reads TenantId set by jwt_auth
             .layer(TenantLayer::with_config(
                 xavyo_tenant::TenantConfig::builder()
                     .require_tenant(true)
                     .build(),
-            ));
+            ))
+            .layer(axum::middleware::from_fn(jwt_auth_middleware))
+            .layer(axum::middleware::from_fn(api_key_auth_middleware))
+            .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+            .layer(axum::Extension(pool.clone()));
 
     // Connector routes (F045 - Connector Framework)
     let connector_encryption = Arc::new(CredentialEncryption::new(config.connector_encryption_key));
@@ -1218,7 +1218,7 @@ async fn main() {
     // F113: Support both API key and JWT authentication for programmatic access
     // F-IDEMPOTENCY: Support Idempotency-Key header for safe retries
     let idempotency_state = middleware::IdempotencyState { pool: pool.clone() };
-    let tenant_routes = tenant_router(pool.clone(), token_config.clone())
+    let tenant_routes = tenant_router(pool.clone(), admin_pool_shared.clone(), token_config.clone())
         // F-IDEMPOTENCY: Idempotency middleware must run after JWT auth to access claims
         .layer(axum::middleware::from_fn_with_state(
             idempotency_state,

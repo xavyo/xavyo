@@ -509,6 +509,7 @@ pub async fn api_key_auth_middleware(
         roles,
         purpose: None,
         email: None,
+        name: None,
         // F-061 Power of Attorney: API keys don't support identity assumption
         acting_as_poa_id: None,
         acting_as_user_id: None,

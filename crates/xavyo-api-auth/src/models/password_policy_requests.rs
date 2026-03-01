@@ -38,6 +38,9 @@ pub struct UpdatePasswordPolicyRequest {
     /// Minimum hours before password can be changed (0 = immediate).
     #[validate(range(min = 0))]
     pub min_age_hours: Option<i32>,
+
+    /// Whether to check passwords against the HIBP breached password database.
+    pub check_breached_passwords: Option<bool>,
 }
 
 impl UpdatePasswordPolicyRequest {
@@ -54,6 +57,7 @@ impl UpdatePasswordPolicyRequest {
             expiration_days: self.expiration_days,
             history_count: self.history_count,
             min_age_hours: self.min_age_hours,
+            check_breached_passwords: self.check_breached_passwords,
         }
     }
 }
@@ -87,6 +91,9 @@ pub struct PasswordPolicyResponse {
 
     /// Minimum hours before password can be changed (0 = immediate).
     pub min_age_hours: i32,
+
+    /// Whether to check passwords against the HIBP breached password database.
+    pub check_breached_passwords: bool,
 }
 
 impl From<xavyo_db::TenantPasswordPolicy> for PasswordPolicyResponse {
@@ -101,6 +108,7 @@ impl From<xavyo_db::TenantPasswordPolicy> for PasswordPolicyResponse {
             expiration_days: policy.expiration_days,
             history_count: policy.history_count,
             min_age_hours: policy.min_age_hours,
+            check_breached_passwords: policy.check_breached_passwords,
         }
     }
 }
@@ -121,6 +129,7 @@ mod tests {
             expiration_days: Some(90),
             history_count: Some(5),
             min_age_hours: Some(24),
+            check_breached_passwords: Some(true),
         };
 
         let upsert = request.into_upsert();
