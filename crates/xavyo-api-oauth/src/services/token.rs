@@ -275,7 +275,19 @@ impl TokenService {
     /// Failures are logged and return an empty list so token issuance
     /// is never blocked by a role lookup failure.
     async fn lookup_user_roles(&self, user_id: Uuid, tenant_id: Uuid) -> Vec<String> {
-        match xavyo_db::UserRole::get_user_roles(&self.pool, user_id, tenant_id).await {
+        // set_config('app.current_tenant', ..., true) is SET LOCAL — only valid inside a
+        // transaction. Use begin/rollback so the context persists to the query.
+        let result = async {
+            let mut tx = self.pool.begin().await?;
+            xavyo_db::set_tenant_context(&mut *tx, xavyo_core::TenantId::from_uuid(tenant_id))
+                .await
+                .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+            let roles = xavyo_db::UserRole::get_user_roles_conn(&mut tx, user_id, tenant_id).await;
+            tx.rollback().await.ok();
+            roles
+        }
+        .await;
+        match result {
             Ok(roles) => roles,
             Err(e) => {
                 tracing::warn!("Failed to look up user roles for token claims: {e}");
