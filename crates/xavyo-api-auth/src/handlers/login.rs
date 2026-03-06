@@ -167,7 +167,7 @@ pub async fn login_handler(
             } else {
                 // Unknown email - log but don't reveal
                 // Best-effort: don't propagate DB errors (e.g. non-existent tenant)
-                if let Err(e) = lockout_service
+                if let Err(_e) = lockout_service
                     .record_login_attempt(
                         *tenant_id.as_uuid(),
                         None,
@@ -177,10 +177,9 @@ pub async fn login_handler(
                     )
                     .await
                 {
-                    tracing::warn!(
+                    tracing::debug!(
                         tenant_id = %tenant_id,
-                        error = %e,
-                        "Failed to record login attempt for unknown email"
+                        "Failed to record login attempt (tenant may not exist)"
                     );
                 }
 
