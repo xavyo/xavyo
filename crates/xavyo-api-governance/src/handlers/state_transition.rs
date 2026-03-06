@@ -15,7 +15,7 @@ use uuid::Uuid;
 use xavyo_db::OutputFormat;
 
 use crate::{
-    error::ApiResult,
+    error::{ApiGovernanceError, ApiResult},
     models::{
         ExecuteTransitionRequest, ListTransitionAuditQuery, ListTransitionRequestsQuery,
         ObjectLifecycleStatusResponse, TransitionAuditListResponse, TransitionAuditResponse,
@@ -419,7 +419,7 @@ pub async fn export_transition_audit(
             format!("attachment; filename=\"{filename}\""),
         )
         .body(Body::from(result.content))
-        .unwrap();
+        .map_err(|e| ApiGovernanceError::Internal(format!("Response build failed: {e}")))?;
 
     Ok(response)
 }

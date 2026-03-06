@@ -473,12 +473,13 @@ impl PasswordPolicyService {
                 password_expires_at = $3,
                 must_change_password = false,
                 updated_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $4
             ",
         )
         .bind(user_id)
         .bind(now)
         .bind(expires_at)
+        .bind(tenant_id)
         .execute(&mut *conn)
         .await
         .map_err(ApiAuthError::Database)?;

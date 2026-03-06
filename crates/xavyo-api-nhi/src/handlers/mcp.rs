@@ -55,7 +55,7 @@ fn mcp_error_response(error: McpErrorResponse) -> Response {
     if status == StatusCode::TOO_MANY_REQUESTS {
         response
             .headers_mut()
-            .insert("Retry-After", "1800".parse().unwrap());
+            .insert("Retry-After", axum::http::HeaderValue::from_static("1800"));
     }
 
     response

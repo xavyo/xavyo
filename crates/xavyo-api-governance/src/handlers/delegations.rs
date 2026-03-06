@@ -405,8 +405,9 @@ pub async fn process_delegation_lifecycle(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    // Note: In production, this would check for admin privileges
-    // For now we allow any authenticated user with a tenant
+    if !claims.has_role("admin") {
+        return Err(ApiGovernanceError::Unauthorized);
+    }
 
     let result = state
         .delegation_lifecycle_service
