@@ -41,6 +41,17 @@ impl UserRole {
         user_id: uuid::Uuid,
         tenant_id: uuid::Uuid,
     ) -> Result<Vec<String>, sqlx::Error> {
+        let mut conn = pool.acquire().await?;
+        Self::get_user_roles_conn(&mut conn, user_id, tenant_id).await
+    }
+
+    /// Same as `get_user_roles` but uses an existing connection (so the caller
+    /// can set RLS context via `set_config` before calling).
+    pub async fn get_user_roles_conn(
+        conn: &mut sqlx::PgConnection,
+        user_id: uuid::Uuid,
+        tenant_id: uuid::Uuid,
+    ) -> Result<Vec<String>, sqlx::Error> {
         let roles: Vec<UserRole> = sqlx::query_as(
             r"SELECT ur.user_id, ur.role_name, ur.created_at
              FROM user_roles ur
@@ -50,7 +61,7 @@ impl UserRole {
         )
         .bind(user_id)
         .bind(tenant_id)
-        .fetch_all(pool)
+        .fetch_all(conn)
         .await?;
 
         Ok(roles.into_iter().map(|r| r.role_name).collect())
