@@ -209,12 +209,12 @@ impl EmailChangeService {
             .map_err(ApiAuthError::Database)?
             .ok_or(ApiAuthError::EmailChangeTokenInvalid)?;
 
-        // Verify the request belongs to this user
-        if request.user_id != user_id {
+        // Verify the request belongs to this user and tenant (defense-in-depth)
+        if request.user_id != user_id || request.tenant_id != tenant_id {
             warn!(
                 user_id = %user_id,
                 request_user_id = %request.user_id,
-                "Email change verification attempt for different user"
+                "Email change verification attempt for different user or tenant"
             );
             return Err(ApiAuthError::EmailChangeTokenInvalid);
         }

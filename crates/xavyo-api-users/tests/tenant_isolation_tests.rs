@@ -129,6 +129,7 @@ async fn test_update_user_from_other_tenant_returns_not_found() {
         email: Some(unique_email()),
         roles: None,
         is_active: None,
+        email_verified: None,
     };
 
     let result = service

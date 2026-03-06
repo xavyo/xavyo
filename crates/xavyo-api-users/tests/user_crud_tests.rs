@@ -204,6 +204,7 @@ async fn test_update_user_email() {
         email: Some(new_email.clone()),
         roles: None,
         is_active: None,
+        email_verified: None,
     };
 
     let result = service
@@ -236,6 +237,7 @@ async fn test_update_user_roles() {
         email: None,
         roles: Some(vec!["admin".to_string(), "member".to_string()]),
         is_active: None,
+        email_verified: None,
     };
 
     let result = service
@@ -271,6 +273,7 @@ async fn test_update_user_active_status() {
         email: None,
         roles: None,
         is_active: Some(false),
+        email_verified: None,
     };
 
     let result = service
@@ -291,6 +294,7 @@ async fn test_update_user_active_status() {
         email: None,
         roles: None,
         is_active: Some(true),
+        email_verified: None,
     };
 
     let result = service
