@@ -378,6 +378,7 @@ impl AuthState {
             pool.clone(),
             email_sender.clone(),
             frontend_base_url.clone(),
+            password_policy_service.clone(),
         ));
 
         Ok(Self {

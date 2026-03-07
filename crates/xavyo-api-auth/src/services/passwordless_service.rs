@@ -213,13 +213,7 @@ impl PasswordlessService {
         // Look up user by email and tenant — silently succeed if user doesn't exist
         let user = self.find_user_by_email(tenant_id, email).await?;
         if let Some(user) = user {
-            // Check email is verified
-            if !user.email_verified {
-                // Silently return success to prevent enumeration
-                return Ok(expiry_minutes);
-            }
-
-            // Check user is active
+            // Check user is active (silently succeed to prevent enumeration)
             if !user.is_active {
                 return Ok(expiry_minutes);
             }
@@ -322,6 +316,16 @@ impl PasswordlessService {
             .await
             .map_err(|e| ApiAuthError::Internal(format!("Failed to mark token used: {e}")))?;
 
+        // Clicking a magic link proves email ownership — mark as verified
+        sqlx::query(
+            "UPDATE users SET email_verified = true, email_verified_at = COALESCE(email_verified_at, NOW()), updated_at = NOW() WHERE id = $1 AND tenant_id = $2 AND email_verified = false",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| ApiAuthError::Internal(format!("Failed to update email_verified: {e}")))?;
+
         // Check if MFA is required
         let policy = self.get_policy(tenant_id).await?;
         if policy.require_mfa_after_passwordless {
@@ -371,7 +375,7 @@ impl PasswordlessService {
         // Look up user — silently succeed if user doesn't exist
         let user = self.find_user_by_email(tenant_id, email).await?;
         if let Some(user) = user {
-            if !user.email_verified || !user.is_active {
+            if !user.is_active {
                 return Ok(expiry_minutes);
             }
 
@@ -498,6 +502,16 @@ impl PasswordlessService {
         PasswordlessToken::mark_used(&self.pool, tenant_id, db_token.id)
             .await
             .map_err(|e| ApiAuthError::Internal(format!("Failed to mark token used: {e}")))?;
+
+        // Entering correct OTP proves email ownership — mark as verified
+        sqlx::query(
+            "UPDATE users SET email_verified = true, email_verified_at = COALESCE(email_verified_at, NOW()), updated_at = NOW() WHERE id = $1 AND tenant_id = $2 AND email_verified = false",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| ApiAuthError::Internal(format!("Failed to update email_verified: {e}")))?;
 
         // Check MFA requirement
         let policy = self.get_policy(tenant_id).await?;

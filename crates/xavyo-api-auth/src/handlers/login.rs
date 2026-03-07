@@ -320,9 +320,6 @@ pub async fn login_handler(
         return Err(ApiAuthError::AccountLocked);
     }
 
-    // Note: email_verified is already checked in auth_service.login()
-    // which returns ApiAuthError::EmailNotVerified before we reach here.
-
     // Check if password is expired
     if user.needs_password_change() {
         // Don't lock out for expired password, but don't allow full access

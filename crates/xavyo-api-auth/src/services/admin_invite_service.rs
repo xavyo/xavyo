@@ -14,7 +14,8 @@ use xavyo_db::models::{
 
 use crate::error::ApiAuthError;
 use crate::services::{
-    hash_token, validate_email, validate_password, verify_token_hash_constant_time, EmailSender,
+    hash_token, validate_email, verify_token_hash_constant_time, EmailSender,
+    PasswordPolicyService,
 };
 
 /// Default invitation token expiry (7 days).
@@ -42,6 +43,7 @@ pub struct AdminInviteService {
     pool: PgPool,
     email_sender: Arc<dyn EmailSender>,
     frontend_base_url: String,
+    password_policy_service: Arc<PasswordPolicyService>,
 }
 
 impl AdminInviteService {
@@ -50,11 +52,13 @@ impl AdminInviteService {
         pool: PgPool,
         email_sender: Arc<dyn EmailSender>,
         frontend_base_url: String,
+        password_policy_service: Arc<PasswordPolicyService>,
     ) -> Self {
         Self {
             pool,
             email_sender,
             frontend_base_url,
+            password_policy_service,
         }
     }
 
@@ -245,17 +249,7 @@ If you didn't expect this invitation, you can safely ignore this email.
         ip_address: Option<String>,
         user_agent: Option<String>,
     ) -> Result<(User, UserInvitation), ApiAuthError> {
-        // Validate password
-        let password_result = validate_password(password);
-        if !password_result.is_valid {
-            let error_msg = password_result.errors.first().map_or_else(
-                || "Invalid password".to_string(),
-                std::string::ToString::to_string,
-            );
-            return Err(ApiAuthError::Validation(error_msg));
-        }
-
-        // Find invitation by token hash
+        // Find invitation by token hash first, so we know the tenant for password policy
         let token_hash = hash_token(token);
         let invitation = UserInvitation::find_by_token_hash(&self.pool, &token_hash)
             .await
@@ -283,6 +277,26 @@ If you didn't expect this invitation, you can safely ignore this email.
         // fail the transaction's status guard.
         if Utc::now() > invitation.expires_at {
             return Err(ApiAuthError::InvitationExpired);
+        }
+
+        // Validate password against the invitation's tenant password policy
+        let policy = self
+            .password_policy_service
+            .get_password_policy(invitation.tenant_id)
+            .await?;
+        let validation = PasswordPolicyService::validate_password(password, &policy);
+        if !validation.is_valid {
+            let errors: Vec<String> = validation
+                .errors
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect();
+            return Err(ApiAuthError::WeakPassword(errors));
+        }
+
+        // Check against HIBP breached password database
+        if let Err(e) = PasswordPolicyService::check_breached(password, &policy).await {
+            return Err(ApiAuthError::WeakPassword(vec![e.to_string()]));
         }
 
         // Get email from invitation

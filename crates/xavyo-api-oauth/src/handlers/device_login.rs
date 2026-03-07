@@ -466,15 +466,6 @@ pub async fn device_login_handler(
                 "Account is deactivated. Please contact support.",
             );
         }
-        // F111: Handle unverified email explicitly with actionable message
-        Err(xavyo_api_auth::ApiAuthError::EmailNotVerified) => {
-            return render_login_error_with_csrf(
-                &request.user_code,
-                &client_id,
-                &scopes,
-                "Please verify your email address before logging in. Check your inbox for the verification link.",
-            );
-        }
         Err(e) => {
             warn!(error = %e, "Login failed");
             return render_login_error_with_csrf(
