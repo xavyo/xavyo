@@ -444,7 +444,8 @@ async fn main() {
     };
 
     // Build auth routes: tenant-required routes (login, register, forgot-password, etc.)
-    let tenant_auth_routes = auth_router(auth_state.clone()).layer(TenantLayer::with_config(
+    let tenant_auth_routes =
+        auth_router(auth_state.clone(), config.jwt_public_key.clone()).layer(TenantLayer::with_config(
         xavyo_tenant::TenantConfig::builder()
             .require_tenant(true)
             .build(),

@@ -5,14 +5,16 @@
 use crate::error::ApiAuthError;
 use crate::models::PasswordPolicyConfig;
 use crate::services::org_policy_service::{OrgPolicyError, OrgPolicyService};
+use crate::services::SessionService;
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
 use std::sync::Arc;
 use tracing::{info, warn};
 use uuid::Uuid;
+use xavyo_auth::{hash_password, verify_password};
 use xavyo_db::{
-    models::org_security_policy::OrgPolicyType, set_tenant_context, PasswordHistory,
-    TenantPasswordPolicy, UpsertPasswordPolicy,
+    models::org_security_policy::OrgPolicyType, set_tenant_context, PasswordHistory, RevokeReason,
+    TenantPasswordPolicy, UpsertPasswordPolicy, User,
 };
 
 /// Special characters allowed in passwords.
@@ -125,6 +127,15 @@ impl PasswordValidationResult {
             .collect::<Vec<_>>()
             .join("; ")
     }
+}
+
+/// Result of a successful password change operation.
+#[derive(Debug, Clone)]
+pub struct PasswordChangeResult {
+    /// Number of sessions revoked.
+    pub sessions_revoked: i64,
+    /// Number of refresh tokens revoked.
+    pub refresh_tokens_revoked: i64,
 }
 
 /// Password policy service for validating passwords against tenant policies.
@@ -447,6 +458,131 @@ impl PasswordPolicyService {
         }
 
         Some(Utc::now() + Duration::days(i64::from(expiration_days)))
+    }
+
+    /// Change a user's password with full policy enforcement.
+    ///
+    /// Consolidates the shared logic from `/auth/password` and `/me/password`:
+    /// verify current password, validate new password against policy, check HIBP,
+    /// check history, hash, update, and optionally revoke sessions + refresh tokens.
+    pub async fn change_user_password(
+        &self,
+        user_id: Uuid,
+        tenant_id: Uuid,
+        current_password: &str,
+        new_password: &str,
+        revoke_sessions: bool,
+        session_service: &SessionService,
+    ) -> Result<PasswordChangeResult, ApiAuthError> {
+        // Acquire a connection with tenant context for RLS on the users table
+        let mut conn = self.pool.acquire().await.map_err(ApiAuthError::Database)?;
+        set_tenant_context(&mut *conn, xavyo_core::TenantId::from_uuid(tenant_id))
+            .await
+            .map_err(ApiAuthError::DatabaseInternal)?;
+
+        // 1. Fetch user
+        let user: User = sqlx::query_as("SELECT * FROM users WHERE id = $1 AND tenant_id = $2")
+            .bind(user_id)
+            .bind(tenant_id)
+            .fetch_optional(&mut *conn)
+            .await
+            .map_err(ApiAuthError::Database)?
+            .ok_or_else(|| ApiAuthError::Internal("User not found".to_string()))?;
+
+        // 2. Verify current password
+        let valid = verify_password(current_password, &user.password_hash)
+            .map_err(|_| ApiAuthError::InvalidCredentials)?;
+        if !valid {
+            return Err(ApiAuthError::InvalidCredentials);
+        }
+
+        // 3. Get tenant password policy
+        let policy = self.get_password_policy(tenant_id).await?;
+
+        // 4. Check minimum password age
+        if let Err(e) =
+            Self::check_min_password_age(user.password_changed_at, policy.min_age_hours)
+        {
+            return Err(ApiAuthError::Validation(e.to_string()));
+        }
+
+        // 5. Validate new password against policy
+        let validation = Self::validate_password(new_password, &policy);
+        if !validation.is_valid {
+            let errors: Vec<String> = validation
+                .errors
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect();
+            return Err(ApiAuthError::WeakPassword(errors));
+        }
+
+        // 6. Check HIBP breached database
+        if let Err(e) = Self::check_breached(new_password, &policy).await {
+            return Err(ApiAuthError::WeakPassword(vec![e.to_string()]));
+        }
+
+        // 7. Check password history
+        if policy.history_count > 0 {
+            let in_history = self
+                .check_password_history(user_id, tenant_id, new_password, policy.history_count)
+                .await?;
+            if in_history {
+                return Err(ApiAuthError::Validation(
+                    "Password was recently used. Please choose a different password.".to_string(),
+                ));
+            }
+        }
+
+        // 8. Hash new password
+        let new_password_hash = hash_password(new_password)
+            .map_err(|e| ApiAuthError::Internal(format!("Failed to hash password: {e}")))?;
+
+        // 9. Add old hash to history
+        if policy.history_count > 0 {
+            self.add_to_password_history(
+                user_id,
+                tenant_id,
+                &user.password_hash,
+                policy.history_count,
+            )
+            .await?;
+        }
+
+        // 10. Update password (reuse the tenant-context connection)
+        sqlx::query(
+            "UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 AND tenant_id = $3",
+        )
+        .bind(&new_password_hash)
+        .bind(user_id)
+        .bind(tenant_id)
+        .execute(&mut *conn)
+        .await
+        .map_err(ApiAuthError::Database)?;
+
+        // Drop the connection before calling other services that acquire their own
+        drop(conn);
+
+        // 11. Update timestamps (clears must_change_password)
+        self.update_password_timestamps(user_id, tenant_id, policy.expiration_days)
+            .await?;
+
+        // 12. Revoke sessions and refresh tokens concurrently if requested
+        let (sessions_revoked, refresh_tokens_revoked) = if revoke_sessions {
+            let (s, r) = tokio::try_join!(
+                session_service
+                    .revoke_all_user_sessions(user_id, tenant_id, RevokeReason::PasswordChange),
+                session_service.revoke_all_user_refresh_tokens(user_id, tenant_id),
+            )?;
+            (s as i64, r as i64)
+        } else {
+            (0, 0)
+        };
+
+        Ok(PasswordChangeResult {
+            sessions_revoked,
+            refresh_tokens_revoked,
+        })
     }
 
     /// Update user's password timestamps after a password change.

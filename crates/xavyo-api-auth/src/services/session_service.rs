@@ -431,6 +431,37 @@ impl SessionService {
         Ok(policy)
     }
 
+    /// Revoke all refresh tokens for a user (e.g., on password change or reset).
+    pub async fn revoke_all_user_refresh_tokens(
+        &self,
+        user_id: Uuid,
+        tenant_id: Uuid,
+    ) -> Result<u64, ApiAuthError> {
+        let mut conn = self.pool.acquire().await.map_err(ApiAuthError::Database)?;
+        set_tenant_context(&mut *conn, xavyo_core::TenantId::from_uuid(tenant_id))
+            .await
+            .map_err(ApiAuthError::DatabaseInternal)?;
+
+        let result = sqlx::query(
+            "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
+        )
+        .bind(user_id)
+        .bind(tenant_id)
+        .execute(&mut *conn)
+        .await
+        .map_err(ApiAuthError::Database)?;
+
+        let count = result.rows_affected();
+
+        info!(
+            user_id = %user_id,
+            revoked_count = count,
+            "Revoked all user refresh tokens"
+        );
+
+        Ok(count)
+    }
+
     /// Revoke all sessions for a user (e.g., on password change).
     pub async fn revoke_all_user_sessions(
         &self,

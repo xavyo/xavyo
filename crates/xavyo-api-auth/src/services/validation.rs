@@ -2,8 +2,23 @@
 //!
 //! Provides email and password validation according to the spec requirements.
 
+use crate::error::ApiAuthError;
 use regex::Regex;
 use std::sync::LazyLock;
+
+/// Convert `validator` crate errors into an `ApiAuthError::Validation`.
+pub fn extract_validation_errors(e: validator::ValidationErrors) -> ApiAuthError {
+    let errors: Vec<String> = e
+        .field_errors()
+        .values()
+        .flat_map(|errors| {
+            errors
+                .iter()
+                .filter_map(|e| e.message.as_ref().map(std::string::ToString::to_string))
+        })
+        .collect();
+    ApiAuthError::Validation(errors.join(", "))
+}
 
 /// Minimum password length requirement.
 pub const MIN_PASSWORD_LENGTH: usize = 8;

@@ -112,7 +112,7 @@ pub async fn admin_reset_password(
     .execute(&mut *tx)
     .await?;
 
-    // Revoke all refresh tokens
+    // Revoke all refresh tokens (inside transaction for atomicity)
     sqlx::query(
         "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
     )

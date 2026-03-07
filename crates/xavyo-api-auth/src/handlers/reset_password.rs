@@ -205,7 +205,8 @@ pub async fn reset_password_handler(
     .execute(&mut *tx)
     .await?;
 
-    // Revoke all refresh tokens for this user (include tenant_id for tenant isolation)
+    // Revoke all refresh tokens for this user (inside transaction for atomicity —
+    // if the password changes, old refresh tokens must not survive)
     let revoked = sqlx::query(
         "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
     )

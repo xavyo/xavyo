@@ -427,8 +427,8 @@ impl AuthState {
 /// - `POST /auth/resend-verification` - Resend verification email (email rate limited)
 /// - `POST /auth/reset-password` - Complete password reset
 /// - `POST /auth/verify-email` - Verify email address
-/// - `PUT /auth/password` - Change password
-pub fn auth_router(state: AuthState) -> Router {
+/// - `PUT /auth/password` - Change password (JWT-authenticated, rate limited)
+pub fn auth_router(state: AuthState, jwt_public_key: String) -> Router {
     // Login route with rate limiting
     let login_route = Router::new()
         .route("/login", post(login_handler))
@@ -447,11 +447,19 @@ pub fn auth_router(state: AuthState) -> Router {
         .route("/register", post(register_handler))
         .layer(Extension(state.email_sender.clone()));
 
-    // Rate-limited password change route (5 attempts/min/IP)
+    // Rate-limited password change route (5 attempts/min/IP).
+    // Requires JWT auth to extract UserId — applied here because the other
+    // auth routes (login, register, etc.) are unauthenticated.
     let password_change_route = Router::new()
         .route("/password", put(password_change_handler))
         .layer(middleware::from_fn(rate_limit_middleware))
-        .layer(Extension(state.sensitive_rate_limiter.clone()));
+        .layer(Extension(state.sensitive_rate_limiter.clone()))
+        .layer(middleware::from_fn(
+            crate::middleware::jwt_auth::jwt_auth_middleware,
+        ))
+        .layer(Extension(crate::middleware::jwt_auth::JwtPublicKey(
+            jwt_public_key,
+        )));
 
     // Routes without rate limiting
     let other_routes = Router::new()
@@ -731,11 +739,17 @@ pub fn me_router(state: AuthState) -> Router {
         .layer(middleware::from_fn(rate_limit_middleware))
         .layer(Extension(state.sensitive_rate_limiter.clone()));
 
+    // Rate-limited password change route (5 attempts/min/IP)
+    let password_change_route = Router::new()
+        .route("/password", put(me_password_change))
+        .layer(middleware::from_fn(rate_limit_middleware))
+        .layer(Extension(state.sensitive_rate_limiter.clone()));
+
     Router::new()
         // Profile endpoints
         .route("/profile", get(get_profile).put(update_profile))
-        // Password change endpoint
-        .route("/password", put(me_password_change))
+        // Password change endpoint (rate limited)
+        .merge(password_change_route)
         // Email change endpoints (rate limited)
         .merge(email_change_routes)
         // Security overview endpoints
