@@ -103,6 +103,10 @@ pub enum BootstrapError {
     #[error("Failed to re-enable RLS after bootstrap: {0}")]
     RlsRestore(#[source] sqlx::Error),
 
+    /// Failed to check if tenant already exists (fast-path check).
+    #[error("Failed to check tenant existence: {0}")]
+    TenantCheck(#[source] sqlx::Error),
+
     /// General database error during bootstrap.
     #[error("Database error during bootstrap: {0}")]
     Database(#[from] sqlx::Error),

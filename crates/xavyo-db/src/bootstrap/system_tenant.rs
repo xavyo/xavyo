@@ -53,15 +53,27 @@ async fn acquire_bootstrap_lock(pool: &PgPool) -> Result<(), BootstrapError> {
         .map_err(BootstrapError::LockAcquisition)?;
 
     if !result.0 {
-        // Could not acquire lock immediately, try waiting
-        warn!("Bootstrap lock not immediately available, waiting...");
+        // Could not acquire lock immediately, retry with timeout
+        warn!("Bootstrap lock not immediately available, retrying...");
 
-        // Wait with timeout (5 seconds)
-        sqlx::query("SELECT pg_advisory_lock($1)")
-            .bind(BOOTSTRAP_LOCK_KEY)
-            .execute(pool)
-            .await
-            .map_err(BootstrapError::LockAcquisition)?;
+        // Retry pg_try_advisory_lock every 500ms for up to 10 seconds
+        let mut acquired = false;
+        for _ in 0..20 {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            let retry: (bool,) =
+                sqlx::query_as("SELECT pg_try_advisory_lock($1) as acquired")
+                    .bind(BOOTSTRAP_LOCK_KEY)
+                    .fetch_one(pool)
+                    .await
+                    .map_err(BootstrapError::LockAcquisition)?;
+            if retry.0 {
+                acquired = true;
+                break;
+            }
+        }
+        if !acquired {
+            warn!("Bootstrap lock not acquired after 10s, proceeding without lock (bootstrap is idempotent)");
+        }
     }
 
     info!("Bootstrap lock acquired");
@@ -295,6 +307,37 @@ pub async fn create_cli_oauth_client(pool: &PgPool) -> Result<bool, BootstrapErr
 #[instrument(skip(pool), name = "bootstrap")]
 pub async fn run_bootstrap(pool: &PgPool) -> Result<BootstrapResult, BootstrapError> {
     info!("bootstrap.started: Beginning system tenant bootstrap");
+
+    // Fast path: if system tenant already exists, skip bootstrap entirely.
+    // This avoids blocking on the advisory lock when other instances hold it.
+    let already_exists: Option<(uuid::Uuid,)> =
+        sqlx::query_as("SELECT id FROM tenants WHERE id = $1")
+            .bind(SYSTEM_TENANT_ID)
+            .fetch_optional(pool)
+            .await
+            .map_err(BootstrapError::TenantCheck)?;
+
+    if already_exists.is_some() {
+        // Also check OAuth client
+        let client_exists: Option<(String,)> =
+            sqlx::query_as("SELECT client_id FROM oauth_clients WHERE client_id = 'xavyo-cli' AND tenant_id = $1")
+                .bind(SYSTEM_TENANT_ID)
+                .fetch_optional(pool)
+                .await
+                .map_err(BootstrapError::TenantCheck)?;
+
+        if client_exists.is_some() {
+            info!(
+                tenant_id = %SYSTEM_TENANT_ID,
+                "bootstrap.skipped: System tenant and OAuth client already exist"
+            );
+            return Ok(BootstrapResult {
+                tenant_created: false,
+                oauth_client_created: false,
+                tenant_id: SYSTEM_TENANT_ID,
+            });
+        }
+    }
 
     // Acquire lock to prevent concurrent bootstrap
     acquire_bootstrap_lock(pool).await?;
