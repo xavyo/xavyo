@@ -3,7 +3,7 @@
 //! Handles user registration, login, and credential verification.
 
 use crate::error::ApiAuthError;
-use crate::services::validation::{normalize_email, validate_email, validate_password};
+use crate::services::validation::{normalize_email, validate_email};
 use sqlx::PgPool;
 use xavyo_auth::PasswordHasher;
 use xavyo_core::{TenantId, UserId};
@@ -26,22 +26,15 @@ impl AuthService {
         }
     }
 
-    /// Register a new user.
+    /// Register a new user with the given email and password.
     ///
-    /// # Arguments
-    ///
-    /// * `tenant_id` - The tenant to register the user in
-    /// * `email` - User's email address
-    /// * `password` - User's plaintext password
-    ///
-    /// # Returns
-    ///
-    /// The newly created user's ID.
+    /// **Callers are responsible for password validation** (via tenant password policy).
+    /// This method only validates email format, checks for duplicates, hashes the
+    /// password, and inserts the user with `email_verified = false`.
     ///
     /// # Errors
     ///
     /// - `ApiAuthError::InvalidEmail` if email format is invalid
-    /// - `ApiAuthError::WeakPassword` if password doesn't meet requirements
     /// - `ApiAuthError::EmailInUse` if email is already registered for the tenant
     pub async fn register(
         &self,
@@ -56,17 +49,6 @@ impl AuthService {
                 || "Invalid email format".to_string(),
                 |e| e.to_string(),
             )));
-        }
-
-        // Validate password
-        let password_result = validate_password(password);
-        if !password_result.is_valid {
-            let errors: Vec<String> = password_result
-                .errors
-                .iter()
-                .map(std::string::ToString::to_string)
-                .collect();
-            return Err(ApiAuthError::WeakPassword(errors));
         }
 
         // Normalize email
@@ -86,14 +68,14 @@ impl AuthService {
             .hash(password)
             .map_err(|e| ApiAuthError::Internal(format!("Password hashing failed: {e}")))?;
 
-        // Insert user
+        // Insert user with email_verified = false (self-service must verify)
         let id = uuid::Uuid::new_v4();
         let created_at = chrono::Utc::now();
 
         sqlx::query(
             r"
-            INSERT INTO users (id, tenant_id, email, password_hash, is_active, email_verified, email_verified_at, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, true, true, $5, $5, $5)
+            INSERT INTO users (id, tenant_id, email, password_hash, is_active, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, true, $5, $5)
             ",
         )
         .bind(id)
@@ -169,11 +151,9 @@ impl AuthService {
             return Err(ApiAuthError::AccountInactive);
         }
 
-        // Check if email is verified
-        if !user.email_verified {
-            tracing::warn!(user_id = %user.id, "Login attempt with unverified email");
-            return Err(ApiAuthError::EmailNotVerified);
-        }
+        // Note: email_verified is NOT checked here. Unverified users can log in.
+        // The frontend can show a verification banner. Blocking login for unverified
+        // email creates a dead end when email delivery is unavailable.
 
         // Verify password
         let valid = self

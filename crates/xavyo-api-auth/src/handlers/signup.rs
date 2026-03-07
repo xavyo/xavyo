@@ -9,8 +9,8 @@
 use crate::error::ApiAuthError;
 use crate::models::{SignupRequest, SignupResponse};
 use crate::services::{
-    generate_email_verification_token, AuthService, EmailSender, TokenService,
-    EMAIL_VERIFICATION_TOKEN_VALIDITY_HOURS,
+    generate_email_verification_token, AuthService, EmailSender, PasswordPolicyService,
+    TokenService, EMAIL_VERIFICATION_TOKEN_VALIDITY_HOURS,
 };
 use axum::{extract::ConnectInfo, http::StatusCode, Extension, Json};
 use chrono::{Duration, Utc};
@@ -63,6 +63,7 @@ pub async fn signup_handler(
     Extension(auth_service): Extension<Arc<AuthService>>,
     Extension(token_service): Extension<Arc<TokenService>>,
     Extension(email_sender): Extension<Arc<dyn EmailSender>>,
+    Extension(password_policy_service): Extension<Arc<PasswordPolicyService>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(request): Json<SignupRequest>,
 ) -> Result<(StatusCode, Json<SignupResponse>), ApiAuthError> {
@@ -84,8 +85,19 @@ pub async fn signup_handler(
         }
     })?;
 
-    // Validate password complexity
-    validate_password_complexity(&request.password)?;
+    // Validate password against system tenant's password policy
+    let policy = password_policy_service
+        .get_password_policy(SYSTEM_TENANT_ID)
+        .await?;
+    let validation = PasswordPolicyService::validate_password(&request.password, &policy);
+    if !validation.is_valid {
+        let errors: Vec<String> = validation
+            .errors
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
+        return Err(ApiAuthError::WeakPassword(errors));
+    }
 
     // Validate display name if provided
     if let Some(ref display_name) = request.display_name {
@@ -95,16 +107,7 @@ pub async fn signup_handler(
     // Use system tenant ID
     let tenant_id = TenantId::from_uuid(SYSTEM_TENANT_ID);
 
-    // Check if email already exists in system tenant using get_user_by_email
-    if auth_service
-        .get_user_by_email(tenant_id, &request.email)
-        .await?
-        .is_some()
-    {
-        return Err(ApiAuthError::EmailInUse);
-    }
-
-    // Register user in system tenant
+    // Register user in system tenant (register() checks email uniqueness)
     let (user_id, email, _created_at) = auth_service
         .register(tenant_id, &request.email, &request.password)
         .await?;
@@ -171,39 +174,6 @@ pub async fn signup_handler(
     let response = SignupResponse::new(*user_id.as_uuid(), email, access_token, expires_in);
 
     Ok((StatusCode::CREATED, Json(response)))
-}
-
-/// Validate password complexity.
-///
-/// Ensures password meets the following requirements:
-/// - Minimum 8 characters
-/// - At least one uppercase letter (A-Z)
-/// - At least one lowercase letter (a-z)
-/// - At least one digit (0-9)
-pub fn validate_password_complexity(password: &str) -> Result<(), ApiAuthError> {
-    let mut errors = Vec::new();
-
-    if password.len() < 8 {
-        errors.push("Password must be at least 8 characters".to_string());
-    }
-
-    if !password.chars().any(|c| c.is_ascii_uppercase()) {
-        errors.push("Password must contain at least one uppercase letter".to_string());
-    }
-
-    if !password.chars().any(|c| c.is_ascii_lowercase()) {
-        errors.push("Password must contain at least one lowercase letter".to_string());
-    }
-
-    if !password.chars().any(|c| c.is_ascii_digit()) {
-        errors.push("Password must contain at least one digit".to_string());
-    }
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(ApiAuthError::WeakPassword(errors))
-    }
 }
 
 /// Validate display name.
@@ -279,63 +249,6 @@ async fn send_verification_email(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // ── Password Complexity Tests ───────────────────────────────────────
-
-    #[test]
-    fn test_password_complexity_valid() {
-        assert!(validate_password_complexity("SecureP@ss123").is_ok());
-        assert!(validate_password_complexity("Abcdefg1").is_ok());
-        assert!(validate_password_complexity("Password123").is_ok());
-    }
-
-    #[test]
-    fn test_password_complexity_too_short() {
-        let result = validate_password_complexity("Short1A");
-        assert!(result.is_err());
-        if let Err(ApiAuthError::WeakPassword(errors)) = result {
-            assert!(errors.iter().any(|e| e.contains("at least 8 characters")));
-        }
-    }
-
-    #[test]
-    fn test_password_complexity_missing_uppercase() {
-        let result = validate_password_complexity("lowercase123");
-        assert!(result.is_err());
-        if let Err(ApiAuthError::WeakPassword(errors)) = result {
-            assert!(errors.iter().any(|e| e.contains("uppercase")));
-        }
-    }
-
-    #[test]
-    fn test_password_complexity_missing_lowercase() {
-        let result = validate_password_complexity("UPPERCASE123");
-        assert!(result.is_err());
-        if let Err(ApiAuthError::WeakPassword(errors)) = result {
-            assert!(errors.iter().any(|e| e.contains("lowercase")));
-        }
-    }
-
-    #[test]
-    fn test_password_complexity_missing_digit() {
-        let result = validate_password_complexity("NoDigitsHere");
-        assert!(result.is_err());
-        if let Err(ApiAuthError::WeakPassword(errors)) = result {
-            assert!(errors.iter().any(|e| e.contains("digit")));
-        }
-    }
-
-    #[test]
-    fn test_password_complexity_multiple_failures() {
-        let result = validate_password_complexity("short");
-        assert!(result.is_err());
-        if let Err(ApiAuthError::WeakPassword(errors)) = result {
-            // Should have multiple errors
-            assert!(errors.len() >= 2);
-        }
-    }
-
-    // ── Display Name Validation Tests ───────────────────────────────────
 
     #[test]
     fn test_display_name_valid() {

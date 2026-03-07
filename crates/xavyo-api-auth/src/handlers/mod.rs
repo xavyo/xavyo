@@ -141,7 +141,7 @@ pub use revocation::{revocation_router, revoke_token_handler, revoke_user_tokens
 pub use session::{
     get_session_policy, list_sessions, revoke_all_sessions, revoke_session, update_session_policy,
 };
-pub use signup::{signup_handler, validate_display_name, validate_password_complexity};
+pub use signup::{signup_handler, validate_display_name};
 pub use verify_email::verify_email_handler;
 
 // Admin Invitation exports (F-ADMIN-INVITE)

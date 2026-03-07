@@ -19,7 +19,7 @@ pub struct SignupRequest {
     pub email: String,
 
     /// User password.
-    /// Password complexity is validated separately via `validate_password_complexity`.
+    /// Password complexity is validated against the tenant's password policy.
     #[validate(length(min = 8, max = 128, message = "Password must be 8-128 characters"))]
     pub password: String,
 
