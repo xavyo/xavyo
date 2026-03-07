@@ -558,8 +558,8 @@ impl UserService {
         // M-4: Catch unique constraint violation (concurrent create race) and map to EmailConflict.
         let user: User = match sqlx::query_as(
             r"
-            INSERT INTO users (tenant_id, email, password_hash, is_active, email_verified, created_at, updated_at)
-            VALUES ($1, $2, $3, true, false, $4, $4)
+            INSERT INTO users (tenant_id, email, password_hash, is_active, email_verified, email_verified_at, created_at, updated_at)
+            VALUES ($1, $2, $3, true, true, $4, $4, $4)
             RETURNING *
             ",
         )
