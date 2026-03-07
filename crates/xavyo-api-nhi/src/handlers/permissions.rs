@@ -397,6 +397,92 @@ pub async fn grant_by_server_handler(
 }
 
 // ---------------------------------------------------------------------------
+// NHI tool permission check (service-to-service, no admin role required)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct CheckToolPermissionRequest {
+    pub agent_id: Uuid,
+    pub tool_name: String,
+}
+
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub struct CheckToolPermissionResponse {
+    /// "allow" | "deny" | "requires_approval"
+    pub decision: String,
+    pub requires_approval: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// POST /tool-permissions/check — Check if an agent can call a named tool.
+///
+/// Designed for service-to-service calls (e.g., the CRM MCP server checking
+/// before dispatching a tool on behalf of an OBO agent). Requires any valid
+/// tenant-scoped JWT — no admin role needed.
+///
+/// If the tool is not registered in Xavyo NHI the decision is `allow`
+/// (fail-open for tools not yet governed). Governance is additive.
+pub async fn check_tool_permission(
+    State(state): State<NhiState>,
+    Extension(tenant_id): Extension<TenantId>,
+    Json(request): Json<CheckToolPermissionRequest>,
+) -> Result<Json<CheckToolPermissionResponse>, NhiApiError> {
+    let tenant_uuid = *tenant_id.as_uuid();
+
+    let tool = crate::services::mcp_service::get_tool_by_name(
+        &state.pool,
+        tenant_uuid,
+        &request.tool_name,
+    )
+    .await?;
+
+    let Some(tool) = tool else {
+        // Tool not yet registered in NHI → allow (governance is additive)
+        return Ok(Json(CheckToolPermissionResponse {
+            decision: "allow".to_string(),
+            requires_approval: false,
+            reason: Some("Tool not registered in NHI — ungoverned, allowing".to_string()),
+        }));
+    };
+
+    let has_permission = crate::services::mcp_service::check_permission(
+        &state.pool,
+        tenant_uuid,
+        request.agent_id,
+        tool.id,
+    )
+    .await?;
+
+    if !has_permission {
+        return Ok(Json(CheckToolPermissionResponse {
+            decision: "deny".to_string(),
+            requires_approval: false,
+            reason: Some(format!(
+                "Agent {} not authorized for tool '{}'",
+                request.agent_id, request.tool_name
+            )),
+        }));
+    }
+
+    if tool.requires_approval {
+        return Ok(Json(CheckToolPermissionResponse {
+            decision: "requires_approval".to_string(),
+            requires_approval: true,
+            reason: None,
+        }));
+    }
+
+    Ok(Json(CheckToolPermissionResponse {
+        decision: "allow".to_string(),
+        requires_approval: false,
+        reason: None,
+    }))
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -423,5 +509,7 @@ pub fn permission_routes(state: NhiState) -> Router {
         // List: read-only, tenant-scoped
         .route("/agents/:agent_id/tools", get(list_agent_tools))
         .route("/tools/:tool_id/agents", get(list_tool_agents))
+        // Service-to-service permission check (no admin role required)
+        .route("/tool-permissions/check", post(check_tool_permission))
         .with_state(state)
 }

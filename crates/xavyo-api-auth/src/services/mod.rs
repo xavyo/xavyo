@@ -3,7 +3,6 @@
 pub mod admin_invite_service;
 pub mod alert_service;
 pub mod asset_service;
-pub mod hibp;
 pub mod asset_storage;
 pub mod audit_service;
 pub mod auth_service;
@@ -16,6 +15,7 @@ pub mod email_change_service;
 pub mod email_service;
 pub mod email_template_defaults;
 pub mod email_template_service;
+pub mod hibp;
 pub mod image_validator;
 pub mod ip_restriction_service;
 pub mod lockout_service;

@@ -740,7 +740,11 @@ impl UserService {
         caller_roles: &[String],
     ) -> Result<UserResponse, ApiUsersError> {
         // L-1: Reject empty updates — at least one field must be provided
-        if request.email.is_none() && request.roles.is_none() && request.is_active.is_none() && request.email_verified.is_none() {
+        if request.email.is_none()
+            && request.roles.is_none()
+            && request.is_active.is_none()
+            && request.email_verified.is_none()
+        {
             return Err(ApiUsersError::Validation(
                 "At least one field must be provided for update".to_string(),
             ));

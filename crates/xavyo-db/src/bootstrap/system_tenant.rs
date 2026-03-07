@@ -60,12 +60,11 @@ async fn acquire_bootstrap_lock(pool: &PgPool) -> Result<(), BootstrapError> {
         let mut acquired = false;
         for _ in 0..20 {
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            let retry: (bool,) =
-                sqlx::query_as("SELECT pg_try_advisory_lock($1) as acquired")
-                    .bind(BOOTSTRAP_LOCK_KEY)
-                    .fetch_one(pool)
-                    .await
-                    .map_err(BootstrapError::LockAcquisition)?;
+            let retry: (bool,) = sqlx::query_as("SELECT pg_try_advisory_lock($1) as acquired")
+                .bind(BOOTSTRAP_LOCK_KEY)
+                .fetch_one(pool)
+                .await
+                .map_err(BootstrapError::LockAcquisition)?;
             if retry.0 {
                 acquired = true;
                 break;
@@ -319,12 +318,13 @@ pub async fn run_bootstrap(pool: &PgPool) -> Result<BootstrapResult, BootstrapEr
 
     if already_exists.is_some() {
         // Also check OAuth client
-        let client_exists: Option<(String,)> =
-            sqlx::query_as("SELECT client_id FROM oauth_clients WHERE client_id = 'xavyo-cli' AND tenant_id = $1")
-                .bind(SYSTEM_TENANT_ID)
-                .fetch_optional(pool)
-                .await
-                .map_err(BootstrapError::TenantCheck)?;
+        let client_exists: Option<(String,)> = sqlx::query_as(
+            "SELECT client_id FROM oauth_clients WHERE client_id = 'xavyo-cli' AND tenant_id = $1",
+        )
+        .bind(SYSTEM_TENANT_ID)
+        .fetch_optional(pool)
+        .await
+        .map_err(BootstrapError::TenantCheck)?;
 
         if client_exists.is_some() {
             info!(

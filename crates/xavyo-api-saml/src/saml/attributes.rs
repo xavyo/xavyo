@@ -205,13 +205,18 @@ mod tests {
                 target_friendly_name: None,
                 format: None,
                 multi_value: false,
-                static_value: Some("arn:aws:iam::123:role/R,arn:aws:iam::123:saml-provider/P".to_string()),
+                static_value: Some(
+                    "arn:aws:iam::123:role/R,arn:aws:iam::123:saml-provider/P".to_string(),
+                ),
             }],
         };
         let attrs = resolve_attributes(&user, &mapping);
         assert_eq!(attrs.len(), 1);
         assert_eq!(attrs[0].name, "https://aws.amazon.com/SAML/Attributes/Role");
-        assert_eq!(attrs[0].values, vec!["arn:aws:iam::123:role/R,arn:aws:iam::123:saml-provider/P"]);
+        assert_eq!(
+            attrs[0].values,
+            vec!["arn:aws:iam::123:role/R,arn:aws:iam::123:saml-provider/P"]
+        );
     }
 
     #[test]

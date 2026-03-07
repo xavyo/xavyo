@@ -31,6 +31,8 @@ pub struct ListRolesQuery {
     pub is_abstract: Option<bool>,
     /// Search by name prefix.
     pub name: Option<String>,
+    /// Filter by application ID (only return roles scoped to this application).
+    pub application_id: Option<Uuid>,
     /// Maximum number of results (default: 50, max: 100).
     pub limit: Option<i64>,
     /// Offset for pagination.
@@ -50,6 +52,8 @@ pub struct CreateRoleRequest {
     /// Whether this role is abstract (cannot be assigned directly).
     #[serde(default)]
     pub is_abstract: bool,
+    /// Optional application scope.
+    pub application_id: Option<Uuid>,
 }
 
 impl Validate for CreateRoleRequest {
@@ -145,6 +149,7 @@ pub struct RoleResponse {
     pub hierarchy_depth: i32,
     pub version: i32,
     pub created_by: Uuid,
+    pub application_id: Option<Uuid>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -160,6 +165,7 @@ impl From<xavyo_db::models::GovRole> for RoleResponse {
             hierarchy_depth: role.hierarchy_depth,
             version: role.version,
             created_by: role.created_by,
+            application_id: role.application_id,
             created_at: role.created_at,
             updated_at: role.updated_at,
         }
@@ -312,6 +318,7 @@ pub async fn list_roles(
         parent_role_id: parent_filter,
         is_abstract: query.is_abstract,
         name_prefix: query.name,
+        application_id: query.application_id,
     };
 
     let (roles, total) = state
@@ -371,6 +378,7 @@ pub async fn create_role(
         description: request.description,
         parent_role_id: request.parent_role_id,
         is_abstract: request.is_abstract,
+        application_id: request.application_id,
     };
 
     let role = state

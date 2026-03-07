@@ -33,13 +33,13 @@ impl ApiClient {
             offset
         );
         if let Some(t) = nhi_type {
-            url.push_str(&format!("&type={t}"));
+            url.push_str(&format!("&nhi_type={t}"));
         }
         if let Some(s) = state {
-            url.push_str(&format!("&state={s}"));
+            url.push_str(&format!("&lifecycle_state={s}"));
         }
         if let Some(o) = owner {
-            url.push_str(&format!("&owner={o}"));
+            url.push_str(&format!("&owner_id={o}"));
         }
 
         let response = self.get_authenticated(&url).await?;

@@ -22,7 +22,7 @@ pub struct NhiIdentityResponse {
     #[serde(default)]
     pub backup_owner_id: Option<Uuid>,
     #[serde(default)]
-    pub risk_level: Option<String>,
+    pub risk_score: Option<i32>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -32,8 +32,8 @@ pub struct NhiIdentityResponse {
 pub struct NhiListResponse {
     pub data: Vec<NhiIdentityResponse>,
     pub total: i64,
-    pub limit: i32,
-    pub offset: i32,
+    pub limit: i64,
+    pub offset: i64,
 }
 
 // --- Lifecycle ---

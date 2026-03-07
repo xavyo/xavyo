@@ -87,7 +87,7 @@ impl ApiClient {
     ) -> CliResult<ServiceAccountResponse> {
         let url = format!("{}/nhi/service-accounts/{}", self.config().api_url, id);
 
-        let response = self.put_json(&url, &request).await?;
+        let response = self.patch_json(&url, &request).await?;
 
         if response.status().is_success() {
             response.json().await.map_err(Into::into)
@@ -127,18 +127,17 @@ impl ApiClient {
         }
     }
 
-    /// Suspend a service account
+    /// Suspend a service account (via unified NHI lifecycle endpoint)
     pub async fn suspend_service_account(&self, id: Uuid) -> CliResult<ServiceAccountResponse> {
-        let url = format!(
-            "{}/nhi/service-accounts/{}/suspend",
-            self.config().api_url,
-            id
-        );
+        let url = format!("{}/nhi/{}/suspend", self.config().api_url, id);
 
-        let response = self.post_json(&url, &serde_json::json!({})).await?;
+        let response = self
+            .post_json(&url, &serde_json::json!({"reason": "Suspended via CLI"}))
+            .await?;
 
         if response.status().is_success() {
-            response.json().await.map_err(Into::into)
+            // Lifecycle endpoint returns LifecycleActionResponse; re-fetch full SA
+            self.get_service_account(id).await
         } else {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
@@ -149,18 +148,15 @@ impl ApiClient {
         }
     }
 
-    /// Reactivate a service account
+    /// Reactivate a service account (via unified NHI lifecycle endpoint)
     pub async fn reactivate_service_account(&self, id: Uuid) -> CliResult<ServiceAccountResponse> {
-        let url = format!(
-            "{}/nhi/service-accounts/{}/reactivate",
-            self.config().api_url,
-            id
-        );
+        let url = format!("{}/nhi/{}/reactivate", self.config().api_url, id);
 
         let response = self.post_json(&url, &serde_json::json!({})).await?;
 
         if response.status().is_success() {
-            response.json().await.map_err(Into::into)
+            // Lifecycle endpoint returns LifecycleActionResponse; re-fetch full SA
+            self.get_service_account(id).await
         } else {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();

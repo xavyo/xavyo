@@ -45,6 +45,9 @@ pub struct GovRole {
     /// When the role was created.
     pub created_at: DateTime<Utc>,
 
+    /// Optional application scope (NULL = global/unscoped).
+    pub application_id: Option<Uuid>,
+
     /// When the role was last updated.
     pub updated_at: DateTime<Utc>,
 }
@@ -65,6 +68,9 @@ pub struct CreateGovRole {
     /// If true, cannot be directly assigned to users.
     #[serde(default)]
     pub is_abstract: bool,
+
+    /// Optional application scope (NULL = global/unscoped).
+    pub application_id: Option<Uuid>,
 }
 
 /// Request to update a governance role.
@@ -98,6 +104,9 @@ pub struct GovRoleFilter {
 
     /// Search by name prefix.
     pub name_prefix: Option<String>,
+
+    /// Filter by application ID. `Some(id)` = scoped to that app, `None` = no filter.
+    pub application_id: Option<Uuid>,
 }
 
 /// Tree node for hierarchy visualization.
@@ -253,6 +262,11 @@ impl GovRole {
             query.push_str(&format!(" AND name ILIKE ${param_count} || '%'"));
         }
 
+        if filter.application_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND application_id = ${param_count}"));
+        }
+
         query.push_str(&format!(
             " ORDER BY name LIMIT ${} OFFSET ${}",
             param_count + 1,
@@ -269,6 +283,9 @@ impl GovRole {
         }
         if let Some(ref prefix) = filter.name_prefix {
             q = q.bind(prefix);
+        }
+        if let Some(app_id) = filter.application_id {
+            q = q.bind(app_id);
         }
 
         q.bind(limit).bind(offset).fetch_all(pool).await
@@ -307,6 +324,11 @@ impl GovRole {
             query.push_str(&format!(" AND name ILIKE ${param_count} || '%'"));
         }
 
+        if filter.application_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND application_id = ${param_count}"));
+        }
+
         let mut q = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id);
 
         if let Some(Some(parent_id)) = &filter.parent_role_id {
@@ -317,6 +339,9 @@ impl GovRole {
         }
         if let Some(ref prefix) = filter.name_prefix {
             q = q.bind(prefix);
+        }
+        if let Some(app_id) = filter.application_id {
+            q = q.bind(app_id);
         }
 
         q.fetch_one(pool).await
@@ -357,8 +382,8 @@ impl GovRole {
 
         sqlx::query_as(
             r"
-            INSERT INTO gov_roles (tenant_id, name, description, parent_role_id, is_abstract, hierarchy_depth, created_by)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO gov_roles (tenant_id, name, description, parent_role_id, is_abstract, hierarchy_depth, created_by, application_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
             ",
         )
@@ -369,6 +394,7 @@ impl GovRole {
         .bind(input.is_abstract)
         .bind(depth)
         .bind(created_by)
+        .bind(input.application_id)
         .fetch_one(pool)
         .await
     }
@@ -849,6 +875,7 @@ mod tests {
             description: Some("Engineering department role".to_string()),
             parent_role_id: None,
             is_abstract: true,
+            application_id: None,
         };
 
         assert_eq!(request.name, "Engineering");
@@ -881,6 +908,7 @@ mod tests {
             hierarchy_depth: 0,
             version: 1,
             created_by: Uuid::new_v4(),
+            application_id: None,
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };

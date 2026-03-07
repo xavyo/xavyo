@@ -145,11 +145,13 @@ pub async fn verify_email_handler(
     .await?;
 
     // Mark token as used (include tenant_id for defense-in-depth)
-    sqlx::query("UPDATE email_verification_tokens SET verified_at = NOW() WHERE id = $1 AND tenant_id = $2")
-        .bind(token_id)
-        .bind(*tenant_id.as_uuid())
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(
+        "UPDATE email_verification_tokens SET verified_at = NOW() WHERE id = $1 AND tenant_id = $2",
+    )
+    .bind(token_id)
+    .bind(*tenant_id.as_uuid())
+    .execute(&mut *tx)
+    .await?;
 
     tx.commit().await?;
 

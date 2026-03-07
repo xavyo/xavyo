@@ -945,7 +945,10 @@ fn print_nhi_table(identities: &[NhiIdentityResponse]) {
 
     for nhi in identities {
         let name = truncate(&nhi.name, 20);
-        let risk = nhi.risk_level.as_deref().unwrap_or("-");
+        let risk = nhi
+            .risk_score
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "-".to_string());
         println!(
             "{:<38} {:<22} {:<17} {:<12} {:<10}",
             nhi.id, name, nhi.nhi_type, nhi.lifecycle_state, risk
@@ -963,8 +966,8 @@ fn print_nhi_details(nhi: &NhiIdentityResponse) {
     if let Some(ref desc) = nhi.description {
         println!("Description:     {desc}");
     }
-    if let Some(ref risk) = nhi.risk_level {
-        println!("Risk Level:      {risk}");
+    if let Some(risk) = nhi.risk_score {
+        println!("Risk Score:      {risk}");
     }
     if let Some(ref owner) = nhi.owner_id {
         println!("Owner:           {owner}");

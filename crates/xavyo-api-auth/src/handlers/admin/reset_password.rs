@@ -82,13 +82,12 @@ pub async fn admin_reset_password(
     }
 
     // Check user exists in this tenant
-    let user_exists: Option<(bool,)> = sqlx::query_as(
-        "SELECT is_active FROM users WHERE id = $1 AND tenant_id = $2",
-    )
-    .bind(user_id)
-    .bind(*tenant_id.as_uuid())
-    .fetch_optional(&pool)
-    .await?;
+    let user_exists: Option<(bool,)> =
+        sqlx::query_as("SELECT is_active FROM users WHERE id = $1 AND tenant_id = $2")
+            .bind(user_id)
+            .bind(*tenant_id.as_uuid())
+            .fetch_optional(&pool)
+            .await?;
 
     let (is_active,) = user_exists.ok_or(ApiAuthError::UserNotFound)?;
 

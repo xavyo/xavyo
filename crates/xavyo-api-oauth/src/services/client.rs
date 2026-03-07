@@ -820,9 +820,8 @@ impl OAuth2ClientService {
             OAuthError::Internal("Database error".to_string())
         })?;
 
-        let client = client.ok_or_else(|| {
-            OAuthError::InvalidClient(GENERIC_AUTH_ERROR.to_string())
-        })?;
+        let client =
+            client.ok_or_else(|| OAuthError::InvalidClient(GENERIC_AUTH_ERROR.to_string()))?;
 
         if !client.is_active {
             return Err(OAuthError::InvalidClient(GENERIC_AUTH_ERROR.to_string()));

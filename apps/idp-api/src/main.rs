@@ -975,18 +975,22 @@ async fn main() {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(75);
-    let authorization_routes =
-        authorization_router(pool.clone(), admin_pool_shared.clone(), "all".to_string(), risk_score_deny_threshold)
-            // TenantLayer runs last (innermost) — reads TenantId set by jwt_auth
-            .layer(TenantLayer::with_config(
-                xavyo_tenant::TenantConfig::builder()
-                    .require_tenant(true)
-                    .build(),
-            ))
-            .layer(axum::middleware::from_fn(jwt_auth_middleware))
-            .layer(axum::middleware::from_fn(api_key_auth_middleware))
-            .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
-            .layer(axum::Extension(pool.clone()));
+    let authorization_routes = authorization_router(
+        pool.clone(),
+        admin_pool_shared.clone(),
+        "all".to_string(),
+        risk_score_deny_threshold,
+    )
+    // TenantLayer runs last (innermost) — reads TenantId set by jwt_auth
+    .layer(TenantLayer::with_config(
+        xavyo_tenant::TenantConfig::builder()
+            .require_tenant(true)
+            .build(),
+    ))
+    .layer(axum::middleware::from_fn(jwt_auth_middleware))
+    .layer(axum::middleware::from_fn(api_key_auth_middleware))
+    .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+    .layer(axum::Extension(pool.clone()));
 
     // Connector routes (F045 - Connector Framework)
     let connector_encryption = Arc::new(CredentialEncryption::new(config.connector_encryption_key));
@@ -1218,18 +1222,22 @@ async fn main() {
     // F113: Support both API key and JWT authentication for programmatic access
     // F-IDEMPOTENCY: Support Idempotency-Key header for safe retries
     let idempotency_state = middleware::IdempotencyState { pool: pool.clone() };
-    let tenant_routes = tenant_router(pool.clone(), admin_pool_shared.clone(), token_config.clone())
-        // F-IDEMPOTENCY: Idempotency middleware must run after JWT auth to access claims
-        .layer(axum::middleware::from_fn_with_state(
-            idempotency_state,
-            middleware::idempotency_middleware_jwt,
-        ))
-        .layer(axum::middleware::from_fn(jwt_auth_middleware))
-        // F113: API key middleware runs before JWT - if API key, validates; if not, passes through
-        .layer(axum::middleware::from_fn(api_key_auth_middleware))
-        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
-        // F113: PgPool required for API key validation lookups
-        .layer(axum::Extension(pool.clone()));
+    let tenant_routes = tenant_router(
+        pool.clone(),
+        admin_pool_shared.clone(),
+        token_config.clone(),
+    )
+    // F-IDEMPOTENCY: Idempotency middleware must run after JWT auth to access claims
+    .layer(axum::middleware::from_fn_with_state(
+        idempotency_state,
+        middleware::idempotency_middleware_jwt,
+    ))
+    .layer(axum::middleware::from_fn(jwt_auth_middleware))
+    // F113: API key middleware runs before JWT - if API key, validates; if not, passes through
+    .layer(axum::middleware::from_fn(api_key_auth_middleware))
+    .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+    // F113: PgPool required for API key validation lookups
+    .layer(axum::Extension(pool.clone()));
     // Note: No TenantLayer - provisioning is done before the user has a tenant
 
     // System administration routes (F-SUSPEND, F-DELETE, F-USAGE-TRACK, F-PLAN-MGMT, F-SETTINGS-API)

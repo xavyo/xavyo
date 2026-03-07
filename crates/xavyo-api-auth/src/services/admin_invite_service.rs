@@ -14,8 +14,7 @@ use xavyo_db::models::{
 
 use crate::error::ApiAuthError;
 use crate::services::{
-    hash_token, validate_email, verify_token_hash_constant_time, EmailSender,
-    PasswordPolicyService,
+    hash_token, validate_email, verify_token_hash_constant_time, EmailSender, PasswordPolicyService,
 };
 
 /// Default invitation token expiry (7 days).

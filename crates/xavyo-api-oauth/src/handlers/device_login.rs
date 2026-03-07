@@ -653,11 +653,12 @@ async fn lookup_mfa_session(
         Some((user_id, tenant_id, user_code, expires_at)) => {
             if expires_at < chrono::Utc::now() {
                 // Session expired, delete it (include tenant_id for defense-in-depth)
-                let _ = sqlx::query("DELETE FROM device_mfa_sessions WHERE id = $1 AND tenant_id = $2")
-                    .bind(session_id)
-                    .bind(tenant_id)
-                    .execute(pool)
-                    .await;
+                let _ =
+                    sqlx::query("DELETE FROM device_mfa_sessions WHERE id = $1 AND tenant_id = $2")
+                        .bind(session_id)
+                        .bind(tenant_id)
+                        .execute(pool)
+                        .await;
                 Ok(None)
             } else {
                 Ok(Some((user_id, tenant_id, user_code)))
@@ -668,7 +669,11 @@ async fn lookup_mfa_session(
 }
 
 /// Delete MFA session after successful verification.
-async fn delete_mfa_session(pool: &sqlx::PgPool, session_id: Uuid, tenant_id: Uuid) -> Result<(), sqlx::Error> {
+async fn delete_mfa_session(
+    pool: &sqlx::PgPool,
+    session_id: Uuid,
+    tenant_id: Uuid,
+) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM device_mfa_sessions WHERE id = $1 AND tenant_id = $2")
         .bind(session_id)
         .bind(tenant_id)

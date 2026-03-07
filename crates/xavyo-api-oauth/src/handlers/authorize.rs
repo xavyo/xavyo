@@ -81,10 +81,7 @@ pub async fn authorize_handler(
     let (csrf_token, csrf_sig) = csrf::generate_csrf_token(csrf_secret);
 
     // Build the consent/login URL with all parameters preserved, including CSRF
-    let frontend_base = state
-        .frontend_url
-        .as_deref()
-        .unwrap_or("");
+    let frontend_base = state.frontend_url.as_deref().unwrap_or("");
     let consent_url = format!(
         "{frontend_base}/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method={}{}&csrf_token={}&csrf_sig={}&tenant={}",
         urlencoding::encode(&request.client_id),

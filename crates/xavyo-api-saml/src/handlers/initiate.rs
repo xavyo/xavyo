@@ -49,7 +49,15 @@ pub async fn initiate_sso(
         }
     };
 
-    match initiate_sso_inner(&state, tenant_id, user_id, sp_id, req.relay_state.as_deref()).await {
+    match initiate_sso_inner(
+        &state,
+        tenant_id,
+        user_id,
+        sp_id,
+        req.relay_state.as_deref(),
+    )
+    .await
+    {
         Ok(response) => response,
         Err(e) => {
             tracing::error!(error = %e, sp_id = %sp_id, "IdP-initiated SSO failed");

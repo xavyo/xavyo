@@ -95,6 +95,7 @@ use crate::handlers::{
     admin_list_user_devices,
     // F032 WebAuthn admin handlers
     admin_list_webauthn_credentials,
+    admin_reset_password,
     admin_revoke_device,
     admin_revoke_webauthn_credential,
     // F-ADMIN-INVITE handlers
@@ -192,7 +193,6 @@ use crate::handlers::{
     start_webauthn_authentication,
     start_webauthn_registration,
     trust_device,
-    admin_reset_password,
     unlock_user,
     untrust_device,
     update_branding,

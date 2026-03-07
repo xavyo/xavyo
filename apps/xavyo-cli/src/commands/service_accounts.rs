@@ -62,6 +62,10 @@ pub struct CreateArgs {
     /// Service account name
     pub name: String,
 
+    /// Purpose of the service account
+    #[arg(long, short = 'p')]
+    pub purpose: String,
+
     /// Description
     #[arg(long, short = 'd')]
     pub description: Option<String>,
@@ -83,6 +87,14 @@ pub struct UpdateArgs {
 
     #[arg(long, short = 'd')]
     pub description: Option<String>,
+
+    /// Update purpose
+    #[arg(long, short = 'p')]
+    pub purpose: Option<String>,
+
+    /// Update environment
+    #[arg(long, short = 'e')]
+    pub environment: Option<String>,
 
     #[arg(long)]
     pub json: bool,
@@ -125,14 +137,14 @@ async fn execute_list(args: ListArgs) -> CliResult<()> {
 
     if args.json {
         println!("{}", serde_json::to_string_pretty(&response)?);
-    } else if response.items.is_empty() {
+    } else if response.data.is_empty() {
         println!("No service accounts found.");
     } else {
-        print_sa_table(&response.items);
+        print_sa_table(&response.data);
         println!();
         println!(
             "Showing {} of {} service accounts",
-            response.items.len(),
+            response.data.len(),
             response.total
         );
     }
@@ -162,6 +174,7 @@ async fn execute_create(args: CreateArgs) -> CliResult<()> {
 
     let request = CreateServiceAccountRequest {
         name: args.name,
+        purpose: args.purpose,
         description: args.description,
         owner_id,
     };
@@ -186,6 +199,8 @@ async fn execute_update(args: UpdateArgs) -> CliResult<()> {
     let request = UpdateServiceAccountRequest {
         name: args.name,
         description: args.description,
+        purpose: args.purpose,
+        environment: args.environment,
     };
 
     let sa = client.update_service_account(id, request).await?;
@@ -268,16 +283,19 @@ fn parse_uuid(id_str: &str) -> CliResult<Uuid> {
 }
 
 fn print_sa_table(sas: &[ServiceAccountResponse]) {
-    println!(
-        "{:<38} {:<25} {:<12} {:<15}",
-        "ID", "NAME", "STATUS", "RISK LEVEL"
-    );
-    println!("{}", "-".repeat(92));
+    println!("{:<38} {:<25} {:<12} {:<10}", "ID", "NAME", "STATE", "RISK");
+    println!("{}", "-".repeat(87));
 
     for sa in sas {
         let name = truncate(&sa.name, 23);
-        let risk = sa.risk_level.as_deref().unwrap_or("-");
-        println!("{:<38} {:<25} {:<12} {:<15}", sa.id, name, sa.status, risk);
+        let risk = sa
+            .risk_score
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "-".to_string());
+        println!(
+            "{:<38} {:<25} {:<12} {:<10}",
+            sa.id, name, sa.lifecycle_state, risk
+        );
     }
 }
 
@@ -286,13 +304,17 @@ fn print_sa_details(sa: &ServiceAccountResponse) {
     println!("{}", "\u{2501}".repeat(50));
     println!("ID:          {}", sa.id);
     println!("Name:        {}", sa.name);
-    println!("Status:      {}", sa.status);
+    println!("State:       {}", sa.lifecycle_state);
+    println!("Purpose:     {}", sa.purpose);
 
     if let Some(ref desc) = sa.description {
         println!("Description: {desc}");
     }
-    if let Some(ref risk) = sa.risk_level {
-        println!("Risk Level:  {risk}");
+    if let Some(ref env) = sa.environment {
+        println!("Environment: {env}");
+    }
+    if let Some(risk) = sa.risk_score {
+        println!("Risk Score:  {risk}");
     }
     if let Some(ref owner) = sa.owner_id {
         println!("Owner:       {owner}");
@@ -302,7 +324,8 @@ fn print_sa_details(sa: &ServiceAccountResponse) {
         "Created:     {}",
         sa.created_at.format("%Y-%m-%d %H:%M:%S UTC")
     );
-    if let Some(ref updated) = sa.updated_at {
-        println!("Updated:     {}", updated.format("%Y-%m-%d %H:%M:%S UTC"));
-    }
+    println!(
+        "Updated:     {}",
+        sa.updated_at.format("%Y-%m-%d %H:%M:%S UTC")
+    );
 }

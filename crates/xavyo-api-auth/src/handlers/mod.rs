@@ -52,6 +52,7 @@ pub mod verify_email;
 pub use admin::{
     // WebAuthn admin handlers (F032)
     admin_list_webauthn_credentials,
+    admin_reset_password,
     admin_revoke_webauthn_credential,
     // Organization security policy handlers (F-066)
     create_org_policy,
@@ -65,7 +66,6 @@ pub use admin::{
     get_user_mfa_status,
     get_webauthn_policy,
     list_org_policies,
-    admin_reset_password,
     unlock_user,
     update_lockout_policy,
     update_mfa_policy,

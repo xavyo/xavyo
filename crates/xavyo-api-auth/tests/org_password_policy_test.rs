@@ -241,7 +241,10 @@ fn test_org_password_policy_serialization_roundtrip() {
     assert_eq!(roundtrip.expiration_days, config.expiration_days);
     assert_eq!(roundtrip.history_count, config.history_count);
     assert_eq!(roundtrip.min_age_hours, config.min_age_hours);
-    assert_eq!(roundtrip.check_breached_passwords, config.check_breached_passwords);
+    assert_eq!(
+        roundtrip.check_breached_passwords,
+        config.check_breached_passwords
+    );
 }
 
 #[test]

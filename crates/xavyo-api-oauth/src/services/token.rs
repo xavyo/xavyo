@@ -258,10 +258,7 @@ impl TokenService {
         .map(|opt| opt.unwrap_or_default());
 
         match result {
-            Ok((email, name)) => (
-                if email.is_empty() { None } else { Some(email) },
-                name,
-            ),
+            Ok((email, name)) => (if email.is_empty() { None } else { Some(email) }, name),
             Err(e) => {
                 tracing::warn!("Failed to look up user profile for token claims: {e}");
                 (None, None)
@@ -862,8 +859,8 @@ impl TokenService {
             tenant_id,
             scope,
             ACCESS_TOKEN_EXPIRY_SECS,
-            None, // No user email for client credentials
-            None, // No user name for client credentials
+            None,   // No user email for client credentials
+            None,   // No user name for client credentials
             vec![], // No user roles for client credentials
         )?;
 
