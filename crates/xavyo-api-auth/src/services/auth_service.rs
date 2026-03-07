@@ -92,8 +92,8 @@ impl AuthService {
 
         sqlx::query(
             r"
-            INSERT INTO users (id, tenant_id, email, password_hash, is_active, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, true, $5, $5)
+            INSERT INTO users (id, tenant_id, email, password_hash, is_active, email_verified, email_verified_at, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, true, true, $5, $5, $5)
             ",
         )
         .bind(id)
