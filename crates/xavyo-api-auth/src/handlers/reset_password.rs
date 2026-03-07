@@ -186,8 +186,9 @@ pub async fn reset_password_handler(
 
     // Update user's password and clear lockout state (include tenant_id for defense-in-depth)
     // Clearing lockout is correct: the user proved account ownership via email token
+    // Also set email_verified = true: receiving the reset email proves email ownership
     sqlx::query(
-        "UPDATE users SET password_hash = $1, failed_login_count = 0, locked_at = NULL, locked_until = NULL, updated_at = NOW() WHERE id = $2 AND tenant_id = $3",
+        "UPDATE users SET password_hash = $1, failed_login_count = 0, locked_at = NULL, locked_until = NULL, email_verified = true, email_verified_at = COALESCE(email_verified_at, NOW()), updated_at = NOW() WHERE id = $2 AND tenant_id = $3",
     )
     .bind(&new_password_hash)
     .bind(user_id)
