@@ -444,12 +444,13 @@ async fn main() {
     };
 
     // Build auth routes: tenant-required routes (login, register, forgot-password, etc.)
-    let tenant_auth_routes =
-        auth_router(auth_state.clone(), config.jwt_public_key.clone()).layer(TenantLayer::with_config(
-        xavyo_tenant::TenantConfig::builder()
-            .require_tenant(true)
-            .build(),
-    ));
+    let tenant_auth_routes = auth_router(auth_state.clone(), config.jwt_public_key.clone()).layer(
+        TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(true)
+                .build(),
+        ),
+    );
 
     // Public auth routes — no tenant header needed (signup, refresh, logout)
     let public_auth_routes = public_auth_router(auth_state.clone());

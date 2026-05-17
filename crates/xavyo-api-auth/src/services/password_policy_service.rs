@@ -500,8 +500,7 @@ impl PasswordPolicyService {
         let policy = self.get_password_policy(tenant_id).await?;
 
         // 4. Check minimum password age
-        if let Err(e) =
-            Self::check_min_password_age(user.password_changed_at, policy.min_age_hours)
+        if let Err(e) = Self::check_min_password_age(user.password_changed_at, policy.min_age_hours)
         {
             return Err(ApiAuthError::Validation(e.to_string()));
         }
@@ -570,8 +569,11 @@ impl PasswordPolicyService {
         // 12. Revoke sessions and refresh tokens concurrently if requested
         let (sessions_revoked, refresh_tokens_revoked) = if revoke_sessions {
             let (s, r) = tokio::try_join!(
-                session_service
-                    .revoke_all_user_sessions(user_id, tenant_id, RevokeReason::PasswordChange),
+                session_service.revoke_all_user_sessions(
+                    user_id,
+                    tenant_id,
+                    RevokeReason::PasswordChange
+                ),
                 session_service.revoke_all_user_refresh_tokens(user_id, tenant_id),
             )?;
             (s as i64, r as i64)

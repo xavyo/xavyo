@@ -86,9 +86,8 @@ pub use token_service::{
 pub use user_agent_parser::{parse_user_agent, DeviceInfo};
 pub use validation::{
     extract_validation_errors, normalize_email, validate_email, validate_password,
-    EmailValidationError, EmailValidationResult, PasswordValidationError,
-    PasswordValidationResult, MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH,
-    SPECIAL_CHARS,
+    EmailValidationError, EmailValidationResult, PasswordValidationError, PasswordValidationResult,
+    MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, SPECIAL_CHARS,
 };
 pub use webauthn_service::{
     WebAuthnConfig, WebAuthnService, LOCKOUT_MINUTES as WEBAUTHN_LOCKOUT_MINUTES,
