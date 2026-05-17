@@ -100,10 +100,11 @@ impl LockoutService {
             r"
                 SELECT locked_at, locked_until, failed_login_count, lockout_reason
                 FROM users
-                WHERE id = $1
+                WHERE id = $1 AND tenant_id = $2
                 ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .fetch_optional(&mut *conn)
         .await
         .map_err(ApiAuthError::Database)?;

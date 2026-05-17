@@ -201,13 +201,14 @@ impl ProvisioningService {
             r"
             UPDATE users SET password_hash = src.password_hash
             FROM (SELECT password_hash FROM users WHERE email = $1 AND tenant_id = $2 AND password_hash != '') src
-            WHERE users.id = $3
+            WHERE users.id = $3 AND users.tenant_id = $4
             RETURNING true
             ",
         )
         .bind(email)
         .bind(context.system_tenant_id)
         .bind(admin_user.id)
+        .bind(tenant.id)
         .fetch_optional(&mut *tx)
         .await
         .map_err(|e| {
