@@ -38,6 +38,16 @@ pub struct OpenIdConfiguration {
     /// End session endpoint (OIDC RP-Initiated Logout).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_session_endpoint: Option<String>,
+    /// Pushed Authorization Request endpoint (RFC 9126 §5).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pushed_authorization_request_endpoint: Option<String>,
+    /// RFC 9396 §6.1: the `authorization_details` type values supported.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorization_details_types_supported: Option<Vec<String>>,
+    /// RFC 9207: whether the AS includes the `iss` parameter in authorization
+    /// responses (mix-up defense; required by FAPI 2.0 §5.3.2.2-7).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorization_response_iss_parameter_supported: Option<bool>,
 }
 
 use super::token::DEVICE_CODE_GRANT_TYPE;
@@ -94,6 +104,12 @@ impl OpenIdConfiguration {
                 "act".to_string(),
             ],
             end_session_endpoint: Some(format!("{issuer}/oauth/logout")),
+            // RFC 9126: Pushed Authorization Request endpoint
+            pushed_authorization_request_endpoint: Some(format!("{issuer}/oauth/par")),
+            // RFC 9396: supported authorization_details types (v1: tool_access)
+            authorization_details_types_supported: Some(vec!["tool_access".to_string()]),
+            // RFC 9207: the AS returns `iss` in authorization responses.
+            authorization_response_iss_parameter_supported: Some(true),
         }
     }
 }

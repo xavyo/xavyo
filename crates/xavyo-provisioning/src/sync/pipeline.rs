@@ -504,8 +504,9 @@ impl SyncPipeline {
 
     /// Execute `AddFocus` action - create new identity.
     ///
-    /// NOTE: This is a placeholder. In a full implementation, this would
-    /// call the identity service to create a new user based on the change attributes.
+    /// NOTE: identity-service integration is not yet wired. Non-dry-run
+    /// invocations therefore return `not_implemented` so the orchestrator
+    /// can surface unprocessed changes instead of silently marking them done.
     async fn execute_add_focus(&self, change: &mut InboundChange) -> ActionResult {
         if self.dry_run {
             info!(
@@ -516,14 +517,15 @@ impl SyncPipeline {
             return ActionResult::success(SyncAction::AddFocus);
         }
 
-        // TODO: Implement identity creation via identity service
-        // For now, log and return success (shadow will be created without link)
         warn!(
             change_id = %change.id,
             external_uid = %change.external_uid,
-            "AddFocus action not yet implemented - shadow will be created unlinked"
+            "AddFocus action not yet implemented — surfacing as unprocessed"
         );
-        ActionResult::success(SyncAction::AddFocus)
+        ActionResult::not_implemented(
+            SyncAction::AddFocus,
+            "AddFocus requires identity-service integration",
+        )
     }
 
     /// Execute `DeleteFocus` action - delete identity.
@@ -538,14 +540,16 @@ impl SyncPipeline {
             return ActionResult::success(SyncAction::DeleteFocus);
         }
 
-        // TODO: Implement identity deletion via identity service
         warn!(
             change_id = %change.id,
             external_uid = %change.external_uid,
             linked_identity_id = ?change.linked_identity_id,
-            "DeleteFocus action not yet implemented"
+            "DeleteFocus action not yet implemented — surfacing as unprocessed"
         );
-        ActionResult::success(SyncAction::DeleteFocus)
+        ActionResult::not_implemented(
+            SyncAction::DeleteFocus,
+            "DeleteFocus requires identity-service integration",
+        )
     }
 
     /// Execute `InactivateFocus` action - disable identity.
@@ -560,14 +564,16 @@ impl SyncPipeline {
             return ActionResult::success(SyncAction::InactivateFocus);
         }
 
-        // TODO: Implement identity inactivation via identity service
         warn!(
             change_id = %change.id,
             external_uid = %change.external_uid,
             linked_identity_id = ?change.linked_identity_id,
-            "InactivateFocus action not yet implemented"
+            "InactivateFocus action not yet implemented — surfacing as unprocessed"
         );
-        ActionResult::success(SyncAction::InactivateFocus)
+        ActionResult::not_implemented(
+            SyncAction::InactivateFocus,
+            "InactivateFocus requires identity-service integration",
+        )
     }
 
     /// Unlink a shadow from its identity.

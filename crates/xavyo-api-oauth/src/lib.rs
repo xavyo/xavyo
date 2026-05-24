@@ -43,10 +43,14 @@
 //! ```
 
 pub mod csrf;
+/// Resource-side DPoP (RFC 9449) proof enforcement.
+pub mod dpop_validation;
 pub mod error;
 pub mod handlers;
 pub mod middleware;
 pub mod models;
+/// RFC 9396 `authorization_details` request-side validation.
+pub mod rar_validation;
 pub mod router;
 pub mod services;
 pub mod utils;

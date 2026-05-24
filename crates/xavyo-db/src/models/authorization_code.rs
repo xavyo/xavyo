@@ -52,6 +52,12 @@ pub struct AuthorizationCode {
     /// Whether the code has been used (exchanged for tokens).
     pub used: bool,
 
+    /// RFC 9396 `authorization_details` granted at `/authorize` (raw JSONB
+    /// array), embedded in the access token at `/token`. `#[sqlx(default)]` so
+    /// explicit-column SELECTs that predate this column still map cleanly.
+    #[sqlx(default)]
+    pub authorization_details: Option<serde_json::Value>,
+
     /// When the code was created.
     pub created_at: DateTime<Utc>,
 }
@@ -101,6 +107,7 @@ pub struct AuthorizationCodeBuilder {
     code_challenge_method: String,
     nonce: Option<String>,
     expires_at: DateTime<Utc>,
+    authorization_details: Option<serde_json::Value>,
 }
 
 impl AuthorizationCodeBuilder {
@@ -128,6 +135,7 @@ impl AuthorizationCodeBuilder {
             code_challenge_method: "S256".to_string(),
             nonce: None,
             expires_at: Utc::now() + Duration::minutes(AUTH_CODE_EXPIRY_MINUTES),
+            authorization_details: None,
         }
     }
 
@@ -135,6 +143,13 @@ impl AuthorizationCodeBuilder {
     #[must_use]
     pub fn nonce(mut self, nonce: String) -> Self {
         self.nonce = Some(nonce);
+        self
+    }
+
+    /// Set the RFC 9396 `authorization_details` (raw JSONB) granted with this code.
+    #[must_use]
+    pub fn authorization_details(mut self, details: Option<serde_json::Value>) -> Self {
+        self.authorization_details = details;
         self
     }
 
@@ -173,6 +188,7 @@ impl AuthorizationCodeBuilder {
             code_challenge_method: self.code_challenge_method,
             nonce: self.nonce,
             expires_at: self.expires_at,
+            authorization_details: self.authorization_details,
         })
     }
 }
@@ -190,6 +206,7 @@ pub struct NewAuthorizationCode {
     pub code_challenge_method: String,
     pub nonce: Option<String>,
     pub expires_at: DateTime<Utc>,
+    pub authorization_details: Option<serde_json::Value>,
 }
 
 #[cfg(test)]
@@ -211,6 +228,7 @@ mod tests {
             nonce: None,
             expires_at: Utc::now() + Duration::minutes(5),
             used: false,
+            authorization_details: None,
             created_at: Utc::now(),
         };
 
@@ -233,6 +251,7 @@ mod tests {
             nonce: None,
             expires_at: Utc::now() - Duration::minutes(1),
             used: false,
+            authorization_details: None,
             created_at: Utc::now() - Duration::minutes(11),
         };
 
@@ -255,6 +274,7 @@ mod tests {
             nonce: None,
             expires_at: Utc::now() + Duration::minutes(5),
             used: true,
+            authorization_details: None,
             created_at: Utc::now(),
         };
 
@@ -277,6 +297,7 @@ mod tests {
             nonce: None,
             expires_at: Utc::now() + Duration::minutes(5),
             used: false,
+            authorization_details: None,
             created_at: Utc::now(),
         };
 

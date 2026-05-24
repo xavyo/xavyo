@@ -328,7 +328,7 @@ fn map_execution_log(
     ExecutionLogResponse {
         id: log.id,
         tenant_id: log.tenant_id,
-        script_id: log.script_id.unwrap_or(Uuid::nil()),
+        script_id: log.script_id,
         binding_id: log.binding_id,
         connector_id: Some(log.connector_id),
         script_version: log.script_version,
@@ -341,7 +341,7 @@ fn map_execution_log(
         output: log.output_result,
         error: log.error_message,
         duration_ms: log.duration_ms,
-        executed_by: Uuid::nil(), // execution logs do not track actor; placeholder
+        executed_by: None, // schema does not currently capture actor — emit as null
         executed_at: log.executed_at,
     }
 }

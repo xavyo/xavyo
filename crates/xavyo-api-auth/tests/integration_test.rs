@@ -280,11 +280,11 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
         use super::*;
 
         fn create_token_config() -> TokenConfig {
-            TokenConfig {
-                private_key: TEST_PRIVATE_KEY.to_vec(),
-                issuer: "xavyo-test".to_string(),
-                audience: "xavyo-test".to_string(),
-            }
+            TokenConfig::new(
+                TEST_PRIVATE_KEY.to_vec(),
+                "xavyo-test".to_string(),
+                "xavyo-test".to_string(),
+            )
         }
 
         /// T034: Test successful token refresh
@@ -459,11 +459,11 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
         use super::*;
 
         fn create_token_config() -> TokenConfig {
-            TokenConfig {
-                private_key: TEST_PRIVATE_KEY.to_vec(),
-                issuer: "xavyo-test".to_string(),
-                audience: "xavyo-test".to_string(),
-            }
+            TokenConfig::new(
+                TEST_PRIVATE_KEY.to_vec(),
+                "xavyo-test".to_string(),
+                "xavyo-test".to_string(),
+            )
         }
 
         /// T043: Test successful logout

@@ -4,10 +4,10 @@
 //! using per-target attribute mapping configurations.
 
 use uuid::Uuid;
-use xavyo_api_scim::models::{
+use xavyo_db::models::ScimTargetAttributeMapping;
+use xavyo_scim_types::{
     ScimEmail, ScimGroup, ScimGroupMember, ScimName, ScimPatchOp, ScimPatchRequest, ScimUser,
 };
-use xavyo_db::models::ScimTargetAttributeMapping;
 
 /// Handles mapping between internal identity attributes and SCIM representations.
 pub struct AttributeMapper;

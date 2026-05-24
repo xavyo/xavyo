@@ -11,10 +11,12 @@ use rand::RngCore;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use std::net::IpAddr;
+use std::sync::Arc;
 use subtle::ConstantTimeEq;
 use xavyo_auth::{encode_token, JwtClaims};
 use xavyo_core::{TenantId, UserId};
 use xavyo_db::{RefreshToken, UserRole};
+use zeroize::Zeroizing;
 
 /// Default refresh token validity in days.
 pub const REFRESH_TOKEN_VALIDITY_DAYS: i64 = 7;
@@ -32,14 +34,36 @@ pub const EMAIL_VERIFICATION_TOKEN_VALIDITY_HOURS: i64 = 24;
 pub const SECURE_TOKEN_BYTES: usize = 32;
 
 /// Configuration for JWT token generation.
+///
+/// `private_key` is held inside `Arc<Zeroizing<Vec<u8>>>` so:
+/// - `Clone` stays cheap (Arc bumps a refcount; no plaintext copy)
+/// - the bytes are zeroed when the last reference drops
+///
+/// Construct via [`TokenConfig::new`] which takes ownership of the raw
+/// `Vec<u8>` and wraps it in the zeroizing buffer in one move — no extra
+/// plaintext copy.
 #[derive(Clone)]
 pub struct TokenConfig {
-    /// PEM-encoded RSA private key for signing JWTs.
-    pub private_key: Vec<u8>,
+    /// PEM-encoded RSA private key for signing JWTs (zeroized on drop).
+    pub private_key: Arc<Zeroizing<Vec<u8>>>,
     /// Token issuer (iss claim).
     pub issuer: String,
     /// Token audience (aud claim).
     pub audience: String,
+}
+
+impl TokenConfig {
+    /// Construct a `TokenConfig`, moving the PEM bytes into the zeroizing
+    /// buffer. The caller's `Vec<u8>` is consumed and the only owned
+    /// plaintext copy from this point on lives inside `Zeroizing`.
+    #[must_use]
+    pub fn new(private_key: Vec<u8>, issuer: String, audience: String) -> Self {
+        Self {
+            private_key: Arc::new(Zeroizing::new(private_key)),
+            issuer,
+            audience,
+        }
+    }
 }
 
 /// Service for managing JWT and refresh tokens.
@@ -137,7 +161,7 @@ impl TokenService {
 
         let claims = builder.build();
 
-        encode_token(&claims, &self.config.private_key).map_err(|e| {
+        encode_token(&claims, self.config.private_key.as_slice()).map_err(|e| {
             tracing::error!("Failed to encode JWT: {}", e);
             ApiAuthError::Internal(format!("Token generation error: {e}"))
         })
@@ -173,7 +197,7 @@ impl TokenService {
             .purpose("mfa_verification")
             .build();
 
-        let token = encode_token(&claims, &self.config.private_key).map_err(|e| {
+        let token = encode_token(&claims, self.config.private_key.as_slice()).map_err(|e| {
             tracing::error!("Failed to encode partial JWT: {}", e);
             ApiAuthError::Internal(format!("Token generation error: {e}"))
         })?;

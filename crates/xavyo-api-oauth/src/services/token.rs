@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
-use xavyo_auth::{encode_token_with_kid, JwtClaims};
+use xavyo_auth::{encode_token_with_kid, AuthorizationDetail, JwtClaims};
 
 /// Database representation of a refresh token.
 #[derive(Debug, FromRow)]
@@ -318,12 +318,54 @@ impl TokenService {
         user_name: Option<&str>,
         roles: Vec<String>,
     ) -> Result<String, OAuthError> {
+        self.generate_access_token_bound(
+            user_id,
+            client_id,
+            tenant_id,
+            scope,
+            expires_in_secs,
+            user_email,
+            user_name,
+            roles,
+            None,
+            None,
+        )
+    }
+
+    /// Like [`Self::generate_access_token`] but optionally sender-constrains the
+    /// token to a DPoP key (RFC 9449): when `dpop_jkt` is `Some`, the issued
+    /// token carries a `cnf.jkt` confirmation and MUST be presented with a
+    /// matching DPoP proof at resource endpoints.
+    #[allow(clippy::too_many_arguments)]
+    pub fn generate_access_token_bound(
+        &self,
+        user_id: Option<Uuid>,
+        client_id: &str,
+        tenant_id: Uuid,
+        scope: &str,
+        expires_in_secs: i64,
+        user_email: Option<&str>,
+        user_name: Option<&str>,
+        roles: Vec<String>,
+        dpop_jkt: Option<&str>,
+        authorization_details: Option<Vec<AuthorizationDetail>>,
+    ) -> Result<String, OAuthError> {
         // Build claims for access token
         let mut claims_builder = JwtClaims::builder()
             .issuer(&self.issuer)
             .audience(vec![client_id.to_string()])
             .tenant_uuid(tenant_id)
             .expires_in_secs(expires_in_secs);
+
+        // DPoP: sender-constrain the token when a proof key thumbprint is given.
+        if let Some(jkt) = dpop_jkt {
+            claims_builder = claims_builder.dpop_jkt(jkt);
+        }
+
+        // RFC 9396: embed the granted authorization_details (fine-grained grants).
+        if let Some(details) = authorization_details {
+            claims_builder = claims_builder.authorization_details(details);
+        }
 
         // Set subject based on user_id or client_id
         if let Some(uid) = user_id {
@@ -713,6 +755,7 @@ impl TokenService {
     ///
     /// A `TokenResponse` containing `access_token`, `id_token` (optional),
     /// `refresh_token` (optional), and metadata.
+    #[allow(clippy::too_many_arguments)]
     pub async fn issue_authorization_code_tokens(
         &self,
         user_id: Uuid,
@@ -721,9 +764,22 @@ impl TokenService {
         tenant_id: Uuid,
         scope: &str,
         nonce: Option<&str>,
+        dpop_jkt: Option<&str>,
+        authorization_details: Option<serde_json::Value>,
     ) -> Result<TokenResponse, OAuthError> {
         let auth_time = Utc::now().timestamp();
         let scopes: Vec<&str> = scope.split_whitespace().collect();
+
+        // RFC 9396: the stored authorization_details was validated + canonicalized
+        // at request time. Deserialize the typed form for the token claim; a parse
+        // failure here means stored data is corrupt (internal error, not client).
+        let parsed_details: Option<Vec<AuthorizationDetail>> = match &authorization_details {
+            Some(v) => Some(serde_json::from_value(v.clone()).map_err(|e| {
+                tracing::error!("stored authorization_details failed to deserialize: {e}");
+                OAuthError::Internal("Failed to issue tokens".to_string())
+            })?),
+            None => None,
+        };
 
         // Look up user profile and roles for token claims
         let ((user_email, user_name), roles) = tokio::join!(
@@ -731,8 +787,8 @@ impl TokenService {
             self.lookup_user_roles(user_id, tenant_id),
         );
 
-        // Generate access token
-        let access_token = self.generate_access_token(
+        // Generate access token (sender-constrained when dpop_jkt is set)
+        let access_token = self.generate_access_token_bound(
             Some(user_id),
             client_id,
             tenant_id,
@@ -741,6 +797,8 @@ impl TokenService {
             user_email.as_deref(),
             user_name.as_deref(),
             roles,
+            dpop_jkt,
+            parsed_details,
         )?;
 
         // Generate ID token if openid scope is present
@@ -764,11 +822,18 @@ impl TokenService {
 
         Ok(TokenResponse {
             access_token,
-            token_type: "Bearer".to_string(),
+            // RFC 9449: sender-constrained tokens use the "DPoP" token type.
+            token_type: if dpop_jkt.is_some() {
+                "DPoP".to_string()
+            } else {
+                "Bearer".to_string()
+            },
             expires_in: ACCESS_TOKEN_EXPIRY_SECS,
             refresh_token,
             id_token,
             scope: Some(scope.to_string()),
+            // RFC 9396 §7: echo the granted authorization_details.
+            authorization_details,
         })
     }
 
@@ -871,6 +936,7 @@ impl TokenService {
             refresh_token: None, // No refresh token for client credentials
             id_token: None,      // No ID token (no user authentication)
             scope: Some(scope.to_string()),
+            authorization_details: None,
         })
     }
 
@@ -926,6 +992,7 @@ impl TokenService {
             refresh_token: Some(new_refresh_token.to_string()),
             id_token: None, // No ID token for refresh grant
             scope: Some(scope.to_string()),
+            authorization_details: None,
         })
     }
 
@@ -997,6 +1064,7 @@ impl TokenService {
             } else {
                 Some(scope.to_string())
             },
+            authorization_details: None,
         })
     }
 
@@ -1076,6 +1144,7 @@ impl TokenService {
             refresh_token,
             id_token,
             scope: Some(scope.to_string()),
+            authorization_details: None,
         })
     }
 }

@@ -2176,6 +2176,10 @@ pub enum GovernanceError {
     #[error("Validation error: {0}")]
     Validation(String),
 
+    /// Feature is recognized but not yet implemented (maps to HTTP 501).
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
+
     // =========================================================================
     // Validation Errors (F-004 Entitlement Service)
     // =========================================================================

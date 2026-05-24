@@ -104,6 +104,12 @@ pub async fn authorize_grant_handler(
     )
     .await?;
 
+    // RFC 9396: validate + canonicalize authorization_details before binding it
+    // to the authorization code (so it can be embedded in the token at /token).
+    let authorization_details = crate::rar_validation::validate_authorization_details(
+        request.authorization_details.as_deref(),
+    )?;
+
     let code = state
         .authorization_service
         .create_authorization_code(
@@ -115,6 +121,7 @@ pub async fn authorize_grant_handler(
             &request.code_challenge,
             &request.code_challenge_method,
             request.nonce.as_deref(),
+            authorization_details.as_ref(),
         )
         .await?;
 
@@ -122,5 +129,7 @@ pub async fn authorize_grant_handler(
         authorization_code: code,
         state: request.state,
         redirect_uri: request.redirect_uri,
+        // RFC 9207: the frontend echoes this as `iss` in the redirect (mix-up defense).
+        iss: state.issuer.clone(),
     }))
 }

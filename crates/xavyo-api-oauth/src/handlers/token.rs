@@ -39,8 +39,14 @@ pub async fn token_handler(
 
     match request.grant_type.as_str() {
         "authorization_code" => {
-            handle_authorization_code_grant(&state, &request, &client_id, client_secret.as_deref())
-                .await
+            handle_authorization_code_grant(
+                &state,
+                &headers,
+                &request,
+                &client_id,
+                client_secret.as_deref(),
+            )
+            .await
         }
         "client_credentials" => {
             handle_client_credentials_grant(
@@ -124,10 +130,16 @@ fn extract_client_credentials(
 /// eliminating the need for an X-Tenant-ID header in the token exchange request.
 async fn handle_authorization_code_grant(
     state: &OAuthState,
+    headers: &HeaderMap,
     request: &TokenRequest,
     client_id: &str,
     client_secret: Option<&str>,
 ) -> Result<Json<TokenResponse>, OAuthError> {
+    // DPoP (RFC 9449): if the client presents a proof, validate it against this
+    // token request and bind the issued token to the proof key (opportunistic
+    // binding). Clients with `require_dpop` / FAPI 2.0 (§5.3.2.1-5) MUST present
+    // one — enforced below once the client is loaded.
+    let dpop_jkt = extract_dpop_binding(state, headers)?;
     // Validate required parameters
     let code = request
         .code
@@ -158,10 +170,37 @@ async fn handle_authorization_code_grant(
         .get_client_by_id(tenant_id, client_uuid)
         .await?;
 
-    // SECURITY: Confidential clients MUST always provide client_secret.
-    // Without this check, an attacker could omit the secret and bypass
-    // authentication for confidential clients entirely.
-    if client.client_type == crate::models::ClientType::Confidential {
+    // RFC 9449 / FAPI 2.0 §5.3.2.1-5: clients that require sender-constrained
+    // tokens MUST present a DPoP proof. Reject a bare (bearer) token request.
+    if client.requires_dpop() && dpop_jkt.is_none() {
+        return Err(OAuthError::InvalidRequest(
+            "this client requires a DPoP proof (RFC 9449)".to_string(),
+        ));
+    }
+
+    // Client authentication. `private_key_jwt` (RFC 7523) takes precedence when
+    // a `client_assertion` is present — the FAPI 2.0 strong-auth method.
+    if let Some(assertion) = request.client_assertion.as_deref() {
+        if let Some(t) = request.client_assertion_type.as_deref() {
+            if t != xavyo_auth::CLIENT_ASSERTION_TYPE_JWT_BEARER {
+                return Err(OAuthError::InvalidRequest(
+                    "unsupported client_assertion_type".to_string(),
+                ));
+            }
+        }
+        let jwks = client.jwks.as_ref().ok_or_else(|| {
+            OAuthError::InvalidClient("client is not configured for private_key_jwt".to_string())
+        })?;
+        let token_endpoint = format!("{}/oauth/token", state.issuer.trim_end_matches('/'));
+        let audiences = [state.issuer.as_str(), token_endpoint.as_str()];
+        state
+            .client_service
+            .verify_client_assertion(tenant_id, &client.client_id, assertion, &audiences, jwks)
+            .await?;
+    } else if client.client_type == crate::models::ClientType::Confidential {
+        // SECURITY: Confidential clients MUST always provide client_secret.
+        // Without this check, an attacker could omit the secret and bypass
+        // authentication for confidential clients entirely.
         let secret = client_secret.ok_or_else(|| {
             OAuthError::InvalidClient(
                 "client_secret is required for confidential clients".to_string(),
@@ -190,7 +229,7 @@ async fn handle_authorization_code_grant(
     // the atomic transaction in validate_and_consume_code.
 
     // Validate and consume the authorization code (with PKCE verification)
-    let (user_id, scope, nonce) = state
+    let (user_id, scope, nonce, authorization_details) = state
         .authorization_service
         .validate_and_consume_code(tenant_id, code, client_uuid, redirect_uri, code_verifier)
         .await?;
@@ -210,10 +249,40 @@ async fn handle_authorization_code_grant(
             tenant_id,
             &scope,
             nonce.as_deref(),
+            dpop_jkt.as_deref(),
+            authorization_details,
         )
         .await?;
 
     Ok(Json(token_response))
+}
+
+/// Validate a DPoP proof presented on the token endpoint (RFC 9449 §4.3) and
+/// return the proof key's RFC 7638 thumbprint to bind the issued token.
+///
+/// Returns `Ok(None)` when no `DPoP` header is present (opportunistic binding).
+/// The token-request proof has no `ath`. `htu` is built from the configured
+/// issuer URL (proxy-safe), not the live `Host` header.
+fn extract_dpop_binding(
+    state: &OAuthState,
+    headers: &HeaderMap,
+) -> Result<Option<String>, OAuthError> {
+    let Some(proof) = headers.get("dpop").and_then(|v| v.to_str().ok()) else {
+        return Ok(None);
+    };
+    let htu = format!("{}/oauth/token", state.issuer.trim_end_matches('/'));
+    let validated =
+        xavyo_auth::dpop::validate_proof(proof, "POST", &htu, chrono::Utc::now().timestamp(), None)
+            .map_err(|e| {
+                tracing::warn!(
+                    target: "security",
+                    event_type = "dpop_proof_invalid",
+                    error = %e,
+                    "DPoP proof rejected at token endpoint"
+                );
+                OAuthError::InvalidGrant("invalid DPoP proof".to_string())
+            })?;
+    Ok(Some(validated.jkt))
 }
 
 /// Authorization code lookup result.
@@ -584,6 +653,23 @@ async fn handle_token_exchange_grant(
     let subject_claims = decode_token(subject_token, &state.public_key)
         .map_err(|e| OAuthError::InvalidGrant(format!("invalid subject_token: {e}")))?;
 
+    // SECURITY: Reject purpose-bound tokens (e.g., partial MFA-verification tokens).
+    // They share the same signing key / iss / aud as access tokens — only `purpose`
+    // distinguishes them. Without this guard, an MFA-partial token could be exchanged
+    // for a full delegated access token, bypassing MFA entirely.
+    if !subject_claims.is_access_token() {
+        tracing::warn!(
+            target: "security",
+            event_type = "wrong_token_purpose",
+            jti = %subject_claims.jti,
+            purpose = ?subject_claims.purpose,
+            "Rejected purpose-bound subject_token in token exchange"
+        );
+        return Err(OAuthError::InvalidGrant(
+            "subject_token must be a full access token".to_string(),
+        ));
+    }
+
     // SECURITY: Check subject_token against revocation blacklist.
     // Without this, a revoked token (e.g., via admin revoke-user) could still be
     // exchanged for a fresh delegated token, extending access past revocation.
@@ -621,9 +707,77 @@ async fn handle_token_exchange_grant(
         ));
     }
 
+    // SECURITY: verify the principal (subject) is still active in the tenant.
+    // Without this, a freshly-deactivated user's still-valid access token can
+    // be exchanged for a delegated token within its TTL (see deep review §2.9).
+    // The principal may be a human user or an NHI; check both, in order.
+    {
+        let user_active: Option<bool> =
+            sqlx::query_scalar("SELECT is_active FROM users WHERE id = $1 AND tenant_id = $2")
+                .bind(principal_id)
+                .bind(tenant_id)
+                .fetch_optional(&state.pool)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to look up subject user: {}", e);
+                    OAuthError::Internal("Database error".to_string())
+                })?;
+
+        let subject_is_active = match user_active {
+            Some(true) => true,
+            Some(false) => false,
+            None => {
+                // Not a user — try NHI lifecycle.
+                let nhi_state: Option<String> = sqlx::query_scalar(
+                    r"
+                    SELECT lifecycle_state::text
+                    FROM nhi_identities
+                    WHERE id = $1 AND tenant_id = $2
+                    ",
+                )
+                .bind(principal_id)
+                .bind(tenant_id)
+                .fetch_optional(&state.pool)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to look up subject NHI: {}", e);
+                    OAuthError::Internal("Database error".to_string())
+                })?;
+                matches!(nhi_state.as_deref(), Some("active"))
+            }
+        };
+
+        if !subject_is_active {
+            tracing::warn!(
+                target: "security",
+                event_type = "token_exchange_inactive_subject",
+                principal_id = %principal_id,
+                tenant_id = %tenant_id,
+                "Rejected token exchange — subject is not active"
+            );
+            return Err(OAuthError::InvalidGrant(
+                "subject is not active".to_string(),
+            ));
+        }
+    }
+
     // Step 2: Verify actor_token signature and extract claims
     let actor_claims = decode_token(actor_token, &state.public_key)
         .map_err(|e| OAuthError::InvalidGrant(format!("invalid actor_token: {e}")))?;
+
+    // SECURITY: Reject purpose-bound actor tokens (same rationale as subject_token).
+    if !actor_claims.is_access_token() {
+        tracing::warn!(
+            target: "security",
+            event_type = "wrong_token_purpose",
+            jti = %actor_claims.jti,
+            purpose = ?actor_claims.purpose,
+            "Rejected purpose-bound actor_token in token exchange"
+        );
+        return Err(OAuthError::InvalidGrant(
+            "actor_token must be a full access token".to_string(),
+        ));
+    }
 
     let actor_nhi_id = Uuid::parse_str(&actor_claims.sub)
         .map_err(|_| OAuthError::InvalidGrant("actor_token has invalid sub claim".to_string()))?;
@@ -804,6 +958,8 @@ mod tests {
             actor_token_type: None,
             audience: None,
             resource: None,
+            client_assertion: None,
+            client_assertion_type: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -832,6 +988,8 @@ mod tests {
             actor_token_type: None,
             audience: None,
             resource: None,
+            client_assertion: None,
+            client_assertion_type: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -860,6 +1018,8 @@ mod tests {
             actor_token_type: None,
             audience: None,
             resource: None,
+            client_assertion: None,
+            client_assertion_type: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -888,6 +1048,8 @@ mod tests {
             actor_token_type: None,
             audience: None,
             resource: None,
+            client_assertion: None,
+            client_assertion_type: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -948,6 +1110,8 @@ mod tests {
             actor_token_type: None,
             audience: None,
             resource: None,
+            client_assertion: None,
+            client_assertion_type: None,
         };
 
         let result = extract_client_credentials(&headers, &request);
@@ -979,6 +1143,8 @@ mod tests {
             actor_token_type: None,
             audience: None,
             resource: None,
+            client_assertion: None,
+            client_assertion_type: None,
         };
 
         let result = extract_client_credentials(&headers, &request);

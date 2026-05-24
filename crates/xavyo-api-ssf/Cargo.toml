@@ -1,0 +1,39 @@
+[package]
+name = "xavyo-api-ssf"
+version = "0.1.0"
+edition = "2021"
+description = "OpenID Shared Signals Framework (SSF) Transmitter API for xavyo: stream management + configuration metadata"
+license = "BSL-1.1"
+publish = false
+repository = "https://github.com/xavyo/xavyo"
+
+[dependencies]
+# Workspace crates
+xavyo-core = { path = "../xavyo-core" }
+xavyo-db = { path = "../xavyo-db" }
+xavyo-ssf = { path = "../xavyo-ssf" }
+
+# Web framework
+axum = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# OpenAPI documentation
+utoipa = { workspace = true }
+
+# Database
+sqlx = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+# URL parsing for the receiver-endpoint SSRF guard
+url = "2"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }

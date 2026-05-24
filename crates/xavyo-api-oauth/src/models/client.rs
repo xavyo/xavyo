@@ -115,6 +115,32 @@ pub struct ClientResponse {
     pub created_at: DateTime<Utc>,
     /// Last update timestamp.
     pub updated_at: DateTime<Utc>,
+    /// RFC 9449: client requires DPoP-bound (sender-constrained) tokens.
+    #[serde(default)]
+    pub require_dpop: bool,
+    /// FAPI 2.0 Security Profile opt-in (§5.3.2): implies PAR + DPoP mandatory.
+    #[serde(default)]
+    pub fapi_profile: bool,
+    /// Inline JWKS for `private_key_jwt` client-assertion verification (RFC 7523).
+    /// `None` ⇒ the client does not use `private_key_jwt`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jwks: Option<serde_json::Value>,
+}
+
+impl ClientResponse {
+    /// Whether this client must present a DPoP proof and receive a
+    /// sender-constrained token (explicit `require_dpop`, or FAPI 2.0 which
+    /// mandates sender-constrained tokens, §5.3.2.1-5).
+    #[must_use]
+    pub fn requires_dpop(&self) -> bool {
+        self.require_dpop || self.fapi_profile
+    }
+
+    /// Whether this client must use PAR (RFC 9126) — FAPI 2.0 §5.3.2.2.
+    #[must_use]
+    pub fn requires_par(&self) -> bool {
+        self.fapi_profile
+    }
 }
 
 /// `OAuth2` client creation response (includes secret for confidential clients).
@@ -135,4 +161,63 @@ pub struct ClientListResponse {
     pub clients: Vec<ClientResponse>,
     /// Total count.
     pub total: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A minimal `ClientResponse` with both profile flags off.
+    fn base() -> ClientResponse {
+        ClientResponse {
+            id: Uuid::nil(),
+            client_id: "c".to_string(),
+            name: "c".to_string(),
+            client_type: ClientType::Confidential,
+            redirect_uris: vec![],
+            grant_types: vec![],
+            scopes: vec![],
+            is_active: true,
+            logo_url: None,
+            description: None,
+            nhi_id: None,
+            post_logout_redirect_uris: vec![],
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            require_dpop: false,
+            fapi_profile: false,
+            jwks: None,
+        }
+    }
+
+    #[test]
+    fn plain_client_requires_neither() {
+        let c = base();
+        assert!(!c.requires_dpop());
+        assert!(!c.requires_par());
+    }
+
+    #[test]
+    fn require_dpop_flag_requires_dpop_only() {
+        let c = ClientResponse {
+            require_dpop: true,
+            ..base()
+        };
+        assert!(c.requires_dpop());
+        assert!(!c.requires_par(), "require_dpop alone does not mandate PAR");
+    }
+
+    #[test]
+    fn fapi_profile_implies_both_par_and_dpop() {
+        // FAPI 2.0 §5.3.2: profile clients must use PAR and sender-constrained tokens.
+        let c = ClientResponse {
+            fapi_profile: true,
+            ..base()
+        };
+        assert!(
+            c.requires_dpop(),
+            "FAPI 2.0 mandates sender-constrained tokens"
+        );
+        assert!(c.requires_par(), "FAPI 2.0 mandates PAR");
+    }
 }

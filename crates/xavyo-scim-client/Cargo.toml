@@ -18,7 +18,7 @@ openapi = ["utoipa"]
 xavyo-db = { path = "../xavyo-db" }
 xavyo-core = { path = "../xavyo-core" }
 xavyo-connector = { path = "../xavyo-connector" }
-xavyo-api-scim = { path = "../xavyo-api-scim" }
+xavyo-scim-types = { path = "../xavyo-scim-types" }
 xavyo-webhooks = { path = "../xavyo-webhooks" }
 xavyo-events = { path = "../xavyo-events", optional = true }
 

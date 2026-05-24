@@ -88,6 +88,27 @@ pub struct OAuth2Client {
 
     /// Allowed post-logout redirect URIs (OIDC RP-Initiated Logout).
     pub post_logout_redirect_uris: Vec<String>,
+
+    /// When true, this client must present a DPoP proof and receives
+    /// sender-constrained tokens (RFC 9449). `#[sqlx(default)]` so the many
+    /// explicit-column `SELECT`s that don't yet read this column map cleanly
+    /// (defaulting to `false`) — mandatory enforcement is wired separately.
+    #[sqlx(default)]
+    pub require_dpop: bool,
+
+    /// When true, this client operates under the FAPI 2.0 Security Profile
+    /// (§5.3.2): authorization requests MUST use PAR (RFC 9126) and access
+    /// tokens MUST be sender-constrained via DPoP (RFC 9449). Implies
+    /// `require_dpop` enforcement. `#[sqlx(default)]` for explicit-column SELECT
+    /// safety. Full conformance also needs private_key_jwt/mTLS (follow-up).
+    #[sqlx(default)]
+    pub fapi_profile: bool,
+
+    /// Inline JSON Web Key Set for `private_key_jwt` client-assertion
+    /// verification (RFC 7523). `None` ⇒ the client does not use
+    /// `private_key_jwt`. `#[sqlx(default)]` for explicit-column SELECT safety.
+    #[sqlx(default)]
+    pub jwks: Option<serde_json::Value>,
 }
 
 impl OAuth2Client {
@@ -95,6 +116,22 @@ impl OAuth2Client {
     #[must_use]
     pub fn tenant_id(&self) -> TenantId {
         TenantId::from_uuid(self.tenant_id)
+    }
+
+    /// Whether this client requires a DPoP-bound (sender-constrained) token at
+    /// the token endpoint — either explicitly (`require_dpop`) or because it
+    /// runs under the FAPI 2.0 profile (which mandates sender-constrained
+    /// tokens, §5.3.2.1-5).
+    #[must_use]
+    pub fn requires_dpop(&self) -> bool {
+        self.require_dpop || self.fapi_profile
+    }
+
+    /// Whether this client must use Pushed Authorization Requests (RFC 9126).
+    /// FAPI 2.0 §5.3.2.2 makes PAR mandatory for profile clients.
+    #[must_use]
+    pub fn requires_par(&self) -> bool {
+        self.fapi_profile
     }
 
     /// Get the parsed client type.

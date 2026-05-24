@@ -71,6 +71,13 @@ http = "1.0"
 # Constant-time comparison for security
 subtle = "2.5"
 
+# In-memory zeroization for sensitive material (signing keys).
+# `secrecy::SecretString` is held inside `Arc` in `OAuthSigningKey` so the
+# state's `#[derive(Clone)]` stays cheap and the bytes are zeroed when the
+# last clone drops.
+secrecy = "0.10"
+zeroize = "1"
+
 # HMAC/SHA2 for CSRF tokens (F082)
 hmac = "0.12"
 

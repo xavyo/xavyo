@@ -35,13 +35,24 @@
 //! ```
 
 mod claims;
+/// `private_key_jwt` client authentication (RFC 7523 / OIDC §9).
+pub mod client_assertion;
+/// DPoP (RFC 9449) proof validation and RFC 7638 JWK thumbprints.
+pub mod dpop;
 mod error;
 mod jwks;
 mod jwt;
 mod password;
+/// Rich Authorization Requests (RFC 9396) — `authorization_details`.
+pub mod rar;
 
 // Re-export public API
 pub use claims::{ActorClaim, JwtClaims, JwtClaimsBuilder};
+pub use client_assertion::{
+    validate_client_assertion, ClientAssertionError, ValidatedClientAssertion,
+    CLIENT_ASSERTION_TYPE_JWT_BEARER,
+};
+pub use dpop::{compute_ath, jwk_thumbprint, verify_resource_proof, DpopError, ValidatedProof};
 pub use error::AuthError;
 pub use jsonwebtoken::Algorithm;
 pub use jwks::{JwkSet, JwksClient};
@@ -50,3 +61,4 @@ pub use jwt::{
     encode_token_with_kid, extract_kid, ValidationConfig,
 };
 pub use password::{hash_password, verify_password, PasswordHasher};
+pub use rar::{parse_authorization_details, AuthorizationDetail, RarError};

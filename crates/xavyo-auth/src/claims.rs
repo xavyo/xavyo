@@ -3,6 +3,7 @@
 //! Provides the `JwtClaims` struct containing both RFC 7519 standard claims
 //! and Xavyo-specific custom claims (`tenant_id`, roles).
 
+use crate::rar::AuthorizationDetail;
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -179,6 +180,28 @@ pub struct JwtClaims {
     /// matches one of the `may_act` entries.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub may_act: Option<MayActClaim>,
+
+    /// Confirmation claim (RFC 7800 / RFC 9449 §6). When present, this access
+    /// token is sender-constrained (DPoP): `cnf.jkt` is the RFC 7638 thumbprint
+    /// of the client's public key, and the token MUST be presented with a valid
+    /// DPoP proof whose key thumbprint matches. Absent ⇒ ordinary bearer token.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cnf: Option<CnfClaim>,
+
+    /// Rich Authorization Requests (RFC 9396 §7): the granted
+    /// `authorization_details` — fine-grained, structured permissions (e.g.
+    /// `tool_access`) that resource servers enforce per element. Absent ⇒ the
+    /// token carries only coarse `scope`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorization_details: Option<Vec<AuthorizationDetail>>,
+}
+
+/// RFC 7800 / RFC 9449 confirmation claim. Currently carries only the DPoP
+/// key thumbprint (`jkt`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CnfClaim {
+    /// RFC 7638 JWK SHA-256 thumbprint of the DPoP-binding public key.
+    pub jkt: String,
 }
 
 impl JwtClaims {
@@ -192,6 +215,18 @@ impl JwtClaims {
     #[must_use]
     pub fn is_expired(&self) -> bool {
         Utc::now().timestamp() > self.exp
+    }
+
+    /// Returns `true` if these claims represent a full access token.
+    ///
+    /// Purpose-bound tokens (e.g., partial MFA-verification tokens with
+    /// `purpose = Some("mfa_verification")`) share the same signing key,
+    /// issuer, and audience as access tokens, so any OAuth endpoint that
+    /// accepts an access token MUST guard with `is_access_token()` to
+    /// avoid trivial MFA / purpose bypass.
+    #[must_use]
+    pub fn is_access_token(&self) -> bool {
+        self.purpose.is_none()
     }
 
     /// Get the tenant ID if present.
@@ -251,6 +286,13 @@ impl JwtClaims {
         self.act.is_some()
     }
 
+    /// Returns the DPoP key thumbprint (`cnf.jkt`) if this token is
+    /// sender-constrained, else `None` (ordinary bearer token).
+    #[must_use]
+    pub fn dpop_jkt(&self) -> Option<&str> {
+        self.cnf.as_ref().map(|c| c.jkt.as_str())
+    }
+
     /// Get the actual actor NHI ID (the agent doing the work).
     #[must_use]
     pub fn actor_nhi_id(&self) -> Option<Uuid> {
@@ -295,6 +337,8 @@ pub struct JwtClaimsBuilder {
     delegation_id: Option<Uuid>,
     delegation_depth: Option<i32>,
     may_act: Option<MayActClaim>,
+    cnf: Option<CnfClaim>,
+    authorization_details: Option<Vec<AuthorizationDetail>>,
 }
 
 impl JwtClaimsBuilder {
@@ -468,6 +512,21 @@ impl JwtClaimsBuilder {
         self
     }
 
+    /// Sender-constrain this token to a DPoP key (RFC 9449 §6): sets the
+    /// `cnf.jkt` confirmation to the given RFC 7638 thumbprint.
+    #[must_use]
+    pub fn dpop_jkt(mut self, jkt: impl Into<String>) -> Self {
+        self.cnf = Some(CnfClaim { jkt: jkt.into() });
+        self
+    }
+
+    /// Set the granted RFC 9396 `authorization_details` (the token claim).
+    #[must_use]
+    pub fn authorization_details(mut self, details: Vec<AuthorizationDetail>) -> Self {
+        self.authorization_details = Some(details);
+        self
+    }
+
     /// Build the JWT claims.
     ///
     /// # Defaults
@@ -513,6 +572,8 @@ impl JwtClaimsBuilder {
             delegation_id: self.delegation_id,
             delegation_depth: self.delegation_depth,
             may_act: self.may_act,
+            cnf: self.cnf,
+            authorization_details: self.authorization_details,
         }
     }
 }
@@ -590,6 +651,37 @@ mod tests {
 
         assert!(claims.has_any_role(&["admin", "user"]));
         assert!(!claims.has_any_role(&["superadmin", "moderator"]));
+    }
+
+    /// Regression guard for the CRITICAL MFA-bypass fix (deep review §2.1).
+    /// A token with NO `purpose` is a full access token; any purpose-bound
+    /// token (e.g. the partial MFA-verification token) is NOT. OAuth endpoints
+    /// that accept access tokens MUST reject the latter via `is_access_token()`.
+    #[test]
+    fn test_is_access_token_discriminates_purpose() {
+        // Full access token: no purpose claim.
+        let access = JwtClaims::builder().subject("user-123").build();
+        assert!(
+            access.is_access_token(),
+            "a token without a purpose must be treated as an access token"
+        );
+
+        // Partial MFA-verification token: purpose = mfa_verification.
+        let partial = JwtClaims::builder()
+            .subject("user-123")
+            .purpose("mfa_verification")
+            .build();
+        assert!(
+            !partial.is_access_token(),
+            "an mfa_verification token must NOT be accepted as an access token"
+        );
+
+        // Any other purpose-bound token is likewise rejected.
+        let other = JwtClaims::builder()
+            .subject("user-123")
+            .purpose("password_reset")
+            .build();
+        assert!(!other.is_access_token());
     }
 
     #[test]

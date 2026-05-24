@@ -1,0 +1,16 @@
+[package]
+name = "xavyo-scim-types"
+version = "0.1.0"
+edition = "2021"
+description = "SCIM 2.0 (RFC 7643/7644) DTOs shared between xavyo-api-scim and xavyo-scim-client"
+authors = ["xavyo Team"]
+license = "BSL-1.1"
+publish = false
+repository = "https://github.com/xavyo/xavyo"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+utoipa = { workspace = true }

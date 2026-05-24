@@ -41,6 +41,13 @@ pub struct TokenRequest {
     /// Target resource URI (for token_exchange grant, RFC 8707).
     /// Restricts the token to a specific resource server.
     pub resource: Option<String>,
+    /// `private_key_jwt` client assertion (RFC 7523 §2.2) — a signed JWT
+    /// authenticating the client in lieu of a `client_secret`.
+    pub client_assertion: Option<String>,
+    /// Client assertion type; MUST be
+    /// `urn:ietf:params:oauth:client-assertion-type:jwt-bearer` when
+    /// `client_assertion` is present.
+    pub client_assertion_type: Option<String>,
 }
 
 /// Token response for POST /oauth/token.
@@ -61,6 +68,10 @@ pub struct TokenResponse {
     /// Granted scopes.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scope: Option<String>,
+    /// RFC 9396 §7: the granted `authorization_details` (JSON array), echoed
+    /// when the request carried fine-grained authorization.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorization_details: Option<serde_json::Value>,
 }
 
 impl TokenResponse {
@@ -74,6 +85,7 @@ impl TokenResponse {
             refresh_token: None,
             id_token: None,
             scope: None,
+            authorization_details: None,
         }
     }
 
@@ -95,6 +107,13 @@ impl TokenResponse {
     #[must_use]
     pub fn with_scope(mut self, scope: String) -> Self {
         self.scope = Some(scope);
+        self
+    }
+
+    /// Add RFC 9396 `authorization_details` (JSON array).
+    #[must_use]
+    pub fn with_authorization_details(mut self, details: serde_json::Value) -> Self {
+        self.authorization_details = Some(details);
         self
     }
 }

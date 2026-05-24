@@ -905,6 +905,18 @@ pub mod tenant_attribute_definition;
 // Security Hardening models (F069)
 pub mod revoked_token;
 
+// DPoP proof replay cache (RFC 9449)
+pub mod dpop_proof_jti;
+
+// private_key_jwt client-assertion replay cache (RFC 7523)
+pub mod client_assertion_jti;
+
+// Shared Signals Framework streams + subjects (OpenID SSF 1.0)
+pub mod ssf;
+
+// Pushed Authorization Requests (RFC 9126)
+pub mod par_request;
+
 // Security Hardening models (F082)
 pub mod signing_key;
 
@@ -933,6 +945,21 @@ pub use tenant_attribute_definition::TenantAttributeDefinition;
 
 // Security Hardening exports (F069)
 pub use revoked_token::{CreateRevokedToken, RevokedToken};
+
+// DPoP proof replay cache export (RFC 9449)
+pub use dpop_proof_jti::DpopProofJti;
+
+// private_key_jwt client-assertion replay cache export (RFC 7523)
+pub use client_assertion_jti::ClientAssertionJti;
+
+// Shared Signals Framework exports (OpenID SSF 1.0)
+pub use ssf::{
+    CreateSsfStream, SsfStream, SsfSubject, STREAM_STATUS_DISABLED, STREAM_STATUS_ENABLED,
+    STREAM_STATUS_PAUSED,
+};
+
+// Pushed Authorization Requests export (RFC 9126)
+pub use par_request::{CreatePushedAuthRequest, PushedAuthRequest, REQUEST_URI_PREFIX};
 
 // Security Hardening exports (F082)
 pub use signing_key::{CreateSigningKey, SigningKey};

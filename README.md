@@ -259,8 +259,8 @@ curl -X POST http://localhost:8080/auth/login \
 - **Axum** — Async-first HTTP framework with Tower middleware
 - **PostgreSQL RLS** — Tenant isolation enforced at the database level
 - **32 crates** — Modular architecture, each crate independently testable
-- **198 SQL migrations** — Battle-tested, production-grade schema
-- **665K lines of Rust** — Comprehensive implementation, not a prototype
+- **204 SQL migrations** — Battle-tested, production-grade schema
+- **670K lines of Rust** — Comprehensive implementation, not a prototype
 - **7,400+ tests** — 5,576 unit/integration + 1,907 functional tests across 14 batches
 
 ---
@@ -365,7 +365,7 @@ xavyo/
 └── specs/                 # Feature specifications
 ```
 
-**32 crates** | **198 SQL migrations** | **1,739 source files** | **665K lines of Rust**
+**32 crates** | **204 SQL migrations** | **1,739 source files** | **670K lines of Rust**
 
 ---
 

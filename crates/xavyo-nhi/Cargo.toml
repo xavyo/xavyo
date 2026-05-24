@@ -31,6 +31,11 @@ utoipa = { workspace = true, optional = true }
 tokio-test.workspace = true
 
 [features]
-default = []
+# `domain` brings in the trait + risk-scoring logic. Foundation consumers
+# (notably `xavyo-db`, which only needs the type enums for SQLx encode/decode)
+# can opt out with `default-features = false, features = ["sqlx"]` to avoid
+# pulling NHI domain logic into the persistence layer.
+default = ["domain"]
+domain = []
 sqlx = ["dep:sqlx"]
 openapi = ["dep:utoipa"]

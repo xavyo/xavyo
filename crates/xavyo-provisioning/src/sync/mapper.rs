@@ -222,19 +222,25 @@ impl InboundMapper {
             if let Some(value) = obj.get(ext_attr) {
                 // Apply transformation if present
                 let transformed = if let Some(ref expr) = mapping.transform {
-                    // TODO: Implement transformation expression evaluation
+                    // Transformation expression evaluation is not yet implemented.
+                    // Fail loud rather than pass the raw value through — silently
+                    // dropping the transform produces wrong downstream attribute
+                    // values with `success: true` (see deep review §2.5).
                     warn!(
                         external_attribute = %ext_attr,
                         internal_attribute = %mapping.internal_attribute,
                         transform_expression = %expr,
-                        "Attribute transformation configured but not yet implemented; \
-                         value passed through without transformation"
+                        "Attribute transformation configured but evaluator not implemented; \
+                         rejecting mapping to surface the gap"
                     );
-                    result.warnings.push(format!(
-                        "Transform '{}' on attribute '{}' was skipped (not implemented)",
-                        expr, ext_attr
+                    return Err(SyncError::mapping(
+                        ext_attr.clone(),
+                        format!(
+                            "transform '{}' on attribute '{}' is not implemented; \
+                             configure no transform or implement the evaluator first",
+                            expr, ext_attr
+                        ),
                     ));
-                    value.clone()
                 } else {
                     value.clone()
                 };

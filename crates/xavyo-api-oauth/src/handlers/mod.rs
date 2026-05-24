@@ -10,6 +10,7 @@ pub mod device_login;
 pub mod discovery;
 pub mod introspection;
 pub mod logout;
+pub mod par;
 pub mod revocation;
 pub mod token;
 pub mod userinfo;
@@ -17,7 +18,7 @@ pub mod userinfo;
 pub use admin_sessions::{
     admin_revoke_user_handler, delete_session_handler, list_active_sessions_handler,
 };
-pub use authorize::{authorize_handler, consent_handler};
+pub use authorize::authorize_handler;
 pub use authorize_grant::{authorize_grant_handler, authorize_info_handler};
 pub use client_admin::{
     create_client_handler, delete_client_handler, get_client_handler, list_clients_handler,
@@ -43,6 +44,7 @@ pub use discovery::{
 };
 pub use introspection::introspect_token_handler;
 pub use logout::end_session_handler;
+pub use par::par_handler;
 pub use revocation::revoke_token_handler;
 pub use token::token_handler;
 pub use userinfo::userinfo_handler;

@@ -7,7 +7,7 @@
 
 use serde_json::{json, Value};
 use uuid::Uuid;
-use xavyo_api_scim::models::{ScimEmail, ScimGroup, ScimName, ScimUser};
+use xavyo_scim_types::{ScimEmail, ScimGroup, ScimName, ScimUser};
 
 /// A test tenant with associated IDs for multi-tenant testing.
 #[derive(Clone, Debug)]
@@ -153,7 +153,7 @@ pub fn generate_scim_group_with_members(
             // Try to parse as UUID, skip if invalid
             Uuid::parse_str(id)
                 .ok()
-                .map(|uuid| xavyo_api_scim::models::ScimGroupMember {
+                .map(|uuid| xavyo_scim_types::ScimGroupMember {
                     value: uuid,
                     display: None,
                     member_type: Some("User".to_string()),

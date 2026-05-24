@@ -521,6 +521,10 @@ pub async fn api_key_auth_middleware(
         delegation_id: None,
         delegation_depth: None,
         may_act: None,
+        // DPoP: API-key-derived tokens are not sender-constrained
+        cnf: None,
+        // RFC 9396: API keys carry coarse scopes, not authorization_details
+        authorization_details: None,
     };
 
     request.extensions_mut().insert(synthetic_claims);

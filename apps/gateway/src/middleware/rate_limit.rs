@@ -29,6 +29,29 @@ use crate::middleware::tenant::TenantContext;
 /// Type alias for our rate limiter.
 type Limiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
 
+/// Fallback quota when the configured `requests_per_minute` is zero (which
+/// `NonZeroU32::new` rejects). 100 r/min is the gateway's documented default.
+const FALLBACK_RPM: NonZeroU32 = match NonZeroU32::new(100) {
+    Some(n) => n,
+    None => unreachable!(),
+};
+
+/// Fallback burst size when configured `burst_size` is zero. 10 is the
+/// gateway's documented default.
+const FALLBACK_BURST: NonZeroU32 = match NonZeroU32::new(10) {
+    Some(n) => n,
+    None => unreachable!(),
+};
+
+/// Build a `Quota` from a raw (rpm, burst) tuple, swapping in safe fallbacks
+/// if either input is zero. Centralising this keeps the construction sites
+/// short and avoids the `unwrap_or(NonZeroU32::new(N).unwrap())` pattern that
+/// peppered this file pre-refactor.
+fn quota_from_raw(rpm: u32, burst: u32) -> Quota {
+    Quota::per_minute(NonZeroU32::new(rpm).unwrap_or(FALLBACK_RPM))
+        .allow_burst(NonZeroU32::new(burst).unwrap_or(FALLBACK_BURST))
+}
+
 /// Rate limit state for all tenants.
 #[derive(Clone)]
 pub struct RateLimitState {
@@ -43,12 +66,9 @@ pub struct RateLimitState {
 impl RateLimitState {
     /// Create a new rate limit state from configuration.
     pub fn new(config: &RateLimitConfig) -> Self {
-        let default_quota = Quota::per_minute(
-            NonZeroU32::new(config.default_requests_per_minute)
-                .unwrap_or(NonZeroU32::new(100).unwrap()),
-        )
-        .allow_burst(
-            NonZeroU32::new(config.default_burst_size).unwrap_or(NonZeroU32::new(10).unwrap()),
+        let default_quota = quota_from_raw(
+            config.default_requests_per_minute,
+            config.default_burst_size,
         );
 
         Self {
@@ -60,67 +80,42 @@ impl RateLimitState {
 
     /// Get or create a rate limiter for a tenant.
     pub fn get_limiter(&self, tenant_id: Option<&str>) -> Arc<Limiter> {
-        match tenant_id {
-            Some(tid) => {
-                // Check if we have an override for this tenant
-                if let Some(override_config) = self.config.tenant_overrides.get(tid) {
-                    let quota = Quota::per_minute(
-                        NonZeroU32::new(override_config.requests_per_minute)
-                            .unwrap_or(NonZeroU32::new(100).unwrap()),
-                    )
-                    .allow_burst(
-                        NonZeroU32::new(override_config.burst_size)
-                            .unwrap_or(NonZeroU32::new(10).unwrap()),
-                    );
+        let Some(tid) = tenant_id else {
+            return self.default_limiter.clone();
+        };
 
-                    // Get or create limiter for this tenant
-                    let limiters = self
-                        .tenant_limiters
-                        .read()
-                        .unwrap_or_else(|e| e.into_inner());
-                    if let Some(limiter) = limiters.get(tid) {
-                        return limiter.clone();
-                    }
-                    drop(limiters);
+        let quota = if let Some(o) = self.config.tenant_overrides.get(tid) {
+            quota_from_raw(o.requests_per_minute, o.burst_size)
+        } else {
+            quota_from_raw(
+                self.config.default_requests_per_minute,
+                self.config.default_burst_size,
+            )
+        };
 
-                    let mut limiters = self
-                        .tenant_limiters
-                        .write()
-                        .unwrap_or_else(|e| e.into_inner());
-                    let limiter = Arc::new(RateLimiter::direct(quota));
-                    limiters.insert(tid.to_string(), limiter.clone());
-                    limiter
-                } else {
-                    // Use default quota for this tenant
-                    let limiters = self
-                        .tenant_limiters
-                        .read()
-                        .unwrap_or_else(|e| e.into_inner());
-                    if let Some(limiter) = limiters.get(tid) {
-                        return limiter.clone();
-                    }
-                    drop(limiters);
-
-                    let quota = Quota::per_minute(
-                        NonZeroU32::new(self.config.default_requests_per_minute)
-                            .unwrap_or(NonZeroU32::new(100).unwrap()),
-                    )
-                    .allow_burst(
-                        NonZeroU32::new(self.config.default_burst_size)
-                            .unwrap_or(NonZeroU32::new(10).unwrap()),
-                    );
-
-                    let mut limiters = self
-                        .tenant_limiters
-                        .write()
-                        .unwrap_or_else(|e| e.into_inner());
-                    let limiter = Arc::new(RateLimiter::direct(quota));
-                    limiters.insert(tid.to_string(), limiter.clone());
-                    limiter
-                }
+        // Read-fast path: limiter already exists.
+        {
+            let limiters = self
+                .tenant_limiters
+                .read()
+                .unwrap_or_else(|e| e.into_inner());
+            if let Some(limiter) = limiters.get(tid) {
+                return limiter.clone();
             }
-            None => self.default_limiter.clone(),
         }
+
+        // Slow path: write-lock and create. Re-check under the write lock to
+        // handle a concurrent inserter.
+        let mut limiters = self
+            .tenant_limiters
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(existing) = limiters.get(tid) {
+            return existing.clone();
+        }
+        let limiter = Arc::new(RateLimiter::direct(quota));
+        limiters.insert(tid.to_string(), limiter.clone());
+        limiter
     }
 
     /// Check if a request is allowed.
@@ -221,9 +216,12 @@ fn rate_limited_response(retry_after: u64) -> Response {
     };
 
     let mut response = (StatusCode::TOO_MANY_REQUESTS, Json(body)).into_response();
-    response
-        .headers_mut()
-        .insert("Retry-After", retry_after.to_string().parse().unwrap());
+    // `retry_after.to_string()` produces only digit characters, which always
+    // parse to a valid `HeaderValue` — but we route through `if let Ok` to
+    // avoid an `.unwrap()` in an HTTP response path.
+    if let Ok(header_val) = retry_after.to_string().parse() {
+        response.headers_mut().insert("Retry-After", header_val);
+    }
     response
 }
 

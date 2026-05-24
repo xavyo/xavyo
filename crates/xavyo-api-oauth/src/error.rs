@@ -26,6 +26,9 @@ pub enum OAuthErrorCode {
     UnsupportedGrantType,
     /// The requested scope is invalid, unknown, or malformed.
     InvalidScope,
+    /// RFC 9396 §5: the `authorization_details` is malformed or contains an
+    /// unknown/unsupported type.
+    InvalidAuthorizationDetails,
     /// The resource owner denied the request.
     AccessDenied,
     /// The authorization server does not support the response type.
@@ -55,6 +58,7 @@ impl std::fmt::Display for OAuthErrorCode {
             Self::UnauthorizedClient => "unauthorized_client",
             Self::UnsupportedGrantType => "unsupported_grant_type",
             Self::InvalidScope => "invalid_scope",
+            Self::InvalidAuthorizationDetails => "invalid_authorization_details",
             Self::AccessDenied => "access_denied",
             Self::UnsupportedResponseType => "unsupported_response_type",
             Self::ServerError => "server_error",
@@ -120,6 +124,10 @@ pub enum OAuthError {
     #[error("Invalid scope: {0}")]
     InvalidScope(String),
 
+    /// RFC 9396 §5: malformed or unsupported `authorization_details`.
+    #[error("Invalid authorization_details: {0}")]
+    InvalidAuthorizationDetails(String),
+
     /// Access denied by user.
     #[error("Access denied: {0}")]
     AccessDenied(String),
@@ -180,6 +188,7 @@ impl OAuthError {
             Self::UnauthorizedClient(_) => StatusCode::UNAUTHORIZED,
             Self::UnsupportedGrantType(_) => StatusCode::BAD_REQUEST,
             Self::InvalidScope(_) => StatusCode::BAD_REQUEST,
+            Self::InvalidAuthorizationDetails(_) => StatusCode::BAD_REQUEST,
             Self::AccessDenied(_) => StatusCode::FORBIDDEN,
             Self::UnsupportedResponseType(_) => StatusCode::BAD_REQUEST,
             Self::InvalidToken(_) => StatusCode::UNAUTHORIZED,
@@ -207,6 +216,7 @@ impl OAuthError {
             Self::UnauthorizedClient(_) => OAuthErrorCode::UnauthorizedClient,
             Self::UnsupportedGrantType(_) => OAuthErrorCode::UnsupportedGrantType,
             Self::InvalidScope(_) => OAuthErrorCode::InvalidScope,
+            Self::InvalidAuthorizationDetails(_) => OAuthErrorCode::InvalidAuthorizationDetails,
             Self::AccessDenied(_) => OAuthErrorCode::AccessDenied,
             Self::UnsupportedResponseType(_) => OAuthErrorCode::UnsupportedResponseType,
             Self::InvalidToken(_) => OAuthErrorCode::InvalidToken,

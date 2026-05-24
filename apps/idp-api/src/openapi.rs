@@ -324,7 +324,7 @@ impl Modify for SecurityAddon {
         xavyo_api_auth::handlers::admin::webauthn_policy::admin_revoke_credential,
         // OAuth2
         xavyo_api_oauth::handlers::authorize::authorize_handler,
-        xavyo_api_oauth::handlers::authorize::consent_handler,
+        xavyo_api_oauth::handlers::par::par_handler,
         xavyo_api_oauth::handlers::token::token_handler,
         xavyo_api_oauth::handlers::discovery::discovery_handler,
         xavyo_api_oauth::handlers::discovery::jwks_handler,
@@ -1447,7 +1447,8 @@ impl Modify for SecurityAddon {
         // OAuth2 models
         xavyo_api_oauth::models::TokenRequest,
         xavyo_api_oauth::models::TokenResponse,
-        xavyo_api_oauth::models::ConsentRequest,
+        xavyo_api_oauth::models::PushedAuthRequestForm,
+        xavyo_api_oauth::models::ParResponse,
         xavyo_api_oauth::models::OpenIdConfiguration,
         xavyo_api_oauth::models::JwkSet,
         xavyo_api_oauth::models::Jwk,
