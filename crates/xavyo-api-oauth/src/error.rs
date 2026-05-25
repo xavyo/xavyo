@@ -391,7 +391,9 @@ mod tests {
         let resp = err.into_response();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         assert_eq!(
-            resp.headers().get("dpop-nonce").and_then(|v| v.to_str().ok()),
+            resp.headers()
+                .get("dpop-nonce")
+                .and_then(|v| v.to_str().ok()),
             Some("test-nonce-value")
         );
         // The token form does NOT carry a WWW-Authenticate challenge.
@@ -408,7 +410,9 @@ mod tests {
         let resp = err.into_response();
         assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(
-            resp.headers().get("dpop-nonce").and_then(|v| v.to_str().ok()),
+            resp.headers()
+                .get("dpop-nonce")
+                .and_then(|v| v.to_str().ok()),
             Some("resource-nonce")
         );
         let www = resp
