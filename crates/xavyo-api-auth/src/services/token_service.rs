@@ -200,9 +200,16 @@ impl TokenService {
         let access_token =
             self.create_access_token(user_id, tenant_id, roles, email, auth_context.as_ref())?;
 
-        // Generate refresh token
+        // Generate refresh token, persisting the auth context so it survives
+        // token rotation (carried forward on refresh).
         let refresh_token = self
-            .create_refresh_token(user_id, tenant_id, user_agent, ip_address)
+            .create_refresh_token(
+                user_id,
+                tenant_id,
+                auth_context.as_ref(),
+                user_agent,
+                ip_address,
+            )
             .await?;
 
         let expires_in = self.access_token_validity.num_seconds();
@@ -294,6 +301,7 @@ impl TokenService {
         &self,
         user_id: UserId,
         tenant_id: TenantId,
+        auth_context: Option<&AuthContext>,
         user_agent: Option<String>,
         ip_address: Option<IpAddr>,
     ) -> Result<String, ApiAuthError> {
@@ -303,10 +311,12 @@ impl TokenService {
         let token_hash = hash_token(&opaque_token);
         let expires_at = Utc::now() + self.refresh_token_validity;
 
-        // Store the hash in the database
+        // Store the hash + the authentication context, so a later refresh can
+        // carry the original acr/amr/auth_time forward to the re-issued token.
         let query = r"
-            INSERT INTO refresh_tokens (user_id, tenant_id, token_hash, expires_at, user_agent, ip_address)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO refresh_tokens
+                (user_id, tenant_id, token_hash, expires_at, user_agent, ip_address, acr, amr, auth_time)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ";
 
         sqlx::query(query)
@@ -316,6 +326,9 @@ impl TokenService {
             .bind(expires_at)
             .bind(user_agent)
             .bind(ip_address.map(|ip| ip.to_string()))
+            .bind(auth_context.map(|c| c.acr.clone()))
+            .bind(auth_context.map(|c| c.amr.clone()))
+            .bind(auth_context.map(|c| c.auth_time))
             .execute(&self.pool)
             .await?;
 
@@ -349,7 +362,7 @@ impl TokenService {
             // C-3: Filter by tenant_id at DB level when available
             let query = r"
                 SELECT id, user_id, tenant_id, token_hash, expires_at, revoked_at, created_at, user_agent,
-                       COALESCE(ip_address::text, '') as ip_address
+                       COALESCE(ip_address::text, '') as ip_address, acr, amr, auth_time
                 FROM refresh_tokens
                 WHERE token_hash = $1 AND tenant_id = $2
             ";
@@ -361,7 +374,7 @@ impl TokenService {
         } else {
             let query = r"
                 SELECT id, user_id, tenant_id, token_hash, expires_at, revoked_at, created_at, user_agent,
-                       COALESCE(ip_address::text, '') as ip_address
+                       COALESCE(ip_address::text, '') as ip_address, acr, amr, auth_time
                 FROM refresh_tokens
                 WHERE token_hash = $1
             ";
@@ -447,14 +460,25 @@ impl TokenService {
         let user_id = UserId::from_uuid(token.user_id);
         let tenant_id = TenantId::from_uuid(token.tenant_id);
 
-        // FOLLOW-UP (acr/amr/auth_time): the refresh re-issue path cannot yet
-        // carry forward the original authentication context — refresh_tokens does
-        // not store it — so refreshed access tokens currently drop acr/amr/
-        // auth_time. Must be fixed (store at issuance, forward here) before
-        // step-up auth (RFC 9470) ships, or post-refresh tokens would fail
-        // step-up checks.
+        // Carry the ORIGINAL authentication context forward (OIDC: acr/amr/
+        // auth_time describe the login, not this re-issue), so step-up assurance
+        // and max_age survive token rotation. Absent only for tokens issued
+        // before context tracking, or non-interactive issuance.
+        let forwarded_context = match (&token.acr, &token.amr, token.auth_time) {
+            (Some(acr), Some(amr), Some(auth_time)) => {
+                Some(AuthContext::from_parts(acr.clone(), amr.clone(), auth_time))
+            }
+            _ => None,
+        };
+
         self.create_tokens(
-            user_id, tenant_id, roles, email, None, user_agent, ip_address,
+            user_id,
+            tenant_id,
+            roles,
+            email,
+            forwarded_context,
+            user_agent,
+            ip_address,
         )
         .await
     }
@@ -712,5 +736,19 @@ mod tests {
 
         // auth_time is populated for fresh logins.
         assert!(AuthContext::password().auth_time > 0);
+    }
+
+    #[test]
+    fn auth_context_from_parts_round_trip() {
+        // Refresh forwarding reconstructs the context from stored columns; it
+        // must preserve the original values verbatim (not re-stamp auth_time).
+        let ctx = AuthContext::from_parts(
+            "2".to_string(),
+            vec!["pwd".to_string(), "otp".to_string(), "mfa".to_string()],
+            1_700_000_000,
+        );
+        assert_eq!(ctx.acr, "2");
+        assert_eq!(ctx.amr, vec!["pwd", "otp", "mfa"]);
+        assert_eq!(ctx.auth_time, 1_700_000_000);
     }
 }
