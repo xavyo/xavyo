@@ -1007,7 +1007,7 @@ impl MicroCertificationService {
         pending.extend(escalated);
 
         // Sort by deadline
-        pending.sort_by(|a, b| a.deadline.cmp(&b.deadline));
+        pending.sort_by_key(|p| p.deadline);
 
         // Truncate to limit
         pending.truncate(limit.max(0) as usize);

@@ -367,7 +367,7 @@ impl BirthrightPolicyService {
         let mut policies = self.list_active(tenant_id).await?;
 
         // Sort by priority (higher = first) to ensure consistent evaluation order
-        policies.sort_by(|a, b| b.priority.cmp(&a.priority));
+        policies.sort_by_key(|p| std::cmp::Reverse(p.priority));
 
         let mut matching_policies = Vec::new();
         let mut total_entitlements = std::collections::HashSet::new();
@@ -414,7 +414,7 @@ impl BirthrightPolicyService {
         let mut policies = self.list_active(tenant_id).await?;
 
         // Sort by priority (higher = first) to ensure consistent evaluation order
-        policies.sort_by(|a, b| b.priority.cmp(&a.priority));
+        policies.sort_by_key(|p| std::cmp::Reverse(p.priority));
 
         let mut matching = Vec::new();
 
@@ -755,13 +755,11 @@ mod tests {
 
         // Validate value based on operator
         match condition.operator {
-            ConditionOperator::In | ConditionOperator::NotIn => {
-                if !condition.value.is_array() {
-                    return Err(GovernanceError::InvalidPolicyConditions(format!(
-                        "Operator '{}' requires an array value",
-                        condition.operator.as_str()
-                    )));
-                }
+            ConditionOperator::In | ConditionOperator::NotIn if !condition.value.is_array() => {
+                return Err(GovernanceError::InvalidPolicyConditions(format!(
+                    "Operator '{}' requires an array value",
+                    condition.operator.as_str()
+                )));
             }
             _ => {}
         }

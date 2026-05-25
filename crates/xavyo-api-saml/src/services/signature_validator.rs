@@ -345,31 +345,29 @@ fn extract_signature_info(xml: &str) -> SamlResult<SignatureInfo> {
                     }
                 }
             }
-            Ok(Event::Empty(e)) => {
-                if in_signed_info {
-                    let full_tag = std::str::from_utf8(&e).unwrap_or("");
-                    signed_info_content.push('<');
-                    signed_info_content.push_str(full_tag);
-                    signed_info_content.push_str("/>");
+            Ok(Event::Empty(e)) if in_signed_info => {
+                let full_tag = std::str::from_utf8(&e).unwrap_or("");
+                signed_info_content.push('<');
+                signed_info_content.push_str(full_tag);
+                signed_info_content.push_str("/>");
 
-                    // Capture SignatureMethod and DigestMethod Algorithm attributes
-                    let local_name_owned = e.local_name();
-                    let local = std::str::from_utf8(local_name_owned.as_ref()).unwrap_or("");
-                    if local == "SignatureMethod" {
-                        for attr in e.attributes().flatten() {
-                            let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                            if key == "Algorithm" {
-                                signature_algorithm =
-                                    Some(attr.unescape_value().unwrap_or_default().to_string());
-                            }
+                // Capture SignatureMethod and DigestMethod Algorithm attributes
+                let local_name_owned = e.local_name();
+                let local = std::str::from_utf8(local_name_owned.as_ref()).unwrap_or("");
+                if local == "SignatureMethod" {
+                    for attr in e.attributes().flatten() {
+                        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                        if key == "Algorithm" {
+                            signature_algorithm =
+                                Some(attr.unescape_value().unwrap_or_default().to_string());
                         }
-                    } else if local == "DigestMethod" {
-                        for attr in e.attributes().flatten() {
-                            let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                            if key == "Algorithm" {
-                                digest_algorithm =
-                                    Some(attr.unescape_value().unwrap_or_default().to_string());
-                            }
+                    }
+                } else if local == "DigestMethod" {
+                    for attr in e.attributes().flatten() {
+                        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                        if key == "Algorithm" {
+                            digest_algorithm =
+                                Some(attr.unescape_value().unwrap_or_default().to_string());
                         }
                     }
                 }
@@ -539,41 +537,41 @@ fn extract_element_by_id(xml: &str, element_id: &str) -> SamlResult<String> {
                     depth += 1;
                 }
             }
-            Ok(Event::End(_)) => {
-                if capturing {
-                    depth -= 1;
-                    if depth == 0 {
-                        let end_offset = reader.buffer_position() as usize;
-                        if let Some(start) = capture_start_offset {
-                            // SECURITY: Use .get() to prevent panic on non-ASCII UTF-8 boundary misalignment.
-                            result = xml
-                                .get(start..end_offset)
+            Ok(Event::End(_)) if capturing => {
+                depth -= 1;
+                if depth == 0 {
+                    let end_offset = reader.buffer_position() as usize;
+                    if let Some(start) = capture_start_offset {
+                        // SECURITY: Use .get() to prevent panic on non-ASCII UTF-8 boundary misalignment.
+                        result = xml
+                            .get(start..end_offset)
+                            .ok_or_else(|| {
+                                SamlError::SignatureValidationFailed(
+                                    "XML byte offset misaligned with UTF-8 character boundary"
+                                        .to_string(),
+                                )
+                            })?
+                            .to_string();
+                    }
+                    return Ok(result);
+                }
+            }
+            Ok(Event::Empty(ref e)) if !capturing => {
+                for attr in e.attributes().flatten() {
+                    let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                    if key == "ID" {
+                        let val = attr.unescape_value().unwrap_or_default();
+                        if val.as_ref() == element_id {
+                            let end_offset = reader.buffer_position() as usize;
+                            return Ok(xml
+                                .get(event_offset..end_offset)
                                 .ok_or_else(|| {
                                     SamlError::SignatureValidationFailed(
                                         "XML byte offset misaligned with UTF-8 character boundary"
                                             .to_string(),
                                     )
                                 })?
-                                .to_string();
-                        }
-                        return Ok(result);
-                    }
-                }
-            }
-            Ok(Event::Empty(ref e)) => {
-                if !capturing {
-                    for attr in e.attributes().flatten() {
-                        let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                        if key == "ID" {
-                            let val = attr.unescape_value().unwrap_or_default();
-                            if val.as_ref() == element_id {
-                                let end_offset = reader.buffer_position() as usize;
-                                return Ok(xml.get(event_offset..end_offset)
-                                    .ok_or_else(|| SamlError::SignatureValidationFailed(
-                                        "XML byte offset misaligned with UTF-8 character boundary".to_string(),
-                                    ))?
-                                    .to_string());
-                            }
+                                .to_string());
                         }
                     }
                 }
@@ -623,14 +621,12 @@ fn remove_signature_element_parsed(xml: &str) -> SamlResult<String> {
                     sig_depth += 1;
                 }
             }
-            Ok(Event::End(_)) => {
-                if sig_depth > 0 {
-                    sig_depth -= 1;
-                    if sig_depth == 0 {
-                        let end_offset = reader.buffer_position() as usize;
-                        if let Some(start) = sig_start_offset.take() {
-                            sig_ranges.push((start, end_offset));
-                        }
+            Ok(Event::End(_)) if sig_depth > 0 => {
+                sig_depth -= 1;
+                if sig_depth == 0 {
+                    let end_offset = reader.buffer_position() as usize;
+                    if let Some(start) = sig_start_offset.take() {
+                        sig_ranges.push((start, end_offset));
                     }
                 }
             }

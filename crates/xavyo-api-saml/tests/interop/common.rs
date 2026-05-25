@@ -427,10 +427,8 @@ pub fn parse_saml_xml(xml: &str) -> Result<ParsedAssertion, String> {
             Ok(Event::Text(e)) => {
                 let text = e.unescape().unwrap_or_default().to_string();
                 match current_element.as_str() {
-                    "Issuer" => {
-                        if parsed.issuer.is_none() {
-                            parsed.issuer = Some(text);
-                        }
+                    "Issuer" if parsed.issuer.is_none() => {
+                        parsed.issuer = Some(text);
                     }
                     "NameID" => {
                         parsed.name_id = Some(text);
@@ -441,15 +439,13 @@ pub fn parse_saml_xml(xml: &str) -> Result<ParsedAssertion, String> {
                     "AuthnContextClassRef" => {
                         parsed.authn_context_class_ref = Some(text);
                     }
-                    "AttributeValue" => {
-                        if in_attribute_value {
-                            if let Some(ref attr_name) = current_attribute_name {
-                                parsed
-                                    .attributes
-                                    .entry(attr_name.clone())
-                                    .or_default()
-                                    .push(text);
-                            }
+                    "AttributeValue" if in_attribute_value => {
+                        if let Some(ref attr_name) = current_attribute_name {
+                            parsed
+                                .attributes
+                                .entry(attr_name.clone())
+                                .or_default()
+                                .push(text);
                         }
                     }
                     _ => {}

@@ -267,9 +267,9 @@ impl SearchQuery {
     ) -> Result<(String, Vec<String>), SearchError> {
         let mut conditions = vec!["tenant_id = $1".to_string()];
         let mut params = vec![tenant_id.to_string()];
-        let mut param_idx = 2;
 
-        for filter in &self.filters {
+        // Postgres positional params start at $2 ($1 is tenant_id).
+        for (param_idx, filter) in (2..).zip(&self.filters) {
             // Validate field is allowed
             if !allowed_fields.contains(&filter.field.as_str()) {
                 return Err(SearchError::InvalidField(filter.field.clone()));
@@ -295,7 +295,6 @@ impl SearchQuery {
             };
 
             params.push(value_str);
-            param_idx += 1;
         }
 
         Ok((conditions.join(" AND "), params))

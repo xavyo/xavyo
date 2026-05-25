@@ -189,7 +189,7 @@ impl PolicyAuditStore for InMemoryPolicyAuditStore {
             .collect();
 
         // Sort by timestamp descending (most recent first)
-        results.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        results.sort_by_key(|r| std::cmp::Reverse(r.timestamp));
 
         let total = results.len() as i64;
 

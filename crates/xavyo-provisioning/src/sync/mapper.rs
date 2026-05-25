@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::warn;
 use uuid::Uuid;
 
 use super::error::{SyncError, SyncResult};
@@ -220,29 +219,13 @@ impl InboundMapper {
         // Process each mapping
         for (ext_attr, mapping) in &self.mappings {
             if let Some(value) = obj.get(ext_attr) {
-                // Apply transformation if present
-                let transformed = if let Some(ref expr) = mapping.transform {
-                    // Transformation expression evaluation is not yet implemented.
-                    // Fail loud rather than pass the raw value through — silently
-                    // dropping the transform produces wrong downstream attribute
-                    // values with `success: true` (see deep review §2.5).
-                    warn!(
-                        external_attribute = %ext_attr,
-                        internal_attribute = %mapping.internal_attribute,
-                        transform_expression = %expr,
-                        "Attribute transformation configured but evaluator not implemented; \
-                         rejecting mapping to surface the gap"
-                    );
-                    return Err(SyncError::mapping(
-                        ext_attr.clone(),
-                        format!(
-                            "transform '{}' on attribute '{}' is not implemented; \
-                             configure no transform or implement the evaluator first",
-                            expr, ext_attr
-                        ),
-                    ));
-                } else {
-                    value.clone()
+                // Apply transformation if present. Unknown transforms fail closed
+                // (returning an error) rather than passing the raw value through —
+                // silently dropping a transform produces wrong downstream values
+                // with `success: true` (see deep review §2.5).
+                let transformed = match &mapping.transform {
+                    Some(expr) => apply_transforms(expr, ext_attr, value)?,
+                    None => value.clone(),
                 };
 
                 result
@@ -296,6 +279,49 @@ impl Default for InboundMapper {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Apply a `|`-separated chain of named string transforms to a JSON value.
+///
+/// Transforms operate on string values and are applied left to right
+/// (`"lowercase|trim"` lowercases, then trims). Whitespace around each name and
+/// empty steps (from a stray `|`) are tolerated. An unknown transform name or a
+/// non-string input fails closed (returns `Err`) so a misconfigured transform
+/// can never silently emit a wrong downstream value.
+fn apply_transforms(
+    expr: &str,
+    attribute: &str,
+    value: &serde_json::Value,
+) -> SyncResult<serde_json::Value> {
+    let mut current = value.as_str().map(str::to_owned).ok_or_else(|| {
+        SyncError::mapping(
+            attribute,
+            format!("transform '{expr}' on attribute '{attribute}' requires a string value"),
+        )
+    })?;
+
+    for step in expr.split('|') {
+        let name = step.trim();
+        if name.is_empty() {
+            continue;
+        }
+        current = match name {
+            "lowercase" => current.to_lowercase(),
+            "uppercase" => current.to_uppercase(),
+            "trim" => current.trim().to_owned(),
+            other => {
+                return Err(SyncError::mapping(
+                    attribute,
+                    format!(
+                        "transform '{other}' on attribute '{attribute}' is not implemented; \
+                         supported transforms: lowercase, uppercase, trim"
+                    ),
+                ));
+            }
+        };
+    }
+
+    Ok(serde_json::Value::String(current))
 }
 
 #[cfg(test)]
@@ -412,8 +438,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mapping_with_transform_placeholder() {
-        // Test that transform expressions are stored (actual transformation is TODO)
+    fn test_mapping_with_transform_lowercase_trim() {
         let mut mapper = InboundMapper::new();
         mapper.add_mapping(
             AttributeMapping::simple("email", "email").with_transform("lowercase|trim"),
@@ -424,17 +449,39 @@ mod tests {
         });
 
         let result = mapper.map(&external).unwrap();
-        // Currently passthrough - when transform is implemented, this should be lowercase and trimmed
         assert!(result.is_success());
-        assert!(result.attributes.contains_key("email"));
-        // Verify a warning is emitted about the skipped transform
+        // lowercase then trim, applied left to right.
+        assert_eq!(
+            result.attributes.get("email").and_then(|v| v.as_str()),
+            Some("john.doe@example.com")
+        );
+    }
+
+    #[test]
+    fn test_unknown_transform_fails_closed() {
+        let mut mapper = InboundMapper::new();
+        mapper.add_mapping(AttributeMapping::simple("email", "email").with_transform("rot13"));
+
+        let external = serde_json::json!({ "email": "user@example.com" });
+
+        let err = mapper.map(&external).unwrap_err();
         assert!(
-            result
-                .warnings
-                .iter()
-                .any(|w| w.contains("lowercase|trim") && w.contains("skipped")),
-            "Expected a warning about skipped transform, got: {:?}",
-            result.warnings
+            err.to_string().contains("not implemented"),
+            "unknown transform must fail closed, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_transform_on_non_string_fails_closed() {
+        let mut mapper = InboundMapper::new();
+        mapper.add_mapping(AttributeMapping::simple("age", "age").with_transform("trim"));
+
+        let external = serde_json::json!({ "age": 42 });
+
+        let err = mapper.map(&external).unwrap_err();
+        assert!(
+            err.to_string().contains("requires a string value"),
+            "string transform on a non-string must fail closed, got: {err}"
         );
     }
 

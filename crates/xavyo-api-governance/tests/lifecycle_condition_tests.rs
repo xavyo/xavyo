@@ -311,10 +311,8 @@ mod transition_flow {
                         failed_conditions.push("termination_date_reached".to_string());
                     }
                 }
-                "no_active_sessions" => {
-                    if _active_sessions > 0 {
-                        failed_conditions.push("no_active_sessions".to_string());
-                    }
+                "no_active_sessions" if _active_sessions > 0 => {
+                    failed_conditions.push("no_active_sessions".to_string());
                 }
                 "custom_attribute_equals" => {
                     let attribute = condition.config.get("attribute").and_then(|v| v.as_str());
