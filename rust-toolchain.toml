@@ -1,0 +1,16 @@
+# Pin the Rust toolchain so local builds match CI.
+#
+# Why: CI installs the toolchain via `dtolnay/rust-toolchain@stable` (a floating
+# channel). On 2026-05-25 stable advanced to clippy 1.95.0, which flagged lints
+# that a local 1.92.0 toolchain did not — master went red and the divergence
+# could not be reproduced locally until the exact CI version was installed by
+# hand. Pinning here makes `cargo` use the same toolchain everywhere
+# (rust-toolchain.toml takes precedence over rustup's default and directory
+# overrides), so CI lints are reproducible locally before pushing.
+#
+# Bumping: change `channel` deliberately, after confirming
+# `cargo clippy --workspace --all-targets -- -D warnings` is clean on the new
+# version (and update CI's dtolnay pin if/when it is also pinned).
+[toolchain]
+channel = "1.95.0"
+components = ["clippy", "rustfmt"]
