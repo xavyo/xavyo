@@ -1014,7 +1014,7 @@ async fn main() {
 
     // Governance routes (F033 - IGA Entitlement Management)
     // F113: Support both API key and JWT authentication for programmatic access
-    let governance_routes = governance_router(pool.clone())
+    let governance_routes = governance_router(pool.clone(), ssf_emitter.clone())
         .layer(axum::middleware::from_fn(admin_guard))
         .layer(axum::middleware::from_fn(jwt_auth_middleware))
         .layer(axum::middleware::from_fn(api_key_auth_middleware))

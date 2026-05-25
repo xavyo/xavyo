@@ -8682,6 +8682,7 @@ dependencies = [
  "xavyo-nhi",
  "xavyo-provisioning",
  "xavyo-siem",
+ "xavyo-ssf",
  "xavyo-tenant",
  "xavyo-webhooks",
 ]
