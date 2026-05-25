@@ -108,6 +108,19 @@ pub fn verify_dpop_nonce(secret: &[u8], candidate: &str, now: i64, window_secs: 
 pub fn check_or_challenge(secret: &[u8], presented: Option<&str>, now: i64, window_secs: i64, allowed_age_windows: i64) -> NonceCheck;
 ```
 
+Step-up authentication (RFC 9470), in `step_up` — a resource enforces an `acr`
+(assurance) / `auth_time` (freshness) requirement on a sensitive operation, and
+challenges insufficient tokens. `acr`/`auth_time` are stamped on login tokens
+and carried across refresh:
+
+```rust
+/// Check whether the token meets the requirement at `now`; otherwise a Challenge.
+pub fn check_step_up(claims: &JwtClaims, req: &StepUpRequirement, now: i64) -> StepUpOutcome;
+
+/// Build the RFC 9470 §3 `WWW-Authenticate: Bearer error="insufficient_user_authentication" …` value.
+pub fn step_up_challenge_header(acr_values: &str, max_age: Option<i64>) -> String;
+```
+
 ## Usage Example
 
 ```rust
