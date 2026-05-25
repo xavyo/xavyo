@@ -33,13 +33,23 @@ ignore = [
     # Deadline: Review when rsa 0.10+ is released
     { id = "RUSTSEC-2023-0071", reason = "no fix available; PostgreSQL-only project, MySQL RSA path unused" },
 
-    # RUSTSEC-2024-0363: sqlx 0.7.4 — Binary protocol misinterpretation via truncating casts
-    # Affected crate: sqlx (direct dependency)
-    # Why exempted: Upgrading to sqlx 0.8+ is a major migration (breaking API changes
-    #               across all 22+ crates). The vulnerability affects MySQL binary protocol;
-    #               we use PostgreSQL exclusively. Tracked for next major dependency update.
-    # Deadline: 2026-06-01
-    { id = "RUSTSEC-2024-0363", reason = "sqlx 0.8 migration pending; MySQL-only vulnerability, we use PostgreSQL" },
+    # (RUSTSEC-2024-0363 sqlx removed 2026-05-25: resolved by the sqlx 0.8.6 upgrade.)
+
+    # NOTE — rustls-webpki 0.101.7 (RUSTSEC-2026-0104 reachable CRL-parsing panic;
+    #   -0098/-0099 certificate name-constraint bypasses): flagged by `cargo audit`
+    #   (raw-lockfile scan) but intentionally NOT ignored here, because `cargo deny`
+    #   does not detect it — the crate is pulled only via xavyo-secrets' OPTIONAL
+    #   `aws-provider` feature (the AWS SDK's legacy rustls-0.21 connector) and is
+    #   absent from the default build graph. All compiled TLS uses rustls 0.23 /
+    #   rustls-webpki 0.103.13. If a build ever enables aws-provider, either upgrade
+    #   the AWS SDK past its rustls-0.21 connector or add explicit ignores here then.
+
+    # RUSTSEC-2026-0097: rand — unsound when a custom `log::Log` implementation calls
+    # `rand::rng()` reentrantly from within its own logging path.
+    # Affected crate: rand (transitive). xavyo logs via `tracing`; it installs no custom
+    # `log::Log` that calls rand, so the reentrancy precondition never holds.
+    # Deadline: 2026-09-01 — drop when transitive deps move to a fixed rand release.
+    { id = "RUSTSEC-2026-0097", reason = "unsound only under a reentrant custom log::Log calling rand::rng(); xavyo uses tracing, precondition never holds" },
 ]
 
 # ============================================================================
