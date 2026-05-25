@@ -62,6 +62,14 @@ pub fn well_known_router() -> Router<OAuthState>;
 | GET | `/.well-known/openid-configuration` | OIDC Discovery |
 | GET | `/.well-known/jwks.json` | JSON Web Key Set |
 
+**DPoP-Nonce (RFC 9449 §8–9):** when `OAuthState::with_dpop_nonce_required(true)`
+(default; env `DPOP_NONCE_REQUIRED`), a DPoP-bound request without a valid
+server nonce is answered with a `use_dpop_nonce` challenge carrying a fresh
+`DPoP-Nonce` header — `/oauth/token` returns 400, resource endpoints return 401
+with a `WWW-Authenticate: DPoP` challenge. FAPI clients always require a nonce.
+The nonce HMAC key is derived from the CSRF secret (independent of the signing
+key).
+
 ### Types
 
 ```rust

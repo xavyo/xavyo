@@ -3,7 +3,10 @@
 //! Provides error types for `OAuth2` flows following RFC 6749.
 
 use axum::{
-    http::StatusCode,
+    http::{
+        header::{HeaderName, HeaderValue, WWW_AUTHENTICATE},
+        StatusCode,
+    },
     response::{IntoResponse, Response},
     Json,
 };
@@ -47,6 +50,8 @@ pub enum OAuthErrorCode {
     SlowDown,
     /// RFC 8628: The device code has expired (device code flow).
     ExpiredToken,
+    /// RFC 9449 §8–9: the request requires a server-issued DPoP nonce.
+    UseDpopNonce,
 }
 
 impl std::fmt::Display for OAuthErrorCode {
@@ -68,6 +73,7 @@ impl std::fmt::Display for OAuthErrorCode {
             Self::AuthorizationPending => "authorization_pending",
             Self::SlowDown => "slow_down",
             Self::ExpiredToken => "expired_token",
+            Self::UseDpopNonce => "use_dpop_nonce",
         };
         write!(f, "{s}")
     }
@@ -144,6 +150,24 @@ pub enum OAuthError {
     #[error("Insufficient scope: {0}")]
     InsufficientScope(String),
 
+    /// RFC 9449 §9: the token endpoint requires a DPoP nonce. The client must
+    /// retry with the carried nonce echoed in the proof's `nonce` claim. HTTP
+    /// 400 + `DPoP-Nonce` response header.
+    #[error("Use DPoP nonce")]
+    UseDpopNonceToken {
+        /// Fresh server-issued nonce for the client to echo on retry.
+        nonce: String,
+    },
+
+    /// RFC 9449 §8: a resource endpoint requires a DPoP nonce. HTTP 401 with a
+    /// `WWW-Authenticate: DPoP error="use_dpop_nonce"` challenge + `DPoP-Nonce`
+    /// response header.
+    #[error("Use DPoP nonce")]
+    UseDpopNonceResource {
+        /// Fresh server-issued nonce for the client to echo on retry.
+        nonce: String,
+    },
+
     /// RFC 8628: Authorization request is still pending.
     #[error("The authorization request is still pending")]
     AuthorizationPending,
@@ -193,6 +217,10 @@ impl OAuthError {
             Self::UnsupportedResponseType(_) => StatusCode::BAD_REQUEST,
             Self::InvalidToken(_) => StatusCode::UNAUTHORIZED,
             Self::InsufficientScope(_) => StatusCode::FORBIDDEN,
+            // RFC 9449: token-endpoint nonce challenge is 400; resource-endpoint
+            // nonce challenge is 401 (it's an access-token authorization error).
+            Self::UseDpopNonceToken { .. } => StatusCode::BAD_REQUEST,
+            Self::UseDpopNonceResource { .. } => StatusCode::UNAUTHORIZED,
             // RFC 8628 device code errors are 400 Bad Request per spec
             Self::AuthorizationPending => StatusCode::BAD_REQUEST,
             Self::SlowDown(_) => StatusCode::BAD_REQUEST,
@@ -221,6 +249,9 @@ impl OAuthError {
             Self::UnsupportedResponseType(_) => OAuthErrorCode::UnsupportedResponseType,
             Self::InvalidToken(_) => OAuthErrorCode::InvalidToken,
             Self::InsufficientScope(_) => OAuthErrorCode::InsufficientScope,
+            Self::UseDpopNonceToken { .. } | Self::UseDpopNonceResource { .. } => {
+                OAuthErrorCode::UseDpopNonce
+            }
             Self::AuthorizationPending => OAuthErrorCode::AuthorizationPending,
             Self::SlowDown(_) => OAuthErrorCode::SlowDown,
             Self::ExpiredToken(_) => OAuthErrorCode::ExpiredToken,
@@ -270,8 +301,43 @@ impl IntoResponse for OAuthError {
     fn into_response(self) -> Response {
         let status = self.status_code();
         let body = Json(self.to_response());
-        (status, body).into_response()
+
+        // RFC 9449 §8–9: a DPoP-nonce challenge carries the fresh nonce in a
+        // `DPoP-Nonce` response header; the resource-server form (§8) also sends
+        // a `WWW-Authenticate: DPoP error="use_dpop_nonce"` challenge with the
+        // accepted proof algorithms (§7.1).
+        match self {
+            Self::UseDpopNonceToken { nonce } => {
+                (status, [dpop_nonce_header(&nonce)], body).into_response()
+            }
+            Self::UseDpopNonceResource { nonce } => (
+                status,
+                [
+                    dpop_nonce_header(&nonce),
+                    (
+                        WWW_AUTHENTICATE,
+                        HeaderValue::from_static(
+                            "DPoP error=\"use_dpop_nonce\", \
+                             error_description=\"DPoP nonce required\", \
+                             algs=\"RS256 PS256 ES256\"",
+                        ),
+                    ),
+                ],
+                body,
+            )
+                .into_response(),
+            _ => (status, body).into_response(),
+        }
     }
+}
+
+/// Build the `DPoP-Nonce` response header. The nonce is base64url (RFC 9449
+/// §8.1), so it is always a valid header value; the fallback is unreachable.
+fn dpop_nonce_header(nonce: &str) -> (HeaderName, HeaderValue) {
+    (
+        HeaderName::from_static("dpop-nonce"),
+        HeaderValue::from_str(nonce).unwrap_or(HeaderValue::from_static("")),
+    )
 }
 
 #[cfg(test)]
@@ -312,5 +378,50 @@ mod tests {
             OAuthError::AccessDenied("test".into()).status_code(),
             StatusCode::FORBIDDEN
         );
+    }
+
+    #[test]
+    fn dpop_nonce_token_challenge_sets_header_and_400() {
+        // RFC 9449 §9: token-endpoint challenge is 400 with the fresh nonce in a
+        // DPoP-Nonce header. Guards the IntoResponse header plumbing.
+        let err = OAuthError::UseDpopNonceToken {
+            nonce: "test-nonce-value".to_string(),
+        };
+        assert_eq!(err.error_code().to_string(), "use_dpop_nonce");
+        let resp = err.into_response();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            resp.headers()
+                .get("dpop-nonce")
+                .and_then(|v| v.to_str().ok()),
+            Some("test-nonce-value")
+        );
+        // The token form does NOT carry a WWW-Authenticate challenge.
+        assert!(resp.headers().get(WWW_AUTHENTICATE).is_none());
+    }
+
+    #[test]
+    fn dpop_nonce_resource_challenge_sets_headers_and_401() {
+        // RFC 9449 §8: resource-endpoint challenge is 401 with both DPoP-Nonce
+        // and a WWW-Authenticate: DPoP error="use_dpop_nonce" challenge.
+        let err = OAuthError::UseDpopNonceResource {
+            nonce: "resource-nonce".to_string(),
+        };
+        let resp = err.into_response();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            resp.headers()
+                .get("dpop-nonce")
+                .and_then(|v| v.to_str().ok()),
+            Some("resource-nonce")
+        );
+        let www = resp
+            .headers()
+            .get(WWW_AUTHENTICATE)
+            .and_then(|v| v.to_str().ok())
+            .expect("WWW-Authenticate present");
+        assert!(www.starts_with("DPoP "));
+        assert!(www.contains("error=\"use_dpop_nonce\""));
+        assert!(www.contains("algs="));
     }
 }

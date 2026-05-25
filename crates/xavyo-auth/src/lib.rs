@@ -57,7 +57,10 @@ pub use client_assertion::{
     CLIENT_ASSERTION_TYPE_JWT_BEARER,
 };
 pub use dpop::{compute_ath, jwk_thumbprint, verify_resource_proof, DpopError, ValidatedProof};
-pub use dpop_nonce::{issue_dpop_nonce, verify_dpop_nonce, DPOP_NONCE_WINDOW_SECS};
+pub use dpop_nonce::{
+    check_or_challenge, derive_secret as derive_dpop_nonce_secret, issue_dpop_nonce,
+    verify_dpop_nonce, NonceCheck, DPOP_NONCE_ALLOWED_AGE_WINDOWS, DPOP_NONCE_WINDOW_SECS,
+};
 pub use error::AuthError;
 pub use jsonwebtoken::Algorithm;
 pub use jwks::{JwkSet, JwksClient};

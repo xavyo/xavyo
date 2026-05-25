@@ -92,6 +92,22 @@ pub fn hash_password(password: &str) -> Result<String, AuthError>;
 pub fn verify_password(password: &str, hash: &str) -> Result<bool, AuthError>;
 ```
 
+DPoP-Nonce (RFC 9449 §8–9), in `dpop_nonce` — stateless `HMAC(secret, window)`
+so any node can issue/verify without shared state:
+
+```rust
+/// Derive the nonce HMAC key from a root secret (e.g. the CSRF secret), keeping
+/// it independent of the JWT signing key.
+pub fn derive_dpop_nonce_secret(root_secret: &[u8]) -> Vec<u8>;
+
+/// Issue / constant-time verify a nonce for the time window containing `now`.
+pub fn issue_dpop_nonce(secret: &[u8], now: i64, window_secs: i64) -> String;
+pub fn verify_dpop_nonce(secret: &[u8], candidate: &str, now: i64, window_secs: i64, allowed_age_windows: i64) -> bool;
+
+/// Accept a valid presented nonce or return a fresh `Challenge(nonce)`.
+pub fn check_or_challenge(secret: &[u8], presented: Option<&str>, now: i64, window_secs: i64, allowed_age_windows: i64) -> NonceCheck;
+```
+
 ## Usage Example
 
 ```rust

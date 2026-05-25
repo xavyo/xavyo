@@ -737,6 +737,8 @@ async fn main() {
         // F082-US6: CSRF secret MUST be independent of JWT signing key
         config.csrf_secret.to_vec(),
     )
+    // RFC 9449 §8–9: global DPoP-Nonce requirement (FAPI clients always on).
+    .with_dpop_nonce_required(config.dpop_nonce_required)
     // F084: Share RevocationCache with OAuth2 revocation/introspection handlers
     .with_revocation_cache(revocation_cache.clone())
     // F117: Set system tenant ID for device code email confirmations

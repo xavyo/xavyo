@@ -64,6 +64,51 @@ pub fn verify_dpop_nonce(
     })
 }
 
+/// Derive the DPoP-nonce HMAC key from a root secret (e.g. the CSRF secret).
+///
+/// The nonce key MUST be independent of the JWT signing key (which is public via
+/// JWKS and rotated on its own schedule). Reusing the already-independent CSRF
+/// secret with a distinct domain prefix gives that independence without making
+/// operators provision yet another secret. Domain separation keeps the CSRF and
+/// nonce uses cryptographically distinct.
+#[must_use]
+pub fn derive_secret(root_secret: &[u8]) -> Vec<u8> {
+    let mut mac = HmacSha256::new_from_slice(root_secret).expect("HMAC accepts any key length");
+    mac.update(b"dpop-nonce:v1:root");
+    mac.finalize().into_bytes().to_vec()
+}
+
+/// Outcome of checking a presented DPoP `nonce` when the endpoint requires one.
+#[derive(Debug, PartialEq, Eq)]
+pub enum NonceCheck {
+    /// The proof carried a currently-valid nonce — proceed.
+    Ok,
+    /// No nonce, or a stale/forged one — challenge the client with this fresh
+    /// nonce (return it in the `DPoP-Nonce` response header).
+    Challenge(String),
+}
+
+/// Check a (possibly absent) presented nonce, issuing a fresh challenge nonce
+/// when the presented one is missing, stale, or forged.
+///
+/// Call only when a nonce is required for this request; bearer (non-DPoP)
+/// requests never reach here.
+#[must_use]
+pub fn check_or_challenge(
+    secret: &[u8],
+    presented: Option<&str>,
+    now: i64,
+    window_secs: i64,
+    allowed_age_windows: i64,
+) -> NonceCheck {
+    match presented {
+        Some(n) if verify_dpop_nonce(secret, n, now, window_secs, allowed_age_windows) => {
+            NonceCheck::Ok
+        }
+        _ => NonceCheck::Challenge(issue_dpop_nonce(secret, now, window_secs)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,5 +164,50 @@ mod tests {
         let now = 1_000_000;
         let future = issue_dpop_nonce(SECRET, now + 10 * W, W);
         assert!(!verify_dpop_nonce(SECRET, &future, now, W, 1));
+    }
+
+    #[test]
+    fn derived_secret_is_stable_independent_and_distinct() {
+        let root = b"csrf-root-secret-material";
+        let a = derive_secret(root);
+        let b = derive_secret(root);
+        assert_eq!(a, b, "derivation must be deterministic");
+        assert_ne!(a, root.to_vec(), "derived secret must differ from the root");
+        assert_ne!(
+            derive_secret(b"other-root"),
+            a,
+            "different roots must derive different secrets"
+        );
+        assert_eq!(a.len(), 32, "HMAC-SHA256 output is 32 bytes");
+    }
+
+    #[test]
+    fn check_or_challenge_accepts_valid_and_challenges_otherwise() {
+        let now = 1_000_000;
+        let good = issue_dpop_nonce(SECRET, now, W);
+
+        assert_eq!(
+            check_or_challenge(SECRET, Some(&good), now, W, 1),
+            NonceCheck::Ok
+        );
+
+        // Absent nonce → challenge with a freshly issued, verifiable nonce.
+        let NonceCheck::Challenge(fresh) = check_or_challenge(SECRET, None, now, W, 1) else {
+            panic!("absent nonce must produce a challenge");
+        };
+        assert!(verify_dpop_nonce(SECRET, &fresh, now, W, 1));
+
+        // Forged nonce → challenge.
+        assert!(matches!(
+            check_or_challenge(SECRET, Some("forged"), now, W, 1),
+            NonceCheck::Challenge(_)
+        ));
+
+        // Stale nonce (older than the allowed window) → challenge.
+        let stale = issue_dpop_nonce(SECRET, now - 5 * W, W);
+        assert!(matches!(
+            check_or_challenge(SECRET, Some(&stale), now, W, 1),
+            NonceCheck::Challenge(_)
+        ));
     }
 }

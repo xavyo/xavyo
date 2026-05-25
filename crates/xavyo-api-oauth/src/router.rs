@@ -107,6 +107,15 @@ pub struct OAuthState {
     /// CSRF secret for consent form protection (F082-US6).
     /// SECURITY: This MUST be independent of the JWT signing key.
     csrf_secret: Vec<u8>,
+    /// HMAC key for stateless DPoP-Nonce (RFC 9449 §8–9). Derived from
+    /// `csrf_secret` so it inherits the same independence from the JWT signing
+    /// key (which is public via JWKS) without an extra operator-provisioned
+    /// secret.
+    dpop_nonce_secret: Vec<u8>,
+    /// Whether DPoP-bound requests must carry a server-issued nonce (RFC 9449
+    /// §8–9). Global toggle (env `DPOP_NONCE_REQUIRED`, default `true`); FAPI
+    /// clients always require one regardless of this flag (FAPI 2.0 §5.3).
+    dpop_nonce_required: bool,
     /// F117: Device confirmation service for Storm-2372 remediation.
     pub device_confirmation_service: Option<Arc<DeviceConfirmationService>>,
     /// F117: Device risk service for Storm-2372 risk scoring.
@@ -192,6 +201,10 @@ impl OAuthState {
         ));
         let userinfo_service = Arc::new(UserInfoService::new(pool.clone()));
 
+        // Derive the DPoP-nonce HMAC key from the (signing-key-independent) CSRF
+        // secret before it is moved into the struct.
+        let dpop_nonce_secret = xavyo_auth::derive_dpop_nonce_secret(&csrf_secret);
+
         Self {
             pool,
             client_service,
@@ -207,6 +220,8 @@ impl OAuthState {
             signing_keys,
             revocation_cache: None,
             csrf_secret,
+            dpop_nonce_secret,
+            dpop_nonce_required: true,
             device_confirmation_service: None,
             device_risk_service: None,
             system_tenant_id: SYSTEM_TENANT_ID, // Safe default; overridable via with_system_tenant_id
@@ -262,6 +277,26 @@ impl OAuthState {
     pub fn with_frontend_url(mut self, url: String) -> Self {
         self.frontend_url = Some(url);
         self
+    }
+
+    /// Set whether DPoP-bound requests must carry a server-issued nonce
+    /// (RFC 9449 §8–9). Defaults to `true`; FAPI clients always require one.
+    #[must_use]
+    pub fn with_dpop_nonce_required(mut self, required: bool) -> Self {
+        self.dpop_nonce_required = required;
+        self
+    }
+
+    /// The HMAC key for issuing/verifying stateless DPoP nonces.
+    #[must_use]
+    pub fn dpop_nonce_secret(&self) -> &[u8] {
+        &self.dpop_nonce_secret
+    }
+
+    /// Whether a DPoP nonce is required for DPoP-bound requests (global toggle).
+    #[must_use]
+    pub fn dpop_nonce_required(&self) -> bool {
+        self.dpop_nonce_required
     }
 
     /// Set the Kafka event producer for delegation events.
