@@ -291,3 +291,195 @@ impl SsfSubject {
         .await
     }
 }
+
+/// A signed SET queued for poll-based delivery (RFC 8936). Rows live until the
+/// receiver acknowledges them on a subsequent poll.
+#[derive(Debug, Clone, FromRow)]
+pub struct SsfQueuedEvent {
+    /// The SET's `jti` — also the acknowledgement key.
+    pub jti: String,
+    /// Tenant isolation (RLS-enforced).
+    pub tenant_id: Uuid,
+    /// The stream this SET is queued for.
+    pub stream_id: Uuid,
+    /// The signed compact JWS, served verbatim to the receiver.
+    pub set_jwt: String,
+    /// Enqueue timestamp (FIFO ordering).
+    pub created_at: DateTime<Utc>,
+}
+
+impl SsfQueuedEvent {
+    /// Enqueue a signed SET for poll delivery. Idempotent on `jti`.
+    ///
+    /// # Errors
+    /// Propagates the underlying `sqlx` error.
+    pub async fn enqueue<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        stream_id: Uuid,
+        jti: &str,
+        set_jwt: &str,
+    ) -> Result<(), sqlx::Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        sqlx::query(
+            r"
+            INSERT INTO ssf_event_queue (jti, tenant_id, stream_id, set_jwt)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (jti) DO NOTHING
+            ",
+        )
+        .bind(jti)
+        .bind(tenant_id)
+        .bind(stream_id)
+        .bind(set_jwt)
+        .execute(executor)
+        .await?;
+        Ok(())
+    }
+
+    /// Fetch up to `max_events` oldest queued SETs for a stream (FIFO). SETs stay
+    /// queued until acked (RFC 8936 §2.4), so repeated polls without an ack
+    /// return the same batch.
+    ///
+    /// # Errors
+    /// Propagates the underlying `sqlx` error.
+    pub async fn poll<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        stream_id: Uuid,
+        max_events: i64,
+    ) -> Result<Vec<Self>, sqlx::Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        sqlx::query_as(
+            r"
+            SELECT * FROM ssf_event_queue
+            WHERE tenant_id = $1 AND stream_id = $2
+            ORDER BY created_at
+            LIMIT $3
+            ",
+        )
+        .bind(tenant_id)
+        .bind(stream_id)
+        .bind(max_events)
+        .fetch_all(executor)
+        .await
+    }
+
+    /// Acknowledge (delete) the given `jti`s for a stream. A stale `jti` is a
+    /// no-op (a fresh SET has a new `jti`). Returns the number of rows removed.
+    ///
+    /// # Errors
+    /// Propagates the underlying `sqlx` error.
+    pub async fn ack<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        stream_id: Uuid,
+        jtis: &[String],
+    ) -> Result<u64, sqlx::Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        if jtis.is_empty() {
+            return Ok(0);
+        }
+        let result = sqlx::query(
+            r"
+            DELETE FROM ssf_event_queue
+            WHERE tenant_id = $1 AND stream_id = $2 AND jti = ANY($3)
+            ",
+        )
+        .bind(tenant_id)
+        .bind(stream_id)
+        .bind(jtis)
+        .execute(executor)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    /// Total queued SETs for a stream — used to compute `moreAvailable`.
+    ///
+    /// # Errors
+    /// Propagates the underlying `sqlx` error.
+    pub async fn count_for_stream<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        stream_id: Uuid,
+    ) -> Result<i64, sqlx::Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM ssf_event_queue WHERE tenant_id = $1 AND stream_id = $2",
+        )
+        .bind(tenant_id)
+        .bind(stream_id)
+        .fetch_one(executor)
+        .await?;
+        Ok(row.0)
+    }
+}
+
+/// Resolves a poll bearer token (by its hash) to the stream + tenant it grants
+/// access to. This is the pre-tenant-context credential lookup for RFC 8936
+/// polls: the receiver presents a token, this recovers the tenant, then the
+/// handler sets the tenant context for the RLS-scoped queue access.
+#[derive(Debug, Clone, FromRow)]
+pub struct SsfPollToken {
+    /// SHA-256 hex of the per-stream poll bearer token.
+    pub token_hash: String,
+    /// The stream this token grants poll access to.
+    pub stream_id: Uuid,
+    /// The tenant the stream belongs to.
+    pub tenant_id: Uuid,
+    /// Creation timestamp.
+    pub created_at: DateTime<Utc>,
+}
+
+impl SsfPollToken {
+    /// Register a poll token hash for a stream (called at poll-stream creation).
+    ///
+    /// # Errors
+    /// Propagates the underlying `sqlx` error.
+    pub async fn create<'e, E>(
+        executor: E,
+        token_hash: &str,
+        stream_id: Uuid,
+        tenant_id: Uuid,
+    ) -> Result<(), sqlx::Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        sqlx::query(
+            r"
+            INSERT INTO ssf_poll_tokens (token_hash, stream_id, tenant_id)
+            VALUES ($1, $2, $3)
+            ",
+        )
+        .bind(token_hash)
+        .bind(stream_id)
+        .bind(tenant_id)
+        .execute(executor)
+        .await?;
+        Ok(())
+    }
+
+    /// Resolve a presented token hash to its stream + tenant. No tenant context
+    /// is required (this table is not RLS-scoped — it is the resolution itself).
+    /// Returns `None` for an unknown token.
+    ///
+    /// # Errors
+    /// Propagates the underlying `sqlx` error.
+    pub async fn resolve<'e, E>(executor: E, token_hash: &str) -> Result<Option<Self>, sqlx::Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        sqlx::query_as("SELECT * FROM ssf_poll_tokens WHERE token_hash = $1")
+            .bind(token_hash)
+            .fetch_optional(executor)
+            .await
+    }
+}

@@ -16,7 +16,7 @@ api
 
 🔴 **alpha**
 
-16 unit tests (SSRF guard, model serialization, transmitter SET building). No HTTP+Postgres integration tests yet, and the receiver-side roles (poll delivery per RFC 8936, verification events) are not implemented. API will change.
+20 unit tests (SSRF guard, model serialization, transmitter SET building, poll token hashing/parsing). Push (RFC 8935) and poll (RFC 8936) delivery are both implemented; verification events (SSF §7.1.4) and a queue-TTL janitor are not. No HTTP+Postgres integration tests yet — API will change.
 
 ## Dependencies
 
@@ -44,6 +44,12 @@ api
 ///   POST      /subjects:add     add a subject to a stream
 ///   POST      /subjects:remove  remove a subject from a stream
 pub fn ssf_router() -> Router<SsfState>;
+
+/// Poll-based delivery (RFC 8936). Receiver-facing — authenticates with the
+/// per-stream bearer token, NOT the tenant JWT. Mount at `/ssf` OUTSIDE the
+/// tenant-auth middleware (e.g. `ssf_router(...).layer(auth).merge(ssf_poll_router(...))`).
+///   POST /poll   ack the prior batch + pull queued SETs (jti -> JWS)
+pub fn ssf_poll_router(state: SsfState) -> Router;
 
 /// Transmitter metadata (SSF §7). Mount at `/.well-known`.
 ///   GET /.well-known/ssf-configuration

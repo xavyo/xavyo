@@ -8,8 +8,11 @@ use xavyo_db::models::{
     SsfStream, STREAM_STATUS_DISABLED, STREAM_STATUS_ENABLED, STREAM_STATUS_PAUSED,
 };
 
-/// Push delivery method URN (RFC 8935) — the only delivery method in v1.
+/// Push delivery method URN (RFC 8935).
 pub const PUSH_DELIVERY_METHOD: &str = "urn:ietf:rfc:8935";
+
+/// Poll delivery method URN (RFC 8936).
+pub const POLL_DELIVERY_METHOD: &str = "urn:ietf:rfc:8936";
 
 /// SSF stream `delivery` object (SSF §8.1.1).
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -39,19 +42,29 @@ pub struct CreateStreamRequest {
 }
 
 impl CreateStreamRequest {
-    /// Validate the request. v1 accepts only push delivery, and the receiver
-    /// `endpoint_url` must pass the SSRF guard (https + public host).
+    /// Validate the request. Push delivery (RFC 8935) requires the receiver
+    /// `endpoint_url` to pass the SSRF guard (https + public host); poll
+    /// delivery (RFC 8936) does not call out, so its `endpoint_url` is
+    /// informational and not SSRF-checked.
     ///
     /// # Errors
-    /// [`SsfApiError::InvalidRequest`] on unsupported delivery or an endpoint
-    /// that fails [`crate::ssrf::validate_receiver_url`].
+    /// [`SsfApiError::InvalidRequest`] on an unsupported delivery method or a
+    /// push endpoint that fails [`crate::ssrf::validate_receiver_url`].
     pub fn validate(&self) -> Result<(), SsfApiError> {
-        if self.delivery.method != PUSH_DELIVERY_METHOD {
-            return Err(SsfApiError::InvalidRequest(format!(
-                "unsupported delivery method (v1 supports only {PUSH_DELIVERY_METHOD})"
-            )));
+        match self.delivery.method.as_str() {
+            PUSH_DELIVERY_METHOD => crate::ssrf::validate_receiver_url(&self.delivery.endpoint_url),
+            POLL_DELIVERY_METHOD => Ok(()),
+            other => Err(SsfApiError::InvalidRequest(format!(
+                "unsupported delivery method '{other}' \
+                 (supported: {PUSH_DELIVERY_METHOD} push, {POLL_DELIVERY_METHOD} poll)"
+            ))),
         }
-        crate::ssrf::validate_receiver_url(&self.delivery.endpoint_url)
+    }
+
+    /// Whether this request asks for poll-based delivery (RFC 8936).
+    #[must_use]
+    pub fn is_poll(&self) -> bool {
+        self.delivery.method == POLL_DELIVERY_METHOD
     }
 }
 
@@ -75,10 +88,17 @@ pub struct StreamResponse {
     /// Optional description.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// The per-stream poll bearer token (RFC 8936). Returned **once**, only on
+    /// creation of a poll-delivery stream — store it, it cannot be retrieved
+    /// again. Absent for push streams and on list/get.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub poll_token: Option<String>,
 }
 
 impl StreamResponse {
     /// Build a response from a stored stream, stamping the transmitter `iss`.
+    /// `poll_token` is `None` (set explicitly via [`Self::with_poll_token`] on
+    /// poll-stream creation).
     #[must_use]
     pub fn from_stream(stream: SsfStream, issuer: &str) -> Self {
         Self {
@@ -93,8 +113,47 @@ impl StreamResponse {
             events_delivered: stream.events_delivered,
             status: stream.status,
             description: stream.description,
+            poll_token: None,
         }
     }
+
+    /// Attach the one-time poll bearer token (poll-stream creation only).
+    #[must_use]
+    pub fn with_poll_token(mut self, token: String) -> Self {
+        self.poll_token = Some(token);
+        self
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Body for `POST /ssf/poll` — poll-based delivery (RFC 8936 §2.4).
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct PollRequest {
+    /// Maximum SETs to return in this poll (clamped server-side).
+    #[serde(default, rename = "maxEvents")]
+    pub max_events: Option<i64>,
+    /// RFC 8936: if `false` the transmitter MAY hold the request open (long
+    /// poll). v1 always returns immediately; the field is accepted for
+    /// compatibility.
+    #[serde(default = "default_true", rename = "returnImmediately")]
+    pub return_immediately: bool,
+    /// `jti`s of SETs the receiver acknowledges as delivered — removed from the
+    /// queue before the next batch is selected.
+    #[serde(default)]
+    pub ack: Vec<String>,
+}
+
+/// Response to `POST /ssf/poll` (RFC 8936 §2.4).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct PollResponse {
+    /// Map of SET `jti` → compact JWS for the returned batch.
+    pub sets: std::collections::HashMap<String, String>,
+    /// Whether more queued SETs remain beyond this batch.
+    #[serde(rename = "moreAvailable")]
+    pub more_available: bool,
 }
 
 /// Body for `POST /ssf/status` (update stream status).
@@ -171,7 +230,10 @@ impl SsfConfigurationMetadata {
         Self {
             issuer: issuer.to_string(),
             jwks_uri: format!("{base}/.well-known/jwks.json"),
-            delivery_methods_supported: vec![PUSH_DELIVERY_METHOD.to_string()],
+            delivery_methods_supported: vec![
+                PUSH_DELIVERY_METHOD.to_string(),
+                POLL_DELIVERY_METHOD.to_string(),
+            ],
             configuration_endpoint: format!("{base}/ssf/streams"),
             status_endpoint: format!("{base}/ssf/status"),
             add_subject_endpoint: format!("{base}/ssf/subjects:add"),
@@ -197,15 +259,36 @@ mod tests {
             m.add_subject_endpoint,
             "https://idp.example.com/ssf/subjects:add"
         );
-        assert_eq!(m.delivery_methods_supported, vec![PUSH_DELIVERY_METHOD]);
+        assert_eq!(
+            m.delivery_methods_supported,
+            vec![PUSH_DELIVERY_METHOD, POLL_DELIVERY_METHOD]
+        );
     }
 
     #[test]
-    fn create_request_rejects_non_push_delivery() {
+    fn create_request_accepts_poll_delivery() {
+        // Poll delivery (RFC 8936) is now supported; endpoint_url is not
+        // SSRF-checked because poll never calls out.
         let req = CreateStreamRequest {
             aud: "https://rp".into(),
             delivery: DeliveryConfig {
-                method: "urn:ietf:rfc:8936".into(), // poll, not supported in v1
+                method: POLL_DELIVERY_METHOD.into(),
+                endpoint_url: "https://rp/poll".into(),
+            },
+            events_requested: vec![],
+            delivery_authorization_header: None,
+            description: None,
+        };
+        assert!(req.validate().is_ok());
+        assert!(req.is_poll());
+    }
+
+    #[test]
+    fn create_request_rejects_unknown_delivery() {
+        let req = CreateStreamRequest {
+            aud: "https://rp".into(),
+            delivery: DeliveryConfig {
+                method: "urn:example:carrier-pigeon".into(),
                 endpoint_url: "https://rp/ssf".into(),
             },
             events_requested: vec![],

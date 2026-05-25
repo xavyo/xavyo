@@ -94,7 +94,7 @@ Criteria:
 | xavyo-api-import | 🟢 stable | 92+ | 45+ | Full integration test coverage |
 | xavyo-api-oidc-federation | 🟡 beta | 13 | 16 | Insufficient coverage |
 | xavyo-api-nhi | 🟢 stable | 77 | 33 | Complete with risk scoring, F-047 & F-048 |
-| xavyo-api-ssf | 🔴 alpha | 16 | 43 | SSF transmitter + SSRF guard, no integration tests |
+| xavyo-api-ssf | 🔴 alpha | 20 | 50 | SSF push + poll (RFC 8936) delivery + SSRF guard, no integration tests |
 
 ---
 

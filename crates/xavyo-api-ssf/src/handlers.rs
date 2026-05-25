@@ -13,7 +13,7 @@ use axum::{
 use sqlx::pool::PoolConnection;
 use sqlx::Postgres;
 use xavyo_core::TenantId;
-use xavyo_db::models::{CreateSsfStream, SsfStream, SsfSubject};
+use xavyo_db::models::{CreateSsfStream, SsfPollToken, SsfStream, SsfSubject};
 use xavyo_ssf::{CREDENTIAL_CHANGE_URI, SESSION_REVOKED_URI};
 
 use crate::error::SsfApiError;
@@ -35,7 +35,7 @@ pub struct SsfState {
 const SUPPORTED_EVENTS: [&str; 2] = [SESSION_REVOKED_URI, CREDENTIAL_CHANGE_URI];
 
 /// Acquire a pooled connection with the tenant RLS context set.
-async fn tenant_conn(
+pub(crate) async fn tenant_conn(
     pool: &sqlx::PgPool,
     tenant_id: uuid::Uuid,
 ) -> Result<PoolConnection<Postgres>, SsfApiError> {
@@ -60,6 +60,7 @@ pub async fn create_stream(
 ) -> Result<(StatusCode, Json<StreamResponse>), SsfApiError> {
     req.validate()?;
     let tenant = *tenant_id.as_uuid();
+    let is_poll = req.is_poll();
 
     // We deliver only the requested events we actually support.
     let events_delivered: Vec<String> = req
@@ -85,10 +86,23 @@ pub async fn create_stream(
     )
     .await?;
 
-    Ok((
-        StatusCode::CREATED,
-        Json(StreamResponse::from_stream(stream, &state.issuer)),
-    ))
+    // RFC 8936: a poll stream gets a one-time bearer token (hash stored) the
+    // receiver presents to POST /ssf/poll. Returned once in this response.
+    let response = if is_poll {
+        let token = crate::poll::generate_poll_token();
+        SsfPollToken::create(
+            &mut *conn,
+            &crate::poll::hash_poll_token(&token),
+            stream.stream_id,
+            tenant,
+        )
+        .await?;
+        StreamResponse::from_stream(stream, &state.issuer).with_poll_token(token)
+    } else {
+        StreamResponse::from_stream(stream, &state.issuer)
+    };
+
+    Ok((StatusCode::CREATED, Json(response)))
 }
 
 /// `GET /ssf/streams` — list the tenant's streams.

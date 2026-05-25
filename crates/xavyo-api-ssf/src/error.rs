@@ -19,6 +19,11 @@ pub enum SsfApiError {
     #[error("stream not found")]
     StreamNotFound,
 
+    /// The poll bearer token was missing or did not resolve to a stream
+    /// (RFC 8936 receiver auth).
+    #[error("invalid or missing poll credentials")]
+    Unauthorized,
+
     /// A database error (sanitized in the response).
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
@@ -33,6 +38,7 @@ impl SsfApiError {
         match self {
             Self::InvalidRequest(_) => StatusCode::BAD_REQUEST,
             Self::StreamNotFound => StatusCode::NOT_FOUND,
+            Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::Database(_) | Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

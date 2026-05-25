@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use reqwest::Client;
 use uuid::Uuid;
-use xavyo_db::models::SsfStream;
+use xavyo_db::models::{SsfQueuedEvent, SsfStream};
 use xavyo_ssf::{CaepEvent, SecurityEventToken, SubjectId};
 
 use crate::ssrf::validate_receiver_url;
@@ -41,6 +41,9 @@ pub enum DeliveryError {
     /// The receiver responded with a non-success status.
     #[error("receiver returned status {0}")]
     Status(u16),
+    /// Enqueuing a SET for poll delivery failed.
+    #[error("failed to queue SET for poll delivery: {0}")]
+    Queue(String),
 }
 
 /// Signs and pushes Security Event Tokens to stream receivers.
@@ -81,6 +84,8 @@ impl SsfTransmitter {
     }
 
     /// Build + sign a SET for `event`/`subject` addressed to `stream`'s receiver.
+    /// Returns `(jti, compact_jws)` — the `jti` is the queue/ack key for poll
+    /// delivery and the SET's identifier for push.
     ///
     /// # Errors
     /// [`DeliveryError::Signing`] if signing fails.
@@ -89,7 +94,7 @@ impl SsfTransmitter {
         stream: &SsfStream,
         subject: &SubjectId,
         event: &CaepEvent,
-    ) -> Result<String, DeliveryError> {
+    ) -> Result<(String, String), DeliveryError> {
         let set = SecurityEventToken::new(
             self.issuer.clone(),
             stream.aud.clone(),
@@ -98,8 +103,10 @@ impl SsfTransmitter {
         );
         let now = chrono::Utc::now().timestamp();
         let jti = Uuid::new_v4().to_string();
-        set.sign(&self.signing_key_pem, &self.kid, now, &jti)
-            .map_err(|e| DeliveryError::Signing(e.to_string()))
+        let jws = set
+            .sign(&self.signing_key_pem, &self.kid, now, &jti)
+            .map_err(|e| DeliveryError::Signing(e.to_string()))?;
+        Ok((jti, jws))
     }
 
     /// POST a signed SET to a receiver endpoint (pure transport — the caller
@@ -159,7 +166,14 @@ impl SsfTransmitter {
 
         let mut outcomes = Vec::with_capacity(streams.len());
         for stream in streams {
-            let outcome = self.emit_one(&stream, subject, event).await;
+            // Poll-delivery streams (RFC 8936) are enqueued for the receiver to
+            // pull; push streams (RFC 8935) are delivered now.
+            let outcome = if stream.delivery_method == crate::models::POLL_DELIVERY_METHOD {
+                self.enqueue_one(pool, tenant_id, &stream, subject, event)
+                    .await
+            } else {
+                self.emit_one(&stream, subject, event).await
+            };
             if let Err(ref e) = outcome {
                 tracing::warn!(
                     target: "ssf",
@@ -173,7 +187,7 @@ impl SsfTransmitter {
         Ok(outcomes)
     }
 
-    /// Validate, sign, and deliver a SET to one stream.
+    /// Validate, sign, and deliver a SET to one push stream.
     async fn emit_one(
         &self,
         stream: &SsfStream,
@@ -185,13 +199,39 @@ impl SsfTransmitter {
         // DNS-rebinding mitigation: a public-looking hostname could resolve to a
         // private address. Resolve now and reject if any resolved IP is non-public.
         assert_endpoint_resolves_public(&stream.endpoint_url).await?;
-        let set_jwt = self.build_set(stream, subject, event)?;
+        let (_jti, set_jwt) = self.build_set(stream, subject, event)?;
         self.deliver(
             &stream.endpoint_url,
             stream.delivery_authorization_header.as_deref(),
             &set_jwt,
         )
         .await
+    }
+
+    /// Sign and enqueue a SET for a poll-delivery stream (RFC 8936). No SSRF
+    /// check — poll delivery never calls out; the receiver pulls. Sets the
+    /// tenant context so the RLS-scoped queue insert is tenant-isolated.
+    async fn enqueue_one(
+        &self,
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        stream: &SsfStream,
+        subject: &SubjectId,
+        event: &CaepEvent,
+    ) -> Result<(), DeliveryError> {
+        let (jti, set_jwt) = self.build_set(stream, subject, event)?;
+        let mut conn = pool
+            .acquire()
+            .await
+            .map_err(|e| DeliveryError::Queue(e.to_string()))?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await
+            .map_err(|e| DeliveryError::Queue(e.to_string()))?;
+        SsfQueuedEvent::enqueue(&mut *conn, tenant_id, stream.stream_id, &jti, &set_jwt)
+            .await
+            .map_err(|e| DeliveryError::Queue(e.to_string()))
     }
 }
 

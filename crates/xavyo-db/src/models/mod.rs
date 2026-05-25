@@ -954,8 +954,8 @@ pub use client_assertion_jti::ClientAssertionJti;
 
 // Shared Signals Framework exports (OpenID SSF 1.0)
 pub use ssf::{
-    CreateSsfStream, SsfStream, SsfSubject, STREAM_STATUS_DISABLED, STREAM_STATUS_ENABLED,
-    STREAM_STATUS_PAUSED,
+    CreateSsfStream, SsfPollToken, SsfQueuedEvent, SsfStream, SsfSubject, STREAM_STATUS_DISABLED,
+    STREAM_STATUS_ENABLED, STREAM_STATUS_PAUSED,
 };
 
 // Pushed Authorization Requests export (RFC 9126)
