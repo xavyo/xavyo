@@ -9,8 +9,8 @@
 use crate::error::ApiAuthError;
 use crate::models::{SignupRequest, SignupResponse};
 use crate::services::{
-    generate_email_verification_token, AuthService, EmailSender, PasswordPolicyService,
-    TokenService, EMAIL_VERIFICATION_TOKEN_VALIDITY_HOURS,
+    generate_email_verification_token, AuthContext, AuthService, EmailSender,
+    PasswordPolicyService, TokenService, EMAIL_VERIFICATION_TOKEN_VALIDITY_HOURS,
 };
 use axum::{extract::ConnectInfo, http::StatusCode, Extension, Json};
 use chrono::{Duration, Utc};
@@ -129,6 +129,8 @@ pub async fn signup_handler(
             tenant_id,
             vec![], // No roles for new user
             Some(email.clone()),
+            // Signup auto-login is password-based — single factor (acr "1").
+            Some(AuthContext::password()),
             None, // No user agent
             Some(addr.ip()),
         )

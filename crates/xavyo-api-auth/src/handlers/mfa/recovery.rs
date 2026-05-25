@@ -1,5 +1,6 @@
 //! Recovery code handlers.
 
+use crate::services::AuthContext;
 use axum::{extract::State, http::StatusCode, Extension, Json};
 use std::net::IpAddr;
 use tracing::info;
@@ -86,6 +87,8 @@ pub async fn verify_recovery_code(
             user.tenant_id(),
             roles,
             Some(user.email.clone()),
+            // Completed via an MFA recovery code — multi-factor (acr "2").
+            Some(AuthContext::mfa_recovery_code()),
             user_agent,
             ip_address,
         )

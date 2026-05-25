@@ -194,6 +194,23 @@ pub struct JwtClaims {
     /// token carries only coarse `scope`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authorization_details: Option<Vec<AuthorizationDetail>>,
+
+    /// OIDC Authentication Context Class Reference. xavyo uses `"1"`
+    /// (single-factor) and `"2"` (multi-factor satisfied). Consumed by step-up
+    /// authentication (RFC 9470). Absent on machine/partial tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acr: Option<String>,
+
+    /// OIDC Authentication Methods References (RFC 8176): the methods used to
+    /// authenticate, e.g. `["pwd"]`, `["pwd","otp","mfa"]`, `["mfa","hwk"]`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amr: Option<Vec<String>>,
+
+    /// OIDC `auth_time` — when the end-user authentication occurred (Unix
+    /// seconds). NOT the token-issuance time; carried forward across refresh so
+    /// `max_age` checks remain meaningful. Absent on machine/partial tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_time: Option<i64>,
 }
 
 /// RFC 7800 confirmation claim. Carries the proof-of-possession binding for a
@@ -351,6 +368,9 @@ pub struct JwtClaimsBuilder {
     may_act: Option<MayActClaim>,
     cnf: Option<CnfClaim>,
     authorization_details: Option<Vec<AuthorizationDetail>>,
+    acr: Option<String>,
+    amr: Option<Vec<String>>,
+    auth_time: Option<i64>,
 }
 
 impl JwtClaimsBuilder {
@@ -549,6 +569,27 @@ impl JwtClaimsBuilder {
         self
     }
 
+    /// Set the OIDC `acr` (authentication context class reference).
+    #[must_use]
+    pub fn acr(mut self, acr: impl Into<String>) -> Self {
+        self.acr = Some(acr.into());
+        self
+    }
+
+    /// Set the OIDC `amr` (authentication methods references, RFC 8176).
+    #[must_use]
+    pub fn amr(mut self, amr: Vec<String>) -> Self {
+        self.amr = Some(amr);
+        self
+    }
+
+    /// Set the OIDC `auth_time` (when end-user authentication occurred, seconds).
+    #[must_use]
+    pub fn auth_time(mut self, auth_time: i64) -> Self {
+        self.auth_time = Some(auth_time);
+        self
+    }
+
     /// Build the JWT claims.
     ///
     /// # Defaults
@@ -596,6 +637,9 @@ impl JwtClaimsBuilder {
             may_act: self.may_act,
             cnf: self.cnf,
             authorization_details: self.authorization_details,
+            acr: self.acr,
+            amr: self.amr,
+            auth_time: self.auth_time,
         }
     }
 }
@@ -976,5 +1020,59 @@ mod tests {
         assert_eq!(chain[0], "agent-top");
         assert_eq!(chain[1], "agent-mid");
         assert_eq!(chain[2], "agent-leaf");
+    }
+
+    #[test]
+    fn builder_sets_authentication_context() {
+        let claims = JwtClaims::builder()
+            .subject("u1")
+            .acr("2")
+            .amr(vec![
+                "pwd".to_string(),
+                "otp".to_string(),
+                "mfa".to_string(),
+            ])
+            .auth_time(1_700_000_000)
+            .build();
+        assert_eq!(claims.acr.as_deref(), Some("2"));
+        assert_eq!(
+            claims.amr,
+            Some(vec!["pwd".into(), "otp".into(), "mfa".into()])
+        );
+        assert_eq!(claims.auth_time, Some(1_700_000_000));
+    }
+
+    #[test]
+    fn auth_context_claims_absent_by_default() {
+        let claims = JwtClaims::builder().subject("u1").build();
+        assert!(claims.acr.is_none());
+        assert!(claims.amr.is_none());
+        assert!(claims.auth_time.is_none());
+    }
+
+    #[test]
+    fn auth_context_serde_round_trip_and_legacy_compat() {
+        // Round-trip with the claims present.
+        let claims = JwtClaims::builder()
+            .subject("u1")
+            .acr("1")
+            .amr(vec!["pwd".to_string()])
+            .auth_time(42)
+            .build();
+        let json = serde_json::to_string(&claims).unwrap();
+        assert!(json.contains("\"acr\":\"1\""));
+        assert!(json.contains("\"auth_time\":42"));
+        let back: JwtClaims = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.acr.as_deref(), Some("1"));
+        assert_eq!(back.amr, Some(vec!["pwd".into()]));
+        assert_eq!(back.auth_time, Some(42));
+
+        // Legacy token (no acr/amr/auth_time) deserializes with the fields None —
+        // so tokens issued before this change keep working.
+        let legacy = r#"{"sub":"u1","iss":"xavyo","aud":[],"exp":9999999999,"iat":1,"jti":"j"}"#;
+        let parsed: JwtClaims = serde_json::from_str(legacy).unwrap();
+        assert!(parsed.acr.is_none());
+        assert!(parsed.amr.is_none());
+        assert!(parsed.auth_time.is_none());
     }
 }
