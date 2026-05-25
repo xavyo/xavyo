@@ -46,7 +46,7 @@ Criteria:
 | Crate | Status | Tests | Public Items | Notes |
 |-------|--------|-------|--------------|-------|
 | xavyo-core | 🟢 stable | 54 | 76 | Foundational types, well-tested |
-| xavyo-auth | 🟢 stable | 44 | 39 | JWT/Argon2id complete |
+| xavyo-auth | 🟢 stable | 51 | 46 | JWT/Argon2id + DPoP, acr/amr/auth_time, RFC 9470 step-up |
 | xavyo-db | 🟢 stable | 958+ | 400+ | 111K LOC, excellent coverage |
 | xavyo-tenant | 🟢 stable | 30 | 13 | Middleware complete |
 | xavyo-events | 🟢 stable | 123+ | 45 | Kafka bus with idempotence |

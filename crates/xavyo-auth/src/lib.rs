@@ -49,6 +49,8 @@ pub mod mtls;
 mod password;
 /// Rich Authorization Requests (RFC 9396) — `authorization_details`.
 pub mod rar;
+/// Step-up authentication challenge (RFC 9470).
+pub mod step_up;
 
 // Re-export public API
 pub use claims::{ActorClaim, JwtClaims, JwtClaimsBuilder};
@@ -71,3 +73,4 @@ pub use jwt::{
 pub use mtls::{cert_binding_satisfied, compute_x5t_s256, x5t_s256_from_pem};
 pub use password::{hash_password, verify_password, PasswordHasher};
 pub use rar::{parse_authorization_details, AuthorizationDetail, RarError};
+pub use step_up::{check_step_up, step_up_challenge_header, StepUpOutcome, StepUpRequirement};
