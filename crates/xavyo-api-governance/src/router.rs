@@ -685,14 +685,26 @@ impl GovernanceState {
             gdpr_report_service: Arc::new(GdprReportService::new(pool)),
         })
     }
+
+    /// Attach a CAEP emitter so role assignment/revocation broadcasts
+    /// `token-claims-change` Shared Signals (CAEP 1.0). Rebuilds
+    /// `role_assignment_service` with the emitter; pass the same
+    /// `Arc<dyn CaepEmitter>` used by the auth/SSF transmitter layer.
+    #[must_use]
+    pub fn with_caep_emitter(mut self, emitter: Arc<dyn xavyo_ssf::CaepEmitter>) -> Self {
+        self.role_assignment_service =
+            Arc::new(RoleAssignmentService::new(self.pool.clone()).with_emitter(emitter));
+        self
+    }
 }
 
 /// Create the governance API router.
 ///
 /// All routes are prefixed with `/governance` and require authentication.
-pub fn governance_router(pool: PgPool) -> Router {
+pub fn governance_router(pool: PgPool, caep_emitter: Arc<dyn xavyo_ssf::CaepEmitter>) -> Router {
     let state = GovernanceState::new(pool)
-        .expect("Failed to initialize GovernanceState (check XAVYO_SIEM_ENCRYPTION_KEY)");
+        .expect("Failed to initialize GovernanceState (check XAVYO_SIEM_ENCRYPTION_KEY)")
+        .with_caep_emitter(caep_emitter);
 
     Router::new()
         // Applications

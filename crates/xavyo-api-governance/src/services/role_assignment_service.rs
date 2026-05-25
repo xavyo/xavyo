@@ -11,6 +11,7 @@
 use chrono::Utc;
 use sqlx::PgPool;
 use std::collections::HashSet;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use xavyo_db::models::{
@@ -18,6 +19,7 @@ use xavyo_db::models::{
     GovRole, GovRoleEntitlement,
 };
 use xavyo_governance::error::{GovernanceError, Result};
+use xavyo_ssf::{CaepEmitter, NoopEmitter};
 
 use crate::services::{AssignmentService, InducementTriggerService};
 
@@ -52,6 +54,8 @@ pub struct RoleAssignmentService {
     pool: PgPool,
     assignment_service: AssignmentService,
     inducement_trigger_service: InducementTriggerService,
+    /// CAEP sink for `token-claims-change` signals (Noop unless SSF is wired).
+    emitter: Arc<dyn CaepEmitter>,
 }
 
 impl RoleAssignmentService {
@@ -62,7 +66,18 @@ impl RoleAssignmentService {
             assignment_service: AssignmentService::new(pool.clone()),
             inducement_trigger_service: InducementTriggerService::new(pool.clone()),
             pool,
+            emitter: Arc::new(NoopEmitter),
         }
+    }
+
+    /// Attach a CAEP emitter so role assignment/revocation broadcasts a
+    /// `token-claims-change` Shared Signal (RFC 8417 SET / CAEP 1.0). The user's
+    /// effective entitlements — and thus token claims — change on assignment, so
+    /// relying parties should re-evaluate access.
+    #[must_use]
+    pub fn with_emitter(mut self, emitter: Arc<dyn CaepEmitter>) -> Self {
+        self.emitter = emitter;
+        self
     }
 
     /// Assign a role to a user.
@@ -181,6 +196,15 @@ impl RoleAssignmentService {
             "Role assigned with constructions triggered"
         );
 
+        // CAEP (Shared Signals): the user's effective entitlements changed, so
+        // their token claims will differ on next issuance — broadcast a
+        // token-claims-change signal. Fire-and-forget.
+        self.emitter.token_claims_change(
+            tenant_id,
+            user_id,
+            serde_json::json!({ "role_id": role_id, "role": role.name, "change": "assigned" }),
+        );
+
         Ok(RoleAssignmentResult {
             role_id,
             user_id,
@@ -294,6 +318,15 @@ impl RoleAssignmentService {
             deprovisioning_count = deprovisioning_operation_ids.len(),
             revoked_by = ?revoked_by,
             "Role revoked with deprovisioning triggered"
+        );
+
+        // CAEP (Shared Signals): entitlements were revoked, so the user's token
+        // claims will shrink on next issuance — broadcast a token-claims-change
+        // signal. Fire-and-forget.
+        self.emitter.token_claims_change(
+            tenant_id,
+            user_id,
+            serde_json::json!({ "role_id": role_id, "role": role.name, "change": "revoked" }),
         );
 
         Ok(RoleRevocationResult {
