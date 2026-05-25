@@ -26,6 +26,12 @@ const SET_CONTENT_TYPE: &str = "application/secevent+jwt";
 /// Per-delivery HTTP timeout.
 const DELIVERY_TIMEOUT_SECS: u64 = 10;
 
+/// TTL for queued poll-delivery SETs (RFC 8936). A receiver that stops polling
+/// leaves its queue to accumulate; pruning at enqueue bounds growth so an
+/// abandoned stream cannot grow without limit. 7 days is generous for a receiver
+/// that is merely offline for a while.
+const QUEUE_TTL_SECS: i64 = 7 * 24 * 60 * 60;
+
 /// Errors from SET delivery.
 #[derive(Debug, thiserror::Error)]
 pub enum DeliveryError {
@@ -231,7 +237,35 @@ impl SsfTransmitter {
             .map_err(|e| DeliveryError::Queue(e.to_string()))?;
         SsfQueuedEvent::enqueue(&mut *conn, tenant_id, stream.stream_id, &jti, &set_jwt)
             .await
-            .map_err(|e| DeliveryError::Queue(e.to_string()))
+            .map_err(|e| DeliveryError::Queue(e.to_string()))?;
+
+        // TTL safety net: bound the queue for a stream whose receiver has stopped
+        // polling. Best-effort — the SET is already enqueued, so a prune failure
+        // must not fail the emit; just log it.
+        let cutoff = chrono::Utc::now() - chrono::Duration::seconds(QUEUE_TTL_SECS);
+        match SsfQueuedEvent::prune_stream_older_than(
+            &mut *conn,
+            tenant_id,
+            stream.stream_id,
+            cutoff,
+        )
+        .await
+        {
+            Ok(n) if n > 0 => tracing::info!(
+                target: "ssf",
+                stream_id = %stream.stream_id,
+                pruned = n,
+                "pruned expired queued SETs"
+            ),
+            Ok(_) => {}
+            Err(e) => tracing::warn!(
+                target: "ssf",
+                stream_id = %stream.stream_id,
+                error = %e,
+                "failed to prune expired queued SETs (non-fatal)"
+            ),
+        }
+        Ok(())
     }
 }
 
