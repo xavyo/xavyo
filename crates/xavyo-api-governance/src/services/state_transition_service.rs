@@ -275,38 +275,38 @@ impl StateTransitionService {
         }
 
         // 9. Handle approval workflow
+        //
+        // Approval-request integration is not yet wired into state transitions.
+        // Persisting `PendingApproval` with `approval_request_id = None` would
+        // leave the request permanently stuck (no approver, no advancement —
+        // see deep review §2.7). Mark the request as Cancelled with a clear
+        // error message and return 501 so the caller knows the path is unbuilt
+        // rather than silently parked.
         if transition.requires_approval {
-            // TODO: Create approval request and link it
-            // For now, mark as pending approval
+            let failure_msg =
+                "Transitions that require approval are not yet supported (approval-request \
+                 creation is not implemented). Either remove `requires_approval` from the \
+                 transition definition or wait for the approval subsystem to be wired up."
+                    .to_string();
+
             let update = UpdateGovStateTransitionRequest {
-                status: Some(TransitionRequestStatus::PendingApproval),
-                approval_request_id: None, // Would be set when approval request created
+                status: Some(TransitionRequestStatus::Cancelled),
+                approval_request_id: None,
                 executed_at: None,
                 grace_period_ends_at: None,
                 rollback_available: None,
-                error_message: None,
+                error_message: Some(failure_msg.clone()),
             };
 
-            let updated_request = GovStateTransitionRequest::update(
+            let _ = GovStateTransitionRequest::update(
                 &self.pool,
                 tenant_id,
                 transition_request.id,
                 &update,
             )
-            .await?
-            .ok_or(GovernanceError::StateTransitionRequestNotFound(
-                transition_request.id,
-            ))?;
+            .await; // best-effort; we still want to return 501 below if this fails
 
-            return Ok((
-                StatusCode::ACCEPTED,
-                self.build_transition_response(
-                    &updated_request,
-                    &transition.name,
-                    &from_state.name,
-                    &to_state.name,
-                ),
-            ));
+            return Err(GovernanceError::NotImplemented(failure_msg));
         }
 
         // 10. Execute the transition immediately

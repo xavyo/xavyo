@@ -1021,9 +1021,9 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         .bind(&client_id_str)
         .bind(&client_secret_hash)
         .bind(format!("Test Exchange Client {}", suffix))
-        .bind(&vec!["https://example.com/callback"] as &[&str])
-        .bind(&vec!["urn:ietf:params:oauth:grant-type:token-exchange"] as &[&str])
-        .bind(&vec!["read:tools", "write:tools"] as &[&str])
+        .bind(&["https://example.com/callback"] as &[&str])
+        .bind(&["urn:ietf:params:oauth:grant-type:token-exchange"] as &[&str])
+        .bind(&["read:tools", "write:tools"] as &[&str])
         .bind(nhi_id)
         .execute(&ctx.admin_pool)
         .await
@@ -1149,7 +1149,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         let server = build_server(&ctx);
 
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1195,6 +1195,102 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         assert_eq!(decoded.delegation_depth, Some(1));
     }
 
+    /// Regression guard for the CRITICAL MFA-bypass fix (deep review §2.1) at
+    /// the token-exchange `subject_token` site. A partial MFA-verification
+    /// token (`purpose = "mfa_verification"`) is signed with the same key /
+    /// issuer / audience as a real access token — the only difference is the
+    /// `purpose` claim. The exchange handler MUST reject it via
+    /// `JwtClaims::is_access_token()`, otherwise an attacker holding a
+    /// half-logged-in partial token plus a delegated actor token could mint a
+    /// full delegated access token, bypassing MFA entirely.
+    #[tokio::test]
+    async fn test_token_exchange_rejects_purpose_bound_subject_token() {
+        let ctx = OAuthTestContext::new().await;
+        let uid = OAuthTestContext::unique_id();
+
+        let tid = ctx
+            .create_tenant("te-http-mfa", &format!("te-http-mfa-{uid}"))
+            .await;
+        let tenant_id = *tid.as_uuid();
+
+        let user_id = ctx
+            .create_user(
+                tid,
+                &format!("mfa-{uid}@test.com"),
+                "$argon2id$v=19$m=16,t=2,p=1$dGVzdA$TE/UbYA",
+            )
+            .await;
+        let agent_id =
+            create_test_nhi(&ctx.admin_pool, tenant_id, &format!("mfa-agent-{uid}")).await;
+
+        let (client_id_str, client_secret) =
+            create_exchange_client(&ctx, tenant_id, &uid, Some(agent_id)).await;
+
+        // A valid delegation grant exists — so the ONLY thing that should block
+        // the exchange is the purpose-bound subject token.
+        let _grant = create_grant(
+            &ctx,
+            tenant_id,
+            user_id,
+            agent_id,
+            vec!["read:tools".to_string()],
+            Some(3),
+        )
+        .await;
+
+        // Subject token is a PARTIAL MFA token, not a full access token.
+        let partial_mfa_jwt = {
+            let claims = JwtClaims::builder()
+                .subject(user_id.to_string())
+                .issuer("https://idp.test.xavyo.com")
+                .audience(vec!["test-client".to_string()])
+                .tenant_uuid(tenant_id)
+                .roles(Vec::<String>::new())
+                .expires_in_secs(300)
+                .purpose("mfa_verification")
+                .build();
+            xavyo_auth::encode_token(&claims, TEST_PRIVATE_KEY.as_bytes()).unwrap()
+        };
+        let agent_jwt = sign_jwt(agent_id, tenant_id);
+
+        let server = build_server(&ctx);
+
+        let form_body = serde_urlencoded::to_string([
+            (
+                "grant_type",
+                "urn:ietf:params:oauth:grant-type:token-exchange",
+            ),
+            ("subject_token", &partial_mfa_jwt),
+            (
+                "subject_token_type",
+                "urn:ietf:params:oauth:token-type:access_token",
+            ),
+            ("actor_token", &agent_jwt),
+            ("client_id", &client_id_str),
+            ("client_secret", &client_secret),
+            ("scope", "read:tools"),
+        ])
+        .unwrap();
+
+        let response = server
+            .post("/token")
+            .content_type("application/x-www-form-urlencoded")
+            .add_header(
+                "X-Tenant-ID",
+                HeaderValue::from_str(&tenant_id.to_string()).unwrap(),
+            )
+            .bytes(form_body.into())
+            .await;
+
+        // Must be rejected — NOT a 200 with an access_token.
+        response.assert_status_bad_request();
+        let body: serde_json::Value = response.json();
+        assert!(
+            body.get("access_token").is_none(),
+            "purpose-bound subject token must NOT yield an access token (MFA-bypass guard)"
+        );
+    }
+
     #[tokio::test]
     async fn test_token_exchange_missing_subject_token() {
         let ctx = OAuthTestContext::new().await;
@@ -1214,7 +1310,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let server = build_server(&ctx);
 
         // Omit subject_token entirely
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1266,7 +1362,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         let server = build_server(&ctx);
 
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1332,7 +1428,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let server = build_server(&ctx);
 
         // Send X-Tenant-ID for tenant B, but the JWT carries tenant A
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1396,7 +1492,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         let server = build_server(&ctx);
 
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1469,7 +1565,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let server = build_server(&ctx);
 
         // Request scope "admin:everything" which is not in the grant
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1543,7 +1639,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let server = build_server(&ctx);
 
         // new_depth would be 2, exceeding max_delegation_depth=1
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1605,7 +1701,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let server = build_server(&ctx);
 
         // Omit client_secret
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1742,9 +1838,9 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         .bind(&client_id_str)
         .bind(&client_secret_hash)
         .bind(format!("NHI Bind Client {}", suffix))
-        .bind(&vec!["https://example.com/callback"] as &[&str])
-        .bind(&vec!["client_credentials"] as &[&str])
-        .bind(&vec!["read:tools", "write:tools"] as &[&str])
+        .bind(&["https://example.com/callback"] as &[&str])
+        .bind(&["client_credentials"] as &[&str])
+        .bind(&["read:tools", "write:tools"] as &[&str])
         .bind(nhi_id)
         .execute(&ctx.admin_pool)
         .await
@@ -1804,7 +1900,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         let server = build_server(&ctx);
 
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             ("grant_type", "client_credentials"),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
@@ -1852,7 +1948,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         let server = build_server(&ctx);
 
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             ("grant_type", "client_credentials"),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),

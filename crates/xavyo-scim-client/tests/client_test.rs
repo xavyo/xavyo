@@ -218,7 +218,7 @@ async fn test_409_returns_conflict_error() {
         .await;
 
     let client = bearer_client(&server);
-    let user = xavyo_api_scim::models::ScimUser {
+    let user = xavyo_scim_types::ScimUser {
         schemas: vec!["urn:ietf:params:scim:schemas:core:2.0:User".to_string()],
         id: None,
         external_id: Some("ext-123".to_string()),
@@ -619,12 +619,12 @@ async fn test_create_user_posts_to_users_endpoint() {
         .await;
 
     let client = bearer_client(&server);
-    let user = xavyo_api_scim::models::ScimUser {
+    let user = xavyo_scim_types::ScimUser {
         schemas: vec!["urn:ietf:params:scim:schemas:core:2.0:User".to_string()],
         id: None,
         external_id: Some("ext-123".to_string()),
         user_name: "jane@example.com".to_string(),
-        name: Some(xavyo_api_scim::models::ScimName {
+        name: Some(xavyo_scim_types::ScimName {
             formatted: None,
             family_name: Some("Doe".to_string()),
             given_name: Some("Jane".to_string()),
@@ -641,7 +641,7 @@ async fn test_create_user_posts_to_users_endpoint() {
         locale: None,
         timezone: None,
         active: true,
-        emails: vec![xavyo_api_scim::models::ScimEmail {
+        emails: vec![xavyo_scim_types::ScimEmail {
             value: "jane@example.com".to_string(),
             email_type: Some("work".to_string()),
             primary: true,

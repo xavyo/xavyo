@@ -52,7 +52,7 @@ fn url_encode_id(id: &str) -> String {
         .add(b'=');
     utf8_percent_encode(id, PATH_SEGMENT_ENCODE).to_string()
 }
-use xavyo_api_scim::models::{
+use xavyo_scim_types::{
     ScimGroup, ScimGroupListResponse, ScimPatchRequest, ScimUser, ScimUserListResponse,
 };
 
@@ -295,7 +295,7 @@ impl ScimClient {
     pub async fn deactivate_user(&self, id: &str) -> ScimClientResult<ScimUser> {
         let patch = ScimPatchRequest {
             schemas: vec!["urn:ietf:params:scim:api:messages:2.0:PatchOp".to_string()],
-            operations: vec![xavyo_api_scim::models::ScimPatchOp {
+            operations: vec![xavyo_scim_types::ScimPatchOp {
                 op: "replace".to_string(),
                 path: Some("active".to_string()),
                 value: Some(serde_json::Value::Bool(false)),
@@ -399,7 +399,7 @@ impl ScimClient {
                 .iter()
                 .map(|id| serde_json::json!({ "value": id }))
                 .collect();
-            operations.push(xavyo_api_scim::models::ScimPatchOp {
+            operations.push(xavyo_scim_types::ScimPatchOp {
                 op: "add".to_string(),
                 path: Some("members".to_string()),
                 value: Some(serde_json::Value::Array(members)),
@@ -409,7 +409,7 @@ impl ScimClient {
         if !remove_member_ids.is_empty() {
             for id in remove_member_ids {
                 let escaped_id = escape_scim_filter_value(id);
-                operations.push(xavyo_api_scim::models::ScimPatchOp {
+                operations.push(xavyo_scim_types::ScimPatchOp {
                     op: "remove".to_string(),
                     path: Some(format!("members[value eq \"{escaped_id}\"]")),
                     value: None,

@@ -7,11 +7,44 @@
 //! Security hardening (F069): Includes production environment detection,
 //! insecure default key validation, and multi-key JWT signing support.
 
+use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use std::env;
 use std::sync::Arc;
 use thiserror::Error;
 use xavyo_secrets::SecretProvider;
+
+/// Read a sensitive env var and immediately scrub it from the OS environment
+/// table so a later `ps eww`, `/proc/self/environ` read, or accidental
+/// subprocess inherit can't recover the secret.
+///
+/// Use for any value carrying a private key, password, or HMAC/encryption
+/// secret. The string still lives in `Config` for the daemon's lifetime —
+/// wrapping that field in `secrecy::SecretString` is a separate refactor.
+fn take_sensitive_env(name: &str) -> Result<String, env::VarError> {
+    let value = env::var(name);
+    // SAFETY: this helper is called only from `Config::from_env`, which runs
+    // single-threaded during startup before the tokio runtime is launched, so
+    // there is no concurrent reader of the environment table.
+    #[allow(unused_unsafe)]
+    unsafe {
+        env::remove_var(name);
+    }
+    value
+}
+
+/// Like `take_sensitive_env` but returns a `SecretString` so the value is
+/// zeroed on drop and can't accidentally leak via `Debug` / `Display`.
+fn take_sensitive_env_secret(name: &str) -> Result<SecretString, env::VarError> {
+    take_sensitive_env(name).map(SecretString::from)
+}
+
+/// Same as `take_sensitive_env` but with a fallback closure when the var is
+/// absent. Mirrors `env::var().unwrap_or_else(...)` shape used throughout this
+/// module for keys with insecure-development defaults.
+fn take_sensitive_env_or_else<F: FnOnce() -> String>(name: &str, fallback: F) -> String {
+    take_sensitive_env(name).unwrap_or_else(|_| fallback())
+}
 
 // ── Insecure default constants (F069-S1) ──────────────────────────────────
 
@@ -107,8 +140,10 @@ pub struct SigningKey {
     /// Key ID (kid) for JWKS identification.
     pub kid: String,
 
-    /// PEM-encoded RSA private key.
-    pub private_key_pem: String,
+    /// PEM-encoded RSA private key. Wrapped in `SecretString` so the bytes are
+    /// zeroed on drop and never leak through `Debug` / `Display`. Use
+    /// `.expose_secret()` to access (only at the JWT signing boundary).
+    pub private_key_pem: SecretString,
 
     /// PEM-encoded RSA public key.
     pub public_key_pem: String,
@@ -162,7 +197,11 @@ fn parse_signing_keys() -> Result<Option<Vec<SigningKey>>, ConfigError> {
         .into_iter()
         .map(|e| SigningKey {
             kid: e.kid,
-            private_key_pem: e.private_key,
+            // `e.private_key` came from JSON deserialization (`SigningKeyEntry`)
+            // which is a one-shot `String` — we move it straight into the
+            // `SecretString` wrapper so the only plaintext copy lives behind
+            // `expose_secret()` from this point on.
+            private_key_pem: SecretString::from(e.private_key),
             public_key_pem: e.public_key,
             is_active: e.active,
         })
@@ -471,8 +510,10 @@ pub struct Config {
     /// Falls back to `database_url` if not set.
     pub app_database_url: Option<String>,
 
-    /// RS256 private key in PEM format for signing JWTs (single-key fallback)
-    pub jwt_private_key: String,
+    /// RS256 private key in PEM format for signing JWTs (single-key fallback).
+    /// Wrapped in `SecretString` so the bytes are zeroed on drop and never
+    /// leak through `Debug` / `Display`. Use `.expose_secret()` to access.
+    pub jwt_private_key: SecretString,
 
     /// RS256 public key in PEM format for verifying JWTs (single-key fallback)
     pub jwt_public_key: String,
@@ -604,14 +645,20 @@ impl Config {
 
         let app_database_url = env::var("APP_DATABASE_URL").ok();
 
-        let jwt_private_key = env::var("JWT_PRIVATE_KEY")
+        // SECURITY: load JWT keys via `take_sensitive_env_secret` so the OS env
+        // table is scrubbed after the daemon has captured the value AND the
+        // in-memory copy is wrapped in `SecretString` (zeroed on drop, no
+        // accidental `Debug` leaks). See helpers for rationale.
+        let jwt_private_key = take_sensitive_env_secret("JWT_PRIVATE_KEY")
             .map_err(|_| ConfigError::MissingVar("JWT_PRIVATE_KEY".to_string()))?;
 
         let jwt_public_key = env::var("JWT_PUBLIC_KEY")
             .map_err(|_| ConfigError::MissingVar("JWT_PUBLIC_KEY".to_string()))?;
 
-        // Validate PEM format (basic check)
-        if !jwt_private_key.contains("-----BEGIN") {
+        // Validate PEM format (basic check) — must expose the secret briefly
+        // to inspect the PEM header. The slice we look at is not copied or
+        // stored beyond the predicate evaluation.
+        if !jwt_private_key.expose_secret().contains("-----BEGIN") {
             return Err(ConfigError::InvalidValue {
                 var: "JWT_PRIVATE_KEY".to_string(),
                 message: "Must be PEM format (should contain -----BEGIN)".to_string(),
@@ -657,38 +704,36 @@ impl Config {
             });
         }
 
-        // Social login configuration
-        let social_encryption_key = env::var("SOCIAL_ENCRYPTION_KEY").unwrap_or_else(|_| {
+        // Social login configuration (secrets — scrubbed from env after read).
+        let social_encryption_key = take_sensitive_env_or_else("SOCIAL_ENCRYPTION_KEY", || {
             base64::Engine::encode(&base64::engine::general_purpose::STANDARD, [0u8; 32])
         });
-        let social_state_secret = env::var("SOCIAL_STATE_SECRET")
-            .unwrap_or_else(|_| "development-social-state-secret-change-in-production".to_string());
+        let social_state_secret = take_sensitive_env_or_else("SOCIAL_STATE_SECRET", || {
+            "development-social-state-secret-change-in-production".to_string()
+        });
         let frontend_url =
             env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
 
-        // SAML encryption key (hex-encoded 32 bytes)
+        // SAML encryption key (hex-encoded 32 bytes) — secret, scrub after read.
         let saml_encryption_key = parse_hex_encryption_key(
             "SAML_ENCRYPTION_KEY",
-            &env::var("SAML_ENCRYPTION_KEY").unwrap_or_else(|_| {
-                // Default for development only - must be changed in production
+            &take_sensitive_env_or_else("SAML_ENCRYPTION_KEY", || {
                 "0000000000000000000000000000000000000000000000000000000000000000".to_string()
             }),
         )?;
 
-        // OIDC Federation encryption key (hex-encoded 32 bytes)
+        // OIDC Federation encryption key (hex-encoded 32 bytes) — secret.
         let federation_encryption_key = parse_hex_encryption_key(
             "FEDERATION_ENCRYPTION_KEY",
-            &env::var("FEDERATION_ENCRYPTION_KEY").unwrap_or_else(|_| {
-                // Default for development only - must be changed in production
+            &take_sensitive_env_or_else("FEDERATION_ENCRYPTION_KEY", || {
                 "1111111111111111111111111111111111111111111111111111111111111111".to_string()
             }),
         )?;
 
-        // MFA TOTP encryption key (hex-encoded 32 bytes)
+        // MFA TOTP encryption key (hex-encoded 32 bytes) — secret.
         let mfa_encryption_key = parse_hex_encryption_key(
             "MFA_ENCRYPTION_KEY",
-            &env::var("MFA_ENCRYPTION_KEY").unwrap_or_else(|_| {
-                // Default for development only - must be changed in production
+            &take_sensitive_env_or_else("MFA_ENCRYPTION_KEY", || {
                 "2222222222222222222222222222222222222222222222222222222222222222".to_string()
             }),
         )?;
@@ -702,30 +747,27 @@ impl Config {
         let webauthn_origin =
             env::var("WEBAUTHN_ORIGIN").unwrap_or_else(|_| "http://localhost:8080".to_string());
 
-        // Connector encryption key (hex-encoded 32 bytes)
+        // Connector encryption key (hex-encoded 32 bytes) — secret.
         let connector_encryption_key = parse_hex_encryption_key(
             "CONNECTOR_ENCRYPTION_KEY",
-            &env::var("CONNECTOR_ENCRYPTION_KEY").unwrap_or_else(|_| {
-                // Default for development only - must be changed in production
+            &take_sensitive_env_or_else("CONNECTOR_ENCRYPTION_KEY", || {
                 "3333333333333333333333333333333333333333333333333333333333333333".to_string()
             }),
         )?;
 
-        // Webhook encryption key (hex-encoded 32 bytes) for webhook subscription secrets (F085)
+        // Webhook encryption key (hex-encoded 32 bytes) — secret. F085.
         let webhook_encryption_key = parse_hex_encryption_key(
             "WEBHOOK_ENCRYPTION_KEY",
-            &env::var("WEBHOOK_ENCRYPTION_KEY").unwrap_or_else(|_| {
-                // Default for development only - must be changed in production
+            &take_sensitive_env_or_else("WEBHOOK_ENCRYPTION_KEY", || {
                 "4444444444444444444444444444444444444444444444444444444444444444".to_string()
             }),
         )?;
 
-        // CSRF secret (hex-encoded 32 bytes) for OAuth consent form protection (F082-US6)
+        // CSRF secret (hex-encoded 32 bytes) for OAuth consent form protection (F082-US6) — secret.
         // SECURITY: This MUST be independent of the JWT signing key to avoid key material reuse.
         let csrf_secret = parse_hex_encryption_key(
             "CSRF_SECRET",
-            &env::var("CSRF_SECRET").unwrap_or_else(|_| {
-                // Default for development only - must be changed in production
+            &take_sensitive_env_or_else("CSRF_SECRET", || {
                 "5555555555555555555555555555555555555555555555555555555555555555".to_string()
             }),
         )?;
@@ -749,10 +791,15 @@ impl Config {
         let signing_keys = match parse_signing_keys()? {
             Some(keys) => keys,
             None => {
-                // Backward compat: construct single key from existing vars
+                // Backward compat: construct single key from existing vars.
+                // `SecretString` is not `Clone` to discourage accidental
+                // duplication; we clone the exposed string into a fresh
+                // `SecretString` so both fields end up holding zeroizing copies.
                 vec![SigningKey {
                     kid: jwt_key_id.clone(),
-                    private_key_pem: jwt_private_key.clone(),
+                    private_key_pem: SecretString::from(
+                        jwt_private_key.expose_secret().to_string(),
+                    ),
                     public_key_pem: jwt_public_key.clone(),
                     is_active: true,
                 }]
@@ -868,15 +915,20 @@ impl Config {
                         .into_iter()
                         .map(|e| SigningKey {
                             kid: e.kid,
-                            private_key_pem: e.private_key,
+                            private_key_pem: SecretString::from(e.private_key),
                             public_key_pem: e.public_key,
                             is_active: e.active,
                         })
                         .collect();
-                    // Extract active key fields without borrowing config simultaneously
+                    // Extract active key fields without borrowing config simultaneously.
+                    // `private_key_pem` is `SecretString`: clone the exposed bytes
+                    // into a new `SecretString` so the sync-back to
+                    // `config.jwt_private_key` keeps the same zeroizing semantics.
                     if let Some(active_key) = config.active_signing_key() {
                         let active_kid = active_key.kid.clone();
-                        let active_priv = active_key.private_key_pem.clone();
+                        let active_priv = SecretString::from(
+                            active_key.private_key_pem.expose_secret().to_string(),
+                        );
                         let active_pub = active_key.public_key_pem.clone();
                         config.jwt_private_key = active_priv;
                         config.jwt_public_key = active_pub;
@@ -1173,15 +1225,17 @@ mod tests {
             app_env: AppEnvironment::Development,
             database_url: "postgres://localhost/test".to_string(),
             app_database_url: None,
-            jwt_private_key: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
-                .to_string(),
+            jwt_private_key: SecretString::from(
+                "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----".to_string(),
+            ),
             jwt_public_key: "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----"
                 .to_string(),
             jwt_key_id: "primary".to_string(),
             signing_keys: vec![SigningKey {
                 kid: "primary".to_string(),
-                private_key_pem: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
-                    .to_string(),
+                private_key_pem: SecretString::from(
+                    "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----".to_string(),
+                ),
                 public_key_pem: "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----"
                     .to_string(),
                 is_active: true,
@@ -1222,15 +1276,17 @@ mod tests {
             app_env: AppEnvironment::Production,
             database_url: "postgres://localhost/test".to_string(),
             app_database_url: None,
-            jwt_private_key: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
-                .to_string(),
+            jwt_private_key: SecretString::from(
+                "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----".to_string(),
+            ),
             jwt_public_key: "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----"
                 .to_string(),
             jwt_key_id: "key-2026-01".to_string(),
             signing_keys: vec![SigningKey {
                 kid: "key-2026-01".to_string(),
-                private_key_pem: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
-                    .to_string(),
+                private_key_pem: SecretString::from(
+                    "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----".to_string(),
+                ),
                 public_key_pem: "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----"
                     .to_string(),
                 is_active: true,
@@ -1565,8 +1621,9 @@ mod tests {
         let mut config = test_config_secure();
         config.signing_keys.push(SigningKey {
             kid: "key-old".to_string(),
-            private_key_pem: "-----BEGIN PRIVATE KEY-----\nold\n-----END PRIVATE KEY-----"
-                .to_string(),
+            private_key_pem: SecretString::from(
+                "-----BEGIN PRIVATE KEY-----\nold\n-----END PRIVATE KEY-----".to_string(),
+            ),
             public_key_pem: "-----BEGIN PUBLIC KEY-----\nold\n-----END PUBLIC KEY-----".to_string(),
             is_active: false,
         });

@@ -37,6 +37,37 @@ pub async fn userinfo_handler(
         OAuthError::InvalidToken("Invalid access token".to_string())
     })?;
 
+    // SECURITY: Reject purpose-bound tokens (e.g., partial MFA-verification tokens).
+    // They share the same signing key / iss / aud as access tokens — only `purpose`
+    // distinguishes them. Without this guard, an MFA-partial token presented here
+    // would leak the user's profile as if MFA were complete.
+    if !claims.is_access_token() {
+        tracing::warn!(
+            target: "security",
+            event_type = "wrong_token_purpose",
+            jti = %claims.jti,
+            purpose = ?claims.purpose,
+            "Rejected purpose-bound token at /oauth/userinfo"
+        );
+        return Err(OAuthError::InvalidToken(
+            "Token is not an access token".to_string(),
+        ));
+    }
+
+    // DPoP (RFC 9449): if the access token is sender-constrained (`cnf.jkt`),
+    // require a matching DPoP proof for this request. Bearer presentation of a
+    // DPoP-bound token is rejected here (no downgrade). Checked before the
+    // revocation lookup so a missing-proof downgrade fails fast.
+    crate::dpop_validation::enforce_dpop(
+        &state,
+        &headers,
+        &claims,
+        &token,
+        "GET",
+        "/oauth/userinfo",
+    )
+    .await?;
+
     // Check if the token has been revoked (F-3: HIGH - userinfo bypasses revocation cache)
     // SECURITY: Fail-closed - if revocation check cannot be performed, reject the token.
     if !claims.jti.is_empty() {

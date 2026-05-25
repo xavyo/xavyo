@@ -29,6 +29,7 @@ Business logic independent of HTTP transport.
 | [xavyo-authorization](../../crates/xavyo-authorization/CRATE.md) | Authorization engine (PDP) | 🟡 beta |
 | [xavyo-webhooks](../../crates/xavyo-webhooks/CRATE.md) | Event subscriptions and delivery | 🟡 beta |
 | [xavyo-siem](../../crates/xavyo-siem/CRATE.md) | Audit log export (syslog, Splunk) | 🟡 beta |
+| [xavyo-ssf](../../crates/xavyo-ssf/CRATE.md) | CAEP/Shared Signals: SETs, subject IDs, emitter | 🔴 alpha |
 | [xavyo-secrets](../../crates/xavyo-secrets/CRATE.md) | External secret providers | 🟢 stable |
 | [xavyo-scim-client](../../crates/xavyo-scim-client/CRATE.md) | Outbound SCIM provisioning | 🟢 stable |
 | [xavyo-ext-authz](../../crates/xavyo-ext-authz/CRATE.md) | Envoy ext_authz v3 gRPC server for AgentGateway | 🟡 beta |
@@ -64,6 +65,7 @@ REST endpoints exposed to clients.
 | [xavyo-api-import](../../crates/xavyo-api-import/CRATE.md) | Bulk user import API | 🟢 stable |
 | [xavyo-api-oidc-federation](../../crates/xavyo-api-oidc-federation/CRATE.md) | OIDC federation endpoints | 🟡 beta |
 | [xavyo-api-nhi](../../crates/xavyo-api-nhi/CRATE.md) | Non-human identity API | 🟢 stable |
+| [xavyo-api-ssf](../../crates/xavyo-api-ssf/CRATE.md) | SSF transmitter: streams, push CAEP signals | 🔴 alpha |
 
 ## Dependency Rules
 

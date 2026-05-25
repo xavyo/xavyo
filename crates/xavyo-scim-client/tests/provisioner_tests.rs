@@ -100,9 +100,9 @@ async fn test_provisioner_update_user() {
 
     let client = server.client();
 
-    let patch = xavyo_api_scim::models::ScimPatchRequest {
+    let patch = xavyo_scim_types::ScimPatchRequest {
         schemas: vec!["urn:ietf:params:scim:api:messages:2.0:PatchOp".to_string()],
-        operations: vec![xavyo_api_scim::models::ScimPatchOp {
+        operations: vec![xavyo_scim_types::ScimPatchOp {
             op: "replace".to_string(),
             path: Some("displayName".to_string()),
             value: Some(json!("Updated Name")),

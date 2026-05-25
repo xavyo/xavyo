@@ -132,9 +132,9 @@ async fn test_sync_incremental_sync() {
     let client = server.client();
 
     // Perform incremental update
-    let patch = xavyo_api_scim::models::ScimPatchRequest {
+    let patch = xavyo_scim_types::ScimPatchRequest {
         schemas: vec!["urn:ietf:params:scim:api:messages:2.0:PatchOp".to_string()],
-        operations: vec![xavyo_api_scim::models::ScimPatchOp {
+        operations: vec![xavyo_scim_types::ScimPatchOp {
             op: "replace".to_string(),
             path: Some("displayName".to_string()),
             value: Some(json!("Updated During Incremental Sync")),
@@ -255,9 +255,9 @@ async fn test_sync_mixed_operation_counts() {
     }
 
     // Perform 2 updates
-    let patch = xavyo_api_scim::models::ScimPatchRequest {
+    let patch = xavyo_scim_types::ScimPatchRequest {
         schemas: vec!["urn:ietf:params:scim:api:messages:2.0:PatchOp".to_string()],
-        operations: vec![xavyo_api_scim::models::ScimPatchOp {
+        operations: vec![xavyo_scim_types::ScimPatchOp {
             op: "replace".to_string(),
             path: Some("active".to_string()),
             value: Some(json!(true)),

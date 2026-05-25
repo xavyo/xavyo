@@ -241,6 +241,7 @@ use axum::{
 };
 use sqlx::PgPool;
 use std::sync::Arc;
+use xavyo_ssf::CaepEmitter;
 
 /// Application state for authentication routes.
 #[derive(Clone)]
@@ -413,6 +414,16 @@ impl AuthState {
             token_config,
         })
     }
+
+    /// Attach a CAEP emitter so credential-change flows broadcast Shared
+    /// Signals. Rebuilds `password_policy_service` with the emitter; the
+    /// session service is emitter-wired by the caller before `new`.
+    #[must_use]
+    pub fn with_caep_emitter(mut self, emitter: Arc<dyn CaepEmitter>) -> Self {
+        self.password_policy_service =
+            Arc::new(PasswordPolicyService::new(self.pool.clone()).with_emitter(emitter));
+        self
+    }
 }
 
 /// Create the authentication router for tenant-required endpoints.
@@ -461,10 +472,15 @@ pub fn auth_router(state: AuthState, jwt_public_key: String) -> Router {
             jwt_public_key,
         )));
 
-    // Routes without rate limiting
+    // Rate-limited token-redemption routes (reset-password, verify-email).
+    // Both endpoints accept a token + apply argon2/HIBP — without throttling they
+    // amplify into a DoS surface and a HIBP-quota drain (see deep review §2.6).
+    // The same `sensitive_rate_limiter` is used as the password-change route.
     let other_routes = Router::new()
         .route("/reset-password", post(reset_password_handler))
-        .route("/verify-email", post(verify_email_handler));
+        .route("/verify-email", post(verify_email_handler))
+        .layer(middleware::from_fn(rate_limit_middleware))
+        .layer(Extension(state.sensitive_rate_limiter.clone()));
 
     Router::new()
         .merge(login_route)

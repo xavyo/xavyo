@@ -20,9 +20,10 @@ use axum::{
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
-use xavyo_auth::{decode_token, extract_kid};
+use xavyo_auth::dpop::DPOP_PROOF_MAX_AGE_SECS;
+use xavyo_auth::{cert_binding_satisfied, decode_token, extract_kid, verify_resource_proof};
 use xavyo_core::{TenantId, UserId};
-use xavyo_db::models::RevokedToken;
+use xavyo_db::models::{DpopProofJti, RevokedToken};
 
 use crate::middleware::api_key::ApiKeyContext;
 use crate::services::revocation_cache::RevocationCache;
@@ -137,6 +138,133 @@ pub async fn jwt_auth_middleware(
     if claims.jti.is_empty() {
         tracing::warn!(sub = %claims.sub, "Rejected token with empty JTI");
         return Err((StatusCode::UNAUTHORIZED, "Token missing required JTI claim").into_response());
+    }
+
+    // DPoP (RFC 9449): if the access token is sender-constrained (`cnf.jkt`),
+    // the request MUST carry a matching DPoP proof for THIS method+path. This
+    // is the resource-edge enforcement that makes sender-constraint real —
+    // bearer presentation of a DPoP-bound token is rejected here. Runs before
+    // the revocation DB lookups so a missing-proof downgrade fails fast.
+    if let Some(jkt) = claims.dpop_jkt() {
+        // Proxy-safe htu: built from the configured issuer URL, not the Host header.
+        let Some(issuer) = request.extensions().get::<IssuerUrl>().map(|i| i.0.clone()) else {
+            tracing::error!(
+                target: "security",
+                event_type = "dpop_issuer_unavailable",
+                "IssuerUrl extension missing; cannot validate DPoP (fail-closed)"
+            );
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Token verification unavailable",
+            )
+                .into_response());
+        };
+        let Some(proof) = request.headers().get("dpop").and_then(|v| v.to_str().ok()) else {
+            tracing::warn!(
+                target: "security",
+                event_type = "dpop_proof_missing",
+                "DPoP-bound token presented without a DPoP proof"
+            );
+            return Err((StatusCode::UNAUTHORIZED, "DPoP proof required").into_response());
+        };
+        let htm = request.method().as_str().to_string();
+        let expected_htu = format!("{}{}", issuer.trim_end_matches('/'), request.uri().path());
+        let validated = verify_resource_proof(
+            proof,
+            jkt,
+            &htm,
+            &expected_htu,
+            chrono::Utc::now().timestamp(),
+            token,
+        )
+        .map_err(|e| {
+            tracing::warn!(
+                target: "security",
+                event_type = "dpop_proof_invalid",
+                error = %e,
+                "DPoP proof rejected"
+            );
+            (StatusCode::UNAUTHORIZED, "Invalid DPoP proof").into_response()
+        })?;
+
+        // Tenant-scoped replay check. A cnf.jkt token without tid is malformed.
+        let Some(tid) = claims.tid else {
+            return Err((StatusCode::UNAUTHORIZED, "DPoP-bound token missing tid").into_response());
+        };
+        let Some(pool) = request.extensions().get::<PgPool>().cloned() else {
+            tracing::error!(
+                target: "security",
+                event_type = "dpop_replay_store_unavailable",
+                "No PgPool to replay-check DPoP proof (fail-closed)"
+            );
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Token verification unavailable",
+            )
+                .into_response());
+        };
+        let mut conn = pool.acquire().await.map_err(|e| {
+            tracing::error!(error = %e, "DPoP replay: acquire conn (fail-closed)");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Token verification failed",
+            )
+                .into_response()
+        })?;
+        if sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tid.to_string())
+            .execute(&mut *conn)
+            .await
+            .is_err()
+        {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Token verification failed",
+            )
+                .into_response());
+        }
+        let expires_at = chrono::Utc::now() + chrono::Duration::seconds(DPOP_PROOF_MAX_AGE_SECS);
+        match DpopProofJti::record_if_new(&mut *conn, tid, &validated.jti, expires_at).await {
+            Ok(true) => {}
+            Ok(false) => {
+                tracing::warn!(
+                    target: "security",
+                    event_type = "dpop_proof_replay",
+                    jti = %validated.jti,
+                    "DPoP proof replay rejected"
+                );
+                return Err((StatusCode::UNAUTHORIZED, "DPoP proof replay").into_response());
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "DPoP replay: record failed (fail-closed)");
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Token verification failed",
+                )
+                    .into_response());
+            }
+        }
+    }
+
+    // mTLS (RFC 8705): if the access token is certificate-bound
+    // (`cnf["x5t#S256"]`), the request MUST present a matching client cert. The
+    // TLS-terminating gateway forwards the cert's SHA-256 thumbprint in the
+    // trusted `X-Client-Cert-Thumbprint` header (trusted only on the internal
+    // network, same model as `X-Tenant-ID`). Fail-closed: a cert-bound token
+    // presented without a matching thumbprint is rejected.
+    if let Some(expected_x5t) = claims.cert_thumbprint() {
+        let presented = request
+            .headers()
+            .get("x-client-cert-thumbprint")
+            .and_then(|v| v.to_str().ok());
+        if !cert_binding_satisfied(expected_x5t, presented) {
+            tracing::warn!(
+                target: "security",
+                event_type = "mtls_cert_binding_failed",
+                "certificate-bound token presented without a matching client certificate"
+            );
+            return Err((StatusCode::UNAUTHORIZED, "client certificate required").into_response());
+        }
     }
 
     // Check if the token has been revoked (F069-S4, F082-US4: cache-first)
@@ -369,6 +497,14 @@ pub struct JwtPublicKey(pub String);
 /// Wrapper for multiple JWT public keys (kid → PEM) for key rotation (F069-S5).
 #[derive(Clone)]
 pub struct JwtPublicKeys(pub HashMap<String, String>);
+
+/// Public-facing issuer base URL, injected at the router root. Used to build a
+/// proxy-safe `htu` for DPoP proof validation (RFC 9449) — comparing against
+/// the configured issuer rather than the live `Host` header. Required for any
+/// request bearing a DPoP-bound (`cnf.jkt`) access token; the middleware
+/// fails closed if it is absent.
+#[derive(Clone)]
+pub struct IssuerUrl(pub String);
 
 /// Marker indicating if the request was authenticated via a service account (`client_credentials`).
 /// When true, the `user_id` is a synthetic UUID derived from the `client_id`.

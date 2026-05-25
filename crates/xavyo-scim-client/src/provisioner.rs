@@ -217,7 +217,7 @@ impl Provisioner {
         target_id: Uuid,
         user_id: Uuid,
         state: &ScimProvisioningState,
-        scim_user: &xavyo_api_scim::models::ScimUser,
+        scim_user: &xavyo_scim_types::ScimUser,
         mappings: &[ScimTargetAttributeMapping],
         started: Instant,
     ) -> ScimClientResult<()> {
@@ -469,7 +469,7 @@ impl Provisioner {
                             if let Some(ref v) = op.value {
                                 if let Some(s) = v.as_str() {
                                     if updated.emails.is_empty() {
-                                        updated.emails.push(xavyo_api_scim::models::ScimEmail {
+                                        updated.emails.push(xavyo_scim_types::ScimEmail {
                                             value: s.to_string(),
                                             email_type: Some("work".to_string()),
                                             primary: true,

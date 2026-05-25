@@ -33,6 +33,19 @@ struct DbOAuth2Client {
     pub updated_at: chrono::DateTime<chrono::Utc>,
     pub nhi_id: Option<Uuid>,
     pub post_logout_redirect_uris: Vec<String>,
+    /// RFC 9449 per-client DPoP enforcement. `#[sqlx(default)]` so SELECTs that
+    /// don't list the column still map (defaulting false).
+    #[sqlx(default)]
+    pub require_dpop: bool,
+    /// FAPI 2.0 Security Profile opt-in (§5.3.2): implies PAR + DPoP mandatory.
+    #[sqlx(default)]
+    pub fapi_profile: bool,
+    /// Inline JWKS for `private_key_jwt` client-assertion verification (RFC 7523).
+    #[sqlx(default)]
+    pub jwks: Option<serde_json::Value>,
+    /// Registered mTLS cert thumbprint for `self_signed_tls_client_auth` (RFC 8705).
+    #[sqlx(default)]
+    pub tls_client_cert_thumbprint: Option<String>,
 }
 
 /// Service for managing `OAuth2` clients.
@@ -121,8 +134,10 @@ impl OAuth2ClientService {
             INSERT INTO oauth_clients (
                 id, tenant_id, client_id, client_secret_hash, name, client_type,
                 redirect_uris, grant_types, scopes, is_active, logo_url, description,
-                created_at, updated_at, nhi_id, post_logout_redirect_uris
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $12, $13, $14)
+                created_at, updated_at, nhi_id, post_logout_redirect_uris,
+                require_dpop, fapi_profile, jwks, tls_client_cert_thumbprint
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $12, $13, $14,
+                      $15, $16, $17, $18)
             ",
         )
         .bind(id)
@@ -139,6 +154,10 @@ impl OAuth2ClientService {
         .bind(now)
         .bind(request.nhi_id)
         .bind(&request.post_logout_redirect_uris)
+        .bind(request.require_dpop)
+        .bind(request.fapi_profile)
+        .bind(&request.jwks)
+        .bind(&request.tls_client_cert_thumbprint)
         .execute(&mut *conn)
         .await
         .map_err(|e| {
@@ -161,6 +180,10 @@ impl OAuth2ClientService {
             post_logout_redirect_uris: request.post_logout_redirect_uris,
             created_at: now,
             updated_at: now,
+            require_dpop: request.require_dpop,
+            fapi_profile: request.fapi_profile,
+            jwks: request.jwks,
+            tls_client_cert_thumbprint: request.tls_client_cert_thumbprint,
         };
 
         Ok((response, plaintext_secret))
@@ -211,7 +234,8 @@ impl OAuth2ClientService {
         let client: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris,
+                   require_dpop, fapi_profile, jwks, tls_client_cert_thumbprint
             FROM oauth_clients
             WHERE client_id = $1 AND tenant_id = $2
             ",
@@ -227,6 +251,72 @@ impl OAuth2ClientService {
         .ok_or(OAuthError::ClientNotFound)?;
 
         Ok(self.db_client_to_response(client))
+    }
+
+    /// Authenticate a confidential client via `private_key_jwt` (RFC 7523):
+    /// validate the `client_assertion` against the client's registered JWKS and
+    /// reject replays via a tenant-scoped single-use `jti` cache.
+    /// `accepted_audiences` are the AS identifiers the assertion's `aud` may
+    /// name (issuer and/or token-endpoint URL).
+    ///
+    /// # Errors
+    /// [`OAuthError::InvalidClient`] if the assertion is malformed, fails
+    /// validation, or its `jti` was already used.
+    pub async fn verify_client_assertion(
+        &self,
+        tenant_id: Uuid,
+        expected_client_id: &str,
+        assertion: &str,
+        accepted_audiences: &[&str],
+        client_jwks: &serde_json::Value,
+    ) -> Result<(), OAuthError> {
+        let jwks: jsonwebtoken::jwk::JwkSet = serde_json::from_value(client_jwks.clone())
+            .map_err(|_| OAuthError::InvalidClient("client JWKS is malformed".to_string()))?;
+
+        let now = chrono::Utc::now().timestamp();
+        let validated = xavyo_auth::validate_client_assertion(
+            assertion,
+            expected_client_id,
+            accepted_audiences,
+            &jwks,
+            now,
+        )
+        .map_err(|e| OAuthError::InvalidClient(format!("client_assertion rejected: {e}")))?;
+
+        // Tenant-scoped single-use jti replay check (RFC 7523 §3).
+        let mut conn = self.pool.acquire().await.map_err(|e| {
+            tracing::error!("Failed to acquire connection for client_assertion replay: {e}");
+            OAuthError::Internal("Database error".to_string())
+        })?;
+        sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+            .bind(tenant_id.to_string())
+            .execute(&mut *conn)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to set tenant context: {e}");
+                OAuthError::Internal("Database error".to_string())
+            })?;
+        let expires_at = chrono::Utc::now()
+            + chrono::Duration::seconds(
+                xavyo_auth::client_assertion::CLIENT_ASSERTION_MAX_LIFETIME_SECS,
+            );
+        let fresh = xavyo_db::models::ClientAssertionJti::record_if_new(
+            &mut *conn,
+            tenant_id,
+            &validated.jti,
+            expires_at,
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("client_assertion jti replay check failed: {e}");
+            OAuthError::Internal("Database error".to_string())
+        })?;
+        if !fresh {
+            return Err(OAuthError::InvalidClient(
+                "client_assertion replay detected".to_string(),
+            ));
+        }
+        Ok(())
     }
 
     /// Get a client by its internal ID.
@@ -254,7 +344,8 @@ impl OAuth2ClientService {
         let client: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris,
+                   require_dpop, fapi_profile, jwks, tls_client_cert_thumbprint
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -295,7 +386,8 @@ impl OAuth2ClientService {
         let clients: Vec<DbOAuth2Client> = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris,
+                   require_dpop, fapi_profile, jwks, tls_client_cert_thumbprint
             FROM oauth_clients
             WHERE tenant_id = $1
             ORDER BY created_at DESC
@@ -345,7 +437,8 @@ impl OAuth2ClientService {
         let existing: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris,
+                   require_dpop, fapi_profile, jwks, tls_client_cert_thumbprint
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -382,6 +475,13 @@ impl OAuth2ClientService {
         let post_logout_redirect_uris = request
             .post_logout_redirect_uris
             .unwrap_or(existing.post_logout_redirect_uris);
+        // Per-client security flags: update when provided, else keep existing.
+        let require_dpop = request.require_dpop.unwrap_or(existing.require_dpop);
+        let fapi_profile = request.fapi_profile.unwrap_or(existing.fapi_profile);
+        let jwks = request.jwks.or(existing.jwks);
+        let tls_client_cert_thumbprint = request
+            .tls_client_cert_thumbprint
+            .or(existing.tls_client_cert_thumbprint);
         let now = chrono::Utc::now();
 
         sqlx::query(
@@ -389,7 +489,9 @@ impl OAuth2ClientService {
             UPDATE oauth_clients
             SET name = $1, redirect_uris = $2, grant_types = $3, scopes = $4,
                 is_active = $5, logo_url = $6, description = $7, updated_at = $8,
-                post_logout_redirect_uris = $11
+                post_logout_redirect_uris = $11,
+                require_dpop = $12, fapi_profile = $13, jwks = $14,
+                tls_client_cert_thumbprint = $15
             WHERE id = $9 AND tenant_id = $10
             ",
         )
@@ -404,6 +506,10 @@ impl OAuth2ClientService {
         .bind(id)
         .bind(tenant_id)
         .bind(&post_logout_redirect_uris)
+        .bind(require_dpop)
+        .bind(fapi_profile)
+        .bind(&jwks)
+        .bind(&tls_client_cert_thumbprint)
         .execute(&mut *conn)
         .await
         .map_err(|e| {
@@ -432,6 +538,10 @@ impl OAuth2ClientService {
             post_logout_redirect_uris,
             created_at: existing.created_at,
             updated_at: now,
+            require_dpop,
+            fapi_profile,
+            jwks,
+            tls_client_cert_thumbprint,
         })
     }
 
@@ -586,7 +696,8 @@ impl OAuth2ClientService {
         let client: DbOAuth2Client = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris,
+                   require_dpop, fapi_profile, jwks, tls_client_cert_thumbprint
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -860,6 +971,10 @@ impl OAuth2ClientService {
             post_logout_redirect_uris: client.post_logout_redirect_uris,
             created_at: client.created_at,
             updated_at: client.updated_at,
+            require_dpop: client.require_dpop,
+            fapi_profile: client.fapi_profile,
+            jwks: client.jwks,
+            tls_client_cert_thumbprint: client.tls_client_cert_thumbprint,
         }
     }
 
@@ -1068,6 +1183,10 @@ mod tests {
             post_logout_redirect_uris: vec![],
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            require_dpop: false,
+            fapi_profile: false,
+            jwks: None,
+            tls_client_cert_thumbprint: None,
         };
 
         // Create a mock pool (we won't use it, just need it for the service)
@@ -1108,6 +1227,10 @@ mod tests {
             post_logout_redirect_uris: vec![],
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            require_dpop: false,
+            fapi_profile: false,
+            jwks: None,
+            tls_client_cert_thumbprint: None,
         };
 
         let client_type = match db_client.client_type.as_str() {
@@ -1305,6 +1428,10 @@ mod tests {
             post_logout_redirect_uris: vec![],
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            require_dpop: false,
+            fapi_profile: false,
+            jwks: None,
+            tls_client_cert_thumbprint: None,
         };
 
         // Create a mock pool (not used for validation, just needed for service)

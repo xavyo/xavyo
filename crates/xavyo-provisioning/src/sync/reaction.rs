@@ -277,6 +277,16 @@ impl ActionResult {
             affected_shadow_id: None,
         }
     }
+
+    /// Create a "not implemented" result.
+    ///
+    /// Use this for action paths that are valid in principle but not yet
+    /// wired to the underlying service. Returning `failed(..)` (rather than
+    /// `success(..)`) ensures the orchestrator surfaces the change as
+    /// unprocessed instead of silently treating it as done.
+    pub fn not_implemented(action: SyncAction, detail: impl Into<String>) -> Self {
+        Self::failed(action, format!("not implemented: {}", detail.into()))
+    }
 }
 
 #[cfg(test)]

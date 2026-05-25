@@ -16,6 +16,7 @@ use xavyo_db::{
     models::org_security_policy::OrgPolicyType, set_tenant_context, PasswordHistory, RevokeReason,
     TenantPasswordPolicy, UpsertPasswordPolicy, User,
 };
+use xavyo_ssf::{CaepEmitter, CredentialChangeType, NoopEmitter};
 
 /// Special characters allowed in passwords.
 pub const SPECIAL_CHARS: &str = "!@#$%^&*()_+-=[]{}|;:,.<>?";
@@ -142,13 +143,25 @@ pub struct PasswordChangeResult {
 #[derive(Clone)]
 pub struct PasswordPolicyService {
     pool: PgPool,
+    /// CAEP signal sink (defaults to a no-op when SSF is not configured).
+    emitter: Arc<dyn CaepEmitter>,
 }
 
 impl PasswordPolicyService {
     /// Create a new password policy service.
     #[must_use]
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            emitter: Arc::new(NoopEmitter),
+        }
+    }
+
+    /// Attach a CAEP emitter so credential changes broadcast Shared Signals.
+    #[must_use]
+    pub fn with_emitter(mut self, emitter: Arc<dyn CaepEmitter>) -> Self {
+        self.emitter = emitter;
+        self
     }
 
     /// Validate a password against the tenant's policy.
@@ -202,7 +215,15 @@ impl PasswordPolicyService {
     ///
     /// Should be called after `validate_password` passes. If the policy has
     /// `check_breached_passwords` enabled, queries the HIBP k-anonymity API.
-    /// Fails open: if the HIBP API is unreachable, the password is allowed through.
+    ///
+    /// **Fail mode** is controlled by the `HIBP_FAIL_CLOSED` env var:
+    /// - unset / "false" / "0": fail-open (legacy behaviour). On HIBP error,
+    ///   allow the password through and emit a security warning. Operators
+    ///   are expected to monitor the `hibp_fail_open` counter and alert.
+    /// - "true" / "1": fail-closed. On HIBP error, reject the password as if
+    ///   it were breached. Use this for high-assurance tenants where an
+    ///   attacker disrupting egress to api.pwnedpasswords.com would otherwise
+    ///   silently disable the breach check.
     pub async fn check_breached(
         password: &str,
         policy: &TenantPasswordPolicy,
@@ -218,9 +239,34 @@ impl PasswordPolicyService {
             }
             Ok(false) => Ok(()),
             Err(()) => {
-                // Fail open -- don't block the user if HIBP is down
-                warn!("HIBP check failed, allowing password through (fail-open)");
-                Ok(())
+                let fail_closed = std::env::var("HIBP_FAIL_CLOSED")
+                    .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+                    .unwrap_or(false);
+
+                if fail_closed {
+                    // SECURITY: fail-closed — treat HIBP unavailability as if the
+                    // password were breached. Prevents an attacker who can disrupt
+                    // egress to api.pwnedpasswords.com from silently disabling the
+                    // breach check.
+                    warn!(
+                        target: "security",
+                        event_type = "hibp_fail_closed",
+                        outcome = "rejected",
+                        "HIBP check failed; rejecting password (HIBP_FAIL_CLOSED=true)"
+                    );
+                    Err(PasswordPolicyError::Breached)
+                } else {
+                    // Fail-open is observable: every occurrence emits a counter
+                    // event so operators can alert on a sustained outage and
+                    // flip HIBP_FAIL_CLOSED if needed.
+                    warn!(
+                        target: "security",
+                        event_type = "hibp_fail_open",
+                        outcome = "allowed",
+                        "HIBP check failed; allowing password through (set HIBP_FAIL_CLOSED=true to harden)"
+                    );
+                    Ok(())
+                }
             }
         }
     }
@@ -500,8 +546,7 @@ impl PasswordPolicyService {
         let policy = self.get_password_policy(tenant_id).await?;
 
         // 4. Check minimum password age
-        if let Err(e) =
-            Self::check_min_password_age(user.password_changed_at, policy.min_age_hours)
+        if let Err(e) = Self::check_min_password_age(user.password_changed_at, policy.min_age_hours)
         {
             return Err(ApiAuthError::Validation(e.to_string()));
         }
@@ -570,14 +615,26 @@ impl PasswordPolicyService {
         // 12. Revoke sessions and refresh tokens concurrently if requested
         let (sessions_revoked, refresh_tokens_revoked) = if revoke_sessions {
             let (s, r) = tokio::try_join!(
-                session_service
-                    .revoke_all_user_sessions(user_id, tenant_id, RevokeReason::PasswordChange),
+                session_service.revoke_all_user_sessions(
+                    user_id,
+                    tenant_id,
+                    RevokeReason::PasswordChange
+                ),
                 session_service.revoke_all_user_refresh_tokens(user_id, tenant_id),
             )?;
             (s as i64, r as i64)
         } else {
             (0, 0)
         };
+
+        // CAEP (Shared Signals): broadcast a credential-change signal so relying
+        // parties learn the password rotated. Fire-and-forget.
+        self.emitter.credential_change(
+            tenant_id,
+            user_id,
+            "password".to_string(),
+            CredentialChangeType::Update,
+        );
 
         Ok(PasswordChangeResult {
             sessions_revoked,

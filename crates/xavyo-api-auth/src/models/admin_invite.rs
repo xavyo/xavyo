@@ -39,13 +39,22 @@ impl CreateInvitationRequest {
 }
 
 /// Request to accept an invitation.
-#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[derive(Clone, Deserialize, ToSchema)]
 pub struct AcceptInvitationRequest {
     /// Invitation token from the email link.
     pub token: String,
 
     /// Password for the new account.
     pub password: String,
+}
+
+impl std::fmt::Debug for AcceptInvitationRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AcceptInvitationRequest")
+            .field("token", &"<redacted>")
+            .field("password", &"<redacted>")
+            .finish()
+    }
 }
 
 impl AcceptInvitationRequest {

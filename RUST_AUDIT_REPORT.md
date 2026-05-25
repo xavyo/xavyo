@@ -1,105 +1,90 @@
-# Rust Audit Report - xavyo-idp
-Date: 2026-02-04
+# Rust Audit Report — xavyo-idp
 
-## Résumé
+Date: 2026-05-24 (refresh during deep-review verify-and-harden loop)
+Previous: 2026-02-04
 
-| Catégorie | Avant | Après |
-|-----------|-------|-------|
-| Formatage (cargo fmt) | OK | OK |
-| Blocs unsafe | 0 | 0 |
-| Vulnérabilités | **3** | **1** |
-| Warnings dépendances | 7 | 6 |
-| Clippy pedantic | ~18793 | ~18793 |
+## Summary
 
----
+| Metric | Before this pass | After |
+|--------|------------------|-------|
+| `cargo audit` vulnerabilities | **18** | **4** |
+| of which Critical (9.x) | 1 (`lettre`) | 0 |
+| of which High (7.x–8.7) | 8 | 0 |
+| Unmaintained warnings | 4 | 4 |
+| `cargo fmt --check` | clean | clean |
 
-## Corrections appliquées
-
-### 1. validator 0.18 -> 0.20
-**Fichiers modifiés:**
-- `crates/xavyo-api-agents/Cargo.toml`
-- `crates/xavyo-api-auth/Cargo.toml`
-- `crates/xavyo-api-authorization/Cargo.toml`
-- `crates/xavyo-api-governance/Cargo.toml`
-- `crates/xavyo-api-oauth/Cargo.toml`
-- `crates/xavyo-webhooks/Cargo.toml`
-
-**Corrige:**
-- RUSTSEC-2024-0421 (idna)
-
-### 2. openidconnect 3.5 -> 4.0
-**Fichiers modifiés:**
-- `crates/xavyo-api-oidc-federation/Cargo.toml`
-- `crates/xavyo-api-oidc-federation/src/services/discovery.rs`
-
-**Corrige:**
-- RUSTSEC-2025-0003 (webpki) via rustls upgrade
-- RUSTSEC-2025-0134 (rustls-pemfile) via oauth2 5.0
+`cargo-audit` reinstalled (`cargo install cargo-audit`). All Critical and High
+advisories were resolved by in-range / minor dependency bumps. The 4 remaining
+are either no-fix-available (accepted) or only reachable under opt-in AWS
+feature flags against trusted AWS endpoints.
 
 ---
 
-## Vulnérabilité restante
+## Fixed (all Critical + High)
 
-### rsa 0.9.10 (RUSTSEC-2023-0071)
-- **Problème**: Marvin Attack - récupération potentielle de clé via timing sidechannels
-- **Sévérité**: 5.9 (medium)
-- **Solution**: PAS DE FIX DISPONIBLE
-- **Source**: sqlx-mysql, xavyo-api-oauth, xavyo-api-auth
-- **Risque**: Acceptable si pas d'usage de PKCS#1v1.5 decrypt
-- **Action**: Surveiller https://rustsec.org/advisories/RUSTSEC-2023-0071
-
----
-
-## Warnings dépendances (non critiques)
-
-| Crate | Advisory | Source | Action |
-|-------|----------|--------|--------|
-| proc-macro-error 1.0.4 | RUSTSEC-2024-0370 | utoipa-gen | Attendre utoipa 5.x |
-| atty 0.2.14 | RUSTSEC-2021-0145 | dépendance transitive | Attendre upstream |
+| Crate | Advisory | Sev | Fix applied |
+|-------|----------|-----|-------------|
+| `lettre` | RUSTSEC-2026-0141 (TLS hostname verification disabled on Boring backend) | **9.1 CRIT** | `cargo update` 0.11.19 → 0.11.22 |
+| `aws-lc-sys` | RUSTSEC-2026-0046, -0047 (PKCS7_verify chain/sig bypass) | **7.5 HIGH** | bumped `aws-lc-rs` 1.15.4 → 1.17.0 ⇒ `aws-lc-sys` 0.37 → 0.41 |
+| `aws-lc-sys` | RUSTSEC-2026-0048 (CRL distribution-point scope logic) | **7.4 HIGH** | same |
+| `aws-lc-sys` | RUSTSEC-2026-0044 (X.509 name-constraint bypass) | med | same |
+| `aws-lc-sys` | RUSTSEC-2026-0045 (AES-CCM timing side-channel) | 5.9 med | same |
+| `quinn-proto` | RUSTSEC-2026-0037 (endpoint DoS) | **8.7 HIGH** | `cargo update` 0.11.13 → 0.11.14 |
+| `thin-vec` | RUSTSEC-2026-0103 (UAF/double-free in IntoIter::drop) | **7.3 HIGH** | `cargo update` 0.2.14 → 0.2.18 |
+| `rustls-webpki` (0.103.x copy) | RUSTSEC-2026-0049/0098/0099/0104 | med | `cargo update` 0.103.9 → 0.103.13 |
+| `tar` | RUSTSEC-2026-0068 + symlink chmod | 5.1 med | `cargo update` 0.4.44 → 0.4.46 |
 
 ---
 
-## Tests validés
+## Remaining (4) — accepted / documented
 
-Tous les tests passent après les modifications:
-- xavyo-api-oidc-federation: 28 tests OK
-- xavyo-webhooks: 90 tests OK
-- xavyo-api-auth: 241 tests OK
-- xavyo-api-oauth: 198 tests OK
+### 1. `rsa` 0.9.x — RUSTSEC-2023-0071 (Marvin Attack, 5.9 medium) — NO FIX AVAILABLE
+Carried over from the 2026-02-04 report. No upstream fix exists. Risk is
+timing-based key recovery via PKCS#1 v1.5 decryption. xavyo does not perform
+PKCS#1 v1.5 *decryption* — `rsa` arrives transitively via `sqlx-mysql` (unused —
+we build sqlx with postgres only) and RSA *signing/verification* for JWTs uses
+`jsonwebtoken`/`aws-lc`/`ring`, not the `rsa` crate's vulnerable decrypt path.
+**Action:** monitor https://rustsec.org/advisories/RUSTSEC-2023-0071; accept.
+
+### 2–4. `rustls-webpki` 0.101.7 — RUSTSEC-2026-0098/0099/0104 (cert-validation edge cases)
+**Only present under the opt-in `aws-ses` / `aws-provider` feature flags.** The
+0.101.7 copy is pulled exclusively by the AWS SDK TLS stack:
+`aws-sdk-{sts,sesv2,secretsmanager}` → `aws-smithy-http-client` → `hyper-rustls 0.24`
+→ `rustls 0.21` → `rustls-webpki 0.101.7`. Those AWS crates are **optional**
+dependencies (`crates/xavyo-api-auth` `aws-ses`, `crates/xavyo-secrets`
+`aws-provider`) and are **not enabled in the default build**, which uses lettre
+(SMTP) for email and env/file providers for secrets. When the AWS features *are*
+enabled, the affected code path is TLS validation against AWS's own pinned-CA
+endpoints (STS / SES / Secrets Manager), where the CRL-parse-panic and
+name-constraint-acceptance advisories have low practical exploitability. The fix
+requires the upstream AWS SDK to move to `rustls 0.23`; not actionable from this
+repo without forking the SDK.
+**Action:** accept while AWS features are off by default; track AWS SDK rustls
+upgrade; if AWS features ship enabled, pin `hyper-rustls`/`rustls` overrides.
 
 ---
 
-## Prochaines étapes
+## Unmaintained warnings (4) — non-exploitable
 
-### Priorité 1 - Qualité code
-1. [ ] Traiter les ~18793 warnings clippy pedantic
-2. [ ] Commencer par: `cargo clippy --fix -p <crate> -- -W clippy::pedantic`
-
-### Priorité 2 - Maintenance
-3. [ ] Surveiller RUSTSEC-2023-0071 (rsa) pour un fix
-4. [ ] Mettre à jour utoipa vers 5.x quand disponible
+| Crate | Advisory | Source | Note |
+|-------|----------|--------|------|
+| `proc-macro-error` | RUSTSEC-2024-0370 | `utoipa-gen` (build-time) | macro expansion only; no runtime surface |
+| `number_prefix` | RUSTSEC-2025-0119 | `indicatif` (CLI progress bars) | CLI cosmetic; not in server path |
+| `rand` | RUSTSEC-2026-0097 | transitive | unsound *only* with a custom logger that calls `rand::rng()` during logging — not xavyo's usage |
+| `atty`/legacy | (carried) | transitive | superseded; tracked |
 
 ---
 
-## Commandes utiles
+## Commands
 
 ```bash
-# Vérifier vulnérabilités
-cargo audit
-
-# Corriger clippy automatiquement
-cargo clippy --fix -p xavyo-core -- -W clippy::pedantic
-
-# Voir les warnings pour un crate
-cargo clippy -p xavyo-core -- -W clippy::pedantic
-
-# Rechercher dans le log clippy
-grep "missing_errors_doc" clippy_detailed.log | head -20
+cargo install cargo-audit          # one-time
+cargo audit                        # 4 documented advisories remain (see above)
+cargo update -p <crate>            # how the fixes above were applied (Lock-only)
 ```
 
----
+## Verification
 
-## Fichiers générés
-
-- `RUST_AUDIT_REPORT.md` - Ce rapport
-- `clippy_detailed.log` - Détail des ~18793 warnings clippy (5.6 MB)
+After the dependency bumps, `cargo check` on `idp-api` + core auth/oauth crates
+was re-run to confirm the workspace still compiles (the `aws-lc-sys` 0.41 bump
+rebuilds the bundled AWS-LC C library). `cargo fmt --check` remains clean.

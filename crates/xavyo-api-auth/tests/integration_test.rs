@@ -280,11 +280,11 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
         use super::*;
 
         fn create_token_config() -> TokenConfig {
-            TokenConfig {
-                private_key: TEST_PRIVATE_KEY.to_vec(),
-                issuer: "xavyo-test".to_string(),
-                audience: "xavyo-test".to_string(),
-            }
+            TokenConfig::new(
+                TEST_PRIVATE_KEY.to_vec(),
+                "xavyo-test".to_string(),
+                "xavyo-test".to_string(),
+            )
         }
 
         /// T034: Test successful token refresh
@@ -315,6 +315,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
                     user.user_id(),
                     user.tenant_id(),
                     vec!["user".to_string()],
+                    None,
                     None,
                     None,
                 )
@@ -371,6 +372,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
                     vec!["user".to_string()],
                     None,
                     None,
+                    None,
                 )
                 .await
                 .expect("Token creation should succeed");
@@ -425,6 +427,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
                     vec!["user".to_string()],
                     None,
                     None,
+                    None,
                 )
                 .await
                 .expect("Token creation should succeed");
@@ -459,11 +462,11 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
         use super::*;
 
         fn create_token_config() -> TokenConfig {
-            TokenConfig {
-                private_key: TEST_PRIVATE_KEY.to_vec(),
-                issuer: "xavyo-test".to_string(),
-                audience: "xavyo-test".to_string(),
-            }
+            TokenConfig::new(
+                TEST_PRIVATE_KEY.to_vec(),
+                "xavyo-test".to_string(),
+                "xavyo-test".to_string(),
+            )
         }
 
         /// T043: Test successful logout
@@ -494,6 +497,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
                     user.user_id(),
                     user.tenant_id(),
                     vec!["user".to_string()],
+                    None,
                     None,
                     None,
                 )
@@ -535,6 +539,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
                     user.user_id(),
                     user.tenant_id(),
                     vec!["user".to_string()],
+                    None,
                     None,
                     None,
                 )

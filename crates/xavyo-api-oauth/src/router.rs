@@ -2,7 +2,7 @@
 //!
 //! Configures routes for OAuth2/OIDC endpoints:
 //! - GET /oauth/authorize - Authorization endpoint
-//! - POST /oauth/authorize/consent - Consent submission
+//! - GET /oauth/authorize/info, POST /oauth/authorize/grant - Consent UI integration
 //! - POST /oauth/token - Token endpoint (includes `device_code` grant)
 //! - GET /oauth/userinfo - `UserInfo` endpoint
 //! - POST /oauth/device/code - RFC 8628 Device Authorization endpoint
@@ -14,14 +14,15 @@
 
 use crate::handlers::{
     admin_revoke_user_handler, authorize_grant_handler, authorize_handler, authorize_info_handler,
-    consent_handler, create_client_handler, delete_client_handler, delete_session_handler,
+    create_client_handler, delete_client_handler, delete_session_handler,
     device_authorization_handler, device_authorize_handler, device_confirm_handler,
     device_login_handler, device_login_page_handler, device_mfa_handler, device_mfa_page_handler,
     device_resend_confirmation_handler, device_verification_page_handler,
     device_verify_code_handler, discovery_handler, end_session_handler, get_client_handler,
     introspect_token_handler, jwks_handler, list_active_sessions_handler, list_clients_handler,
-    mcp_client_metadata_handler, protected_resource_handler, regenerate_secret_handler,
-    revoke_token_handler, token_handler, update_client_handler, userinfo_handler,
+    mcp_client_metadata_handler, par_handler, protected_resource_handler,
+    regenerate_secret_handler, revoke_token_handler, token_handler, update_client_handler,
+    userinfo_handler,
 };
 use crate::services::{
     AuthorizationService, DeviceConfirmationService, DeviceRiskService, OAuth2ClientService,
@@ -31,22 +32,49 @@ use axum::{
     routing::{delete, get, post, put},
     Router,
 };
+use secrecy::SecretString;
 use sqlx::PgPool;
 use std::sync::Arc;
 use xavyo_api_auth::RevocationCache;
 use xavyo_db::SYSTEM_TENANT_ID;
+use zeroize::Zeroizing;
 
 /// A JWT signing key for multi-key rotation support (F069-S5).
+///
+/// `private_key_pem` is wrapped in `Arc<SecretString>` so:
+/// - `Clone` stays cheap (Arc bumps a refcount; no plaintext copy)
+/// - the bytes are zeroed when the last reference drops
+/// - `Debug` prints `[REDACTED]` and never leaks the PEM
 #[derive(Debug, Clone)]
 pub struct OAuthSigningKey {
     /// Key ID (kid) for JWKS identification.
     pub kid: String,
-    /// PEM-encoded RSA private key.
-    pub private_key_pem: String,
+    /// PEM-encoded RSA private key (zeroized on drop, redacted in Debug).
+    pub private_key_pem: Arc<SecretString>,
     /// PEM-encoded RSA public key.
     pub public_key_pem: String,
     /// Whether this is the active signing key (used for new tokens).
     pub is_active: bool,
+}
+
+impl OAuthSigningKey {
+    /// Construct from a plaintext PEM string. The string is moved into the
+    /// `SecretString` so the only owned plaintext copy lives behind
+    /// `expose_secret()`.
+    #[must_use]
+    pub fn from_pem(
+        kid: String,
+        private_key_pem: String,
+        public_key_pem: String,
+        is_active: bool,
+    ) -> Self {
+        Self {
+            kid,
+            private_key_pem: Arc::new(SecretString::from(private_key_pem)),
+            public_key_pem,
+            is_active,
+        }
+    }
 }
 
 /// Application state for OAuth2/OIDC routes.
@@ -65,7 +93,9 @@ pub struct OAuthState {
     /// Issuer URL (e.g., "<https://idp.xavyo.com>").
     pub issuer: String,
     /// JWT private key (PEM format) for signing tokens (active key).
-    pub private_key: Vec<u8>,
+    /// Held inside `Arc<Zeroizing<...>>` so `Clone` stays cheap and the bytes
+    /// are zeroed when the last reference drops.
+    pub private_key: Arc<Zeroizing<Vec<u8>>>,
     /// JWT public key (PEM format) for JWKS (active key).
     pub public_key: Vec<u8>,
     /// Key ID for JWKS (active key).
@@ -110,12 +140,12 @@ impl OAuthState {
         key_id: String,
         csrf_secret: Vec<u8>,
     ) -> Self {
-        let signing_keys = vec![OAuthSigningKey {
-            kid: key_id.clone(),
-            private_key_pem: String::from_utf8_lossy(&private_key).to_string(),
-            public_key_pem: String::from_utf8_lossy(&public_key).to_string(),
-            is_active: true,
-        }];
+        let signing_keys = vec![OAuthSigningKey::from_pem(
+            key_id.clone(),
+            String::from_utf8_lossy(&private_key).to_string(),
+            String::from_utf8_lossy(&public_key).to_string(),
+            true,
+        )];
         Self::with_signing_keys(
             pool,
             issuer,
@@ -150,6 +180,10 @@ impl OAuthState {
     ) -> Self {
         let client_service = Arc::new(OAuth2ClientService::new(pool.clone()));
         let authorization_service = Arc::new(AuthorizationService::new(pool.clone()));
+        // `TokenService` still takes a plain `Vec<u8>`; the bytes pass through
+        // this boundary into its own internal copy. Migrating
+        // `TokenService::new` to accept `Arc<Zeroizing<Vec<u8>>>` is a follow-up
+        // that closes the chain another step.
         let token_service = Arc::new(TokenService::new(
             pool.clone(),
             issuer.clone(),
@@ -165,7 +199,9 @@ impl OAuthState {
             token_service,
             userinfo_service,
             issuer,
-            private_key,
+            // Wrap the moved Vec into Zeroizing<...> so the bytes are zeroed
+            // when the last `Arc` clone drops.
+            private_key: Arc::new(Zeroizing::new(private_key)),
             public_key,
             key_id,
             signing_keys,
@@ -307,7 +343,11 @@ pub fn oauth_router(state: OAuthState) -> Router {
     Router::new()
         // Authorization endpoint
         .route("/authorize", get(authorize_handler))
-        .route("/authorize/consent", post(consent_handler))
+        // RFC 9126: Pushed Authorization Request endpoint
+        .route("/par", post(par_handler))
+        // NOTE: consent submission goes through the authenticated /authorize/grant
+        // endpoint (mounted on a separate router with auth middleware). The legacy
+        // /authorize/consent form-post route was removed (see deep review §2.3).
         // Token endpoint (supports authorization_code, refresh_token, client_credentials, device_code)
         .route("/token", post(token_handler))
         // UserInfo endpoint (protected - will add auth middleware)

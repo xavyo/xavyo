@@ -13,9 +13,15 @@ axum = { version = "0.7", features = ["macros"] }
 tower = { version = "0.4", features = ["util", "timeout"] }
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 
+# In-memory zeroization for `TokenConfig.private_key` (PEM bytes). The buffer
+# is held inside `Arc<Zeroizing<Vec<u8>>>` so cloning the TokenService stays
+# cheap and the bytes are zeroed when the last clone drops.
+zeroize = "1"
+
 # Internal dependencies
 xavyo-core = { path = "../xavyo-core" }
 xavyo-auth = { path = "../xavyo-auth" }
+xavyo-ssf = { path = "../xavyo-ssf" }
 xavyo-db = { path = "../xavyo-db" }
 xavyo-tenant = { path = "../xavyo-tenant" }
 xavyo-webhooks = { path = "../xavyo-webhooks" }

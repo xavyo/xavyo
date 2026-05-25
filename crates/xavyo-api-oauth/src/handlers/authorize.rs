@@ -2,13 +2,12 @@
 
 use crate::csrf;
 use crate::error::OAuthError;
-use crate::models::{AuthorizationErrorResponse, AuthorizationRequest, ConsentRequest};
+use crate::models::AuthorizationRequest;
 use crate::router::OAuthState;
 use axum::{
     extract::{Query, State},
     http::header::SET_COOKIE,
     response::{IntoResponse, Redirect, Response},
-    Form,
 };
 use uuid::Uuid;
 
@@ -32,6 +31,17 @@ pub async fn authorize_handler(
     headers: axum::http::HeaderMap,
     Query(request): Query<AuthorizationRequest>,
 ) -> Result<Response, OAuthError> {
+    // RFC 9126: if a `request_uri` (PAR) is supplied, atomically consume the
+    // pushed request and proceed with ITS parameters — any other supplied query
+    // params (besides client_id, used for binding) are ignored per §4.
+    let used_par = request.request_uri.is_some();
+    let request = if let Some(request_uri) = request.request_uri.clone() {
+        let tenant_id = extract_tenant_from_request(&headers, request.tenant.as_deref())?;
+        consume_par(&state, tenant_id, &request_uri, &request.client_id).await?
+    } else {
+        request
+    };
+
     // Validate the authorization request parameters
     state
         .authorization_service
@@ -61,6 +71,14 @@ pub async fn authorize_handler(
         ));
     }
 
+    // FAPI 2.0 §5.3.2.2: a profile client MUST use PAR — reject a direct
+    // (non-`request_uri`) authorization request.
+    if client.requires_par() && !used_par {
+        return Err(OAuthError::InvalidRequest(
+            "this client requires a pushed authorization request (RFC 9126)".to_string(),
+        ));
+    }
+
     // SECURITY: Validate redirect_uri against registered URIs (strict exact match)
     state
         .client_service
@@ -83,7 +101,7 @@ pub async fn authorize_handler(
     // Build the consent/login URL with all parameters preserved, including CSRF
     let frontend_base = state.frontend_url.as_deref().unwrap_or("");
     let consent_url = format!(
-        "{frontend_base}/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method={}{}&csrf_token={}&csrf_sig={}&tenant={}",
+        "{frontend_base}/oauth/authorize?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method={}{}{}&csrf_token={}&csrf_sig={}&tenant={}",
         urlencoding::encode(&request.client_id),
         urlencoding::encode(&request.redirect_uri),
         urlencoding::encode(&request.scope),
@@ -91,6 +109,9 @@ pub async fn authorize_handler(
         urlencoding::encode(&request.code_challenge),
         urlencoding::encode(&request.code_challenge_method),
         request.nonce.as_ref().map_or(String::new(), |n| format!("&nonce={}", urlencoding::encode(n))),
+        // RFC 9396: preserve authorization_details across the consent round-trip
+        // so the frontend echoes it back to POST /oauth/authorize/grant.
+        request.authorization_details.as_ref().map_or(String::new(), |d| format!("&authorization_details={}", urlencoding::encode(d))),
         urlencoding::encode(&csrf_token),
         urlencoding::encode(&csrf_sig),
         tenant_id,
@@ -107,128 +128,6 @@ pub async fn authorize_handler(
     Ok(response)
 }
 
-/// Processes user consent and issues authorization code on approval.
-#[utoipa::path(
-    post,
-    path = "/oauth/authorize/consent",
-    request_body = ConsentRequest,
-    responses(
-        (status = 302, description = "Redirect with authorization code or error"),
-        (status = 400, description = "Invalid consent request"),
-    ),
-    tag = "OAuth2"
-)]
-pub async fn consent_handler(
-    State(_state): State<OAuthState>,
-    headers: axum::http::HeaderMap,
-    Form(request): Form<ConsentRequest>,
-) -> Result<Response, OAuthError> {
-    // F082-US6: Validate CSRF token (double-submit cookie pattern)
-    {
-        let csrf_secret = _state.csrf_secret();
-        let form_token = request.csrf_token.as_deref().unwrap_or("");
-        let form_sig = request.csrf_sig.as_deref().unwrap_or("");
-
-        // Extract CSRF token from cookie
-        let cookie_token = headers
-            .get("cookie")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|cookies| {
-                cookies.split(';').find_map(|c| {
-                    let c = c.trim();
-                    c.strip_prefix("csrf_token=")
-                        .map(std::string::ToString::to_string)
-                })
-            })
-            .unwrap_or_default();
-
-        // Validate: form token must match cookie token, and HMAC must be valid
-        let csrf_valid = !form_token.is_empty()
-            && form_token == cookie_token
-            && csrf::validate_csrf_token(form_token, form_sig, csrf_secret);
-
-        if !csrf_valid {
-            tracing::warn!(
-                target: "security",
-                event_type = "csrf_failed",
-                outcome = "rejected",
-                "CSRF validation failed on OAuth consent form"
-            );
-            return Err(OAuthError::InvalidRequest(
-                "CSRF validation failed".to_string(),
-            ));
-        }
-    }
-
-    // Check if user denied consent
-    if !request.approved {
-        let error_response = AuthorizationErrorResponse {
-            error: "access_denied".to_string(),
-            error_description: Some("The user denied the authorization request".to_string()),
-            state: Some(request.state.clone()),
-        };
-
-        let redirect_url = build_error_redirect(&request.redirect_uri, &error_response);
-        return Ok(Redirect::to(&redirect_url).into_response());
-    }
-
-    // Parse client_id
-    let _client_uuid = Uuid::parse_str(&request.client_id)
-        .map_err(|_| OAuthError::InvalidClient("Invalid client_id format".to_string()))?;
-
-    // In a real implementation, we would:
-    // 1. Get the authenticated user from the session
-    // 2. Get the tenant_id from the user's context
-    // For now, we'll need these to be provided somehow
-
-    // TODO: Get user_id and tenant_id from authenticated session
-    // For now, return an error indicating this needs proper implementation
-    // This is a placeholder that demonstrates the flow
-
-    // In a real scenario, you would have middleware that:
-    // 1. Verifies the user is authenticated
-    // 2. Extracts user_id and tenant_id from the session
-    // 3. Makes them available via request extensions
-
-    // Placeholder: In production, extract from session
-    // let user_id = extract_user_from_session(&request);
-    // let tenant_id = extract_tenant_from_session(&request);
-
-    // For demonstration, we'll return an error indicating session is needed
-    Err(OAuthError::InvalidRequest(
-        "User authentication required. This endpoint needs integration with session management."
-            .to_string(),
-    ))
-
-    // The code below shows what would happen with proper session integration:
-    /*
-    // Generate authorization code
-    let code = state
-        .authorization_service
-        .create_authorization_code(
-            tenant_id,
-            client_uuid,
-            user_id,
-            &request.redirect_uri,
-            &request.scope,
-            &request.code_challenge,
-            &request.code_challenge_method,
-            request.nonce.as_deref(),
-        )
-        .await?;
-
-    // Build redirect URL with code and state
-    let redirect_url = format!(
-        "{}?code={}&state={}",
-        request.redirect_uri,
-        urlencoding::encode(&code),
-        urlencoding::encode(&request.state)
-    );
-
-    Ok(Redirect::to(&redirect_url).into_response())
-    */
-}
-
 /// Extract tenant ID from request headers.
 ///
 /// SECURITY: This function extracts the tenant context for pre-authentication
@@ -238,7 +137,66 @@ pub async fn consent_handler(
 ///
 /// In a production deployment, this header should ONLY be trusted from
 /// the internal network (i.e., set by the reverse proxy, not by clients).
-fn extract_tenant_from_request(
+/// Atomically consume a PAR `request_uri` and return the pushed authorization
+/// request (RFC 9126 §4). Single-use: a second use of the same `request_uri`
+/// returns `invalid_request`. The presented `client_id` must match the one the
+/// request was pushed with.
+async fn consume_par(
+    state: &OAuthState,
+    tenant_id: Uuid,
+    request_uri: &str,
+    presented_client_id: &str,
+) -> Result<AuthorizationRequest, OAuthError> {
+    let mut conn = state.pool.acquire().await.map_err(|e| {
+        tracing::error!("PAR consume: failed to acquire connection: {e}");
+        OAuthError::Internal("Database error".to_string())
+    })?;
+    sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+        .bind(tenant_id.to_string())
+        .execute(&mut *conn)
+        .await
+        .map_err(|e| {
+            tracing::error!("PAR consume: failed to set tenant context: {e}");
+            OAuthError::Internal("Database error".to_string())
+        })?;
+
+    let stored = xavyo_db::models::PushedAuthRequest::consume(&mut *conn, tenant_id, request_uri)
+        .await
+        .map_err(|e| {
+            tracing::error!("PAR consume: query failed: {e}");
+            OAuthError::Internal("Database error".to_string())
+        })?
+        .ok_or_else(|| {
+            OAuthError::InvalidRequest(
+                "request_uri is invalid, expired, or already used".to_string(),
+            )
+        })?;
+
+    // Bind: the client_id presented at /authorize must match the pushed one.
+    if !presented_client_id.is_empty() && presented_client_id != stored.client_id {
+        return Err(OAuthError::InvalidRequest(
+            "client_id does not match the pushed authorization request".to_string(),
+        ));
+    }
+
+    Ok(AuthorizationRequest {
+        response_type: stored.response_type,
+        client_id: stored.client_id,
+        redirect_uri: stored.redirect_uri,
+        scope: stored.scope,
+        state: stored.state,
+        code_challenge: stored.code_challenge,
+        code_challenge_method: stored.code_challenge_method,
+        nonce: stored.nonce,
+        tenant: Some(tenant_id.to_string()),
+        request_uri: None,
+        // RFC 9396: carry the pushed authorization_details (stored as JSONB) back
+        // into the request as its JSON-string wire form.
+        authorization_details: stored.authorization_details.map(|v| v.to_string()),
+    })
+}
+
+pub(crate) fn extract_tenant_from_request(
     headers: &axum::http::HeaderMap,
     query_tenant: Option<&str>,
 ) -> Result<Uuid, OAuthError> {
@@ -260,57 +218,4 @@ fn extract_tenant_from_request(
         tracing::warn!(tenant_str = %tenant_str, "Invalid tenant ID format");
         OAuthError::InvalidRequest("Invalid tenant ID format".to_string())
     })
-}
-
-/// Build an error redirect URL with query parameters.
-fn build_error_redirect(redirect_uri: &str, error: &AuthorizationErrorResponse) -> String {
-    let mut url = format!(
-        "{}?error={}",
-        redirect_uri,
-        urlencoding::encode(&error.error)
-    );
-
-    if let Some(ref desc) = error.error_description {
-        url.push_str(&format!("&error_description={}", urlencoding::encode(desc)));
-    }
-
-    if let Some(ref state) = error.state {
-        url.push_str(&format!("&state={}", urlencoding::encode(state)));
-    }
-
-    url
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_build_error_redirect_with_all_fields() {
-        let error = AuthorizationErrorResponse {
-            error: "access_denied".to_string(),
-            error_description: Some("User denied access".to_string()),
-            state: Some("abc123".to_string()),
-        };
-
-        let url = build_error_redirect("https://example.com/callback", &error);
-
-        assert!(url.starts_with("https://example.com/callback?"));
-        assert!(url.contains("error=access_denied"));
-        assert!(url.contains("error_description=User%20denied%20access"));
-        assert!(url.contains("state=abc123"));
-    }
-
-    #[test]
-    fn test_build_error_redirect_minimal() {
-        let error = AuthorizationErrorResponse {
-            error: "invalid_request".to_string(),
-            error_description: None,
-            state: None,
-        };
-
-        let url = build_error_redirect("https://example.com/callback", &error);
-
-        assert_eq!(url, "https://example.com/callback?error=invalid_request");
-    }
 }

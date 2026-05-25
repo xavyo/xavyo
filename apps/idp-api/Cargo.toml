@@ -71,6 +71,12 @@ sha2 = "0.10"
 # Random for CSRF token generation (F082)
 rand = "0.8"
 
+# In-memory zeroization for sensitive material (JWT private key — `Config.jwt_private_key`
+# and `SigningKey.private_key_pem`). Zeroed on drop; `ExposeSecret::expose_secret()`
+# is the only way to access the bytes, which discourages accidental `Debug`/`Display`
+# leaks.
+secrecy = "0.10"
+
 # Cancellation token for background workers (F085)
 tokio-util = { version = "0.7", features = ["rt"] }
 
@@ -81,6 +87,7 @@ xavyo-auth = { path = "../../crates/xavyo-auth" }
 xavyo-api-auth = { path = "../../crates/xavyo-api-auth" }
 xavyo-api-users = { path = "../../crates/xavyo-api-users" }
 xavyo-api-oauth = { path = "../../crates/xavyo-api-oauth" }
+xavyo-api-ssf = { path = "../../crates/xavyo-api-ssf" }
 xavyo-api-social = { path = "../../crates/xavyo-api-social" }
 xavyo-api-saml = { path = "../../crates/xavyo-api-saml" }
 xavyo-api-oidc-federation = { path = "../../crates/xavyo-api-oidc-federation" }

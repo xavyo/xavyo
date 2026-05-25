@@ -4,13 +4,61 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
 /// Authorization request query parameters for GET /oauth/authorize.
+///
+/// When `request_uri` (RFC 9126 PAR) is present the client sends only
+/// `client_id` + `request_uri`; the remaining parameters are loaded from the
+/// pushed request. They are therefore `#[serde(default)]` so the query
+/// deserializes in that case — `validate_authorization_request` still rejects
+/// the direct flow if they are missing/invalid.
 #[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct AuthorizationRequest {
     /// Response type (must be "code").
+    #[serde(default)]
     pub response_type: String,
     /// Client ID.
     pub client_id: String,
     /// Redirect URI (must match registered URI).
+    #[serde(default)]
+    pub redirect_uri: String,
+    /// Requested scopes (space-separated).
+    #[serde(default)]
+    pub scope: String,
+    /// State for CSRF protection.
+    #[serde(default)]
+    pub state: String,
+    /// PKCE code challenge.
+    #[serde(default)]
+    pub code_challenge: String,
+    /// PKCE code challenge method (must be "S256").
+    #[serde(default)]
+    pub code_challenge_method: String,
+    /// OIDC nonce (echoed in ID token).
+    pub nonce: Option<String>,
+    /// Tenant ID (optional, for browser-redirect flows that cannot set X-Tenant-ID header).
+    pub tenant: Option<String>,
+    /// RFC 9126 `request_uri` referencing a pushed authorization request.
+    #[serde(default)]
+    pub request_uri: Option<String>,
+    /// RFC 9396 `authorization_details` (JSON array string) for fine-grained,
+    /// structured permissions (e.g. `tool_access`).
+    #[serde(default)]
+    pub authorization_details: Option<String>,
+}
+
+/// Form body for `POST /oauth/par` (RFC 9126). Same parameters as the
+/// front-channel authorization request, plus optional `client_secret` for
+/// confidential-client authentication (client_secret_post). Basic-auth header
+/// is also accepted by the handler.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct PushedAuthRequestForm {
+    /// Response type (must be "code").
+    pub response_type: String,
+    /// Client ID.
+    pub client_id: String,
+    /// Client secret (confidential clients; optional for public + PKCE).
+    #[serde(default)]
+    pub client_secret: Option<String>,
+    /// Redirect URI.
     pub redirect_uri: String,
     /// Requested scopes (space-separated).
     pub scope: String,
@@ -20,10 +68,30 @@ pub struct AuthorizationRequest {
     pub code_challenge: String,
     /// PKCE code challenge method (must be "S256").
     pub code_challenge_method: String,
-    /// OIDC nonce (echoed in ID token).
+    /// OIDC nonce.
+    #[serde(default)]
     pub nonce: Option<String>,
-    /// Tenant ID (optional, for browser-redirect flows that cannot set X-Tenant-ID header).
+    /// Tenant ID (when the X-Tenant-ID header isn't set).
+    #[serde(default)]
     pub tenant: Option<String>,
+    /// RFC 9396 `authorization_details` (JSON array string).
+    #[serde(default)]
+    pub authorization_details: Option<String>,
+    /// `private_key_jwt` client assertion (RFC 7523) — confidential-client auth.
+    #[serde(default)]
+    pub client_assertion: Option<String>,
+    /// Client assertion type; MUST be the jwt-bearer URN when present.
+    #[serde(default)]
+    pub client_assertion_type: Option<String>,
+}
+
+/// Response from `POST /oauth/par` (RFC 9126 §2.2).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct ParResponse {
+    /// Opaque single-use reference: `urn:ietf:params:oauth:request_uri:<ref>`.
+    pub request_uri: String,
+    /// Lifetime of the `request_uri` in seconds.
+    pub expires_in: i64,
 }
 
 /// Authorization response (redirect parameters).
@@ -46,33 +114,6 @@ pub struct AuthorizationErrorResponse {
     /// State (echoed from request).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state: Option<String>,
-}
-
-/// Consent request (submitted by user).
-#[derive(Debug, Clone, Deserialize, ToSchema)]
-pub struct ConsentRequest {
-    /// Client ID.
-    pub client_id: String,
-    /// Redirect URI.
-    pub redirect_uri: String,
-    /// Requested scopes.
-    pub scope: String,
-    /// State.
-    pub state: String,
-    /// PKCE code challenge.
-    pub code_challenge: String,
-    /// PKCE code challenge method.
-    pub code_challenge_method: String,
-    /// OIDC nonce.
-    pub nonce: Option<String>,
-    /// Whether user approved the request.
-    pub approved: bool,
-    /// CSRF token (F082-US6).
-    #[serde(default)]
-    pub csrf_token: Option<String>,
-    /// CSRF signature (F082-US6).
-    #[serde(default)]
-    pub csrf_sig: Option<String>,
 }
 
 /// Query parameters for GET /oauth/authorize/info.
@@ -121,6 +162,9 @@ pub struct AuthorizeGrantRequest {
     pub code_challenge_method: String,
     /// OIDC nonce (optional).
     pub nonce: Option<String>,
+    /// RFC 9396 `authorization_details` (JSON array string).
+    #[serde(default)]
+    pub authorization_details: Option<String>,
 }
 
 /// Response from POST /oauth/authorize/grant.
@@ -132,4 +176,8 @@ pub struct AuthorizeGrantResponse {
     pub state: String,
     /// Redirect URI to send user back to.
     pub redirect_uri: String,
+    /// RFC 9207 issuer identifier. The consent frontend MUST include this as the
+    /// `iss` parameter in the redirect to `redirect_uri` so the client can detect
+    /// authorization-server mix-up attacks.
+    pub iss: String,
 }

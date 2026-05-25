@@ -30,6 +30,7 @@ mod client_isolation {
             redirect_uris: vec!["https://example.com/callback".to_string()],
             grant_types: vec!["client_credentials".to_string()],
             scopes: vec!["api:read".to_string()],
+            ..Default::default()
         }
     }
 
@@ -229,6 +230,7 @@ mod client_isolation {
             grant_types: None,
             scopes: None,
             is_active: None,
+            ..Default::default()
         };
 
         let result = service
@@ -375,6 +377,7 @@ mod rls_isolation {
                     redirect_uris: vec!["https://example.com/cb".to_string()],
                     grant_types: vec!["client_credentials".to_string()],
                     scopes: vec!["api:read".to_string()],
+                    ..Default::default()
                 },
             )
             .await
@@ -430,6 +433,7 @@ mod rls_isolation {
                     redirect_uris: vec!["https://a.example.com/cb".to_string()],
                     grant_types: vec!["authorization_code".to_string()],
                     scopes: vec!["openid".to_string()],
+                    ..Default::default()
                 },
             )
             .await
@@ -444,6 +448,7 @@ mod rls_isolation {
                     redirect_uris: vec!["https://b.example.com/cb".to_string()],
                     grant_types: vec!["authorization_code".to_string()],
                     scopes: vec!["openid".to_string()],
+                    ..Default::default()
                 },
             )
             .await
@@ -557,6 +562,7 @@ mod token_isolation {
                     redirect_uris: vec!["https://example.com/cb".to_string()],
                     grant_types: vec!["refresh_token".to_string()],
                     scopes: vec!["openid".to_string()],
+                    ..Default::default()
                 },
             )
             .await
@@ -644,6 +650,7 @@ mod token_isolation {
                     redirect_uris: vec!["https://example.com/cb".to_string()],
                     grant_types: vec!["authorization_code".to_string()],
                     scopes: vec!["openid".to_string()],
+                    ..Default::default()
                 },
             )
             .await
@@ -742,6 +749,7 @@ mod bulk_isolation {
                     redirect_uris: vec!["https://a.example.com/cb".to_string()],
                     grant_types: vec!["authorization_code".to_string()],
                     scopes: vec!["openid".to_string()],
+                    ..Default::default()
                 },
             )
             .await
@@ -756,6 +764,7 @@ mod bulk_isolation {
                     redirect_uris: vec!["https://b.example.com/cb".to_string()],
                     grant_types: vec!["authorization_code".to_string()],
                     scopes: vec!["openid".to_string()],
+                    ..Default::default()
                 },
             )
             .await
@@ -817,6 +826,7 @@ mod bulk_isolation {
                     redirect_uris: vec!["https://a.example.com/cb".to_string()],
                     grant_types: vec!["authorization_code".to_string()],
                     scopes: vec!["openid".to_string()],
+                    ..Default::default()
                 },
             )
             .await
@@ -831,6 +841,7 @@ mod bulk_isolation {
                     redirect_uris: vec!["https://b.example.com/cb".to_string()],
                     grant_types: vec!["authorization_code".to_string()],
                     scopes: vec!["openid".to_string()],
+                    ..Default::default()
                 },
             )
             .await

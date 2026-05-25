@@ -9,11 +9,11 @@ use std::error::Error;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use xavyo_api_scim::models::{ScimGroup, ScimGroupListResponse, ScimUser, ScimUserListResponse};
 use xavyo_connector::crypto::CredentialEncryption;
 use xavyo_db::models::scim_provisioning_state::ScimProvisioningState;
 use xavyo_db::models::scim_sync_run::{CreateScimSyncRun, ScimSyncRun};
 use xavyo_db::models::scim_target::ScimTarget;
+use xavyo_scim_types::{ScimGroup, ScimGroupListResponse, ScimUser, ScimUserListResponse};
 
 use crate::client::ScimClient;
 use xavyo_webhooks::EventPublisher;

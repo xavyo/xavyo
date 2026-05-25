@@ -1,6 +1,7 @@
 //! MFA-related request models.
 
 use serde::Deserialize;
+use std::fmt;
 use utoipa::ToSchema;
 use validator::Validate;
 use xavyo_db::MfaPolicy;
@@ -22,7 +23,7 @@ pub struct TotpVerifyRequest {
 }
 
 /// Request to disable MFA.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Deserialize, Validate, ToSchema)]
 pub struct TotpDisableRequest {
     /// User's current password for verification.
     #[validate(length(min = 1, message = "Password is required"))]
@@ -33,12 +34,29 @@ pub struct TotpDisableRequest {
     pub code: String,
 }
 
+impl fmt::Debug for TotpDisableRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TotpDisableRequest")
+            .field("password", &"<redacted>")
+            .field("code", &"<redacted>")
+            .finish()
+    }
+}
+
 /// Request to regenerate recovery codes.
-#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[derive(Deserialize, Validate, ToSchema)]
 pub struct RecoveryRegenerateRequest {
     /// User's current password for verification.
     #[validate(length(min = 1, message = "Password is required"))]
     pub password: String,
+}
+
+impl fmt::Debug for RecoveryRegenerateRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RecoveryRegenerateRequest")
+            .field("password", &"<redacted>")
+            .finish()
+    }
 }
 
 /// Request to verify a recovery code during login.

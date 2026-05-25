@@ -1,11 +1,16 @@
 //! Request DTOs for authentication endpoints.
+//!
+//! Request structs that carry a plaintext password derive `Debug` manually
+//! with the password field redacted, so an accidental `tracing::debug!(?req)`
+//! never leaks credentials. The struct's normal serde behaviour is unchanged.
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use utoipa::ToSchema;
 use validator::Validate;
 
 /// Registration request payload.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct RegisterRequest {
     /// User email address.
     #[validate(email(message = "Invalid email format"))]
@@ -17,8 +22,17 @@ pub struct RegisterRequest {
     pub password: String,
 }
 
+impl fmt::Debug for RegisterRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RegisterRequest")
+            .field("email", &self.email)
+            .field("password", &"<redacted>")
+            .finish()
+    }
+}
+
 /// Login request payload.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct LoginRequest {
     /// User email address.
     #[validate(email(message = "Invalid email format"))]
@@ -29,6 +43,15 @@ pub struct LoginRequest {
     /// that could consume excessive CPU during hashing.
     #[validate(length(min = 1, max = 1024, message = "Password must be 1-1024 characters"))]
     pub password: String,
+}
+
+impl fmt::Debug for LoginRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LoginRequest")
+            .field("email", &self.email)
+            .field("password", &"<redacted>")
+            .finish()
+    }
 }
 
 /// Token refresh request payload.
@@ -54,7 +77,7 @@ pub struct ForgotPasswordRequest {
 }
 
 /// Reset password request payload.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct ResetPasswordRequest {
     /// Password reset token from email.
     #[validate(length(min = 43, max = 43, message = "Invalid token format"))]
@@ -63,6 +86,15 @@ pub struct ResetPasswordRequest {
     /// New password.
     #[validate(length(min = 8, max = 128, message = "Password must be 8-128 characters"))]
     pub new_password: String,
+}
+
+impl fmt::Debug for ResetPasswordRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ResetPasswordRequest")
+            .field("token", &"<redacted>")
+            .field("new_password", &"<redacted>")
+            .finish()
+    }
 }
 
 /// Verify email request payload.
@@ -84,7 +116,7 @@ pub struct ResendVerificationRequest {
 /// Change password request payload.
 ///
 /// Used by authenticated users to change their password.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct PasswordChangeRequest {
     /// Current password for verification.
     pub current_password: String,
@@ -97,6 +129,16 @@ pub struct PasswordChangeRequest {
     /// Defaults to true for security.
     #[serde(default = "default_revoke_sessions")]
     pub revoke_other_sessions: bool,
+}
+
+impl fmt::Debug for PasswordChangeRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PasswordChangeRequest")
+            .field("current_password", &"<redacted>")
+            .field("new_password", &"<redacted>")
+            .field("revoke_other_sessions", &self.revoke_other_sessions)
+            .finish()
+    }
 }
 
 fn default_revoke_sessions() -> bool {

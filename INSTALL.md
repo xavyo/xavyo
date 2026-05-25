@@ -113,7 +113,11 @@ For contributors and developers who need to build and modify xavyo.
 | Rust | 1.75+ | `rustc --version` |
 | OpenSSL | 1.1+ | `openssl version` |
 | Git | 2.30+ | `git --version` |
+| `protoc` | 3.x+ | `protoc --version` (needed by `xavyo-ext-authz` build script) |
 | Node.js | 18+ | `node --version` (for documentation site only) |
+
+Install `protoc` on macOS with `brew install protobuf`, on Debian/Ubuntu with
+`sudo apt install -y protobuf-compiler`, or on Fedora with `sudo dnf install -y protobuf-compiler`.
 
 ### 1. Clone the Repository
 

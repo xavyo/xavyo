@@ -44,21 +44,34 @@
 //! - [`risk`]: Risk score calculation utilities
 
 /// Risk score calculation and normalization utilities.
+///
+/// Gated behind the `domain` feature (default-on). Foundation consumers
+/// that only need the type enums can disable default features.
+#[cfg(feature = "domain")]
 pub mod risk;
 
 /// Core trait for Non-Human Identity abstraction.
+///
+/// Gated behind the `domain` feature (default-on). See `risk` above.
+#[cfg(feature = "domain")]
 pub mod traits;
 
 /// Core type definitions for Non-Human Identities.
 pub mod types;
 
+#[cfg(feature = "domain")]
 pub use risk::{calculate_risk_level, calculate_risk_score, RiskFactors};
+#[cfg(feature = "domain")]
 pub use traits::NhiEntity;
 pub use types::{NhiLifecycleState, NhiRiskLevel, NhiType};
 
 // Backward-compatibility re-exports
+//
+// Only meaningful when the `domain` feature is enabled (the deprecated alias
+// for the trait references `NhiEntity`, which only exists with `domain`).
 
 /// Old trait name. Use [`NhiEntity`] instead.
+#[cfg(feature = "domain")]
 #[deprecated(note = "use NhiEntity instead")]
 pub type NonHumanIdentity = dyn NhiEntity;
 

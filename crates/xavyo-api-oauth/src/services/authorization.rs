@@ -20,6 +20,7 @@ struct AuthCodeRecord {
     nonce: Option<String>,
     expires_at: DateTime<Utc>,
     used: bool,
+    authorization_details: Option<serde_json::Value>,
 }
 
 /// Authorization code length in bytes (32 bytes = 256 bits).
@@ -157,6 +158,7 @@ impl AuthorizationService {
         code_challenge: &str,
         code_challenge_method: &str,
         nonce: Option<&str>,
+        authorization_details: Option<&serde_json::Value>,
     ) -> Result<String, OAuthError> {
         // Generate a cryptographically secure code
         let code = Self::generate_code();
@@ -185,9 +187,9 @@ impl AuthorizationService {
             INSERT INTO authorization_codes (
                 code_hash, client_id, user_id, tenant_id,
                 redirect_uri, scope, code_challenge, code_challenge_method,
-                nonce, expires_at
+                nonce, expires_at, authorization_details
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             ",
         )
         .bind(&code_hash)
@@ -200,6 +202,7 @@ impl AuthorizationService {
         .bind(code_challenge_method)
         .bind(nonce)
         .bind(expires_at)
+        .bind(authorization_details)
         .execute(&mut *conn)
         .await
         .map_err(|e| {
@@ -219,7 +222,7 @@ impl AuthorizationService {
     /// 4. Redirect URI matches
     /// 5. PKCE code verifier matches the stored challenge
     ///
-    /// Returns (`user_id`, scope, nonce) if valid.
+    /// Returns (`user_id`, scope, nonce, `authorization_details`) if valid.
     pub async fn validate_and_consume_code(
         &self,
         tenant_id: Uuid,
@@ -227,7 +230,7 @@ impl AuthorizationService {
         client_id: Uuid,
         redirect_uri: &str,
         code_verifier: &str,
-    ) -> Result<(Uuid, String, Option<String>), OAuthError> {
+    ) -> Result<(Uuid, String, Option<String>, Option<serde_json::Value>), OAuthError> {
         let code_hash = Self::hash_code(code);
 
         // Start a transaction to ensure atomicity
@@ -250,7 +253,7 @@ impl AuthorizationService {
         let record: Option<AuthCodeRecord> = sqlx::query_as(
             r"
             SELECT id, client_id, user_id, redirect_uri, scope,
-                   code_challenge, nonce, expires_at, used
+                   code_challenge, nonce, expires_at, used, authorization_details
             FROM authorization_codes
             WHERE code_hash = $1 AND tenant_id = $2
             FOR UPDATE
@@ -274,14 +277,51 @@ impl AuthorizationService {
             }
         };
 
-        // Check if already used
+        // RFC 6749 §10.5 — reuse detection: if `used = TRUE`, this is a
+        // second redemption attempt against a consumed code. Mark the entire
+        // token family for revocation by inserting a `revoke-all` sentinel.
         if record.used {
-            // Potential token replay attack - revoke all tokens for this family
             tracing::warn!(
-                "Authorization code reuse detected for code_id={}, user_id={}",
-                record.id,
-                record.user_id
+                target: "security",
+                event_type = "oauth_code_reuse_detected",
+                code_id = %record.id,
+                user_id = %record.user_id,
+                tenant_id = %tenant_id,
+                "OAuth authorization-code reuse detected — revoking issued token family"
             );
+
+            // Best-effort: insert a `revoke-all:{user_id}:{timestamp}` sentinel
+            // on the same transaction. The JWT-auth middleware checks for these
+            // sentinels and rejects any access token issued before the timestamp.
+            // Failure to insert is logged but does not change the outer error —
+            // we always deny the redemption.
+            let sentinel_jti = format!("revoke-all:{}:{}", record.user_id, Utc::now().timestamp());
+            let sentinel_expires = Utc::now() + chrono::Duration::hours(1);
+            if let Err(e) = sqlx::query(
+                r"
+                INSERT INTO revoked_tokens (jti, user_id, tenant_id, reason, expires_at)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (jti) DO NOTHING
+                ",
+            )
+            .bind(&sentinel_jti)
+            .bind(record.user_id)
+            .bind(tenant_id)
+            .bind("oauth authorization-code reuse detected")
+            .bind(sentinel_expires)
+            .execute(&mut *tx)
+            .await
+            {
+                tracing::error!(
+                    target: "security",
+                    event_type = "oauth_code_reuse_sentinel_insert_failed",
+                    error = %e,
+                    "Failed to insert revoke-all sentinel after code-reuse detection"
+                );
+            }
+            // Commit the sentinel even though we return an error.
+            let _ = tx.commit().await;
+
             return Err(OAuthError::InvalidGrant(
                 "Authorization code has already been used".to_string(),
             ));
@@ -313,10 +353,14 @@ impl AuthorizationService {
             ));
         }
 
-        // Delete the code to prevent replay (RFC 6749 Section 4.1.2)
+        // RFC 6749 §10.5: mark the code as consumed (instead of deleting). This
+        // keeps the row visible to a second redemption attempt so we can detect
+        // reuse and revoke the issued token family (see branch above). A nightly
+        // cleanup job vacuums rows past `expires_at`.
         sqlx::query(
             r"
-            DELETE FROM authorization_codes
+            UPDATE authorization_codes
+            SET used = TRUE, consumed_at = NOW()
             WHERE id = $1 AND tenant_id = $2
             ",
         )
@@ -325,7 +369,7 @@ impl AuthorizationService {
         .execute(&mut *tx)
         .await
         .map_err(|e| {
-            tracing::error!("Failed to delete authorization code: {}", e);
+            tracing::error!("Failed to mark authorization code consumed: {}", e);
             OAuthError::Internal("Database error".to_string())
         })?;
 
@@ -335,7 +379,12 @@ impl AuthorizationService {
             OAuthError::Internal("Database error".to_string())
         })?;
 
-        Ok((record.user_id, record.scope, record.nonce))
+        Ok((
+            record.user_id,
+            record.scope,
+            record.nonce,
+            record.authorization_details,
+        ))
     }
 }
 
@@ -421,6 +470,8 @@ mod tests {
             code_challenge_method: "S256".to_string(),
             nonce: None,
             tenant: None,
+            request_uri: None,
+            authorization_details: None,
         }
     }
 

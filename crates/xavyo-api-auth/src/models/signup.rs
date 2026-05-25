@@ -4,6 +4,7 @@
 //! that allows new users to create accounts in the system tenant.
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
@@ -11,7 +12,7 @@ use validator::Validate;
 /// Signup request payload.
 ///
 /// Used for self-service account creation in the system tenant.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct SignupRequest {
     /// User email address.
     #[validate(email(message = "Invalid email format"))]
@@ -27,6 +28,16 @@ pub struct SignupRequest {
     #[validate(length(max = 255, message = "Display name must not exceed 255 characters"))]
     #[serde(default)]
     pub display_name: Option<String>,
+}
+
+impl fmt::Debug for SignupRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SignupRequest")
+            .field("email", &self.email)
+            .field("password", &"<redacted>")
+            .field("display_name", &self.display_name)
+            .finish()
+    }
 }
 
 /// Signup response payload.

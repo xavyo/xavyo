@@ -10,7 +10,11 @@ publish = false
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "migrate", "uuid", "chrono", "rust_decimal", "json"] }
 tokio = { version = "1.35", features = ["full"] }
 xavyo-core = { path = "../xavyo-core" }
-xavyo-nhi = { path = "../xavyo-nhi", features = ["sqlx"] }
+# Types-only dependency on xavyo-nhi. We disable default features (which
+# include the `domain` flag covering `risk` + `traits`) so the persistence
+# layer doesn't transitively force NHI domain logic into every consumer of
+# `xavyo-db`. See deep review §4.1.
+xavyo-nhi = { path = "../xavyo-nhi", default-features = false, features = ["sqlx"] }
 thiserror = "1.0"
 tracing = "0.1"
 chrono = { version = "0.4", features = ["serde"] }

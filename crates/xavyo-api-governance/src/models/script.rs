@@ -580,7 +580,8 @@ pub struct ExecutionLogResponse {
     pub tenant_id: Uuid,
 
     /// The script that was executed.
-    pub script_id: Uuid,
+    /// `None` when the DB row's `script_id` is NULL (legacy logs).
+    pub script_id: Option<Uuid>,
 
     /// The binding that triggered the execution (if applicable).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -615,7 +616,10 @@ pub struct ExecutionLogResponse {
     pub duration_ms: i64,
 
     /// Who triggered the execution.
-    pub executed_by: Uuid,
+    /// `None` when actor tracking was not captured for this execution
+    /// (script execution logs don't currently persist the actor — pending
+    /// schema migration, see deep review §2.4).
+    pub executed_by: Option<Uuid>,
 
     /// When the execution started.
     pub executed_at: DateTime<Utc>,

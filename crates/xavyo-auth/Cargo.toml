@@ -42,12 +42,20 @@ tracing = "0.1"
 # Random for salt generation
 rand = "0.8"
 
-# Base64 encoding for JWKS
+# Base64 encoding for JWKS + DPoP
 base64 = "0.22"
+
+# SHA-256 for RFC 7638 JWK thumbprints (DPoP cnf.jkt) and ath hashing
+sha2 = "0.10"
+
+# HMAC for stateless DPoP-Nonce issuance/verification (RFC 9449 §8)
+hmac = "0.12"
 
 [dev-dependencies]
 tokio = { version = "1.35", features = ["full"] }
 wiremock = "0.6"
+# P-256 keygen for signing real DPoP proofs in tests (no production use).
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
 
 [features]
 default = []

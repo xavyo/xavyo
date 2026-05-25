@@ -181,6 +181,8 @@ impl IntoResponse for ApiGovernanceError {
                         "precondition_failed",
                         e.to_string(),
                     )
+                } else if let GovernanceError::NotImplemented(msg) = e {
+                    (StatusCode::NOT_IMPLEMENTED, "not_implemented", msg.clone())
                 } else {
                     match e {
                         GovernanceError::Validation(msg) => {

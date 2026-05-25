@@ -2,6 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use utoipa::ToSchema;
 use validator::Validate;
 
@@ -63,7 +64,7 @@ pub struct UpdateProfileRequest {
 // ============================================================================
 
 /// Request for POST /me/email/change.
-#[derive(Debug, Clone, Serialize, Deserialize, Validate, ToSchema)]
+#[derive(Clone, Serialize, Deserialize, Validate, ToSchema)]
 pub struct EmailChangeRequest {
     /// The new email address.
     #[validate(email(message = "Invalid email format"))]
@@ -72,6 +73,15 @@ pub struct EmailChangeRequest {
 
     /// Current password for verification.
     pub current_password: String,
+}
+
+impl fmt::Debug for EmailChangeRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EmailChangeRequest")
+            .field("new_email", &self.new_email)
+            .field("current_password", &"<redacted>")
+            .finish()
+    }
 }
 
 /// Response for POST /me/email/change (success).

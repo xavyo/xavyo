@@ -20,6 +20,7 @@ use config::{Config, HealthCheckConfig, InputValidationConfig, RateLimitingConfi
 use health::{health_handler, healthz_handler, livez_handler, readyz_handler, startupz_handler};
 use middleware::request_id_layer;
 use openapi::swagger_routes;
+use secrecy::{ExposeSecret, SecretString};
 use sqlx::postgres::PgPoolOptions;
 use state::AppState;
 use std::net::SocketAddr;
@@ -67,6 +68,9 @@ use xavyo_api_scim::{scim_admin_router, scim_resource_router, ScimConfig};
 use xavyo_api_social::{
     admin_social_router, authenticated_social_router, public_social_router, SocialConfig,
     SocialState,
+};
+use xavyo_api_ssf::{
+    ssf_router, ssf_well_known_router, SsfState, SsfStreamEmitter, SsfTransmitter,
 };
 use xavyo_api_tenants::{
     api_keys_router, oauth_clients_router, suspension_check_middleware, system_admin_router,
@@ -254,11 +258,15 @@ async fn main() {
     // Create authentication services
     let auth_service = AuthService::new(pool.clone());
 
-    let token_config = TokenConfig {
-        private_key: config.jwt_private_key.as_bytes().to_vec(),
-        issuer: "xavyo".to_string(),
-        audience: "xavyo".to_string(),
-    };
+    // `jwt_private_key` is `SecretString`; we expose the bytes once to build
+    // a `Vec<u8>`, then immediately hand it to `TokenConfig::new` which moves
+    // it into `Arc<Zeroizing<Vec<u8>>>` — the transient `Vec<u8>` is dropped
+    // (and the inner buffer zeroed) when the last clone goes away.
+    let token_config = TokenConfig::new(
+        config.jwt_private_key.expose_secret().as_bytes().to_vec(),
+        "xavyo".to_string(),
+        "xavyo".to_string(),
+    );
     let token_service = TokenService::new(token_config.clone(), pool.clone());
 
     let login_rate_max: usize = std::env::var("LOGIN_RATE_LIMIT_MAX")
@@ -350,8 +358,25 @@ async fn main() {
         config.mfa_issuer.clone(),
     );
 
+    // Shared Signals (CAEP) emitter — signs + pushes Security Event Tokens to
+    // registered receivers. Reuses the OAuth signing key + issuer. Injected into
+    // the auth services so revocations/credential changes broadcast in real time.
+    let ssf_transmitter = Arc::new(
+        SsfTransmitter::new(
+            Arc::new(config.jwt_private_key.expose_secret().as_bytes().to_vec()),
+            config.jwt_key_id.clone(),
+            config.issuer_url.clone(),
+        )
+        .expect("failed to build SSF transmitter"),
+    );
+    let ssf_emitter = Arc::new(SsfStreamEmitter::new(
+        ssf_transmitter,
+        pool.clone(),
+        config.issuer_url.clone(),
+    ));
+
     // Create session service for session management
-    let session_service = SessionService::new(pool.clone());
+    let session_service = SessionService::new(pool.clone()).with_emitter(ssf_emitter.clone());
     // F112: Clone session service for device routes (will be wrapped in Arc)
     let session_service_for_device = Arc::new(session_service.clone());
 
@@ -376,7 +401,9 @@ async fn main() {
         session_service,
         token_config.clone(),
     ) {
-        Ok(state) => state,
+        // Wire the CAEP emitter so credential-change flows broadcast Shared
+        // Signals (session-revoked is already wired via session_service above).
+        Ok(state) => state.with_caep_emitter(ssf_emitter.clone()),
         Err(e) => {
             tracing::error!("Failed to create auth state: {e}");
             std::process::exit(1);
@@ -444,12 +471,13 @@ async fn main() {
     };
 
     // Build auth routes: tenant-required routes (login, register, forgot-password, etc.)
-    let tenant_auth_routes =
-        auth_router(auth_state.clone(), config.jwt_public_key.clone()).layer(TenantLayer::with_config(
-        xavyo_tenant::TenantConfig::builder()
-            .require_tenant(true)
-            .build(),
-    ));
+    let tenant_auth_routes = auth_router(auth_state.clone(), config.jwt_public_key.clone()).layer(
+        TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(true)
+                .build(),
+        ),
+    );
 
     // Public auth routes — no tenant header needed (signup, refresh, logout)
     let public_auth_routes = public_auth_router(auth_state.clone());
@@ -670,24 +698,31 @@ async fn main() {
         .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
         .layer(axum::Extension(pool.clone()));
 
-    // Build OAuth2/OIDC routes (F069-S5: multi-key support)
+    // Build OAuth2/OIDC routes (F069-S5: multi-key support).
+    //
+    // `OAuthSigningKey::from_pem` accepts a plain `String` and immediately
+    // moves it into `Arc<SecretString>`, keeping the Zeroize chain intact —
+    // the plaintext only exists transiently at this call site, not in the
+    // downstream router state.
     let oauth_signing_keys: Vec<xavyo_api_oauth::OAuthSigningKey> =
         if config.signing_keys.is_empty() {
-            vec![xavyo_api_oauth::OAuthSigningKey {
-                kid: config.jwt_key_id.clone(),
-                private_key_pem: config.jwt_private_key.clone(),
-                public_key_pem: config.jwt_public_key.clone(),
-                is_active: true,
-            }]
+            vec![xavyo_api_oauth::OAuthSigningKey::from_pem(
+                config.jwt_key_id.clone(),
+                config.jwt_private_key.expose_secret().to_string(),
+                config.jwt_public_key.clone(),
+                true,
+            )]
         } else {
             config
                 .signing_keys
                 .iter()
-                .map(|k| xavyo_api_oauth::OAuthSigningKey {
-                    kid: k.kid.clone(),
-                    private_key_pem: k.private_key_pem.clone(),
-                    public_key_pem: k.public_key_pem.clone(),
-                    is_active: k.is_active,
+                .map(|k| {
+                    xavyo_api_oauth::OAuthSigningKey::from_pem(
+                        k.kid.clone(),
+                        k.private_key_pem.expose_secret().to_string(),
+                        k.public_key_pem.clone(),
+                        k.is_active,
+                    )
                 })
                 .collect()
         };
@@ -695,7 +730,7 @@ async fn main() {
     let oauth_state = OAuthState::with_signing_keys(
         pool.clone(),
         config.issuer_url.clone(),
-        config.jwt_private_key.as_bytes().to_vec(),
+        config.jwt_private_key.expose_secret().as_bytes().to_vec(),
         config.jwt_public_key.as_bytes().to_vec(),
         config.jwt_key_id.clone(),
         oauth_signing_keys,
@@ -730,6 +765,23 @@ async fn main() {
 
     // Well-known routes (OIDC discovery, JWKS)
     let well_known_routes = well_known_router(oauth_state.clone());
+
+    // Shared Signals Framework (OpenID SSF/CAEP) — xavyo as Transmitter.
+    // Stream-management API is tenant-scoped + admin-authenticated (mirrors the
+    // OAuth admin layering); the configuration metadata is public discovery.
+    let ssf_state = SsfState {
+        pool: pool.clone(),
+        issuer: config.issuer_url.clone(),
+    };
+    let ssf_routes = ssf_router(ssf_state.clone())
+        .layer(axum::middleware::from_fn(jwt_auth_middleware))
+        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(true)
+                .build(),
+        ));
+    let ssf_well_known_routes = ssf_well_known_router(ssf_state);
 
     // Device code verification routes (F096 - RFC 8628)
     // These render HTML pages for the device authorization flow
@@ -766,10 +818,12 @@ async fn main() {
                 .build(),
         ));
 
-    // Build social login state
+    // Build social login state.
+    // Clone the exposed bytes into a fresh `SecretString` so the adapter
+    // holds its own zeroizing copy.
     let social_auth_adapter = Arc::new(SocialAuthAdapter::new(
         pool.clone(),
-        config.jwt_private_key.clone(),
+        SecretString::from(config.jwt_private_key.expose_secret().to_string()),
     ));
     let social_config = SocialConfig {
         pool: pool.clone(),
@@ -887,7 +941,7 @@ async fn main() {
         pool: pool.clone(),
         master_key: config.federation_encryption_key,
         callback_base_url: config.issuer_url.clone(),
-        jwt_private_key_pem: config.jwt_private_key.as_bytes().to_vec(),
+        jwt_private_key_pem: config.jwt_private_key.expose_secret().as_bytes().to_vec(),
     };
     let federation_state = FederationState::new(&federation_config);
 
@@ -1303,7 +1357,10 @@ async fn main() {
         // OAuth2/OIDC routes
         .nest("/oauth", oauth_routes)
         // Well-known routes (at root level)
-        .nest("/.well-known", well_known_routes)
+        .nest(
+            "/.well-known",
+            well_known_routes.merge(ssf_well_known_routes),
+        )
         // Device code verification routes (F096 - RFC 8628)
         .nest("/device", device_routes)
         // OAuth admin routes (requires admin role)
@@ -1402,6 +1459,8 @@ async fn main() {
         .merge(agents_discovery_routes)
         // Unified NHI routes (F108 - Unified Non-Human Identity Architecture)
         .nest("/nhi", nhi_routes)
+        // Shared Signals Framework stream-management API (OpenID SSF/CAEP)
+        .nest("/ssf", ssf_routes)
         // Tenant provisioning routes (F097 - Self-service tenant creation)
         .nest("/tenants", tenant_routes)
         // System administration routes (F-SUSPEND, F-DELETE, F-USAGE-TRACK, F-PLAN-MGMT, F-SETTINGS-API)
@@ -1410,6 +1469,12 @@ async fn main() {
         .merge(api_keys_routes)
         // OAuth client management routes (F-SECRET-ROTATE)
         .merge(oauth_clients_routes)
+        // DPoP (RFC 9449): public issuer base URL for proxy-safe `htu`
+        // validation in jwt_auth_middleware. Global so every authenticated
+        // route enforces sender-constrained (cnf.jkt) tokens.
+        .layer(axum::Extension(xavyo_api_auth::IssuerUrl(
+            config.issuer_url.clone(),
+        )))
         // Apply middleware to all routes
         .layer(axum::middleware::from_fn(
             middleware::security_headers_middleware,
@@ -1846,11 +1911,11 @@ fn build_cors_layer(origins: &[String]) -> CorsLayer {
 /// Adapter to connect xavyo-api-social to xavyo-auth.
 struct SocialAuthAdapter {
     pool: sqlx::PgPool,
-    jwt_private_key: String,
+    jwt_private_key: SecretString,
 }
 
 impl SocialAuthAdapter {
-    fn new(pool: sqlx::PgPool, jwt_private_key: String) -> Self {
+    fn new(pool: sqlx::PgPool, jwt_private_key: SecretString) -> Self {
         Self {
             pool,
             jwt_private_key,
@@ -1865,12 +1930,13 @@ impl xavyo_api_social::AuthService for SocialAuthAdapter {
         user_id: uuid::Uuid,
         tenant_id: uuid::Uuid,
     ) -> Result<xavyo_api_social::handlers::JwtTokens, xavyo_api_social::SocialError> {
-        // Use xavyo-auth to issue tokens
-        let token_config = TokenConfig {
-            private_key: self.jwt_private_key.as_bytes().to_vec(),
-            issuer: "xavyo".to_string(),
-            audience: "xavyo".to_string(),
-        };
+        // Use xavyo-auth to issue tokens. `TokenConfig::new` moves the
+        // exposed PEM bytes into `Arc<Zeroizing<Vec<u8>>>` (zeroed on drop).
+        let token_config = TokenConfig::new(
+            self.jwt_private_key.expose_secret().as_bytes().to_vec(),
+            "xavyo".to_string(),
+            "xavyo".to_string(),
+        );
         let token_service = TokenService::new(token_config, self.pool.clone());
 
         // Convert to typed IDs

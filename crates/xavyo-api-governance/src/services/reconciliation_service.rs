@@ -787,6 +787,14 @@ impl ReconciliationService {
     }
 
     /// Calculate the next run time based on schedule.
+    ///
+    /// Inputs are clamped to legal chrono ranges before being passed to
+    /// `NaiveDate::from_ymd_opt` / `NaiveTime::from_hms_opt`, so the function
+    /// is panic-free even if a row was inserted directly into the DB with
+    /// out-of-range values. On any unrepresentable date (the function should
+    /// be called only after `validate_schedule`, but `chrono::with_month`
+    /// can still produce `None` on month-rollover edge cases like Mar 31 →
+    /// Feb), we fall back to `now + 1 day`.
     fn calculate_next_run(
         &self,
         frequency: ScheduleFrequency,
@@ -794,29 +802,32 @@ impl ReconciliationService {
         day_of_month: Option<i32>,
         hour_of_day: i32,
     ) -> chrono::DateTime<Utc> {
-        use chrono::{Datelike, Duration, Timelike};
+        use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
 
         let now = Utc::now();
-        let target_hour = hour_of_day as u32;
+        let target_hour = hour_of_day.clamp(0, 23) as u32;
+        let target_time = NaiveTime::from_hms_opt(target_hour, 0, 0)
+            .unwrap_or_else(|| NaiveTime::from_hms_opt(0, 0, 0).expect("00:00:00 is valid"));
+
+        // Helper: build a UTC datetime safely, falling back to `now + days` if
+        // the requested (y, m, d) is not a real calendar date.
+        let build =
+            |year: i32, month: u32, day: u32, fallback_days: i64| -> chrono::DateTime<Utc> {
+                NaiveDate::from_ymd_opt(year, month, day)
+                    .map(|d| NaiveDateTime::new(d, target_time).and_utc())
+                    .unwrap_or_else(|| now + Duration::days(fallback_days))
+            };
 
         match frequency {
             ScheduleFrequency::Daily => {
-                let mut next = now
-                    .with_hour(target_hour)
-                    .unwrap()
-                    .with_minute(0)
-                    .unwrap()
-                    .with_second(0)
-                    .unwrap();
-
+                let mut next = build(now.year(), now.month(), now.day(), 1);
                 if next <= now {
                     next += Duration::days(1);
                 }
-
                 next
             }
             ScheduleFrequency::Weekly => {
-                let target_dow = day_of_week.unwrap_or(0) as u32; // Sunday = 0
+                let target_dow = day_of_week.unwrap_or(0).clamp(0, 6) as u32;
                 let current_dow = now.weekday().num_days_from_sunday();
 
                 let days_until = if target_dow > current_dow {
@@ -824,40 +835,26 @@ impl ReconciliationService {
                 } else if target_dow < current_dow {
                     7 - (current_dow - target_dow)
                 } else {
-                    // Same day - check if we've passed the time
-                    let target_time = now
-                        .with_hour(target_hour)
-                        .unwrap()
-                        .with_minute(0)
-                        .unwrap()
-                        .with_second(0)
-                        .unwrap();
-
-                    if now < target_time {
+                    let same_day = build(now.year(), now.month(), now.day(), 7);
+                    if now < same_day {
                         0
                     } else {
                         7
                     }
                 };
 
-                (now + Duration::days(i64::from(days_until)))
-                    .with_hour(target_hour)
-                    .unwrap()
-                    .with_minute(0)
-                    .unwrap()
-                    .with_second(0)
-                    .unwrap()
+                let target_date = (now + Duration::days(i64::from(days_until))).date_naive();
+                NaiveDateTime::new(target_date, target_time).and_utc()
             }
             ScheduleFrequency::Monthly => {
-                let target_day = day_of_month.unwrap_or(1) as u32;
+                // Cap to 28 to dodge month-end edge cases (Feb 30, etc.).
+                let target_day = day_of_month.unwrap_or(1).clamp(1, 28) as u32;
 
                 let mut next_month = now.month();
                 let mut next_year = now.year();
 
-                // Check if we can run this month
                 if now.day() > target_day || (now.day() == target_day && now.hour() >= target_hour)
                 {
-                    // Move to next month
                     if next_month == 12 {
                         next_month = 1;
                         next_year += 1;
@@ -866,18 +863,7 @@ impl ReconciliationService {
                     }
                 }
 
-                now.with_year(next_year)
-                    .unwrap()
-                    .with_month(next_month)
-                    .unwrap()
-                    .with_day(target_day)
-                    .unwrap()
-                    .with_hour(target_hour)
-                    .unwrap()
-                    .with_minute(0)
-                    .unwrap()
-                    .with_second(0)
-                    .unwrap()
+                build(next_year, next_month, target_day, 30)
             }
         }
     }
