@@ -1604,6 +1604,36 @@ async fn main() {
         });
     }
 
+    // Spawn background vacuum for the DPoP proof-replay cache (RFC 9449 §11.1).
+    // Rows are only useful for the ~120s proof-acceptance window; expired rows
+    // are pruned by migration 0215's permissive expiry policy.
+    {
+        let cleanup_pool = pool.clone();
+        tokio::spawn(async move {
+            let interval = Duration::from_secs(15 * 60); // 15 minutes
+            loop {
+                tokio::time::sleep(interval).await;
+                match xavyo_db::models::DpopProofJti::cleanup_expired(&cleanup_pool).await {
+                    Ok(count) if count > 0 => {
+                        tracing::info!(
+                            target: "security",
+                            deleted = count,
+                            "Vacuumed expired DPoP proof-replay records"
+                        );
+                    }
+                    Ok(_) => {} // Nothing to clean
+                    Err(e) => {
+                        tracing::warn!(
+                            target: "security",
+                            error = %e,
+                            "Failed to vacuum expired DPoP proof-replay records"
+                        );
+                    }
+                }
+            }
+        });
+    }
+
     // Spawn background cleanup task for expired passwordless tokens (F079)
     {
         let cleanup_pool = pool.clone();
