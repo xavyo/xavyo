@@ -69,6 +69,9 @@ use xavyo_api_social::{
     admin_social_router, authenticated_social_router, public_social_router, SocialConfig,
     SocialState,
 };
+use xavyo_api_ssf::{
+    ssf_router, ssf_well_known_router, SsfState, SsfStreamEmitter, SsfTransmitter,
+};
 use xavyo_api_tenants::{
     api_keys_router, oauth_clients_router, suspension_check_middleware, system_admin_router,
     tenant_router,
@@ -355,8 +358,25 @@ async fn main() {
         config.mfa_issuer.clone(),
     );
 
+    // Shared Signals (CAEP) emitter — signs + pushes Security Event Tokens to
+    // registered receivers. Reuses the OAuth signing key + issuer. Injected into
+    // the auth services so revocations/credential changes broadcast in real time.
+    let ssf_transmitter = Arc::new(
+        SsfTransmitter::new(
+            Arc::new(config.jwt_private_key.expose_secret().as_bytes().to_vec()),
+            config.jwt_key_id.clone(),
+            config.issuer_url.clone(),
+        )
+        .expect("failed to build SSF transmitter"),
+    );
+    let ssf_emitter = Arc::new(SsfStreamEmitter::new(
+        ssf_transmitter,
+        pool.clone(),
+        config.issuer_url.clone(),
+    ));
+
     // Create session service for session management
-    let session_service = SessionService::new(pool.clone());
+    let session_service = SessionService::new(pool.clone()).with_emitter(ssf_emitter.clone());
     // F112: Clone session service for device routes (will be wrapped in Arc)
     let session_service_for_device = Arc::new(session_service.clone());
 
@@ -381,7 +401,9 @@ async fn main() {
         session_service,
         token_config.clone(),
     ) {
-        Ok(state) => state,
+        // Wire the CAEP emitter so credential-change flows broadcast Shared
+        // Signals (session-revoked is already wired via session_service above).
+        Ok(state) => state.with_caep_emitter(ssf_emitter.clone()),
         Err(e) => {
             tracing::error!("Failed to create auth state: {e}");
             std::process::exit(1);
@@ -743,6 +765,23 @@ async fn main() {
 
     // Well-known routes (OIDC discovery, JWKS)
     let well_known_routes = well_known_router(oauth_state.clone());
+
+    // Shared Signals Framework (OpenID SSF/CAEP) — xavyo as Transmitter.
+    // Stream-management API is tenant-scoped + admin-authenticated (mirrors the
+    // OAuth admin layering); the configuration metadata is public discovery.
+    let ssf_state = SsfState {
+        pool: pool.clone(),
+        issuer: config.issuer_url.clone(),
+    };
+    let ssf_routes = ssf_router(ssf_state.clone())
+        .layer(axum::middleware::from_fn(jwt_auth_middleware))
+        .layer(axum::Extension(JwtPublicKey(config.jwt_public_key.clone())))
+        .layer(TenantLayer::with_config(
+            xavyo_tenant::TenantConfig::builder()
+                .require_tenant(true)
+                .build(),
+        ));
+    let ssf_well_known_routes = ssf_well_known_router(ssf_state);
 
     // Device code verification routes (F096 - RFC 8628)
     // These render HTML pages for the device authorization flow
@@ -1318,7 +1357,10 @@ async fn main() {
         // OAuth2/OIDC routes
         .nest("/oauth", oauth_routes)
         // Well-known routes (at root level)
-        .nest("/.well-known", well_known_routes)
+        .nest(
+            "/.well-known",
+            well_known_routes.merge(ssf_well_known_routes),
+        )
         // Device code verification routes (F096 - RFC 8628)
         .nest("/device", device_routes)
         // OAuth admin routes (requires admin role)
@@ -1417,6 +1459,8 @@ async fn main() {
         .merge(agents_discovery_routes)
         // Unified NHI routes (F108 - Unified Non-Human Identity Architecture)
         .nest("/nhi", nhi_routes)
+        // Shared Signals Framework stream-management API (OpenID SSF/CAEP)
+        .nest("/ssf", ssf_routes)
         // Tenant provisioning routes (F097 - Self-service tenant creation)
         .nest("/tenants", tenant_routes)
         // System administration routes (F-SUSPEND, F-DELETE, F-USAGE-TRACK, F-PLAN-MGMT, F-SETTINGS-API)

@@ -21,6 +21,7 @@ zeroize = "1"
 # Internal dependencies
 xavyo-core = { path = "../xavyo-core" }
 xavyo-auth = { path = "../xavyo-auth" }
+xavyo-ssf = { path = "../xavyo-ssf" }
 xavyo-db = { path = "../xavyo-db" }
 xavyo-tenant = { path = "../xavyo-tenant" }
 xavyo-webhooks = { path = "../xavyo-webhooks" }

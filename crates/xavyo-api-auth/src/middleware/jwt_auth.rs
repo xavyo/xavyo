@@ -21,7 +21,7 @@ use sqlx::PgPool;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use xavyo_auth::dpop::DPOP_PROOF_MAX_AGE_SECS;
-use xavyo_auth::{decode_token, extract_kid, verify_resource_proof};
+use xavyo_auth::{cert_binding_satisfied, decode_token, extract_kid, verify_resource_proof};
 use xavyo_core::{TenantId, UserId};
 use xavyo_db::models::{DpopProofJti, RevokedToken};
 
@@ -243,6 +243,27 @@ pub async fn jwt_auth_middleware(
                 )
                     .into_response());
             }
+        }
+    }
+
+    // mTLS (RFC 8705): if the access token is certificate-bound
+    // (`cnf["x5t#S256"]`), the request MUST present a matching client cert. The
+    // TLS-terminating gateway forwards the cert's SHA-256 thumbprint in the
+    // trusted `X-Client-Cert-Thumbprint` header (trusted only on the internal
+    // network, same model as `X-Tenant-ID`). Fail-closed: a cert-bound token
+    // presented without a matching thumbprint is rejected.
+    if let Some(expected_x5t) = claims.cert_thumbprint() {
+        let presented = request
+            .headers()
+            .get("x-client-cert-thumbprint")
+            .and_then(|v| v.to_str().ok());
+        if !cert_binding_satisfied(expected_x5t, presented) {
+            tracing::warn!(
+                target: "security",
+                event_type = "mtls_cert_binding_failed",
+                "certificate-bound token presented without a matching client certificate"
+            );
+            return Err((StatusCode::UNAUTHORIZED, "client certificate required").into_response());
         }
     }
 

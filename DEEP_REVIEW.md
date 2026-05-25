@@ -414,3 +414,27 @@ All six "done" criteria met:
 **Dependency security (cargo audit 18→4):** fixed lettre (9.1 crit), aws-lc-sys ×5 (incl. two 7.5 high), quinn-proto (8.7 high), thin-vec (7.3 high), rustls-webpki 0.103.x, tar. Residual 4 documented (rsa no-fix/not-our-path; rustls-webpki 0.101.7 only under opt-in AWS features off-by-default).
 
 **Loop scope boundary:** SOTA protocol features (DPoP RFC 9449, PAR RFC 9126, RAR RFC 9396, CAEP/SSF, FAPI 2.0) are **deliberately not** part of this remediation loop — per advisor, they are threat-modeled feature additions requiring explicit design review, not autonomous loop iterations. Handed to the user as a roadmap decision.
+
+---
+
+## SOTA Hardening — Session Delivery (2026-05-24/25)
+
+The "Loop scope boundary" note above reflected the *remediation* loop. The user subsequently directed the SOTA protocol build via repeated `/loop` runs. This section records what was delivered. All work is **green** (per-crate `cargo test` + `clippy -D warnings` + `fmt`; cross-crate combined test ~1,580 tests, 0 failures; `cargo check --workspace` clean except the pre-existing `protoc`-gated `xavyo-ext-authz`/`gateway`). Design specs live under `docs/superpowers/specs/2026-05-24-*` (gitignored).
+
+### Delivered (complete + tested)
+- **DPoP (RFC 9449)** — proof validation (alg-confusion-safe, `cnf.jkt`, `ath`/`htm`/`htu`/`iat`, 120s freshness + **60s future-skew cap**), resource-edge enforcement (jwt middleware + userinfo), per-client `require_dpop`, `dpop_proof_jtis` replay cache. **Token binding now spans all grants** (auth-code, client_credentials, refresh, token_exchange).
+- **PAR (RFC 9126)** — `POST /oauth/par`, single-use 256-bit `request_uri`, storage, authorize consume + pushed-param precedence, discovery.
+- **RAR (RFC 9396)** — `authorization_details` (`tool_access`) typed parse/validate, JWT claim, threaded PAR→authorize→code→token + echo, `invalid_authorization_details`, discovery types.
+- **FAPI 2.0 baseline** — RFC 9207 `iss`, per-client `fapi_profile` ⇒ PAR + DPoP mandatory (enforced at `/authorize` + `/token`), DPoP skew, discovery flags.
+- **private_key_jwt (RFC 7523)** — `client_assertion` validator (alg from JWK, `iss==sub==client_id`, `aud`, `exp`/`iat`, `jti` replay), client `jwks` storage, wired at `/token` + `/par` + `client_credentials`.
+- **mTLS (RFC 8705)** — `x5t#S256` thumbprint, `cnf["x5t#S256"]`, resource-edge cert-binding enforcement, token binding at `/token`, `self_signed_tls_client_auth` (registered-cert), discovery `tls_client_certificate_bound_access_tokens`. Gateway must forward `X-Client-Cert-Thumbprint` (trusted-header model, like `X-Tenant-ID`).
+- **CAEP / Shared Signals (OpenID SSF 1.0 + CAEP 1.0)** — new crates `xavyo-ssf` (SET builder, all 5 CAEP event types, RFC 9493 subjects, `CaepEmitter`) + `xavyo-api-ssf` (stream-management API, `/.well-known/ssf-configuration`, SSRF guard + delivery-time rebinding check, push transmitter, `SsfStreamEmitter`). **Live emission wired** for session-revoked (logout/revoke/password) + credential-change (password change), mounted in idp-api.
+- **DPoP-Nonce (RFC 9449 §8)** — stateless HMAC nonce issuer/verifier (core).
+- Migrations `0205`–`0213`. New crates: `xavyo-ssf`, `xavyo-api-ssf` (+ earlier `xavyo-scim-types`).
+
+### Remaining follow-ups (need a decision / infra / advisor — not blind autonomous edits)
+- **token-claims-change emission hook** — emitter method shipped; firing it requires choosing the hook point in the IGA role/entitlement assignment lifecycle (governance crate). Decision-worthy.
+- **DPoP-Nonce challenge flow** — wire the stateless core into endpoints (`DPoP-Nonce` header + `use_dpop_nonce` 401 + proof `nonce` verification). Invasive endpoint integration.
+- **mTLS gateway seam** — `apps/gateway` must terminate mTLS + forward the cert thumbprint header. Infrastructure.
+- **`tls_client_auth` PKI-DN path** (beyond `self_signed`); CAEP poll delivery (RFC 8936) + Receiver role + verification endpoint; socket-level IP pinning.
+- **CI integration tests** — the DB-gated paths (PAR/RAR/SSF/mTLS) have unit coverage; full HTTP+Postgres integration tests are CI-only here (no local test DB).

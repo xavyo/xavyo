@@ -241,6 +241,7 @@ use axum::{
 };
 use sqlx::PgPool;
 use std::sync::Arc;
+use xavyo_ssf::CaepEmitter;
 
 /// Application state for authentication routes.
 #[derive(Clone)]
@@ -412,6 +413,16 @@ impl AuthState {
             frontend_base_url,
             token_config,
         })
+    }
+
+    /// Attach a CAEP emitter so credential-change flows broadcast Shared
+    /// Signals. Rebuilds `password_policy_service` with the emitter; the
+    /// session service is emitter-wired by the caller before `new`.
+    #[must_use]
+    pub fn with_caep_emitter(mut self, emitter: Arc<dyn CaepEmitter>) -> Self {
+        self.password_policy_service =
+            Arc::new(PasswordPolicyService::new(self.pool.clone()).with_emitter(emitter));
+        self
     }
 }
 

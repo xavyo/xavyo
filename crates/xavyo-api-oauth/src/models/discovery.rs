@@ -48,6 +48,10 @@ pub struct OpenIdConfiguration {
     /// responses (mix-up defense; required by FAPI 2.0 §5.3.2.2-7).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authorization_response_iss_parameter_supported: Option<bool>,
+    /// RFC 8705 §3.3: whether the AS supports mutual-TLS certificate-bound
+    /// access tokens (`cnf["x5t#S256"]`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tls_client_certificate_bound_access_tokens: Option<bool>,
 }
 
 use super::token::DEVICE_CODE_GRANT_TYPE;
@@ -110,6 +114,8 @@ impl OpenIdConfiguration {
             authorization_details_types_supported: Some(vec!["tool_access".to_string()]),
             // RFC 9207: the AS returns `iss` in authorization responses.
             authorization_response_iss_parameter_supported: Some(true),
+            // RFC 8705: the AS issues + verifies certificate-bound access tokens.
+            tls_client_certificate_bound_access_tokens: Some(true),
         }
     }
 }

@@ -329,6 +329,7 @@ impl TokenService {
             roles,
             None,
             None,
+            None,
         )
     }
 
@@ -348,6 +349,7 @@ impl TokenService {
         user_name: Option<&str>,
         roles: Vec<String>,
         dpop_jkt: Option<&str>,
+        cert_thumbprint: Option<&str>,
         authorization_details: Option<Vec<AuthorizationDetail>>,
     ) -> Result<String, OAuthError> {
         // Build claims for access token
@@ -360,6 +362,12 @@ impl TokenService {
         // DPoP: sender-constrain the token when a proof key thumbprint is given.
         if let Some(jkt) = dpop_jkt {
             claims_builder = claims_builder.dpop_jkt(jkt);
+        }
+
+        // mTLS (RFC 8705): certificate-bind the token when the client presented
+        // an mTLS client certificate.
+        if let Some(x5t) = cert_thumbprint {
+            claims_builder = claims_builder.cert_thumbprint(x5t);
         }
 
         // RFC 9396: embed the granted authorization_details (fine-grained grants).
@@ -765,6 +773,7 @@ impl TokenService {
         scope: &str,
         nonce: Option<&str>,
         dpop_jkt: Option<&str>,
+        cert_thumbprint: Option<&str>,
         authorization_details: Option<serde_json::Value>,
     ) -> Result<TokenResponse, OAuthError> {
         let auth_time = Utc::now().timestamp();
@@ -798,6 +807,7 @@ impl TokenService {
             user_name.as_deref(),
             roles,
             dpop_jkt,
+            cert_thumbprint,
             parsed_details,
         )?;
 
@@ -915,10 +925,14 @@ impl TokenService {
         tenant_id: Uuid,
         scope: &str,
         nhi_id: Option<Uuid>,
+        dpop_jkt: Option<&str>,
+        cert_thumbprint: Option<&str>,
     ) -> Result<TokenResponse, OAuthError> {
         // If an NHI identity is bound to this client, use NHI ID as subject
-        // so the token can be used in delegation flows (RFC 8693 Token Exchange)
-        let access_token = self.generate_access_token(
+        // so the token can be used in delegation flows (RFC 8693 Token Exchange).
+        // Sender-constrain the token when the client used DPoP or mTLS — agent /
+        // machine tokens should not be replayable bearer tokens.
+        let access_token = self.generate_access_token_bound(
             nhi_id, // Use NHI ID as subject when bound, otherwise client_id
             client_id,
             tenant_id,
@@ -927,11 +941,19 @@ impl TokenService {
             None,   // No user email for client credentials
             None,   // No user name for client credentials
             vec![], // No user roles for client credentials
+            dpop_jkt,
+            cert_thumbprint,
+            None, // No authorization_details on client_credentials (v1)
         )?;
 
         Ok(TokenResponse {
             access_token,
-            token_type: "Bearer".to_string(),
+            // RFC 9449: sender-constrained tokens use the "DPoP" token type.
+            token_type: if dpop_jkt.is_some() {
+                "DPoP".to_string()
+            } else {
+                "Bearer".to_string()
+            },
             expires_in: ACCESS_TOKEN_EXPIRY_SECS,
             refresh_token: None, // No refresh token for client credentials
             id_token: None,      // No ID token (no user authentication)
@@ -958,6 +980,7 @@ impl TokenService {
     /// # Returns
     ///
     /// A `TokenResponse` containing `access_token` and `refresh_token`.
+    #[allow(clippy::too_many_arguments)]
     pub async fn issue_refresh_tokens(
         &self,
         user_id: Uuid,
@@ -966,6 +989,8 @@ impl TokenService {
         tenant_id: Uuid,
         scope: &str,
         new_refresh_token: &str,
+        dpop_jkt: Option<&str>,
+        cert_thumbprint: Option<&str>,
     ) -> Result<TokenResponse, OAuthError> {
         // Look up user profile and roles for token claims
         let ((user_email, user_name), roles) = tokio::join!(
@@ -973,8 +998,9 @@ impl TokenService {
             self.lookup_user_roles(user_id, tenant_id),
         );
 
-        // Generate new access token
-        let access_token = self.generate_access_token(
+        // Generate new access token — re-bind to the DPoP key / mTLS cert
+        // presented at the refresh request (sender-constraint carries forward).
+        let access_token = self.generate_access_token_bound(
             Some(user_id),
             client_id,
             tenant_id,
@@ -983,11 +1009,19 @@ impl TokenService {
             user_email.as_deref(),
             user_name.as_deref(),
             roles,
+            dpop_jkt,
+            cert_thumbprint,
+            None,
         )?;
 
         Ok(TokenResponse {
             access_token,
-            token_type: "Bearer".to_string(),
+            // RFC 9449: sender-constrained tokens use the "DPoP" token type.
+            token_type: if dpop_jkt.is_some() {
+                "DPoP".to_string()
+            } else {
+                "Bearer".to_string()
+            },
             expires_in: ACCESS_TOKEN_EXPIRY_SECS,
             refresh_token: Some(new_refresh_token.to_string()),
             id_token: None, // No ID token for refresh grant
@@ -1015,6 +1049,8 @@ impl TokenService {
         scope: &str,
         delegation_depth: i32,
         existing_actor: Option<&xavyo_auth::ActorClaim>,
+        dpop_jkt: Option<&str>,
+        cert_thumbprint: Option<&str>,
     ) -> Result<TokenResponse, OAuthError> {
         use xavyo_auth::ActorClaim;
 
@@ -1045,6 +1081,16 @@ impl TokenService {
             builder = builder.scope(scope);
         }
 
+        // Sender-constrain the delegated token to the actor's DPoP key / mTLS
+        // cert when presented (RFC 9449 / RFC 8705) — agent tokens shouldn't be
+        // replayable bearer tokens.
+        if let Some(jkt) = dpop_jkt {
+            builder = builder.dpop_jkt(jkt);
+        }
+        if let Some(x5t) = cert_thumbprint {
+            builder = builder.cert_thumbprint(x5t);
+        }
+
         let claims = builder.build();
 
         let access_token = encode_token_with_kid(&claims, &self.private_key, &self.key_id)
@@ -1055,7 +1101,12 @@ impl TokenService {
 
         Ok(TokenResponse {
             access_token,
-            token_type: "Bearer".to_string(),
+            // RFC 9449: sender-constrained tokens use the "DPoP" token type.
+            token_type: if dpop_jkt.is_some() {
+                "DPoP".to_string()
+            } else {
+                "Bearer".to_string()
+            },
             expires_in: ACCESS_TOKEN_EXPIRY_SECS,
             refresh_token: None,
             id_token: None,

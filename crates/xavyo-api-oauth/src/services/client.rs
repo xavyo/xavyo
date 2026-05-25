@@ -43,6 +43,9 @@ struct DbOAuth2Client {
     /// Inline JWKS for `private_key_jwt` client-assertion verification (RFC 7523).
     #[sqlx(default)]
     pub jwks: Option<serde_json::Value>,
+    /// Registered mTLS cert thumbprint for `self_signed_tls_client_auth` (RFC 8705).
+    #[sqlx(default)]
+    pub tls_client_cert_thumbprint: Option<String>,
 }
 
 /// Service for managing `OAuth2` clients.
@@ -131,8 +134,10 @@ impl OAuth2ClientService {
             INSERT INTO oauth_clients (
                 id, tenant_id, client_id, client_secret_hash, name, client_type,
                 redirect_uris, grant_types, scopes, is_active, logo_url, description,
-                created_at, updated_at, nhi_id, post_logout_redirect_uris
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $12, $13, $14)
+                created_at, updated_at, nhi_id, post_logout_redirect_uris,
+                require_dpop, fapi_profile, jwks, tls_client_cert_thumbprint
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10, $11, $12, $12, $13, $14,
+                      $15, $16, $17, $18)
             ",
         )
         .bind(id)
@@ -149,6 +154,10 @@ impl OAuth2ClientService {
         .bind(now)
         .bind(request.nhi_id)
         .bind(&request.post_logout_redirect_uris)
+        .bind(request.require_dpop)
+        .bind(request.fapi_profile)
+        .bind(&request.jwks)
+        .bind(&request.tls_client_cert_thumbprint)
         .execute(&mut *conn)
         .await
         .map_err(|e| {
@@ -171,11 +180,10 @@ impl OAuth2ClientService {
             post_logout_redirect_uris: request.post_logout_redirect_uris,
             created_at: now,
             updated_at: now,
-            // FAPI/DPoP profile flags are enabled post-creation (provisioning /
-            // admin API follow-up); a freshly created client defaults to off.
-            require_dpop: false,
-            fapi_profile: false,
-            jwks: None,
+            require_dpop: request.require_dpop,
+            fapi_profile: request.fapi_profile,
+            jwks: request.jwks,
+            tls_client_cert_thumbprint: request.tls_client_cert_thumbprint,
         };
 
         Ok((response, plaintext_secret))
@@ -227,7 +235,7 @@ impl OAuth2ClientService {
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
                    redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris,
-                   require_dpop, fapi_profile, jwks
+                   require_dpop, fapi_profile, jwks, tls_client_cert_thumbprint
             FROM oauth_clients
             WHERE client_id = $1 AND tenant_id = $2
             ",
@@ -337,7 +345,7 @@ impl OAuth2ClientService {
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
                    redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris,
-                   require_dpop, fapi_profile, jwks
+                   require_dpop, fapi_profile, jwks, tls_client_cert_thumbprint
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -378,7 +386,8 @@ impl OAuth2ClientService {
         let clients: Vec<DbOAuth2Client> = sqlx::query_as(
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
-                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris
+                   redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris,
+                   require_dpop, fapi_profile, jwks, tls_client_cert_thumbprint
             FROM oauth_clients
             WHERE tenant_id = $1
             ORDER BY created_at DESC
@@ -429,7 +438,7 @@ impl OAuth2ClientService {
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
                    redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris,
-                   require_dpop, fapi_profile, jwks
+                   require_dpop, fapi_profile, jwks, tls_client_cert_thumbprint
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -466,6 +475,13 @@ impl OAuth2ClientService {
         let post_logout_redirect_uris = request
             .post_logout_redirect_uris
             .unwrap_or(existing.post_logout_redirect_uris);
+        // Per-client security flags: update when provided, else keep existing.
+        let require_dpop = request.require_dpop.unwrap_or(existing.require_dpop);
+        let fapi_profile = request.fapi_profile.unwrap_or(existing.fapi_profile);
+        let jwks = request.jwks.or(existing.jwks);
+        let tls_client_cert_thumbprint = request
+            .tls_client_cert_thumbprint
+            .or(existing.tls_client_cert_thumbprint);
         let now = chrono::Utc::now();
 
         sqlx::query(
@@ -473,7 +489,9 @@ impl OAuth2ClientService {
             UPDATE oauth_clients
             SET name = $1, redirect_uris = $2, grant_types = $3, scopes = $4,
                 is_active = $5, logo_url = $6, description = $7, updated_at = $8,
-                post_logout_redirect_uris = $11
+                post_logout_redirect_uris = $11,
+                require_dpop = $12, fapi_profile = $13, jwks = $14,
+                tls_client_cert_thumbprint = $15
             WHERE id = $9 AND tenant_id = $10
             ",
         )
@@ -488,6 +506,10 @@ impl OAuth2ClientService {
         .bind(id)
         .bind(tenant_id)
         .bind(&post_logout_redirect_uris)
+        .bind(require_dpop)
+        .bind(fapi_profile)
+        .bind(&jwks)
+        .bind(&tls_client_cert_thumbprint)
         .execute(&mut *conn)
         .await
         .map_err(|e| {
@@ -516,10 +538,10 @@ impl OAuth2ClientService {
             post_logout_redirect_uris,
             created_at: existing.created_at,
             updated_at: now,
-            // Preserve the existing profile flags (the UPDATE doesn't touch them).
-            require_dpop: existing.require_dpop,
-            fapi_profile: existing.fapi_profile,
-            jwks: existing.jwks,
+            require_dpop,
+            fapi_profile,
+            jwks,
+            tls_client_cert_thumbprint,
         })
     }
 
@@ -675,7 +697,7 @@ impl OAuth2ClientService {
             r"
             SELECT id, tenant_id, client_id, client_secret_hash, name, client_type,
                    redirect_uris, grant_types, scopes, is_active, logo_url, description, created_at, updated_at, nhi_id, post_logout_redirect_uris,
-                   require_dpop, fapi_profile, jwks
+                   require_dpop, fapi_profile, jwks, tls_client_cert_thumbprint
             FROM oauth_clients
             WHERE id = $1 AND tenant_id = $2
             ",
@@ -952,6 +974,7 @@ impl OAuth2ClientService {
             require_dpop: client.require_dpop,
             fapi_profile: client.fapi_profile,
             jwks: client.jwks,
+            tls_client_cert_thumbprint: client.tls_client_cert_thumbprint,
         }
     }
 
@@ -1163,6 +1186,7 @@ mod tests {
             require_dpop: false,
             fapi_profile: false,
             jwks: None,
+            tls_client_cert_thumbprint: None,
         };
 
         // Create a mock pool (we won't use it, just need it for the service)
@@ -1206,6 +1230,7 @@ mod tests {
             require_dpop: false,
             fapi_profile: false,
             jwks: None,
+            tls_client_cert_thumbprint: None,
         };
 
         let client_type = match db_client.client_type.as_str() {
@@ -1406,6 +1431,7 @@ mod tests {
             require_dpop: false,
             fapi_profile: false,
             jwks: None,
+            tls_client_cert_thumbprint: None,
         };
 
         // Create a mock pool (not used for validation, just needed for service)

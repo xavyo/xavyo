@@ -17,6 +17,7 @@ use xavyo_db::{
     models::org_security_policy::OrgPolicyType, set_tenant_context, CreateSession, RevokeReason,
     Session, SessionInfo, TenantSessionPolicy, UpsertSessionPolicy,
 };
+use xavyo_ssf::{CaepEmitter, NoopEmitter};
 
 /// Throttle interval for activity updates (in seconds).
 const ACTIVITY_UPDATE_THROTTLE_SECONDS: u64 = 60;
@@ -27,6 +28,8 @@ pub struct SessionService {
     pool: PgPool,
     /// Cache for activity update throttling (`session_id` -> `last_update_time`).
     activity_cache: std::sync::Arc<RwLock<HashMap<Uuid, Instant>>>,
+    /// CAEP signal sink (defaults to a no-op when SSF is not configured).
+    emitter: Arc<dyn CaepEmitter>,
 }
 
 impl SessionService {
@@ -36,7 +39,15 @@ impl SessionService {
         Self {
             pool,
             activity_cache: std::sync::Arc::new(RwLock::new(HashMap::new())),
+            emitter: Arc::new(NoopEmitter),
         }
+    }
+
+    /// Attach a CAEP emitter so session revocations broadcast Shared Signals.
+    #[must_use]
+    pub fn with_emitter(mut self, emitter: Arc<dyn CaepEmitter>) -> Self {
+        self.emitter = emitter;
+        self
     }
 
     /// Create a new session for a user.
@@ -484,6 +495,12 @@ impl SessionService {
             revoked_count = count,
             "Revoked all user sessions"
         );
+
+        // CAEP (Shared Signals): broadcast a session-revoked signal so relying
+        // parties can drop access in near-real-time. Fire-and-forget — never
+        // blocks or fails the revocation.
+        self.emitter
+            .session_revoked(tenant_id, user_id, Some(reason.to_string()));
 
         Ok(count)
     }

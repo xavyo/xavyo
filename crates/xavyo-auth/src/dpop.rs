@@ -67,9 +67,9 @@ struct DpopProofClaims {
     /// endpoint request.
     #[serde(default)]
     ath: Option<String>,
-    /// Server-provided nonce (DPoP-Nonce) — parsed but unused in v1.
+    /// Server-provided nonce (DPoP-Nonce, RFC 9449 §8); surfaced on
+    /// [`ValidatedProof::nonce`] for the caller to verify when required.
     #[serde(default)]
-    #[allow(dead_code)]
     nonce: Option<String>,
 }
 
@@ -83,6 +83,10 @@ pub struct ValidatedProof {
     pub jti: String,
     /// The proof's `ath`, if present.
     pub ath: Option<String>,
+    /// The proof's server-provided `nonce` (RFC 9449 §8), if present. The caller
+    /// verifies it with [`crate::dpop_nonce::verify_dpop_nonce`] when the
+    /// endpoint requires a DPoP nonce.
+    pub nonce: Option<String>,
 }
 
 /// Validate a DPoP proof JWT (RFC 9449 §4.3).
@@ -147,6 +151,7 @@ pub fn validate_proof(
         jkt,
         jti: data.claims.jti,
         ath: data.claims.ath,
+        nonce: data.claims.nonce,
     })
 }
 

@@ -109,6 +109,12 @@ pub struct OAuth2Client {
     /// `private_key_jwt`. `#[sqlx(default)]` for explicit-column SELECT safety.
     #[sqlx(default)]
     pub jwks: Option<serde_json::Value>,
+
+    /// `x5t#S256` of the client's registered mTLS certificate for
+    /// `self_signed_tls_client_auth` (RFC 8705). `None` ⇒ not used.
+    /// `#[sqlx(default)]` for explicit-column SELECT safety.
+    #[sqlx(default)]
+    pub tls_client_cert_thumbprint: Option<String>,
 }
 
 impl OAuth2Client {

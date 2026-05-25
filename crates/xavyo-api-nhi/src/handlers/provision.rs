@@ -448,6 +448,10 @@ pub async fn provision_agent(
             )),
             nhi_id: Some(nhi_id),
             post_logout_redirect_uris: vec![],
+            require_dpop: false,
+            fapi_profile: false,
+            jwks: None,
+            tls_client_cert_thumbprint: None,
         };
 
         match state

@@ -7,14 +7,26 @@
 //! and — when the host is an IP literal — that the address is public (no
 //! loopback / private / link-local / ULA / CGNAT / unspecified / multicast).
 //!
-//! NOTE (documented limitation): a *hostname* that resolves to a private
-//! address at delivery time is not caught here. Closing that requires a
-//! resolving HTTP connector that re-checks the resolved IP at connect time
-//! (DNS-rebinding-safe) — tracked for the transmitter (increment D2).
+//! Hostname endpoints are additionally resolved + re-checked at *delivery* time
+//! by the transmitter (`assert_endpoint_resolves_public`, using [`is_public_ip`])
+//! to catch a public-looking hostname that resolves to a private address. A
+//! residual connect-time TOCTOU remains (eliminated only by pinning the
+//! validated IP at the socket layer) — documented in the transmitter.
 
 use crate::error::SsfApiError;
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use url::{Host, Url};
+
+/// Whether an IP address is a public/global address safe for the transmitter to
+/// connect to. Used both at stream registration (IP-literal endpoints) and at
+/// delivery time (resolved hostnames — DNS-rebinding mitigation).
+#[must_use]
+pub fn is_public_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => ipv4_is_public(v4),
+        IpAddr::V6(v6) => ipv6_is_public(v6),
+    }
+}
 
 /// Validate that a receiver endpoint URL is safe for the transmitter to call.
 ///
@@ -158,5 +170,31 @@ mod tests {
     fn rejects_malformed() {
         assert!(!ok("not a url"));
         assert!(!ok("https://"));
+    }
+
+    #[test]
+    fn is_public_ip_classifies_correctly() {
+        use std::net::IpAddr;
+        // Public.
+        assert!(is_public_ip("93.184.216.34".parse::<IpAddr>().unwrap()));
+        assert!(is_public_ip(
+            "2606:2800:220:1:248:1893:25c8:1946".parse().unwrap()
+        ));
+        // Non-public.
+        for ip in [
+            "127.0.0.1",
+            "10.0.0.1",
+            "192.168.0.1",
+            "169.254.169.254",
+            "100.64.0.1",
+            "::1",
+            "fc00::1",
+            "fe80::1",
+        ] {
+            assert!(
+                !is_public_ip(ip.parse::<IpAddr>().unwrap()),
+                "{ip} must be non-public"
+            );
+        }
     }
 }

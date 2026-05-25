@@ -6,10 +6,11 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 /// `OAuth2` client type.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ClientType {
     /// Confidential client (can securely store secrets).
+    #[default]
     Confidential,
     /// Public client (cannot store secrets, e.g., SPA, mobile).
     Public,
@@ -37,7 +38,7 @@ impl std::str::FromStr for ClientType {
 }
 
 /// Request to create a new `OAuth2` client.
-#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct CreateClientRequest {
     /// Human-readable client name.
     pub name: String,
@@ -60,10 +61,22 @@ pub struct CreateClientRequest {
     /// Allowed post-logout redirect URIs (OIDC RP-Initiated Logout).
     #[serde(default)]
     pub post_logout_redirect_uris: Vec<String>,
+    /// RFC 9449: require DPoP-bound (sender-constrained) tokens for this client.
+    #[serde(default)]
+    pub require_dpop: bool,
+    /// FAPI 2.0 Security Profile opt-in (implies PAR + DPoP mandatory).
+    #[serde(default)]
+    pub fapi_profile: bool,
+    /// Inline JWKS for `private_key_jwt` client authentication (RFC 7523).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jwks: Option<serde_json::Value>,
+    /// Registered mTLS cert `x5t#S256` for `self_signed_tls_client_auth` (RFC 8705).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_client_cert_thumbprint: Option<String>,
 }
 
 /// Request to update an `OAuth2` client.
-#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct UpdateClientRequest {
     /// Human-readable client name.
     pub name: Option<String>,
@@ -81,6 +94,14 @@ pub struct UpdateClientRequest {
     pub description: Option<String>,
     /// Allowed post-logout redirect URIs (OIDC RP-Initiated Logout).
     pub post_logout_redirect_uris: Option<Vec<String>>,
+    /// RFC 9449: require DPoP-bound tokens (omit to leave unchanged).
+    pub require_dpop: Option<bool>,
+    /// FAPI 2.0 profile opt-in (omit to leave unchanged).
+    pub fapi_profile: Option<bool>,
+    /// Inline JWKS for `private_key_jwt` (omit to leave unchanged).
+    pub jwks: Option<serde_json::Value>,
+    /// Registered mTLS cert `x5t#S256` (omit to leave unchanged).
+    pub tls_client_cert_thumbprint: Option<String>,
 }
 
 /// `OAuth2` client response.
@@ -125,6 +146,9 @@ pub struct ClientResponse {
     /// `None` ⇒ the client does not use `private_key_jwt`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jwks: Option<serde_json::Value>,
+    /// Registered mTLS cert thumbprint for `self_signed_tls_client_auth` (RFC 8705).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_client_cert_thumbprint: Option<String>,
 }
 
 impl ClientResponse {
@@ -187,6 +211,7 @@ mod tests {
             require_dpop: false,
             fapi_profile: false,
             jwks: None,
+            tls_client_cert_thumbprint: None,
         }
     }
 
@@ -219,5 +244,53 @@ mod tests {
             "FAPI 2.0 mandates sender-constrained tokens"
         );
         assert!(c.requires_par(), "FAPI 2.0 mandates PAR");
+    }
+
+    #[test]
+    fn create_request_omitting_security_flags_defaults_safely() {
+        // Backward compatibility: a client sending the pre-existing JSON (no
+        // require_dpop/fapi_profile/jwks/tls fields) must still deserialize, with
+        // all new security flags defaulting OFF (no surprise enforcement).
+        let json = r#"{
+            "name": "legacy client",
+            "client_type": "confidential",
+            "redirect_uris": ["https://rp.example.com/cb"],
+            "grant_types": ["authorization_code"],
+            "scopes": ["openid"]
+        }"#;
+        let req: CreateClientRequest = serde_json::from_str(json).expect("legacy JSON must parse");
+        assert!(!req.require_dpop);
+        assert!(!req.fapi_profile);
+        assert!(req.jwks.is_none());
+        assert!(req.tls_client_cert_thumbprint.is_none());
+    }
+
+    #[test]
+    fn create_request_accepts_security_flags() {
+        let json = r#"{
+            "name": "fapi client",
+            "client_type": "confidential",
+            "redirect_uris": ["https://rp.example.com/cb"],
+            "grant_types": ["authorization_code"],
+            "scopes": ["openid"],
+            "require_dpop": true,
+            "fapi_profile": true,
+            "tls_client_cert_thumbprint": "ZKcRjPtx"
+        }"#;
+        let req: CreateClientRequest = serde_json::from_str(json).expect("parse");
+        assert!(req.require_dpop);
+        assert!(req.fapi_profile);
+        assert_eq!(req.tls_client_cert_thumbprint.as_deref(), Some("ZKcRjPtx"));
+    }
+
+    #[test]
+    fn update_request_omitting_flags_leaves_them_unset() {
+        // Omitted Option flags ⇒ None ⇒ the service leaves existing values intact.
+        let json = r#"{ "name": "renamed" }"#;
+        let req: UpdateClientRequest = serde_json::from_str(json).expect("parse");
+        assert!(req.require_dpop.is_none());
+        assert!(req.fapi_profile.is_none());
+        assert!(req.jwks.is_none());
+        assert!(req.tls_client_cert_thumbprint.is_none());
     }
 }

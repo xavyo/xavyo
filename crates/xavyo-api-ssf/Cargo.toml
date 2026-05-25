@@ -35,5 +35,12 @@ tracing = { workspace = true }
 # URL parsing for the receiver-endpoint SSRF guard
 url = "2"
 
+# Outbound SET delivery (push transmitter)
+reqwest = { workspace = true }
+
+# Fire-and-forget emission (spawn delivery tasks) + delivery-time DNS resolution
+tokio = { workspace = true, features = ["rt", "macros", "net"] }
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
+wiremock = "0.6"

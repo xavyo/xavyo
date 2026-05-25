@@ -178,6 +178,13 @@ async fn handle_authorization_code_grant(
         ));
     }
 
+    // mTLS (RFC 8705): the client cert thumbprint the gateway verified +
+    // forwarded (trusted header). Used both for client authentication
+    // (self_signed_tls_client_auth) and to certificate-bind the issued token.
+    let cert_thumbprint = headers
+        .get("x-client-cert-thumbprint")
+        .and_then(|v| v.to_str().ok());
+
     // Client authentication. `private_key_jwt` (RFC 7523) takes precedence when
     // a `client_assertion` is present — the FAPI 2.0 strong-auth method.
     if let Some(assertion) = request.client_assertion.as_deref() {
@@ -197,6 +204,14 @@ async fn handle_authorization_code_grant(
             .client_service
             .verify_client_assertion(tenant_id, &client.client_id, assertion, &audiences, jwks)
             .await?;
+    } else if let Some(registered) = client.tls_client_cert_thumbprint.as_deref() {
+        // RFC 8705 self_signed_tls_client_auth: the client authenticates by
+        // presenting its registered mTLS certificate (fail-closed on mismatch).
+        if !xavyo_auth::cert_binding_satisfied(registered, cert_thumbprint) {
+            return Err(OAuthError::InvalidClient(
+                "mTLS client certificate does not match the registered certificate".to_string(),
+            ));
+        }
     } else if client.client_type == crate::models::ClientType::Confidential {
         // SECURITY: Confidential clients MUST always provide client_secret.
         // Without this check, an attacker could omit the secret and bypass
@@ -239,7 +254,7 @@ async fn handle_authorization_code_grant(
         .client_service
         .validate_redirect_uri(&client, redirect_uri)?;
 
-    // Issue tokens
+    // Issue tokens (certificate-bound via `cert_thumbprint` when present).
     let token_response = state
         .token_service
         .issue_authorization_code_tokens(
@@ -250,6 +265,7 @@ async fn handle_authorization_code_grant(
             &scope,
             nonce.as_deref(),
             dpop_jkt.as_deref(),
+            cert_thumbprint,
             authorization_details,
         )
         .await?;
@@ -354,21 +370,73 @@ async fn handle_client_credentials_grant(
     client_id: &str,
     client_secret: Option<&str>,
 ) -> Result<Json<TokenResponse>, OAuthError> {
-    // Client credentials requires a secret
-    let secret = client_secret.ok_or_else(|| {
-        OAuthError::InvalidClient(
-            "client_secret is required for client_credentials grant".to_string(),
-        )
-    })?;
-
     // Extract tenant_id from X-Tenant-ID header
     let tenant_id = extract_tenant_id_from_headers(headers)?;
 
-    // Verify client credentials
-    let client = state
-        .client_service
-        .verify_client_credentials(tenant_id, client_id, secret)
-        .await?;
+    let cert_thumbprint = headers
+        .get("x-client-cert-thumbprint")
+        .and_then(|v| v.to_str().ok());
+
+    // Authenticate the client via one of (RFC 6749 / 7523 / 8705):
+    // private_key_jwt (client_assertion), mTLS (registered cert), or client_secret.
+    let client = if let Some(assertion) = request.client_assertion.as_deref() {
+        if let Some(t) = request.client_assertion_type.as_deref() {
+            if t != xavyo_auth::CLIENT_ASSERTION_TYPE_JWT_BEARER {
+                return Err(OAuthError::InvalidRequest(
+                    "unsupported client_assertion_type".to_string(),
+                ));
+            }
+        }
+        let client = state
+            .client_service
+            .get_client_by_client_id(tenant_id, client_id)
+            .await?;
+        if !client.is_active {
+            return Err(OAuthError::InvalidClient(
+                "Client is not active".to_string(),
+            ));
+        }
+        let jwks = client.jwks.as_ref().ok_or_else(|| {
+            OAuthError::InvalidClient("client is not configured for private_key_jwt".to_string())
+        })?;
+        let token_endpoint = format!("{}/oauth/token", state.issuer.trim_end_matches('/'));
+        let audiences = [state.issuer.as_str(), token_endpoint.as_str()];
+        state
+            .client_service
+            .verify_client_assertion(tenant_id, &client.client_id, assertion, &audiences, jwks)
+            .await?;
+        client
+    } else {
+        let loaded = state
+            .client_service
+            .get_client_by_client_id(tenant_id, client_id)
+            .await?;
+        if let Some(registered) = loaded.tls_client_cert_thumbprint.as_deref() {
+            // RFC 8705 self_signed_tls_client_auth (fail-closed on mismatch).
+            if !loaded.is_active {
+                return Err(OAuthError::InvalidClient(
+                    "Client is not active".to_string(),
+                ));
+            }
+            if !xavyo_auth::cert_binding_satisfied(registered, cert_thumbprint) {
+                return Err(OAuthError::InvalidClient(
+                    "mTLS client certificate does not match the registered certificate".to_string(),
+                ));
+            }
+            loaded
+        } else {
+            // client_secret_basic / _post.
+            let secret = client_secret.ok_or_else(|| {
+                OAuthError::InvalidClient(
+                    "client_secret is required for client_credentials grant".to_string(),
+                )
+            })?;
+            state
+                .client_service
+                .verify_client_credentials(tenant_id, client_id, secret)
+                .await?
+        }
+    };
 
     // Validate the client is allowed to use client_credentials grant
     if !client
@@ -408,6 +476,11 @@ async fn handle_client_credentials_grant(
         }
     };
 
+    // Sender-constrain the issued token to the client's DPoP key / mTLS cert
+    // when presented (RFC 9449 / RFC 8705) — agent tokens shouldn't be bearer.
+    // `cert_thumbprint` was extracted above for client authentication.
+    let dpop_jkt = extract_dpop_binding(state, headers)?;
+
     // Issue tokens for client credentials grant
     // If the client is bound to an NHI identity, the NHI ID becomes the JWT subject
     let token_response = state
@@ -417,6 +490,8 @@ async fn handle_client_credentials_grant(
             tenant_id,
             &granted_scope,
             client.nhi_id,
+            dpop_jkt.as_deref(),
+            cert_thumbprint,
         )
         .await?;
 
@@ -562,6 +637,13 @@ async fn handle_refresh_token_grant(
         .validate_and_rotate_refresh_token(tenant_id, refresh_token, client_internal_id)
         .await?;
 
+    // Re-bind the new access token to the DPoP key / mTLS cert presented at the
+    // refresh request (RFC 9449 / RFC 8705) — sender-constraint carries forward.
+    let dpop_jkt = extract_dpop_binding(state, headers)?;
+    let cert_thumbprint = headers
+        .get("x-client-cert-thumbprint")
+        .and_then(|v| v.to_str().ok());
+
     // Issue new access token
     let token_response = state
         .token_service
@@ -572,6 +654,8 @@ async fn handle_refresh_token_grant(
             tenant_id,
             &scope,
             &new_refresh_token,
+            dpop_jkt.as_deref(),
+            cert_thumbprint,
         )
         .await?;
 
@@ -886,6 +970,13 @@ async fn handle_token_exchange_grant(
         vec![client_id.to_string()]
     };
 
+    // Sender-constrain the delegated (agent) token to the DPoP key / mTLS cert
+    // presented at the exchange (RFC 9449 / RFC 8705).
+    let dpop_jkt = extract_dpop_binding(state, headers)?;
+    let cert_thumbprint = headers
+        .get("x-client-cert-thumbprint")
+        .and_then(|v| v.to_str().ok());
+
     let token_response = state
         .token_service
         .issue_token_exchange_tokens(
@@ -897,6 +988,8 @@ async fn handle_token_exchange_grant(
             &requested_scope,
             new_depth,
             actor_claims.act.as_ref(),
+            dpop_jkt.as_deref(),
+            cert_thumbprint,
         )
         .await?;
 

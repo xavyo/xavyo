@@ -196,12 +196,17 @@ pub struct JwtClaims {
     pub authorization_details: Option<Vec<AuthorizationDetail>>,
 }
 
-/// RFC 7800 / RFC 9449 confirmation claim. Currently carries only the DPoP
-/// key thumbprint (`jkt`).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// RFC 7800 confirmation claim. Carries the proof-of-possession binding for a
+/// sender-constrained token — at most one of: DPoP key thumbprint (`jkt`,
+/// RFC 9449) or mTLS client-certificate thumbprint (`x5t#S256`, RFC 8705).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct CnfClaim {
     /// RFC 7638 JWK SHA-256 thumbprint of the DPoP-binding public key.
-    pub jkt: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jkt: Option<String>,
+    /// RFC 8705 §3.1 SHA-256 thumbprint of the client's mTLS certificate.
+    #[serde(default, rename = "x5t#S256", skip_serializing_if = "Option::is_none")]
+    pub x5t_s256: Option<String>,
 }
 
 impl JwtClaims {
@@ -286,11 +291,18 @@ impl JwtClaims {
         self.act.is_some()
     }
 
-    /// Returns the DPoP key thumbprint (`cnf.jkt`) if this token is
-    /// sender-constrained, else `None` (ordinary bearer token).
+    /// Returns the DPoP key thumbprint (`cnf.jkt`, RFC 9449) if this token is
+    /// DPoP-bound, else `None`.
     #[must_use]
     pub fn dpop_jkt(&self) -> Option<&str> {
-        self.cnf.as_ref().map(|c| c.jkt.as_str())
+        self.cnf.as_ref().and_then(|c| c.jkt.as_deref())
+    }
+
+    /// Returns the mTLS certificate thumbprint (`cnf["x5t#S256"]`, RFC 8705) if
+    /// this token is certificate-bound, else `None`.
+    #[must_use]
+    pub fn cert_thumbprint(&self) -> Option<&str> {
+        self.cnf.as_ref().and_then(|c| c.x5t_s256.as_deref())
     }
 
     /// Get the actual actor NHI ID (the agent doing the work).
@@ -516,7 +528,17 @@ impl JwtClaimsBuilder {
     /// `cnf.jkt` confirmation to the given RFC 7638 thumbprint.
     #[must_use]
     pub fn dpop_jkt(mut self, jkt: impl Into<String>) -> Self {
-        self.cnf = Some(CnfClaim { jkt: jkt.into() });
+        let cnf = self.cnf.get_or_insert_with(CnfClaim::default);
+        cnf.jkt = Some(jkt.into());
+        self
+    }
+
+    /// Certificate-bind this token to an mTLS client cert (RFC 8705): sets the
+    /// `cnf["x5t#S256"]` confirmation to the given certificate thumbprint.
+    #[must_use]
+    pub fn cert_thumbprint(mut self, x5t_s256: impl Into<String>) -> Self {
+        let cnf = self.cnf.get_or_insert_with(CnfClaim::default);
+        cnf.x5t_s256 = Some(x5t_s256.into());
         self
     }
 

@@ -16,6 +16,7 @@ use xavyo_db::{
     models::org_security_policy::OrgPolicyType, set_tenant_context, PasswordHistory, RevokeReason,
     TenantPasswordPolicy, UpsertPasswordPolicy, User,
 };
+use xavyo_ssf::{CaepEmitter, CredentialChangeType, NoopEmitter};
 
 /// Special characters allowed in passwords.
 pub const SPECIAL_CHARS: &str = "!@#$%^&*()_+-=[]{}|;:,.<>?";
@@ -142,13 +143,25 @@ pub struct PasswordChangeResult {
 #[derive(Clone)]
 pub struct PasswordPolicyService {
     pool: PgPool,
+    /// CAEP signal sink (defaults to a no-op when SSF is not configured).
+    emitter: Arc<dyn CaepEmitter>,
 }
 
 impl PasswordPolicyService {
     /// Create a new password policy service.
     #[must_use]
     pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            emitter: Arc::new(NoopEmitter),
+        }
+    }
+
+    /// Attach a CAEP emitter so credential changes broadcast Shared Signals.
+    #[must_use]
+    pub fn with_emitter(mut self, emitter: Arc<dyn CaepEmitter>) -> Self {
+        self.emitter = emitter;
+        self
     }
 
     /// Validate a password against the tenant's policy.
@@ -613,6 +626,15 @@ impl PasswordPolicyService {
         } else {
             (0, 0)
         };
+
+        // CAEP (Shared Signals): broadcast a credential-change signal so relying
+        // parties learn the password rotated. Fire-and-forget.
+        self.emitter.credential_change(
+            tenant_id,
+            user_id,
+            "password".to_string(),
+            CredentialChangeType::Update,
+        );
 
         Ok(PasswordChangeResult {
             sessions_revoked,

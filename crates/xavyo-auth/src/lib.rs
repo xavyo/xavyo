@@ -39,9 +39,13 @@ mod claims;
 pub mod client_assertion;
 /// DPoP (RFC 9449) proof validation and RFC 7638 JWK thumbprints.
 pub mod dpop;
+/// Stateless DPoP-Nonce (RFC 9449 §8) issuance/verification.
+pub mod dpop_nonce;
 mod error;
 mod jwks;
 mod jwt;
+/// Mutual-TLS (RFC 8705) certificate thumbprints for certificate-bound tokens.
+pub mod mtls;
 mod password;
 /// Rich Authorization Requests (RFC 9396) — `authorization_details`.
 pub mod rar;
@@ -53,6 +57,7 @@ pub use client_assertion::{
     CLIENT_ASSERTION_TYPE_JWT_BEARER,
 };
 pub use dpop::{compute_ath, jwk_thumbprint, verify_resource_proof, DpopError, ValidatedProof};
+pub use dpop_nonce::{issue_dpop_nonce, verify_dpop_nonce, DPOP_NONCE_WINDOW_SECS};
 pub use error::AuthError;
 pub use jsonwebtoken::Algorithm;
 pub use jwks::{JwkSet, JwksClient};
@@ -60,5 +65,6 @@ pub use jwt::{
     decode_token, decode_token_with_algorithm, decode_token_with_config, encode_token,
     encode_token_with_kid, extract_kid, ValidationConfig,
 };
+pub use mtls::{cert_binding_satisfied, compute_x5t_s256, x5t_s256_from_pem};
 pub use password::{hash_password, verify_password, PasswordHasher};
 pub use rar::{parse_authorization_details, AuthorizationDetail, RarError};

@@ -87,6 +87,7 @@ xavyo-auth = { path = "../../crates/xavyo-auth" }
 xavyo-api-auth = { path = "../../crates/xavyo-api-auth" }
 xavyo-api-users = { path = "../../crates/xavyo-api-users" }
 xavyo-api-oauth = { path = "../../crates/xavyo-api-oauth" }
+xavyo-api-ssf = { path = "../../crates/xavyo-api-ssf" }
 xavyo-api-social = { path = "../../crates/xavyo-api-social" }
 xavyo-api-saml = { path = "../../crates/xavyo-api-saml" }
 xavyo-api-oidc-federation = { path = "../../crates/xavyo-api-oidc-federation" }

@@ -1021,9 +1021,9 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         .bind(&client_id_str)
         .bind(&client_secret_hash)
         .bind(format!("Test Exchange Client {}", suffix))
-        .bind(&vec!["https://example.com/callback"] as &[&str])
-        .bind(&vec!["urn:ietf:params:oauth:grant-type:token-exchange"] as &[&str])
-        .bind(&vec!["read:tools", "write:tools"] as &[&str])
+        .bind(&["https://example.com/callback"] as &[&str])
+        .bind(&["urn:ietf:params:oauth:grant-type:token-exchange"] as &[&str])
+        .bind(&["read:tools", "write:tools"] as &[&str])
         .bind(nhi_id)
         .execute(&ctx.admin_pool)
         .await
@@ -1149,7 +1149,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         let server = build_server(&ctx);
 
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1255,7 +1255,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         let server = build_server(&ctx);
 
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1310,7 +1310,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let server = build_server(&ctx);
 
         // Omit subject_token entirely
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1362,7 +1362,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         let server = build_server(&ctx);
 
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1428,7 +1428,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let server = build_server(&ctx);
 
         // Send X-Tenant-ID for tenant B, but the JWT carries tenant A
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1492,7 +1492,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         let server = build_server(&ctx);
 
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1565,7 +1565,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let server = build_server(&ctx);
 
         // Request scope "admin:everything" which is not in the grant
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1639,7 +1639,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let server = build_server(&ctx);
 
         // new_depth would be 2, exceeding max_delegation_depth=1
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1701,7 +1701,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         let server = build_server(&ctx);
 
         // Omit client_secret
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             (
                 "grant_type",
                 "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -1838,9 +1838,9 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
         .bind(&client_id_str)
         .bind(&client_secret_hash)
         .bind(format!("NHI Bind Client {}", suffix))
-        .bind(&vec!["https://example.com/callback"] as &[&str])
-        .bind(&vec!["client_credentials"] as &[&str])
-        .bind(&vec!["read:tools", "write:tools"] as &[&str])
+        .bind(&["https://example.com/callback"] as &[&str])
+        .bind(&["client_credentials"] as &[&str])
+        .bind(&["read:tools", "write:tools"] as &[&str])
         .bind(nhi_id)
         .execute(&ctx.admin_pool)
         .await
@@ -1900,7 +1900,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         let server = build_server(&ctx);
 
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             ("grant_type", "client_credentials"),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
@@ -1948,7 +1948,7 @@ up+JPS7AWJPnZipA5wIpDrNHaU1smkSNTznixDrI83yC/8bWQzhCvUGmgukuXpD/
 
         let server = build_server(&ctx);
 
-        let form_body = serde_urlencoded::to_string(&[
+        let form_body = serde_urlencoded::to_string([
             ("grant_type", "client_credentials"),
             ("client_id", &client_id_str),
             ("client_secret", &client_secret),
