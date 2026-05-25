@@ -65,6 +65,7 @@ Criteria:
 | xavyo-ssf | 🔴 alpha | 15 | 23 | CAEP/SSF SET signing + emitter, no integration tests |
 | xavyo-secrets | 🟢 stable | 51 | 28 | Multi-provider (Vault, AWS) |
 | xavyo-scim-client | 🟢 stable | 150+ | 24 | Full integration test coverage |
+| xavyo-scim-types | 🟢 stable | 9 | 17 | Pure SCIM 2.0 DTOs (RFC 7643/7644); RFC-pinned shape |
 | xavyo-ext-authz | 🟡 beta | 41 | 12 | Envoy ext_authz v3 gRPC for AgentGateway |
 
 ### Connector Layer
@@ -86,7 +87,6 @@ Criteria:
 | xavyo-api-scim | 🟡 beta | 45 | 27 | No integration tests |
 | xavyo-api-saml | 🟡 beta | 13 | 18 | 3 TODOs, limited coverage |
 | xavyo-api-social | 🟡 beta | 27 | 19 | Needs validation tests |
-| xavyo-api-agents | 🟢 stable | 335 | 112 | AI agent platform mature |
 | xavyo-api-governance | 🟢 stable | 1058 | 180+ | 135K LOC, massive coverage |
 | xavyo-api-connectors | 🟡 beta | 69 | 42 | 6 TODOs |
 | xavyo-api-tenants | 🟢 stable | 121 | 38 | Multi-tenant bootstrap complete |
@@ -102,7 +102,7 @@ Criteria:
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 19 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-governance, xavyo-scim-client, xavyo-api-auth, xavyo-api-oauth, xavyo-api-agents, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import, xavyo-api-users |
+| 🟢 Stable | 19 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-governance, xavyo-scim-client, xavyo-scim-types, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import, xavyo-api-users |
 | 🟡 Beta | 12 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-ext-authz, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi, xavyo-api-authorization |
 | 🔴 Alpha | 4 | xavyo-connector-rest, xavyo-connector-database, xavyo-ssf, xavyo-api-ssf |
 

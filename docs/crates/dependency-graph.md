@@ -10,7 +10,6 @@ flowchart TB
         api-auth[xavyo-api-auth]
         api-oauth[xavyo-api-oauth]
         api-users[xavyo-api-users]
-        api-agents[xavyo-api-agents]
         api-scim[xavyo-api-scim]
         api-saml[xavyo-api-saml]
         api-social[xavyo-api-social]
@@ -86,9 +85,6 @@ flowchart TB
     api-oauth --> db
     api-users --> auth
     api-users --> db
-    api-agents --> auth
-    api-agents --> secrets
-    api-agents --> nhi
     api-scim --> db
     api-governance --> governance
     api-connectors --> provisioning

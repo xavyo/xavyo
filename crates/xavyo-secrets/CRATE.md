@@ -138,7 +138,7 @@ if !provider.health_check().await? {
 
 ## Integration Points
 
-- **Consumed by**: `xavyo-auth` (JWT keys), `xavyo-db` (connection strings), `xavyo-api-agents` (dynamic secrets)
+- **Consumed by**: `xavyo-auth` (JWT keys), `xavyo-db` (connection strings), `xavyo-api-nhi` (dynamic secrets)
 - **Environment variables**:
   - `SECRET_PROVIDER` - Provider type (env, file, vault, aws)
   - `VAULT_ADDR` - Vault server URL
@@ -166,4 +166,4 @@ Default: `env-provider`, `file-provider`
 
 - `xavyo-auth` - Uses secrets for JWT signing keys
 - `xavyo-connector` - Uses secrets for connector credentials
-- `xavyo-api-agents` - Dynamic secret provisioning
+- `xavyo-api-nhi` - Dynamic secret provisioning for non-human identities

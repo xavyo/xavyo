@@ -1,6 +1,6 @@
 # Crate Index
 
-All 33 crates in xavyo organized by architectural layer.
+All 35 crates in xavyo organized by architectural layer.
 
 See [Maturity Matrix](maturity-matrix.md) for detailed assessment criteria.
 
@@ -32,6 +32,7 @@ Business logic independent of HTTP transport.
 | [xavyo-ssf](../../crates/xavyo-ssf/CRATE.md) | CAEP/Shared Signals: SETs, subject IDs, emitter | 🔴 alpha |
 | [xavyo-secrets](../../crates/xavyo-secrets/CRATE.md) | External secret providers | 🟢 stable |
 | [xavyo-scim-client](../../crates/xavyo-scim-client/CRATE.md) | Outbound SCIM provisioning | 🟢 stable |
+| [xavyo-scim-types](../../crates/xavyo-scim-types/CRATE.md) | Shared SCIM 2.0 DTOs (RFC 7643/7644) | 🟢 stable |
 | [xavyo-ext-authz](../../crates/xavyo-ext-authz/CRATE.md) | Envoy ext_authz v3 gRPC server for AgentGateway | 🟡 beta |
 
 ## Connector Layer
@@ -57,7 +58,6 @@ REST endpoints exposed to clients.
 | [xavyo-api-scim](../../crates/xavyo-api-scim/CRATE.md) | SCIM 2.0 inbound provisioning | 🟡 beta |
 | [xavyo-api-saml](../../crates/xavyo-api-saml/CRATE.md) | SAML 2.0 IdP endpoints | 🟡 beta |
 | [xavyo-api-social](../../crates/xavyo-api-social/CRATE.md) | Social login providers | 🟡 beta |
-| [xavyo-api-agents](../../crates/xavyo-api-agents/CRATE.md) | AI agent security platform | 🟢 stable |
 | [xavyo-api-governance](../../crates/xavyo-api-governance/CRATE.md) | IGA workflows and reporting | 🟢 stable |
 | [xavyo-api-connectors](../../crates/xavyo-api-connectors/CRATE.md) | Connector management API | 🟡 beta |
 | [xavyo-api-tenants](../../crates/xavyo-api-tenants/CRATE.md) | Tenant provisioning API | 🟢 stable |

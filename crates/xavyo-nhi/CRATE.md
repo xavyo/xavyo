@@ -206,7 +206,7 @@ fn get_all_nhis(nhis: &[impl NonHumanIdentity]) -> Vec<&impl NonHumanIdentity> {
 
 ## Integration Points
 
-- **Consumed by**: `xavyo-db` (models), `xavyo-api-agents`, `xavyo-api-nhi`, `xavyo-governance`
+- **Consumed by**: `xavyo-db` (models), `xavyo-api-nhi`, `xavyo-governance`
 - **Provides**: Unified interface for NHI governance operations
 
 ## Feature Flags
@@ -225,7 +225,6 @@ fn get_all_nhis(nhis: &[impl NonHumanIdentity]) -> Vec<&impl NonHumanIdentity> {
 
 ## Related Crates
 
-- `xavyo-api-agents` - AI agent management API
-- `xavyo-api-nhi` - Unified NHI management API
+- `xavyo-api-nhi` - Unified NHI (service account + AI agent) management API
 - `xavyo-governance` - NHI certification campaigns
 - `xavyo-db` - Persistent NHI models
