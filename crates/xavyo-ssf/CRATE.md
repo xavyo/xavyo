@@ -16,7 +16,7 @@ domain
 
 🔴 **alpha**
 
-15 unit tests covering event payloads, subject-identifier serialization, and SET signing. The API will change as receiver-side integration (poll delivery, verification events) lands. Don't depend on signatures yet.
+16 unit tests covering event payloads (incl. the SSF `verification` event), subject-identifier serialization, and SET signing. Don't depend on signatures yet — the API will still change.
 
 ## Dependencies
 

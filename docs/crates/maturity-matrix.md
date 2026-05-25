@@ -62,7 +62,7 @@ Criteria:
 | xavyo-authorization | 🟢 stable | 76 | 16 | Foundation only |
 | xavyo-webhooks | 🟡 beta | 59 | 31 | Needs integration tests |
 | xavyo-siem | 🟡 beta | 115 | 47 | Good coverage, no integration tests |
-| xavyo-ssf | 🔴 alpha | 15 | 23 | CAEP/SSF SET signing + emitter, no integration tests |
+| xavyo-ssf | 🔴 alpha | 16 | 24 | CAEP/SSF SET signing + emitter (incl. SSF verification event), no integration tests |
 | xavyo-secrets | 🟢 stable | 51 | 28 | Multi-provider (Vault, AWS) |
 | xavyo-scim-client | 🟢 stable | 150+ | 24 | Full integration test coverage |
 | xavyo-scim-types | 🟢 stable | 9 | 17 | Pure SCIM 2.0 DTOs (RFC 7643/7644); RFC-pinned shape |

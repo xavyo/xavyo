@@ -370,7 +370,7 @@ async fn main() {
         .expect("failed to build SSF transmitter"),
     );
     let ssf_emitter = Arc::new(SsfStreamEmitter::new(
-        ssf_transmitter,
+        ssf_transmitter.clone(),
         pool.clone(),
         config.issuer_url.clone(),
     ));
@@ -774,6 +774,7 @@ async fn main() {
     let ssf_state = SsfState {
         pool: pool.clone(),
         issuer: config.issuer_url.clone(),
+        transmitter: ssf_transmitter.clone(),
     };
     let ssf_routes = ssf_router(ssf_state.clone())
         .layer(axum::middleware::from_fn(jwt_auth_middleware))

@@ -172,14 +172,9 @@ impl SsfTransmitter {
 
         let mut outcomes = Vec::with_capacity(streams.len());
         for stream in streams {
-            // Poll-delivery streams (RFC 8936) are enqueued for the receiver to
-            // pull; push streams (RFC 8935) are delivered now.
-            let outcome = if stream.delivery_method == crate::models::POLL_DELIVERY_METHOD {
-                self.enqueue_one(pool, tenant_id, &stream, subject, event)
-                    .await
-            } else {
-                self.emit_one(&stream, subject, event).await
-            };
+            let outcome = self
+                .send_one(pool, tenant_id, &stream, subject, event)
+                .await;
             if let Err(ref e) = outcome {
                 tracing::warn!(
                     target: "ssf",
@@ -191,6 +186,30 @@ impl SsfTransmitter {
             outcomes.push((stream.stream_id, outcome));
         }
         Ok(outcomes)
+    }
+
+    /// Deliver one SET to one stream, choosing transport by the stream's
+    /// delivery method: push (RFC 8935) delivers now; poll (RFC 8936) enqueues
+    /// for the receiver to pull. Used by the CAEP fan-out ([`Self::emit`]) and
+    /// the verification path.
+    ///
+    /// # Errors
+    /// [`DeliveryError`] on a blocked endpoint, signing, transport, or queue
+    /// failure for this stream.
+    pub async fn send_one(
+        &self,
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        stream: &SsfStream,
+        subject: &SubjectId,
+        event: &CaepEvent,
+    ) -> Result<(), DeliveryError> {
+        if stream.delivery_method == crate::models::POLL_DELIVERY_METHOD {
+            self.enqueue_one(pool, tenant_id, stream, subject, event)
+                .await
+        } else {
+            self.emit_one(stream, subject, event).await
+        }
     }
 
     /// Validate, sign, and deliver a SET to one push stream.

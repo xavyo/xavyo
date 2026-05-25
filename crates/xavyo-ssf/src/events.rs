@@ -2,9 +2,11 @@
 //!
 //! Each event is carried in the SET's `events` claim as a single-entry map
 //! `{ "<type-uri>": { <payload> } }`. Every CAEP event payload carries an
-//! `event_timestamp` (NumericDate, seconds — CAEP §3.1). v1 ships the two
-//! events xavyo can emit from existing flows: `session-revoked` and
-//! `credential-change`.
+//! `event_timestamp` (NumericDate, seconds — CAEP §3.1).
+//!
+//! Note: [`CaepEvent`] also carries the SSF management event `Verification`
+//! (SSF §7.1.4), which is not a CAEP event and has no `event_timestamp`; the
+//! enum name predates SSF support. Renaming is a follow-up.
 
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +29,11 @@ pub const ASSURANCE_LEVEL_CHANGE_URI: &str =
 /// CAEP `device-compliance-change` event type URI.
 pub const DEVICE_COMPLIANCE_CHANGE_URI: &str =
     "https://schemas.openid.net/secevent/caep/event-type/device-compliance-change";
+
+/// SSF `verification` event type URI (SSF §7.1.4) — a stream-health check, not
+/// a CAEP event.
+pub const VERIFICATION_URI: &str =
+    "https://schemas.openid.net/secevent/ssf/event-type/verification";
 
 /// The kind of credential change (CAEP §3.4 `change_type`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,6 +97,13 @@ pub enum CaepEvent {
         /// Prior status, if known.
         previous_status: Option<String>,
     },
+    /// SSF §7.1.4 — a stream-health verification event. The receiver echoes the
+    /// optional `state` back, confirming it can receive and process SETs. Not a
+    /// CAEP event: it carries no `event_timestamp`.
+    Verification {
+        /// Opaque value the receiver echoes back to correlate the check.
+        state: Option<String>,
+    },
 }
 
 impl CaepEvent {
@@ -102,6 +116,7 @@ impl CaepEvent {
             CaepEvent::TokenClaimsChange { .. } => TOKEN_CLAIMS_CHANGE_URI,
             CaepEvent::AssuranceLevelChange { .. } => ASSURANCE_LEVEL_CHANGE_URI,
             CaepEvent::DeviceComplianceChange { .. } => DEVICE_COMPLIANCE_CHANGE_URI,
+            CaepEvent::Verification { .. } => VERIFICATION_URI,
         }
     }
 
@@ -163,6 +178,13 @@ impl CaepEvent {
                 obj.insert("current_status".into(), current_status.clone().into());
                 if let Some(p) = previous_status {
                     obj.insert("previous_status".into(), p.clone().into());
+                }
+                serde_json::Value::Object(obj)
+            }
+            CaepEvent::Verification { state } => {
+                let mut obj = serde_json::Map::new();
+                if let Some(s) = state {
+                    obj.insert("state".into(), s.clone().into());
                 }
                 serde_json::Value::Object(obj)
             }
@@ -251,5 +273,19 @@ mod tests {
             e.payload(),
             json!({"event_timestamp": 9, "current_status": "not-compliant", "previous_status": "compliant"})
         );
+    }
+
+    #[test]
+    fn verification_payload_with_and_without_state() {
+        let with = CaepEvent::Verification {
+            state: Some("abc123".into()),
+        };
+        assert_eq!(with.type_uri(), VERIFICATION_URI);
+        assert_eq!(with.payload(), json!({ "state": "abc123" }));
+
+        let without = CaepEvent::Verification { state: None };
+        assert_eq!(without.type_uri(), VERIFICATION_URI);
+        // No state, no event_timestamp — an empty object.
+        assert_eq!(without.payload(), json!({}));
     }
 }
