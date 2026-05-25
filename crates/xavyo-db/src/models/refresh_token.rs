@@ -41,6 +41,18 @@ pub struct RefreshToken {
     /// The client's IP address as string (optional, for auditing).
     /// Stored as String because INET type maps to String in sqlx.
     pub ip_address: Option<String>,
+
+    /// OIDC `acr` captured at login, carried forward to refreshed access tokens
+    /// (so step-up assurance survives refresh). `None` for tokens issued before
+    /// authentication-context tracking, or non-interactive issuance.
+    pub acr: Option<String>,
+
+    /// OIDC `amr` (RFC 8176) captured at login, carried forward on refresh.
+    pub amr: Option<Vec<String>>,
+
+    /// OIDC `auth_time` (Unix seconds) captured at login, carried forward on
+    /// refresh so `max_age` checks remain meaningful across token rotation.
+    pub auth_time: Option<i64>,
 }
 
 impl RefreshToken {
@@ -181,6 +193,9 @@ mod tests {
             created_at: Utc::now(),
             user_agent: None,
             ip_address: None,
+            acr: None,
+            amr: None,
+            auth_time: None,
         }
     }
 
