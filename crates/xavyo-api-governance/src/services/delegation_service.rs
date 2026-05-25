@@ -469,7 +469,7 @@ impl DelegationService {
         }
 
         // Sort by created_at
-        all_work_items.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        all_work_items.sort_by_key(|w| w.created_at);
 
         let total = all_work_items.len() as i64;
 

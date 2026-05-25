@@ -462,20 +462,17 @@ fn validate_expression_syntax(expression: &str) -> std::result::Result<(), Strin
     for (i, ch) in expression.chars().enumerate() {
         match ch {
             '(' | '[' | '{' => stack.push(ch),
-            ')' => {
-                if stack.pop() != Some('(') {
-                    return Err(format!("Unmatched closing parenthesis ')' at position {i}"));
-                }
+            // The `stack.pop()` in each guard is always evaluated for a matching
+            // delimiter, so the stack mutates exactly as it would in a body `if`;
+            // a balanced match falls through to the no-op `_` arm.
+            ')' if stack.pop() != Some('(') => {
+                return Err(format!("Unmatched closing parenthesis ')' at position {i}"));
             }
-            ']' => {
-                if stack.pop() != Some('[') {
-                    return Err(format!("Unmatched closing bracket ']' at position {i}"));
-                }
+            ']' if stack.pop() != Some('[') => {
+                return Err(format!("Unmatched closing bracket ']' at position {i}"));
             }
-            '}' => {
-                if stack.pop() != Some('{') {
-                    return Err(format!("Unmatched closing brace '}}' at position {i}"));
-                }
+            '}' if stack.pop() != Some('{') => {
+                return Err(format!("Unmatched closing brace '}}' at position {i}"));
             }
             _ => {}
         }

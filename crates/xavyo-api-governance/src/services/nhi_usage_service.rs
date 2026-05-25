@@ -285,7 +285,7 @@ impl NhiUsageService {
         }
 
         // Sort by days inactive descending (most stale first)
-        stale_nhis.sort_by(|a, b| b.days_inactive.cmp(&a.days_inactive));
+        stale_nhis.sort_by_key(|n| std::cmp::Reverse(n.days_inactive));
 
         let total_stale = stale_nhis.len() as i64;
         let critical_count = stale_nhis.iter().filter(|n| n.days_inactive > 180).count() as i64;

@@ -260,7 +260,7 @@ impl PoaService {
             }
 
             // Sort by created_at descending
-            all_poas.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+            all_poas.sort_by_key(|p| std::cmp::Reverse(p.created_at));
 
             // Apply pagination to merged result
             let total = outgoing_count + incoming_count;

@@ -241,10 +241,8 @@ impl RequestParser {
                         _ => {}
                     }
                 }
-                Ok(Event::Text(e)) => {
-                    if in_issuer {
-                        issuer = Some(e.unescape().unwrap_or_default().to_string());
-                    }
+                Ok(Event::Text(e)) if in_issuer => {
+                    issuer = Some(e.unescape().unwrap_or_default().to_string());
                 }
                 Ok(Event::End(e)) => {
                     let local_name = e.local_name();

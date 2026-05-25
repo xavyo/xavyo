@@ -277,7 +277,7 @@ impl AuditStore for InMemoryAuditStore {
             .collect();
 
         // Sort by timestamp descending (most recent first)
-        results.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        results.sort_by_key(|r| std::cmp::Reverse(r.timestamp));
 
         // Apply offset and limit
         let offset = filter.offset.unwrap_or(0);
