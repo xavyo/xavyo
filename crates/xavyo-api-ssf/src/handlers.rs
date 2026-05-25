@@ -14,12 +14,12 @@ use sqlx::pool::PoolConnection;
 use sqlx::Postgres;
 use xavyo_core::TenantId;
 use xavyo_db::models::{CreateSsfStream, SsfPollToken, SsfStream, SsfSubject};
-use xavyo_ssf::{CREDENTIAL_CHANGE_URI, SESSION_REVOKED_URI};
+use xavyo_ssf::{CaepEvent, SubjectId, CREDENTIAL_CHANGE_URI, SESSION_REVOKED_URI};
 
 use crate::error::SsfApiError;
 use crate::models::{
     CreateStreamRequest, SsfConfigurationMetadata, StatusResponse, StreamIdQuery, StreamResponse,
-    SubjectRequest, UpdateStatusRequest,
+    SubjectRequest, UpdateStatusRequest, VerifyRequest,
 };
 
 /// Shared state for the SSF API.
@@ -29,6 +29,9 @@ pub struct SsfState {
     pub pool: sqlx::PgPool,
     /// Transmitter issuer identifier (stamped into metadata + responses).
     pub issuer: String,
+    /// SET signer/deliverer — used to send stream-verification events (SSF
+    /// §7.1.4) on demand (the CAEP fan-out uses its own emitter copy).
+    pub transmitter: std::sync::Arc<crate::transmitter::SsfTransmitter>,
 }
 
 /// CAEP event types this transmitter can actually deliver (v1).
@@ -103,6 +106,35 @@ pub async fn create_stream(
     };
 
     Ok((StatusCode::CREATED, Json(response)))
+}
+
+/// `POST /ssf/verify` — request a stream-verification event (SSF §7.1.4).
+///
+/// Admin-triggered via the tenant-authed management API: sends a verification
+/// SET to the stream (pushed for RFC 8935 streams, queued for RFC 8936), which
+/// the receiver echoes back to confirm it can receive and process SETs.
+pub async fn verify_stream(
+    State(state): State<SsfState>,
+    Extension(tenant_id): Extension<TenantId>,
+    Json(req): Json<VerifyRequest>,
+) -> Result<StatusCode, SsfApiError> {
+    let tenant = *tenant_id.as_uuid();
+    let stream = {
+        let mut conn = tenant_conn(&state.pool, tenant).await?;
+        SsfStream::get(&mut *conn, tenant, req.stream_id)
+            .await?
+            .ok_or(SsfApiError::StreamNotFound)?
+    };
+
+    let subject = SubjectId::iss_sub(state.issuer.clone(), stream.stream_id.to_string());
+    let event = CaepEvent::Verification { state: req.state };
+    state
+        .transmitter
+        .send_one(&state.pool, tenant, &stream, &subject, &event)
+        .await
+        .map_err(|e| SsfApiError::Internal(e.to_string()))?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// `GET /ssf/streams` — list the tenant's streams.

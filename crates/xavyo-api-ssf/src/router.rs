@@ -11,7 +11,7 @@ use axum::{
 
 use crate::handlers::{
     add_subject, create_stream, delete_stream, get_status, get_stream, list_streams,
-    remove_subject, ssf_configuration, update_status, SsfState,
+    remove_subject, ssf_configuration, update_status, verify_stream, SsfState,
 };
 
 /// Stream-management router. Mount at `/ssf` behind auth + `Extension<TenantId>`.
@@ -20,6 +20,7 @@ use crate::handlers::{
 /// - `GET /ssf/stream?stream_id=…` read · `DELETE /ssf/stream?stream_id=…` delete
 /// - `GET /ssf/status?stream_id=…` · `POST /ssf/status` (update)
 /// - `POST /ssf/subjects:add` · `POST /ssf/subjects:remove`
+/// - `POST /ssf/verify` request a stream-verification event (SSF §7.1.4)
 pub fn ssf_router(state: SsfState) -> Router {
     Router::new()
         .route("/streams", post(create_stream).get(list_streams))
@@ -27,6 +28,7 @@ pub fn ssf_router(state: SsfState) -> Router {
         .route("/status", get(get_status).post(update_status))
         .route("/subjects:add", post(add_subject))
         .route("/subjects:remove", post(remove_subject))
+        .route("/verify", post(verify_stream))
         .with_state(state)
 }
 

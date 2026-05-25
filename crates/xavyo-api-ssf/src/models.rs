@@ -156,6 +156,16 @@ pub struct PollResponse {
     pub more_available: bool,
 }
 
+/// Body for `POST /ssf/verify` — request a stream-verification event (SSF §7.1.4).
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+pub struct VerifyRequest {
+    /// The stream to send the verification event to.
+    pub stream_id: Uuid,
+    /// Optional opaque value the receiver echoes back to correlate the check.
+    #[serde(default)]
+    pub state: Option<String>,
+}
+
 /// Body for `POST /ssf/status` (update stream status).
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct UpdateStatusRequest {
@@ -220,6 +230,8 @@ pub struct SsfConfigurationMetadata {
     pub add_subject_endpoint: String,
     /// Remove-subject endpoint.
     pub remove_subject_endpoint: String,
+    /// Stream-verification endpoint (SSF §7.1.4).
+    pub verification_endpoint: String,
 }
 
 impl SsfConfigurationMetadata {
@@ -238,6 +250,7 @@ impl SsfConfigurationMetadata {
             status_endpoint: format!("{base}/ssf/status"),
             add_subject_endpoint: format!("{base}/ssf/subjects:add"),
             remove_subject_endpoint: format!("{base}/ssf/subjects:remove"),
+            verification_endpoint: format!("{base}/ssf/verify"),
         }
     }
 }

@@ -24,7 +24,7 @@ pub mod subject;
 pub use emitter::{CaepEmitter, NoopEmitter};
 pub use events::{
     CaepEvent, CredentialChangeType, ASSURANCE_LEVEL_CHANGE_URI, CREDENTIAL_CHANGE_URI,
-    DEVICE_COMPLIANCE_CHANGE_URI, SESSION_REVOKED_URI, TOKEN_CLAIMS_CHANGE_URI,
+    DEVICE_COMPLIANCE_CHANGE_URI, SESSION_REVOKED_URI, TOKEN_CLAIMS_CHANGE_URI, VERIFICATION_URI,
 };
 pub use set::{SecurityEventToken, SsfError, SET_TYP};
 pub use subject::SubjectId;

@@ -16,7 +16,7 @@ api
 
 🔴 **alpha**
 
-20 unit tests (SSRF guard, model serialization, transmitter SET building, poll token hashing/parsing). Push (RFC 8935) and poll (RFC 8936) delivery are both implemented; verification events (SSF §7.1.4) and a queue-TTL janitor are not. No HTTP+Postgres integration tests yet — API will change.
+20 unit tests (SSRF guard, model serialization, transmitter SET building, poll token hashing/parsing). Push (RFC 8935) + poll (RFC 8936) delivery, the poll-queue TTL bound, and stream-verification events (SSF §7.1.4) are all implemented (the verification event payload is tested in `xavyo-ssf`). No HTTP+Postgres integration tests yet — API will change.
 
 ## Dependencies
 
@@ -43,6 +43,7 @@ api
 ///   GET/POST  /status           stream status
 ///   POST      /subjects:add     add a subject to a stream
 ///   POST      /subjects:remove  remove a subject from a stream
+///   POST      /verify           request a stream-verification event (SSF §7.1.4)
 pub fn ssf_router() -> Router<SsfState>;
 
 /// Poll-based delivery (RFC 8936). Receiver-facing — authenticates with the
