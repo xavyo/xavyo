@@ -41,6 +41,11 @@ reqwest = { workspace = true }
 # Fire-and-forget emission (spawn delivery tasks) + delivery-time DNS resolution
 tokio = { workspace = true, features = ["rt", "macros", "net"] }
 
+# Poll-delivery (RFC 8936) per-stream bearer token: generate + SHA-256 hash.
+rand = "0.8"
+sha2 = "0.10"
+hex = "0.4"
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
 wiremock = "0.6"

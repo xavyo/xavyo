@@ -70,7 +70,7 @@ use xavyo_api_social::{
     SocialState,
 };
 use xavyo_api_ssf::{
-    ssf_router, ssf_well_known_router, SsfState, SsfStreamEmitter, SsfTransmitter,
+    ssf_poll_router, ssf_router, ssf_well_known_router, SsfState, SsfStreamEmitter, SsfTransmitter,
 };
 use xavyo_api_tenants::{
     api_keys_router, oauth_clients_router, suspension_check_middleware, system_admin_router,
@@ -782,7 +782,11 @@ async fn main() {
             xavyo_tenant::TenantConfig::builder()
                 .require_tenant(true)
                 .build(),
-        ));
+        ))
+        // RFC 8936 poll endpoint is receiver-facing and authenticates with the
+        // per-stream bearer token, NOT the tenant JWT — merge it AFTER the
+        // tenant-auth layers so those layers do not apply to it.
+        .merge(ssf_poll_router(ssf_state.clone()));
     let ssf_well_known_routes = ssf_well_known_router(ssf_state);
 
     // Device code verification routes (F096 - RFC 8628)
