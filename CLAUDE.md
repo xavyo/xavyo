@@ -1,6 +1,6 @@
 # xavyo
 
-> An identity platform for humans, machines, and agents. Rust, Axum, Postgres with row-level security. 32 crates, ~670K lines.
+> An identity platform for humans, machines, and agents. Rust, Axum, Postgres with row-level security. 35 crates, ~670K lines.
 
 For maps, not territory: `llms.txt`, `llms-full.txt`, `docs/crates/index.md`, each crate's `CRATE.md`.
 

@@ -7,7 +7,7 @@
 - [Documentation Site](docs-site/): Comprehensive Docusaurus docs (866 pages) — run `cd docs-site && npm run serve`
 - [Architecture](docs/ARCHITECTURE.md): System overview and design principles
 - [INSTALL](INSTALL.md): Development environment setup
-- [Crate Index](docs/crates/index.md): All 33 crates organized by layer
+- [Crate Index](docs/crates/index.md): All 35 crates organized by layer
 - [Maturity Matrix](docs/crates/maturity-matrix.md): Crate stability assessment
 - [Dependency Graph](docs/crates/dependency-graph.md): How crates relate
 - [OpenAPI Spec](docs/api/openapi.json): 700 paths, 933 operations
@@ -44,7 +44,7 @@ The `docs-site/` contains a full Docusaurus documentation site:
 - [xavyo-events](crates/xavyo-events/CRATE.md): 🟢 Kafka event bus
 - [xavyo-nhi](crates/xavyo-nhi/CRATE.md): 🟢 Non-human identity types and traits
 
-### Domain (10 crates)
+### Domain (11 crates)
 - [xavyo-connector](crates/xavyo-connector/CRATE.md): 🟢 Connector framework
 - [xavyo-provisioning](crates/xavyo-provisioning/CRATE.md): 🟡 Sync engine
 - [xavyo-governance](crates/xavyo-governance/CRATE.md): 🟢 IGA logic
@@ -54,6 +54,7 @@ The `docs-site/` contains a full Docusaurus documentation site:
 - [xavyo-ssf](crates/xavyo-ssf/CRATE.md): 🔴 CAEP/Shared Signals (SETs, emitter)
 - [xavyo-secrets](crates/xavyo-secrets/CRATE.md): 🟢 Secret providers
 - [xavyo-scim-client](crates/xavyo-scim-client/CRATE.md): 🟢 Outbound SCIM
+- [xavyo-scim-types](crates/xavyo-scim-types/CRATE.md): 🟢 Shared SCIM 2.0 DTOs (RFC 7643/7644)
 - [xavyo-ext-authz](crates/xavyo-ext-authz/CRATE.md): 🟡 Envoy ext_authz for AgentGateway
 
 ### Connectors (4 crates)
@@ -62,14 +63,13 @@ The `docs-site/` contains a full Docusaurus documentation site:
 - [xavyo-connector-rest](crates/xavyo-connector-rest/CRATE.md): 🔴 REST APIs
 - [xavyo-connector-database](crates/xavyo-connector-database/CRATE.md): 🔴 Databases
 
-### API (15 crates)
+### API (14 crates)
 - [xavyo-api-auth](crates/xavyo-api-auth/CRATE.md): 🟢 Auth endpoints
 - [xavyo-api-oauth](crates/xavyo-api-oauth/CRATE.md): 🟢 OAuth2/OIDC provider
 - [xavyo-api-users](crates/xavyo-api-users/CRATE.md): 🟢 User management
 - [xavyo-api-scim](crates/xavyo-api-scim/CRATE.md): 🟡 SCIM provisioning
 - [xavyo-api-saml](crates/xavyo-api-saml/CRATE.md): 🟡 SAML IdP
 - [xavyo-api-social](crates/xavyo-api-social/CRATE.md): 🟡 Social login
-- [xavyo-api-agents](crates/xavyo-api-agents/CRATE.md): 🟢 AI agent security
 - [xavyo-api-governance](crates/xavyo-api-governance/CRATE.md): 🟢 IGA API
 - [xavyo-api-connectors](crates/xavyo-api-connectors/CRATE.md): 🟡 Connector API
 - [xavyo-api-tenants](crates/xavyo-api-tenants/CRATE.md): 🟢 Tenant management
