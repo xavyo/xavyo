@@ -15,7 +15,7 @@ impl BackendRouter {
     pub fn new(config: Arc<GatewayConfig>) -> Self {
         // Sort backends by path prefix length (longest first) for correct matching
         let mut backends = config.backends.clone();
-        backends.sort_by(|a, b| b.path_prefix.len().cmp(&a.path_prefix.len()));
+        backends.sort_by_key(|b| std::cmp::Reverse(b.path_prefix.len()));
 
         Self { backends }
     }
