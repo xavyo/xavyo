@@ -400,6 +400,36 @@ impl SsfQueuedEvent {
         Ok(result.rows_affected())
     }
 
+    /// Prune a stream's queued SETs older than `cutoff` (a TTL safety net for
+    /// abandoned streams the receiver stops polling). Tenant-scoped: the caller
+    /// has the tenant RLS context set, so this only touches the given stream.
+    /// Returns the number of rows removed.
+    ///
+    /// # Errors
+    /// Propagates the underlying `sqlx` error.
+    pub async fn prune_stream_older_than<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        stream_id: Uuid,
+        cutoff: DateTime<Utc>,
+    ) -> Result<u64, sqlx::Error>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let result = sqlx::query(
+            r"
+            DELETE FROM ssf_event_queue
+            WHERE tenant_id = $1 AND stream_id = $2 AND created_at < $3
+            ",
+        )
+        .bind(tenant_id)
+        .bind(stream_id)
+        .bind(cutoff)
+        .execute(executor)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
     /// Total queued SETs for a stream — used to compute `moreAvailable`.
     ///
     /// # Errors
