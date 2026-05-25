@@ -525,6 +525,10 @@ pub async fn api_key_auth_middleware(
         cnf: None,
         // RFC 9396: API keys carry coarse scopes, not authorization_details
         authorization_details: None,
+        // API keys are not interactive user authentication — no acr/amr/auth_time.
+        acr: None,
+        amr: None,
+        auth_time: None,
     };
 
     request.extensions_mut().insert(synthetic_claims);

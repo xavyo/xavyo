@@ -318,6 +318,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .expect("Token creation should succeed");
@@ -373,6 +374,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .expect("Token creation should succeed");
@@ -425,6 +427,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
                     user.user_id(),
                     user.tenant_id(),
                     vec!["user".to_string()],
+                    None,
                     None,
                     None,
                     None,
@@ -500,6 +503,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
                     None,
                     None,
                     None,
+                    None,
                 )
                 .await
                 .expect("Token creation should succeed");
@@ -539,6 +543,7 @@ RSiBP/6TepaXLEdSsrN4dARjpDeuV87IokbrVay54JWW0yTStzAzbLFcodp3sBNn
                     user.user_id(),
                     user.tenant_id(),
                     vec!["user".to_string()],
+                    None,
                     None,
                     None,
                     None,

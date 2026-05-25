@@ -1,5 +1,6 @@
 //! TOTP verification handler for login flow.
 
+use crate::services::AuthContext;
 use axum::{extract::State, http::StatusCode, Extension, Json};
 use std::net::IpAddr;
 use tracing::info;
@@ -86,6 +87,8 @@ pub async fn verify_totp(
             user.tenant_id(),
             roles,
             Some(user.email.clone()),
+            // Password + TOTP verified — multi-factor (acr "2").
+            Some(AuthContext::mfa_totp()),
             user_agent,
             ip_address,
         )

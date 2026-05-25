@@ -123,6 +123,9 @@ pub async fn provision_handler(
             new_tenant_id,
             vec!["super_admin".to_string()],
             Some(email.clone()),
+            // No interactive authentication occurred — the admin was provisioned,
+            // not logged in — so no acr/amr/auth_time is asserted.
+            None,
             user_agent.clone(),
             ip_address.as_deref().and_then(|ip| ip.parse().ok()),
         )

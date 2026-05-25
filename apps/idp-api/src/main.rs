@@ -1993,7 +1993,17 @@ impl xavyo_api_social::AuthService for SocialAuthAdapter {
 
         // Issue tokens with 15 minute access token, 7 day refresh token
         match token_service
-            .create_tokens(typed_user_id, typed_tenant_id, roles, email, None, None)
+            // Social/federated login — assurance was established by the external
+            // IdP, not by xavyo, so no acr/amr/auth_time is asserted here.
+            .create_tokens(
+                typed_user_id,
+                typed_tenant_id,
+                roles,
+                email,
+                None,
+                None,
+                None,
+            )
             .await
         {
             Ok((access_token, refresh_token, expires_in)) => {

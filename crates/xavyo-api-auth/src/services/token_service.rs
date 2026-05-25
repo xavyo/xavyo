@@ -33,6 +33,73 @@ pub const EMAIL_VERIFICATION_TOKEN_VALIDITY_HOURS: i64 = 24;
 /// Size of secure tokens in bytes (256 bits of entropy).
 pub const SECURE_TOKEN_BYTES: usize = 32;
 
+/// Authentication context captured when a user completes login, surfaced as the
+/// OIDC `acr` / `amr` / `auth_time` claims on the issued access token.
+///
+/// ACR is xavyo's scheme: `"1"` = single-factor, `"2"` = multi-factor satisfied
+/// (consumed by RFC 9470 step-up). `amr` values follow RFC 8176. The
+/// constructors are the single source of truth for the method→acr/amr mapping,
+/// so call sites just name the method they completed.
+#[derive(Debug, Clone)]
+pub struct AuthContext {
+    /// Authentication context class reference (`"1"` or `"2"`).
+    pub acr: String,
+    /// Authentication methods references (RFC 8176).
+    pub amr: Vec<String>,
+    /// When the end-user authentication occurred (Unix seconds).
+    pub auth_time: i64,
+}
+
+impl AuthContext {
+    fn now(acr: &str, amr: &[&str]) -> Self {
+        Self {
+            acr: acr.to_string(),
+            amr: amr.iter().map(|s| (*s).to_string()).collect(),
+            auth_time: Utc::now().timestamp(),
+        }
+    }
+
+    /// Password only — single factor.
+    #[must_use]
+    pub fn password() -> Self {
+        Self::now("1", &["pwd"])
+    }
+
+    /// Password + TOTP — multi-factor.
+    #[must_use]
+    pub fn mfa_totp() -> Self {
+        Self::now("2", &["pwd", "otp", "mfa"])
+    }
+
+    /// Password + MFA recovery code — multi-factor (proves prior MFA enrollment).
+    #[must_use]
+    pub fn mfa_recovery_code() -> Self {
+        Self::now("2", &["pwd", "mfa"])
+    }
+
+    /// WebAuthn / passkey — multi-factor, hardware-backed.
+    #[must_use]
+    pub fn webauthn() -> Self {
+        Self::now("2", &["mfa", "hwk"])
+    }
+
+    /// Passwordless email link / OTP — single factor (a one-time credential).
+    #[must_use]
+    pub fn passwordless() -> Self {
+        Self::now("1", &["otp"])
+    }
+
+    /// Reconstruct from stored values (e.g. carried forward across refresh).
+    #[must_use]
+    pub fn from_parts(acr: String, amr: Vec<String>, auth_time: i64) -> Self {
+        Self {
+            acr,
+            amr,
+            auth_time,
+        }
+    }
+}
+
 /// Configuration for JWT token generation.
 ///
 /// `private_key` is held inside `Arc<Zeroizing<Vec<u8>>>` so:
@@ -111,6 +178,8 @@ impl TokenService {
     /// * `tenant_id` - The user's tenant ID
     /// * `roles` - User's roles for the JWT claims
     /// * `email` - User's email address for the JWT claims
+    /// * `auth_context` - OIDC `acr`/`amr`/`auth_time` for interactive logins;
+    ///   `None` for non-interactive issuance (refresh re-issue, federated, etc.)
     /// * `user_agent` - Optional client user agent
     /// * `ip_address` - Optional client IP address
     ///
@@ -123,11 +192,13 @@ impl TokenService {
         tenant_id: TenantId,
         roles: Vec<String>,
         email: Option<String>,
+        auth_context: Option<AuthContext>,
         user_agent: Option<String>,
         ip_address: Option<IpAddr>,
     ) -> Result<(String, String, i64), ApiAuthError> {
         // Generate access token
-        let access_token = self.create_access_token(user_id, tenant_id, roles, email)?;
+        let access_token =
+            self.create_access_token(user_id, tenant_id, roles, email, auth_context.as_ref())?;
 
         // Generate refresh token
         let refresh_token = self
@@ -146,6 +217,7 @@ impl TokenService {
         tenant_id: TenantId,
         roles: Vec<String>,
         email: Option<String>,
+        auth_context: Option<&AuthContext>,
     ) -> Result<String, ApiAuthError> {
         let mut builder = JwtClaims::builder()
             .subject(user_id.to_string())
@@ -157,6 +229,18 @@ impl TokenService {
 
         if let Some(email) = email {
             builder = builder.email(email);
+        }
+
+        // OIDC authentication context (acr/amr/auth_time). Emitted on
+        // interactive-login tokens (always present there, so resource-side
+        // step-up logic is uniform); absent when None — e.g. the refresh
+        // re-issue path, which cannot yet carry forward the original context
+        // (a follow-up will store + forward it).
+        if let Some(ctx) = auth_context {
+            builder = builder
+                .acr(&ctx.acr)
+                .amr(ctx.amr.clone())
+                .auth_time(ctx.auth_time);
         }
 
         let claims = builder.build();
@@ -363,8 +447,16 @@ impl TokenService {
         let user_id = UserId::from_uuid(token.user_id);
         let tenant_id = TenantId::from_uuid(token.tenant_id);
 
-        self.create_tokens(user_id, tenant_id, roles, email, user_agent, ip_address)
-            .await
+        // FOLLOW-UP (acr/amr/auth_time): the refresh re-issue path cannot yet
+        // carry forward the original authentication context — refresh_tokens does
+        // not store it — so refreshed access tokens currently drop acr/amr/
+        // auth_time. Must be fixed (store at issuance, forward here) before
+        // step-up auth (RFC 9470) ships, or post-refresh tokens would fail
+        // step-up checks.
+        self.create_tokens(
+            user_id, tenant_id, roles, email, None, user_agent, ip_address,
+        )
+        .await
     }
 
     /// Revoke a refresh token by its opaque value.
@@ -593,5 +685,32 @@ mod tests {
         assert_eq!(hash.len(), 64);
         // Token should verify against its hash
         assert!(verify_token_hash_constant_time(&token, &hash));
+    }
+
+    #[test]
+    fn auth_context_constructors_map_method_to_acr_amr() {
+        // Single-factor methods → acr "1".
+        assert_eq!(AuthContext::password().acr, "1");
+        assert_eq!(AuthContext::password().amr, vec!["pwd".to_string()]);
+        assert_eq!(AuthContext::passwordless().acr, "1");
+        assert_eq!(AuthContext::passwordless().amr, vec!["otp".to_string()]);
+
+        // Multi-factor methods → acr "2", with an "mfa" amr value so resource
+        // step-up checks can be `amr.contains("mfa")`.
+        for ctx in [
+            AuthContext::mfa_totp(),
+            AuthContext::mfa_recovery_code(),
+            AuthContext::webauthn(),
+        ] {
+            assert_eq!(ctx.acr, "2", "MFA methods must be acr 2");
+            assert!(
+                ctx.amr.iter().any(|m| m == "mfa"),
+                "MFA methods must include the 'mfa' amr value, got {:?}",
+                ctx.amr
+            );
+        }
+
+        // auth_time is populated for fresh logins.
+        assert!(AuthContext::password().auth_time > 0);
     }
 }

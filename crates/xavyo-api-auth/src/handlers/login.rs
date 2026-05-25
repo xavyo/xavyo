@@ -6,9 +6,9 @@ use crate::error::ApiAuthError;
 use crate::models::{LoginRequest, MfaMethod, MfaRequiredResponse, TokenResponse};
 use crate::services::security_audit::{SecurityAudit, SecurityEventType};
 use crate::services::{
-    AlertService, AuditService, AuthService, DevicePolicyService, DeviceService, LockoutService,
-    LoginRiskContext, MfaService, RecordLoginAttemptInput, RiskEnforcementService, SessionService,
-    TokenService, WebAuthnService,
+    AlertService, AuditService, AuthContext, AuthService, DevicePolicyService, DeviceService,
+    LockoutService, LoginRiskContext, MfaService, RecordLoginAttemptInput, RiskEnforcementService,
+    SessionService, TokenService, WebAuthnService,
 };
 use axum::extract::FromRequest;
 use axum::http::StatusCode;
@@ -543,6 +543,9 @@ pub async fn login_handler(
             tenant_id_val,
             roles,
             Some(request.email.clone()),
+            // This path issues a full token only when MFA is not required, i.e.
+            // single-factor password authentication (acr "1").
+            Some(AuthContext::password()),
             user_agent.clone(),
             ip_address,
         )

@@ -6,7 +6,7 @@
 use crate::error::ApiAuthError;
 use crate::services::email_service::EmailSender;
 use crate::services::token_service::{
-    generate_secure_token, hash_token, verify_token_hash_constant_time, TokenService,
+    generate_secure_token, hash_token, verify_token_hash_constant_time, AuthContext, TokenService,
 };
 use chrono::{Duration, Utc};
 use parking_lot::Mutex;
@@ -553,7 +553,16 @@ impl PasswordlessService {
 
         let (access_token, refresh_token, expires_in) = self
             .token_service
-            .create_tokens(uid, tid, roles, email, user_agent.map(String::from), ip)
+            .create_tokens(
+                uid,
+                tid,
+                roles,
+                email,
+                // Passwordless email link/OTP — single factor (acr "1").
+                Some(AuthContext::passwordless()),
+                user_agent.map(String::from),
+                ip,
+            )
             .await?;
 
         Ok(PasswordlessVerifyResult::Success {
