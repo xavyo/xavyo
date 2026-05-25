@@ -580,6 +580,11 @@ pub struct Config {
     /// SECURITY: This MUST be generated independently of the JWT signing key.
     pub csrf_secret: [u8; 32],
 
+    /// Whether DPoP-bound requests must carry a server-issued nonce (RFC 9449
+    /// §8–9). Env `DPOP_NONCE_REQUIRED`, default `true`. FAPI clients always
+    /// require a nonce regardless of this flag.
+    pub dpop_nonce_required: bool,
+
     /// Kafka configuration (optional - only if `KAFKA_BOOTSTRAP_SERVERS` is set)
     pub kafka: Option<KafkaConfig>,
 
@@ -772,6 +777,12 @@ impl Config {
             }),
         )?;
 
+        // DPoP-Nonce requirement (RFC 9449 §8–9). Default on; FAPI clients always
+        // require a nonce regardless. Set DPOP_NONCE_REQUIRED=false to disable.
+        let dpop_nonce_required = env::var("DPOP_NONCE_REQUIRED")
+            .map(|s| !matches!(s.to_lowercase().as_str(), "false" | "0" | "no"))
+            .unwrap_or(true);
+
         // Kafka configuration (optional - only enabled if KAFKA_BOOTSTRAP_SERVERS is set)
         let kafka = env::var("KAFKA_BOOTSTRAP_SERVERS")
             .ok()
@@ -835,6 +846,7 @@ impl Config {
             connector_encryption_key,
             webhook_encryption_key,
             csrf_secret,
+            dpop_nonce_required,
             kafka,
             otel,
             secret_provider: None,
@@ -1258,6 +1270,7 @@ mod tests {
             connector_encryption_key: [0x33u8; 32],
             webhook_encryption_key: [0x44u8; 32],
             csrf_secret: [0x55u8; 32],
+            dpop_nonce_required: true,
             kafka: None,
             otel: OtelConfig {
                 otlp_endpoint: None,
@@ -1310,6 +1323,7 @@ mod tests {
             connector_encryption_key: [0xDDu8; 32],
             webhook_encryption_key: [0xEEu8; 32],
             csrf_secret: [0xFFu8; 32],
+            dpop_nonce_required: true,
             kafka: None,
             otel: OtelConfig {
                 otlp_endpoint: None,

@@ -75,6 +75,29 @@ pub async fn enforce_dpop(
         OAuthError::InvalidToken("invalid DPoP proof".to_string())
     })?;
 
+    // RFC 9449 §8: once the proof is cryptographically valid, require a fresh
+    // server-issued nonce when configured. Checked BEFORE the jti replay-record
+    // so a nonce-failed request never consumes a replay-cache slot, and only
+    // after full proof validation so it cannot act as an oracle for
+    // unauthenticated callers.
+    if state.dpop_nonce_required() {
+        if let xavyo_auth::NonceCheck::Challenge(nonce) = xavyo_auth::check_or_challenge(
+            state.dpop_nonce_secret(),
+            validated.nonce.as_deref(),
+            Utc::now().timestamp(),
+            xavyo_auth::DPOP_NONCE_WINDOW_SECS,
+            xavyo_auth::DPOP_NONCE_ALLOWED_AGE_WINDOWS,
+        ) {
+            tracing::info!(
+                target: "security",
+                event_type = "dpop_nonce_challenge",
+                endpoint = "resource",
+                "issued DPoP-Nonce challenge"
+            );
+            return Err(OAuthError::UseDpopNonceResource { nonce });
+        }
+    }
+
     // Replay check, tenant-scoped (tenant from the presented access token).
     let tenant_id = claims
         .tid

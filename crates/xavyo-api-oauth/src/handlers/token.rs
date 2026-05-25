@@ -135,11 +135,8 @@ async fn handle_authorization_code_grant(
     client_id: &str,
     client_secret: Option<&str>,
 ) -> Result<Json<TokenResponse>, OAuthError> {
-    // DPoP (RFC 9449): if the client presents a proof, validate it against this
-    // token request and bind the issued token to the proof key (opportunistic
-    // binding). Clients with `require_dpop` / FAPI 2.0 (§5.3.2.1-5) MUST present
-    // one — enforced below once the client is loaded.
-    let dpop_jkt = extract_dpop_binding(state, headers)?;
+    // DPoP binding is extracted below, after the client is loaded, so the
+    // nonce requirement can honour the per-client FAPI profile.
     // Validate required parameters
     let code = request
         .code
@@ -169,6 +166,15 @@ async fn handle_authorization_code_grant(
         .client_service
         .get_client_by_id(tenant_id, client_uuid)
         .await?;
+
+    // DPoP (RFC 9449): validate any presented proof and bind the issued token to
+    // the proof key (opportunistic binding). FAPI clients always get the nonce
+    // challenge regardless of the global toggle (FAPI 2.0 §5.3).
+    let dpop_jkt = extract_dpop_binding(
+        state,
+        headers,
+        state.dpop_nonce_required() || client.fapi_profile,
+    )?;
 
     // RFC 9449 / FAPI 2.0 §5.3.2.1-5: clients that require sender-constrained
     // tokens MUST present a DPoP proof. Reject a bare (bearer) token request.
@@ -282,22 +288,45 @@ async fn handle_authorization_code_grant(
 fn extract_dpop_binding(
     state: &OAuthState,
     headers: &HeaderMap,
+    nonce_required: bool,
 ) -> Result<Option<String>, OAuthError> {
     let Some(proof) = headers.get("dpop").and_then(|v| v.to_str().ok()) else {
         return Ok(None);
     };
+    let now = chrono::Utc::now().timestamp();
     let htu = format!("{}/oauth/token", state.issuer.trim_end_matches('/'));
     let validated =
-        xavyo_auth::dpop::validate_proof(proof, "POST", &htu, chrono::Utc::now().timestamp(), None)
-            .map_err(|e| {
-                tracing::warn!(
-                    target: "security",
-                    event_type = "dpop_proof_invalid",
-                    error = %e,
-                    "DPoP proof rejected at token endpoint"
-                );
-                OAuthError::InvalidGrant("invalid DPoP proof".to_string())
-            })?;
+        xavyo_auth::dpop::validate_proof(proof, "POST", &htu, now, None).map_err(|e| {
+            tracing::warn!(
+                target: "security",
+                event_type = "dpop_proof_invalid",
+                error = %e,
+                "DPoP proof rejected at token endpoint"
+            );
+            OAuthError::InvalidGrant("invalid DPoP proof".to_string())
+        })?;
+
+    // RFC 9449 §9: after the proof is cryptographically valid, require a fresh
+    // server-issued nonce when configured. A missing/stale nonce yields a
+    // `use_dpop_nonce` challenge carrying a new nonce; the client retries.
+    if nonce_required {
+        if let xavyo_auth::NonceCheck::Challenge(nonce) = xavyo_auth::check_or_challenge(
+            state.dpop_nonce_secret(),
+            validated.nonce.as_deref(),
+            now,
+            xavyo_auth::DPOP_NONCE_WINDOW_SECS,
+            xavyo_auth::DPOP_NONCE_ALLOWED_AGE_WINDOWS,
+        ) {
+            tracing::info!(
+                target: "security",
+                event_type = "dpop_nonce_challenge",
+                endpoint = "token",
+                "issued DPoP-Nonce challenge"
+            );
+            return Err(OAuthError::UseDpopNonceToken { nonce });
+        }
+    }
+
     Ok(Some(validated.jkt))
 }
 
@@ -479,7 +508,11 @@ async fn handle_client_credentials_grant(
     // Sender-constrain the issued token to the client's DPoP key / mTLS cert
     // when presented (RFC 9449 / RFC 8705) — agent tokens shouldn't be bearer.
     // `cert_thumbprint` was extracted above for client authentication.
-    let dpop_jkt = extract_dpop_binding(state, headers)?;
+    let dpop_jkt = extract_dpop_binding(
+        state,
+        headers,
+        state.dpop_nonce_required() || client.fapi_profile,
+    )?;
 
     // Issue tokens for client credentials grant
     // If the client is bound to an NHI identity, the NHI ID becomes the JWT subject
@@ -607,14 +640,16 @@ async fn handle_refresh_token_grant(
     let tenant_id = extract_tenant_id_from_headers(headers)?;
 
     // For confidential clients, verify the secret
-    // For public clients, validate the client exists and belongs to the tenant
-    let client_internal_id = if let Some(secret) = client_secret {
+    // For public clients, validate the client exists and belongs to the tenant.
+    // Retain `fapi_profile` so the DPoP-nonce requirement below honours FAPI 2.0
+    // even when the global toggle is off.
+    let (client_internal_id, client_fapi) = if let Some(secret) = client_secret {
         // Confidential client - verify credentials
         let client = state
             .client_service
             .verify_client_credentials(tenant_id, client_id, secret)
             .await?;
-        client.id
+        (client.id, client.fapi_profile)
     } else {
         // Public client - verify the client exists in this tenant
         // R8-F2: Use the looked-up client's internal ID (not the parsed client_id string).
@@ -628,7 +663,7 @@ async fn handle_refresh_token_grant(
             .map_err(|_| {
                 OAuthError::InvalidClient("Client not found in specified tenant".to_string())
             })?;
-        client.id
+        (client.id, client.fapi_profile)
     };
 
     // Validate and rotate the refresh token
@@ -639,7 +674,8 @@ async fn handle_refresh_token_grant(
 
     // Re-bind the new access token to the DPoP key / mTLS cert presented at the
     // refresh request (RFC 9449 / RFC 8705) — sender-constraint carries forward.
-    let dpop_jkt = extract_dpop_binding(state, headers)?;
+    let dpop_jkt =
+        extract_dpop_binding(state, headers, state.dpop_nonce_required() || client_fapi)?;
     let cert_thumbprint = headers
         .get("x-client-cert-thumbprint")
         .and_then(|v| v.to_str().ok());
@@ -972,7 +1008,11 @@ async fn handle_token_exchange_grant(
 
     // Sender-constrain the delegated (agent) token to the DPoP key / mTLS cert
     // presented at the exchange (RFC 9449 / RFC 8705).
-    let dpop_jkt = extract_dpop_binding(state, headers)?;
+    let dpop_jkt = extract_dpop_binding(
+        state,
+        headers,
+        state.dpop_nonce_required() || client.fapi_profile,
+    )?;
     let cert_thumbprint = headers
         .get("x-client-cert-thumbprint")
         .and_then(|v| v.to_str().ok());
