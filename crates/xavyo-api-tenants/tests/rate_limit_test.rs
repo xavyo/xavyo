@@ -96,14 +96,14 @@ fn test_remaining_attempts_tracking() {
         "New IP should have full quota"
     );
 
-    // After 3 attempts, should have 7 remaining
+    // After 3 attempts, should have 97 remaining
     for _ in 0..3 {
         limiter.record_attempt(ip);
     }
     assert_eq!(
         limiter.remaining_attempts(ip),
         PROVISION_RATE_LIMIT_MAX - 3,
-        "Should have 7 remaining after 3 attempts"
+        "Should have 97 remaining after 3 attempts"
     );
 
     // After exhausting, should have 0 remaining
@@ -146,7 +146,7 @@ fn test_rate_limiter_thread_safety() {
         assert_eq!(
             remaining,
             PROVISION_RATE_LIMIT_MAX - 3,
-            "Each IP should have 7 remaining attempts"
+            "Each IP should have 97 remaining attempts"
         );
     }
 }
