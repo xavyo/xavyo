@@ -153,6 +153,7 @@ let app = Router::new()
 - Never tell a user to check email for a device confirmation that was not created and sent
 - Never mail a device-confirmation link with an empty token or `/oauth/device/confirm` (router is `/device/confirm`)
 - Never validate or resend device confirmations under `system_tenant_id` when the record belongs to another tenant
+- Never trust `X-Forwarded-For` / `X-Real-IP` / `CF-Connecting-IP` for Storm-2372 device risk scoring unless `TrustXff` is set
 
 ## Related Crates
 
