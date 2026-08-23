@@ -17,12 +17,12 @@ impl EnableUserExecutor {
         Self
     }
 
-    /// Check if the user is currently active.
+    /// Check if the user is currently active. `None` if the user is not in this tenant.
     async fn is_user_active(
         pool: &PgPool,
         tenant_id: Uuid,
         user_id: Uuid,
-    ) -> Result<bool, sqlx::Error> {
+    ) -> Result<Option<bool>, sqlx::Error> {
         let result: Option<(bool,)> =
             sqlx::query_as("SELECT is_active FROM users WHERE id = $1 AND tenant_id = $2")
                 .bind(user_id)
@@ -30,7 +30,7 @@ impl EnableUserExecutor {
                 .fetch_optional(pool)
                 .await?;
 
-        Ok(result.map(|(active,)| active).unwrap_or(false))
+        Ok(result.map(|(active,)| active))
     }
 
     /// Enable the user.
@@ -72,13 +72,14 @@ impl ActionExecutor for EnableUserExecutor {
         let tenant_id = ctx.tenant_id;
         // Check current state
         match Self::is_user_active(pool, tenant_id, target_user_id).await {
-            Ok(true) => {
+            Ok(Some(true)) => {
                 // User already active - skip
                 return ExecutionResult::skipped(serde_json::json!({"is_active": true}));
             }
-            Ok(false) => {
+            Ok(Some(false)) => {
                 // Proceed with enable
             }
+            Ok(None) => return ExecutionResult::failure("User not found"),
             Err(e) => return ExecutionResult::failure(format!("Failed to check user status: {e}")),
         }
 
@@ -104,13 +105,13 @@ impl ActionExecutor for EnableUserExecutor {
         _params: &serde_json::Value,
     ) -> (bool, Option<serde_json::Value>, Option<serde_json::Value>) {
         match Self::is_user_active(pool, ctx.tenant_id, target_user_id).await {
-            Ok(true) => (false, Some(serde_json::json!({"is_active": true})), None),
-            Ok(false) => (
+            Ok(Some(true)) => (false, Some(serde_json::json!({"is_active": true})), None),
+            Ok(Some(false)) => (
                 true,
                 Some(serde_json::json!({"is_active": false})),
                 Some(serde_json::json!({"is_active": true})),
             ),
-            Err(_) => (false, None, None),
+            Ok(None) | Err(_) => (false, None, None),
         }
     }
 
@@ -127,5 +128,19 @@ mod tests {
     fn test_executor_action_type() {
         let executor = EnableUserExecutor::new();
         assert_eq!(executor.action_type(), "enable");
+    }
+
+    #[test]
+    fn missing_user_is_not_treated_as_inactive() {
+        let src = include_str!("enable_user.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("Ok(None) => return ExecutionResult::failure(\"User not found\")"),
+            "missing users must fail, not skip as already active"
+        );
+        assert!(
+            !production.contains("unwrap_or(false)"),
+            "must not treat a missing user as inactive"
+        );
     }
 }

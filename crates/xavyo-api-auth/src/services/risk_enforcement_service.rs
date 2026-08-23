@@ -508,7 +508,7 @@ impl RiskEnforcementService {
                 &factor.factor_type,
             )
             .await
-            .unwrap_or(0.0);
+            .map_err(|e| RiskEnforcementError::DatabaseError(e.to_string()))?;
 
             // Normalize to 0-10 range (cap at 10)
             let normalized = value.min(10.0);
@@ -727,6 +727,27 @@ mod tests {
         assert!(
             !production.contains("proceeding with fail-open"),
             "must not skip enforcement after a risk-eval error"
+        );
+    }
+
+    #[test]
+    fn calculate_score_does_not_fail_open_on_event_sum() {
+        let src = include_str!("risk_enforcement_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let calc = production
+            .split("fn calculate_score")
+            .nth(1)
+            .expect("calculate_score")
+            .split("fn determine_action")
+            .next()
+            .expect("calculate_score body");
+        assert!(
+            calc.contains("map_err(|e| RiskEnforcementError::DatabaseError"),
+            "event sum errors must fail closed"
+        );
+        assert!(
+            !calc.contains("unwrap_or(0.0)"),
+            "must not treat missing risk events as score 0"
         );
     }
 

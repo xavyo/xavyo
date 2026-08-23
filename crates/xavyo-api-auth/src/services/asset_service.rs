@@ -124,9 +124,10 @@ impl AssetService {
             .ok_or(ApiAuthError::AssetNotFound)?;
 
         // Check if asset is in use
-        let is_referenced = BrandingAsset::is_referenced(&self.pool, &asset.storage_path)
-            .await
-            .map_err(ApiAuthError::Database)?;
+        let is_referenced =
+            BrandingAsset::is_referenced(&self.pool, tenant_id, &asset.storage_path)
+                .await
+                .map_err(ApiAuthError::Database)?;
 
         if is_referenced {
             return Err(ApiAuthError::AssetInUse(format!(
@@ -259,5 +260,15 @@ mod tests {
         assert_eq!(content_type_to_extension("image/webp"), "webp");
         assert_eq!(content_type_to_extension("image/svg+xml"), "svg");
         assert_eq!(content_type_to_extension("application/octet-stream"), "bin");
+    }
+
+    #[test]
+    fn delete_asset_reference_check_passes_tenant_id() {
+        let src = include_str!("asset_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("is_referenced(&self.pool, tenant_id, &asset.storage_path)"),
+            "branding reference check must pass tenant_id"
+        );
     }
 }

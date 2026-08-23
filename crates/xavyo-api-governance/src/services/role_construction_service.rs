@@ -288,15 +288,13 @@ impl RoleConstructionService {
         Ok(())
     }
 
-    /// Validate that a connector exists.
-    /// For now, we just verify the UUID format is valid.
-    /// In the future, this could check against the connectors table.
-    async fn validate_connector(&self, _tenant_id: Uuid, connector_id: Uuid) -> Result<()> {
-        // Check if connector exists in connectors table
+    /// Validate that a connector exists in this tenant.
+    async fn validate_connector(&self, tenant_id: Uuid, connector_id: Uuid) -> Result<()> {
         let exists: bool = sqlx::query_scalar(
-            r"SELECT EXISTS(SELECT 1 FROM connector_configurations WHERE id = $1)",
+            r"SELECT EXISTS(SELECT 1 FROM connector_configurations WHERE id = $1 AND tenant_id = $2)",
         )
         .bind(connector_id)
+        .bind(tenant_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -317,5 +315,19 @@ mod tests {
     fn test_service_creation() {
         // This is a compile-time test to ensure the service can be created
         // Actual database tests would require a test database setup
+    }
+
+    #[test]
+    fn validate_connector_scopes_by_tenant() {
+        let src = include_str!("role_construction_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("FROM connector_configurations WHERE id = $1 AND tenant_id = $2"),
+            "connector lookup must include tenant_id"
+        );
+        assert!(
+            !production.contains("FROM connector_configurations WHERE id = $1)"),
+            "must not look up connectors by id alone"
+        );
     }
 }

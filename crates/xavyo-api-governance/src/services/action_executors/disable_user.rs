@@ -17,12 +17,12 @@ impl DisableUserExecutor {
         Self
     }
 
-    /// Check if the user is currently active.
+    /// Check if the user is currently active. `None` if the user is not in this tenant.
     async fn is_user_active(
         pool: &PgPool,
         tenant_id: Uuid,
         user_id: Uuid,
-    ) -> Result<bool, sqlx::Error> {
+    ) -> Result<Option<bool>, sqlx::Error> {
         let result: Option<(bool,)> =
             sqlx::query_as("SELECT is_active FROM users WHERE id = $1 AND tenant_id = $2")
                 .bind(user_id)
@@ -30,7 +30,7 @@ impl DisableUserExecutor {
                 .fetch_optional(pool)
                 .await?;
 
-        Ok(result.map(|(active,)| active).unwrap_or(false))
+        Ok(result.map(|(active,)| active))
     }
 
     /// Disable the user.
@@ -92,13 +92,14 @@ impl ActionExecutor for DisableUserExecutor {
         let tenant_id = ctx.tenant_id;
         // Check current state
         match Self::is_user_active(pool, tenant_id, target_user_id).await {
-            Ok(false) => {
+            Ok(Some(false)) => {
                 // User already disabled - skip
                 return ExecutionResult::skipped(serde_json::json!({"is_active": false}));
             }
-            Ok(true) => {
+            Ok(Some(true)) => {
                 // Proceed with disable
             }
+            Ok(None) => return ExecutionResult::failure("User not found"),
             Err(e) => return ExecutionResult::failure(format!("Failed to check user status: {e}")),
         }
 
@@ -140,13 +141,13 @@ impl ActionExecutor for DisableUserExecutor {
         _params: &serde_json::Value,
     ) -> (bool, Option<serde_json::Value>, Option<serde_json::Value>) {
         match Self::is_user_active(pool, ctx.tenant_id, target_user_id).await {
-            Ok(false) => (false, Some(serde_json::json!({"is_active": false})), None),
-            Ok(true) => (
+            Ok(Some(false)) => (false, Some(serde_json::json!({"is_active": false})), None),
+            Ok(Some(true)) => (
                 true,
                 Some(serde_json::json!({"is_active": true})),
                 Some(serde_json::json!({"is_active": false})),
             ),
-            Err(_) => (false, None, None),
+            Ok(None) | Err(_) => (false, None, None),
         }
     }
 
@@ -176,6 +177,20 @@ mod tests {
         assert!(
             !production.contains("unwrap_or(0)"),
             "must not treat session terminate errors as zero sessions"
+        );
+    }
+
+    #[test]
+    fn missing_user_is_not_treated_as_inactive() {
+        let src = include_str!("disable_user.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("Ok(None) => return ExecutionResult::failure(\"User not found\")"),
+            "missing users must fail, not skip as already disabled"
+        );
+        assert!(
+            !production.contains("unwrap_or(false)"),
+            "must not treat a missing user as inactive"
         );
     }
 }
