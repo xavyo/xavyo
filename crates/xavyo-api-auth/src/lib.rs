@@ -57,6 +57,7 @@ pub use services::{
     hash_token,
     normalize_email,
     parse_user_agent,
+    risk_eval_on_error,
     validate_email,
     validate_password,
     verify_token_hash_constant_time,

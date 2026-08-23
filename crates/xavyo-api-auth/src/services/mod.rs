@@ -71,8 +71,8 @@ pub use passwordless_service::{
 };
 pub use profile_service::ProfileService;
 pub use risk_enforcement_service::{
-    EnforcementAction, EnforcementDecision, LoginRiskContext, RiskEnforcementError,
-    RiskEnforcementService,
+    risk_eval_on_error, EnforcementAction, EnforcementDecision, LoginRiskContext,
+    RiskEnforcementError, RiskEnforcementService,
 };
 #[cfg(feature = "aws-ses")]
 pub use ses_email_service::{SesEmailConfig, SesEmailSender};

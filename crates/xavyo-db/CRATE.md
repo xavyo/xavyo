@@ -126,6 +126,7 @@ tx.commit().await?;
 - Never use raw SQL for JOINs without tenant filters on both sides
 - Never commit transactions without proper error handling
 - Never store `TenantConnection` across await points
+- Never default risk-enforcement `fail_open` to true (login must refuse on eval errors)
 
 ## Related Crates
 
