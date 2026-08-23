@@ -883,7 +883,7 @@ mod lifecycle_tests {
 
             // Get event actions
             let actions = lifecycle_service
-                .get_event_actions(event.id)
+                .get_event_actions(tenant_id, event.id)
                 .await
                 .expect("Failed to get actions");
 

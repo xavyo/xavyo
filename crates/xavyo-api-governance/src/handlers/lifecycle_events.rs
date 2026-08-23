@@ -95,17 +95,20 @@ pub async fn get_event(
 
     let event = state.lifecycle_event_service.get(tenant_id, id).await?;
 
-    let actions = state.lifecycle_event_service.get_event_actions(id).await?;
+    let actions = state
+        .lifecycle_event_service
+        .get_event_actions(tenant_id, id)
+        .await?;
 
-    // Get snapshot if one exists for this event
+    // Get snapshot if one exists for this event. Lookup errors must not hide
+    // as "no snapshot".
     let snapshot = xavyo_db::GovAccessSnapshot::find_by_event(
         state.lifecycle_event_service.pool(),
         tenant_id,
         id,
     )
     .await
-    .ok()
-    .flatten()
+    .map_err(ApiGovernanceError::Database)?
     .map(crate::models::AccessSnapshotSummary::from);
 
     Ok(Json(LifecycleEventWithActionsResponse {
@@ -239,4 +242,36 @@ pub async fn trigger_event(
         .await?;
 
     Ok(Json(result))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn get_event_scopes_actions_and_snapshot() {
+        let src = include_str!("lifecycle_events.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let get_event = production
+            .split("pub async fn get_event")
+            .nth(1)
+            .expect("get_event")
+            .split("/// Create a lifecycle event")
+            .next()
+            .expect("get_event body");
+        assert!(
+            get_event.contains("get_event_actions(tenant_id, id)"),
+            "event actions lookup must pass tenant_id"
+        );
+        assert!(
+            get_event.contains("map_err(ApiGovernanceError::Database)"),
+            "snapshot lookup errors must fail closed"
+        );
+        assert!(
+            !get_event.contains(".ok()\n    .flatten()"),
+            "must not hide snapshot lookup errors as missing snapshot"
+        );
+        assert!(
+            !get_event.contains("get_event_actions(id)"),
+            "must not list event actions by id alone"
+        );
+    }
 }

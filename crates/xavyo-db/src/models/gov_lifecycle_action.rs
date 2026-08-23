@@ -130,18 +130,20 @@ impl GovLifecycleAction {
         .await
     }
 
-    /// List actions for an event.
+    /// List actions for an event within a tenant.
     pub async fn list_by_event(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         event_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
             SELECT * FROM gov_lifecycle_actions
-            WHERE event_id = $1
+            WHERE tenant_id = $1 AND event_id = $2
             ORDER BY created_at ASC
             ",
         )
+        .bind(tenant_id)
         .bind(event_id)
         .fetch_all(pool)
         .await
@@ -385,6 +387,27 @@ impl GovLifecycleAction {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn list_by_event_scopes_by_tenant() {
+        let src = include_str!("gov_lifecycle_action.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("pub async fn list_by_event")
+            .nth(1)
+            .expect("list_by_event")
+            .split("pub async fn list_by_tenant")
+            .next()
+            .expect("list_by_event body");
+        assert!(
+            lookup.contains("WHERE tenant_id = $1 AND event_id = $2"),
+            "lifecycle action listing must include tenant_id"
+        );
+        assert!(
+            !lookup.contains("WHERE event_id = $1"),
+            "must not list lifecycle actions by event_id alone"
+        );
+    }
 
     #[test]
     fn test_action_type_methods() {
