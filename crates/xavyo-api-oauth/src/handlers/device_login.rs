@@ -16,13 +16,15 @@ use crate::middleware::session_cookie::{
 use crate::models::{DeviceLoginErrorResponse, DeviceLoginRequest, DeviceMfaRequest};
 use crate::router::OAuthState;
 use crate::services::DeviceCodeService;
+use crate::utils::extract_origin_ip;
 use axum::{
-    extract::{Query, State},
+    extract::{ConnectInfo, Query, State},
     http::{header::SET_COOKIE, HeaderMap, HeaderValue},
     response::{Html, IntoResponse, Redirect, Response},
     Extension, Form,
 };
 use serde::Deserialize;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -30,6 +32,7 @@ use validator::Validate;
 use xavyo_api_auth::services::{
     AuditService, AuthService, LockoutService, MfaService, SessionService,
 };
+use xavyo_api_auth::TrustXff;
 use xavyo_core::TenantId;
 use xavyo_db::{AuthMethod, FailureReason};
 
@@ -61,6 +64,25 @@ fn extract_tenant_id(headers: &HeaderMap) -> Result<Uuid, DeviceLoginErrorRespon
 
     Uuid::parse_str(tenant_str)
         .map_err(|_| DeviceLoginErrorResponse::validation_error("X-Tenant-ID must be a valid UUID"))
+}
+
+/// Peer IP for lockout, MFA, and session records.
+///
+/// Forwarded headers are used only when `TrustXff` is set.
+fn device_client_ip(
+    headers: &HeaderMap,
+    connect_info: Option<&ConnectInfo<SocketAddr>>,
+    trust_xff: bool,
+) -> Option<String> {
+    extract_origin_ip(headers, connect_info.map(|ci| &ci.0), trust_xff)
+}
+
+fn device_client_ip_addr(
+    headers: &HeaderMap,
+    connect_info: Option<&ConnectInfo<SocketAddr>>,
+    trust_xff: bool,
+) -> Option<IpAddr> {
+    device_client_ip(headers, connect_info, trust_xff).and_then(|s| s.parse().ok())
 }
 
 /// Display login form during device code flow.
@@ -266,6 +288,8 @@ pub async fn device_login_handler(
     Extension(mfa_service): Extension<Arc<MfaService>>,
     Extension(audit_service): Extension<Arc<AuditService>>,
     headers: HeaderMap,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
+    trust_xff: Option<Extension<TrustXff>>,
     Form(request): Form<DeviceLoginRequest>,
 ) -> Response {
     // Determine secure flag based on environment
@@ -337,13 +361,8 @@ pub async fn device_login_handler(
 
     let tenant_id_typed = TenantId::from_uuid(tenant_id);
 
-    // Extract client info for audit
-    let ip_address = headers
-        .get("X-Forwarded-For")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.split(',').next())
-        .and_then(|s| s.trim().parse().ok());
-    let ip_str = ip_address.map(|ip: std::net::IpAddr| ip.to_string());
+    // Extract client info for audit / lockout (peer IP unless TrustXff)
+    let ip_str = device_client_ip(&headers, connect_info.as_ref(), trust_xff.is_some());
     let user_agent = headers
         .get(axum::http::header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
@@ -810,6 +829,8 @@ pub async fn device_mfa_handler(
     Extension(mfa_service): Extension<Arc<MfaService>>,
     Extension(audit_service): Extension<Arc<AuditService>>,
     headers: HeaderMap,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
+    trust_xff: Option<Extension<TrustXff>>,
     Form(request): Form<DeviceMfaRequest>,
 ) -> Response {
     // Determine secure flag based on environment
@@ -884,12 +905,8 @@ pub async fn device_mfa_handler(
             }
         };
 
-    // Extract client info for MFA verification
-    let ip_for_mfa = headers
-        .get("X-Forwarded-For")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.split(',').next())
-        .and_then(|s| s.trim().parse::<std::net::IpAddr>().ok());
+    // Extract client info for MFA verification (peer IP unless TrustXff)
+    let ip_for_mfa = device_client_ip_addr(&headers, connect_info.as_ref(), trust_xff.is_some());
     let user_agent_for_mfa = headers
         .get(axum::http::header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
@@ -925,12 +942,8 @@ pub async fn device_mfa_handler(
     // Delete MFA session
     let _ = delete_mfa_session(&state.pool, request.mfa_session_id, tenant_id).await;
 
-    // Extract client info for session
-    let ip_str = headers
-        .get("X-Forwarded-For")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.split(',').next())
-        .map(|s| s.trim().to_string());
+    // Extract client info for session (peer IP unless TrustXff)
+    let ip_str = device_client_ip(&headers, connect_info.as_ref(), trust_xff.is_some());
     let user_agent = headers
         .get(axum::http::header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
@@ -1159,5 +1172,40 @@ mod tests {
 
         let result = extract_tenant_id(&headers);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn untrusted_xff_does_not_override_peer_ip() {
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Forwarded-For", HeaderValue::from_static("10.0.0.1"));
+        let peer = SocketAddr::from(([203, 0, 113, 10], 443));
+        let connect = ConnectInfo(peer);
+        let ip = device_client_ip(&headers, Some(&connect), false);
+        assert_eq!(ip.as_deref(), Some("203.0.113.10"));
+        assert_eq!(device_client_ip(&headers, None, false), None);
+    }
+
+    #[test]
+    fn trusted_xff_is_used_when_trust_xff() {
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Forwarded-For", HeaderValue::from_static("10.0.0.1"));
+        let peer = SocketAddr::from(([203, 0, 113, 10], 443));
+        let connect = ConnectInfo(peer);
+        let ip = device_client_ip(&headers, Some(&connect), true);
+        assert_eq!(ip.as_deref(), Some("10.0.0.1"));
+    }
+
+    #[test]
+    fn device_login_handlers_do_not_read_xff_directly() {
+        let src = include_str!("device_login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("device_client_ip"),
+            "login/MFA must use fail-closed IP extraction"
+        );
+        assert!(
+            !production.contains("\"X-Forwarded-For\""),
+            "must not read X-Forwarded-For without TrustXff"
+        );
     }
 }
