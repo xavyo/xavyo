@@ -169,16 +169,21 @@ impl EmailChangeRequest {
     }
 
     /// Mark the request as verified.
-    pub async fn mark_verified(pool: &sqlx::PgPool, id: uuid::Uuid) -> Result<Self, sqlx::Error> {
+    pub async fn mark_verified(
+        pool: &sqlx::PgPool,
+        tenant_id: uuid::Uuid,
+        id: uuid::Uuid,
+    ) -> Result<Self, sqlx::Error> {
         sqlx::query_as(
             r"
             UPDATE email_change_requests
             SET verified_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             RETURNING *
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .fetch_one(pool)
         .await
     }
@@ -265,6 +270,24 @@ mod tests {
         assert!(!request.is_verified());
         assert!(!request.is_cancelled());
         assert!(request.is_expired());
+    }
+
+    #[test]
+    fn mark_verified_scopes_by_tenant() {
+        let src = include_str!("email_change_request.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("fn mark_verified")
+            .nth(1)
+            .expect("mark_verified");
+        assert!(
+            lookup.contains("WHERE id = $1 AND tenant_id = $2"),
+            "email change verification must include tenant_id"
+        );
+        assert!(
+            !lookup.contains("WHERE id = $1\n            RETURNING"),
+            "must not mark email change requests verified by id alone"
+        );
     }
 
     #[test]

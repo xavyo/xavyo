@@ -436,9 +436,10 @@ pub async fn get_step_escalation(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    // Verify step exists
+    // Verify step exists in this tenant
     let step = xavyo_db::models::GovApprovalStep::find_by_id(
         state.escalation_policy_service.pool(),
+        tenant_id,
         step_id,
     )
     .await?
@@ -493,10 +494,11 @@ pub async fn configure_step_escalation(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    // Verify step exists
-    let step = GovApprovalStep::find_by_id(state.escalation_policy_service.pool(), step_id)
-        .await?
-        .ok_or(ApiGovernanceError::StepNotFound(step_id))?;
+    // Verify step exists in this tenant
+    let step =
+        GovApprovalStep::find_by_id(state.escalation_policy_service.pool(), tenant_id, step_id)
+            .await?
+            .ok_or(ApiGovernanceError::StepNotFound(step_id))?;
 
     // Create or update the rule
     let input = CreateEscalationRule {
@@ -549,8 +551,8 @@ pub async fn remove_step_escalation(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    // Verify step exists
-    let _ = GovApprovalStep::find_by_id(state.escalation_policy_service.pool(), step_id)
+    // Verify step exists in this tenant
+    let _ = GovApprovalStep::find_by_id(state.escalation_policy_service.pool(), tenant_id, step_id)
         .await?
         .ok_or(ApiGovernanceError::StepNotFound(step_id))?;
 
@@ -590,8 +592,8 @@ pub async fn enable_step_escalation(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    // Verify step exists
-    let _ = GovApprovalStep::find_by_id(state.escalation_policy_service.pool(), step_id)
+    // Verify step exists in this tenant
+    let _ = GovApprovalStep::find_by_id(state.escalation_policy_service.pool(), tenant_id, step_id)
         .await?
         .ok_or(ApiGovernanceError::StepNotFound(step_id))?;
 
@@ -634,8 +636,8 @@ pub async fn disable_step_escalation(
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    // Verify step exists
-    let _ = GovApprovalStep::find_by_id(state.escalation_policy_service.pool(), step_id)
+    // Verify step exists in this tenant
+    let _ = GovApprovalStep::find_by_id(state.escalation_policy_service.pool(), tenant_id, step_id)
         .await?
         .ok_or(ApiGovernanceError::StepNotFound(step_id))?;
 
@@ -647,4 +649,21 @@ pub async fn disable_step_escalation(
     Ok(Json(StepEscalationResponse::from_step_and_rule(
         step_id, false, rule,
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn step_lookups_pass_tenant_id() {
+        let src = include_str!("escalation_policies.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("GovApprovalStep::find_by_id(\n        state.escalation_policy_service.pool(),\n        tenant_id,\n        step_id,"),
+            "step escalation handlers must pass tenant_id"
+        );
+        assert!(
+            !production.contains("find_by_id(state.escalation_policy_service.pool(), step_id)"),
+            "must not look up approval steps by id alone"
+        );
+    }
 }
