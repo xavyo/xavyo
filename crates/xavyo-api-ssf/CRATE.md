@@ -41,7 +41,7 @@ api
 ///   POST/GET  /streams          create / list streams
 ///   GET/DELETE /stream          read / delete a stream
 ///   GET/POST  /status           stream status
-///   POST      /subjects:add     add a subject to a stream
+///   POST      /subjects:add     add a subject to a stream (Axum: /subjects:op dispatcher)
 ///   POST      /subjects:remove  remove a subject from a stream
 ///   POST      /verify           request a stream-verification event (SSF §7.1.4)
 pub fn ssf_router() -> Router<SsfState>;
