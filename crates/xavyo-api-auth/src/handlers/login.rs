@@ -434,18 +434,7 @@ pub async fn login_handler(
             );
             decision
         }
-        Err(crate::services::RiskEnforcementError::ServiceUnavailable) => {
-            return Err(ApiAuthError::RiskServiceUnavailable);
-        }
-        Err(e) => {
-            // Fail-open: log and continue with no action
-            tracing::warn!(
-                user_id = %user_id.as_uuid(),
-                error = %e,
-                "Risk evaluation failed, proceeding with fail-open"
-            );
-            crate::services::EnforcementDecision::skip()
-        }
+        Err(e) => return Err(login_risk_eval_error(e)),
     };
 
     // Handle risk enforcement decisions
@@ -607,7 +596,53 @@ pub async fn login_handler(
     Ok((StatusCode::OK, Json(LoginResponse::Success(response))))
 }
 
+/// Risk-evaluation failures must refuse login, not skip enforcement.
+///
+/// Policy load errors used to continue login as if risk were disabled,
+/// bypassing fail-closed tenant policy.
+pub fn login_risk_eval_error(err: crate::services::RiskEnforcementError) -> ApiAuthError {
+    tracing::warn!(error = %err, "Risk evaluation failed, refusing login");
+    ApiAuthError::RiskServiceUnavailable
+}
+
 #[cfg(test)]
 mod tests {
-    // Handler tests require integration test setup
+    use super::*;
+    use crate::services::RiskEnforcementError;
+
+    #[test]
+    fn login_risk_eval_error_is_unavailable_not_skip() {
+        let cases = [
+            RiskEnforcementError::PolicyLoadFailed("policy".into()),
+            RiskEnforcementError::DatabaseError("db".into()),
+            RiskEnforcementError::EventCreationFailed("event".into()),
+            RiskEnforcementError::AlertCreationFailed("alert".into()),
+            RiskEnforcementError::ServiceUnavailable,
+        ];
+        for err in cases {
+            let mapped = login_risk_eval_error(err);
+            assert!(
+                matches!(mapped, ApiAuthError::RiskServiceUnavailable),
+                "got {mapped:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn login_handler_does_not_skip_on_risk_error() {
+        let src = include_str!("login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("login_risk_eval_error"),
+            "login must fail closed on risk-eval errors"
+        );
+        assert!(
+            !production.contains("proceeding with fail-open"),
+            "must not skip enforcement after a risk-eval error"
+        );
+        assert!(
+            !production.contains("EnforcementDecision::skip()"),
+            "must not treat risk-eval errors as a skipped decision"
+        );
+    }
 }
