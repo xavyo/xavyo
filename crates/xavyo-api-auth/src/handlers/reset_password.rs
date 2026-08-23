@@ -44,7 +44,6 @@ type PasswordResetTokenRow = (
 )]
 pub async fn reset_password_handler(
     Extension(pool): Extension<PgPool>,
-    Extension(_request_tenant_id): Extension<TenantId>,
     Extension(password_policy_service): Extension<Arc<PasswordPolicyService>>,
     Extension(session_service): Extension<Arc<SessionService>>,
     Json(request): Json<ResetPasswordRequest>,
@@ -273,6 +272,10 @@ mod tests {
         assert!(
             production.contains("UPDATE oauth_refresh_tokens"),
             "password reset must revoke OAuth refresh tokens"
+        );
+        assert!(
+            !production.contains("Extension(_request_tenant_id)"),
+            "reset-password must derive tenant from the token, not X-Tenant-ID"
         );
     }
 }

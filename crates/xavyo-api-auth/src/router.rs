@@ -437,8 +437,6 @@ impl AuthState {
 /// - `POST /auth/register` - User registration
 /// - `POST /auth/forgot-password` - Initiate password reset (email rate limited)
 /// - `POST /auth/resend-verification` - Resend verification email (email rate limited)
-/// - `POST /auth/reset-password` - Complete password reset
-/// - `POST /auth/verify-email` - Verify email address
 /// - `PUT /auth/password` - Change password (JWT-authenticated, rate limited)
 pub fn auth_router(state: AuthState, jwt_public_key: String) -> Router {
     // Login route with rate limiting
@@ -473,22 +471,11 @@ pub fn auth_router(state: AuthState, jwt_public_key: String) -> Router {
             jwt_public_key,
         )));
 
-    // Rate-limited token-redemption routes (reset-password, verify-email).
-    // Both endpoints accept a token + apply argon2/HIBP — without throttling they
-    // amplify into a DoS surface and a HIBP-quota drain (see deep review §2.6).
-    // The same `sensitive_rate_limiter` is used as the password-change route.
-    let other_routes = Router::new()
-        .route("/reset-password", post(reset_password_handler))
-        .route("/verify-email", post(verify_email_handler))
-        .layer(middleware::from_fn(rate_limit_middleware))
-        .layer(Extension(state.sensitive_rate_limiter.clone()));
-
     Router::new()
         .merge(login_route)
         .merge(email_rate_limited_routes)
         .merge(register_route)
         .merge(password_change_route)
-        .merge(other_routes)
         .layer(Extension(state.pool))
         .layer(Extension(state.auth_service))
         .layer(Extension(state.token_service))
@@ -510,12 +497,17 @@ pub fn auth_router(state: AuthState, jwt_public_key: String) -> Router {
 /// - `signup_handler` hardcodes `SYSTEM_TENANT_ID`
 /// - `refresh_handler` extracts tenant from the refresh token
 /// - `logout_handler` extracts tenant from the refresh token
+/// - `reset_password_handler` / `verify_email_handler` look the token up by
+///   hash and derive tenant from the row. Requiring `X-Tenant-ID` (and the
+///   BFF sending the system tenant) made RLS hide real-tenant tokens.
 ///
 /// # Endpoints
 ///
 /// - `POST /auth/signup` - Self-service signup (F111, rate limited)
 /// - `POST /auth/refresh` - Token refresh
 /// - `POST /auth/logout` - User logout
+/// - `POST /auth/reset-password` - Complete password reset (token is proof)
+/// - `POST /auth/verify-email` - Verify email address (token is proof)
 pub fn public_auth_router(state: AuthState) -> Router {
     // Signup route for self-service system tenant signup (F111)
     // Rate limited to 10 requests per IP per hour
@@ -525,12 +517,22 @@ pub fn public_auth_router(state: AuthState) -> Router {
         .layer(Extension(state.signup_rate_limiter.clone()))
         .layer(Extension(state.email_sender.clone()));
 
+    // Rate-limited token-redemption routes (reset-password, verify-email).
+    // Both endpoints accept a token + apply argon2/HIBP — without throttling they
+    // amplify into a DoS surface and a HIBP-quota drain (see deep review §2.6).
+    let token_redemption_routes = Router::new()
+        .route("/reset-password", post(reset_password_handler))
+        .route("/verify-email", post(verify_email_handler))
+        .layer(middleware::from_fn(rate_limit_middleware))
+        .layer(Extension(state.sensitive_rate_limiter.clone()));
+
     let other_routes = Router::new()
         .route("/refresh", post(refresh_handler))
         .route("/logout", post(logout_handler));
 
     Router::new()
         .merge(signup_route)
+        .merge(token_redemption_routes)
         .merge(other_routes)
         .layer(Extension(state.pool))
         .layer(Extension(state.auth_service))
@@ -1116,6 +1118,38 @@ mod tests {
         assert!(
             production.contains("with_session_service(session_service.clone())"),
             "email change must revoke sessions after the address changes"
+        );
+    }
+
+    #[test]
+    fn token_redemption_routes_do_not_require_tenant_header() {
+        let src = include_str!("router.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let public = production
+            .split("pub fn public_auth_router")
+            .nth(1)
+            .and_then(|s| s.split("pub fn ").next())
+            .expect("public_auth_router body");
+        let tenant = production
+            .split("pub fn auth_router")
+            .nth(1)
+            .and_then(|s| s.split("pub fn public_auth_router").next())
+            .expect("auth_router body");
+        assert!(
+            public.contains(".route(\"/reset-password\""),
+            "reset-password must not require X-Tenant-ID"
+        );
+        assert!(
+            public.contains(".route(\"/verify-email\""),
+            "verify-email must not require X-Tenant-ID"
+        );
+        assert!(
+            !tenant.contains(".route(\"/reset-password\""),
+            "reset-password must not sit behind TenantLayer"
+        );
+        assert!(
+            !tenant.contains(".route(\"/verify-email\""),
+            "verify-email must not sit behind TenantLayer"
         );
     }
 }
