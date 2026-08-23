@@ -62,15 +62,23 @@ fn default_escalation_enabled() -> bool {
 }
 
 impl GovApprovalStep {
-    /// Find a step by ID.
-    pub async fn find_by_id(pool: &sqlx::PgPool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
+    /// Find a step by ID within a tenant (via its parent workflow).
+    pub async fn find_by_id(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
-            SELECT * FROM gov_approval_steps
-            WHERE id = $1
+            SELECT s.id, s.workflow_id, s.step_order, s.approver_type,
+                   s.specific_approvers, s.created_at, s.escalation_enabled
+            FROM gov_approval_steps s
+            INNER JOIN gov_approval_workflows w ON w.id = s.workflow_id
+            WHERE s.id = $1 AND w.tenant_id = $2
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .fetch_optional(pool)
         .await
     }
@@ -230,6 +238,27 @@ impl GovApprovalStep {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn find_by_id_scopes_by_tenant() {
+        let src = include_str!("gov_approval_step.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("pub async fn find_by_id")
+            .nth(1)
+            .expect("find_by_id")
+            .split("pub async fn find_by_workflow")
+            .next()
+            .expect("find_by_id body");
+        assert!(
+            lookup.contains("AND w.tenant_id = $2"),
+            "approval step lookup must join workflow tenant_id"
+        );
+        assert!(
+            !lookup.contains("FROM gov_approval_steps\n            WHERE id = $1"),
+            "must not look up approval steps by id alone"
+        );
+    }
 
     #[test]
     fn test_approver_type_serialization() {

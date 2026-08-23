@@ -271,7 +271,7 @@ impl EmailChangeService {
                 .ok_or(ApiAuthError::UserNotFound)?;
 
         // Mark the request as verified
-        EmailChangeRequest::mark_verified(&self.pool, request.id)
+        EmailChangeRequest::mark_verified(&self.pool, tenant_id, request.id)
             .await
             .map_err(ApiAuthError::Database)?;
 
@@ -345,6 +345,21 @@ mod tests {
         assert!(
             !production.contains("if let Some(ref session_service) = self.session_service"),
             "must not skip session revoke when the service is missing"
+        );
+    }
+
+    #[test]
+    fn mark_verified_passes_tenant_id() {
+        let src = include_str!("email_change_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production
+                .contains("EmailChangeRequest::mark_verified(&self.pool, tenant_id, request.id)"),
+            "email change verification must pass tenant_id"
+        );
+        assert!(
+            !production.contains("EmailChangeRequest::mark_verified(&self.pool, request.id)"),
+            "must not mark email change requests verified by id alone"
         );
     }
 }

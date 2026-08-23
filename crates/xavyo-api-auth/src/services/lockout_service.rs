@@ -100,10 +100,11 @@ impl LockoutService {
             r"
                 SELECT locked_at, locked_until, failed_login_count, lockout_reason
                 FROM users
-                WHERE id = $1
+                WHERE id = $1 AND tenant_id = $2
                 ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .fetch_optional(&mut *conn)
         .await
         .map_err(ApiAuthError::Database)?;
@@ -127,7 +128,8 @@ impl LockoutService {
         if let Some(until) = locked_until {
             if Utc::now() > until {
                 // Auto-unlock
-                self.unlock_user_internal(&mut *conn, user_id).await?;
+                self.unlock_user_internal(&mut *conn, user_id, tenant_id)
+                    .await?;
 
                 info!(
                     user_id = %user_id,
@@ -204,11 +206,12 @@ impl LockoutService {
             SET failed_login_count = failed_login_count + 1,
                 last_failed_login_at = NOW(),
                 updated_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             RETURNING failed_login_count
             ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .fetch_one(&mut *tx)
         .await
         .map_err(ApiAuthError::Database)?;
@@ -231,11 +234,12 @@ impl LockoutService {
                     locked_until = $2,
                     lockout_reason = 'max_attempts',
                     updated_at = NOW()
-                WHERE id = $1
+                WHERE id = $1 AND tenant_id = $3
                 ",
             )
             .bind(user_id)
             .bind(locked_until)
+            .bind(tenant_id)
             .execute(&mut *tx)
             .await
             .map_err(ApiAuthError::Database)?;
@@ -296,10 +300,11 @@ impl LockoutService {
             SET failed_login_count = 0,
                 last_failed_login_at = NULL,
                 updated_at = NOW()
-            WHERE id = $1
+            WHERE id = $1 AND tenant_id = $2
             ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .execute(&mut *conn)
         .await
         .map_err(ApiAuthError::Database)?;
@@ -314,7 +319,9 @@ impl LockoutService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
-        let result = self.unlock_user_internal(&mut *conn, user_id).await?;
+        let result = self
+            .unlock_user_internal(&mut *conn, user_id, tenant_id)
+            .await?;
 
         if result {
             info!(
@@ -331,6 +338,7 @@ impl LockoutService {
         &self,
         executor: E,
         user_id: Uuid,
+        tenant_id: Uuid,
     ) -> Result<bool, ApiAuthError>
     where
         E: sqlx::Executor<'e, Database = sqlx::Postgres>,
@@ -344,10 +352,11 @@ impl LockoutService {
                 failed_login_count = 0,
                 last_failed_login_at = NULL,
                 updated_at = NOW()
-            WHERE id = $1 AND locked_at IS NOT NULL
+            WHERE id = $1 AND tenant_id = $2 AND locked_at IS NOT NULL
             ",
         )
         .bind(user_id)
+        .bind(tenant_id)
         .execute(executor)
         .await
         .map_err(ApiAuthError::Database)?;
@@ -413,5 +422,35 @@ mod tests {
         };
         assert!(!status.is_locked);
         assert!(status.locked_until.is_none());
+    }
+
+    #[test]
+    fn lockout_user_queries_scope_by_tenant() {
+        let src = include_str!("lockout_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $2"),
+            "lockout user lookups must include tenant_id"
+        );
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $3"),
+            "lockout updates that already bind extra params must still include tenant_id"
+        );
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $2 AND locked_at IS NOT NULL"),
+            "unlock must include tenant_id"
+        );
+        assert!(
+            !production.contains("FROM users\n                WHERE id = $1\n"),
+            "must not look up users by id alone"
+        );
+        assert!(
+            !production.contains("WHERE id = $1\n            RETURNING failed_login_count"),
+            "must not increment failed logins by id alone"
+        );
+        assert!(
+            !production.contains("WHERE id = $1 AND locked_at IS NOT NULL"),
+            "must not unlock users by id alone"
+        );
     }
 }
