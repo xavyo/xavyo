@@ -161,9 +161,102 @@ pub fn scim_router(config: ScimConfig) -> Router {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn test_scim_config_defaults() {
-        // This would need a mock pool in real tests
-        // For now, just verify the struct works
+    use super::*;
+    use axum::{
+        body::{to_bytes, Body},
+        http::{Request, StatusCode},
+    };
+    use serde_json::Value;
+    use tower::ServiceExt;
+
+    fn lazy_pool() -> PgPool {
+        sqlx::PgPool::connect_lazy("postgres://invalid:invalid@127.0.0.1:1/invalid")
+            .expect("lazy pool does not connect until checkout")
+    }
+
+    fn resource_router() -> Router {
+        scim_resource_router(ScimConfig::new(lazy_pool(), "http://localhost"))
+    }
+
+    async fn get_no_auth(path: &str) -> (StatusCode, Value) {
+        let response = resource_router()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(path)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("read response body");
+        let json: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+        (status, json)
+    }
+
+    #[tokio::test]
+    async fn test_scim_config_defaults() {
+        let config = ScimConfig::new(lazy_pool(), "http://localhost");
+        assert_eq!(config.rate_limit_per_sec, 25);
+        assert_eq!(config.rate_limit_burst, 50);
+        let config = config.with_rate_limits(10, 20);
+        assert_eq!(config.rate_limit_per_sec, 10);
+        assert_eq!(config.rate_limit_burst, 20);
+    }
+
+    #[tokio::test]
+    async fn service_provider_config_without_authorization_is_not_401() {
+        let (status, json) = get_no_auth("/ServiceProviderConfig").await;
+        assert_ne!(
+            status,
+            StatusCode::UNAUTHORIZED,
+            "discovery must not hit ScimAuthLayer: {json}"
+        );
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            json["schemas"][0].as_str(),
+            Some("urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig")
+        );
+    }
+
+    #[tokio::test]
+    async fn resource_types_without_authorization_is_not_401() {
+        let (status, json) = get_no_auth("/ResourceTypes").await;
+        assert_ne!(status, StatusCode::UNAUTHORIZED, "{json}");
+        assert_eq!(status, StatusCode::OK);
+        let schemas: Vec<&str> = json["Resources"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|r| r["schema"].as_str())
+            .collect();
+        assert!(schemas.contains(&"urn:ietf:params:scim:schemas:core:2.0:User"));
+        assert!(schemas.contains(&"urn:ietf:params:scim:schemas:core:2.0:Group"));
+    }
+
+    #[tokio::test]
+    async fn schemas_without_authorization_is_not_401() {
+        let (status, json) = get_no_auth("/Schemas").await;
+        assert_ne!(status, StatusCode::UNAUTHORIZED, "{json}");
+        assert_eq!(status, StatusCode::OK);
+        let ids: Vec<&str> = json["Resources"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|r| r["id"].as_str())
+            .collect();
+        assert!(ids.contains(&"urn:ietf:params:scim:schemas:core:2.0:User"));
+        assert!(ids.contains(&"urn:ietf:params:scim:schemas:core:2.0:Group"));
+        assert!(ids.contains(&"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"));
+    }
+
+    #[tokio::test]
+    async fn users_without_authorization_is_401_from_scim_auth_layer() {
+        let (status, json) = get_no_auth("/Users").await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(json["status"].as_str(), Some("401"));
     }
 }

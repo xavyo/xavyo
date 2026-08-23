@@ -180,3 +180,72 @@ pub async fn schemas() -> Response {
 
     scim_response(StatusCode::OK, response)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+    use serde_json::Value;
+
+    async fn json_body(response: Response) -> (StatusCode, Value) {
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("read discovery handler body");
+        let json: Value = serde_json::from_slice(&bytes).expect("discovery body is JSON");
+        (status, json)
+    }
+
+    fn schemas_contain(json: &Value, urn: &str) -> bool {
+        json["schemas"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|s| s.as_str() == Some(urn))
+    }
+
+    #[tokio::test]
+    async fn service_provider_config_handler_is_200_unauthenticated() {
+        let (status, json) = json_body(service_provider_config().await).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_ne!(status, StatusCode::UNAUTHORIZED);
+        assert!(schemas_contain(
+            &json,
+            "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"
+        ));
+    }
+
+    #[tokio::test]
+    async fn resource_types_handler_is_200_unauthenticated() {
+        let (status, json) = json_body(resource_types().await).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_ne!(status, StatusCode::UNAUTHORIZED);
+        assert!(schemas_contain(
+            &json,
+            "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+        ));
+        let resources = json["Resources"].as_array().expect("Resources array");
+        let schema_urns: Vec<&str> = resources
+            .iter()
+            .filter_map(|r| r["schema"].as_str())
+            .collect();
+        assert!(schema_urns.contains(&"urn:ietf:params:scim:schemas:core:2.0:User"));
+        assert!(schema_urns.contains(&"urn:ietf:params:scim:schemas:core:2.0:Group"));
+    }
+
+    #[tokio::test]
+    async fn schemas_handler_is_200_unauthenticated() {
+        let (status, json) = json_body(schemas().await).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_ne!(status, StatusCode::UNAUTHORIZED);
+        let ids: Vec<&str> = json["Resources"]
+            .as_array()
+            .expect("Resources array")
+            .iter()
+            .filter_map(|r| r["id"].as_str())
+            .collect();
+        assert!(ids.contains(&"urn:ietf:params:scim:schemas:core:2.0:User"));
+        assert!(ids.contains(&"urn:ietf:params:scim:schemas:core:2.0:Group"));
+        assert!(ids.contains(&"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"));
+    }
+}
