@@ -71,6 +71,17 @@ pub fn extract_tenant_from_header(headers: &HeaderMap) -> Result<Uuid, OAuthErro
         .map_err(|_| OAuthError::InvalidRequest("X-Tenant-ID is not a valid UUID".to_string()))
 }
 
+/// Whether a JWT's `tid` belongs to the requesting client's tenant.
+///
+/// Missing `tid` used to be treated as a match, so a token without tenant
+/// could be introspected as active or revoked into another tenant.
+pub fn token_tid_matches_tenant(token_tid: Option<Uuid>, request_tenant: Uuid) -> bool {
+    match token_tid {
+        Some(tid) => tid == request_tenant,
+        None => false,
+    }
+}
+
 /// Authenticate an `OAuth2` client using extracted credentials.
 ///
 /// Looks up the client by `client_id` within the given tenant, then verifies
@@ -194,5 +205,14 @@ mod tests {
         headers.insert("x-tenant-id", "not-a-uuid".parse().unwrap());
         let result = extract_tenant_from_header(&headers);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn token_tid_matches_tenant_requires_tid() {
+        let tenant = Uuid::from_u128(1);
+        let other = Uuid::from_u128(2);
+        assert!(token_tid_matches_tenant(Some(tenant), tenant));
+        assert!(!token_tid_matches_tenant(Some(other), tenant));
+        assert!(!token_tid_matches_tenant(None, tenant));
     }
 }
