@@ -8,9 +8,8 @@
 //! - provides a grace window if `api.pwnedpasswords.com` is briefly unreachable;
 //! - is bounded (`MAX_ENTRIES`) with random eviction to keep memory predictable.
 //!
-//! See deep review §2.6 for the fail-mode discussion. The cache does NOT change
-//! the fail-open vs. fail-closed semantics in `password_policy_service.rs` — it
-//! only reduces how often that decision is exercised.
+//! Fail-mode is decided by `password_policy_service::hibp_on_unavailable`
+//! (fail-closed by default). The cache only reduces how often that path runs.
 
 use sha1::{Digest, Sha1};
 use std::collections::HashMap;
@@ -103,7 +102,7 @@ pub async fn check_password_breached(password: &str) -> Result<bool, ()> {
         .send()
         .await
         .map_err(|e| {
-            warn!(error = %e, "HIBP API request failed, failing open");
+            warn!(error = %e, "HIBP API request failed");
         })?;
 
     let body = response.text().await.map_err(|e| {
