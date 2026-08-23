@@ -21,6 +21,7 @@
 pub mod consumers;
 pub mod error;
 pub mod handlers;
+pub mod identity_switch;
 pub mod jobs;
 pub mod models;
 pub mod router;
