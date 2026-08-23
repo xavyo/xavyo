@@ -42,10 +42,9 @@ pub fn provision_rate_limiter() -> RateLimiter {
 ///
 /// ## IP Extraction
 ///
-/// IP address is extracted in this order:
-/// 1. `X-Forwarded-For` header (first IP in chain) - for reverse proxies
-/// 2. `X-Real-IP` header - commonly used by nginx
-/// 3. Peer address from connection - direct connection fallback
+/// Uses `extract_client_ip`: forwarded headers only when `TrustXff` is set,
+/// otherwise the peer address. A client-supplied `X-Forwarded-For` must not
+/// bypass the provisioning rate limit.
 ///
 /// Adds rate limit headers to all responses:
 /// - `X-RateLimit-Limit`: Maximum requests allowed
@@ -57,8 +56,7 @@ pub async fn provision_rate_limit_middleware(
     request: Request<Body>,
     next: Next,
 ) -> Response {
-    // Extract client IP from headers or connection info
-    // Uses X-Forwarded-For, X-Real-IP, or falls back to peer address
+    // Peer IP unless TrustXff allows forwarded headers
     let ip = match extract_client_ip(&request) {
         Some(ip_str) => match ip_str.parse::<IpAddr>() {
             Ok(ip) => ip,

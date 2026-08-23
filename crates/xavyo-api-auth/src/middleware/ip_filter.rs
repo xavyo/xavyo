@@ -17,45 +17,43 @@ use xavyo_auth::JwtClaims;
 use xavyo_core::TenantId;
 
 use crate::error::ProblemDetails;
+use crate::middleware::jwt_auth::TrustXff;
 use crate::models::IpRestrictionPolicyConfig;
 use crate::services::org_policy_service::OrgPolicyService;
 use crate::services::IpRestrictionService;
 
 /// Extract client IP address from request headers and connection info.
 ///
-/// Checks in order:
-/// 1. X-Forwarded-For header (first IP in chain)
-/// 2. X-Real-IP header
-/// 3. Peer address from connection
+/// Forwarded headers (`X-Forwarded-For`, `X-Real-IP`) are used only when
+/// `TrustXff` is present. Otherwise the peer address is used so provisioning
+/// rate limits and IP filters cannot be spoofed.
 pub fn extract_client_ip(req: &Request<Body>) -> Option<String> {
-    // Check X-Forwarded-For header (standard proxy header)
-    if let Some(xff) = req.headers().get("X-Forwarded-For") {
-        if let Ok(value) = xff.to_str() {
-            // X-Forwarded-For can contain multiple IPs: client, proxy1, proxy2
-            // The first IP is typically the original client
-            if let Some(first_ip) = value.split(',').next() {
-                let ip = first_ip.trim();
-                // Validate it's a valid IP
+    let trust_xff = req.extensions().get::<TrustXff>().is_some();
+
+    if trust_xff {
+        if let Some(xff) = req.headers().get("X-Forwarded-For") {
+            if let Ok(value) = xff.to_str() {
+                if let Some(first_ip) = value.split(',').next() {
+                    let ip = first_ip.trim();
+                    if ip.parse::<IpAddr>().is_ok() {
+                        debug!(ip = %ip, "Extracted IP from X-Forwarded-For");
+                        return Some(ip.to_string());
+                    }
+                }
+            }
+        }
+
+        if let Some(xri) = req.headers().get("X-Real-IP") {
+            if let Ok(value) = xri.to_str() {
+                let ip = value.trim();
                 if ip.parse::<IpAddr>().is_ok() {
-                    debug!(ip = %ip, "Extracted IP from X-Forwarded-For");
+                    debug!(ip = %ip, "Extracted IP from X-Real-IP");
                     return Some(ip.to_string());
                 }
             }
         }
     }
 
-    // Check X-Real-IP header (commonly used by nginx)
-    if let Some(xri) = req.headers().get("X-Real-IP") {
-        if let Ok(value) = xri.to_str() {
-            let ip = value.trim();
-            if ip.parse::<IpAddr>().is_ok() {
-                debug!(ip = %ip, "Extracted IP from X-Real-IP");
-                return Some(ip.to_string());
-            }
-        }
-    }
-
-    // Fall back to peer address from connection
     if let Some(connect_info) = req.extensions().get::<ConnectInfo<SocketAddr>>() {
         let ip = connect_info.0.ip().to_string();
         debug!(ip = %ip, "Using peer address");
@@ -229,6 +227,11 @@ mod tests {
     use super::*;
     use axum::http::HeaderValue;
 
+    fn with_trust_xff(mut req: Request<Body>) -> Request<Body> {
+        req.extensions_mut().insert(TrustXff);
+        req
+    }
+
     fn make_request_with_xff(xff: &str) -> Request<Body> {
         let mut req = Request::new(Body::empty());
         req.headers_mut()
@@ -243,27 +246,33 @@ mod tests {
         req
     }
 
+    fn with_peer(mut req: Request<Body>, ip: [u8; 4]) -> Request<Body> {
+        req.extensions_mut()
+            .insert(ConnectInfo(SocketAddr::from((ip, 443))));
+        req
+    }
+
     #[test]
     fn test_extract_client_ip_xff_single() {
-        let req = make_request_with_xff("192.168.1.100");
+        let req = with_trust_xff(make_request_with_xff("192.168.1.100"));
         assert_eq!(extract_client_ip(&req), Some("192.168.1.100".to_string()));
     }
 
     #[test]
     fn test_extract_client_ip_xff_multiple() {
-        let req = make_request_with_xff("192.168.1.100, 10.0.0.1, 172.16.0.1");
+        let req = with_trust_xff(make_request_with_xff("192.168.1.100, 10.0.0.1, 172.16.0.1"));
         assert_eq!(extract_client_ip(&req), Some("192.168.1.100".to_string()));
     }
 
     #[test]
     fn test_extract_client_ip_xff_with_spaces() {
-        let req = make_request_with_xff("  192.168.1.100  , 10.0.0.1");
+        let req = with_trust_xff(make_request_with_xff("  192.168.1.100  , 10.0.0.1"));
         assert_eq!(extract_client_ip(&req), Some("192.168.1.100".to_string()));
     }
 
     #[test]
     fn test_extract_client_ip_xri() {
-        let req = make_request_with_xri("10.0.0.50");
+        let req = with_trust_xff(make_request_with_xri("10.0.0.50"));
         assert_eq!(extract_client_ip(&req), Some("10.0.0.50".to_string()));
     }
 
@@ -274,26 +283,38 @@ mod tests {
             .insert("X-Forwarded-For", HeaderValue::from_static("192.168.1.100"));
         req.headers_mut()
             .insert("X-Real-IP", HeaderValue::from_static("10.0.0.50"));
+        let req = with_trust_xff(req);
 
-        // X-Forwarded-For should take precedence
         assert_eq!(extract_client_ip(&req), Some("192.168.1.100".to_string()));
     }
 
     #[test]
     fn test_extract_client_ip_ipv6() {
-        let req = make_request_with_xff("2001:db8::1");
+        let req = with_trust_xff(make_request_with_xff("2001:db8::1"));
         assert_eq!(extract_client_ip(&req), Some("2001:db8::1".to_string()));
     }
 
     #[test]
     fn test_extract_client_ip_invalid() {
-        let req = make_request_with_xff("not-an-ip");
+        let req = with_trust_xff(make_request_with_xff("not-an-ip"));
         assert_eq!(extract_client_ip(&req), None);
     }
 
     #[test]
     fn test_extract_client_ip_empty() {
         let req = Request::new(Body::empty());
+        assert_eq!(extract_client_ip(&req), None);
+    }
+
+    #[test]
+    fn untrusted_xff_does_not_override_peer() {
+        let req = with_peer(make_request_with_xff("10.0.0.1"), [203, 0, 113, 10]);
+        assert_eq!(extract_client_ip(&req), Some("203.0.113.10".to_string()));
+    }
+
+    #[test]
+    fn untrusted_xff_without_peer_is_none() {
+        let req = make_request_with_xff("10.0.0.1");
         assert_eq!(extract_client_ip(&req), None);
     }
 }

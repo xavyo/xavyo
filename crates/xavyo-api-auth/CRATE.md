@@ -134,6 +134,7 @@ let user = auth_service.authenticate_password(
 - Never skip rate limiting on auth endpoints
 - Never return different error messages for valid vs invalid usernames
 - Never skip login risk enforcement on evaluation errors (refuse with 503, do not `EnforcementDecision::skip()`)
+- Never trust `X-Forwarded-For` / `X-Real-IP` in `extract_client_ip` unless `TrustXff` is set
 
 ## Related Crates
 
