@@ -40,6 +40,14 @@ pub enum OrgPolicyError {
     Validation(String),
 }
 
+/// Whether the tenant MFA policy requires MFA.
+///
+/// Used when resolving org-inherited defaults. Callers must not map lookup
+/// errors to `required: false`.
+pub(crate) fn tenant_mfa_is_required(policy: &TenantMfaPolicy) -> bool {
+    policy.mfa_policy.to_string() == "required"
+}
+
 /// Treat missing org/policy as absent; other errors refuse the request.
 ///
 /// Skipping enforcement when the lookup fails would fail-open a stricter
@@ -376,8 +384,10 @@ impl OrgPolicyService {
                 }
             }
             OrgPolicyType::Mfa => {
-                let policy = TenantMfaPolicy::get(&*self.pool, tenant_id).await.ok();
-                let required = policy.is_some_and(|p| p.mfa_policy.to_string() == "required");
+                let policy = TenantMfaPolicy::get(&*self.pool, tenant_id)
+                    .await
+                    .map_err(OrgPolicyError::Database)?;
+                let required = tenant_mfa_is_required(&policy);
                 Ok(serde_json::json!({
                     "required": required,
                     "allowed_methods": ["totp", "webauthn"],
@@ -649,5 +659,37 @@ mod tests {
             "db".into(),
         ))));
         assert!(matches!(err, Err(ApiAuthError::Internal(_))));
+    }
+
+    #[test]
+    fn tenant_mfa_is_required_matches_policy() {
+        let required = TenantMfaPolicy {
+            tenant_id: Uuid::new_v4(),
+            mfa_policy: xavyo_db::MfaPolicy::Required,
+        };
+        let optional = TenantMfaPolicy {
+            tenant_id: Uuid::new_v4(),
+            mfa_policy: xavyo_db::MfaPolicy::Optional,
+        };
+        assert!(tenant_mfa_is_required(&required));
+        assert!(!tenant_mfa_is_required(&optional));
+    }
+
+    #[test]
+    fn tenant_mfa_default_does_not_fail_open_on_lookup_error() {
+        let src = include_str!("org_policy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let idx = production
+            .find("TenantMfaPolicy::get")
+            .expect("tenant MFA lookup");
+        let window = &production[idx..(idx + 220).min(production.len())];
+        assert!(
+            window.contains("map_err(OrgPolicyError::Database)"),
+            "MFA policy lookup errors must fail closed"
+        );
+        assert!(
+            !window.contains(".ok()"),
+            "must not treat MFA lookup errors as MFA not required"
+        );
     }
 }

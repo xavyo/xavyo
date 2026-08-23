@@ -397,12 +397,24 @@ pub async fn device_login_handler(
     let client_id = device_code.client_id.clone();
     let scopes = device_code.scopes.clone();
 
-    // First, try to get the user to check lockout (if user exists)
-    let existing_user = auth_service
-        .get_user_by_email(tenant_id_typed, &request.email)
-        .await
-        .ok()
-        .flatten();
+    // First, try to get the user to check lockout (if user exists).
+    // Lookup errors must refuse login; swallowing them skipped lockout.
+    let existing_user = match device_user_for_lockout(
+        auth_service
+            .get_user_by_email(tenant_id_typed, &request.email)
+            .await,
+    ) {
+        Ok(user) => user,
+        Err(e) => {
+            warn!(error = %e, "Failed to look up user for lockout");
+            return render_login_error_with_csrf(
+                &request.user_code,
+                &client_id,
+                &scopes,
+                "An error occurred. Please try again.",
+            );
+        }
+    };
 
     // Check if account is locked (only if user exists). Errors must refuse
     // login; a locked account without `locked_until` is still locked.
@@ -1201,6 +1213,23 @@ pub fn device_lockout_check<E: std::fmt::Display>(
     }
 }
 
+/// User lookup before the lockout check. Database errors must refuse login,
+/// not skip lockout as if the user did not exist.
+pub fn device_user_for_lockout<T, E: std::fmt::Display>(
+    result: Result<Option<T>, E>,
+) -> Result<Option<T>, E> {
+    match result {
+        Ok(user) => Ok(user),
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "User lookup for lockout failed, refusing device login"
+            );
+            Err(e)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1340,5 +1369,28 @@ mod tests {
             !production.contains("Failed to check lockout status"),
             "must not continue login after a lockout-check error"
         );
+        assert!(
+            production.contains("device_user_for_lockout("),
+            "user lookup for lockout must fail closed"
+        );
+        let idx = production
+            .find("get_user_by_email")
+            .expect("user lookup for lockout");
+        let window = &production[idx..(idx + 280).min(production.len())];
+        assert!(
+            !window.contains(".ok()") && !window.contains("flatten()"),
+            "must not skip lockout when user lookup fails"
+        );
+    }
+
+    #[test]
+    fn device_user_for_lockout_does_not_skip_on_error() {
+        assert!(device_user_for_lockout(Ok::<Option<u8>, &str>(Some(1)))
+            .unwrap()
+            .is_some());
+        assert!(device_user_for_lockout(Ok::<Option<u8>, &str>(None))
+            .unwrap()
+            .is_none());
+        assert!(device_user_for_lockout(Err::<Option<u8>, _>("db down")).is_err());
     }
 }

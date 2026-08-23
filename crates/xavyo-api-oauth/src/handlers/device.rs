@@ -186,6 +186,32 @@ fn origin_ip(
     extract_origin_ip(headers, connect_info.map(|ci| &ci.0), trust_xff)
 }
 
+/// Device-code lookup for risk scoring. Errors must refuse approval, not skip risk.
+fn device_code_for_risk<T, E: std::fmt::Display>(
+    result: Result<Option<T>, E>,
+) -> Result<Option<T>, E> {
+    match result {
+        Ok(code) => Ok(code),
+        Err(e) => {
+            tracing::error!(error = %e, "Device code lookup for risk failed, refusing approval");
+            Err(e)
+        }
+    }
+}
+
+/// Pending email-confirmation lookup. Errors must refuse approval, not skip confirmation.
+fn pending_confirmation_for_risk<T, E: std::fmt::Display>(
+    result: Result<Option<T>, E>,
+) -> Result<Option<T>, E> {
+    match result {
+        Ok(pending) => Ok(pending),
+        Err(e) => {
+            tracing::error!(error = %e, "Pending confirmation lookup failed, refusing approval");
+            Err(e)
+        }
+    }
+}
+
 /// Request a device authorization code.
 ///
 /// POST /oauth/device/code
@@ -547,84 +573,108 @@ pub async fn device_authorize_handler(
         "approve" => {
             // F117 Storm-2372 Phase 3: Risk-based approval with scoring
             if let Some(ref risk_service) = state.device_risk_service {
-                // Get device code info for risk assessment
-                if let Ok(Some(device_code_info)) = device_service
-                    .find_pending_by_user_code(tenant_id, &request.user_code)
-                    .await
-                {
-                    let approver_ip =
-                        origin_ip(&headers, connect_info.as_ref(), trust_xff.is_some());
-                    let approver_country = extract_country_code(&headers);
-                    let approver_user_agent = headers
-                        .get("user-agent")
-                        .and_then(|v| v.to_str().ok())
-                        .map(String::from);
+                // Get device code info for risk assessment. Lookup errors must
+                // refuse approval, not skip risk scoring.
+                let device_code_info = match device_code_for_risk(
+                    device_service
+                        .find_pending_by_user_code(tenant_id, &request.user_code)
+                        .await,
+                ) {
+                    Ok(Some(info)) => info,
+                    Ok(None) => {
+                        return Html(render_result_page(
+                            false,
+                            "Failed to authorize. The code may have expired.",
+                        ))
+                        .into_response();
+                    }
+                    Err(_) => {
+                        return Html(render_result_page(
+                            false,
+                            "Unable to verify authorization. Please try again.",
+                        ))
+                        .into_response();
+                    }
+                };
+                let approver_ip = origin_ip(&headers, connect_info.as_ref(), trust_xff.is_some());
+                let approver_country = extract_country_code(&headers);
+                let approver_user_agent = headers
+                    .get("user-agent")
+                    .and_then(|v| v.to_str().ok())
+                    .map(String::from);
 
-                    // Build risk context
-                    let risk_context = RiskContext {
-                        tenant_id,
-                        user_id,
-                        approver_ip: approver_ip.clone(),
-                        approver_country: Some(approver_country.clone()),
-                        origin_ip: device_code_info.origin_ip.clone(),
-                        origin_country: device_code_info.origin_country.clone(),
-                        code_created_at: device_code_info.created_at,
-                        origin_user_agent: device_code_info.origin_user_agent.clone(),
-                        approver_user_agent,
-                    };
+                // Build risk context
+                let risk_context = RiskContext {
+                    tenant_id,
+                    user_id,
+                    approver_ip: approver_ip.clone(),
+                    approver_country: Some(approver_country.clone()),
+                    origin_ip: device_code_info.origin_ip.clone(),
+                    origin_country: device_code_info.origin_country.clone(),
+                    code_created_at: device_code_info.created_at,
+                    origin_user_agent: device_code_info.origin_user_agent.clone(),
+                    approver_user_agent,
+                };
 
-                    // Calculate risk score
-                    let assessment = match risk_service.calculate_score(&risk_context).await {
-                        Ok(a) => a,
-                        Err(e) => {
-                            tracing::error!(error = %e, "Failed to calculate risk score, proceeding with caution");
-                            // In case of error, treat as medium risk (require confirmation)
-                            return Html(render_result_page(
-                                false,
-                                "Unable to verify authorization. Please try again.",
-                            ))
-                            .into_response();
-                        }
-                    };
+                // Calculate risk score
+                let assessment = match risk_service.calculate_score(&risk_context).await {
+                    Ok(a) => a,
+                    Err(e) => {
+                        tracing::error!(error = %e, "Failed to calculate risk score, proceeding with caution");
+                        // In case of error, treat as medium risk (require confirmation)
+                        return Html(render_result_page(
+                            false,
+                            "Unable to verify authorization. Please try again.",
+                        ))
+                        .into_response();
+                    }
+                };
 
-                    tracing::info!(
-                        tenant_id = %tenant_id,
-                        user_id = %user_id,
-                        device_code_id = %device_code_info.id,
-                        risk_score = assessment.score,
-                        risk_action = ?assessment.action,
-                        factors = ?assessment.factors,
-                        "Risk assessment completed for device code approval"
-                    );
+                tracing::info!(
+                    tenant_id = %tenant_id,
+                    user_id = %user_id,
+                    device_code_id = %device_code_info.id,
+                    risk_score = assessment.score,
+                    risk_action = ?assessment.action,
+                    factors = ?assessment.factors,
+                    "Risk assessment completed for device code approval"
+                );
 
-                    // Handle based on risk action
-                    match assessment.action {
-                        RiskAction::Approve => {
-                            // Low risk - proceed with approval
-                            tracing::info!("Low risk approval, proceeding directly");
-                        }
-                        RiskAction::RequireEmailConfirmation => {
-                            // Medium risk - require email confirmation
-                            if let Some(ref confirmation_service) =
-                                state.device_confirmation_service
-                            {
-                                // Check if there's already a confirmed confirmation
-                                let pending = confirmation_service
+                // Handle based on risk action
+                match assessment.action {
+                    RiskAction::Approve => {
+                        // Low risk - proceed with approval
+                        tracing::info!("Low risk approval, proceeding directly");
+                    }
+                    RiskAction::RequireEmailConfirmation => {
+                        // Medium risk - require email confirmation
+                        if let Some(ref confirmation_service) = state.device_confirmation_service {
+                            // Check if there's already a confirmed confirmation
+                            let pending = match pending_confirmation_for_risk(
+                                confirmation_service
                                     .find_pending_confirmation(tenant_id, device_code_info.id)
-                                    .await
-                                    .ok()
-                                    .flatten();
+                                    .await,
+                            ) {
+                                Ok(p) => p,
+                                Err(_) => {
+                                    return Html(render_result_page(
+                                        false,
+                                        "Unable to verify authorization. Please try again.",
+                                    ))
+                                    .into_response();
+                                }
+                            };
 
-                                match pending {
-                                    Some(c) if c.is_confirmed() => {
-                                        // Confirmation already completed, proceed with approval
-                                        tracing::info!(
-                                            confirmation_id = %c.id,
-                                            "Email confirmation already completed, proceeding with approval"
-                                        );
-                                    }
-                                    Some(c) => {
-                                        return check_email_response(
+                            match pending {
+                                Some(c) if c.is_confirmed() => {
+                                    // Confirmation already completed, proceed with approval
+                                    tracing::info!(
+                                        confirmation_id = %c.id,
+                                        "Email confirmation already completed, proceeding with approval"
+                                    );
+                                }
+                                Some(c) => {
+                                    return check_email_response(
                                             &state,
                                             tenant_id,
                                             c.device_code_id,
@@ -633,9 +683,9 @@ pub async fn device_authorize_handler(
                                                 assessment.score
                                             ),
                                         );
-                                    }
-                                    None => {
-                                        return send_and_prompt_confirmation(
+                                }
+                                None => {
+                                    return send_and_prompt_confirmation(
                                             &state,
                                             confirmation_service.as_ref(),
                                             tenant_id,
@@ -648,55 +698,62 @@ pub async fn device_authorize_handler(
                                             ),
                                         )
                                         .await;
-                                    }
                                 }
-                            } else {
-                                // SECURITY: Confirmation service not configured — block rather than silently approve
-                                tracing::error!("Email confirmation required but DeviceConfirmationService not configured");
-                                return Html(render_result_page(
+                            }
+                        } else {
+                            // SECURITY: Confirmation service not configured — block rather than silently approve
+                            tracing::error!("Email confirmation required but DeviceConfirmationService not configured");
+                            return Html(render_result_page(
                                     false,
                                     "Additional verification is required but not available. Please contact your administrator.",
                                 ))
                                 .into_response();
-                            }
                         }
-                        RiskAction::RequireMfaAndNotify => {
-                            // High risk - require MFA and notify admins
-                            tracing::warn!(
-                                tenant_id = %tenant_id,
-                                user_id = %user_id,
-                                risk_score = assessment.score,
-                                "HIGH RISK device code approval - MFA and admin notification required"
-                            );
+                    }
+                    RiskAction::RequireMfaAndNotify => {
+                        // High risk - require MFA and notify admins
+                        tracing::warn!(
+                            tenant_id = %tenant_id,
+                            user_id = %user_id,
+                            risk_score = assessment.score,
+                            "HIGH RISK device code approval - MFA and admin notification required"
+                        );
 
-                            // Notify admins of high-risk attempt
-                            if let Err(e) = risk_service
-                                .notify_admins(tenant_id, user_id, &assessment, device_code_info.id)
-                                .await
-                            {
-                                tracing::error!(error = %e, "Failed to notify admins of high-risk approval");
-                            }
+                        // Notify admins of high-risk attempt
+                        if let Err(e) = risk_service
+                            .notify_admins(tenant_id, user_id, &assessment, device_code_info.id)
+                            .await
+                        {
+                            tracing::error!(error = %e, "Failed to notify admins of high-risk approval");
+                        }
 
-                            // TODO: Implement MFA verification flow for high-risk approvals
-                            // For now, show a warning and require email confirmation as fallback
-                            if let Some(ref confirmation_service) =
-                                state.device_confirmation_service
-                            {
-                                let pending = confirmation_service
+                        // TODO: Implement MFA verification flow for high-risk approvals
+                        // For now, show a warning and require email confirmation as fallback
+                        if let Some(ref confirmation_service) = state.device_confirmation_service {
+                            let pending = match pending_confirmation_for_risk(
+                                confirmation_service
                                     .find_pending_confirmation(tenant_id, device_code_info.id)
-                                    .await
-                                    .ok()
-                                    .flatten();
+                                    .await,
+                            ) {
+                                Ok(p) => p,
+                                Err(_) => {
+                                    return Html(render_result_page(
+                                        false,
+                                        "Unable to verify authorization. Please try again.",
+                                    ))
+                                    .into_response();
+                                }
+                            };
 
-                                match pending {
-                                    Some(c) if c.is_confirmed() => {
-                                        tracing::info!(
-                                            confirmation_id = %c.id,
-                                            "High-risk but email confirmed, proceeding with approval"
-                                        );
-                                    }
-                                    Some(c) => {
-                                        return check_email_response(
+                            match pending {
+                                Some(c) if c.is_confirmed() => {
+                                    tracing::info!(
+                                        confirmation_id = %c.id,
+                                        "High-risk but email confirmed, proceeding with approval"
+                                    );
+                                }
+                                Some(c) => {
+                                    return check_email_response(
                                             &state,
                                             tenant_id,
                                             c.device_code_id,
@@ -705,9 +762,9 @@ pub async fn device_authorize_handler(
                                                 assessment.score
                                             ),
                                         );
-                                    }
-                                    None => {
-                                        return send_and_prompt_confirmation(
+                                }
+                                None => {
+                                    return send_and_prompt_confirmation(
                                             &state,
                                             confirmation_service.as_ref(),
                                             tenant_id,
@@ -720,28 +777,27 @@ pub async fn device_authorize_handler(
                                             ),
                                         )
                                         .await;
-                                    }
                                 }
-                            } else {
-                                // SECURITY: MFA/confirmation service not configured — block rather than silently approve
-                                tracing::error!("High-risk approval requires verification but DeviceConfirmationService not configured");
-                                return Html(render_result_page(
+                            }
+                        } else {
+                            // SECURITY: MFA/confirmation service not configured — block rather than silently approve
+                            tracing::error!("High-risk approval requires verification but DeviceConfirmationService not configured");
+                            return Html(render_result_page(
                                     false,
                                     "This authorization request requires additional verification that is not currently available. Please contact your administrator.",
                                 ))
                                 .into_response();
-                            }
                         }
                     }
+                }
 
-                    // After successful approval, record the user's IP for future risk assessments
-                    if let Some(ip) = &approver_ip {
-                        if let Err(e) = risk_service
-                            .record_user_ip(tenant_id, user_id, ip, Some(&approver_country))
-                            .await
-                        {
-                            tracing::error!(error = %e, "Failed to record user IP after approval");
-                        }
+                // After successful approval, record the user's IP for future risk assessments
+                if let Some(ip) = &approver_ip {
+                    if let Err(e) = risk_service
+                        .record_user_ip(tenant_id, user_id, ip, Some(&approver_country))
+                        .await
+                    {
+                        tracing::error!(error = %e, "Failed to record user IP after approval");
                     }
                 }
             }
@@ -2111,5 +2167,51 @@ mod tests {
                 "must not advertise a sent email that was not sent ({needle})"
             );
         }
+    }
+
+    #[test]
+    fn device_code_for_risk_does_not_skip_on_error() {
+        assert!(device_code_for_risk(Ok::<Option<u8>, &str>(Some(1)))
+            .unwrap()
+            .is_some());
+        assert!(device_code_for_risk(Ok::<Option<u8>, &str>(None))
+            .unwrap()
+            .is_none());
+        assert!(device_code_for_risk(Err::<Option<u8>, _>("db down")).is_err());
+    }
+
+    #[test]
+    fn pending_confirmation_for_risk_does_not_skip_on_error() {
+        assert!(
+            pending_confirmation_for_risk(Ok::<Option<u8>, &str>(Some(1)))
+                .unwrap()
+                .is_some()
+        );
+        assert!(pending_confirmation_for_risk(Err::<Option<u8>, _>("db down")).is_err());
+    }
+
+    #[test]
+    fn device_approval_does_not_skip_risk_on_lookup_error() {
+        let src = include_str!("device.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("device_code_for_risk("),
+            "device-code lookup errors must refuse approval"
+        );
+        assert!(
+            production.contains("pending_confirmation_for_risk("),
+            "confirmation lookup errors must refuse approval"
+        );
+        for (i, _) in production.match_indices("find_pending_confirmation") {
+            let window = &production[i..(i + 220).min(production.len())];
+            assert!(
+                !window.contains(".ok()") && !window.contains("flatten()"),
+                "must not skip confirmation when pending lookup fails: {window}"
+            );
+        }
+        assert!(
+            production.contains("if let Ok(Some(device_code_info))") == false,
+            "must not skip risk scoring when device-code lookup fails"
+        );
     }
 }

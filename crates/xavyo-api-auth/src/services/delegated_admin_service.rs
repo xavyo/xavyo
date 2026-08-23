@@ -544,14 +544,17 @@ impl DelegatedAdminService {
         self.invalidate_user_permission_cache(tenant_id, user_id);
 
         // Revoke user's active sessions so new permissions take effect immediately
-        let _ = sqlx::query(
-            "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
+        session_revoke_result(
+            sqlx::query(
+                "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
              WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+            )
+            .bind(user_id)
+            .bind(tenant_id)
+            .execute(&self.pool)
+            .await,
         )
-        .bind(user_id)
-        .bind(tenant_id)
-        .execute(&self.pool)
-        .await;
+        .map_err(ApiAuthError::Database)?;
 
         // Log the action
         self.log_admin_action(
@@ -721,14 +724,17 @@ impl DelegatedAdminService {
         self.invalidate_user_permission_cache(tenant_id, assignment.user_id);
 
         // Revoke user's active sessions so permission removal takes effect immediately
-        let _ = sqlx::query(
-            "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
+        session_revoke_result(
+            sqlx::query(
+                "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
              WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+            )
+            .bind(assignment.user_id)
+            .bind(tenant_id)
+            .execute(&self.pool)
+            .await,
         )
-        .bind(assignment.user_id)
-        .bind(tenant_id)
-        .execute(&self.pool)
-        .await;
+        .map_err(ApiAuthError::Database)?;
 
         // Log the action
         self.log_admin_action(
@@ -991,6 +997,19 @@ impl DelegatedAdminService {
     }
 }
 
+/// Fail-closed mapping for session revocation after a permission change.
+/// Swallowing the error reported the assignment as applied while old sessions
+/// kept the previous permissions.
+pub(crate) fn session_revoke_result<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, E> {
+    match result {
+        Ok(value) => Ok(value),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to revoke sessions after permission change");
+            Err(e)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1052,5 +1071,25 @@ mod tests {
         assert!(effective.is_in_scope("group", "marketing"));
         assert!(!effective.is_in_scope("group", "engineering"));
         assert!(!effective.is_in_scope("department", "sales"));
+    }
+
+    #[test]
+    fn session_revoke_result_does_not_skip_on_error() {
+        assert!(session_revoke_result(Ok::<u64, &str>(1)).is_ok());
+        assert!(session_revoke_result(Err::<u64, _>("db down")).is_err());
+    }
+
+    #[test]
+    fn permission_change_does_not_swallow_session_revoke() {
+        let src = include_str!("delegated_admin_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("session_revoke_result("),
+            "session revoke after permission change must fail closed"
+        );
+        assert!(
+            !production.contains("let _ = sqlx::query("),
+            "must not swallow session revoke after assign/revoke"
+        );
     }
 }
