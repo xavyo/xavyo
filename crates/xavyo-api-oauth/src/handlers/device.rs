@@ -27,6 +27,7 @@ use tracing::warn;
 use utoipa::ToSchema;
 use uuid::Uuid;
 use xavyo_api_auth::services::SessionService;
+use xavyo_api_auth::TrustXff;
 
 /// Device authorization grant type URN.
 pub const DEVICE_CODE_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:device_code";
@@ -176,6 +177,15 @@ fn extract_tenant_id(headers: &HeaderMap) -> Result<Uuid, OAuthError> {
         .map_err(|_| OAuthError::InvalidRequest("X-Tenant-ID must be a valid UUID".to_string()))
 }
 
+/// Peer IP, using forwarded headers only when `TrustXff` is present.
+fn origin_ip(
+    headers: &HeaderMap,
+    connect_info: Option<&ConnectInfo<SocketAddr>>,
+    trust_xff: bool,
+) -> Option<String> {
+    extract_origin_ip(headers, connect_info.map(|ci| &ci.0), trust_xff)
+}
+
 /// Request a device authorization code.
 ///
 /// POST /oauth/device/code
@@ -198,6 +208,7 @@ pub async fn device_authorization_handler(
     State(state): State<OAuthState>,
     headers: HeaderMap,
     connect_info: Option<ConnectInfo<SocketAddr>>,
+    trust_xff: Option<Extension<TrustXff>>,
     Form(request): Form<DeviceAuthorizationRequest>,
 ) -> Result<axum::Json<DeviceAuthorizationResponse>, OAuthError> {
     // Extract tenant_id from header
@@ -240,8 +251,7 @@ pub async fn device_authorization_handler(
     let verification_uri = format!("{}/device", state.issuer);
 
     // Storm-2372 remediation (F117): Extract origin context from request
-    let socket_addr = connect_info.as_ref().map(|ci| &ci.0);
-    let origin_ip = extract_origin_ip(&headers, socket_addr);
+    let origin_ip = origin_ip(&headers, connect_info.as_ref(), trust_xff.is_some());
     let origin_country = Some(extract_country_code(&headers));
     let origin_user_agent = headers
         .get("User-Agent")
@@ -332,6 +342,8 @@ pub async fn device_verify_code_handler(
     State(state): State<OAuthState>,
     Extension(session_service): Extension<Arc<SessionService>>,
     headers: HeaderMap,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
+    trust_xff: Option<Extension<TrustXff>>,
     Form(request): Form<DeviceVerifyRequest>,
 ) -> Response {
     // Determine secure flag based on environment
@@ -414,7 +426,7 @@ pub async fn device_verify_code_handler(
             if is_authenticated {
                 // Storm-2372 Remediation (F117): Build enhanced approval context
                 // Get approver's IP for mismatch detection
-                let approver_ip = extract_origin_ip(&headers, None);
+                let approver_ip = origin_ip(&headers, connect_info.as_ref(), trust_xff.is_some());
 
                 // Fetch client name for display (None if unknown)
                 let client_name = device_service
@@ -486,6 +498,8 @@ pub async fn device_authorize_handler(
     State(state): State<OAuthState>,
     Extension(session_service): Extension<Arc<SessionService>>,
     headers: HeaderMap,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
+    trust_xff: Option<Extension<TrustXff>>,
     Form(request): Form<DeviceAuthorizeRequest>,
 ) -> Response {
     // Validate CSRF token
@@ -538,7 +552,8 @@ pub async fn device_authorize_handler(
                     .find_pending_by_user_code(tenant_id, &request.user_code)
                     .await
                 {
-                    let approver_ip = extract_origin_ip(&headers, None);
+                    let approver_ip =
+                        origin_ip(&headers, connect_info.as_ref(), trust_xff.is_some());
                     let approver_country = extract_country_code(&headers);
                     let approver_user_agent = headers
                         .get("user-agent")
