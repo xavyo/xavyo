@@ -658,6 +658,24 @@ pub fn social_login_allowed(is_active: bool, is_locked: bool) -> Result<(), Soci
     Ok(())
 }
 
+/// Email lookup failures or a missing user must refuse social JWT issuance.
+pub fn social_email_from_lookup<E: std::fmt::Display>(
+    result: Result<Option<String>, E>,
+) -> Result<String, SocialError> {
+    match result {
+        Ok(Some(email)) => Ok(email),
+        Ok(None) => Err(SocialError::InternalError {
+            message: "User email not found".to_string(),
+        }),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to fetch user email during social login");
+            Err(SocialError::InternalError {
+                message: "Failed to fetch user email".to_string(),
+            })
+        }
+    }
+}
+
 /// Role lookup failures must refuse social token issuance, not mint `["user"]`.
 pub fn social_roles_from_lookup<E: std::fmt::Display>(
     result: Result<Vec<String>, E>,
@@ -706,6 +724,22 @@ mod tests {
             matches!(err, Err(SocialError::InternalError { ref message }) if message == "Failed to fetch user roles"),
             "got {err:?}"
         );
+    }
+
+    #[test]
+    fn social_email_from_lookup_does_not_fail_open() {
+        assert_eq!(
+            social_email_from_lookup(Ok::<_, &str>(Some("a@b.c".into()))).unwrap(),
+            "a@b.c"
+        );
+        assert!(matches!(
+            social_email_from_lookup(Ok::<_, &str>(None)),
+            Err(SocialError::InternalError { ref message }) if message == "User email not found"
+        ));
+        assert!(matches!(
+            social_email_from_lookup(Err("db")),
+            Err(SocialError::InternalError { ref message }) if message == "Failed to fetch user email"
+        ));
     }
 
     #[test]

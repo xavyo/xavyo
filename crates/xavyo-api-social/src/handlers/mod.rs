@@ -9,7 +9,8 @@ pub mod unlink;
 pub use admin::{disable_provider, list_providers, update_provider};
 pub use authorize::{authorize, available_providers};
 pub use callback::{
-    callback_apple_post, callback_get, social_login_allowed, social_roles_from_lookup, JwtTokens,
+    callback_apple_post, callback_get, social_email_from_lookup, social_login_allowed,
+    social_roles_from_lookup, JwtTokens,
 };
 pub use link::{initiate_link, link_account, list_connections};
 pub use unlink::unlink_account;
