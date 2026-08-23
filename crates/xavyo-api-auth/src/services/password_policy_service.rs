@@ -4,7 +4,7 @@
 
 use crate::error::ApiAuthError;
 use crate::models::PasswordPolicyConfig;
-use crate::services::org_policy_service::{OrgPolicyError, OrgPolicyService};
+use crate::services::org_policy_service::OrgPolicyService;
 use crate::services::SessionService;
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
@@ -263,11 +263,12 @@ impl PasswordPolicyService {
     ) -> Result<TenantPasswordPolicy, ApiAuthError> {
         let org_service = OrgPolicyService::new(Arc::new(self.pool.clone()));
 
-        match org_service
-            .get_effective_policy_for_user(tenant_id, user_id, OrgPolicyType::Password)
-            .await
-        {
-            Ok((config, sources)) => {
+        match crate::services::org_policy_or_absent(
+            org_service
+                .get_effective_policy_for_user(tenant_id, user_id, OrgPolicyType::Password)
+                .await,
+        )? {
+            Some((config, sources)) => {
                 // Check if we got an actual org policy (not just tenant default)
                 let has_org_policy = sources.iter().any(|s| {
                     !matches!(
@@ -306,14 +307,7 @@ impl PasswordPolicyService {
                     self.get_password_policy(tenant_id).await
                 }
             }
-            Err(OrgPolicyError::OrgNotFound(_) | OrgPolicyError::PolicyNotFound) => {
-                // No org policy exists, fall back to tenant policy
-                self.get_password_policy(tenant_id).await
-            }
-            Err(e) => {
-                warn!(error = %e, "Failed to resolve org password policy, falling back to tenant");
-                self.get_password_policy(tenant_id).await
-            }
+            None => self.get_password_policy(tenant_id).await,
         }
     }
 
@@ -861,6 +855,20 @@ mod tests {
         assert!(
             !production.contains("HIBP_FAIL_CLOSED"),
             "must not default fail-open via HIBP_FAIL_CLOSED"
+        );
+    }
+
+    #[test]
+    fn effective_password_policy_does_not_fail_open_on_org_error() {
+        let src = include_str!("password_policy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("org_policy_or_absent"),
+            "org password policy lookup errors must refuse"
+        );
+        assert!(
+            !production.contains("falling back to tenant"),
+            "must not skip org password policy on lookup error"
         );
     }
 }

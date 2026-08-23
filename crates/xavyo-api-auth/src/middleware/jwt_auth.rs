@@ -104,30 +104,17 @@ pub async fn jwt_auth_middleware(
         return Err((StatusCode::UNAUTHORIZED, "Empty bearer token").into_response());
     }
 
-    // Resolve the correct public key for validation (F069-S5: kid-based lookup)
-    let resolved_key = if let Some(ref keys) = public_keys {
-        // Try to extract kid from token header to find the correct key
-        match extract_kid(token) {
-            Ok(Some(kid)) => {
-                if let Some(key_pem) = keys.get(&kid) {
-                    key_pem.clone()
-                } else {
-                    tracing::warn!(kid = %kid, "Token kid not found in known keys, falling back to default");
-                    default_public_key.clone()
-                }
-            }
-            Ok(None) => {
-                // No kid in token header, use default key
-                default_public_key.clone()
-            }
-            Err(_) => {
-                // Failed to parse header, use default key (decode_token will catch real errors)
-                default_public_key.clone()
-            }
-        }
-    } else {
-        default_public_key
-    };
+    // Resolve the correct public key for validation (F069-S5: kid-based lookup).
+    // Unknown kids and unreadable headers must not fall back to the default key.
+    let resolved_key = resolve_jwt_verification_key(
+        extract_kid(token),
+        public_keys.as_ref(),
+        &default_public_key,
+    )
+    .map_err(|reason| {
+        tracing::warn!(reason, "Rejected token during signing-key resolution");
+        (StatusCode::UNAUTHORIZED, "Invalid or expired token").into_response()
+    })?;
 
     // Decode and validate JWT (iss/aud must match tokens minted by TokenConfig)
     let expected = request
@@ -597,6 +584,27 @@ pub struct AllowPartialToken;
 /// Fail-closed mapping for revoke-all sentinel lookups.
 ///
 /// Query errors previously treated cascade-revoked tokens as still valid.
+/// Select the JWT verification key from an optional kid map.
+///
+/// When a key map is present, an unreadable header or unknown `kid` is rejected
+/// instead of verifying against the default key (which would accept a token
+/// that names a rotated/revoked key while being signed by the current one).
+/// Tokens with no `kid` still use the default (pre-rotation issuers).
+pub fn resolve_jwt_verification_key(
+    kid: Result<Option<String>, xavyo_auth::AuthError>,
+    keys: Option<&HashMap<String, String>>,
+    default_key: &str,
+) -> Result<String, &'static str> {
+    let Some(map) = keys else {
+        return Ok(default_key.to_string());
+    };
+    match kid {
+        Err(_) => Err("invalid token header"),
+        Ok(None) => Ok(default_key.to_string()),
+        Ok(Some(kid)) => map.get(&kid).cloned().ok_or("unknown token signing key"),
+    }
+}
+
 /// Any lookup failure must be treated as revoked.
 pub fn sentinel_query_revoked<E: std::fmt::Display>(result: Result<bool, E>) -> bool {
     match result {
@@ -670,6 +678,69 @@ mod tests {
         assert!(
             !production.contains("unwrap_or(false)"),
             "must not treat sentinel query errors as not-revoked"
+        );
+    }
+
+    #[test]
+    fn resolve_jwt_key_uses_default_when_no_map() {
+        assert_eq!(
+            resolve_jwt_verification_key(Ok(Some("k1".into())), None, "default").unwrap(),
+            "default"
+        );
+    }
+
+    #[test]
+    fn resolve_jwt_key_uses_default_when_kid_absent() {
+        let mut keys = HashMap::new();
+        keys.insert("k1".into(), "pem1".into());
+        assert_eq!(
+            resolve_jwt_verification_key(Ok(None), Some(&keys), "default").unwrap(),
+            "default"
+        );
+    }
+
+    #[test]
+    fn resolve_jwt_key_selects_mapped_kid() {
+        let mut keys = HashMap::new();
+        keys.insert("k1".into(), "pem1".into());
+        assert_eq!(
+            resolve_jwt_verification_key(Ok(Some("k1".into())), Some(&keys), "default").unwrap(),
+            "pem1"
+        );
+    }
+
+    #[test]
+    fn resolve_jwt_key_rejects_unknown_kid() {
+        let mut keys = HashMap::new();
+        keys.insert("k1".into(), "pem1".into());
+        assert!(
+            resolve_jwt_verification_key(Ok(Some("rotated".into())), Some(&keys), "default")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn resolve_jwt_key_rejects_unreadable_header() {
+        let keys = HashMap::new();
+        assert!(resolve_jwt_verification_key(
+            Err(xavyo_auth::AuthError::InvalidToken("bad".into())),
+            Some(&keys),
+            "default"
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn jwt_auth_does_not_fallback_unknown_kid() {
+        let src = include_str!("jwt_auth.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("resolve_jwt_verification_key("),
+            "signing-key lookup must fail closed"
+        );
+        assert!(
+            !production.contains("falling back to default"),
+            "must not verify unknown kids against the default key"
         );
     }
 }

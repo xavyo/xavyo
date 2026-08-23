@@ -10,8 +10,9 @@ pub mod session_activity;
 pub use api_key::{api_key_auth_middleware, api_key_roles, ApiKeyContext, ApiKeyError};
 pub use ip_filter::{check_org_ip_restriction, extract_client_ip, ip_filter_middleware};
 pub use jwt_auth::{
-    jwt_auth_middleware, sentinel_query_revoked, tenant_header_agrees, AllowPartialToken,
-    IssuerUrl, JwtExpectedAudience, JwtPublicKey, JwtPublicKeys, ServiceAccountMarker, TrustXff,
+    jwt_auth_middleware, resolve_jwt_verification_key, sentinel_query_revoked,
+    tenant_header_agrees, AllowPartialToken, IssuerUrl, JwtExpectedAudience, JwtPublicKey,
+    JwtPublicKeys, ServiceAccountMarker, TrustXff,
 };
 pub use permission_guard::{
     check_resource_scope, is_super_admin, permission_guard_layer, permission_guard_middleware,

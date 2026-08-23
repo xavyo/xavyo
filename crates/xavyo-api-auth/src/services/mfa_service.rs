@@ -670,13 +670,15 @@ impl MfaService {
     ) -> Result<MfaRequirement, ApiAuthError> {
         let org_service = OrgPolicyService::new(Arc::new(self.pool.clone()));
 
-        match org_service
-            .get_effective_policy_for_user(tenant_id, user_id, OrgPolicyType::Mfa)
-            .await
-        {
-            Ok((config, _sources)) => {
-                let mfa_config: MfaPolicyConfig =
-                    serde_json::from_value(config).unwrap_or_default();
+        match crate::services::org_policy_or_absent(
+            org_service
+                .get_effective_policy_for_user(tenant_id, user_id, OrgPolicyType::Mfa)
+                .await,
+        )? {
+            Some((config, _sources)) => {
+                let mfa_config: MfaPolicyConfig = serde_json::from_value(config).map_err(|e| {
+                    ApiAuthError::Internal(format!("Invalid org MFA policy config: {e}"))
+                })?;
 
                 Ok(MfaRequirement {
                     required: mfa_config.required,
@@ -685,15 +687,12 @@ impl MfaService {
                     remember_device_days: mfa_config.remember_device_days,
                 })
             }
-            Err(_) => {
-                // If org policy resolution fails, return non-required default
-                Ok(MfaRequirement {
-                    required: false,
-                    allowed_methods: vec!["totp".to_string(), "webauthn".to_string()],
-                    grace_period_hours: 0,
-                    remember_device_days: 0,
-                })
-            }
+            None => Ok(MfaRequirement {
+                required: false,
+                allowed_methods: vec!["totp".to_string(), "webauthn".to_string()],
+                grace_period_hours: 0,
+                remember_device_days: 0,
+            }),
         }
     }
 
@@ -832,5 +831,23 @@ mod tests {
         assert_eq!(secret1.len(), TOTP_SECRET_LENGTH);
         assert_eq!(secret2.len(), TOTP_SECRET_LENGTH);
         assert_ne!(secret1, secret2); // Random secrets should differ
+    }
+
+    #[test]
+    fn mfa_requirement_does_not_fail_open_on_org_policy_error() {
+        let src = include_str!("mfa_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("org_policy_or_absent"),
+            "org MFA policy lookup errors must refuse"
+        );
+        assert!(
+            !production.contains("return non-required default"),
+            "must not skip MFA when org policy lookup fails"
+        );
+        assert!(
+            !production.contains("unwrap_or_default()"),
+            "must not treat invalid MFA config as not-required"
+        );
     }
 }

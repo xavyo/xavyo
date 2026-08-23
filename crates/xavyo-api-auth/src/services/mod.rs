@@ -108,4 +108,4 @@ pub use admin_invite_service::AdminInviteService;
 pub mod org_policy_service;
 
 // Organization Security Policy exports (F-066)
-pub use org_policy_service::{OrgPolicyError, OrgPolicyService};
+pub use org_policy_service::{org_policy_or_absent, OrgPolicyError, OrgPolicyService};
