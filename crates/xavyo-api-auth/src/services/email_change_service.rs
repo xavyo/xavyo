@@ -220,7 +220,7 @@ impl EmailChangeService {
         let token_hash = hash_token(token);
 
         // Find the pending request
-        let request = EmailChangeRequest::find_by_token_hash(&self.pool, &token_hash)
+        let request = EmailChangeRequest::find_by_token_hash(&self.pool, tenant_id, &token_hash)
             .await
             .map_err(ApiAuthError::Database)?
             .ok_or(ApiAuthError::EmailChangeTokenInvalid)?;
@@ -366,6 +366,22 @@ mod tests {
         assert!(
             !production.contains("EmailChangeRequest::mark_verified(&self.pool, request.id)"),
             "must not mark email change requests verified by id alone"
+        );
+    }
+
+    #[test]
+    fn email_change_token_lookup_passes_tenant_id() {
+        let src = include_str!("email_change_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains(
+                "EmailChangeRequest::find_by_token_hash(&self.pool, tenant_id, &token_hash)"
+            ),
+            "email change token lookup must pass tenant_id"
+        );
+        assert!(
+            !production.contains("EmailChangeRequest::find_by_token_hash(&self.pool, &token_hash)"),
+            "must not look up email change requests by token hash alone"
         );
     }
 }

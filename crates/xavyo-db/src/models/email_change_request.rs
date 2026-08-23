@@ -82,17 +82,20 @@ impl EmailChangeRequest {
     /// Find a pending email change request by token hash.
     pub async fn find_by_token_hash(
         pool: &sqlx::PgPool,
+        tenant_id: uuid::Uuid,
         token_hash: &str,
     ) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as(
             r"
             SELECT * FROM email_change_requests
             WHERE token_hash = $1
+            AND tenant_id = $2
             AND verified_at IS NULL
             AND cancelled_at IS NULL
             ",
         )
         .bind(token_hash)
+        .bind(tenant_id)
         .fetch_optional(pool)
         .await
     }
@@ -287,6 +290,24 @@ mod tests {
         assert!(
             !lookup.contains("WHERE id = $1\n            RETURNING"),
             "must not mark email change requests verified by id alone"
+        );
+    }
+
+    #[test]
+    fn find_by_token_hash_scopes_by_tenant() {
+        let src = include_str!("email_change_request.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("fn find_by_token_hash")
+            .nth(1)
+            .expect("find_by_token_hash");
+        assert!(
+            lookup.contains("AND tenant_id = $2"),
+            "email change token lookup must include tenant_id"
+        );
+        assert!(
+            !lookup.contains("WHERE token_hash = $1\n            AND verified_at IS NULL"),
+            "must not look up email change requests by token hash alone"
         );
     }
 

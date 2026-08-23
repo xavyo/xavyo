@@ -148,9 +148,10 @@ async fn process_forgot_password(
 
     // Invalidate any existing unused tokens for this user
     sqlx::query(
-        "UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL",
+        "UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND tenant_id = $2 AND used_at IS NULL",
     )
     .bind(user_id)
+    .bind(tenant_id.as_uuid())
     .execute(&mut *tx)
     .await?;
 
@@ -212,5 +213,19 @@ mod tests {
         assert_eq!(resets.len(), 1);
         assert_eq!(resets[0].0, "test@example.com");
         assert_eq!(resets[0].1, "token123");
+    }
+
+    #[test]
+    fn forgot_password_invalidates_reset_tokens_by_tenant() {
+        let src = include_str!("forgot_password.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE user_id = $1 AND tenant_id = $2 AND used_at IS NULL"),
+            "invalidating unused reset tokens must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE user_id = $1 AND used_at IS NULL"),
+            "must not invalidate reset tokens by user_id alone"
+        );
     }
 }

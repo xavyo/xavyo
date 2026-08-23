@@ -449,7 +449,8 @@ impl TokenService {
         refresh_account_status(is_active, account_is_locked(locked_at, locked_until))?;
 
         // Revoke the old refresh token (token rotation)
-        self.revoke_token_by_hash(&token.token_hash).await?;
+        self.revoke_token_by_hash(&token.token_hash, token.tenant_id)
+            .await?;
 
         // Fail closed: a role-lookup error must not mint a downgraded JWT.
         let roles = refresh_roles(
@@ -490,21 +491,38 @@ impl TokenService {
     }
 
     /// Revoke a refresh token by its opaque value.
+    ///
+    /// Tenant is read from the token row, then the write is tenant-scoped.
     pub async fn revoke_token(&self, opaque_token: &str) -> Result<(), ApiAuthError> {
         let token_hash = hash_token(opaque_token);
-        self.revoke_token_by_hash(&token_hash).await
+        let tenant_id: Option<uuid::Uuid> =
+            sqlx::query_scalar("SELECT tenant_id FROM refresh_tokens WHERE token_hash = $1")
+                .bind(&token_hash)
+                .fetch_optional(&self.pool)
+                .await?;
+
+        if let Some(tenant_id) = tenant_id {
+            self.revoke_token_by_hash(&token_hash, tenant_id).await?;
+        }
+
+        Ok(())
     }
 
-    /// Revoke a refresh token by its hash.
-    async fn revoke_token_by_hash(&self, token_hash: &str) -> Result<(), ApiAuthError> {
+    /// Revoke a refresh token by its hash within a tenant.
+    async fn revoke_token_by_hash(
+        &self,
+        token_hash: &str,
+        tenant_id: uuid::Uuid,
+    ) -> Result<(), ApiAuthError> {
         let query = r"
             UPDATE refresh_tokens
             SET revoked_at = NOW()
-            WHERE token_hash = $1 AND revoked_at IS NULL
+            WHERE token_hash = $1 AND tenant_id = $2 AND revoked_at IS NULL
         ";
 
         sqlx::query(query)
             .bind(token_hash)
+            .bind(tenant_id)
             .execute(&self.pool)
             .await?;
 
@@ -908,5 +926,27 @@ mod tests {
             Some(now),
             Some(now - chrono::Duration::hours(1))
         ));
+    }
+
+    #[test]
+    fn refresh_token_revoke_filters_tenant_id() {
+        let src = include_str!("token_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("revoke_token_by_hash(&token.token_hash, token.tenant_id)"),
+            "refresh rotation must revoke by tenant"
+        );
+        assert!(
+            production.contains("WHERE token_hash = $1 AND tenant_id = $2 AND revoked_at IS NULL"),
+            "hash revoke must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE token_hash = $1 AND revoked_at IS NULL\n"),
+            "must not revoke refresh tokens by hash alone"
+        );
+        assert!(
+            production.contains("SELECT tenant_id FROM refresh_tokens WHERE token_hash = $1"),
+            "logout revoke must discover tenant_id before the write"
+        );
     }
 }
