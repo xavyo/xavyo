@@ -39,7 +39,6 @@ type EmailVerificationTokenRow = (
 )]
 pub async fn verify_email_handler(
     Extension(pool): Extension<PgPool>,
-    Extension(_tenant_id): Extension<TenantId>,
     Json(request): Json<VerifyEmailRequest>,
 ) -> Result<Json<VerifyEmailResponse>, ApiAuthError> {
     // Validate request format
@@ -180,5 +179,15 @@ mod tests {
         let response = VerifyEmailResponse::already_verified();
         assert!(response.message.contains("verified"));
         assert!(response.already_verified);
+    }
+
+    #[test]
+    fn verify_email_does_not_use_request_tenant_header() {
+        let src = include_str!("verify_email.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("Extension(_tenant_id)"),
+            "verify-email must derive tenant from the token, not X-Tenant-ID"
+        );
     }
 }
