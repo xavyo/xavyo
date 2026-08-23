@@ -743,7 +743,7 @@ impl WebAuthnService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
-        UserWebAuthnCredential::has_enabled_credentials(&mut *conn, user_id)
+        UserWebAuthnCredential::has_enabled_credentials(&mut *conn, tenant_id, user_id)
             .await
             .map_err(ApiAuthError::Database)
     }
@@ -890,5 +890,19 @@ mod tests {
     fn test_constants() {
         assert_eq!(MAX_FAILED_ATTEMPTS, 5);
         assert_eq!(LOCKOUT_MINUTES, 5);
+    }
+
+    #[test]
+    fn has_webauthn_enabled_passes_tenant_id() {
+        let src = include_str!("webauthn_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("fn has_webauthn_enabled")
+            .nth(1)
+            .expect("has_webauthn_enabled");
+        assert!(
+            lookup.contains("has_enabled_credentials(&mut *conn, tenant_id, user_id)"),
+            "WebAuthn MFA check must pass tenant_id"
+        );
     }
 }

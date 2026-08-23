@@ -229,8 +229,12 @@ impl BrandingAsset {
         .await
     }
 
-    /// Check if asset is referenced in tenant branding.
-    pub async fn is_referenced<'e, E>(executor: E, storage_path: &str) -> Result<bool, sqlx::Error>
+    /// Check if asset is referenced in this tenant's branding.
+    pub async fn is_referenced<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        storage_path: &str,
+    ) -> Result<bool, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
@@ -239,14 +243,16 @@ impl BrandingAsset {
             r"
             SELECT EXISTS(
                 SELECT 1 FROM tenant_branding
-                WHERE logo_url LIKE $1
-                   OR logo_dark_url LIKE $1
-                   OR favicon_url LIKE $1
-                   OR email_logo_url LIKE $1
-                   OR login_page_background_url LIKE $1
+                WHERE tenant_id = $1
+                  AND (logo_url LIKE $2
+                   OR logo_dark_url LIKE $2
+                   OR favicon_url LIKE $2
+                   OR email_logo_url LIKE $2
+                   OR login_page_background_url LIKE $2)
             )
             ",
         )
+        .bind(tenant_id)
         .bind(&pattern)
         .fetch_one(executor)
         .await?;
@@ -311,5 +317,23 @@ mod tests {
     fn test_asset_list_filter_default() {
         let filter = AssetListFilter::default();
         assert!(filter.asset_type.is_none());
+    }
+
+    #[test]
+    fn is_referenced_scopes_by_tenant() {
+        let src = include_str!("branding_asset.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("fn is_referenced")
+            .nth(1)
+            .expect("is_referenced");
+        assert!(
+            lookup.contains("WHERE tenant_id = $1"),
+            "branding reference lookup must include tenant_id"
+        );
+        assert!(
+            !lookup.contains("WHERE logo_url LIKE $1"),
+            "must not scan tenant_branding without tenant_id"
+        );
     }
 }

@@ -437,17 +437,19 @@ impl UserWebAuthnCredential {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Check if user has any enabled `WebAuthn` credentials.
+    /// Check if user has any enabled `WebAuthn` credentials in this tenant.
     pub async fn has_enabled_credentials<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<bool, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
         let result: (bool,) = sqlx::query_as(
-            "SELECT EXISTS(SELECT 1 FROM user_webauthn_credentials WHERE user_id = $1 AND is_enabled = true)",
+            "SELECT EXISTS(SELECT 1 FROM user_webauthn_credentials WHERE tenant_id = $1 AND user_id = $2 AND is_enabled = true)",
         )
+        .bind(tenant_id)
         .bind(user_id)
         .fetch_one(executor)
         .await?;
@@ -509,5 +511,23 @@ mod tests {
         let info: CredentialInfo = cred.into();
         assert_eq!(info.name, "My YubiKey");
         assert_eq!(info.authenticator_type, "cross-platform");
+    }
+
+    #[test]
+    fn has_enabled_credentials_scopes_by_tenant() {
+        let src = include_str!("webauthn_credential.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("has_enabled_credentials")
+            .nth(1)
+            .expect("has_enabled_credentials");
+        assert!(
+            lookup.contains("tenant_id = $1 AND user_id = $2"),
+            "MFA credential lookup must include tenant_id"
+        );
+        assert!(
+            !lookup.contains("WHERE user_id = $1 AND is_enabled"),
+            "must not look up credentials by user_id alone"
+        );
     }
 }

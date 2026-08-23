@@ -239,27 +239,27 @@ impl EffectiveAccessService {
     ///
     /// Returns a list of (`role_id`, `role_name`) tuples for roles the user is assigned to.
     /// Only returns non-abstract roles (abstract roles cannot be directly assigned).
+    /// Joins `user_roles` through `users` so a missing `tenant_id` on `user_roles`
+    /// cannot leak another tenant's assignments.
     async fn get_user_gov_roles(
         &self,
         tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<Vec<(Uuid, String)>> {
-        // Query gov_role_assignments (F088) to get user's assigned governance roles
-        // Note: This table would need to exist for role assignments
-        // For now, check if there's a gov_user_role_assignments or similar table
         let roles: Vec<(Uuid, String)> = sqlx::query_as(
             r"
             SELECT r.id, r.name
             FROM gov_roles r
-            JOIN gov_user_role_assignments ura ON r.id = ura.role_id
-            WHERE ura.tenant_id = $1 AND ura.user_id = $2 AND r.is_abstract = false
+            JOIN user_roles ur ON ur.role_name = r.name
+            JOIN users u ON ur.user_id = u.id AND u.tenant_id = $1
+            WHERE ur.user_id = $2 AND r.tenant_id = $1 AND r.is_abstract = false
             ",
         )
         .bind(tenant_id)
         .bind(user_id)
         .fetch_all(&self.pool)
         .await
-        .unwrap_or_default(); // Return empty if table doesn't exist yet
+        .map_err(GovernanceError::Database)?;
 
         Ok(roles)
     }
@@ -282,5 +282,35 @@ mod tests {
         let json = serde_json::to_string(&group).unwrap();
         assert!(json.contains("group_id"));
         assert!(json.contains("Admins"));
+    }
+
+    #[test]
+    fn get_user_gov_roles_uses_real_assignments_and_fail_closed() {
+        let src = include_str!("effective_access_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("fn get_user_gov_roles")
+            .nth(1)
+            .expect("get_user_gov_roles");
+        assert!(
+            lookup.contains("JOIN user_roles ur ON ur.role_name = r.name"),
+            "gov roles must come from user_roles, not a phantom table"
+        );
+        assert!(
+            lookup.contains("JOIN users u ON ur.user_id = u.id AND u.tenant_id = $1"),
+            "user_roles lookup must join users for tenant isolation"
+        );
+        assert!(
+            lookup.contains("map_err(GovernanceError::Database)"),
+            "assignment lookup errors must fail closed"
+        );
+        assert!(
+            !lookup.contains("gov_user_role_assignments"),
+            "must not query a table that does not exist"
+        );
+        assert!(
+            !lookup.contains("unwrap_or_default()"),
+            "must not swallow lookup errors as empty roles"
+        );
     }
 }

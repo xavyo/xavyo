@@ -229,7 +229,7 @@ impl BulkActionJob {
         // Process in batches
         loop {
             // Check for cancellation before each batch
-            if self.check_cancelled(action.id).await? {
+            if self.check_cancelled(action.tenant_id, action.id).await? {
                 info!(action_id = %action.id, "Bulk action was cancelled");
                 stats.cancelled = 1;
                 return Ok(stats);
@@ -319,12 +319,17 @@ impl BulkActionJob {
     }
 
     /// Check if the action has been cancelled.
-    async fn check_cancelled(&self, action_id: Uuid) -> Result<bool, BulkActionJobError> {
+    async fn check_cancelled(
+        &self,
+        tenant_id: Uuid,
+        action_id: Uuid,
+    ) -> Result<bool, BulkActionJobError> {
         let status: Option<(String,)> = sqlx::query_as(
             r#"
-            SELECT status FROM gov_bulk_actions WHERE id = $1
+            SELECT status FROM gov_bulk_actions WHERE tenant_id = $1 AND id = $2
             "#,
         )
+        .bind(tenant_id)
         .bind(action_id)
         .fetch_optional(self.pool.as_ref())
         .await
@@ -588,5 +593,23 @@ mod tests {
     fn test_with_rate_limit() {
         // Test that rate_limit_per_sec defaults are correct
         assert_eq!(DEFAULT_RATE_LIMIT_PER_SEC, 0.0);
+    }
+
+    #[test]
+    fn check_cancelled_scopes_by_tenant() {
+        let src = include_str!("bulk_action_job.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let lookup = production
+            .split("fn check_cancelled")
+            .nth(1)
+            .expect("check_cancelled");
+        assert!(
+            lookup.contains("WHERE tenant_id = $1 AND id = $2"),
+            "cancellation lookup must include tenant_id"
+        );
+        assert!(
+            !lookup.contains("FROM gov_bulk_actions WHERE id = $1"),
+            "must not look up bulk actions by id alone"
+        );
     }
 }
