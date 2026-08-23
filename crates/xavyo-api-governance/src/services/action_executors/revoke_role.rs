@@ -34,17 +34,20 @@ impl RevokeRoleExecutor {
     /// Check if the user has the specified role.
     async fn user_has_role(
         pool: &PgPool,
+        tenant_id: Uuid,
         user_id: Uuid,
         role_name: &str,
     ) -> Result<bool, sqlx::Error> {
         let count: (i64,) = sqlx::query_as(
             r#"
-            SELECT COUNT(*) FROM user_roles
-            WHERE user_id = $1 AND role_name = $2
+            SELECT COUNT(*) FROM user_roles ur
+            JOIN users u ON ur.user_id = u.id AND u.tenant_id = $3
+            WHERE ur.user_id = $1 AND ur.role_name = $2
             "#,
         )
         .bind(user_id)
         .bind(role_name)
+        .bind(tenant_id)
         .fetch_one(pool)
         .await?;
 
@@ -81,17 +84,21 @@ impl RevokeRoleExecutor {
     /// Revoke the role from the user.
     async fn revoke_role(
         pool: &PgPool,
+        tenant_id: Uuid,
         user_id: Uuid,
         role_name: &str,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r#"
-            DELETE FROM user_roles
-            WHERE user_id = $1 AND role_name = $2
+            DELETE FROM user_roles ur
+            USING users u
+            WHERE ur.user_id = $1 AND ur.role_name = $2
+              AND u.id = ur.user_id AND u.tenant_id = $3
             "#,
         )
         .bind(user_id)
         .bind(role_name)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -130,7 +137,7 @@ impl ActionExecutor for RevokeRoleExecutor {
         };
 
         // Check if user has the role
-        match Self::user_has_role(pool, target_user_id, &role_name).await {
+        match Self::user_has_role(pool, ctx.tenant_id, target_user_id, &role_name).await {
             Ok(false) => {
                 return ExecutionResult::skipped(serde_json::json!({
                     "has_role": false,
@@ -145,7 +152,7 @@ impl ActionExecutor for RevokeRoleExecutor {
         }
 
         // Revoke the role
-        match Self::revoke_role(pool, target_user_id, &role_name).await {
+        match Self::revoke_role(pool, ctx.tenant_id, target_user_id, &role_name).await {
             Ok(true) => {
                 // Invalidate all sessions for the user so they lose revoked permissions
                 if let Err(e) =
@@ -199,7 +206,7 @@ impl ActionExecutor for RevokeRoleExecutor {
             None => return (false, None, None),
         };
 
-        match Self::user_has_role(pool, target_user_id, &role_name).await {
+        match Self::user_has_role(pool, ctx.tenant_id, target_user_id, &role_name).await {
             Ok(true) => (
                 true,
                 Some(serde_json::json!({"has_role": true})),
@@ -236,6 +243,26 @@ mod tests {
         assert!(
             !production.contains("tracing::warn!"),
             "must not log-and-ignore session revoke errors"
+        );
+    }
+
+    #[test]
+    fn revoke_role_queries_join_users_tenant() {
+        let src = include_str!("revoke_role.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("JOIN users u ON ur.user_id = u.id AND u.tenant_id = $3"),
+            "role lookup must join users for tenant isolation"
+        );
+        assert!(
+            production.contains("AND u.id = ur.user_id AND u.tenant_id = $3"),
+            "role delete must join users for tenant isolation"
+        );
+        assert!(
+            !production.contains(
+                "DELETE FROM user_roles\n            WHERE user_id = $1 AND role_name = $2"
+            ),
+            "must not delete user_roles without a tenant-scoped users join"
         );
     }
 }

@@ -515,12 +515,14 @@ impl BatchSimulationService {
                 // Insert into user_roles if not already present
                 let existing_role: i64 = sqlx::query_scalar(
                     r"
-                    SELECT COUNT(*) FROM user_roles
-                    WHERE user_id = $1 AND role_name = $2
+                    SELECT COUNT(*) FROM user_roles ur
+                    JOIN users u ON ur.user_id = u.id AND u.tenant_id = $3
+                    WHERE ur.user_id = $1 AND ur.role_name = $2
                     ",
                 )
                 .bind(user_id)
                 .bind(&role_name)
+                .bind(tenant_id)
                 .fetch_one(&mut **tx)
                 .await
                 .map_err(GovernanceError::Database)?;
@@ -529,11 +531,14 @@ impl BatchSimulationService {
                     sqlx::query(
                         r"
                         INSERT INTO user_roles (user_id, role_name)
-                        VALUES ($1, $2)
+                        SELECT u.id, $2
+                        FROM users u
+                        WHERE u.id = $1 AND u.tenant_id = $3
                         ",
                     )
                     .bind(user_id)
                     .bind(&role_name)
+                    .bind(tenant_id)
                     .execute(&mut **tx)
                     .await
                     .map_err(GovernanceError::Database)?;
@@ -618,12 +623,15 @@ impl BatchSimulationService {
                     // Remove from user_roles
                     sqlx::query(
                         r"
-                        DELETE FROM user_roles
-                        WHERE user_id = $1 AND role_name = $2
+                        DELETE FROM user_roles ur
+                        USING users u
+                        WHERE ur.user_id = $1 AND ur.role_name = $2
+                          AND u.id = ur.user_id AND u.tenant_id = $3
                         ",
                     )
                     .bind(user_id)
                     .bind(&role_name)
+                    .bind(tenant_id)
                     .execute(&mut **tx)
                     .await
                     .map_err(GovernanceError::Database)?;
@@ -1198,21 +1206,23 @@ impl BatchSimulationService {
                 .bind(tenant_id)
                 .fetch_optional(&self.pool)
                 .await
-                .unwrap_or(None);
+                .map_err(GovernanceError::Database)?;
 
         let count = if let Some(ref name) = role_name {
             sqlx::query_scalar::<_, i64>(
                 r"
                 SELECT COUNT(*)
-                FROM user_roles
-                WHERE user_id = $1 AND role_name = $2
+                FROM user_roles ur
+                JOIN users u ON ur.user_id = u.id AND u.tenant_id = $3
+                WHERE ur.user_id = $1 AND ur.role_name = $2
                 ",
             )
             .bind(user_id)
             .bind(name)
+            .bind(tenant_id)
             .fetch_one(&self.pool)
             .await
-            .unwrap_or(0)
+            .map_err(GovernanceError::Database)?
         } else {
             0
         };
@@ -1223,6 +1233,7 @@ impl BatchSimulationService {
             SELECT COUNT(*)
             FROM gov_entitlement_assignments
             WHERE user_id = $1
+              AND tenant_id = $3
               AND target_type = 'role'
               AND target_id = $2
               AND status = 'active'
@@ -1230,9 +1241,10 @@ impl BatchSimulationService {
         )
         .bind(user_id)
         .bind(role_id)
+        .bind(tenant_id)
         .fetch_one(&self.pool)
         .await
-        .unwrap_or(0);
+        .map_err(GovernanceError::Database)?;
 
         Ok(count > 0 || assignment_count > 0)
     }
@@ -1240,7 +1252,7 @@ impl BatchSimulationService {
     /// Check if user has a specific entitlement.
     async fn user_has_entitlement(
         &self,
-        _tenant_id: Uuid,
+        tenant_id: Uuid,
         user_id: Uuid,
         entitlement_id: Uuid,
     ) -> Result<bool> {
@@ -1250,14 +1262,16 @@ impl BatchSimulationService {
             FROM gov_entitlement_assignments
             WHERE user_id = $1
               AND entitlement_id = $2
+              AND tenant_id = $3
               AND status = 'active'
             ",
         )
         .bind(user_id)
         .bind(entitlement_id)
+        .bind(tenant_id)
         .fetch_one(&self.pool)
         .await
-        .unwrap_or(0);
+        .map_err(GovernanceError::Database)?;
 
         Ok(count > 0)
     }
@@ -1771,5 +1785,45 @@ mod tests {
             applied_at: None,
             applied_by: None,
         }
+    }
+
+    #[test]
+    fn role_mutations_join_users_tenant_and_do_not_fail_open() {
+        let src = include_str!("batch_simulation_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("JOIN users u ON ur.user_id = u.id AND u.tenant_id = $3"),
+            "role lookup must join users for tenant isolation"
+        );
+        assert!(
+            production.contains("WHERE u.id = $1 AND u.tenant_id = $3"),
+            "role insert must select the user from the requesting tenant"
+        );
+        assert!(
+            production.contains("AND u.id = ur.user_id AND u.tenant_id = $3"),
+            "role delete must join users for tenant isolation"
+        );
+        assert!(
+            production.contains("AND tenant_id = $3"),
+            "entitlement assignment lookup must filter tenant_id"
+        );
+        let user_has_role = production
+            .split("async fn user_has_role")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("user_has_role");
+        assert!(
+            !user_has_role.contains("unwrap_or("),
+            "user_has_role must not treat query errors as no role"
+        );
+        let user_has_entitlement = production
+            .split("async fn user_has_entitlement")
+            .nth(1)
+            .and_then(|s| s.split("async fn ").next())
+            .expect("user_has_entitlement");
+        assert!(
+            !user_has_entitlement.contains("unwrap_or(0)"),
+            "user_has_entitlement must not treat query errors as no assignment"
+        );
     }
 }
