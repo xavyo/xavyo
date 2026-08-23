@@ -195,15 +195,30 @@ impl BatchMergeService {
         for candidate in candidates {
             processed += 1;
 
-            // Determine source and target based on attribute rule
-            let (source_id, target_id) = self
+            // Determine source and target based on attribute rule.
+            // Lookup errors must fail the candidate, not pick an arbitrary direction.
+            let (source_id, target_id) = match self
                 .determine_merge_direction(
                     tenant_id,
                     candidate.identity_a_id,
                     candidate.identity_b_id,
                     request.attribute_rule,
                 )
-                .await;
+                .await
+            {
+                Ok(pair) => pair,
+                Err(e) => {
+                    failed += 1;
+                    _results.push(BatchMergeItemResult {
+                        candidate_id: candidate.id,
+                        success: false,
+                        error: Some(e.to_string()),
+                        skipped: false,
+                        merge_operation_id: None,
+                    });
+                    continue;
+                }
+            };
 
             // Build attribute selections based on rule
             let attribute_selections = self.build_attribute_selections(request.attribute_rule);
@@ -281,25 +296,21 @@ impl BatchMergeService {
     /// Determine merge direction based on attribute rule.
     ///
     /// Returns (`source_id`, `target_id`) where source will be archived.
+    /// Errors if `created_at` cannot be loaded for either identity.
     async fn determine_merge_direction(
         &self,
         tenant_id: Uuid,
         identity_a_id: Uuid,
         identity_b_id: Uuid,
         rule: AttributeResolutionRule,
-    ) -> (Uuid, Uuid) {
-        // For newest/oldest_wins, we need to determine which identity is newer
-        // Based on created_at timestamp from users table
-
+    ) -> Result<(Uuid, Uuid)> {
         let user_a = sqlx::query_scalar::<_, chrono::DateTime<chrono::Utc>>(
             "SELECT created_at FROM users WHERE id = $1 AND tenant_id = $2",
         )
         .bind(identity_a_id)
         .bind(tenant_id)
         .fetch_optional(&self.pool)
-        .await
-        .ok()
-        .flatten();
+        .await?;
 
         let user_b = sqlx::query_scalar::<_, chrono::DateTime<chrono::Utc>>(
             "SELECT created_at FROM users WHERE id = $1 AND tenant_id = $2",
@@ -307,51 +318,13 @@ impl BatchMergeService {
         .bind(identity_b_id)
         .bind(tenant_id)
         .fetch_optional(&self.pool)
-        .await
-        .ok()
-        .flatten();
+        .await?;
 
-        match (user_a, user_b) {
-            (Some(a_created), Some(b_created)) => {
-                let a_is_newer = a_created > b_created;
-                match rule {
-                    AttributeResolutionRule::NewestWins => {
-                        // Keep newer (target), archive older (source)
-                        if a_is_newer {
-                            (identity_b_id, identity_a_id) // Archive B, keep A
-                        } else {
-                            (identity_a_id, identity_b_id) // Archive A, keep B
-                        }
-                    }
-                    AttributeResolutionRule::OldestWins => {
-                        // Keep older (target), archive newer (source)
-                        if a_is_newer {
-                            (identity_a_id, identity_b_id) // Archive A (newer), keep B (older)
-                        } else {
-                            (identity_b_id, identity_a_id) // Archive B (newer), keep A (older)
-                        }
-                    }
-                    AttributeResolutionRule::PreferNonNull => {
-                        // For PreferNonNull, direction doesn't matter for merge direction
-                        // as the attribute handling is done at merge time.
-                        // Default to keeping the newer record as target.
-                        if a_is_newer {
-                            (identity_b_id, identity_a_id) // Archive B, keep A
-                        } else {
-                            (identity_a_id, identity_b_id) // Archive A, keep B
-                        }
-                    }
-                }
-            }
-            _ => {
-                // Fallback: use alphabetical order by ID
-                if identity_a_id < identity_b_id {
-                    (identity_a_id, identity_b_id)
-                } else {
-                    (identity_b_id, identity_a_id)
-                }
-            }
-        }
+        merge_direction_from_created_at(identity_a_id, identity_b_id, user_a, user_b, rule).ok_or(
+            GovernanceError::Validation(
+                "Unable to determine merge direction: identity created_at missing".to_string(),
+            ),
+        )
     }
 
     /// Build attribute selections based on resolution rule.
@@ -364,6 +337,37 @@ impl BatchMergeService {
         // Custom attribute selections would be needed for manual selection
         None
     }
+}
+
+/// Decide merge direction from both identities' `created_at`.
+///
+/// Returns `None` when either timestamp is missing so the caller can fail
+/// the candidate instead of archiving an arbitrary identity.
+pub(crate) fn merge_direction_from_created_at(
+    identity_a_id: Uuid,
+    identity_b_id: Uuid,
+    created_a: Option<chrono::DateTime<chrono::Utc>>,
+    created_b: Option<chrono::DateTime<chrono::Utc>>,
+    rule: AttributeResolutionRule,
+) -> Option<(Uuid, Uuid)> {
+    let (a_created, b_created) = (created_a?, created_b?);
+    let a_is_newer = a_created > b_created;
+    Some(match rule {
+        AttributeResolutionRule::NewestWins | AttributeResolutionRule::PreferNonNull => {
+            if a_is_newer {
+                (identity_b_id, identity_a_id)
+            } else {
+                (identity_a_id, identity_b_id)
+            }
+        }
+        AttributeResolutionRule::OldestWins => {
+            if a_is_newer {
+                (identity_a_id, identity_b_id)
+            } else {
+                (identity_b_id, identity_a_id)
+            }
+        }
+    })
 }
 
 #[cfg(test)]
@@ -400,5 +404,68 @@ mod tests {
         let _ = AttributeResolutionRule::NewestWins;
         let _ = AttributeResolutionRule::OldestWins;
         let _ = AttributeResolutionRule::PreferNonNull;
+    }
+
+    #[test]
+    fn merge_direction_newest_keeps_later_created() {
+        let older = Uuid::from_u128(1);
+        let newer = Uuid::from_u128(2);
+        let t0 = chrono::DateTime::from_timestamp(1_700_000_000, 0).unwrap();
+        let t1 = chrono::DateTime::from_timestamp(1_700_000_100, 0).unwrap();
+        let (source, target) = merge_direction_from_created_at(
+            older,
+            newer,
+            Some(t0),
+            Some(t1),
+            AttributeResolutionRule::NewestWins,
+        )
+        .expect("both timestamps");
+        assert_eq!(source, older);
+        assert_eq!(target, newer);
+    }
+
+    #[test]
+    fn merge_direction_missing_created_at_does_not_guess() {
+        let a = Uuid::from_u128(1);
+        let b = Uuid::from_u128(2);
+        let t0 = chrono::DateTime::from_timestamp(1_700_000_000, 0).unwrap();
+        assert!(merge_direction_from_created_at(
+            a,
+            b,
+            Some(t0),
+            None,
+            AttributeResolutionRule::NewestWins,
+        )
+        .is_none());
+        assert!(merge_direction_from_created_at(
+            a,
+            b,
+            None,
+            None,
+            AttributeResolutionRule::OldestWins,
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn determine_merge_direction_does_not_swallow_created_at_errors() {
+        let src = include_str!("batch_merge_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("merge_direction_from_created_at("),
+            "merge direction must use fail-closed created_at"
+        );
+        let idx = production
+            .find("SELECT created_at FROM users")
+            .expect("created_at lookup");
+        let window = &production[idx..(idx + 400).min(production.len())];
+        assert!(
+            !window.contains(".ok()") && !window.contains("flatten()"),
+            "must not swallow created_at lookup errors"
+        );
+        assert!(
+            !production.contains("Fallback: use alphabetical order by ID"),
+            "must not archive an arbitrary identity when created_at is missing"
+        );
     }
 }

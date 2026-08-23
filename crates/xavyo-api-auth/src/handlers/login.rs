@@ -113,94 +113,99 @@ pub async fn login_handler(
     {
         Ok(user) => user,
         Err(ApiAuthError::InvalidCredentials) => {
-            // Try to find user to record failed attempt
-            if let Ok(Some(user)) = auth_service
-                .get_user_by_email(tenant_id, &request.email)
-                .await
-            {
-                // Record failed attempt and check lockout (F024)
-                let lockout_status = lockout_service
-                    .record_failed_attempt(
-                        user.id,
-                        *tenant_id.as_uuid(),
-                        &request.email,
-                        ip_str.as_deref(),
-                        FailureReason::InvalidPassword,
-                    )
-                    .await?;
+            // Try to find user to record failed attempt. Lookup errors must
+            // refuse the request, not skip lockout as unknown-email.
+            match user_for_lockout_record(
+                auth_service
+                    .get_user_by_email(tenant_id, &request.email)
+                    .await,
+            )? {
+                Some(user) => {
+                    // Record failed attempt and check lockout (F024)
+                    let lockout_status = lockout_service
+                        .record_failed_attempt(
+                            user.id,
+                            *tenant_id.as_uuid(),
+                            &request.email,
+                            ip_str.as_deref(),
+                            FailureReason::InvalidPassword,
+                        )
+                        .await?;
 
-                // Record audit trail (F025) - with device/location tracking
-                let _ = audit_service
-                    .record_login_attempt(
-                        *tenant_id.as_uuid(),
-                        RecordLoginAttemptInput {
-                            user_id: Some(user.id),
-                            email: request.email.clone(),
-                            success: false,
-                            failure_reason: Some("invalid_password".to_string()),
-                            auth_method: AuthMethod::Password,
-                            ip_address: ip_str.clone(),
-                            user_agent: user_agent.clone(),
-                            device_fingerprint: device_fingerprint.clone(),
-                            geo_country: None, // TODO: Add geo lookup
-                            geo_city: None,
-                        },
-                    )
-                    .await;
+                    // Record audit trail (F025) - with device/location tracking
+                    let _ = audit_service
+                        .record_login_attempt(
+                            *tenant_id.as_uuid(),
+                            RecordLoginAttemptInput {
+                                user_id: Some(user.id),
+                                email: request.email.clone(),
+                                success: false,
+                                failure_reason: Some("invalid_password".to_string()),
+                                auth_method: AuthMethod::Password,
+                                ip_address: ip_str.clone(),
+                                user_agent: user_agent.clone(),
+                                device_fingerprint: device_fingerprint.clone(),
+                                geo_country: None, // TODO: Add geo lookup
+                                geo_city: None,
+                            },
+                        )
+                        .await;
 
-                // Check failed attempts threshold for alert (F025)
-                let _ = alert_service
-                    .check_failed_attempts_threshold(
-                        *tenant_id.as_uuid(),
-                        user.id,
-                        &request.email,
-                        ip_str.as_deref(),
-                    )
-                    .await;
+                    // Check failed attempts threshold for alert (F025)
+                    let _ = alert_service
+                        .check_failed_attempts_threshold(
+                            *tenant_id.as_uuid(),
+                            user.id,
+                            &request.email,
+                            ip_str.as_deref(),
+                        )
+                        .await;
 
-                if lockout_status.is_locked {
-                    if let Some(until) = lockout_status.locked_until {
-                        return Err(ApiAuthError::AccountLockedUntil(until.to_rfc3339()));
+                    if lockout_status.is_locked {
+                        if let Some(until) = lockout_status.locked_until {
+                            return Err(ApiAuthError::AccountLockedUntil(until.to_rfc3339()));
+                        }
+                        return Err(ApiAuthError::AccountLocked);
                     }
-                    return Err(ApiAuthError::AccountLocked);
                 }
-            } else {
-                // Unknown email - log but don't reveal
-                // Best-effort: don't propagate DB errors (e.g. non-existent tenant)
-                if let Err(_e) = lockout_service
-                    .record_login_attempt(
-                        *tenant_id.as_uuid(),
-                        None,
-                        &request.email,
-                        ip_str.as_deref(),
-                        FailureReason::UnknownEmail,
-                    )
-                    .await
-                {
-                    tracing::debug!(
-                        tenant_id = %tenant_id,
-                        "Failed to record login attempt (tenant may not exist)"
-                    );
-                }
+                None => {
+                    // Unknown email - log but don't reveal
+                    // Best-effort: don't propagate DB errors (e.g. non-existent tenant)
+                    if let Err(_e) = lockout_service
+                        .record_login_attempt(
+                            *tenant_id.as_uuid(),
+                            None,
+                            &request.email,
+                            ip_str.as_deref(),
+                            FailureReason::UnknownEmail,
+                        )
+                        .await
+                    {
+                        tracing::debug!(
+                            tenant_id = %tenant_id,
+                            "Failed to record login attempt (tenant may not exist)"
+                        );
+                    }
 
-                // Record audit trail for unknown email (F025)
-                let _ = audit_service
-                    .record_login_attempt(
-                        *tenant_id.as_uuid(),
-                        RecordLoginAttemptInput {
-                            user_id: None,
-                            email: request.email.clone(),
-                            success: false,
-                            failure_reason: Some("invalid_credentials".to_string()),
-                            auth_method: AuthMethod::Password,
-                            ip_address: ip_str.clone(),
-                            user_agent: user_agent.clone(),
-                            device_fingerprint: device_fingerprint.clone(),
-                            geo_country: None,
-                            geo_city: None,
-                        },
-                    )
-                    .await;
+                    // Record audit trail for unknown email (F025)
+                    let _ = audit_service
+                        .record_login_attempt(
+                            *tenant_id.as_uuid(),
+                            RecordLoginAttemptInput {
+                                user_id: None,
+                                email: request.email.clone(),
+                                success: false,
+                                failure_reason: Some("invalid_credentials".to_string()),
+                                auth_method: AuthMethod::Password,
+                                ip_address: ip_str.clone(),
+                                user_agent: user_agent.clone(),
+                                device_fingerprint: device_fingerprint.clone(),
+                                geo_country: None,
+                                geo_city: None,
+                            },
+                        )
+                        .await;
+                }
             }
             // F082-US8: Emit structured security audit event for login failure
             SecurityAudit::emit(
@@ -229,11 +234,13 @@ pub async fn login_handler(
             return Err(ApiAuthError::InvalidCredentials);
         }
         Err(ApiAuthError::AccountInactive) => {
-            // Record the attempt for inactive accounts
-            if let Ok(Some(user)) = auth_service
-                .get_user_by_email(tenant_id, &request.email)
-                .await
-            {
+            // Record the attempt for inactive accounts. Lookup errors must
+            // refuse the request rather than skip lockout recording.
+            if let Some(user) = user_for_lockout_record(
+                auth_service
+                    .get_user_by_email(tenant_id, &request.email)
+                    .await,
+            )? {
                 if let Err(e) = lockout_service
                     .record_login_attempt(
                         *tenant_id.as_uuid(),
@@ -617,6 +624,23 @@ pub fn webauthn_enrollment(result: Result<bool, ApiAuthError>) -> Result<bool, A
     }
 }
 
+/// User lookup for lockout recording. Database errors must not be treated as
+/// "unknown email", which skips incrementing the lockout counter.
+pub fn user_for_lockout_record<T, E: std::fmt::Display>(
+    result: Result<Option<T>, E>,
+) -> Result<Option<T>, E> {
+    match result {
+        Ok(user) => Ok(user),
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "User lookup for lockout recording failed, refusing login"
+            );
+            Err(e)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -688,6 +712,31 @@ mod tests {
         assert!(
             !window.contains("unwrap_or(false)"),
             "must not fail-open WebAuthn enrollment"
+        );
+    }
+
+    #[test]
+    fn user_for_lockout_record_does_not_skip_on_error() {
+        assert!(user_for_lockout_record(Ok::<Option<u8>, &str>(Some(1)))
+            .unwrap()
+            .is_some());
+        assert!(user_for_lockout_record(Ok::<Option<u8>, &str>(None))
+            .unwrap()
+            .is_none());
+        assert!(user_for_lockout_record(Err::<Option<u8>, _>("db down")).is_err());
+    }
+
+    #[test]
+    fn login_handler_does_not_skip_lockout_on_user_lookup_error() {
+        let src = include_str!("login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("user_for_lockout_record("),
+            "failed-login user lookup must fail closed"
+        );
+        assert!(
+            !production.contains("if let Ok(Some(user)) = auth_service"),
+            "must not treat user-lookup errors as unknown email"
         );
     }
 }
