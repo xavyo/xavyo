@@ -417,14 +417,25 @@ pub struct CheckToolPermissionResponse {
     pub reason: Option<String>,
 }
 
+/// Unregistered tools are not an allow. Callers must not treat a missing
+/// catalog entry as permission to invoke.
+pub fn unregistered_tool_decision() -> CheckToolPermissionResponse {
+    CheckToolPermissionResponse {
+        decision: "deny".to_string(),
+        requires_approval: false,
+        reason: Some("Tool not registered in NHI — deny (fail closed)".to_string()),
+    }
+}
+
 /// POST /tool-permissions/check — Check if an agent can call a named tool.
 ///
 /// Designed for service-to-service calls (e.g., the CRM MCP server checking
 /// before dispatching a tool on behalf of an OBO agent). Requires any valid
 /// tenant-scoped JWT — no admin role needed.
 ///
-/// If the tool is not registered in Xavyo NHI the decision is `allow`
-/// (fail-open for tools not yet governed). Governance is additive.
+/// If the tool is not registered in Xavyo NHI the decision is `deny`
+/// (fail-closed). MCP invoke already 404s unknown tools; this check must
+/// not contradict that.
 pub async fn check_tool_permission(
     State(state): State<NhiState>,
     Extension(tenant_id): Extension<TenantId>,
@@ -440,12 +451,7 @@ pub async fn check_tool_permission(
     .await?;
 
     let Some(tool) = tool else {
-        // Tool not yet registered in NHI → allow (governance is additive)
-        return Ok(Json(CheckToolPermissionResponse {
-            decision: "allow".to_string(),
-            requires_approval: false,
-            reason: Some("Tool not registered in NHI — ungoverned, allowing".to_string()),
-        }));
+        return Ok(Json(unregistered_tool_decision()));
     };
 
     let has_permission = crate::services::mcp_service::check_permission(
@@ -512,4 +518,39 @@ pub fn permission_routes(state: NhiState) -> Router {
         // Service-to-service permission check (no admin role required)
         .route("/tool-permissions/check", post(check_tool_permission))
         .with_state(state)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unregistered_tool_is_deny_not_allow() {
+        let decision = unregistered_tool_decision();
+        assert_eq!(decision.decision, "deny");
+        assert!(!decision.requires_approval);
+        let reason = decision.reason.expect("reason");
+        assert!(reason.to_lowercase().contains("deny"), "{reason}");
+        assert!(!reason.to_lowercase().contains("allow"), "{reason}");
+    }
+
+    #[test]
+    fn check_handler_does_not_fail_open_on_unregistered_tools() {
+        let src = include_str!("permissions.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("unregistered_tool_decision"),
+            "check_tool_permission must fail closed for unknown tools"
+        );
+        for needle in [
+            format!("{}ing", "ungoverned, allow"),
+            format!("{}open", "fail-"),
+            "governance is additive".to_string(),
+        ] {
+            assert!(
+                !production.contains(&needle),
+                "must not fail-open unregistered tools ({needle})"
+            );
+        }
+    }
 }
