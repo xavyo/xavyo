@@ -387,7 +387,9 @@ impl ApprovalService {
             let audit_input = CreateGovDelegationAudit {
                 delegation_id,
                 deputy_id: approver_id,
-                delegator_id: approval_info.delegator_id.unwrap_or(Uuid::nil()),
+                delegator_id: approval_info.delegator_id.ok_or_else(|| {
+                    GovernanceError::Validation("delegation audit requires a delegator".to_string())
+                })?,
                 action_type: DelegationActionType::ApproveRequest,
                 work_item_type: WorkItemType::AccessRequest,
                 work_item_id: request_id,
@@ -401,12 +403,12 @@ impl ApprovalService {
         }
 
         // Check if this is the final step
-        let is_final = GovApprovalStep::is_final_step(
-            &self.pool,
-            request.workflow_id.unwrap_or(Uuid::nil()),
-            request.current_step + 1,
-        )
-        .await?;
+        let workflow_id = request.workflow_id.ok_or_else(|| {
+            GovernanceError::Validation("Access request is missing a workflow".to_string())
+        })?;
+        let is_final =
+            GovApprovalStep::is_final_step(&self.pool, workflow_id, request.current_step + 1)
+                .await?;
 
         if is_final {
             // All approvals complete - provision the entitlement
@@ -541,7 +543,9 @@ impl ApprovalService {
             let audit_input = CreateGovDelegationAudit {
                 delegation_id,
                 deputy_id: approver_id,
-                delegator_id: approval_info.delegator_id.unwrap_or(Uuid::nil()),
+                delegator_id: approval_info.delegator_id.ok_or_else(|| {
+                    GovernanceError::Validation("delegation audit requires a delegator".to_string())
+                })?,
                 action_type: DelegationActionType::RejectRequest,
                 work_item_type: WorkItemType::AccessRequest,
                 work_item_id: request_id,
@@ -702,6 +706,24 @@ mod tests {
 
         assert!(matches!(result.new_status, GovRequestStatus::Rejected));
         assert!(result.provisioned_assignment_id.is_none());
+    }
+
+    #[test]
+    fn approval_does_not_provision_without_workflow_or_delegator() {
+        let src = include_str!("approval_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(Uuid::nil())"),
+            "approvals must not use a nil UUID as workflow or delegator"
+        );
+        assert!(
+            production.contains("Access request is missing a workflow"),
+            "missing workflow_id must not be treated as the final approval step"
+        );
+        assert!(
+            production.contains("delegation audit requires a delegator"),
+            "delegate approvals must record the real delegator"
+        );
     }
 
     #[test]

@@ -833,7 +833,7 @@ impl RoleHierarchyService {
         .await?;
 
         if !deleted {
-            return Err(GovernanceError::RoleEntitlementNotFound(Uuid::nil()));
+            return Err(GovernanceError::RoleEntitlementNotFound(entitlement_id));
         }
 
         // Recompute effective entitlements for the role, its descendants, and ancestors
@@ -1024,5 +1024,19 @@ mod tests {
     #[test]
     fn test_service_with_custom_depth() {
         // Verify custom depth is stored
+    }
+
+    #[test]
+    fn unmapped_entitlement_error_uses_entitlement_id() {
+        let src = include_str!("role_hierarchy_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("RoleEntitlementNotFound(Uuid::nil())"),
+            "missing role-entitlement mappings must not report a nil UUID"
+        );
+        assert!(
+            production.contains("RoleEntitlementNotFound(entitlement_id)"),
+            "not-found errors must identify the entitlement"
+        );
     }
 }
