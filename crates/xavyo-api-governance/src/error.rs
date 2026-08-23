@@ -440,3 +440,38 @@ impl From<validator::ValidationErrors> for ApiGovernanceError {
 
 /// Result type alias for API operations.
 pub type ApiResult<T> = std::result::Result<T, ApiGovernanceError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::response::IntoResponse;
+
+    #[test]
+    fn campaign_no_items_is_precondition_failed_not_success() {
+        let err = ApiGovernanceError::Governance(GovernanceError::CampaignNoItems);
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::PRECONDITION_FAILED);
+        assert!(
+            !response.status().is_success(),
+            "launch with no assignments must not be treated as HTTP success (was recorded as PASS on 412)"
+        );
+    }
+
+    #[test]
+    fn campaign_not_draft_is_not_success() {
+        let id = Uuid::new_v4();
+        let err = ApiGovernanceError::Governance(GovernanceError::CampaignNotDraft(id));
+        let response = err.into_response();
+        assert!(
+            !response.status().is_success(),
+            "launch of a non-draft campaign must not be HTTP success"
+        );
+    }
+
+    #[test]
+    fn forbidden_is_not_success() {
+        let response = ApiGovernanceError::Forbidden.into_response();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert!(!response.status().is_success());
+    }
+}
