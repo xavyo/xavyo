@@ -333,15 +333,20 @@ impl GovBulkStateOperation {
     }
 
     /// Mark operation as running.
-    pub async fn mark_running(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
+    pub async fn mark_running(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r"
             UPDATE gov_bulk_state_operations
             SET status = 'running', started_at = NOW()
-            WHERE id = $1 AND status = 'pending'
+            WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -351,6 +356,7 @@ impl GovBulkStateOperation {
     /// Update progress counters.
     pub async fn update_progress(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         processed_count: i32,
         success_count: i32,
@@ -359,11 +365,12 @@ impl GovBulkStateOperation {
         let result = sqlx::query(
             r"
             UPDATE gov_bulk_state_operations
-            SET processed_count = $2, success_count = $3, failure_count = $4
-            WHERE id = $1 AND status = 'running'
+            SET processed_count = $3, success_count = $4, failure_count = $5
+            WHERE id = $1 AND tenant_id = $2 AND status = 'running'
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(processed_count)
         .bind(success_count)
         .bind(failure_count)
@@ -376,17 +383,19 @@ impl GovBulkStateOperation {
     /// Mark operation as completed.
     pub async fn mark_completed(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         results: JsonValue,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r"
             UPDATE gov_bulk_state_operations
-            SET status = 'completed', results = $2, completed_at = NOW()
-            WHERE id = $1 AND status = 'running'
+            SET status = 'completed', results = $3, completed_at = NOW()
+            WHERE id = $1 AND tenant_id = $2 AND status = 'running'
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(&results)
         .execute(pool)
         .await?;
@@ -397,17 +406,19 @@ impl GovBulkStateOperation {
     /// Mark operation as failed.
     pub async fn mark_failed(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         results: JsonValue,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r"
             UPDATE gov_bulk_state_operations
-            SET status = 'failed', results = $2, completed_at = NOW()
-            WHERE id = $1 AND status IN ('pending', 'running')
+            SET status = 'failed', results = $3, completed_at = NOW()
+            WHERE id = $1 AND tenant_id = $2 AND status IN ('pending', 'running')
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(&results)
         .execute(pool)
         .await?;
@@ -470,5 +481,36 @@ impl GovBulkStateOperation {
         .await?;
 
         Ok(result.rows_affected() > 0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn status_mutations_scope_by_tenant() {
+        let src = include_str!("gov_bulk_state_operation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for fn_name in [
+            "fn mark_running",
+            "fn update_progress",
+            "fn mark_completed",
+            "fn mark_failed",
+        ] {
+            let body = production
+                .split(fn_name)
+                .nth(1)
+                .unwrap_or_else(|| panic!("{fn_name} missing"))
+                .split("pub async fn")
+                .next()
+                .unwrap_or_else(|| panic!("{fn_name} body"));
+            assert!(
+                body.contains("AND tenant_id = $2"),
+                "{fn_name} must include tenant_id"
+            );
+            assert!(
+                !body.contains("WHERE id = $1 AND status"),
+                "{fn_name} must not mutate operations by id alone"
+            );
+        }
     }
 }

@@ -522,6 +522,7 @@ impl BulkActionService {
         // Update progress counters
         GovBulkAction::update_progress(
             &self.pool,
+            tenant_id,
             action_id,
             processed_count,
             success_count,
@@ -533,9 +534,9 @@ impl BulkActionService {
         // Determine final status and mark completed/failed (includes setting results and completed_at)
         let results_json = serde_json::json!(results);
         if failure_count > 0 && success_count == 0 {
-            GovBulkAction::mark_failed(&self.pool, action_id, results_json).await?;
+            GovBulkAction::mark_failed(&self.pool, tenant_id, action_id, results_json).await?;
         } else {
-            GovBulkAction::mark_completed(&self.pool, action_id, results_json).await?;
+            GovBulkAction::mark_completed(&self.pool, tenant_id, action_id, results_json).await?;
         }
 
         // Return updated action
@@ -712,6 +713,37 @@ mod tests {
         assert!(
             !production.contains("SELECT COUNT(*) FROM user_roles\n            WHERE user_id = $1 AND role_name = $2"),
             "must not count user_roles without a tenant-scoped users join"
+        );
+    }
+
+    #[test]
+    fn execute_mutations_pass_tenant_id() {
+        let src = include_str!("bulk_action_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("GovBulkAction::update_progress(\n            &self.pool,\n            tenant_id,\n            action_id,"),
+            "update_progress must pass tenant_id"
+        );
+        assert!(
+            production.contains(
+                "GovBulkAction::mark_failed(&self.pool, tenant_id, action_id, results_json)"
+            ),
+            "mark_failed must pass tenant_id"
+        );
+        assert!(
+            production.contains(
+                "GovBulkAction::mark_completed(&self.pool, tenant_id, action_id, results_json)"
+            ),
+            "mark_completed must pass tenant_id"
+        );
+        assert!(
+            !production.contains("GovBulkAction::mark_failed(&self.pool, action_id, results_json)"),
+            "must not mark bulk actions failed by id alone"
+        );
+        assert!(
+            !production
+                .contains("GovBulkAction::mark_completed(&self.pool, action_id, results_json)"),
+            "must not mark bulk actions completed by id alone"
         );
     }
 }
