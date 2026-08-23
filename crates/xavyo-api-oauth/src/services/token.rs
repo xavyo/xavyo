@@ -268,10 +268,12 @@ impl TokenService {
 
     /// Fetch the user's actual roles from the database.
     ///
-    /// Returns a list of role names (e.g., `["super_admin"]`).
-    /// Failures are logged and return an empty list so token issuance
-    /// is never blocked by a role lookup failure.
-    async fn lookup_user_roles(&self, user_id: Uuid, tenant_id: Uuid) -> Vec<String> {
+    /// Failures refuse token issuance — a missing role list must not mint a JWT.
+    async fn lookup_user_roles(
+        &self,
+        user_id: Uuid,
+        tenant_id: Uuid,
+    ) -> Result<Vec<String>, OAuthError> {
         // set_config('app.current_tenant', ..., true) is SET LOCAL — only valid inside a
         // transaction. Use begin/rollback so the context persists to the query.
         let result = async {
@@ -284,13 +286,19 @@ impl TokenService {
             roles
         }
         .await;
-        match result {
-            Ok(roles) => roles,
-            Err(e) => {
-                tracing::warn!("Failed to look up user roles for token claims: {e}");
-                vec![]
-            }
-        }
+        oauth_roles(result)
+    }
+
+    /// Refuse tokens when the account is inactive or locked.
+    async fn ensure_account_allowed(
+        &self,
+        user_id: Uuid,
+        tenant_id: Uuid,
+    ) -> Result<(), OAuthError> {
+        let user = xavyo_db::models::User::find_by_id_in_tenant(&self.pool, tenant_id, user_id)
+            .await?
+            .ok_or(OAuthError::UserNotFound)?;
+        oauth_account_allowed(user.is_active, user.is_locked())
     }
 
     /// Generate an access token (JWT with RS256).
@@ -790,11 +798,14 @@ impl TokenService {
             None => None,
         };
 
+        self.ensure_account_allowed(user_id, tenant_id).await?;
+
         // Look up user profile and roles for token claims
         let ((user_email, user_name), roles) = tokio::join!(
             self.lookup_user_profile(user_id, tenant_id),
             self.lookup_user_roles(user_id, tenant_id),
         );
+        let roles = roles?;
 
         // Generate access token (sender-constrained when dpop_jkt is set)
         let access_token = self.generate_access_token_bound(
@@ -992,11 +1003,14 @@ impl TokenService {
         dpop_jkt: Option<&str>,
         cert_thumbprint: Option<&str>,
     ) -> Result<TokenResponse, OAuthError> {
+        self.ensure_account_allowed(user_id, tenant_id).await?;
+
         // Look up user profile and roles for token claims
         let ((user_email, user_name), roles) = tokio::join!(
             self.lookup_user_profile(user_id, tenant_id),
             self.lookup_user_roles(user_id, tenant_id),
         );
+        let roles = roles?;
 
         // Generate new access token — re-bind to the DPoP key / mTLS cert
         // presented at the refresh request (sender-constraint carries forward).
@@ -1151,11 +1165,14 @@ impl TokenService {
         let auth_time = Utc::now().timestamp();
         let scopes: Vec<&str> = scope.split_whitespace().collect();
 
+        self.ensure_account_allowed(user_id, tenant_id).await?;
+
         // Look up user profile and roles for token claims
         let ((user_email, user_name), roles) = tokio::join!(
             self.lookup_user_profile(user_id, tenant_id),
             self.lookup_user_roles(user_id, tenant_id),
         );
+        let roles = roles?;
 
         // Generate access token
         let access_token = self.generate_access_token(
@@ -1197,6 +1214,34 @@ impl TokenService {
             scope: Some(scope.to_string()),
             authorization_details: None,
         })
+    }
+}
+
+/// Inactive or locked accounts must not receive OAuth JWTs.
+pub fn oauth_account_allowed(is_active: bool, is_locked: bool) -> Result<(), OAuthError> {
+    if !is_active {
+        return Err(OAuthError::InvalidGrant(
+            "Account is not active".to_string(),
+        ));
+    }
+    if is_locked {
+        return Err(OAuthError::InvalidGrant("Account is locked".to_string()));
+    }
+    Ok(())
+}
+
+/// Role lookup failures must refuse token issuance, not mint an empty-role JWT.
+pub fn oauth_roles<E: std::fmt::Display>(
+    result: Result<Vec<String>, E>,
+) -> Result<Vec<String>, OAuthError> {
+    match result {
+        Ok(roles) => Ok(roles),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to fetch user roles for OAuth token");
+            Err(OAuthError::Internal(
+                "Failed to fetch user roles".to_string(),
+            ))
+        }
     }
 }
 
@@ -1544,5 +1589,56 @@ xxU7T7aU32bKZLygCDtwsN8=
             .expect("roles should be an array");
         assert!(roles.iter().any(|r| r.as_str() == Some("super_admin")));
         assert!(!roles.iter().any(|r| r.as_str() == Some("openid")));
+    }
+
+    #[test]
+    fn oauth_account_allowed_active_unlocked() {
+        assert!(oauth_account_allowed(true, false).is_ok());
+    }
+
+    #[test]
+    fn oauth_account_allowed_refuses_inactive() {
+        assert!(matches!(
+            oauth_account_allowed(false, false),
+            Err(OAuthError::InvalidGrant(ref msg)) if msg.contains("not active")
+        ));
+    }
+
+    #[test]
+    fn oauth_account_allowed_refuses_locked() {
+        assert!(matches!(
+            oauth_account_allowed(true, true),
+            Err(OAuthError::InvalidGrant(ref msg)) if msg.contains("locked")
+        ));
+    }
+
+    #[test]
+    fn oauth_roles_does_not_default_to_empty() {
+        assert_eq!(
+            oauth_roles(Ok::<Vec<String>, &str>(vec!["admin".into()])).unwrap(),
+            vec!["admin".to_string()]
+        );
+        assert!(matches!(
+            oauth_roles(Err("db")),
+            Err(OAuthError::Internal(ref msg)) if msg == "Failed to fetch user roles"
+        ));
+    }
+
+    #[test]
+    fn oauth_token_issue_does_not_fail_open_roles_or_lockout() {
+        let src = include_str!("token.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("ensure_account_allowed"),
+            "token issuance must refuse inactive/locked accounts"
+        );
+        assert!(
+            production.contains("oauth_roles("),
+            "role lookup errors must refuse token issuance"
+        );
+        assert!(
+            !production.contains("token issuance is never blocked by a role lookup"),
+            "must not skip role lookup failures"
+        );
     }
 }
