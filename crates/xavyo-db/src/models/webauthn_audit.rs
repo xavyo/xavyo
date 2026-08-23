@@ -158,6 +158,7 @@ impl WebAuthnAuditLog {
     /// Find audit logs for a user.
     pub async fn find_by_user_id<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
         limit: i64,
         offset: i64,
@@ -168,11 +169,12 @@ impl WebAuthnAuditLog {
         sqlx::query_as(
             r"
             SELECT * FROM webauthn_audit_log
-            WHERE user_id = $1
+            WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3
+            LIMIT $3 OFFSET $4
             ",
         )
+        .bind(tenant_id)
         .bind(user_id)
         .bind(limit)
         .bind(offset)
@@ -183,6 +185,7 @@ impl WebAuthnAuditLog {
     /// Find audit logs for a specific credential.
     pub async fn find_by_credential_id<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         credential_id: Uuid,
         limit: i64,
     ) -> Result<Vec<Self>, sqlx::Error>
@@ -192,11 +195,12 @@ impl WebAuthnAuditLog {
         sqlx::query_as(
             r"
             SELECT * FROM webauthn_audit_log
-            WHERE credential_id = $1
+            WHERE tenant_id = $1 AND credential_id = $2
             ORDER BY created_at DESC
-            LIMIT $2
+            LIMIT $3
             ",
         )
+        .bind(tenant_id)
         .bind(credential_id)
         .bind(limit)
         .fetch_all(executor)
@@ -206,6 +210,7 @@ impl WebAuthnAuditLog {
     /// Find recent failed authentication attempts for a user.
     pub async fn count_recent_failures<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
         minutes: i64,
     ) -> Result<i64, sqlx::Error>
@@ -215,11 +220,12 @@ impl WebAuthnAuditLog {
         let result: (i64,) = sqlx::query_as(
             r"
             SELECT COUNT(*) FROM webauthn_audit_log
-            WHERE user_id = $1
+            WHERE tenant_id = $1 AND user_id = $2
                 AND action = 'authentication_failed'
-                AND created_at > NOW() - ($2 || ' minutes')::INTERVAL
+                AND created_at > NOW() - ($3 || ' minutes')::INTERVAL
             ",
         )
+        .bind(tenant_id)
         .bind(user_id)
         .bind(minutes.to_string())
         .fetch_one(executor)
@@ -230,6 +236,7 @@ impl WebAuthnAuditLog {
     /// Find counter anomaly events for a credential.
     pub async fn find_counter_anomalies<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         credential_id: Uuid,
     ) -> Result<Vec<Self>, sqlx::Error>
     where
@@ -238,10 +245,11 @@ impl WebAuthnAuditLog {
         sqlx::query_as(
             r"
             SELECT * FROM webauthn_audit_log
-            WHERE credential_id = $1 AND action = 'counter_anomaly_detected'
+            WHERE tenant_id = $1 AND credential_id = $2 AND action = 'counter_anomaly_detected'
             ORDER BY created_at DESC
             ",
         )
+        .bind(tenant_id)
         .bind(credential_id)
         .fetch_all(executor)
         .await
@@ -297,5 +305,27 @@ mod tests {
             WebAuthnAuditAction::AuthenticationFailed
         );
         assert!("invalid_action".parse::<WebAuthnAuditAction>().is_err());
+    }
+
+    #[test]
+    fn audit_queries_filter_by_tenant_id() {
+        let src = include_str!("webauthn_audit.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE tenant_id = $1 AND user_id = $2"),
+            "user-scoped WebAuthn audit queries must filter tenant_id"
+        );
+        assert!(
+            production.contains("WHERE tenant_id = $1 AND credential_id = $2"),
+            "credential-scoped WebAuthn audit queries must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE user_id = $1\n"),
+            "must not query WebAuthn audit by user_id alone"
+        );
+        assert!(
+            !production.contains("WHERE credential_id = $1\n"),
+            "must not query WebAuthn audit by credential_id alone"
+        );
     }
 }

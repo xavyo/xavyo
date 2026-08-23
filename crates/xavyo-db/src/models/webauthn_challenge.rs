@@ -134,12 +134,17 @@ impl WebAuthnChallenge {
     }
 
     /// Find a challenge by ID (for verification).
-    pub async fn find_by_id<'e, E>(executor: E, id: Uuid) -> Result<Option<Self>, sqlx::Error>
+    pub async fn find_by_id<'e, E>(
+        executor: E,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<Option<Self>, sqlx::Error>
     where
         E: PgExecutor<'e>,
     {
-        sqlx::query_as("SELECT * FROM webauthn_challenges WHERE id = $1")
+        sqlx::query_as("SELECT * FROM webauthn_challenges WHERE id = $1 AND tenant_id = $2")
             .bind(id)
+            .bind(tenant_id)
             .fetch_optional(executor)
             .await
     }
@@ -251,5 +256,23 @@ mod tests {
             ..challenge
         };
         assert!(expired_challenge.is_expired());
+    }
+
+    #[test]
+    fn challenge_lookups_filter_by_tenant_id() {
+        let src = include_str!("webauthn_challenge.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE id = $1 AND tenant_id = $2"),
+            "find_by_id must filter tenant_id"
+        );
+        assert!(
+            production.contains("user_id = $1 AND tenant_id = $2 AND ceremony_type = $3"),
+            "user-scoped challenge queries must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE id = $1\""),
+            "must not look up challenges by id alone"
+        );
     }
 }
