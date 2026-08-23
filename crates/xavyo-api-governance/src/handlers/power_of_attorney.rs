@@ -378,7 +378,7 @@ pub async fn admin_revoke_poa(
         ("id" = Uuid, Path, description = "Power of Attorney ID to use for identity assumption")
     ),
     responses(
-        (status = 200, description = "Identity assumed successfully", body = AssumeIdentityResponse),
+        (status = 501, description = "Identity-switch JWT re-issuance is not implemented"),
         (status = 400, description = "PoA is not active or already assuming another identity"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Power of Attorney not found or not authorized"),
@@ -387,56 +387,21 @@ pub async fn admin_revoke_poa(
     security(("bearer_auth" = []))
 )]
 pub async fn assume_identity(
-    State(state): State<GovernanceState>,
+    State(_state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
-    Path(poa_id): Path<Uuid>,
+    Path(_poa_id): Path<Uuid>,
 ) -> ApiResult<Json<AssumeIdentityResponse>> {
-    let tenant_id = *claims
+    let _tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    let attorney_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
+    let _attorney_id =
+        Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
-    // Generate a unique JTI for the assumed session token
-    let session_jti = format!("poa-{}", Uuid::new_v4());
-
-    // Extract IP and user agent from request context (would need headers in real impl)
-    let ip_address: Option<String> = None;
-    let user_agent: Option<String> = None;
-
-    // SECURITY: The service computes role intersection (donor_roles ∩ attorney_roles)
-    // to prevent privilege escalation. The attorney cannot gain roles they don't already have.
-    let (session, donor_id, effective_roles, roles_restricted) = state
-        .poa_service
-        .assume_identity(
-            tenant_id,
-            attorney_id,
-            poa_id,
-            session_jti.clone(),
-            ip_address,
-            user_agent,
-        )
-        .await?;
-
-    // In a real implementation, we would generate a new JWT here with:
-    // - acting_as_user_id: donor_id
-    // - acting_as_poa_id: poa_id
-    // - acting_as_session_id: session.id
-    // - roles: effective_roles (intersection, NOT donor_roles)
-    // For now, we return a placeholder token
-    let access_token = format!("assumed_token_{}", session.id);
-
-    Ok(Json(AssumeIdentityResponse {
-        access_token,
-        session_id: session.id,
-        donor_id,
-        donor_name: None, // Would be populated from user lookup
-        donor_email: None,
-        scope: None,
-        effective_roles: Some(effective_roles),
-        roles_restricted: Some(roles_restricted),
-    }))
+    // Fail closed: do not open an assumed session or return a placeholder
+    // access_token. JwtClaims.acting_as_* is the trust boundary.
+    Err(crate::identity_switch::unimplemented_identity_switch_jwt())
 }
 
 /// Drop the currently assumed identity and return to the attorney's own identity.
@@ -445,7 +410,7 @@ pub async fn assume_identity(
     path = "/governance/power-of-attorney/drop",
     tag = "Governance - Power of Attorney",
     responses(
-        (status = 200, description = "Identity dropped successfully", body = DropIdentityResponse),
+        (status = 501, description = "Identity-switch JWT re-issuance is not implemented"),
         (status = 400, description = "Not currently assuming any identity"),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
@@ -453,26 +418,18 @@ pub async fn assume_identity(
     security(("bearer_auth" = []))
 )]
 pub async fn drop_identity(
-    State(state): State<GovernanceState>,
+    State(_state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
 ) -> ApiResult<Json<DropIdentityResponse>> {
-    let tenant_id = *claims
+    let _tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
 
-    let attorney_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
+    let _attorney_id =
+        Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
-    let _dropped = state
-        .poa_service
-        .drop_identity(tenant_id, attorney_id)
-        .await?;
-
-    // In a real implementation, we would generate a new JWT for the attorney's own identity
-    // For now, we return a placeholder token
-    let access_token = format!("original_token_{}", attorney_id);
-
-    Ok(Json(DropIdentityResponse { access_token }))
+    Err(crate::identity_switch::unimplemented_identity_switch_jwt())
 }
 
 /// Get the current assumed identity status.

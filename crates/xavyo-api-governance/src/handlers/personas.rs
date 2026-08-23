@@ -990,7 +990,7 @@ pub struct PaginationQuery {
     tag = "Governance - Persona Management",
     request_body = SwitchContextRequest,
     responses(
-        (status = 200, description = "Switched to persona", body = SwitchContextResponse),
+        (status = 501, description = "Identity-switch JWT re-issuance is not implemented"),
         (status = 400, description = "Invalid request"),
         (status = 401, description = "Unauthorized"),
         (status = 403, description = "Persona does not belong to user"),
@@ -1001,40 +1001,21 @@ pub struct PaginationQuery {
     security(("bearer_auth" = []))
 )]
 pub async fn switch_context(
-    State(state): State<GovernanceState>,
+    State(_state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<SwitchContextRequest>,
 ) -> ApiResult<Json<SwitchContextResponse>> {
     request.validate()?;
 
-    let tenant_id = *claims
+    let _tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
-    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
+    let _user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
-    let context_info = state
-        .persona_session_service
-        .switch_to_persona(
-            tenant_id,
-            user_id,
-            request.persona_id,
-            request.reason,
-            None, // Use default session duration
-        )
-        .await?;
-
-    // Generate new JWT with persona claims
-    // For now, return a placeholder token - in production this would call the auth service
-    let access_token = format!("persona_token_{}", context_info.session_id);
-
-    Ok(Json(SwitchContextResponse {
-        session_id: context_info.session_id,
-        access_token,
-        active_persona_id: context_info.persona_id,
-        active_persona_name: context_info.persona_name,
-        switched_at: chrono::Utc::now(),
-    }))
+    // Fail closed: do not persist a persona session or return a placeholder
+    // access_token. The BFF stores `access_token` as the session cookie.
+    Err(crate::identity_switch::unimplemented_identity_switch_jwt())
 }
 
 /// Switch back to physical user context.
@@ -1044,7 +1025,7 @@ pub async fn switch_context(
     tag = "Governance - Persona Management",
     request_body = SwitchBackRequest,
     responses(
-        (status = 200, description = "Switched back to physical user", body = SwitchContextResponse),
+        (status = 501, description = "Identity-switch JWT re-issuance is not implemented"),
         (status = 400, description = "Invalid request"),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
@@ -1052,33 +1033,19 @@ pub async fn switch_context(
     security(("bearer_auth" = []))
 )]
 pub async fn switch_back(
-    State(state): State<GovernanceState>,
+    State(_state): State<GovernanceState>,
     Extension(claims): Extension<JwtClaims>,
     Json(request): Json<SwitchBackRequest>,
 ) -> ApiResult<Json<SwitchContextResponse>> {
     request.validate()?;
 
-    let tenant_id = *claims
+    let _tenant_id = *claims
         .tenant_id()
         .ok_or(ApiGovernanceError::Unauthorized)?
         .as_uuid();
-    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
+    let _user_id = Uuid::parse_str(&claims.sub).map_err(|_| ApiGovernanceError::Unauthorized)?;
 
-    let context_info = state
-        .persona_session_service
-        .switch_back_to_physical(tenant_id, user_id, request.reason)
-        .await?;
-
-    // Generate new JWT without persona claims
-    let access_token = format!("physical_token_{}", context_info.session_id);
-
-    Ok(Json(SwitchContextResponse {
-        session_id: context_info.session_id,
-        access_token,
-        active_persona_id: None,
-        active_persona_name: None,
-        switched_at: chrono::Utc::now(),
-    }))
+    Err(crate::identity_switch::unimplemented_identity_switch_jwt())
 }
 
 /// Get current context for the authenticated user.

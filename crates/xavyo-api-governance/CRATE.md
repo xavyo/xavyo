@@ -89,6 +89,10 @@ pub fn archetypes_router() -> Router<GovState>;  // F-058 Identity Archetypes
 | Lifecycle | GET | `/users/:id/lifecycle/status` | Get user lifecycle status (F-193) |
 | GDPR | GET | `/gdpr/report` | Generate tenant GDPR compliance report (F-067) |
 | GDPR | GET | `/gdpr/users/:user_id/data-protection` | Per-user data protection summary (F-067) |
+| Context | POST | `/context/switch` | 501 until identity-switch JWT issuance exists |
+| Context | POST | `/context/switch-back` | 501 until identity-switch JWT issuance exists |
+| PoA | POST | `/power-of-attorney/:id/assume` | 501 until identity-switch JWT issuance exists |
+| PoA | POST | `/power-of-attorney/drop` | 501 until identity-switch JWT issuance exists |
 
 ## Usage Example
 
@@ -121,6 +125,7 @@ let app = Router::new()
 - Never bypass approval workflows for privileged access
 - Never skip SoD checks before granting entitlements
 - Never allow campaign decisions without audit trail
+- Never return a placeholder `access_token` for persona switch or PoA assume/drop (501 until signed JWT re-issuance is wired)
 
 ## Related Crates
 
