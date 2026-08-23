@@ -20,23 +20,44 @@ const ALLOWED_ROLES: &[&str] = &["user", "member", "admin", "super_admin"];
 /// Kept in sync with `PasswordPolicyService::SPECIAL_CHARS` in xavyo-api-auth.
 const SPECIAL_CHARS: &str = "!@#$%^&*()_+-=[]{}|;:,.<>?";
 
-/// Revoke outstanding refresh tokens for a user inside an open transaction.
+/// Revoke sessions and both families of refresh tokens inside an open transaction.
 ///
 /// Identity changes and deactivation used to log revoke errors and still
-/// commit, leaving old tokens valid after email/role/status updates.
-async fn revoke_refresh_tokens_in_tx(
+/// commit, leaving old tokens valid after email/role/status updates. Session
+/// and OAuth refresh rows were never touched, so the user could mint a new
+/// access token without re-authenticating.
+async fn revoke_user_auth_in_tx(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     user_id: UserId,
     tenant_id: TenantId,
 ) -> Result<u64, sqlx::Error> {
-    let result = sqlx::query(
+    let sessions = sqlx::query(
+        "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
+         WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
+    )
+    .bind(user_id.as_uuid())
+    .bind(tenant_id.as_uuid())
+    .execute(&mut **tx)
+    .await?;
+
+    let refresh = sqlx::query(
         "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL",
     )
     .bind(user_id.as_uuid())
     .bind(tenant_id.as_uuid())
     .execute(&mut **tx)
     .await?;
-    Ok(result.rows_affected())
+
+    let oauth = sqlx::query(
+        "UPDATE oauth_refresh_tokens SET revoked = TRUE, revoked_at = now() \
+         WHERE user_id = $1 AND tenant_id = $2 AND revoked = FALSE",
+    )
+    .bind(user_id.as_uuid())
+    .bind(tenant_id.as_uuid())
+    .execute(&mut **tx)
+    .await?;
+
+    Ok(sessions.rows_affected() + refresh.rows_affected() + oauth.rows_affected())
 }
 
 /// Validate a password against the tenant's `TenantPasswordPolicy`.
@@ -980,7 +1001,7 @@ impl UserService {
         // the race window where a concurrent token refresh could issue a new access
         // token with stale email/roles between commit and revocation.
         if email_changed || roles_changed || deactivated {
-            let revoked = revoke_refresh_tokens_in_tx(&mut tx, user_id, tenant_id).await?;
+            let revoked = revoke_user_auth_in_tx(&mut tx, user_id, tenant_id).await?;
             if revoked > 0 {
                 tracing::info!(
                     user_id = %user_id,
@@ -1131,7 +1152,7 @@ impl UserService {
 
         // H-1: Revoke refresh tokens INSIDE the transaction (before commit) to close
         // the race window where a deactivated user could refresh their token.
-        let revoked = revoke_refresh_tokens_in_tx(&mut tx, user_id, tenant_id).await?;
+        let revoked = revoke_user_auth_in_tx(&mut tx, user_id, tenant_id).await?;
         if revoked > 0 {
             tracing::info!(
                 user_id = %user_id,
@@ -1429,8 +1450,16 @@ mod tests {
         let src = include_str!("user_service.rs");
         let production = src.split("mod tests").next().expect("production source");
         assert!(
-            production.contains("revoke_refresh_tokens_in_tx("),
-            "identity change and deactivation must revoke tokens in the same transaction"
+            production.contains("revoke_user_auth_in_tx("),
+            "identity change and deactivation must revoke sessions and refresh tokens in the same transaction"
+        );
+        assert!(
+            production.contains("UPDATE oauth_refresh_tokens"),
+            "must also revoke OAuth refresh tokens"
+        );
+        assert!(
+            production.contains("UPDATE sessions"),
+            "must also revoke browser sessions"
         );
         assert!(
             !production.contains("Failed to revoke refresh tokens after identity change"),

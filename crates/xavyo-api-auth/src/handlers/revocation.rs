@@ -294,21 +294,15 @@ pub async fn revoke_user_tokens_handler(
         cache.invalidate(&all_jti_clone).await;
     }
 
-    // Also revoke all refresh tokens for the user. Update errors must not
-    // look like "sign out everywhere" succeeded with zero refresh tokens.
+    // Also revoke sessions and both families of refresh tokens. Update errors
+    // must not look like "sign out everywhere" succeeded with leftover tokens.
     let refresh_revoked = refresh_tokens_revoked(
-        sqlx::query(
-            r"
-        UPDATE refresh_tokens
-        SET revoked_at = NOW()
-        WHERE tenant_id = $1 AND user_id = $2 AND revoked_at IS NULL
-        ",
+        crate::services::revoke_auth::revoke_user_sessions_and_refresh_tokens(
+            &pool,
+            tenant_id,
+            body.user_id,
         )
-        .bind(tenant_id)
-        .bind(body.user_id)
-        .execute(&pool)
-        .await
-        .map(|r| r.rows_affected()),
+        .await,
     )?;
 
     let tokens_revoked = refresh_revoked + 1; // +1 for the access token marker
@@ -369,6 +363,10 @@ mod tests {
         assert!(
             production.contains("refresh_tokens_revoked("),
             "sign-out-everywhere must fail closed on refresh-token revoke"
+        );
+        assert!(
+            production.contains("revoke_user_sessions_and_refresh_tokens("),
+            "sign-out-everywhere must revoke sessions and both refresh-token families"
         );
         assert!(
             !production.contains("unwrap_or(0)"),

@@ -13,6 +13,56 @@ use crate::models::{
 use crate::services::attribute_mapper::{AttributeMapperService, ExtractedUserData};
 use crate::services::filter_parser::{parse_filter, AttributeMapper};
 
+/// Revoke browser sessions and both families of refresh tokens.
+///
+/// SCIM DELETE/disable used to return success while old tokens stayed valid.
+async fn revoke_user_sessions_and_refresh_tokens(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    user_id: Uuid,
+) -> Result<u64, sqlx::Error> {
+    let sessions = sqlx::query(
+        r"
+        UPDATE sessions
+        SET revoked_at = NOW(), revoked_reason = 'security'
+        WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL
+        ",
+    )
+    .bind(user_id)
+    .bind(tenant_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+
+    let refresh = sqlx::query(
+        r"
+        UPDATE refresh_tokens
+        SET revoked_at = NOW()
+        WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL
+        ",
+    )
+    .bind(user_id)
+    .bind(tenant_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+
+    let oauth = sqlx::query(
+        r"
+        UPDATE oauth_refresh_tokens
+        SET revoked = TRUE, revoked_at = now()
+        WHERE user_id = $1 AND tenant_id = $2 AND revoked = FALSE
+        ",
+    )
+    .bind(user_id)
+    .bind(tenant_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+
+    Ok(sessions + refresh + oauth)
+}
+
 /// Service for SCIM user operations.
 pub struct UserService {
     pool: PgPool,
@@ -311,7 +361,7 @@ impl UserService {
         request: ReplaceScimUserRequest,
     ) -> ScimResult<ScimUser> {
         // Verify user exists
-        let _ = self.find_user(tenant_id, user_id).await?;
+        let current = self.find_user(tenant_id, user_id).await?;
 
         let mapper = self.get_mapper(tenant_id).await?;
         let data = mapper.extract_user_data(&request)?;
@@ -371,6 +421,10 @@ impl UserService {
             }
             Err(e) => return Err(e.into()),
         };
+
+        if !user.is_active || user.email != current.email {
+            revoke_user_sessions_and_refresh_tokens(&self.pool, tenant_id, user_id).await?;
+        }
 
         let groups = self.get_user_groups(tenant_id, user.id).await?;
         Ok(mapper.to_scim_user(&user, groups, &self.base_url))
@@ -449,6 +503,10 @@ impl UserService {
             }
             Err(e) => return Err(e.into()),
         };
+
+        if !updated.is_active || updated.email != original_email {
+            revoke_user_sessions_and_refresh_tokens(&self.pool, tenant_id, user_id).await?;
+        }
 
         let mapper = self.get_mapper(tenant_id).await?;
         let groups = self.get_user_groups(tenant_id, updated.id).await?;
@@ -638,6 +696,8 @@ impl UserService {
             return Err(ScimError::NotFound(format!("User {user_id} not found")));
         }
 
+        revoke_user_sessions_and_refresh_tokens(&self.pool, tenant_id, user_id).await?;
+
         Ok(())
     }
 }
@@ -750,5 +810,28 @@ mod tests {
 
         apply_test_patch_op(&mut user, &op).unwrap();
         assert!(!user.is_active);
+    }
+
+    #[test]
+    fn deactivate_and_identity_change_revoke_sessions_and_refresh_tokens() {
+        let src = include_str!("user_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("revoke_user_sessions_and_refresh_tokens("),
+            "SCIM deactivate/email change must revoke sessions and refresh tokens"
+        );
+        assert!(
+            production.contains("UPDATE oauth_refresh_tokens"),
+            "must also revoke OAuth refresh tokens"
+        );
+        let delete = production
+            .split("pub async fn delete_user")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn").next())
+            .expect("delete_user body");
+        assert!(
+            delete.contains("revoke_user_sessions_and_refresh_tokens("),
+            "SCIM DELETE must revoke tokens"
+        );
     }
 }
