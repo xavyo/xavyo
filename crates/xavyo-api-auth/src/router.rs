@@ -338,10 +338,11 @@ impl AuthState {
             .unwrap_or_else(|_| "https://app.xavyo.net".to_string());
         // Create profile services (F027)
         let profile_service = Arc::new(ProfileService::new(pool.clone()));
-        let email_change_service = Arc::new(EmailChangeService::new(
-            pool.clone(),
-            frontend_base_url.clone(),
-        ));
+        let session_service = Arc::new(session_service);
+        let email_change_service = Arc::new(
+            EmailChangeService::new(pool.clone(), frontend_base_url.clone())
+                .with_session_service(session_service.clone()),
+        );
         // Create IP restriction service (F028)
         let ip_restriction_service = Arc::new(IpRestrictionService::new(pool.clone()));
         // Create delegated admin service (F029)
@@ -392,7 +393,7 @@ impl AuthState {
             sensitive_rate_limiter: Arc::new(sensitive_limiter),
             email_sender,
             mfa_service: Arc::new(mfa_service),
-            session_service: Arc::new(session_service),
+            session_service,
             password_policy_service,
             lockout_service,
             audit_service,
@@ -1106,5 +1107,15 @@ mod tests {
         let _limiter = RateLimiter::new(config);
         // AuthState creation requires AuthService and TokenService
         // which need database connections
+    }
+
+    #[test]
+    fn email_change_service_is_wired_with_session_service() {
+        let src = include_str!("router.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("with_session_service(session_service.clone())"),
+            "email change must revoke sessions after the address changes"
+        );
     }
 }

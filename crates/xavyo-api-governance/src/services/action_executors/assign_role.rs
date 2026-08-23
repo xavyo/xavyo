@@ -148,11 +148,9 @@ impl ActionExecutor for AssignRoleExecutor {
                 if let Err(e) =
                     Self::revoke_user_sessions(pool, ctx.tenant_id, target_user_id).await
                 {
-                    tracing::warn!(
-                        user_id = %target_user_id,
-                        error = %e,
-                        "Failed to revoke sessions after role assignment"
-                    );
+                    return ExecutionResult::failure(format!(
+                        "Failed to revoke sessions after role assignment: {e}"
+                    ));
                 }
                 ExecutionResult::success(
                     serde_json::json!({
@@ -215,5 +213,19 @@ mod tests {
     fn test_executor_action_type() {
         let executor = AssignRoleExecutor::new();
         assert_eq!(executor.action_type(), "assign_role");
+    }
+
+    #[test]
+    fn assign_role_does_not_swallow_session_revoke() {
+        let src = include_str!("assign_role.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("Failed to revoke sessions after role assignment: {e}"),
+            "session revoke errors must fail the action"
+        );
+        assert!(
+            !production.contains("tracing::warn!"),
+            "must not log-and-ignore session revoke errors"
+        );
     }
 }
