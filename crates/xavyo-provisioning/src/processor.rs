@@ -97,10 +97,46 @@ pub enum ProcessorError {
     /// Operation skipped due to conflict resolution.
     #[error("Operation {operation_id} skipped: superseded by conflicting operation")]
     OperationSuperseded { operation_id: Uuid },
+
+    /// The requested deprovision action is not implemented.
+    #[error("Deprovision action '{action}' is not implemented")]
+    DeprovisionNotImplemented { action: String },
+}
+
+impl ProcessorError {
+    /// Error if this deprovision action would otherwise be skipped as success.
+    #[must_use]
+    pub fn unimplemented_deprovision(
+        action: xavyo_connector::types::DeprovisionAction,
+    ) -> Option<Self> {
+        use xavyo_connector::types::DeprovisionAction;
+        match action {
+            DeprovisionAction::Move | DeprovisionAction::Rename => {
+                Some(Self::DeprovisionNotImplemented {
+                    action: action.to_string(),
+                })
+            }
+            DeprovisionAction::Delete | DeprovisionAction::Disable | DeprovisionAction::None => {
+                None
+            }
+        }
+    }
 }
 
 /// Result type for processor operations.
 pub type ProcessorResult<T> = Result<T, ProcessorError>;
+
+/// Fail closed for deprovision actions that have no implementation.
+pub(crate) fn deprovision_or_err(
+    action: xavyo_connector::types::DeprovisionAction,
+) -> ProcessorResult<()> {
+    if let Some(err) = ProcessorError::unimplemented_deprovision(action) {
+        warn!(action = %action, "{err}");
+        Err(err)
+    } else {
+        Ok(())
+    }
+}
 
 /// Result of processing batches with connector isolation (F047).
 #[derive(Debug, Clone, Default)]
@@ -673,6 +709,9 @@ impl DefaultOperationProcessor {
             ProcessorError::ConflictRequiresManual { .. } => ("CONFLICT_MANUAL".to_string(), false),
             ProcessorError::OperationSuperseded { .. } => ("SUPERSEDED".to_string(), false),
             ProcessorError::Serialization(_) => ("SERIALIZATION_ERROR".to_string(), false),
+            ProcessorError::DeprovisionNotImplemented { .. } => {
+                ("DEPROVISION_NOT_IMPLEMENTED".to_string(), false)
+            }
         }
     }
 
@@ -902,6 +941,8 @@ impl DefaultOperationProcessor {
 
         let uid = Uid::from_id(target_uid.clone());
 
+        deprovision_or_err(mapping.deprovision_action)?;
+
         // Check deprovision action
         match mapping.deprovision_action {
             xavyo_connector::types::DeprovisionAction::Delete => {
@@ -920,13 +961,9 @@ impl DefaultOperationProcessor {
             xavyo_connector::types::DeprovisionAction::None => {
                 info!(target_uid = %uid.value(), "Deprovision action is None, skipping");
             }
-            xavyo_connector::types::DeprovisionAction::Move => {
-                // Move operation would require connector-specific handling
-                warn!(target_uid = %uid.value(), "Move deprovision action not yet implemented");
-            }
-            xavyo_connector::types::DeprovisionAction::Rename => {
-                // Rename operation would require connector-specific handling
-                warn!(target_uid = %uid.value(), "Rename deprovision action not yet implemented");
+            xavyo_connector::types::DeprovisionAction::Move
+            | xavyo_connector::types::DeprovisionAction::Rename => {
+                unreachable!("unimplemented_deprovision already returned Err")
             }
         }
 
@@ -1296,5 +1333,29 @@ mod tests {
         // Empty case
         let empty_result = ConnectorBatchResult::default();
         assert_eq!(empty_result.success_rate(), 100.0);
+    }
+
+    #[test]
+    fn move_and_rename_deprovision_are_not_success() {
+        use xavyo_connector::types::DeprovisionAction;
+        let mov = ProcessorError::unimplemented_deprovision(DeprovisionAction::Move)
+            .expect("Move must not succeed silently");
+        let ren = ProcessorError::unimplemented_deprovision(DeprovisionAction::Rename)
+            .expect("Rename must not succeed silently");
+        assert!(mov.to_string().contains("move"));
+        assert!(ren.to_string().contains("rename"));
+        assert!(ProcessorError::unimplemented_deprovision(DeprovisionAction::Delete).is_none());
+        assert!(ProcessorError::unimplemented_deprovision(DeprovisionAction::Disable).is_none());
+        assert!(ProcessorError::unimplemented_deprovision(DeprovisionAction::None).is_none());
+    }
+
+    #[test]
+    fn process_delete_guard_rejects_move_and_rename() {
+        use xavyo_connector::types::DeprovisionAction;
+        assert!(deprovision_or_err(DeprovisionAction::Move).is_err());
+        assert!(deprovision_or_err(DeprovisionAction::Rename).is_err());
+        assert!(deprovision_or_err(DeprovisionAction::Delete).is_ok());
+        assert!(deprovision_or_err(DeprovisionAction::Disable).is_ok());
+        assert!(deprovision_or_err(DeprovisionAction::None).is_ok());
     }
 }

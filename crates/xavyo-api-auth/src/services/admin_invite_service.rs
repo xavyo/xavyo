@@ -8,8 +8,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use xavyo_db::models::{
-    AdminAction, AdminAuditLog, AdminResourceType, AdminRoleTemplate, CreateAdminInvitation,
-    CreateAuditLogEntry, User, UserInvitation,
+    AdminAction, AdminAuditLog, AdminResourceType, CreateAdminInvitation, CreateAuditLogEntry,
+    User, UserInvitation,
 };
 
 use crate::error::ApiAuthError;
@@ -22,6 +22,20 @@ const DEFAULT_EXPIRY_DAYS: i64 = 7;
 
 /// Maximum pending invitations per tenant.
 const MAX_PENDING_INVITATIONS: i64 = 10;
+
+/// Role templates cannot be applied on accept. Refuse create/accept so an
+/// invitation is not stored or completed with a silently dropped template.
+pub fn reject_unimplemented_role_template(
+    role_template_id: Option<Uuid>,
+) -> Result<(), ApiAuthError> {
+    if role_template_id.is_some() {
+        Err(ApiAuthError::Validation(
+            "Role template assignment is not implemented; omit role_template_id".to_string(),
+        ))
+    } else {
+        Ok(())
+    }
+}
 
 /// Generate a cryptographically secure invitation token.
 ///
@@ -133,16 +147,9 @@ impl AdminInviteService {
             )));
         }
 
-        // Validate role template if provided
-        if let Some(template_id) = role_template_id {
-            let template = AdminRoleTemplate::get_by_id(&self.pool, tenant_id, template_id)
-                .await
-                .map_err(|e| ApiAuthError::Internal(e.to_string()))?;
-
-            if template.is_none() {
-                return Err(ApiAuthError::TemplateNotFound);
-            }
-        }
+        // Role templates cannot be applied on accept yet — refuse at create
+        // so invitations are not issued with a silently dropped template.
+        reject_unimplemented_role_template(role_template_id)?;
 
         // Generate secure token
         let raw_token = generate_invitation_token();
@@ -259,6 +266,8 @@ If you didn't expect this invitation, you can safely ignore this email.
         if !verify_token_hash_constant_time(token, &invitation.token_hash) {
             return Err(ApiAuthError::InvalidInvitationToken);
         }
+
+        reject_unimplemented_role_template(invitation.role_template_id)?;
 
         // Check if already accepted
         if invitation.status == "accepted" {
@@ -417,15 +426,6 @@ If you didn't expect this invitation, you can safely ignore this email.
         tx.commit()
             .await
             .map_err(|e| ApiAuthError::Internal(format!("Failed to commit transaction: {e}")))?;
-
-        // Assign role template if specified
-        if let Some(template_id) = invitation.role_template_id {
-            tracing::info!(
-                user_id = %user.id,
-                template_id = %template_id,
-                "Role template assignment not yet implemented"
-            );
-        }
 
         // Log audit trail
         let new_value = serde_json::json!({
@@ -689,5 +689,13 @@ mod tests {
         assert!(token
             .chars()
             .all(|c| { c.is_ascii_alphanumeric() || c == '-' || c == '_' }));
+    }
+
+    #[test]
+    fn role_template_id_is_rejected_until_assignment_exists() {
+        let id = Uuid::new_v4();
+        let err = reject_unimplemented_role_template(Some(id)).expect_err("must fail closed");
+        assert!(matches!(err, ApiAuthError::Validation(_)), "got {err:?}");
+        assert!(reject_unimplemented_role_template(None).is_ok());
     }
 }
