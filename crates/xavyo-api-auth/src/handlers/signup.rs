@@ -7,15 +7,21 @@
 //! for immediate use in the device code flow.
 
 use crate::error::ApiAuthError;
+use crate::handlers::login::login_client_ip;
+use crate::middleware::jwt_auth::TrustXff;
 use crate::models::{SignupRequest, SignupResponse};
 use crate::services::{
     generate_email_verification_token, AuthContext, AuthService, EmailSender,
     PasswordPolicyService, TokenService, EMAIL_VERIFICATION_TOKEN_VALIDITY_HOURS,
 };
-use axum::{extract::ConnectInfo, http::StatusCode, Extension, Json};
+use axum::{
+    extract::ConnectInfo,
+    http::{HeaderMap, StatusCode},
+    Extension, Json,
+};
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -65,6 +71,8 @@ pub async fn signup_handler(
     Extension(email_sender): Extension<Arc<dyn EmailSender>>,
     Extension(password_policy_service): Extension<Arc<PasswordPolicyService>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    trust_xff: Option<Extension<TrustXff>>,
+    headers: HeaderMap,
     Json(request): Json<SignupRequest>,
 ) -> Result<(StatusCode, Json<SignupResponse>), ApiAuthError> {
     // Validate request using validator derive
@@ -122,6 +130,9 @@ pub async fn signup_handler(
             .await?;
     }
 
+    let ip_str = login_client_ip(&headers, trust_xff.is_some(), Some(addr.ip()));
+    let ip_address: Option<IpAddr> = ip_str.as_deref().and_then(|s| s.parse().ok());
+
     // Generate tokens using TokenService
     let (access_token, _refresh_token, expires_in) = token_service
         .create_tokens(
@@ -132,7 +143,7 @@ pub async fn signup_handler(
             // Signup auto-login is password-based — single factor (acr "1").
             Some(AuthContext::password()),
             None, // No user agent
-            Some(addr.ip()),
+            ip_address,
         )
         .await?;
 
@@ -143,7 +154,7 @@ pub async fn signup_handler(
     let user_id_uuid = *user_id.as_uuid();
     let email_clone = email.clone();
     let tenant_id_clone = tenant_id;
-    let ip = addr.ip();
+    let ip = ip_address.unwrap_or_else(|| addr.ip());
 
     tokio::spawn(async move {
         if let Err(e) = send_verification_email(
@@ -169,7 +180,7 @@ pub async fn signup_handler(
     info!(
         user_id = %user_id,
         tenant_id = %SYSTEM_TENANT_ID,
-        ip = %addr.ip(),
+        ip = ?ip_address,
         "signup.success: New user signed up in system tenant"
     );
 
@@ -304,5 +315,35 @@ mod tests {
     fn test_display_name_tab_not_allowed() {
         let result = validate_display_name("Name\tWith\tTabs");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn signup_does_not_trust_untrusted_xff() {
+        let src = include_str!("signup.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("login_client_ip("),
+            "signup token issue must not trust untrusted X-Forwarded-For"
+        );
+        assert!(
+            production.contains("ip_address,"),
+            "signup must pass TrustXff-aware IP into create_tokens"
+        );
+    }
+
+    #[test]
+    fn untrusted_xff_does_not_override_peer_for_signup_ip() {
+        use axum::http::HeaderValue;
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("10.0.0.1"));
+        let peer = "203.0.113.10".parse().unwrap();
+        assert_eq!(
+            login_client_ip(&headers, false, Some(peer)).as_deref(),
+            Some("203.0.113.10")
+        );
+        assert_eq!(
+            login_client_ip(&headers, true, Some(peer)).as_deref(),
+            Some("10.0.0.1")
+        );
     }
 }
