@@ -126,8 +126,7 @@ pub async fn admin_reset_password(
     // Revoke all active sessions
     let sessions_revoked = session_service
         .revoke_all_user_sessions(user_id, *tenant_id.as_uuid(), RevokeReason::PasswordChange)
-        .await
-        .unwrap_or(0) as i64;
+        .await? as i64;
 
     tracing::info!(
         admin_id = %claims.sub,
@@ -145,4 +144,21 @@ pub async fn admin_reset_password(
             sessions_revoked,
         }),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn admin_reset_password_does_not_swallow_session_revoke() {
+        let src = include_str!("reset_password.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("unwrap_or(0)"),
+            "admin password reset must fail if sessions cannot be revoked"
+        );
+        assert!(
+            production.contains("revoke_all_user_sessions"),
+            "admin password reset must revoke sessions"
+        );
+    }
 }
