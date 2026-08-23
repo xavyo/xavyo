@@ -196,6 +196,12 @@ impl TokenService {
         user_agent: Option<String>,
         ip_address: Option<IpAddr>,
     ) -> Result<(String, String, i64), ApiAuthError> {
+        // Advertised tenant IP restrictions must apply at token issue.
+        let ip_str = ip_address.map(|ip| ip.to_string());
+        super::IpRestrictionService::new(self.pool.clone())
+            .enforce_access(*tenant_id.as_uuid(), ip_str.as_deref(), &roles)
+            .await?;
+
         // Generate access token
         let access_token =
             self.create_access_token(user_id, tenant_id, roles, email, auth_context.as_ref())?;
@@ -849,6 +855,10 @@ mod tests {
         assert!(
             !production.contains(".ok()\n            .flatten()"),
             "must not mint a JWT after swallowing email lookup errors"
+        );
+        assert!(
+            production.contains("enforce_access("),
+            "token issue must enforce tenant IP restrictions"
         );
     }
 

@@ -30,11 +30,11 @@ use tracing::{info, warn};
 use uuid::Uuid;
 use validator::Validate;
 use xavyo_api_auth::services::{
-    AuditService, AuthService, LockoutService, MfaService, SessionService,
+    AuditService, AuthService, IpRestrictionService, LockoutService, MfaService, SessionService,
 };
 use xavyo_api_auth::TrustXff;
 use xavyo_core::TenantId;
-use xavyo_db::{AuthMethod, FailureReason};
+use xavyo_db::{AuthMethod, FailureReason, UserRole};
 
 /// Query parameters for GET /device/login.
 #[derive(Debug, Clone, Deserialize)]
@@ -523,6 +523,31 @@ pub async fn device_login_handler(
             &scopes,
             "Account is deactivated. Please contact support.",
         );
+    }
+
+    // Tenant IP restriction (F028) at device login. Token poll is the CLI IP
+    // and must not skip this user-browser check.
+    let roles = match UserRole::get_user_roles(&state.pool, user.id, tenant_id).await {
+        Ok(roles) => roles,
+        Err(e) => {
+            warn!(error = %e, "Failed to fetch user roles for IP restriction");
+            return render_login_error_with_csrf(
+                &request.user_code,
+                &client_id,
+                &scopes,
+                "An error occurred. Please try again.",
+            );
+        }
+    };
+    if let Err(e) = IpRestrictionService::new(state.pool.clone())
+        .enforce_access(tenant_id, ip_str.as_deref(), &roles)
+        .await
+    {
+        let msg = match e {
+            xavyo_api_auth::ApiAuthError::IpBlocked(reason) => reason,
+            _ => "An error occurred. Please try again.".to_string(),
+        };
+        return render_login_error_with_csrf(&request.user_code, &client_id, &scopes, &msg);
     }
 
     // Check if MFA is required. `has_mfa_enabled` takes (user_id, tenant_id);
@@ -1384,6 +1409,10 @@ mod tests {
         assert!(
             !production.contains("unwrap_or(false)"),
             "must not fail-open MFA enrollment"
+        );
+        assert!(
+            production.contains("enforce_access("),
+            "device login must enforce tenant IP restrictions"
         );
     }
 
