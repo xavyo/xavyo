@@ -141,29 +141,14 @@ impl RiskEnforcementService {
             return Ok(EnforcementDecision::skip());
         }
 
-        // 3-7: Wrap entire evaluation for fail-open/fail-closed handling
+        // 3-7: Evaluation errors refuse login. `policy.fail_open` must not skip
+        // MFA/block — a scoring outage would otherwise disable enforcement.
         match self
             .evaluate_with_policy(tenant_id, user_id, context, &policy)
             .await
         {
             Ok(decision) => Ok(decision),
-            Err(e) => {
-                if policy.fail_open {
-                    tracing::warn!(
-                        "Risk evaluation failed for user {}, proceeding with fail-open: {}",
-                        user_id,
-                        e
-                    );
-                    Ok(EnforcementDecision::skip())
-                } else {
-                    tracing::error!(
-                        "Risk evaluation failed for user {}, fail-closed mode: {}",
-                        user_id,
-                        e
-                    );
-                    Err(RiskEnforcementError::ServiceUnavailable)
-                }
-            }
+            Err(e) => risk_eval_on_error(e),
         }
     }
 
@@ -680,6 +665,17 @@ fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
     EARTH_RADIUS_KM * c
 }
 
+/// Login must refuse when risk evaluation fails.
+///
+/// Tenant `fail_open` used to return [`EnforcementDecision::skip()`], which let
+/// a scoring outage disable MFA/block. Login maps this error to HTTP 503.
+pub fn risk_eval_on_error(
+    err: RiskEnforcementError,
+) -> Result<EnforcementDecision, RiskEnforcementError> {
+    tracing::warn!(error = %err, "Risk evaluation failed, refusing login (fail-closed)");
+    Err(err)
+}
+
 /// Errors specific to risk enforcement evaluation.
 #[derive(Debug, thiserror::Error)]
 pub enum RiskEnforcementError {
@@ -702,6 +698,37 @@ pub enum RiskEnforcementError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn risk_eval_on_error_never_skips() {
+        let cases = [
+            RiskEnforcementError::PolicyLoadFailed("policy".into()),
+            RiskEnforcementError::DatabaseError("db".into()),
+            RiskEnforcementError::EventCreationFailed("event".into()),
+            RiskEnforcementError::AlertCreationFailed("alert".into()),
+            RiskEnforcementError::ServiceUnavailable,
+        ];
+        for err in cases {
+            assert!(
+                risk_eval_on_error(err).is_err(),
+                "evaluation errors must refuse, not skip"
+            );
+        }
+    }
+
+    #[test]
+    fn evaluate_login_risk_error_path_does_not_skip() {
+        let src = include_str!("risk_enforcement_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("risk_eval_on_error"),
+            "evaluate_login_risk must fail closed on evaluation errors"
+        );
+        assert!(
+            !production.contains("proceeding with fail-open"),
+            "must not skip enforcement after a risk-eval error"
+        );
+    }
 
     #[test]
     fn test_enforcement_decision_skip() {

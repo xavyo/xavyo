@@ -76,7 +76,7 @@ impl GovRiskEnforcementPolicy {
     }
 
     /// Get the enforcement policy for a tenant, or return a default policy if none exists.
-    /// The default policy has enforcement disabled, fail-open enabled, and standard travel speed.
+    /// The default policy has enforcement disabled, fail-closed, and standard travel speed.
     pub async fn get_or_default(pool: &PgPool, tenant_id: Uuid) -> Result<Self, sqlx::Error> {
         match Self::get_by_tenant(pool, tenant_id).await? {
             Some(policy) => Ok(policy),
@@ -93,7 +93,7 @@ impl GovRiskEnforcementPolicy {
         input: &UpsertEnforcementPolicy,
     ) -> Result<Self, sqlx::Error> {
         let mode = input.enforcement_mode.unwrap_or(EnforcementMode::Disabled);
-        let fail_open = input.fail_open.unwrap_or(true);
+        let fail_open = input.fail_open.unwrap_or(false);
         let speed = input.impossible_travel_speed_kmh.unwrap_or(900);
         let travel_enabled = input.impossible_travel_enabled.unwrap_or(true);
 
@@ -127,7 +127,7 @@ impl GovRiskEnforcementPolicy {
             id: Uuid::nil(),
             tenant_id,
             enforcement_mode: EnforcementMode::Disabled,
-            fail_open: true,
+            fail_open: false,
             impossible_travel_speed_kmh: 900,
             impossible_travel_enabled: true,
             created_at: now,
@@ -160,7 +160,7 @@ mod tests {
         let policy = GovRiskEnforcementPolicy::default_for_tenant(tenant_id);
         assert_eq!(policy.tenant_id, tenant_id);
         assert_eq!(policy.enforcement_mode, EnforcementMode::Disabled);
-        assert!(policy.fail_open);
+        assert!(!policy.fail_open);
         assert_eq!(policy.impossible_travel_speed_kmh, 900);
         assert!(policy.impossible_travel_enabled);
     }
