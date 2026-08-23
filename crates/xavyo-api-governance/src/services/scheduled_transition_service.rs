@@ -8,8 +8,8 @@ use uuid::Uuid;
 
 use xavyo_db::{
     CreateGovScheduledTransition, GovScheduleStatus, GovScheduledTransition,
-    GovStateTransitionRequest, ScheduledTransitionFilter, TransitionRequestStatus,
-    UpdateGovStateTransitionRequest,
+    GovStateTransitionRequest, LifecycleObjectType, ScheduledTransitionFilter,
+    TransitionRequestStatus, UpdateGovStateTransitionRequest, User,
 };
 use xavyo_governance::error::{GovernanceError, Result};
 
@@ -259,6 +259,108 @@ impl ScheduledTransitionService {
         })
     }
 
+    /// Execute a single due schedule: apply the lifecycle change, then mark done.
+    ///
+    /// Returns `Ok(true)` when the transition was applied. Recorded failures
+    /// return `Ok(false)` so callers can count them without aborting the batch.
+    async fn execute_one(&self, schedule: &GovScheduledTransition) -> Result<bool> {
+        let request = match GovStateTransitionRequest::find_by_id(
+            &self.pool,
+            schedule.tenant_id,
+            schedule.transition_request_id,
+        )
+        .await
+        {
+            Ok(Some(req)) => req,
+            Ok(None) => {
+                let error = format!(
+                    "Transition request {} not found",
+                    schedule.transition_request_id
+                );
+                return self.fail_schedule(schedule, error).await;
+            }
+            Err(e) => {
+                let error = format!("Failed to fetch transition request: {e}");
+                return self.fail_schedule(schedule, error).await;
+            }
+        };
+
+        if request.status != TransitionRequestStatus::Pending {
+            let error = format!(
+                "Transition request is no longer pending (status: {:?})",
+                request.status
+            );
+            return self.fail_schedule(schedule, error).await;
+        }
+
+        match request.object_type {
+            LifecycleObjectType::User => {
+                match User::update_lifecycle_state(
+                    &self.pool,
+                    schedule.tenant_id,
+                    request.object_id,
+                    Some(request.to_state_id),
+                )
+                .await
+                {
+                    Ok(Some(_)) => {}
+                    Ok(None) => {
+                        return self
+                            .fail_schedule(schedule, "User not found".to_string())
+                            .await;
+                    }
+                    Err(e) => {
+                        let error = format!("Failed to update user lifecycle state: {e}");
+                        return self.fail_schedule(schedule, error).await;
+                    }
+                }
+            }
+            other => {
+                let error = format!("Unsupported object type for scheduled transition: {other:?}");
+                return self.fail_schedule(schedule, error).await;
+            }
+        }
+
+        let update = UpdateGovStateTransitionRequest {
+            status: Some(TransitionRequestStatus::Executed),
+            approval_request_id: None,
+            executed_at: Some(Utc::now()),
+            grace_period_ends_at: None,
+            rollback_available: None,
+            error_message: None,
+        };
+        match GovStateTransitionRequest::update(&self.pool, schedule.tenant_id, request.id, &update)
+            .await
+        {
+            Ok(Some(_)) => {}
+            Ok(None) => {
+                return self
+                    .fail_schedule(
+                        schedule,
+                        "Transition request could not be updated".to_string(),
+                    )
+                    .await;
+            }
+            Err(e) => {
+                let error = format!("Failed to update transition request: {e}");
+                return self.fail_schedule(schedule, error).await;
+            }
+        }
+
+        GovScheduledTransition::mark_executed(&self.pool, schedule.tenant_id, schedule.id).await?;
+        Ok(true)
+    }
+
+    async fn fail_schedule(
+        &self,
+        schedule: &GovScheduledTransition,
+        error: String,
+    ) -> Result<bool> {
+        GovScheduledTransition::mark_failed(&self.pool, schedule.tenant_id, schedule.id, &error)
+            .await?;
+        Ok(false)
+    }
+
     /// Process due scheduled transitions.
     ///
     /// This is called by a background job to execute scheduled transitions
@@ -274,95 +376,12 @@ impl ScheduledTransitionService {
 
         for schedule in due_schedules {
             processed += 1;
-
-            // Get the transition request
-            let request = match GovStateTransitionRequest::find_by_id(
-                &self.pool,
-                schedule.tenant_id,
-                schedule.transition_request_id,
-            )
-            .await
-            {
-                Ok(Some(req)) => req,
-                Ok(None) => {
-                    let error = format!(
-                        "Transition request {} not found",
-                        schedule.transition_request_id
-                    );
-                    GovScheduledTransition::mark_failed(&self.pool, schedule.id, &error).await?;
-                    errors.push((schedule.id, error));
-                    failed += 1;
-                    continue;
-                }
-                Err(e) => {
-                    let error = format!("Failed to fetch transition request: {e}");
-                    GovScheduledTransition::mark_failed(&self.pool, schedule.id, &error).await?;
-                    errors.push((schedule.id, error));
-                    failed += 1;
-                    continue;
-                }
-            };
-
-            // Validate request is still pending
-            if request.status != TransitionRequestStatus::Pending {
-                let error = format!(
-                    "Transition request is no longer pending (status: {:?})",
-                    request.status
-                );
-                GovScheduledTransition::mark_failed(&self.pool, schedule.id, &error).await?;
-                errors.push((schedule.id, error));
+            if self.execute_one(&schedule).await? {
+                succeeded += 1;
+            } else {
                 failed += 1;
-                continue;
+                errors.push((schedule.id, "schedule recorded as failed".to_string()));
             }
-
-            // Execute the transition by updating the object's lifecycle state
-            match request.object_type {
-                xavyo_db::LifecycleObjectType::User => {
-                    if let Err(e) = xavyo_db::User::update_lifecycle_state(
-                        &self.pool,
-                        schedule.tenant_id,
-                        request.object_id,
-                        Some(request.to_state_id),
-                    )
-                    .await
-                    {
-                        let error = format!("Failed to update user lifecycle state: {e}");
-                        GovScheduledTransition::mark_failed(&self.pool, schedule.id, &error)
-                            .await?;
-                        errors.push((schedule.id, error));
-                        failed += 1;
-                        continue;
-                    }
-                }
-                _ => {
-                    // Entitlement and Role lifecycle transitions not yet supported
-                    tracing::warn!(
-                        object_type = ?request.object_type,
-                        object_id = %request.object_id,
-                        "Scheduled transition for unsupported object type"
-                    );
-                }
-            }
-
-            // Mark the transition request as executed
-            let update = UpdateGovStateTransitionRequest {
-                status: Some(TransitionRequestStatus::Executed),
-                approval_request_id: None,
-                executed_at: Some(Utc::now()),
-                grace_period_ends_at: None,
-                rollback_available: None,
-                error_message: None,
-            };
-            let _ = GovStateTransitionRequest::update(
-                &self.pool,
-                schedule.tenant_id,
-                request.id,
-                &update,
-            )
-            .await;
-
-            GovScheduledTransition::mark_executed(&self.pool, schedule.id).await?;
-            succeeded += 1;
         }
 
         Ok(ProcessDueResult {
@@ -445,43 +464,9 @@ impl ScheduledTransitionService {
         let mut processed = 0;
 
         for schedule in due_schedules {
-            // Get the transition request
-            let request = match GovStateTransitionRequest::find_by_id(
-                &self.pool,
-                schedule.tenant_id,
-                schedule.transition_request_id,
-            )
-            .await
-            {
-                Ok(Some(req)) => req,
-                Ok(None) => {
-                    let error = format!(
-                        "Transition request {} not found",
-                        schedule.transition_request_id
-                    );
-                    GovScheduledTransition::mark_failed(&self.pool, schedule.id, &error).await?;
-                    continue;
-                }
-                Err(e) => {
-                    let error = format!("Failed to fetch transition request: {e}");
-                    GovScheduledTransition::mark_failed(&self.pool, schedule.id, &error).await?;
-                    continue;
-                }
-            };
-
-            // Validate request is still pending
-            if request.status != TransitionRequestStatus::Pending {
-                let error = format!(
-                    "Transition request is no longer pending (status: {:?})",
-                    request.status
-                );
-                GovScheduledTransition::mark_failed(&self.pool, schedule.id, &error).await?;
-                continue;
+            if self.execute_one(&schedule).await? {
+                processed += 1;
             }
-
-            // Mark as executed
-            GovScheduledTransition::mark_executed(&self.pool, schedule.id).await?;
-            processed += 1;
         }
 
         Ok(processed)
@@ -520,5 +505,50 @@ impl ScheduledTransitionService {
         }
 
         Ok(stats)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn execute_one_applies_lifecycle_and_scopes_status() {
+        let src = include_str!("scheduled_transition_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let execute = production
+            .split("async fn execute_one")
+            .nth(1)
+            .expect("execute_one")
+            .split("async fn fail_schedule")
+            .next()
+            .expect("execute_one body");
+        assert!(
+            execute.contains("User::update_lifecycle_state"),
+            "execution must apply the user lifecycle change"
+        );
+        assert!(
+            execute.contains("mark_executed(&self.pool, schedule.tenant_id, schedule.id)"),
+            "mark_executed must pass tenant_id"
+        );
+        assert!(
+            !execute.contains("let _ = GovStateTransitionRequest::update"),
+            "must not swallow transition-request update errors"
+        );
+        assert!(
+            execute.contains("Unsupported object type"),
+            "unsupported object types must fail, not mark executed"
+        );
+
+        let for_tenant = production
+            .split("fn process_due_transitions_for_tenant")
+            .nth(1)
+            .expect("process_due_transitions_for_tenant");
+        assert!(
+            for_tenant.contains("self.execute_one(&schedule)"),
+            "tenant job path must actually execute the transition"
+        );
+        assert!(
+            !for_tenant.contains("Mark as executed"),
+            "must not mark executed without applying the lifecycle change"
+        );
     }
 }

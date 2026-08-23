@@ -150,4 +150,18 @@ mod tests {
         let err = ScheduledTransitionJobError::Processing("test error".to_string());
         assert!(err.to_string().contains("test error"));
     }
+
+    #[test]
+    fn poll_uses_executing_tenant_path() {
+        let src = include_str!("scheduled_transition_job.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("process_due_transitions_for_tenant(tenant_id, self.batch_size)"),
+            "tenant poll must go through the executing tenant path"
+        );
+        assert!(
+            production.contains("process_all_due_transitions(self.batch_size)"),
+            "global poll must go through per-tenant execution"
+        );
+    }
 }

@@ -308,15 +308,20 @@ impl GovScheduledTransition {
     }
 
     /// Mark a schedule as executed.
-    pub async fn mark_executed(pool: &sqlx::PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
+    pub async fn mark_executed(
+        pool: &sqlx::PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r"
             UPDATE gov_scheduled_transitions
             SET status = 'executed', executed_at = NOW()
-            WHERE id = $1 AND status = 'pending'
+            WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .execute(pool)
         .await?;
 
@@ -326,17 +331,19 @@ impl GovScheduledTransition {
     /// Mark a schedule as failed.
     pub async fn mark_failed(
         pool: &sqlx::PgPool,
+        tenant_id: Uuid,
         id: Uuid,
         error_message: &str,
     ) -> Result<bool, sqlx::Error> {
         let result = sqlx::query(
             r"
             UPDATE gov_scheduled_transitions
-            SET status = 'failed', error_message = $2
-            WHERE id = $1 AND status = 'pending'
+            SET status = 'failed', error_message = $3
+            WHERE id = $1 AND tenant_id = $2 AND status = 'pending'
             ",
         )
         .bind(id)
+        .bind(tenant_id)
         .bind(error_message)
         .execute(pool)
         .await?;
@@ -470,5 +477,31 @@ impl GovScheduledTransition {
         .bind(limit)
         .fetch_all(pool)
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn status_mutations_scope_by_tenant() {
+        let src = include_str!("gov_scheduled_transition.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        for fn_name in ["fn mark_executed", "fn mark_failed"] {
+            let body = production
+                .split(fn_name)
+                .nth(1)
+                .unwrap_or_else(|| panic!("{fn_name} missing"))
+                .split("pub async fn")
+                .next()
+                .unwrap_or_else(|| panic!("{fn_name} body"));
+            assert!(
+                body.contains("AND tenant_id = $2"),
+                "{fn_name} must include tenant_id"
+            );
+            assert!(
+                !body.contains("WHERE id = $1 AND status = 'pending'"),
+                "{fn_name} must not mutate schedules by id alone"
+            );
+        }
     }
 }
