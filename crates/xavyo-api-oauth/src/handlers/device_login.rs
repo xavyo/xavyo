@@ -449,15 +449,25 @@ pub async fn device_login_handler(
         Err(xavyo_api_auth::ApiAuthError::InvalidCredentials) => {
             // Record failed attempt if user exists
             if let Some(ref user) = existing_user {
-                let _ = lockout_service
-                    .record_failed_attempt(
-                        user.id,
-                        tenant_id,
-                        &request.email,
-                        ip_str.as_deref(),
-                        FailureReason::InvalidPassword,
-                    )
-                    .await;
+                if let Err(e) = device_lockout_record(
+                    lockout_service
+                        .record_failed_attempt(
+                            user.id,
+                            tenant_id,
+                            &request.email,
+                            ip_str.as_deref(),
+                            FailureReason::InvalidPassword,
+                        )
+                        .await,
+                ) {
+                    warn!(error = %e, "Failed to record failed attempt");
+                    return render_login_error_with_csrf(
+                        &request.user_code,
+                        &client_id,
+                        &scopes,
+                        "An error occurred. Please try again.",
+                    );
+                }
             }
 
             // Audit log
@@ -1230,6 +1240,21 @@ pub fn device_user_for_lockout<T, E: std::fmt::Display>(
     }
 }
 
+/// Recording a failed attempt must not be swallowed: otherwise lockout
+/// never increments and a locked account can keep guessing.
+pub fn device_lockout_record<T, E: std::fmt::Display>(result: Result<T, E>) -> Result<T, E> {
+    match result {
+        Ok(value) => Ok(value),
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "Failed-attempt recording failed, refusing device login"
+            );
+            Err(e)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1392,5 +1417,29 @@ mod tests {
             .unwrap()
             .is_none());
         assert!(device_user_for_lockout(Err::<Option<u8>, _>("db down")).is_err());
+    }
+
+    #[test]
+    fn device_lockout_record_does_not_skip_on_error() {
+        assert!(device_lockout_record(Ok::<u8, &str>(1)).is_ok());
+        assert!(device_lockout_record(Err::<u8, _>("db down")).is_err());
+    }
+
+    #[test]
+    fn device_login_does_not_swallow_failed_attempt_record() {
+        let src = include_str!("device_login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("device_lockout_record("),
+            "failed-attempt recording must fail closed"
+        );
+        let idx = production
+            .find("record_failed_attempt")
+            .expect("failed-attempt recording");
+        let window = &production[idx.saturating_sub(80)..(idx + 80).min(production.len())];
+        assert!(
+            !window.contains("let _ = lockout_service"),
+            "must not swallow lockout recording: {window}"
+        );
     }
 }

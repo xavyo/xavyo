@@ -254,21 +254,9 @@ impl IdpConfigService {
         )
         .await?;
 
-        // Add initial domains
-        for domain in req.domains {
-            if IdentityProviderDomain::validate_domain(&domain) {
-                let _ = IdentityProviderDomain::create(
-                    &self.pool,
-                    CreateDomain {
-                        tenant_id,
-                        identity_provider_id: idp.id,
-                        domain,
-                        priority: 0,
-                    },
-                )
-                .await;
-            }
-        }
+        // Validate domains before attach so we never report a created IdP
+        // with silently dropped or failed HRD domains.
+        attach_initial_domains(&self.pool, tenant_id, idp.id, req.domains).await?;
 
         tracing::info!(idp_id = %idp.id, "Created identity provider");
         Ok(idp)
@@ -486,5 +474,72 @@ impl IdpConfigService {
         encrypted: &[u8],
     ) -> FederationResult<String> {
         self.encryption.decrypt(tenant_id, encrypted)
+    }
+}
+
+/// Reject an invalid HRD domain instead of silently dropping it.
+pub(crate) fn reject_invalid_initial_domain(domain: &str) -> FederationResult<()> {
+    if IdentityProviderDomain::validate_domain(domain) {
+        Ok(())
+    } else {
+        Err(FederationError::InvalidDomain(domain.to_string()))
+    }
+}
+
+/// Attach HRD domains listed on IdP create. Invalid domains and insert errors
+/// fail the request so the client is not told the IdP was configured for them.
+async fn attach_initial_domains(
+    pool: &PgPool,
+    tenant_id: Uuid,
+    idp_id: Uuid,
+    domains: Vec<String>,
+) -> FederationResult<()> {
+    for domain in &domains {
+        reject_invalid_initial_domain(domain)?;
+    }
+    for domain in domains {
+        IdentityProviderDomain::create(
+            pool,
+            CreateDomain {
+                tenant_id,
+                identity_provider_id: idp_id,
+                domain,
+                priority: 0,
+            },
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reject_invalid_initial_domain_fails_closed() {
+        assert!(reject_invalid_initial_domain("example.com").is_ok());
+        assert!(matches!(
+            reject_invalid_initial_domain("not a domain"),
+            Err(FederationError::InvalidDomain(_))
+        ));
+        assert!(matches!(
+            reject_invalid_initial_domain("-bad.com"),
+            Err(FederationError::InvalidDomain(_))
+        ));
+    }
+
+    #[test]
+    fn idp_create_does_not_swallow_domain_attach() {
+        let src = include_str!("idp_config.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("attach_initial_domains("),
+            "IdP create must attach initial domains fail-closed"
+        );
+        assert!(
+            !production.contains("let _ = IdentityProviderDomain::create("),
+            "must not swallow domain create on IdP create"
+        );
     }
 }

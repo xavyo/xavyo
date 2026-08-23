@@ -381,9 +381,20 @@ async fn assign_group(
         }
     };
 
-    // Add user as a member (ON CONFLICT DO NOTHING handles idempotency)
-    let _ = GroupMembership::add_member(pool, tenant_id, group.id, user_id).await;
-    Ok(())
+    // Add user as a member. ON CONFLICT DO NOTHING yields RowNotFound when
+    // the membership already exists; other errors must fail the assignment.
+    import_membership_result(GroupMembership::add_member(pool, tenant_id, group.id, user_id).await)
+}
+
+/// Membership insert is idempotent (`ON CONFLICT DO NOTHING`). Real DB errors
+/// must fail the import row, not report the user as grouped.
+pub(crate) fn import_membership_result<T>(
+    result: Result<T, sqlx::Error>,
+) -> Result<(), sqlx::Error> {
+    match result {
+        Ok(_) | Err(sqlx::Error::RowNotFound) => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 /// Validate that a role name exists as a `gov_entitlement` with type "role",
@@ -450,4 +461,32 @@ async fn record_error(
     )
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn import_membership_result_treats_conflict_as_ok() {
+        assert!(import_membership_result(Ok::<(), sqlx::Error>(())).is_ok());
+        assert!(import_membership_result(Err::<(), _>(sqlx::Error::RowNotFound)).is_ok());
+        assert!(
+            import_membership_result(Err::<(), _>(sqlx::Error::Protocol("db".into()))).is_err()
+        );
+    }
+
+    #[test]
+    fn assign_group_does_not_swallow_membership_errors() {
+        let src = include_str!("job_processor.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("import_membership_result("),
+            "group membership insert must fail the import row on real errors"
+        );
+        assert!(
+            !production.contains("let _ = GroupMembership::add_member("),
+            "must not swallow group membership failures"
+        );
+    }
 }
