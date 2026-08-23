@@ -308,24 +308,31 @@ impl DeviceCodeService {
 
         // Check expiration first
         if record.is_expired() {
-            // Mark as expired if still pending
+            // Mark as expired if still pending. Persist errors must fail closed
+            // so the code is not left pending for a later authorize.
             if record.status == DeviceCodeStatus::Pending {
-                let _ = DeviceCode::mark_expired(&self.pool, tenant_id, record.id).await;
+                device_poll_write(
+                    DeviceCode::mark_expired(&self.pool, tenant_id, record.id).await,
+                )?;
             }
             return Ok(DeviceAuthorizationStatus::Expired);
         }
 
         // Check rate limiting
         if !record.can_poll() {
-            // Update interval with slow_down increment
+            // Persist the RFC 8628 slow_down interval and last_poll so the
+            // client cannot immediately poll again at the old interval.
             let new_interval = record.interval_seconds + SLOW_DOWN_INCREMENT;
+            device_poll_write(
+                DeviceCode::record_poll(&self.pool, tenant_id, record.id, Some(new_interval)).await,
+            )?;
             return Ok(DeviceAuthorizationStatus::SlowDown {
                 interval: new_interval,
             });
         }
 
-        // Update last poll time
-        let _ = DeviceCode::update_last_poll(&self.pool, tenant_id, record.id).await;
+        // Update last poll time. Errors must refuse the poll, not skip the limiter.
+        device_poll_write(DeviceCode::record_poll(&self.pool, tenant_id, record.id, None).await)?;
 
         // Return status
         match record.status {
@@ -519,6 +526,17 @@ pub struct DeviceTokenExchangeResult {
     pub scope: String,
 }
 
+/// Device-code poll/expire writes must not be swallowed.
+/// Skipping `last_poll_at` fail-opens RFC 8628 rate limiting.
+pub(crate) fn device_poll_write<E: std::fmt::Display>(
+    result: Result<(), E>,
+) -> Result<(), OAuthError> {
+    result.map_err(|e| {
+        tracing::error!(error = %e, "Device code poll mutation failed");
+        OAuthError::Internal("Database error".to_string())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -612,5 +630,33 @@ mod tests {
                 "Invalid character in device code: {c}"
             );
         }
+    }
+
+    #[test]
+    fn device_poll_write_does_not_skip_on_error() {
+        assert!(device_poll_write(Ok::<(), &str>(())).is_ok());
+        assert!(device_poll_write(Err::<(), _>("db down")).is_err());
+    }
+
+    #[test]
+    fn check_authorization_does_not_swallow_poll_writes() {
+        let src = include_str!("device_code.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("device_poll_write("),
+            "poll/expire writes must fail closed"
+        );
+        assert!(
+            !production.contains("let _ = DeviceCode::mark_expired"),
+            "must not swallow mark_expired"
+        );
+        assert!(
+            !production.contains("let _ = DeviceCode::update_last_poll"),
+            "must not swallow last_poll updates"
+        );
+        assert!(
+            production.contains("Some(new_interval)"),
+            "slow_down must persist the increased interval"
+        );
     }
 }

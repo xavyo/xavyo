@@ -280,15 +280,27 @@ impl DeviceCode {
         tenant_id: Uuid,
         id: Uuid,
     ) -> Result<(), sqlx::Error> {
+        Self::record_poll(pool, tenant_id, id, None).await
+    }
+
+    /// Record a poll: bump `last_poll_at` and optionally the RFC 8628 interval.
+    pub async fn record_poll(
+        pool: &PgPool,
+        tenant_id: Uuid,
+        id: Uuid,
+        interval_seconds: Option<i32>,
+    ) -> Result<(), sqlx::Error> {
         sqlx::query(
             r"
             UPDATE device_codes
-            SET last_poll_at = NOW()
+            SET last_poll_at = NOW(),
+                interval_seconds = COALESCE($3, interval_seconds)
             WHERE tenant_id = $1 AND id = $2
             ",
         )
         .bind(tenant_id)
         .bind(id)
+        .bind(interval_seconds)
         .execute(pool)
         .await?;
         Ok(())

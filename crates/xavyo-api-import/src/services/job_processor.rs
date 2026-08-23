@@ -345,11 +345,23 @@ async fn process_single_row(
                         error = %e,
                         "Failed to send invitation email during import"
                     );
-                } else {
-                    // Mark invitation as sent
-                    let _ =
-                        xavyo_db::models::UserInvitation::mark_sent(pool, tenant_id, invitation.id)
-                            .await;
+                } else if let Err(e) = import_mark_sent_result(
+                    xavyo_db::models::UserInvitation::mark_sent(pool, tenant_id, invitation.id)
+                        .await,
+                ) {
+                    tracing::warn!(
+                        user_id = %user_id,
+                        error = %e,
+                        "Failed to mark invitation sent during import"
+                    );
+                    let err = RowError {
+                        line_number: row.line_number,
+                        email: Some(row.email.clone()),
+                        column_name: Some("email".to_string()),
+                        error_type: "invitation_error".to_string(),
+                        error_message: format!("Invitation email sent but mark_sent failed: {e}"),
+                    };
+                    let _ = record_error(pool, tenant_id, job_id, &err).await;
                 }
             }
             Err(e) => {
@@ -393,6 +405,16 @@ pub(crate) fn import_membership_result<T>(
 ) -> Result<(), sqlx::Error> {
     match result {
         Ok(_) | Err(sqlx::Error::RowNotFound) => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
+/// Invitation `mark_sent` must not be swallowed after a successful email send.
+pub(crate) fn import_mark_sent_result<T>(
+    result: Result<T, sqlx::Error>,
+) -> Result<(), sqlx::Error> {
+    match result {
+        Ok(_) => Ok(()),
         Err(e) => Err(e),
     }
 }
@@ -487,6 +509,30 @@ mod tests {
         assert!(
             !production.contains("let _ = GroupMembership::add_member("),
             "must not swallow group membership failures"
+        );
+    }
+
+    #[test]
+    fn import_mark_sent_result_does_not_skip_on_error() {
+        assert!(import_mark_sent_result(Ok::<(), sqlx::Error>(())).is_ok());
+        assert!(import_mark_sent_result(Err::<(), _>(sqlx::Error::Protocol("db".into()))).is_err());
+    }
+
+    #[test]
+    fn import_does_not_swallow_invitation_mark_sent() {
+        let src = include_str!("job_processor.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("import_mark_sent_result("),
+            "invitation mark_sent must fail closed"
+        );
+        let idx = production
+            .find("UserInvitation::mark_sent")
+            .expect("mark_sent");
+        let window = &production[idx.saturating_sub(80)..(idx + 40).min(production.len())];
+        assert!(
+            window.contains("import_mark_sent_result("),
+            "must not swallow mark_sent after sending the invitation email: {window}"
         );
     }
 }
