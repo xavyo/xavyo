@@ -4,11 +4,13 @@
 //! via email with secure tokens that expire after 7 days.
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{ConnectInfo, Path, Query, State},
     http::{HeaderMap, StatusCode},
     Extension, Json,
 };
+use std::net::{IpAddr, SocketAddr};
 use uuid::Uuid;
+use xavyo_api_auth::TrustXff;
 use xavyo_auth::JwtClaims;
 use xavyo_db::models::{AdminAction, AdminAuditLog, AdminResourceType, CreateAuditLogEntry};
 
@@ -336,6 +338,8 @@ pub async fn cancel_invitation_handler(
 pub async fn accept_invitation_handler(
     State(state): State<TenantAppState>,
     headers: HeaderMap,
+    trust_xff: Option<Extension<TrustXff>>,
+    connect_info: Option<ConnectInfo<SocketAddr>>,
     Json(request): Json<AcceptInvitationRequest>,
 ) -> Result<Json<AcceptInvitationResponse>, TenantError> {
     // Validate the request
@@ -343,12 +347,13 @@ pub async fn accept_invitation_handler(
         return Err(TenantError::Validation(error));
     }
 
-    // Extract IP and User-Agent from headers for audit logging
-    let ip_address = headers
-        .get("x-forwarded-for")
-        .or_else(|| headers.get("x-real-ip"))
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.split(',').next().unwrap_or(s).trim().to_string());
+    // Extract IP and User-Agent for audit logging. Forwarded headers only
+    // when TrustXff is set so a client cannot spoof the recorded IP.
+    let ip_address = invitation_accept_ip(
+        &headers,
+        trust_xff.is_some(),
+        connect_info.map(|ConnectInfo(addr)| addr.ip()),
+    );
 
     let user_agent = headers
         .get("user-agent")
@@ -377,6 +382,26 @@ pub async fn accept_invitation_handler(
 // ============================================================================
 // Unit Tests
 // ============================================================================
+
+/// Client IP for invitation-accept audit. Untrusted forwarded headers are ignored.
+pub(crate) fn invitation_accept_ip(
+    headers: &HeaderMap,
+    trust_xff: bool,
+    peer: Option<IpAddr>,
+) -> Option<String> {
+    if trust_xff {
+        let forwarded = headers
+            .get("x-forwarded-for")
+            .or_else(|| headers.get("x-real-ip"))
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.split(',').next().unwrap_or(s).trim().to_string())
+            .filter(|s| !s.is_empty());
+        if forwarded.is_some() {
+            return forwarded;
+        }
+    }
+    peer.map(|ip| ip.to_string())
+}
 
 #[cfg(test)]
 mod tests {
@@ -509,5 +534,42 @@ mod tests {
             password: Some("ValidPassword123".to_string()),
         };
         assert!(request.validate().is_none());
+    }
+
+    #[test]
+    fn untrusted_xff_does_not_override_peer_ip() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", "10.0.0.1".parse().unwrap());
+        let peer = "203.0.113.10".parse().unwrap();
+        assert_eq!(
+            invitation_accept_ip(&headers, false, Some(peer)).as_deref(),
+            Some("203.0.113.10")
+        );
+        assert_eq!(invitation_accept_ip(&headers, false, None), None);
+    }
+
+    #[test]
+    fn trusted_xff_is_used_when_trust_xff() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", "10.0.0.1".parse().unwrap());
+        let peer = "203.0.113.10".parse().unwrap();
+        assert_eq!(
+            invitation_accept_ip(&headers, true, Some(peer)).as_deref(),
+            Some("10.0.0.1")
+        );
+    }
+
+    #[test]
+    fn accept_invitation_does_not_read_xff_without_trust() {
+        let src = include_str!("invitations.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("invitation_accept_ip("),
+            "accept invitation must use fail-closed IP extraction"
+        );
+        assert!(
+            production.contains("trust_xff.is_some()"),
+            "forwarded headers require TrustXff"
+        );
     }
 }

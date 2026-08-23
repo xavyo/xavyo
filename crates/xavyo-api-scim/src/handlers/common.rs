@@ -23,25 +23,26 @@ pub fn scim_response<T: serde::Serialize>(status: StatusCode, body: T) -> Respon
 
 /// Extract client IP from request headers (for audit logging only).
 ///
-/// Falls back to 127.0.0.1 if no forwarded header is present.
-///
-/// SECURITY: X-Forwarded-For is only trustworthy when the application runs
-/// behind a reverse proxy that overwrites/sanitizes this header. In production,
-/// this should be guaranteed by the deployment configuration. The extracted IP
-/// is used exclusively for audit logging — never for security decisions like
-/// rate limiting or access control. An attacker spoofing X-Forwarded-For can
-/// only affect which IP appears in audit logs.
+/// Forwarded headers are used only when `trust_xff` is true. Callers without
+/// `TrustXff` must pass false so a client cannot spoof the audit IP.
 pub fn extract_client_ip(headers: &axum::http::HeaderMap) -> IpAddr {
-    if let Some(xff) = headers.get("x-forwarded-for") {
-        if let Ok(xff_str) = xff.to_str() {
-            if let Some(first_ip) = xff_str.split(',').next() {
-                if let Ok(ip) = first_ip.trim().parse() {
-                    return ip;
+    scim_audit_ip(headers, false)
+}
+
+/// Audit IP extraction. Untrusted forwarded headers are ignored.
+pub(crate) fn scim_audit_ip(headers: &axum::http::HeaderMap, trust_xff: bool) -> IpAddr {
+    if trust_xff {
+        if let Some(xff) = headers.get("x-forwarded-for") {
+            if let Ok(xff_str) = xff.to_str() {
+                if let Some(first_ip) = xff_str.split(',').next() {
+                    if let Ok(ip) = first_ip.trim().parse() {
+                        return ip;
+                    }
                 }
             }
         }
     }
-    "127.0.0.1".parse().unwrap()
+    IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)
 }
 
 /// Maximum User-Agent length stored in audit logs.
@@ -62,4 +63,41 @@ pub fn extract_user_agent(headers: &axum::http::HeaderMap) -> Option<String> {
                 s.to_string()
             }
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::{HeaderMap, HeaderValue};
+
+    #[test]
+    fn untrusted_xff_is_ignored() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("10.0.0.1"));
+        assert_eq!(
+            scim_audit_ip(&headers, false),
+            IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)
+        );
+        assert_eq!(extract_client_ip(&headers), scim_audit_ip(&headers, false));
+    }
+
+    #[test]
+    fn trusted_xff_is_used() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("10.0.0.1"));
+        assert_eq!(
+            scim_audit_ip(&headers, true),
+            "10.0.0.1".parse::<IpAddr>().unwrap()
+        );
+    }
+
+    #[test]
+    fn extract_client_ip_does_not_trust_xff_by_default() {
+        let src = include_str!("common.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("scim_audit_ip(headers, false)"),
+            "SCIM audit IP must not trust client-supplied X-Forwarded-For"
+        );
+    }
 }
