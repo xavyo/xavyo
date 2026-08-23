@@ -323,13 +323,13 @@ pub async fn get_sync_status(
     Extension(claims): Extension<JwtClaims>,
     Path(connector_id): Path<Uuid>,
 ) -> Result<Json<SyncStatusResponse>, ApiError> {
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     let status = state
         .sync_service
-        .get_status(connector_id)
+        .get_status(tenant_id, connector_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     Ok(Json(SyncStatusResponse {
         connector_id: status.connector_id,
@@ -367,13 +367,13 @@ pub async fn get_sync_token(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     let token = state
         .sync_service
-        .get_token(connector_id)
+        .get_token(tenant_id, connector_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     match token {
         Some(t) => Ok(Json(SyncTokenResponse {
@@ -411,13 +411,13 @@ pub async fn reset_sync_token(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     state
         .sync_service
-        .reset_token(connector_id)
+        .reset_token(tenant_id, connector_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -431,7 +431,7 @@ pub async fn reset_sync_token(
         ("connector_id" = Uuid, Path, description = "Connector ID")
     ),
     responses(
-        (status = 200, description = "Sync triggered", body = SyncTriggerResponse),
+        (status = 501, description = "Live inbound sync execution is not implemented"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Connector not found")
     ),
@@ -445,13 +445,13 @@ pub async fn trigger_sync(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     let result = state
         .sync_service
-        .trigger_sync(connector_id)
+        .trigger_sync(tenant_id, connector_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     Ok(Json(SyncTriggerResponse {
         connector_id,
@@ -485,18 +485,19 @@ pub async fn list_changes(
     Path(connector_id): Path<Uuid>,
     Query(query): Query<ListChangesQuery>,
 ) -> Result<Json<ListChangesResponse>, ApiError> {
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     let (changes, total) = state
         .sync_service
         .list_changes(
+            tenant_id,
             connector_id,
             query.status.as_deref(),
             query.limit.unwrap_or(50).min(100),
             query.offset.unwrap_or(0).max(0),
         )
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     let changes = changes
         .into_iter()
@@ -536,13 +537,13 @@ pub async fn get_change(
     Extension(claims): Extension<JwtClaims>,
     Path((connector_id, change_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<InboundChangeResponse>, ApiError> {
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     let change = state
         .sync_service
-        .get_change(connector_id, change_id)
+        .get_change(tenant_id, connector_id, change_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?
+        .map_err(ApiError::from)?
         .ok_or_else(|| ApiError::not_found("Change not found"))?;
 
     Ok(Json(InboundChangeResponse {
@@ -581,13 +582,13 @@ pub async fn retry_change(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     state
         .sync_service
-        .retry_change(connector_id, change_id)
+        .retry_change(tenant_id, connector_id, change_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -618,13 +619,13 @@ pub async fn link_change(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     state
         .sync_service
-        .link_change(connector_id, change_id, request.user_id)
+        .link_change(tenant_id, connector_id, change_id, request.user_id)
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -651,17 +652,18 @@ pub async fn list_sync_conflicts(
     Path(connector_id): Path<Uuid>,
     Query(query): Query<ListConflictsQuery>,
 ) -> Result<Json<ListConflictsResponse>, ApiError> {
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     let (conflicts, total) = state
         .sync_service
         .list_conflicts(
+            tenant_id,
             connector_id,
             query.status.as_deref(),
             query.limit.unwrap_or(50).min(100),
         )
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     let conflicts = conflicts
         .into_iter()
@@ -705,11 +707,12 @@ pub async fn resolve_sync_conflict(
     if !claims.has_role("admin") {
         return Err(ConnectorApiError::Forbidden);
     }
-    let _tenant_id = extract_tenant_id(&claims)?;
+    let tenant_id = extract_tenant_id(&claims)?;
 
     state
         .sync_service
         .resolve_conflict(
+            tenant_id,
             connector_id,
             conflict_id,
             &request.resolution,
@@ -717,7 +720,7 @@ pub async fn resolve_sync_conflict(
             request.resolved_by,
         )
         .await
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+        .map_err(ApiError::from)?;
 
     Ok(StatusCode::NO_CONTENT)
 }

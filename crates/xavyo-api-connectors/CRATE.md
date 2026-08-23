@@ -95,6 +95,9 @@ None
 - Never ignore reconciliation discrepancies
 - Never mark a discrepancy resolved or record remediation `success` without executing the connector action (501 until wired)
 - Never return HTTP success for sync config enable/disable/update without persisting to `gov_sync_configurations`
+- Never look up a connector by id without `tenant_id` from the JWT
+- Never return HTTP 200 for trigger/retry/link/list inbound sync until execution is wired (501)
+- Never persist `Uuid::nil()` as `resolved_by` when ignoring a discrepancy
 
 ## Related Crates
 

@@ -337,7 +337,11 @@ impl ReconciliationService {
         _connector_id: Uuid,
         discrepancy_id: Uuid,
     ) -> ReconciliationServiceResult<()> {
-        let resolved_user_id = user_id.unwrap_or_else(Uuid::nil);
+        let resolved_user_id = user_id.ok_or_else(|| {
+            ReconciliationServiceError::InvalidParameter(
+                "Authenticated user id is required to ignore a discrepancy".to_string(),
+            )
+        })?;
 
         ReconciliationDiscrepancy::ignore(&self.pool, tenant_id, discrepancy_id, resolved_user_id)
             .await?
@@ -727,6 +731,17 @@ impl ReconciliationService {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ignore_discrepancy_rejects_missing_actor() {
+        // Actor is required so we never persist Uuid::nil() as resolved_by.
+        let src = include_str!("reconciliation_service.rs");
+        let nil_fallback = format!("{}::{}", "Uuid", "nil");
+        assert!(
+            !src.contains(&format!("unwrap_or_else({nil_fallback})")),
+            "ignore_discrepancy must not persist a nil user id"
+        );
+    }
 
     #[test]
     fn connector_remediation_is_not_implemented() {

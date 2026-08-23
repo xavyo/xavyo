@@ -2654,6 +2654,7 @@ impl GovernanceError {
                 | Self::MicroCertCannotDecide(_, _)
                 // Power of Attorney (F-PoA)
                 | Self::PoaScopeViolation(_)
+                | Self::PersonaExtensionRequiresApproval
         )
     }
 

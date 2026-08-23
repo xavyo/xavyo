@@ -125,6 +125,7 @@ let app = Router::new()
 - Never bypass approval workflows for privileged access
 - Never skip SoD checks before granting entitlements
 - Never allow campaign decisions without audit trail
+- Never extend a persona that requires approval on behalf of a non-owner until an approval workflow exists
 - Never return a placeholder `access_token` for persona switch or PoA assume/drop (501 until signed JWT re-issuance is wired)
 
 ## Related Crates
