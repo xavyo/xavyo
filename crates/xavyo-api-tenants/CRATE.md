@@ -101,6 +101,7 @@ None
 - Never allow cross-tenant access
 - Never delete tenants without proper cleanup
 - Never rate-limit `/tenants/provision` using a spoofable `X-Forwarded-For` (require `TrustXff`)
+- Never skip `/tenants/provision` rate limiting when the client IP cannot be determined (refuse, fail closed)
 
 ## Related Crates
 

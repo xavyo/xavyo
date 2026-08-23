@@ -35,16 +35,27 @@ pub fn provision_rate_limiter() -> RateLimiter {
     })
 }
 
+/// Resolve the IP used as the provisioning rate-limit key.
+///
+/// Prefers `extract_client_ip` (TrustXff-gated forwarded headers, else peer).
+/// Falls back to the `ConnectInfo` extractor. Returns `None` when neither
+/// source yields a valid address — the middleware must refuse, not skip.
+#[must_use]
+pub(crate) fn provision_client_ip(extracted: Option<&str>, peer: Option<IpAddr>) -> Option<IpAddr> {
+    extracted.and_then(|s| s.parse().ok()).or(peer)
+}
+
 /// Rate limiting middleware for the tenant provisioning endpoint.
 ///
 /// Checks incoming requests against the rate limiter and returns 429
-/// if the client IP has exceeded the rate limit (10 requests per hour).
+/// if the client IP has exceeded the rate limit (100 requests per hour).
 ///
 /// ## IP Extraction
 ///
 /// Uses `extract_client_ip`: forwarded headers only when `TrustXff` is set,
 /// otherwise the peer address. A client-supplied `X-Forwarded-For` must not
-/// bypass the provisioning rate limit.
+/// bypass the provisioning rate limit. If no valid IP can be determined the
+/// request is refused (fail closed) so the limiter cannot be skipped.
 ///
 /// Adds rate limit headers to all responses:
 /// - `X-RateLimit-Limit`: Maximum requests allowed
@@ -56,32 +67,11 @@ pub async fn provision_rate_limit_middleware(
     request: Request<Body>,
     next: Next,
 ) -> Response {
-    // Peer IP unless TrustXff allows forwarded headers
-    let ip = match extract_client_ip(&request) {
-        Some(ip_str) => match ip_str.parse::<IpAddr>() {
-            Ok(ip) => ip,
-            Err(_) => {
-                // If IP parsing fails, fall back to connection info
-                if let Some(ConnectInfo(addr)) = connect_info {
-                    addr.ip()
-                } else {
-                    // Cannot determine IP - fail open but log
-                    tracing::warn!(
-                        "Cannot determine client IP for rate limiting, allowing request"
-                    );
-                    return next.run(request).await;
-                }
-            }
-        },
-        None => {
-            // Fall back to connection info
-            if let Some(ConnectInfo(addr)) = connect_info {
-                addr.ip()
-            } else {
-                tracing::warn!("Cannot determine client IP for rate limiting, allowing request");
-                return next.run(request).await;
-            }
-        }
+    let extracted = extract_client_ip(&request);
+    let peer = connect_info.map(|ConnectInfo(addr)| addr.ip());
+    let Some(ip) = provision_client_ip(extracted.as_deref(), peer) else {
+        tracing::warn!("Cannot determine client IP for rate limiting, refusing request");
+        return unknown_client_ip_response();
     };
 
     // Check if rate limited before recording
@@ -105,6 +95,26 @@ pub async fn provision_rate_limit_middleware(
     add_rate_limit_headers(response.headers_mut(), remaining, reset_time);
 
     response
+}
+
+/// Generate a 400 Bad Request when the client IP cannot be determined.
+///
+/// Provisioning is IP-rate-limited. Skipping the limiter would fail open.
+fn unknown_client_ip_response() -> Response {
+    let body = serde_json::json!({
+        "type": "https://xavyo.net/errors/client-ip-required",
+        "title": "Bad Request",
+        "status": 400,
+        "detail": "Cannot determine client IP for tenant provisioning rate limiting.",
+        "instance": "/tenants/provision"
+    });
+
+    (
+        StatusCode::BAD_REQUEST,
+        [(header::CONTENT_TYPE, "application/problem+json")],
+        body.to_string(),
+    )
+        .into_response()
 }
 
 /// Generate a 429 Too Many Requests response with RFC 7807 format.
@@ -254,5 +264,103 @@ mod tests {
         // Reset time should be approximately 1 hour from now
         assert!(reset >= now + PROVISION_RATE_LIMIT_WINDOW_SECS - 1);
         assert!(reset <= now + PROVISION_RATE_LIMIT_WINDOW_SECS + 1);
+    }
+
+    #[test]
+    fn provision_client_ip_prefers_extracted() {
+        let peer: IpAddr = "10.0.0.1".parse().unwrap();
+        assert_eq!(
+            provision_client_ip(Some("203.0.113.10"), Some(peer)),
+            Some("203.0.113.10".parse().unwrap())
+        );
+    }
+
+    #[test]
+    fn provision_client_ip_falls_back_to_peer() {
+        let peer: IpAddr = "10.0.0.1".parse().unwrap();
+        assert_eq!(provision_client_ip(None, Some(peer)), Some(peer));
+    }
+
+    #[test]
+    fn provision_client_ip_invalid_extracted_falls_back_to_peer() {
+        let peer: IpAddr = "10.0.0.1".parse().unwrap();
+        assert_eq!(
+            provision_client_ip(Some("not-an-ip"), Some(peer)),
+            Some(peer)
+        );
+    }
+
+    #[test]
+    fn provision_client_ip_none_when_unknown() {
+        assert_eq!(provision_client_ip(None, None), None);
+        assert_eq!(provision_client_ip(Some("not-an-ip"), None), None);
+    }
+
+    #[test]
+    fn provision_client_ip_accepts_ipv6() {
+        let ip: IpAddr = "2001:db8::1".parse().unwrap();
+        assert_eq!(provision_client_ip(Some("2001:db8::1"), None), Some(ip));
+    }
+
+    #[test]
+    fn unknown_client_ip_is_bad_request_problem_json() {
+        let response = unknown_client_ip_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response
+                .headers()
+                .get(header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok()),
+            Some("application/problem+json")
+        );
+    }
+
+    fn provision_app() -> axum::Router {
+        async fn ok() -> &'static str {
+            "ok"
+        }
+        axum::Router::new()
+            .route("/tenants/provision", axum::routing::post(ok))
+            .layer(axum::middleware::from_fn(provision_rate_limit_middleware))
+            .layer(Extension(Arc::new(provision_rate_limiter())))
+    }
+
+    #[tokio::test]
+    async fn middleware_refuses_when_client_ip_unknown() {
+        use tower::ServiceExt;
+
+        let response = provision_app()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/tenants/provision")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response
+                .headers()
+                .get(header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok()),
+            Some("application/problem+json")
+        );
+    }
+
+    #[tokio::test]
+    async fn middleware_allows_when_peer_ip_present() {
+        use tower::ServiceExt;
+
+        let mut req = Request::builder()
+            .method("POST")
+            .uri("/tenants/provision")
+            .body(Body::empty())
+            .unwrap();
+        req.extensions_mut()
+            .insert(ConnectInfo(SocketAddr::from(([203, 0, 113, 10], 443))));
+        let response = provision_app().oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }
