@@ -73,9 +73,9 @@ Criteria:
 | Crate | Status | Tests | Public Items | Notes |
 |-------|--------|-------|--------------|-------|
 | xavyo-connector-ldap | 🟢 stable | 239 | 31 | Most mature connector |
-| xavyo-connector-entra | 🟢 stable | 64 | 42 | Production-ready with rate limiting |
-| xavyo-connector-rest | 🔴 alpha | 36 | 7 | Stub implementation |
-| xavyo-connector-database | 🔴 alpha | 33 | 4 | Skeleton only |
+| xavyo-connector-entra | 🟢 stable | 64 | 42 | Crate/API with rate limiting; no UI form |
+| xavyo-connector-rest | 🟢 stable | 114 | 7 | Matches CRATE.md: CRUD, rate limit, retry, SSRF. Crate/API; not a production UI path |
+| xavyo-connector-database | 🟡 beta | 47 | 4 | Matches CRATE.md: PostgreSQL CRUD + transactions. Crate/API; not a production UI path |
 
 ### API Layer
 
@@ -102,9 +102,9 @@ Criteria:
 
 | Status | Count | Crates |
 |--------|-------|--------|
-| 🟢 Stable | 19 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-governance, xavyo-scim-client, xavyo-scim-types, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import, xavyo-api-users |
-| 🟡 Beta | 12 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-ext-authz, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi, xavyo-api-authorization |
-| 🔴 Alpha | 4 | xavyo-connector-rest, xavyo-connector-database, xavyo-ssf, xavyo-api-ssf |
+| 🟢 Stable | 20 | xavyo-core, xavyo-auth, xavyo-db, xavyo-tenant, xavyo-events, xavyo-nhi, xavyo-secrets, xavyo-connector, xavyo-connector-ldap, xavyo-connector-entra, xavyo-connector-rest, xavyo-governance, xavyo-scim-client, xavyo-scim-types, xavyo-api-auth, xavyo-api-oauth, xavyo-api-governance, xavyo-api-tenants, xavyo-api-import, xavyo-api-users |
+| 🟡 Beta | 13 | xavyo-authorization, xavyo-provisioning, xavyo-webhooks, xavyo-siem, xavyo-ext-authz, xavyo-connector-database, xavyo-api-scim, xavyo-api-saml, xavyo-api-social, xavyo-api-connectors, xavyo-api-oidc-federation, xavyo-api-nhi, xavyo-api-authorization |
+| 🔴 Alpha | 2 | xavyo-ssf, xavyo-api-ssf |
 
 ---
 
@@ -141,4 +141,4 @@ Maturity was assessed based on:
 
 ---
 
-*Last updated: 2026-02-03*
+*Last updated: 2026-08-23*

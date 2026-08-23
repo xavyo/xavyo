@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/xavyo/xavyo/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-BSL--1.1-blue.svg" alt="License" /></a>
   <a href="https://github.com/xavyo/xavyo"><img src="https://img.shields.io/badge/rust-1.75+-orange.svg" alt="Rust 1.75+" /></a>
-  <a href="https://github.com/xavyo/xavyo"><img src="https://img.shields.io/badge/status-production--ready-green.svg" alt="Production Ready" /></a>
+  <a href="https://github.com/xavyo/xavyo"><img src="https://img.shields.io/badge/status-beta-yellow.svg" alt="Beta" /></a>
   <a href="https://discord.gg/xavyo"><img src="https://img.shields.io/badge/discord-join-7289da.svg" alt="Discord" /></a>
 </p>
 
@@ -47,8 +47,8 @@ Traditional IAM solutions weren't built for this. They focus on humans, not mach
 │  Humans              │  AI Agents            │  Services            │
 │  ─────────────────   │  ─────────────────    │  ─────────────────   │
 │  • SSO (OIDC/SAML)   │  • Agent Identity     │  • Service Accounts  │
-│  • MFA / Passkeys    │  • Dynamic Creds      │  • API Keys          │
-│  • Social Login      │  • Tool Permissions   │  • mTLS Certificates │
+│  • MFA / Passkeys    │  • Token Vault        │  • API Keys          │
+│  • Social Login      │  • Tool Permissions   │  • Cert-bound tokens │
 │  • Self-Service      │  • Audit Logging      │  • Workload Identity │
 └─────────────────────────────────────────────────────────────────────┘
                                   │
@@ -82,7 +82,7 @@ Traditional IAM solutions weren't built for this. They focus on humans, not mach
 |---------|-------------|
 | **Unified NHI Model** | Single identity model for agents, tools, and service accounts with type-specific extensions |
 | **Lifecycle Management** | State machine: active, inactive, suspended, deprecated, archived — with full transition audit |
-| **Dynamic Credentials** | Short-lived AWS STS, Azure, GCP credentials via OAuth2 token exchange |
+| **Dynamic Credentials** | Not a shipped product path — AWS STS, Azure, and GCP short-lived credentials are not issued today |
 | **Tool Permissions** | Fine-grained grant/revoke of agent-to-tool and NHI-to-NHI calling permissions |
 | **User Permissions** | Control which users can use/manage/admin each NHI identity |
 | **Risk Scoring** | Per-NHI risk assessment with inactivity detection and orphan account discovery |
@@ -94,7 +94,7 @@ Traditional IAM solutions weren't built for this. They focus on humans, not mach
 | **MCP Authorization** | RFC 9728 Protected Resource Metadata + MCP Client Metadata for zero-registration auth flows |
 | **A2A Protocol** | Agent-to-Agent communication with agent card discovery and webhook delivery |
 | **Workload Identity** | Cloud-native identity federation (AWS, Azure, GCP) |
-| **PKI Certificates** | X.509 certificate issuance for agent mTLS authentication |
+| **PKI Certificates** | Not a shipped product path — X.509 issuance for agent mTLS is not available |
 
 ### Identity Governance & Administration (IGA)
 | Feature | Description |
@@ -122,7 +122,7 @@ Traditional IAM solutions weren't built for this. They focus on humans, not mach
 | Feature | Description |
 |---------|-------------|
 | **Connector Framework** | Pluggable architecture for target system integration |
-| **Built-in Connectors** | LDAP, Active Directory, REST APIs, Databases, Microsoft Entra ID |
+| **Built-in Connectors** | LDAP and Active Directory (UI + API). REST APIs and Databases (API; frozen UI form). Microsoft Entra ID crate/API only (no UI form) |
 | **SCIM 2.0 Server** | Inbound provisioning from Azure AD, Okta, Google Workspace |
 | **SCIM 2.0 Client** | Outbound provisioning to SCIM-compliant targets |
 | **Reconciliation** | Scheduled reconciliation with conflict detection and resolution |
@@ -141,7 +141,7 @@ Traditional IAM solutions weren't built for this. They focus on humans, not mach
 | **Audit Logging** | Comprehensive audit trail for all operations |
 | **Correlation Engine** | Cross-system identity correlation and matching |
 | **Token Delegation** | OAuth2 token exchange (RFC 8693) with `may_act` constraints, actor chain depth limits, and resource validation (RFC 8707) |
-| **Cedar Policies** | Fine-grained authorization via AWS Cedar policy language (feature-gated `cedar`). Deny-overrides, defense-in-depth with native policies |
+| **Cedar Policies** | Optional, feature-gated `cedar` on `xavyo-authorization` — not enabled in `idp-api` default features. Deny-overrides, defense-in-depth with native policies |
 | **Ext-AuthZ Gateway** | External authorization service for API gateway integration |
 
 ### OIDC Federation
@@ -245,7 +245,7 @@ curl -X POST http://localhost:8080/auth/login \
 |---|:---:|:---:|:---:|
 | **AI Agent Identity** | Native | Bolt-on | Build it |
 | **NHI Lifecycle Management** | Built-in | N/A | Complex |
-| **Dynamic Cloud Credentials** | Built-in | Separate tool | Complex |
+| **Dynamic Cloud Credentials** | Not shipped | Separate tool | Complex |
 | **IGA (Governance)** | Full suite | Separate product | Enormous effort |
 | **Multi-Tenant by Design** | RLS isolation | Varies | Hard |
 | **SAML + OIDC + Social** | All built-in | Usually one | Build each |
@@ -286,7 +286,7 @@ xavyo exposes a comprehensive REST API with full OpenAPI/Swagger documentation.
 | **Tenants** | `/tenants/*` | Multi-tenant management, settings, invitations |
 | **Import** | `/import/*` | Bulk CSV import with validation |
 | **API Keys** | `/api-keys/*` | Scoped key management, usage stats, introspection |
-| **Authorization** | `/authorization/*` | Policy evaluation, Cedar policies, external authz |
+| **Authorization** | `/authorization/*` | Policy evaluation, optional feature-gated Cedar policies, external authz |
 | **MCP Auth** | `/.well-known/oauth-protected-resource`, `/.well-known/mcp-client-metadata` | RFC 9728 resource metadata + MCP client discovery |
 | **Audit** | `/audit/*` | Event log querying |
 | **Security Policies** | `/policies/*` | Password, session, MFA, lockout configuration |
@@ -344,7 +344,7 @@ xavyo/
 │   │
 │   ├── Services
 │   │   ├── xavyo-governance/       # Governance business logic
-│   │   ├── xavyo-authorization/    # Authorization engine + Cedar policies
+│   │   ├── xavyo-authorization/    # Authorization engine + optional feature-gated Cedar
 │   │   ├── xavyo-nhi/              # NHI domain logic
 │   │   ├── xavyo-provisioning/     # Provisioning orchestration
 │   │   ├── xavyo-webhooks/         # Webhook delivery + DLQ
@@ -355,7 +355,7 @@ xavyo/
 │   └── Connectors
 │       ├── xavyo-connector/          # Connector trait framework
 │       ├── xavyo-connector-ldap/     # LDAP/AD connector
-│       ├── xavyo-connector-entra/    # Microsoft Entra ID connector
+│       ├── xavyo-connector-entra/    # Microsoft Entra ID connector (crate/API; no UI form)
 │       ├── xavyo-connector-rest/     # Generic REST connector
 │       ├── xavyo-connector-database/ # Database connector
 │       └── xavyo-ext-authz/         # External authorization
@@ -408,6 +408,8 @@ cargo fmt --all
 
 - [ ] **Kubernetes Operator** — Deploy xavyo on K8s with CRDs
 - [ ] **Agent SDK** — Python, TypeScript, Go SDKs for agents
+- [ ] **Cloud dynamic credentials** — AWS STS / Azure / GCP issuance (not a shipped product path)
+- [ ] **Agent PKI** — X.509 issuance for agent mTLS (not a shipped product path)
 - [ ] **Policy Engine** — OPA/Rego integration for fine-grained policies
 - [ ] **Terraform Provider** — Infrastructure as Code support
 - [ ] **Web Console** — Admin UI (SvelteKit, in development)
