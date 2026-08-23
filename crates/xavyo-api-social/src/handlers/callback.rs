@@ -438,12 +438,7 @@ async fn process_callback(
                         message: "User not found for existing connection".to_string(),
                     })?;
 
-            if !user.is_active {
-                tracing::warn!(user_id = %user_id, "Rejected social login for deactivated user");
-                return Err(SocialError::InternalError {
-                    message: "Account is deactivated".to_string(),
-                });
-            }
+            social_login_allowed(user.is_active, user.is_locked())?;
 
             // Existing user - update tokens and log in
             state
@@ -647,5 +642,79 @@ impl std::fmt::Debug for JwtTokens {
             .field("refresh_token", &"[REDACTED]")
             .field("expires_in", &self.expires_in)
             .finish()
+    }
+}
+
+/// Inactive or locked accounts must not receive JWTs from social login.
+pub fn social_login_allowed(is_active: bool, is_locked: bool) -> Result<(), SocialError> {
+    if !is_active {
+        tracing::warn!("Rejected social login for deactivated user");
+        return Err(SocialError::AccountInactive);
+    }
+    if is_locked {
+        tracing::warn!("Rejected social login for locked user");
+        return Err(SocialError::AccountLocked);
+    }
+    Ok(())
+}
+
+/// Role lookup failures must refuse social token issuance, not mint `["user"]`.
+pub fn social_roles_from_lookup<E: std::fmt::Display>(
+    result: Result<Vec<String>, E>,
+) -> Result<Vec<String>, SocialError> {
+    result.map_err(|e| {
+        tracing::error!(error = %e, "Failed to fetch user roles during social login");
+        SocialError::InternalError {
+            message: "Failed to fetch user roles".to_string(),
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn social_login_allows_active_unlocked() {
+        assert!(social_login_allowed(true, false).is_ok());
+    }
+
+    #[test]
+    fn social_login_refuses_inactive() {
+        assert!(matches!(
+            social_login_allowed(false, false),
+            Err(SocialError::AccountInactive)
+        ));
+    }
+
+    #[test]
+    fn social_login_refuses_locked() {
+        assert!(matches!(
+            social_login_allowed(true, true),
+            Err(SocialError::AccountLocked)
+        ));
+    }
+
+    #[test]
+    fn social_roles_from_lookup_does_not_default_to_user() {
+        assert_eq!(
+            social_roles_from_lookup(Ok::<Vec<String>, &str>(vec!["admin".into()])).unwrap(),
+            vec!["admin".to_string()]
+        );
+        let err = social_roles_from_lookup(Err("db"));
+        assert!(
+            matches!(err, Err(SocialError::InternalError { ref message }) if message == "Failed to fetch user roles"),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn social_callback_checks_lockout_before_tokens() {
+        let src = include_str!("callback.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("social_login_allowed(user.is_active, user.is_locked())"),
+            "existing social logins must refuse locked accounts"
+        );
     }
 }

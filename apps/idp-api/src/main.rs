@@ -2049,10 +2049,10 @@ impl xavyo_api_social::AuthService for SocialAuthAdapter {
             .ok()
             .flatten();
 
-        // Fetch actual user roles from DB (same pattern as login.rs/verify.rs/recovery.rs)
-        let roles = xavyo_db::UserRole::get_user_roles(&self.pool, user_id, tenant_id)
-            .await
-            .unwrap_or_else(|_| vec!["user".to_string()]);
+        // Fail closed: a role-lookup error must not mint a downgraded JWT.
+        let roles = xavyo_api_social::social_roles_from_lookup(
+            xavyo_db::UserRole::get_user_roles(&self.pool, user_id, tenant_id).await,
+        )?;
 
         // Issue tokens with 15 minute access token, 7 day refresh token
         match token_service

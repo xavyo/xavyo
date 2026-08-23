@@ -445,10 +445,11 @@ impl TokenService {
         // Revoke the old refresh token (token rotation)
         self.revoke_token_by_hash(&token.token_hash).await?;
 
-        // Fetch user roles from database
-        let roles = UserRole::get_user_roles(&self.pool, token.user_id, token.tenant_id)
-            .await
-            .unwrap_or_else(|_| vec!["user".to_string()]);
+        // Fail closed: a role-lookup error must not mint a downgraded JWT.
+        let roles = refresh_roles(
+            UserRole::get_user_roles(&self.pool, token.user_id, token.tenant_id).await,
+        )
+        .map_err(|_| ApiAuthError::Internal("Failed to fetch user roles".to_string()))?;
 
         // Fetch user email for JWT claims
         let email = xavyo_db::User::get_email_by_id(&self.pool, token.user_id)
@@ -621,6 +622,19 @@ pub fn generate_email_verification_token() -> (String, String) {
     (token, hash)
 }
 
+/// Role lookup failures must refuse token refresh, not mint `["user"]`.
+pub fn refresh_roles<E: std::fmt::Display>(
+    result: Result<Vec<String>, E>,
+) -> Result<Vec<String>, E> {
+    match result {
+        Ok(roles) => Ok(roles),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to fetch user roles during token refresh");
+            Err(e)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -750,5 +764,28 @@ mod tests {
         assert_eq!(ctx.acr, "2");
         assert_eq!(ctx.amr, vec!["pwd", "otp", "mfa"]);
         assert_eq!(ctx.auth_time, 1_700_000_000);
+    }
+
+    #[test]
+    fn refresh_roles_does_not_default_to_user() {
+        assert_eq!(
+            refresh_roles(Ok::<Vec<String>, &str>(vec!["admin".into()])).unwrap(),
+            vec!["admin".to_string()]
+        );
+        assert!(refresh_roles(Err("db")).is_err());
+    }
+
+    #[test]
+    fn refresh_does_not_fail_open_roles() {
+        let src = include_str!("token_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("refresh_roles("),
+            "refresh must fail closed on role lookup"
+        );
+        assert!(
+            !production.contains("unwrap_or_else(|_| vec![\"user\""),
+            "must not fail-open role lookup to [\"user\"]"
+        );
     }
 }

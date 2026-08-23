@@ -18,7 +18,10 @@ use std::sync::Arc;
 use std::time::Instant;
 use uuid::Uuid;
 use xavyo_core::{TenantId, UserId};
-use xavyo_db::{PasswordlessPolicy, PasswordlessToken, PasswordlessTokenType, User, UserRole};
+use xavyo_db::{
+    set_tenant_context, PasswordlessPolicy, PasswordlessToken, PasswordlessTokenType, User,
+    UserRole,
+};
 
 /// Maximum magic link requests per email within the rate limit window.
 const EMAIL_RATE_LIMIT: usize = 5;
@@ -307,9 +310,10 @@ impl PasswordlessService {
             return Err(ApiAuthError::TokenExpired);
         }
 
-        // Check account lockout
+        // Check account lockout / active status against `users`. Permanent
+        // lockouts have `locked_until IS NULL`.
         let user_id = db_token.user_id;
-        self.check_lockout(tenant_id, user_id).await?;
+        self.check_account_allowed(tenant_id, user_id).await?;
 
         // Mark token as used
         PasswordlessToken::mark_used(&self.pool, tenant_id, db_token.id)
@@ -326,9 +330,7 @@ impl PasswordlessService {
         .await
         .map_err(|e| ApiAuthError::Internal(format!("Failed to update email_verified: {e}")))?;
 
-        // Check if MFA is required
-        let policy = self.get_policy(tenant_id).await?;
-        if policy.require_mfa_after_passwordless {
+        if self.must_challenge_mfa(tenant_id, user_id).await? {
             let uid = UserId::from_uuid(user_id);
             let tid = TenantId::from_uuid(tenant_id);
             let (partial_token, expires_in) = self.token_service.create_partial_token(uid, tid)?;
@@ -495,8 +497,8 @@ impl PasswordlessService {
             )));
         }
 
-        // Code is correct — check account lockout
-        self.check_lockout(tenant_id, user_id).await?;
+        // Code is correct — check account lockout / active status
+        self.check_account_allowed(tenant_id, user_id).await?;
 
         // Mark token as used
         PasswordlessToken::mark_used(&self.pool, tenant_id, db_token.id)
@@ -513,9 +515,7 @@ impl PasswordlessService {
         .await
         .map_err(|e| ApiAuthError::Internal(format!("Failed to update email_verified: {e}")))?;
 
-        // Check MFA requirement
-        let policy = self.get_policy(tenant_id).await?;
-        if policy.require_mfa_after_passwordless {
+        if self.must_challenge_mfa(tenant_id, user_id).await? {
             let uid = UserId::from_uuid(user_id);
             let tid = TenantId::from_uuid(tenant_id);
             let (partial_token, expires_in) = self.token_service.create_partial_token(uid, tid)?;
@@ -540,10 +540,10 @@ impl PasswordlessService {
         let uid = UserId::from_uuid(user_id);
         let tid = TenantId::from_uuid(tenant_id);
 
-        // Fetch user roles
-        let roles = UserRole::get_user_roles(&self.pool, user_id, tenant_id)
-            .await
-            .unwrap_or_else(|_| vec!["user".to_string()]);
+        // Fail closed: a role-lookup error must not mint a downgraded JWT.
+        let roles =
+            passwordless_roles(UserRole::get_user_roles(&self.pool, user_id, tenant_id).await)
+                .map_err(|_| ApiAuthError::Internal("Failed to fetch user roles".to_string()))?;
 
         // Fetch user email for JWT claims
         let email = User::get_email_by_id(&self.pool, user_id)
@@ -593,27 +593,112 @@ impl PasswordlessService {
         Ok(user)
     }
 
-    /// Check if the user's account is locked out.
-    async fn check_lockout(&self, tenant_id: Uuid, user_id: Uuid) -> Result<(), ApiAuthError> {
-        // Check if there's an active lockout for this user
-        let locked: Option<bool> = sqlx::query_scalar(
-            r"
-            SELECT EXISTS(
-                SELECT 1 FROM account_lockouts
-                WHERE tenant_id = $1 AND user_id = $2 AND locked_until > NOW()
+    /// Refuse passwordless login when the account is inactive or locked.
+    ///
+    /// Uses `users.locked_at` / `users.locked_until` (same columns as
+    /// [`crate::services::LockoutService`]). A missing user is treated as an
+    /// invalid token so we do not leak account existence.
+    async fn check_account_allowed(
+        &self,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<(), ApiAuthError> {
+        let user = User::find_by_id_in_tenant(&self.pool, tenant_id, user_id)
+            .await
+            .map_err(ApiAuthError::Database)?
+            .ok_or(ApiAuthError::InvalidToken)?;
+        passwordless_account_status(user.is_active, user.is_locked())
+    }
+
+    /// MFA after passwordless: tenant policy *or* enrolled TOTP/WebAuthn.
+    /// Enrollment lookup errors must refuse login, not skip MFA.
+    async fn must_challenge_mfa(
+        &self,
+        tenant_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<bool, ApiAuthError> {
+        let policy = self.get_policy(tenant_id).await?;
+        let mut conn = self.pool.acquire().await.map_err(ApiAuthError::Database)?;
+        set_tenant_context(&mut *conn, TenantId::from_uuid(tenant_id))
+            .await
+            .map_err(ApiAuthError::DatabaseInternal)?;
+        let totp = passwordless_enrollment(
+            sqlx::query_scalar(
+                r"
+                SELECT EXISTS(
+                    SELECT 1 FROM user_totp_secrets
+                    WHERE user_id = $1 AND tenant_id = $2 AND is_enabled = true
+                )
+                ",
             )
-            ",
-        )
-        .bind(tenant_id)
-        .bind(user_id)
-        .fetch_optional(&self.pool)
-        .await?;
+            .bind(user_id)
+            .bind(tenant_id)
+            .fetch_one(&mut *conn)
+            .await,
+        )?;
+        let webauthn = passwordless_enrollment(
+            sqlx::query_scalar(
+                r"
+                SELECT EXISTS(
+                    SELECT 1 FROM user_webauthn_credentials
+                    WHERE user_id = $1 AND tenant_id = $2 AND is_enabled = true
+                )
+                ",
+            )
+            .bind(user_id)
+            .bind(tenant_id)
+            .fetch_one(&mut *conn)
+            .await,
+        )?;
+        Ok(passwordless_mfa_required(
+            policy.require_mfa_after_passwordless,
+            totp,
+            webauthn,
+        ))
+    }
+}
 
-        if locked == Some(true) {
-            return Err(ApiAuthError::AccountLocked);
+/// Inactive or locked accounts must not complete passwordless login.
+pub fn passwordless_account_status(is_active: bool, is_locked: bool) -> Result<(), ApiAuthError> {
+    if !is_active {
+        return Err(ApiAuthError::AccountInactive);
+    }
+    if is_locked {
+        return Err(ApiAuthError::AccountLocked);
+    }
+    Ok(())
+}
+
+/// MFA is required when tenant policy says so *or* the user has enrolled a factor.
+pub fn passwordless_mfa_required(policy_requires: bool, totp: bool, webauthn: bool) -> bool {
+    policy_requires || totp || webauthn
+}
+
+/// Enrollment lookup errors must refuse login, not skip MFA.
+pub fn passwordless_enrollment<E: std::fmt::Display>(
+    result: Result<bool, E>,
+) -> Result<bool, ApiAuthError> {
+    match result {
+        Ok(enabled) => Ok(enabled),
+        Err(e) => {
+            tracing::warn!(error = %e, "MFA enrollment check failed, refusing passwordless login");
+            Err(ApiAuthError::Internal(
+                "Failed to check MFA enrollment".to_string(),
+            ))
         }
+    }
+}
 
-        Ok(())
+/// Role lookup failures must refuse token issuance, not mint `["user"]`.
+pub fn passwordless_roles<E: std::fmt::Display>(
+    result: Result<Vec<String>, E>,
+) -> Result<Vec<String>, E> {
+    match result {
+        Ok(roles) => Ok(roles),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to fetch user roles during passwordless login");
+            Err(e)
+        }
     }
 }
 
@@ -746,5 +831,78 @@ mod tests {
             &policy,
             PasswordlessTokenType::EmailOtp
         ));
+    }
+
+    #[test]
+    fn passwordless_account_status_allows_active_unlocked() {
+        assert!(passwordless_account_status(true, false).is_ok());
+    }
+
+    #[test]
+    fn passwordless_account_status_refuses_inactive() {
+        assert!(matches!(
+            passwordless_account_status(false, false),
+            Err(ApiAuthError::AccountInactive)
+        ));
+    }
+
+    #[test]
+    fn passwordless_account_status_refuses_locked_including_permanent() {
+        assert!(matches!(
+            passwordless_account_status(true, true),
+            Err(ApiAuthError::AccountLocked)
+        ));
+        // Inactive + locked still surfaces inactive first; lockout is still a refuse.
+        assert!(passwordless_account_status(false, true).is_err());
+    }
+
+    #[test]
+    fn passwordless_mfa_required_on_policy_or_enrollment() {
+        assert!(!passwordless_mfa_required(false, false, false));
+        assert!(passwordless_mfa_required(true, false, false));
+        assert!(passwordless_mfa_required(false, true, false));
+        assert!(passwordless_mfa_required(false, false, true));
+    }
+
+    #[test]
+    fn passwordless_enrollment_does_not_fail_open() {
+        assert!(passwordless_enrollment(Ok::<bool, &str>(true)).unwrap());
+        assert!(!passwordless_enrollment(Ok::<bool, &str>(false)).unwrap());
+        let err = passwordless_enrollment(Err("db"));
+        assert!(
+            matches!(err, Err(ApiAuthError::Internal(ref msg)) if msg == "Failed to check MFA enrollment"),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn passwordless_roles_does_not_default_to_user() {
+        assert_eq!(
+            passwordless_roles(Ok::<Vec<String>, &str>(vec!["admin".into()])).unwrap(),
+            vec!["admin".to_string()]
+        );
+        assert!(passwordless_roles(Err("db")).is_err());
+    }
+
+    #[test]
+    fn passwordless_verify_does_not_query_account_lockouts() {
+        let src = include_str!("passwordless_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("account_lockouts"),
+            "lockout must use users.locked_at/locked_until"
+        );
+        assert!(
+            production.contains("check_account_allowed"),
+            "verify must fail closed on inactive/locked accounts"
+        );
+        assert!(
+            production.contains("must_challenge_mfa"),
+            "verify must check enrolled MFA, not only tenant policy"
+        );
+        assert!(
+            !production.contains("unwrap_or_else(|_| vec![\"user\""),
+            "must not fail-open role lookup to [\"user\"]"
+        );
     }
 }
