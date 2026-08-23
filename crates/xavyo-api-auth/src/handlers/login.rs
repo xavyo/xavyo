@@ -375,44 +375,31 @@ pub async fn login_handler(
         // New location alerts would go here when geo-lookup is implemented
     }
 
-    // Track device on login (F026)
-    let _is_new_device = if let Some(ref fingerprint) = device_fingerprint {
-        match device_service
-            .update_device_on_login(
-                *user_id.as_uuid(),
-                *tenant_id_val.as_uuid(),
-                fingerprint,
-                user_agent.as_deref(),
-                ip_str.as_deref(),
-                None, // geo_country - TODO: Add geo lookup
-                None, // geo_city
-            )
-            .await
-        {
-            Ok((_, is_new)) => is_new,
-            Err(ApiAuthError::DeviceRevoked) => {
-                // Don't fail login for revoked device, just don't track
-                tracing::warn!(
-                    user_id = %user_id.as_uuid(),
-                    "Login from revoked device, continuing without device tracking"
-                );
-                false
-            }
-            Err(e) => {
-                // Log but don't fail login if device tracking fails
-                tracing::warn!("Failed to track device on login: {}", e);
-                false
-            }
-        }
+    // Track device on login (F026). A revoked device must not continue login.
+    // Other tracking errors treat the device as new so risk is not skipped.
+    let tracked_new_device = if let Some(ref fingerprint) = device_fingerprint {
+        login_device_tracking(
+            device_service
+                .update_device_on_login(
+                    *user_id.as_uuid(),
+                    *tenant_id_val.as_uuid(),
+                    fingerprint,
+                    user_agent.as_deref(),
+                    ip_str.as_deref(),
+                    None, // geo_country - TODO: Add geo lookup
+                    None, // geo_city
+                )
+                .await,
+        )?
     } else {
         false
     };
 
     // Risk enforcement evaluation (F073)
-    let is_new_device_for_risk = audit_result
-        .as_ref()
-        .map(|r| r.is_new_device)
-        .unwrap_or(false);
+    let is_new_device_for_risk = login_new_device_for_risk(
+        audit_result.as_ref().ok().map(|r| r.is_new_device),
+        tracked_new_device,
+    );
     let risk_context = LoginRiskContext {
         ip_address: ip_str.clone(),
         user_agent: user_agent.clone(),
@@ -624,6 +611,29 @@ pub fn webauthn_enrollment(result: Result<bool, ApiAuthError>) -> Result<bool, A
     }
 }
 
+/// Device tracking on login. Revoked devices must refuse login. Other errors
+/// treat the device as new so new-device risk is not skipped.
+pub fn login_device_tracking(
+    result: Result<(uuid::Uuid, bool), ApiAuthError>,
+) -> Result<bool, ApiAuthError> {
+    match result {
+        Ok((_, is_new)) => Ok(is_new),
+        Err(ApiAuthError::DeviceRevoked) => {
+            tracing::warn!("Login from revoked device, refusing login");
+            Err(ApiAuthError::DeviceRevoked)
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Device tracking failed, treating as new device");
+            Ok(true)
+        }
+    }
+}
+
+/// New-device flag for risk. Missing audit data must not skip new-device risk.
+pub fn login_new_device_for_risk(audit_is_new: Option<bool>, tracked_new: bool) -> bool {
+    audit_is_new.unwrap_or(true) || tracked_new
+}
+
 /// User lookup for lockout recording. Database errors must not be treated as
 /// "unknown email", which skips incrementing the lockout counter.
 pub fn user_for_lockout_record<T, E: std::fmt::Display>(
@@ -737,6 +747,43 @@ mod tests {
         assert!(
             !production.contains("if let Ok(Some(user)) = auth_service"),
             "must not treat user-lookup errors as unknown email"
+        );
+    }
+
+    #[test]
+    fn login_device_tracking_refuses_revoked_device() {
+        assert!(login_device_tracking(Ok((uuid::Uuid::new_v4(), true))).unwrap());
+        assert!(!login_device_tracking(Ok((uuid::Uuid::new_v4(), false))).unwrap());
+        assert!(matches!(
+            login_device_tracking(Err(ApiAuthError::DeviceRevoked)),
+            Err(ApiAuthError::DeviceRevoked)
+        ));
+        assert!(login_device_tracking(Err(ApiAuthError::Internal("db".into()))).unwrap());
+    }
+
+    #[test]
+    fn login_new_device_for_risk_does_not_skip_on_missing_audit() {
+        assert!(login_new_device_for_risk(None, false));
+        assert!(login_new_device_for_risk(Some(true), false));
+        assert!(!login_new_device_for_risk(Some(false), false));
+        assert!(login_new_device_for_risk(Some(false), true));
+    }
+
+    #[test]
+    fn login_handler_does_not_skip_revoked_device_or_new_device_risk() {
+        let src = include_str!("login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("login_device_tracking("),
+            "revoked devices must refuse login"
+        );
+        assert!(
+            !production.contains("continuing without device tracking"),
+            "must not continue login from a revoked device"
+        );
+        assert!(
+            production.contains("login_new_device_for_risk("),
+            "missing audit data must not skip new-device risk"
         );
     }
 }

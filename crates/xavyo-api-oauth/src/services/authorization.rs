@@ -297,30 +297,25 @@ impl AuthorizationService {
             // we always deny the redemption.
             let sentinel_jti = format!("revoke-all:{}:{}", record.user_id, Utc::now().timestamp());
             let sentinel_expires = Utc::now() + chrono::Duration::hours(1);
-            if let Err(e) = sqlx::query(
-                r"
-                INSERT INTO revoked_tokens (jti, user_id, tenant_id, reason, expires_at)
-                VALUES ($1, $2, $3, $4, $5)
-                ON CONFLICT (jti) DO NOTHING
-                ",
-            )
-            .bind(&sentinel_jti)
-            .bind(record.user_id)
-            .bind(tenant_id)
-            .bind("oauth authorization-code reuse detected")
-            .bind(sentinel_expires)
-            .execute(&mut *tx)
-            .await
-            {
-                tracing::error!(
-                    target: "security",
-                    event_type = "oauth_code_reuse_sentinel_insert_failed",
-                    error = %e,
-                    "Failed to insert revoke-all sentinel after code-reuse detection"
-                );
-            }
+            code_reuse_sentinel_write(
+                sqlx::query(
+                    r"
+                    INSERT INTO revoked_tokens (jti, user_id, tenant_id, reason, expires_at)
+                    VALUES ($1, $2, $3, $4, $5)
+                    ON CONFLICT (jti) DO NOTHING
+                    ",
+                )
+                .bind(&sentinel_jti)
+                .bind(record.user_id)
+                .bind(tenant_id)
+                .bind("oauth authorization-code reuse detected")
+                .bind(sentinel_expires)
+                .execute(&mut *tx)
+                .await
+                .map(|_| ()),
+            )?;
             // Commit the sentinel even though we return an error.
-            let _ = tx.commit().await;
+            code_reuse_sentinel_write(tx.commit().await.map(|_| ()))?;
 
             return Err(OAuthError::InvalidGrant(
                 "Authorization code has already been used".to_string(),
@@ -388,6 +383,24 @@ impl AuthorizationService {
     }
 }
 
+/// Token-family revoke after authorization-code reuse must not be swallowed.
+/// Insert/commit errors used to leave issued tokens valid.
+pub(crate) fn code_reuse_sentinel_write<E: std::fmt::Display>(
+    result: Result<(), E>,
+) -> Result<(), OAuthError> {
+    result.map_err(|e| {
+        tracing::error!(
+            target: "security",
+            event_type = "oauth_code_reuse_sentinel_write_failed",
+            error = %e,
+            "Failed to persist revoke-all sentinel after authorization-code reuse"
+        );
+        OAuthError::Internal(
+            "Failed to revoke token family after authorization-code reuse".to_string(),
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -431,6 +444,26 @@ mod tests {
         let code1 = AuthorizationService::generate_code();
         let code2 = AuthorizationService::generate_code();
         assert_ne!(code1, code2);
+    }
+
+    #[test]
+    fn code_reuse_sentinel_write_does_not_skip_on_error() {
+        assert!(code_reuse_sentinel_write(Ok::<(), &str>(())).is_ok());
+        assert!(code_reuse_sentinel_write(Err::<(), _>("db down")).is_err());
+    }
+
+    #[test]
+    fn code_reuse_does_not_swallow_sentinel_persist() {
+        let src = include_str!("authorization.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("code_reuse_sentinel_write("),
+            "code-reuse revoke must fail closed"
+        );
+        assert!(
+            !production.contains("let _ = tx.commit()"),
+            "must not swallow sentinel commit after code reuse"
+        );
     }
 
     #[test]
