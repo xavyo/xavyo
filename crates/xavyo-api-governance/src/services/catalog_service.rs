@@ -946,7 +946,7 @@ impl CatalogService {
         // Get cart
         let cart = RequestCart::find_by_pair(&self.pool, tenant_id, requester_id, beneficiary_id)
             .await?
-            .ok_or(GovernanceError::RequestCartNotFound(Uuid::nil()))?;
+            .ok_or(GovernanceError::RequestCartNotFound(requester_id))?;
 
         // Verify cart item exists and belongs to this cart
         let item = RequestCartItem::find_by_id(&self.pool, tenant_id, cart_item_id)
@@ -974,7 +974,7 @@ impl CatalogService {
         // Get cart
         let cart = RequestCart::find_by_pair(&self.pool, tenant_id, requester_id, beneficiary_id)
             .await?
-            .ok_or(GovernanceError::RequestCartNotFound(Uuid::nil()))?;
+            .ok_or(GovernanceError::RequestCartNotFound(requester_id))?;
 
         // Verify cart item exists and belongs to this cart
         let existing = RequestCartItem::find_by_id(&self.pool, tenant_id, cart_item_id)
@@ -1005,7 +1005,7 @@ impl CatalogService {
     ) -> Result<()> {
         let cart = RequestCart::find_by_pair(&self.pool, tenant_id, requester_id, beneficiary_id)
             .await?
-            .ok_or(GovernanceError::RequestCartNotFound(Uuid::nil()))?;
+            .ok_or(GovernanceError::RequestCartNotFound(requester_id))?;
 
         RequestCart::clear_items(&self.pool, tenant_id, cart.id).await?;
         Ok(())
@@ -1030,7 +1030,7 @@ impl CatalogService {
     ) -> Result<CartValidationResult> {
         let cart = RequestCart::find_by_pair(&self.pool, tenant_id, requester_id, beneficiary_id)
             .await?
-            .ok_or(GovernanceError::RequestCartNotFound(Uuid::nil()))?;
+            .ok_or(GovernanceError::RequestCartNotFound(requester_id))?;
 
         let items =
             RequestCartItem::list_by_cart_with_details(&self.pool, tenant_id, cart.id).await?;
@@ -1143,7 +1143,7 @@ impl CatalogService {
 
         let cart = RequestCart::find_by_pair(&self.pool, tenant_id, requester_id, beneficiary_id)
             .await?
-            .ok_or(GovernanceError::RequestCartNotFound(Uuid::nil()))?;
+            .ok_or(GovernanceError::RequestCartNotFound(requester_id))?;
 
         let items =
             RequestCartItem::list_by_cart_with_details(&self.pool, tenant_id, cart.id).await?;
@@ -1429,6 +1429,20 @@ mod tests {
         assert_eq!(ctx.requester_id, user_id);
         assert_eq!(ctx.beneficiary_id, user_id);
         assert!(!ctx.is_manager_request);
+    }
+
+    #[test]
+    fn cart_not_found_does_not_use_nil_uuid() {
+        let src = include_str!("catalog_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("RequestCartNotFound(Uuid::nil())"),
+            "missing carts must be reported with the requester id, not a nil UUID"
+        );
+        assert!(
+            production.contains("RequestCartNotFound(requester_id)"),
+            "cart lookup errors must identify the requester"
+        );
     }
 
     #[test]

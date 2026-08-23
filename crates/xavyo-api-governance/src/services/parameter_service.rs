@@ -79,7 +79,7 @@ impl ParameterService {
     ) -> Result<GovRoleParameter, GovernanceError> {
         GovRoleParameter::find_by_name(&self.pool, tenant_id, role_id, name)
             .await?
-            .ok_or_else(|| GovernanceError::RoleParameterNotFound(Uuid::nil()))
+            .ok_or(GovernanceError::RoleParameterNotFound(role_id))
     }
 
     /// List all parameters for a role.
@@ -418,14 +418,23 @@ impl ParameterService {
 
         // Get all assignments for this role
         // Note: This would need to be paginated for large datasets
-        let assignments = GovEntitlementAssignment::list_parametric_by_user_and_role(
-            &self.pool,
-            tenant_id,
-            Uuid::nil(),
-            role_id,
+        let assignments: Vec<GovEntitlementAssignment> = sqlx::query_as(
+            r"
+            SELECT ea.*
+            FROM gov_entitlement_assignments ea
+            INNER JOIN gov_role_entitlements re
+                ON re.entitlement_id = ea.entitlement_id
+               AND re.tenant_id = ea.tenant_id
+            WHERE ea.tenant_id = $1
+              AND re.role_id = $2
+              AND ea.parameter_hash IS NOT NULL
+            ",
         )
+        .bind(tenant_id)
+        .bind(role_id)
+        .fetch_all(&self.pool)
         .await
-        .unwrap_or_default();
+        .map_err(GovernanceError::Database)?;
 
         let mut flagged = Vec::new();
 
@@ -696,7 +705,7 @@ impl ParameterService {
             parameter_hash,
         )
         .await?
-        .ok_or(GovernanceError::AssignmentNotFound(Uuid::nil()))?;
+        .ok_or(GovernanceError::AssignmentNotFound(user_id))?;
 
         // Use the standard revocation method
         self.revoke_parametric_assignment(tenant_id, assignment.id, actor_id, reason)
@@ -744,5 +753,32 @@ mod tests {
         assert!(!ParameterService::is_valid_parameter_name("has-dash"));
         assert!(!ParameterService::is_valid_parameter_name("has space"));
         assert!(!ParameterService::is_valid_parameter_name("has.dot"));
+    }
+
+    #[test]
+    fn parametric_lookups_do_not_use_nil_uuid() {
+        let src = include_str!("parameter_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("Uuid::nil()"),
+            "parametric lookups must not use a nil UUID as user or not-found id"
+        );
+        assert!(
+            production.contains("re.tenant_id = ea.tenant_id"),
+            "schema-violation scan must join role entitlements on tenant"
+        );
+        let flag = production
+            .split("pub async fn flag_schema_violations")
+            .nth(1)
+            .and_then(|s| s.split("pub async fn ").next())
+            .expect("flag_schema_violations");
+        assert!(
+            !flag.contains("Uuid::nil()"),
+            "schema-violation scan must not query assignments as the nil user"
+        );
+        assert!(
+            flag.contains("map_err(GovernanceError::Database)"),
+            "schema-violation scan must not treat query errors as no assignments"
+        );
     }
 }

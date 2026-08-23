@@ -1069,7 +1069,7 @@ impl MicroCertificationService {
                 Some(entitlement.application_id),
             )
             .await?
-            .ok_or_else(|| GovernanceError::MicroCertTriggerNotFound(Uuid::nil()))?
+            .ok_or(GovernanceError::MicroCertTriggerNotFound(entitlement_id))?
         };
 
         // Find an active assignment for this user and entitlement
@@ -1688,6 +1688,20 @@ mod tests {
 
         assert_eq!(result.succeeded.len(), 2);
         assert_eq!(result.failed.len(), 1);
+    }
+
+    #[test]
+    fn missing_trigger_does_not_use_nil_uuid() {
+        let src = include_str!("micro_certification_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            !production.contains("MicroCertTriggerNotFound(Uuid::nil())"),
+            "missing triggers must not be reported with a nil UUID"
+        );
+        assert!(
+            production.contains("MicroCertTriggerNotFound(entitlement_id)"),
+            "missing trigger errors must identify the entitlement"
+        );
     }
 
     fn create_test_certification() -> GovMicroCertification {
