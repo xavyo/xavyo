@@ -115,6 +115,7 @@ impl MfaAuditLog {
     /// Find audit logs for a user with pagination.
     pub async fn find_by_user<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
         limit: i64,
         offset: i64,
@@ -125,11 +126,12 @@ impl MfaAuditLog {
         sqlx::query_as(
             r"
             SELECT * FROM mfa_audit_log
-            WHERE user_id = $1
+            WHERE tenant_id = $1 AND user_id = $2
             ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3
+            LIMIT $3 OFFSET $4
             ",
         )
+        .bind(tenant_id)
         .bind(user_id)
         .bind(limit)
         .bind(offset)
@@ -183,6 +185,7 @@ impl MfaAuditLog {
     /// Count recent failed verification attempts for a user.
     pub async fn count_recent_failures<'e, E>(
         executor: E,
+        tenant_id: Uuid,
         user_id: Uuid,
         minutes: i64,
     ) -> Result<i64, sqlx::Error>
@@ -192,11 +195,12 @@ impl MfaAuditLog {
         let result: (i64,) = sqlx::query_as(
             r"
             SELECT COUNT(*) FROM mfa_audit_log
-            WHERE user_id = $1
+            WHERE tenant_id = $1 AND user_id = $2
               AND action = 'verify_failed'
-              AND created_at > NOW() - ($2 || ' minutes')::INTERVAL
+              AND created_at > NOW() - ($3 || ' minutes')::INTERVAL
             ",
         )
+        .bind(tenant_id)
         .bind(user_id)
         .bind(minutes.to_string())
         .fetch_one(executor)
@@ -232,5 +236,19 @@ mod tests {
             created_at: Utc::now(),
         };
         assert_eq!(log.action, "verify_success");
+    }
+
+    #[test]
+    fn mfa_audit_queries_filter_by_tenant_id() {
+        let src = include_str!("mfa_audit_log.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("WHERE tenant_id = $1 AND user_id = $2"),
+            "user-scoped MFA audit queries must filter tenant_id"
+        );
+        assert!(
+            !production.contains("WHERE user_id = $1\n"),
+            "must not query MFA audit by user_id alone"
+        );
     }
 }

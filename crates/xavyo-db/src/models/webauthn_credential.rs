@@ -260,7 +260,12 @@ impl UserWebAuthnCredential {
 
     /// Find all credentials for a user.
     ///
-    /// SECURITY: Caller must validate that `user_id` belongs to the current tenant.
+    /// **SECURITY WARNING**: This method does NOT filter by `tenant_id`.
+    /// Use `find_by_user_id_and_tenant()` for tenant-isolated queries.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use find_by_user_id_and_tenant() for tenant-isolated queries"
+    )]
     pub async fn find_by_user_id<'e, E>(
         executor: E,
         user_id: Uuid,
@@ -298,7 +303,12 @@ impl UserWebAuthnCredential {
 
     /// Count credentials for a user.
     ///
-    /// SECURITY: Caller must validate that `user_id` belongs to the current tenant.
+    /// **SECURITY WARNING**: This method does NOT filter by `tenant_id`.
+    /// Use `count_by_user_id_and_tenant()` for tenant-isolated queries.
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use count_by_user_id_and_tenant() for tenant-isolated queries"
+    )]
     pub async fn count_by_user_id<'e, E>(executor: E, user_id: Uuid) -> Result<i64, sqlx::Error>
     where
         E: PgExecutor<'e>,
@@ -528,6 +538,28 @@ mod tests {
         assert!(
             !lookup.contains("WHERE user_id = $1 AND is_enabled"),
             "must not look up credentials by user_id alone"
+        );
+    }
+
+    #[test]
+    fn tenant_scoped_user_lookups_filter_tenant_id() {
+        let src = include_str!("webauthn_credential.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        let find = production
+            .split("pub async fn find_by_user_id_and_tenant")
+            .nth(1)
+            .expect("find_by_user_id_and_tenant");
+        assert!(
+            find.contains("user_id = $1 AND tenant_id = $2"),
+            "find_by_user_id_and_tenant must filter tenant_id"
+        );
+        let count = production
+            .split("pub async fn count_by_user_id_and_tenant")
+            .nth(1)
+            .expect("count_by_user_id_and_tenant");
+        assert!(
+            count.contains("user_id = $1 AND tenant_id = $2"),
+            "count_by_user_id_and_tenant must filter tenant_id"
         );
     }
 }

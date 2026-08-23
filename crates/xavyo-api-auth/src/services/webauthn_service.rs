@@ -112,18 +112,20 @@ impl WebAuthnService {
         }
 
         // Check max credentials limit
-        let credential_count = UserWebAuthnCredential::count_by_user_id(&mut *tx, user_id)
-            .await
-            .map_err(ApiAuthError::Database)?;
+        let credential_count =
+            UserWebAuthnCredential::count_by_user_id_and_tenant(&mut *tx, tenant_id, user_id)
+                .await
+                .map_err(ApiAuthError::Database)?;
 
         if credential_count >= i64::from(policy.max_credentials_per_user) {
             return Err(ApiAuthError::MaxWebAuthnCredentials);
         }
 
         // Get existing credentials to exclude (prevent re-registration)
-        let existing_creds = UserWebAuthnCredential::find_by_user_id(&mut *tx, user_id)
-            .await
-            .map_err(ApiAuthError::Database)?;
+        let existing_creds =
+            UserWebAuthnCredential::find_by_user_id_and_tenant(&mut *tx, tenant_id, user_id)
+                .await
+                .map_err(ApiAuthError::Database)?;
 
         let exclude_credentials: Vec<CredentialID> = existing_creds
             .iter()
@@ -382,7 +384,7 @@ impl WebAuthnService {
 
         // Check rate limiting
         let recent_failures =
-            WebAuthnAuditLog::count_recent_failures(&mut *tx, user_id, LOCKOUT_MINUTES)
+            WebAuthnAuditLog::count_recent_failures(&mut *tx, tenant_id, user_id, LOCKOUT_MINUTES)
                 .await
                 .map_err(ApiAuthError::Database)?;
 
@@ -391,9 +393,10 @@ impl WebAuthnService {
         }
 
         // Get user's credentials
-        let credentials = UserWebAuthnCredential::find_by_user_id(&mut *tx, user_id)
-            .await
-            .map_err(ApiAuthError::Database)?;
+        let credentials =
+            UserWebAuthnCredential::find_by_user_id_and_tenant(&mut *tx, tenant_id, user_id)
+                .await
+                .map_err(ApiAuthError::Database)?;
 
         if credentials.is_empty() {
             return Err(ApiAuthError::WebAuthnNoCredentials);
@@ -617,9 +620,10 @@ impl WebAuthnService {
             .await
             .map_err(ApiAuthError::DatabaseInternal)?;
 
-        let credentials = UserWebAuthnCredential::find_by_user_id(&mut *conn, user_id)
-            .await
-            .map_err(ApiAuthError::Database)?;
+        let credentials =
+            UserWebAuthnCredential::find_by_user_id_and_tenant(&mut *conn, tenant_id, user_id)
+                .await
+                .map_err(ApiAuthError::Database)?;
 
         Ok(credentials.into_iter().map(Into::into).collect())
     }
@@ -781,9 +785,13 @@ impl WebAuthnService {
             "Admin listing WebAuthn credentials for user"
         );
 
-        let credentials = UserWebAuthnCredential::find_by_user_id(&mut *conn, target_user_id)
-            .await
-            .map_err(ApiAuthError::Database)?;
+        let credentials = UserWebAuthnCredential::find_by_user_id_and_tenant(
+            &mut *conn,
+            tenant_id,
+            target_user_id,
+        )
+        .await
+        .map_err(ApiAuthError::Database)?;
 
         Ok(credentials.into_iter().map(Into::into).collect())
     }
@@ -903,6 +911,47 @@ mod tests {
         assert!(
             lookup.contains("has_enabled_credentials(&mut *conn, tenant_id, user_id)"),
             "WebAuthn MFA check must pass tenant_id"
+        );
+    }
+
+    #[test]
+    fn credential_and_lockout_lookups_pass_tenant_id() {
+        let src = include_str!("webauthn_service.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("count_by_user_id_and_tenant(&mut *tx, tenant_id, user_id)"),
+            "registration must count credentials by tenant"
+        );
+        assert!(
+            production.contains("find_by_user_id_and_tenant(&mut *tx, tenant_id, user_id)"),
+            "registration and authentication must list credentials by tenant"
+        );
+        assert!(
+            production.contains("find_by_user_id_and_tenant(&mut *conn, tenant_id, user_id)"),
+            "list_credentials must pass tenant_id"
+        );
+        assert!(
+            production.contains(
+                "find_by_user_id_and_tenant(\n            &mut *conn,\n            tenant_id,\n            target_user_id,"
+            ),
+            "admin list must pass tenant_id"
+        );
+        assert!(
+            !production.contains("count_by_user_id(&mut"),
+            "must not count credentials by user_id alone"
+        );
+        assert!(
+            !production.contains("find_by_user_id(&mut"),
+            "must not list credentials by user_id alone"
+        );
+        assert!(
+            production
+                .contains("count_recent_failures(&mut *tx, tenant_id, user_id, LOCKOUT_MINUTES)"),
+            "WebAuthn lockout count must include tenant_id"
+        );
+        assert!(
+            !production.contains("count_recent_failures(&mut *tx, user_id,"),
+            "must not count WebAuthn failures by user_id alone"
         );
     }
 }
