@@ -128,12 +128,10 @@ async fn try_revoke_access_token(state: &OAuthState, tenant_id: Uuid, token: &st
         Err(_) => return false, // Not a valid JWT signed by us
     };
 
-    // Verify the token belongs to the requesting client's tenant
-    if let Some(token_tid) = claims.tid {
-        if token_tid != tenant_id {
-            // Token belongs to a different tenant — treat as unknown per RFC 7009
-            return false;
-        }
+    // Verify the token belongs to the requesting client's tenant.
+    // Missing tid is unknown — do not revoke into another tenant.
+    if !super::client_auth::token_tid_matches_tenant(claims.tid, tenant_id) {
+        return false;
     }
 
     let jti = &claims.jti;
@@ -379,5 +377,19 @@ mod tests {
         let headers = HeaderMap::new();
         let result = extract_tenant_from_header(&headers);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn revocation_does_not_skip_missing_tid() {
+        let src = include_str!("revocation.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("token_tid_matches_tenant("),
+            "revocation must reject tokens missing tid"
+        );
+        assert!(
+            !production.contains("if let Some(token_tid) = claims.tid"),
+            "must not skip tenant match when tid is absent"
+        );
     }
 }

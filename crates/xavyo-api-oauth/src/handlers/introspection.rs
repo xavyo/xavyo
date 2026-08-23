@@ -134,14 +134,10 @@ async fn try_introspect_access_token(
         Err(_) => return None, // Not a valid/unexpired JWT signed by us
     };
 
-    // Verify the token belongs to the requesting client's tenant (RFC 7662 §2.1:
-    // "the authorization server MUST be able to determine whether the token was
-    // issued to the client making the introspection call")
-    if let Some(token_tid) = claims.tid {
-        if token_tid != tenant_id {
-            // Token belongs to a different tenant — treat as unknown
-            return Some(IntrospectionResponse::inactive());
-        }
+    // Verify the token belongs to the requesting client's tenant (RFC 7662 §2.1).
+    // Missing tid is unknown — not a match for this client.
+    if !super::client_auth::token_tid_matches_tenant(claims.tid, tenant_id) {
+        return Some(IntrospectionResponse::inactive());
     }
 
     // Check JTI blacklist
@@ -308,6 +304,14 @@ mod tests {
         assert!(
             !production.contains("unwrap_or(false)"),
             "must not treat sentinel query errors as not-revoked"
+        );
+        assert!(
+            production.contains("token_tid_matches_tenant("),
+            "introspection must reject tokens missing tid"
+        );
+        assert!(
+            !production.contains("if let Some(token_tid) = claims.tid"),
+            "must not skip tenant match when tid is absent"
         );
     }
 }
