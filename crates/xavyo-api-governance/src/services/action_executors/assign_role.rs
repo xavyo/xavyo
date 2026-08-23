@@ -56,31 +56,16 @@ impl AssignRoleExecutor {
         Ok(count.0 > 0)
     }
 
-    /// Revoke all sessions for a user (force re-authentication after role change).
+    /// Revoke sessions and refresh tokens (force re-authentication after role change).
     async fn revoke_user_sessions(
         pool: &PgPool,
         tenant_id: Uuid,
         user_id: Uuid,
     ) -> Result<u64, sqlx::Error> {
-        let result = sqlx::query(
-            "UPDATE sessions SET revoked_at = NOW(), revoked_reason = 'security' \
-             WHERE user_id = $1 AND tenant_id = $2 AND revoked_at IS NULL AND expires_at > NOW()",
+        crate::services::revoke_auth::revoke_user_sessions_and_refresh_tokens(
+            pool, tenant_id, user_id,
         )
-        .bind(user_id)
-        .bind(tenant_id)
-        .execute(pool)
-        .await?;
-
-        let count = result.rows_affected();
-        if count > 0 {
-            tracing::info!(
-                user_id = %user_id,
-                tenant_id = %tenant_id,
-                revoked_count = count,
-                "Revoked sessions after role assignment"
-            );
-        }
-        Ok(count)
+        .await
     }
 
     /// Assign the role to the user.
@@ -240,6 +225,10 @@ mod tests {
         assert!(
             !production.contains("tracing::warn!"),
             "must not log-and-ignore session revoke errors"
+        );
+        assert!(
+            production.contains("revoke_user_sessions_and_refresh_tokens("),
+            "role assignment must revoke refresh tokens, not only sessions"
         );
     }
 
