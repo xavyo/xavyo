@@ -10,6 +10,7 @@ use axum::{
 };
 use sqlx;
 use uuid::Uuid;
+use xavyo_api_auth::middleware::sentinel_query_revoked;
 use xavyo_auth::decode_token;
 
 /// Returns user claims based on the scopes in the access token.
@@ -106,13 +107,16 @@ pub async fn userinfo_handler(
     // R8-F5: Skip sentinel check if tid is None — token will be rejected at line 118 anyway.
     // Using unwrap_or_default() would query with nil UUID, which is always a no-op.
     if let (false, Some(tenant_id_for_sentinel)) = (claims.jti.is_empty(), claims.tid) {
-        let sentinel_revoked: bool = if let Ok(mut conn) = state.pool.acquire().await {
-            let _ = sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
-                .bind(tenant_id_for_sentinel.to_string())
-                .execute(&mut *conn)
-                .await;
-            sqlx::query_scalar(
-                r"
+        let sentinel_revoked: bool = match state.pool.acquire().await {
+            Ok(mut conn) => {
+                match sqlx::query("SELECT set_config('app.current_tenant', $1::text, true)")
+                    .bind(tenant_id_for_sentinel.to_string())
+                    .execute(&mut *conn)
+                    .await
+                {
+                    Ok(_) => sentinel_query_revoked(
+                        sqlx::query_scalar(
+                            r"
                 SELECT EXISTS(
                     SELECT 1 FROM revoked_tokens
                     WHERE jti LIKE 'revoke-all:' || $1 || ':%'
@@ -120,16 +124,17 @@ pub async fn userinfo_handler(
                       AND created_at > to_timestamp($2)
                 )
                 ",
-            )
-            .bind(&claims.sub)
-            .bind(claims.iat as f64)
-            .bind(tenant_id_for_sentinel)
-            .fetch_one(&mut *conn)
-            .await
-            .unwrap_or(false)
-        } else {
-            // Fail-closed: treat connection errors as revoked
-            true
+                        )
+                        .bind(&claims.sub)
+                        .bind(claims.iat as f64)
+                        .bind(tenant_id_for_sentinel)
+                        .fetch_one(&mut *conn)
+                        .await,
+                    ),
+                    Err(e) => sentinel_query_revoked(Err(e)),
+                }
+            }
+            Err(e) => sentinel_query_revoked(Err(e)),
         };
 
         if sentinel_revoked {
@@ -242,5 +247,19 @@ mod tests {
         let result = extract_bearer_token(&headers);
         // SECURITY: Empty bearer tokens must be rejected
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn userinfo_does_not_fail_open_sentinel_query() {
+        let src = include_str!("userinfo.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("sentinel_query_revoked("),
+            "userinfo sentinel lookups must fail closed"
+        );
+        assert!(
+            !production.contains("unwrap_or(false)"),
+            "must not treat sentinel query errors as not-revoked"
+        );
     }
 }

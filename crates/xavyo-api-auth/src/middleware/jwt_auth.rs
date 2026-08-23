@@ -360,14 +360,16 @@ pub async fn jwt_auth_middleware(
                 if let Some(pool) = sentinel_pool {
                     let sentinel_revoked: bool = match pool.acquire().await {
                         Ok(mut conn) => {
-                            let _ = sqlx::query(
+                            match sqlx::query(
                                 "SELECT set_config('app.current_tenant', $1::text, true)",
                             )
                             .bind(tid.to_string())
                             .execute(&mut *conn)
-                            .await;
-                            sqlx::query_scalar(
-                                r"
+                            .await
+                            {
+                                Ok(_) => sentinel_query_revoked(
+                                    sqlx::query_scalar(
+                                        r"
                             SELECT EXISTS(
                                 SELECT 1 FROM revoked_tokens
                                 WHERE jti LIKE 'revoke-all:' || $1 || ':%'
@@ -375,19 +377,17 @@ pub async fn jwt_auth_middleware(
                                   AND created_at > to_timestamp($2)
                             )
                             ",
-                            )
-                            .bind(&claims.sub)
-                            .bind(claims.iat as f64)
-                            .bind(tid)
-                            .fetch_one(&mut *conn)
-                            .await
-                            .unwrap_or(false)
+                                    )
+                                    .bind(&claims.sub)
+                                    .bind(claims.iat as f64)
+                                    .bind(tid)
+                                    .fetch_one(&mut *conn)
+                                    .await,
+                                ),
+                                Err(e) => sentinel_query_revoked(Err(e)),
+                            }
                         }
-                        Err(e) => {
-                            // Fail-closed: treat connection errors as revoked
-                            tracing::error!(error = %e, "Sentinel check connection failed (fail-closed)");
-                            true
-                        }
+                        Err(e) => sentinel_query_revoked(Err(e)),
                     };
                     if sentinel_revoked {
                         tracing::warn!(jti = %claims.jti, sub = %claims.sub, "Rejected token via revoke-all sentinel");
@@ -399,9 +399,9 @@ pub async fn jwt_auth_middleware(
                 // SECURITY: If PgPool is absent, sentinel check cannot run. The individual
                 // JTI check above (lines 136-189) already provides fail-closed behavior,
                 // so cascade revocations are the only gap. In practice, PgPool is always
-                // present when RevocationCache is configured. Do NOT change this to
-                // fail-open (e.g., unwrap_or(false)) — that would allow cascade-revoked
-                // tokens to bypass revocation for their remaining lifetime.
+                // present when RevocationCache is configured. Do not treat a missing
+                // pool as "not revoked" — that would let cascade-revoked tokens live
+                // out their remaining lifetime.
             } // end if sub_is_valid_uuid
               // C-5: For non-UUID sub (e.g. client_credentials tokens), sentinel check
               // is skipped — these tokens use client_id as sub, not user UUIDs, and
@@ -594,6 +594,20 @@ impl ServiceAccountMarker {
 #[derive(Clone, Copy, Debug)]
 pub struct AllowPartialToken;
 
+/// Fail-closed mapping for revoke-all sentinel lookups.
+///
+/// Query errors previously treated cascade-revoked tokens as still valid.
+/// Any lookup failure must be treated as revoked.
+pub fn sentinel_query_revoked<E: std::fmt::Display>(result: Result<bool, E>) -> bool {
+    match result {
+        Ok(revoked) => revoked,
+        Err(e) => {
+            tracing::error!(error = %e, "Sentinel check failed (fail-closed)");
+            true
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -636,5 +650,26 @@ mod tests {
         let tid = uuid::Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
         assert!(tenant_header_agrees(Some("22222222-2222-2222-2222-222222222222"), tid).is_err());
         assert!(tenant_header_agrees(Some("not-a-uuid"), tid).is_err());
+    }
+
+    #[test]
+    fn sentinel_query_revoked_does_not_fail_open() {
+        assert!(sentinel_query_revoked(Ok::<bool, &str>(true)));
+        assert!(!sentinel_query_revoked(Ok::<bool, &str>(false)));
+        assert!(sentinel_query_revoked(Err("db down")));
+    }
+
+    #[test]
+    fn jwt_auth_does_not_fail_open_sentinel_query() {
+        let src = include_str!("jwt_auth.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("sentinel_query_revoked("),
+            "sentinel lookups must fail closed"
+        );
+        assert!(
+            !production.contains("unwrap_or(false)"),
+            "must not treat sentinel query errors as not-revoked"
+        );
     }
 }
