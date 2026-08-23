@@ -404,29 +404,26 @@ pub async fn device_login_handler(
         .ok()
         .flatten();
 
-    // Check if account is locked (only if user exists)
+    // Check if account is locked (only if user exists). Errors must refuse
+    // login; a locked account without `locked_until` is still locked.
     if let Some(ref user) = existing_user {
-        match lockout_service
-            .check_account_locked(user.id, tenant_id)
-            .await
-        {
-            Ok(status) => {
-                if status.is_locked {
-                    if let Some(locked_until) = status.locked_until {
-                        return render_login_error_with_csrf(
-                            &request.user_code,
-                            &client_id,
-                            &scopes,
-                            &format!(
-                                "Account is locked. Try again after {}.",
-                                locked_until.format("%Y-%m-%d %H:%M:%S UTC")
-                            ),
-                        );
-                    }
-                }
+        match device_lockout_check(
+            lockout_service
+                .check_account_locked(user.id, tenant_id)
+                .await
+                .map(|s| (s.is_locked, s.locked_until)),
+        ) {
+            Ok(None) => {}
+            Ok(Some(msg)) => {
+                return render_login_error_with_csrf(&request.user_code, &client_id, &scopes, &msg);
             }
-            Err(e) => {
-                warn!(error = %e, "Failed to check lockout status");
+            Err(_) => {
+                return render_login_error_with_csrf(
+                    &request.user_code,
+                    &client_id,
+                    &scopes,
+                    "An error occurred. Please try again.",
+                );
             }
         }
     }
@@ -1171,6 +1168,39 @@ pub fn device_totp_required<E: std::fmt::Display>(enrollment: Result<bool, E>) -
     }
 }
 
+/// Message shown when device login is refused because the account is locked.
+///
+/// A locked account without `locked_until` is still locked (permanent lockout).
+pub fn device_lockout_message(
+    is_locked: bool,
+    locked_until: Option<chrono::DateTime<chrono::Utc>>,
+) -> Option<String> {
+    if !is_locked {
+        return None;
+    }
+    Some(match locked_until {
+        Some(until) => format!(
+            "Account is locked. Try again after {}.",
+            until.format("%Y-%m-%d %H:%M:%S UTC")
+        ),
+        None => "Account is locked.".to_string(),
+    })
+}
+
+/// Fail-closed lockout check for device login.
+/// Lookup errors must refuse the login, not skip lockout.
+pub fn device_lockout_check<E: std::fmt::Display>(
+    result: Result<(bool, Option<chrono::DateTime<chrono::Utc>>), E>,
+) -> Result<Option<String>, E> {
+    match result {
+        Ok((is_locked, until)) => Ok(device_lockout_message(is_locked, until)),
+        Err(e) => {
+            tracing::warn!(error = %e, "Lockout check failed, refusing device login");
+            Err(e)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1276,6 +1306,39 @@ mod tests {
         assert!(
             !production.contains("unwrap_or(false)"),
             "must not fail-open MFA enrollment"
+        );
+    }
+
+    #[test]
+    fn device_lockout_message_blocks_locked_without_until() {
+        assert_eq!(device_lockout_message(false, None), None);
+        let msg = device_lockout_message(true, None).expect("locked");
+        assert!(msg.contains("locked"));
+        let until = chrono::DateTime::from_timestamp(1_700_000_000, 0);
+        let timed = device_lockout_message(true, until).expect("timed lock");
+        assert!(timed.contains("Try again after"));
+    }
+
+    #[test]
+    fn device_lockout_check_does_not_skip_on_error() {
+        assert_eq!(device_lockout_check(Ok::<_, &str>((false, None))), Ok(None));
+        assert!(device_lockout_check(Ok::<_, &str>((true, None)))
+            .unwrap()
+            .is_some());
+        assert!(device_lockout_check(Err("db down")).is_err());
+    }
+
+    #[test]
+    fn device_login_does_not_fail_open_lockout() {
+        let src = include_str!("device_login.rs");
+        let production = src.split("mod tests").next().expect("production source");
+        assert!(
+            production.contains("device_lockout_check("),
+            "lockout lookup errors must fail closed"
+        );
+        assert!(
+            !production.contains("Failed to check lockout status"),
+            "must not continue login after a lockout-check error"
         );
     }
 }
